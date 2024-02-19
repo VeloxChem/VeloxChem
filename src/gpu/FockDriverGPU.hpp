@@ -44,6 +44,8 @@ auto computeMatrixMultiplication(double* C, const double* A, const double* B, co
 
 auto diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void;
 
+auto diagonalizeMatrixMultiGPU(double* A, double* W, const int64_t nrows_A) -> void;
+
 }  // namespace gpu
 
 #endif

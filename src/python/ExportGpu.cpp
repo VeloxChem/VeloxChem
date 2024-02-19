@@ -141,7 +141,14 @@ export_gpu(py::module& m)
 
             // diagonalize matrix
 
-            gpu::diagonalizeMatrix(evecs, evals, static_cast<int64_t>(nrows_A));
+            if (dim < 8192)
+            {
+                gpu::diagonalizeMatrix(evecs, evals, static_cast<int64_t>(nrows_A));
+            }
+            else
+            {
+                gpu::diagonalizeMatrixMultiGPU(evecs, evals, static_cast<int64_t>(nrows_A));
+            }
 
             py::list result;
 

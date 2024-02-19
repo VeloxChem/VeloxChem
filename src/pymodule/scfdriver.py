@@ -1113,6 +1113,9 @@ class ScfDriver:
 
             diff_den = self._comp_density_change(den_mat, self.density)
 
+            self.ostream.print_info(f'diff_den computed: {diff_den}')
+            self.ostream.flush()
+
             e_scf = (e_el + self._nuc_energy + self._d4_energy +
                      self._ef_nuc_energy)
 
@@ -1156,18 +1159,28 @@ class ScfDriver:
             profiler.stop_timer('StoreDIIS')
             profiler.start_timer('EffFock')
 
+            eff_fock_t0 = tm.time()
+
             #eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
             if self.rank == mpi_master():
                 eff_fock_mat = acc_diis.get_effective_fock(fock_mat)
             else:
                 eff_fock_mat = None
 
+            eff_fock_t1 = tm.time()
+            self.ostream.print_info(f'Eff. Fock computed in {eff_fock_t1-eff_fock_t0:.2f} sec')
+
             profiler.stop_timer('EffFock')
 
             profiler.start_timer('FockDiag')
 
+            new_mo_t0 = tm.time()
+
             self._molecular_orbitals = self._gen_molecular_orbitals(
                 molecule, eff_fock_mat, oao_mat)
+
+            new_mo_t1 = tm.time()
+            self.ostream.print_info(f'New MO computed in {new_mo_t1-new_mo_t0:.2f} sec')
 
             profiler.stop_timer('FockDiag')
 
@@ -1177,6 +1190,8 @@ class ScfDriver:
             self._update_mol_orbs_phase()
 
             profiler.start_timer('NewDens')
+
+            new_den_t0 = tm.time()
 
             if self.rank == mpi_master():
                 den_mat = self.molecular_orbitals.get_density(molecule)
@@ -1192,10 +1207,11 @@ class ScfDriver:
             self.comm.Bcast(den_mat_np, root=mpi_master())
             den_mat = AODensityMatrix([den_mat_np], denmat.rest)
 
-            profiler.stop_timer('NewDens')
-
-            self.ostream.print_info(f'new density computed')
+            new_den_t1 = tm.time()
+            self.ostream.print_info(f'New density computed in {new_den_t1-new_den_t0:.2f} sec')
             self.ostream.flush()
+
+            profiler.stop_timer('NewDens')
 
             profiler.check_memory_usage('Iteration {:d} Fock diag.'.format(
                 self._num_iter))

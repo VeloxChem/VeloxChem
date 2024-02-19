@@ -2006,6 +2006,53 @@ diagonalizeMatrix(double* A, double* W, const int64_t nrows_A) -> void
     magmaSafe(magma_finalize());
 }
 
+auto
+diagonalizeMatrixMultiGPU(double* A, double* W, const int64_t nrows_A) -> void
+{
+    // TODO allow diagonalizeMatrix on non-master MPI rank
+
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+
+    std::string errmpirank("gpu::diagonalizeMatrix: Should only be called from MPI master rank");
+    errors::assertMsgCritical(rank == mpi::master(), errmpirank);
+
+    magmaSafe(magma_init());
+
+    magma_int_t n = static_cast<magma_int_t>(nrows_A);
+
+    // TODO adapt number of GPUs
+    magma_int_t ngpu = 8;
+
+    auto nb = magma_get_dsytrd_nb(n);
+    auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));
+    auto liwork = 3 + 5*n;
+
+    double *wA, *work;
+    magma_int_t *iwork;
+
+    hipSafe(hipHostMalloc(&wA, n * n * sizeof(double)));
+    hipSafe(hipHostMalloc(&work, lwork * sizeof(double)));
+    hipSafe(hipHostMalloc(&iwork, liwork * sizeof(magma_int_t)));
+
+    magma_int_t info;
+    magma_dsyevd_m(ngpu, MagmaVec, MagmaUpper, n, A, n, W, work, lwork, iwork, liwork, &info);
+
+    if (info != 0)
+    {
+        std::stringstream ss;
+        ss << "gpu::diagonalizeMatrixMultiGPU: (magma error) " << magma_strerror(info);
+        errors::assertMsgCritical(false, ss.str());
+    }
+
+    hipSafe(hipDeviceSynchronize());
+
+    hipSafe(hipHostFree(wA));
+    hipSafe(hipHostFree(work));
+    hipSafe(hipHostFree(iwork));
+
+    magmaSafe(magma_finalize());
+}
+
 /*
 auto
 diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
