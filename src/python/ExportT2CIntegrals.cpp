@@ -8,7 +8,6 @@
 #include "NuclearPotentialDriver.hpp"
 #include "OverlapDriver.hpp"
 #include "Point.hpp"
-#include "QuadrupoleDriver.hpp"
 
 namespace vlx_t2cintegrals {  // vlx_t2cintegrals namespace
 
@@ -69,16 +68,6 @@ export_t2cintegrals(py::module& m)
             [](const CDipoleDriver& dip_drv, const CMolecule& molecule, const CMolecularBasis& basis, const TPoint3D& point)
                 -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(dip_drv.compute(basis, molecule, point)); },
             "Computes dipole matrix for given molecule, basis and origin.");
-
-    // CQuadrupoleDriver class
-
-    PyClass<CQuadrupoleDriver>(m, "QuadrupoleDriver")
-        .def(py::init<>())
-        .def(
-            "compute",
-            [](const CQuadrupoleDriver& quad_drv, const CMolecule& molecule, const CMolecularBasis& basis, const TPoint3D& point)
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(quad_drv.compute(basis, molecule, point)); },
-            "Computes quadrupole matrix for given molecule, basis and origin.");
 
     // ...
 }
