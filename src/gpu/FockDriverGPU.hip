@@ -1950,7 +1950,8 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
 }
 
 auto
-computeMatrixMultiplication(double* C, const double* A, const double* B, const int64_t nrows_A, const int64_t ncols_A, const int64_t ncols_B) -> void
+computeMatrixMultiplication(double* C, const double* A, const double* B, const std::string& trans_A, const std::string& trans_B,
+                            const int64_t m_inp, const int64_t k_inp, const int64_t n_inp) -> void
 {
     // TODO allow computeMatrixMultiplication on non-master MPI rank
 
@@ -1959,47 +1960,42 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const i
     std::string errmpirank("gpu::computeMatrixMultiplication: Should only be called from MPI master rank");
     errors::assertMsgCritical(rank == mpi::master(), errmpirank);
 
+    // TODO: matmul on multiple GPUs
+
     hipSafe(hipSetDevice(4));
 
-    const auto nrows_B = ncols_A;
+    auto m = static_cast<int32_t>(m_inp);
+    auto k = static_cast<int32_t>(k_inp);
+    auto n = static_cast<int32_t>(n_inp);
 
     double *d_A, *d_B, *d_C;
 
-    hipSafe(hipMalloc(&d_A, nrows_A * ncols_A * sizeof(double)));
-    hipSafe(hipMalloc(&d_B, nrows_B * ncols_B * sizeof(double)));
-    hipSafe(hipMalloc(&d_C, nrows_A * ncols_B * sizeof(double)));
+    hipSafe(hipMalloc(&d_A, m * k * sizeof(double)));
+    hipSafe(hipMalloc(&d_B, k * n * sizeof(double)));
+    hipSafe(hipMalloc(&d_C, m * n * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_A, A, nrows_A * ncols_A * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_B, B, nrows_B * ncols_B * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_A, A, m * k * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_B, B, k * n * sizeof(double), hipMemcpyHostToDevice));
 
-    // TODO double check the criteria
-    if (std::max({nrows_A, ncols_A, ncols_B}) < 8192)
-    {
-        dim3 threads_per_block(TILE_DIM, TILE_DIM);
+    hipblasHandle_t handle;
+    hipblasSafe(hipblasCreate(&handle));
 
-        dim3 num_blocks((ncols_B + threads_per_block.x - 1) / threads_per_block.x, (nrows_A + threads_per_block.y - 1) / threads_per_block.y);
+    double alpha = 1.0, beta = 0.0;
 
-        hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_C, d_A, d_B,
-                static_cast<uint32_t>(nrows_A), static_cast<uint32_t>(ncols_A), static_cast<uint32_t>(ncols_B));
-    }
-    else
-    {
-        hipblasHandle_t handle;
-        hipblasSafe(hipblasCreate(&handle));
+    auto op_A = (trans_A == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
+    auto op_B = (trans_B == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
 
-        double alpha = 1.0, beta = 0.0;
+    // Note: we compute C^T = B^T * A^T since hipblas is column-major
+    // Also need to adjust lda accordingly
 
-        auto m = static_cast<int32_t>(nrows_A);
-        auto k = static_cast<int32_t>(ncols_A);
-        auto n = static_cast<int32_t>(ncols_B);
+    auto lda_A = (trans_A == std::string("N")) ? k : m;
+    auto lda_B = (trans_B == std::string("N")) ? n : k;
 
-        // compute C^T = B^T * A^T since hipblas is column-major
-        hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, m, k, &alpha, d_B, n, d_A, k, &beta, d_C, n));
+    hipblasSafe(hipblasDgemm(handle, op_B, op_A, n, m, k, &alpha, d_B, lda_B, d_A, lda_A, &beta, d_C, n));
 
-        hipblasSafe(hipblasDestroy(handle));
-    }
+    hipSafe(hipMemcpy(C, d_C, m * n * sizeof(double), hipMemcpyDeviceToHost));
 
-    hipSafe(hipMemcpy(C, d_C, nrows_A * ncols_B * sizeof(double), hipMemcpyDeviceToHost));
+    hipblasSafe(hipblasDestroy(handle));
 
     hipSafe(hipDeviceSynchronize());
 

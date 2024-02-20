@@ -44,7 +44,8 @@ auto computeDotProduct(const double* A, const double* B, const int64_t size) -> 
 
 auto computeWeightedSum(double* weighted_data, const std::vector<double>& weights, const std::vector<const double*>& pointers, const int64_t size) -> void;
 
-auto computeMatrixMultiplication(double* C, const double* A, const double* B, const int64_t nrows_A, const int64_t ncols_A, const int64_t ncols_B) -> void;
+auto computeMatrixMultiplication(double* C, const double* A, const double* B, const std::string& trans_A, const std::string& trans_B,
+                                 const int64_t m_inp, const int64_t k_inp, const int64_t n_inp) -> void;
 
 auto diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void;
 

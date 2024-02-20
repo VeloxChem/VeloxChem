@@ -135,15 +135,21 @@ export_gpu(py::module& m)
         "matmul_gpu",
         [](const py::array_t<double>& A, const py::array_t<double>& B) -> py::array_t<double> {
             std::string errshape("matmul_gpu: Mismatch in matrix shape");
+            std::string errstyle("matmul_gpu: Expecting contiguous numpy array");
 
             errors::assertMsgCritical(A.shape(1) == B.shape(0), errshape);
 
-            std::string errstyle("matmul_gpu: Expecting contiguous numpy array");
-
             auto c_style_A = py::detail::check_flags(A.ptr(), py::array::c_style);
-            auto c_style_B = py::detail::check_flags(B.ptr(), py::array::c_style);
+            auto f_style_A = py::detail::check_flags(A.ptr(), py::array::f_style);
 
-            errors::assertMsgCritical(c_style_A && c_style_B, errstyle);
+            auto c_style_B = py::detail::check_flags(B.ptr(), py::array::c_style);
+            auto f_style_B = py::detail::check_flags(B.ptr(), py::array::f_style);
+
+            errors::assertMsgCritical(c_style_A | f_style_A, errstyle);
+            errors::assertMsgCritical(c_style_B | f_style_B, errstyle);
+
+            const auto trans_A = c_style_A ? std::string("N") : std::string("T");
+            const auto trans_B = c_style_B ? std::string("N") : std::string("T");
 
             const auto nrows_A = static_cast<int64_t>(A.shape(0));
             const auto ncols_A = static_cast<int64_t>(A.shape(1));
@@ -151,7 +157,7 @@ export_gpu(py::module& m)
 
             std::vector<double> C(nrows_A * ncols_B);
 
-            gpu::computeMatrixMultiplication(C.data(), A.data(), B.data(), nrows_A, ncols_A, ncols_B);
+            gpu::computeMatrixMultiplication(C.data(), A.data(), B.data(), trans_A, trans_B, nrows_A, ncols_A, ncols_B);
 
             return vlx_general::pointer_to_numpy(C.data(), {nrows_A, ncols_B});
         },
