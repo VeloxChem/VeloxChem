@@ -926,8 +926,7 @@ class SadGuessDriver:
                         csad_b[aoinds_2[j], aoinds_1[i]] = c2_j_sqrt_b_occ[i]
 
         if density_type.lower() == 'restricted':
-            # TODO: allow transpose in matmul_gpu
-            return matmul_gpu(csad, csad.T.copy())
+            return matmul_gpu(csad, csad.T)
 
         elif density_type.lower() == 'unrestricted':
             return (

@@ -117,11 +117,10 @@ class CTwoDiis:
 
             fds = matmul_gpu(fmat, matmul_gpu(dmat, smat))
 
+            # TODO: use hipblas
             fds = fds - fds.T
 
-            # TODO: allow transpose in matmul_gpu
-            self.error_vectors.append(
-                matmul_gpu(tmat.T.copy(), matmul_gpu(fds, tmat)))
+            self.error_vectors.append(matmul_gpu(tmat.T, matmul_gpu(fds, tmat)))
 
     def compute_error_vectors_restricted_openshell(self, fock_matrices,
                                                    fock_matrices_beta,

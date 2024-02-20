@@ -276,10 +276,10 @@ class MolecularOrbitals:
 
             occ = self.occa_to_numpy()
 
+            # TODO: use hipblas
             occ_mo = occ * mo
 
-            # TODO: allow transpose in matmul_gpu
-            dens = matmul_gpu(occ_mo.copy(), occ_mo.T.copy())
+            dens = matmul_gpu(occ_mo, occ_mo.T)
 
             return AODensityMatrix([dens], denmat.rest)
 

@@ -90,9 +90,11 @@ class ScfRestrictedDriver(ScfDriver):
 
         if self.rank == mpi_master():
             fds = matmul_gpu(fock_mat, matmul_gpu(den_mat.alpha_to_numpy(0), ovl_mat))
+
+            # TODO: use hipblas
             fds = fds - fds.T
-            # TODO: allow transpose in matmul_gpu
-            e_mat = matmul_gpu(oao_mat.T.copy(), matmul_gpu(fds, oao_mat))
+
+            e_mat = matmul_gpu(oao_mat.T, matmul_gpu(fds, oao_mat))
 
             e_mat_shape = e_mat.shape
             e_grad = 2.0 * np.linalg.norm(e_mat)
@@ -237,17 +239,12 @@ class ScfRestrictedDriver(ScfDriver):
 
         if self.rank == mpi_master():
             tmat = oao_mat
-            #fmo = np.matmul(tmat.T, np.matmul(fock_mat, tmat))
-            fmo = matmul_gpu(tmat.T.copy(), matmul_gpu(fock_mat, tmat))
 
-            # TODO: double check the criteria
-            if max(fmo.shape) < 4096:
-                eigs, evecs = np.linalg.eigh(fmo)
-            else:
-                eigs, evecs = eigh_gpu(fmo)
-                evecs = evecs.T.copy()
+            fmo = matmul_gpu(tmat.T, matmul_gpu(fock_mat, tmat))
 
-            #orb_coefs = np.matmul(tmat, evecs)
+            eigs, evecs_T = eigh_gpu(fmo)
+            evecs = evecs_T.T
+
             orb_coefs = matmul_gpu(tmat, evecs)
             orb_coefs, eigs = self._delete_mos(orb_coefs, eigs)
 
