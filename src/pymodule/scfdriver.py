@@ -1073,7 +1073,7 @@ class ScfDriver:
             e_el = self._comp_energy(fock_mat, vxc_mat, e_pe, kin_mat, npot_mat,
                                      den_mat)
 
-            self.ostream.print_info(f'Elec. energy: {e_el} a.u.')
+            self.ostream.print_info(f'Elec. energy:      {e_el} a.u.')
             self.ostream.flush()
 
             fock_mat = self._comp_full_fock(fock_mat, vxc_mat, V_pe, kin_mat, npot_mat)
@@ -1106,14 +1106,14 @@ class ScfDriver:
             e_mat, e_grad, max_grad = self._comp_gradient(fock_mat, ovl_mat, den_mat,
                                                           oao_mat)
 
-            self.ostream.print_info(f'e_grad computed: {e_grad}')
+            self.ostream.print_info(f'e_grad:            {e_grad}')
             self.ostream.flush()
 
             # compute density change and energy change
 
             diff_den = self._comp_density_change(den_mat, self.density)
 
-            self.ostream.print_info(f'diff_den computed: {diff_den}')
+            self.ostream.print_info(f'diff_den:          {diff_den}')
             self.ostream.flush()
 
             e_scf = (e_el + self._nuc_energy + self._d4_energy +
@@ -1168,7 +1168,7 @@ class ScfDriver:
                 eff_fock_mat = None
 
             eff_fock_t1 = tm.time()
-            self.ostream.print_info(f'Eff. Fock computed in {eff_fock_t1-eff_fock_t0:.2f} sec')
+            self.ostream.print_info(f'Eff. Fock   computed in {eff_fock_t1-eff_fock_t0:.2f} sec')
 
             profiler.stop_timer('EffFock')
 
@@ -1180,7 +1180,7 @@ class ScfDriver:
                 molecule, eff_fock_mat, oao_mat)
 
             new_mo_t1 = tm.time()
-            self.ostream.print_info(f'New MO computed in {new_mo_t1-new_mo_t0:.2f} sec')
+            self.ostream.print_info(f'New MO      computed in {new_mo_t1-new_mo_t0:.2f} sec')
 
             profiler.stop_timer('FockDiag')
 
