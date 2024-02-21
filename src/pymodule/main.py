@@ -417,9 +417,9 @@ def main():
             hessian_drv.compute(task.molecule)
 
         elif scf_drv.scf_type == 'restricted':
-            hessian_drv = ScfHessianDriver(task.mpi_comm, task.ostream)
+            hessian_drv = ScfHessianDriver(scf_drv)
             hessian_drv.update_settings(method_dict, hessian_dict)
-            hessian_drv.compute(task.molecule, task.ao_basis, scf_drv)
+            hessian_drv.compute(task.molecule, task.ao_basis)
 
         if task.mpi_rank == mpi_master():
             hessian_drv.vibrational_analysis(task.molecule)

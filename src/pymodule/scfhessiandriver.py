@@ -38,24 +38,24 @@ class ScfHessianDriver(HessianDriver):
     """
     Implements SCF Hessian driver.
 
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
+    :param scf_drv:
+        The Scf driver.
 
     Instance variables
         - do_raman: Additionally calculate Raman intensities
                 (at significantly higher computational cost).
     """
 
-    def __init__(self, comm=None, ostream=None):
+    def __init__(self, scf_drv):
         """
         Initializes SCF Hessian driver.
         """
 
-        super().__init__(comm, ostream)
+        super().__init__(scf_drv.comm, scf_drv.ostream)
 
+        self.scf_driver = scf_drv
         self.flag = 'SCF Hessian Driver'
+
         self.do_raman = False
         self.pople = False
 
@@ -98,7 +98,7 @@ class ScfHessianDriver(HessianDriver):
             key = freq_dict['do_raman'].lower()
             self.do_raman = (key in ['yes', 'y'])
 
-    def compute(self, molecule, ao_basis, scf_drv):
+    def compute(self, molecule, ao_basis):
         """
         Computes the analytical or numerical nuclear Hessian.
 
@@ -106,16 +106,14 @@ class ScfHessianDriver(HessianDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param scf_drv:
-            The SCF driver.
         """
 
         self.print_header()
         start_time = tm.time()
 
-        self.elec_energy = scf_drv.get_scf_energy()
+        self.elec_energy = self.scf_driver.get_scf_energy()
 
-        self.compute_numerical(molecule, ao_basis, scf_drv)
+        self.compute_numerical(molecule, ao_basis)
 
         # print Hessian
         if self.do_print_hessian:
@@ -130,7 +128,7 @@ class ScfHessianDriver(HessianDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def compute_numerical(self, molecule, ao_basis, scf_drv):
+    def compute_numerical(self, molecule, ao_basis):
         """
         Performs the calculation of a numerical Hessian based only
         on the energy.
@@ -139,11 +137,9 @@ class ScfHessianDriver(HessianDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param scf_drv:
-            The SCF driver.
         """
 
-        scf_drv.ostream.mute()
+        self.ostream.mute()
 
         # atom labels
         labels = molecule.get_labels()
@@ -171,7 +167,7 @@ class ScfHessianDriver(HessianDriver):
         # set up LR solver and member variable
         if self.do_raman:
             # linear response driver for polarizability calculation
-            lr_drv = LinearResponseSolver(self.comm, scf_drv.ostream)
+            lr_drv = LinearResponseSolver(self.comm, self.ostream)
             # polarizability: 3 coordinates x 3 coordinates
             # (ignoring frequencies)
             # polarizability gradient: dictionary goes through
@@ -180,11 +176,11 @@ class ScfHessianDriver(HessianDriver):
             if self.rank == mpi_master():
                 self.polarizability_gradient = np.zeros((3, 3, 3 * natm))
 
-        scf_drv.restart = False
-        scf_results = scf_drv.compute(molecule, ao_basis)
-        assert_msg_critical(scf_drv.is_converged,
+        self.scf_driver.restart = False
+        scf_results = self.scf_driver.compute(molecule, ao_basis)
+        assert_msg_critical(self.scf_driver.is_converged,
                             'ScfHessianDriver: SCF did not converge')
-        energy_0 = scf_drv.get_scf_energy()
+        energy_0 = self.scf_driver.get_scf_energy()
 
         for i in range(natm):
             for x in range(3):
@@ -193,10 +189,10 @@ class ScfHessianDriver(HessianDriver):
                 new_mol = Molecule(labels, coords, units='au')
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
-                scf_results = scf_drv.compute(new_mol, ao_basis)
-                assert_msg_critical(scf_drv.is_converged,
+                scf_results = self.scf_driver.compute(new_mol, ao_basis)
+                assert_msg_critical(self.scf_driver.is_converged,
                                     'ScfHessianDriver: SCF did not converge')
-                energy_ixp = scf_drv.get_scf_energy()
+                energy_ixp = self.scf_driver.get_scf_energy()
 
                 prop.compute_scf_prop(new_mol, ao_basis, scf_results)
                 if self.rank == mpi_master():
@@ -211,10 +207,10 @@ class ScfHessianDriver(HessianDriver):
                 new_mol = Molecule(labels, coords, units='au')
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
-                scf_results = scf_drv.compute(new_mol, ao_basis)
-                assert_msg_critical(scf_drv.is_converged,
+                scf_results = self.scf_driver.compute(new_mol, ao_basis)
+                assert_msg_critical(self.scf_driver.is_converged,
                                     'ScfHessianDriver: SCF did not converge')
-                energy_ixm = scf_drv.get_scf_energy()
+                energy_ixm = self.scf_driver.get_scf_energy()
 
                 prop.compute_scf_prop(new_mol, ao_basis, scf_results)
                 if self.rank == mpi_master():
@@ -257,22 +253,24 @@ class ScfHessianDriver(HessianDriver):
                             new_mol = Molecule(labels, coords, units='au')
                             new_mol.set_charge(charge)
                             new_mol.set_multiplicity(multiplicity)
-                            scf_results = scf_drv.compute(new_mol, ao_basis)
+                            scf_results = self.scf_driver.compute(
+                                new_mol, ao_basis)
                             assert_msg_critical(
-                                scf_drv.is_converged,
+                                self.scf_driver.is_converged,
                                 'ScfHessianDriver: SCF did not converge')
-                            energy_jyp = scf_drv.get_scf_energy()
+                            energy_jyp = self.scf_driver.get_scf_energy()
 
                             # Plus x, plus y
                             coords[i, x] += self.delta_h
                             new_mol = Molecule(labels, coords, units='au')
                             new_mol.set_charge(charge)
                             new_mol.set_multiplicity(multiplicity)
-                            scf_results = scf_drv.compute(new_mol, ao_basis)
+                            scf_results = self.scf_driver.compute(
+                                new_mol, ao_basis)
                             assert_msg_critical(
-                                scf_drv.is_converged,
+                                self.scf_driver.is_converged,
                                 'ScfHessianDriver: SCF did not converge')
-                            energy_ixp_jyp = scf_drv.get_scf_energy()
+                            energy_ixp_jyp = self.scf_driver.get_scf_energy()
                             coords[i, x] -= self.delta_h
 
                             # Minus y
@@ -280,22 +278,24 @@ class ScfHessianDriver(HessianDriver):
                             new_mol = Molecule(labels, coords, units='au')
                             new_mol.set_charge(charge)
                             new_mol.set_multiplicity(multiplicity)
-                            scf_results = scf_drv.compute(new_mol, ao_basis)
+                            scf_results = self.scf_driver.compute(
+                                new_mol, ao_basis)
                             assert_msg_critical(
-                                scf_drv.is_converged,
+                                self.scf_driver.is_converged,
                                 'ScfHessianDriver: SCF did not converge')
-                            energy_jym = scf_drv.get_scf_energy()
+                            energy_jym = self.scf_driver.get_scf_energy()
 
                             # Minus x, minus y:
                             coords[i, x] -= self.delta_h
                             new_mol = Molecule(labels, coords, units='au')
                             new_mol.set_charge(charge)
                             new_mol.set_multiplicity(multiplicity)
-                            scf_results = scf_drv.compute(new_mol, ao_basis)
+                            scf_results = self.scf_driver.compute(
+                                new_mol, ao_basis)
                             assert_msg_critical(
-                                scf_drv.is_converged,
+                                self.scf_driver.is_converged,
                                 'ScfHessianDriver: SCF did not converge')
-                            energy_ixm_jym = scf_drv.get_scf_energy()
+                            energy_ixm_jym = self.scf_driver.get_scf_energy()
 
                             coords[i, x] += self.delta_h
                             coords[j, y] += self.delta_h
@@ -309,7 +309,8 @@ class ScfHessianDriver(HessianDriver):
         self.hessian = hessian.reshape(3 * natm, 3 * natm)
 
         # restore scf_drv to initial state
-        scf_results = scf_drv.compute(molecule, ao_basis)
-        assert_msg_critical(scf_drv.is_converged,
+        scf_results = self.scf_driver.compute(molecule, ao_basis)
+        assert_msg_critical(self.scf_driver.is_converged,
                             'ScfHessianDriver: SCF did not converge')
-        scf_drv.ostream.unmute()
+
+        self.ostream.unmute()
