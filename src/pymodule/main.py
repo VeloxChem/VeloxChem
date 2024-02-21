@@ -338,9 +338,10 @@ def main():
                 errmsg += 'in XTB calculation.'
                 if task.mpi_rank == mpi_master():
                     assert_msg_critical(False, errmsg)
-            xtb_drv = XtbDriver(task.mpi_comm)
+            xtb_drv = XtbDriver(task.mpi_comm, task.ostream)
             xtb_drv.set_method(method_dict['xtb'].lower())
-            xtb_drv.compute(task.molecule, task.ostream)
+            xtb_drv.xtb_verbose = True
+            xtb_results = xtb_drv.compute(task.molecule)
         else:
             scf_drv = select_scf_driver(task, scf_type)
             scf_drv.update_settings(scf_dict, method_dict)

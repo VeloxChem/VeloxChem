@@ -99,6 +99,14 @@ class OutputStream:
                 self.stream.close()
             self.state = False
 
+    @property
+    def is_muted(self):
+        """
+        Checks if the output stream is muted.
+        """
+
+        return (self._state_backup is not None)
+
     def mute(self):
         """
         Mutes the output stream.

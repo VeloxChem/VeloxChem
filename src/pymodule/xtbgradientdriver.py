@@ -61,12 +61,12 @@ class XtbGradientDriver(GradientDriver):
 
         self.print_header()
 
-        xtb_drv.mute()
+        xtb_drv.ostream.mute()
         self.ostream.mute()
 
-        xtb_drv.compute(molecule, self.ostream)
+        xtb_drv.compute(molecule)
 
-        xtb_drv.unmute()
+        xtb_drv.ostream.unmute()
         self.ostream.unmute()
 
         self.gradient = xtb_drv.get_gradient()
@@ -88,12 +88,12 @@ class XtbGradientDriver(GradientDriver):
             The xTB driver.
         """
 
-        xtb_drv.mute()
+        xtb_drv.ostream.mute()
         self.ostream.mute()
 
-        xtb_drv.compute(molecule, self.ostream)
+        xtb_drv.compute(molecule)
 
-        xtb_drv.unmute()
+        xtb_drv.ostream.unmute()
         self.ostream.unmute()
 
         return xtb_drv.get_energy()

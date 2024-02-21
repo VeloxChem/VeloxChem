@@ -20,11 +20,11 @@ class TestOptimizeXTB:
 
         task = MpiTask([inpfile, None])
 
-        xtb_drv = XtbDriver(task.mpi_comm)
-        xtb_drv.mute()
+        xtb_drv = XtbDriver(task.mpi_comm, task.ostream)
+        xtb_drv.ostream.mute()
 
         xtb_drv.set_method(xtb_method.lower())
-        xtb_drv.compute(task.molecule, task.ostream)
+        xtb_drv.compute(task.molecule)
 
         grad_drv = XtbGradientDriver(task.mpi_comm, task.ostream)
         opt_drv = OptimizationDriver(grad_drv)
