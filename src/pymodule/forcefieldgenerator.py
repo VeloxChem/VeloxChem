@@ -1236,12 +1236,11 @@ class ForceFieldGenerator:
             # XTB Hessian
             self.ostream.print_info('Computing Hessian using XTB...')
             self.ostream.flush()
-            xtb_hessian_drv = XtbHessianDriver(self.comm)
-            xtb_hessian_drv.ostream.state = False
-            xtb_hessian_drv.compute(self.molecule, xtb_drv)
+
+            xtb_hessian_drv = XtbHessianDriver(xtb_drv)
+            xtb_hessian_drv.compute(self.molecule)
             hessian = np.copy(xtb_hessian_drv.hessian)
 
-            self.ostream.print_blank()
             self.ostream.print_reference('Reference:')
             self.ostream.print_reference(xtb_drv.get_reference())
             self.ostream.print_blank()

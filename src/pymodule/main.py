@@ -411,9 +411,9 @@ def main():
                         if 'hessian' in task.input_dict else {})
 
         if use_xtb:
-            hessian_drv = XtbHessianDriver(task.mpi_comm, task.ostream)
+            hessian_drv = XtbHessianDriver(xtb_drv)
             hessian_drv.update_settings(method_dict, hessian_dict)
-            hessian_drv.compute(task.molecule, xtb_drv)
+            hessian_drv.compute(task.molecule)
 
         elif scf_drv.scf_type == 'restricted':
             hessian_drv = ScfHessianDriver(task.mpi_comm, task.ostream)

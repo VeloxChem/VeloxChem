@@ -36,22 +36,21 @@ class XtbHessianDriver(HessianDriver):
     """
     Implements XTB Hessian driver.
 
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
+    :param xtb_drv:
+        The XTB driver.
 
     Instance variables
         - flag: The driver flag.
     """
 
-    def __init__(self, comm=None, ostream=None):
+    def __init__(self, xtb_drv):
         """
         Initializes XTB Hessian driver.
         """
 
-        super().__init__(comm, ostream)
+        super().__init__(xtb_drv.comm, xtb_drv.ostream)
 
+        self.xtb_driver = xtb_drv
         self.flag = 'XTB Hessian Driver'
 
     def update_settings(self, method_dict, freq_dict=None):
@@ -69,23 +68,25 @@ class XtbHessianDriver(HessianDriver):
         if freq_dict is None:
             freq_dict = {}
 
-    def compute(self, molecule, xtb_drv):
+    def compute(self, molecule):
         """
         Computes the numerical nuclear Hessian.
 
         :param molecule:
             The molecule.
-        :param xtb_drv:
-            The xTB driver.
         """
 
         self.print_header()
 
         start_time = tm.time()
 
-        self.elec_energy = xtb_drv.get_energy()
+        self.ostream.mute()
+        self.xtb_driver.compute(molecule)
+        self.ostream.unmute()
 
-        self.compute_numerical(molecule, xtb_drv)
+        self.elec_energy = self.xtb_driver.get_energy()
+
+        self.compute_numerical(molecule)
 
         # print Hessian
         if self.do_print_hessian:
@@ -97,17 +98,14 @@ class XtbHessianDriver(HessianDriver):
         valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
-        self.ostream.print_blank()
         self.ostream.flush()
 
-    def compute_numerical(self, molecule, xtb_drv):
+    def compute_numerical(self, molecule):
         """
         Performs calculation of numerical Hessian.
 
         :param molecule:
             The molecule.
-        :param xtb_drv:
-            The xTB driver.
         """
 
         self.ostream.mute()
@@ -142,8 +140,8 @@ class XtbHessianDriver(HessianDriver):
                     new_mol.set_multiplicity(multiplicity)
                     # create a new XTB driver object;
                     # without this the energy is always zero...;
-                    new_xtb_drv = XtbDriver(self.comm, self.ostream)
-                    new_xtb_drv.set_method(xtb_drv.get_method())
+                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv.set_method(self.xtb_driver.get_method())
                     new_xtb_drv.ostream.mute()
                     new_xtb_drv.compute(new_mol)
 
@@ -155,8 +153,8 @@ class XtbHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
-                    new_xtb_drv = XtbDriver(self.comm, self.ostream)
-                    new_xtb_drv.set_method(xtb_drv.get_method())
+                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv.set_method(self.xtb_driver.get_method())
                     new_xtb_drv.ostream.mute()
                     new_xtb_drv.compute(new_mol)
 
@@ -184,8 +182,8 @@ class XtbHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
-                    new_xtb_drv = XtbDriver(self.comm, self.ostream)
-                    new_xtb_drv.set_method(xtb_drv.get_method())
+                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv.set_method(self.xtb_driver.get_method())
                     new_xtb_drv.ostream.mute()
                     new_xtb_drv.compute(new_mol)
 
@@ -197,8 +195,8 @@ class XtbHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
-                    new_xtb_drv = XtbDriver(self.comm, self.ostream)
-                    new_xtb_drv.set_method(xtb_drv.get_method())
+                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv.set_method(self.xtb_driver.get_method())
                     new_xtb_drv.ostream.mute()
                     new_xtb_drv.compute(new_mol)
 
@@ -210,8 +208,8 @@ class XtbHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
-                    new_xtb_drv = XtbDriver(self.comm, self.ostream)
-                    new_xtb_drv.set_method(xtb_drv.get_method())
+                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv.set_method(self.xtb_driver.get_method())
                     new_xtb_drv.ostream.mute()
                     new_xtb_drv.compute(new_mol)
 
@@ -223,8 +221,8 @@ class XtbHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
-                    new_xtb_drv = XtbDriver(self.comm, self.ostream)
-                    new_xtb_drv.set_method(xtb_drv.get_method())
+                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv.set_method(self.xtb_driver.get_method())
                     new_xtb_drv.ostream.mute()
                     new_xtb_drv.compute(new_mol)
 
