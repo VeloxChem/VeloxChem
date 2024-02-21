@@ -31,39 +31,36 @@ class OpenMMGradientDriver(GradientDriver):
     """
     Implements OpenMM gradient driver.
 
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
+    :param openmm_drv:
+        The OpenMM driver.
 
     Instance variables
         - flag: The driver flag.
     """
 
-    def __init__(self, comm=None, ostream=None):
+    def __init__(self, openmm_drv):
         """
         Initializes OpenMM gradient driver.
         """
 
-        super().__init__(comm, ostream)
+        super().__init__(openmm_drv.comm, openmm_drv.ostream)
 
+        self.openmm_driver = openmm_drv
         self.flag = 'OpenMM Gradient Driver'
 
-    def compute(self, molecule, openmm_drv):
+    def compute(self, molecule):
         """
         Performs calculation of OpenMM analytical gradient.
 
         :param molecule:
             The molecule.
-        :param openmm_drv:
-            The OpenMM driver.
         """
 
         self.print_header()
 
-        openmm_drv.compute(molecule)
+        self.openmm_driver.compute(molecule)
 
-        self.gradient = openmm_drv.get_gradient()
+        self.gradient = self.openmm_driver.get_gradient()
         self.gradient = self.comm.bcast(self.gradient, root=mpi_master())
 
         self.print_geometry(molecule)
@@ -72,16 +69,14 @@ class OpenMMGradientDriver(GradientDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def compute_energy(self, molecule, openmm_drv):
+    def compute_energy(self, molecule):
         """
         Performs calculation of XTB energy.
 
         :param molecule:
             The molecule.
-        :param openmm_drv:
-            The OpenMM driver.
         """
 
-        openmm_drv.compute(molecule)
+        self.openmm_driver.compute(molecule)
 
-        return openmm_drv.get_energy()
+        return self.openmm_driver.get_energy()

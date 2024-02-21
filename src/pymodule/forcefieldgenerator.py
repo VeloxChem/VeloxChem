@@ -1911,19 +1911,19 @@ class ForceFieldGenerator:
             The constraints.
         """
 
-        openmm_drv = OpenMMDriver(self.comm)
+        openmm_drv = OpenMMDriver(self.comm, self.ostream)
         openmm_drv.add_topology(top_file, self.gromacs_include_path)
 
-        grad_drv = OpenMMGradientDriver(self.comm)
-        grad_drv.ostream.mute()
-
+        self.ostream.mute()
+        grad_drv = OpenMMGradientDriver(openmm_drv)
         opt_drv = OptimizationDriver(grad_drv)
         opt_drv.update_settings({
             'constraints': constraints,
             'filename': str(Path(top_file).parent / Path(top_file).stem),
             'keep_files': self.keep_files,
         })
-        final_mol = opt_drv.compute(molecule, openmm_drv)
+        final_mol = opt_drv.compute(molecule)
+        self.ostream.unmute()
 
         openmm_drv.compute(final_mol)
 
