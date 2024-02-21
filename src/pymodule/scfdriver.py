@@ -829,6 +829,8 @@ class ScfDriver:
             The profiler.
         """
 
+        self._scf_tensors = None
+
         if not self._first_step:
             profiler.begin({
                 'timing': self.timing,

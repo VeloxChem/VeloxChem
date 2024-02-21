@@ -377,9 +377,10 @@ def main():
             if use_xtb:
                 grad_drv = XtbGradientDriver(xtb_drv)
                 grad_drv.compute(task.molecule)
+
             elif scf_drv.scf_type == 'restricted':
-                grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream)
-                grad_drv.compute(task.molecule, task.ao_basis, scf_drv)
+                grad_drv = ScfGradientDriver(scf_drv)
+                grad_drv.compute(task.molecule, task.ao_basis)
 
         elif run_excited_state_gradient:
 
@@ -449,10 +450,10 @@ def main():
                 opt_drv.compute(task.molecule)
 
             elif scf_drv.scf_type == 'restricted':
-                grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream)
+                grad_drv = ScfGradientDriver(scf_drv)
                 opt_drv = OptimizationDriver(grad_drv)
                 opt_drv.update_settings(opt_dict)
-                opt_drv.compute(task.molecule, task.ao_basis, scf_drv)
+                opt_drv.compute(task.molecule, task.ao_basis)
 
         elif run_excited_state_gradient:
 
