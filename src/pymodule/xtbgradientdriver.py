@@ -31,45 +31,39 @@ class XtbGradientDriver(GradientDriver):
     """
     Implements XTB gradient driver.
 
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
+    :param xtb_drv:
+        The XTB driver.
 
     Instance variables
         - flag: The driver flag.
     """
 
-    def __init__(self, comm=None, ostream=None):
+    def __init__(self, xtb_drv):
         """
         Initializes XTB gradient driver.
         """
 
-        super().__init__(comm, ostream)
+        super().__init__(xtb_drv.comm, xtb_drv.ostream)
+
+        self.xtb_driver = xtb_drv
 
         self.flag = 'XTB Gradient Driver'
 
-    def compute(self, molecule, xtb_drv):
+    def compute(self, molecule):
         """
         Performs calculation of XTB analytical gradient.
 
         :param molecule:
             The molecule.
-        :param xtb_drv:
-            The xTB driver.
         """
 
         self.print_header()
 
-        xtb_drv.ostream.mute()
         self.ostream.mute()
-
-        xtb_drv.compute(molecule)
-
-        xtb_drv.ostream.unmute()
+        self.xtb_driver.compute(molecule)
         self.ostream.unmute()
 
-        self.gradient = xtb_drv.get_gradient()
+        self.gradient = self.xtb_driver.get_gradient()
         self.gradient = self.comm.bcast(self.gradient, root=mpi_master())
 
         self.print_geometry(molecule)
@@ -78,22 +72,16 @@ class XtbGradientDriver(GradientDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def compute_energy(self, molecule, xtb_drv):
+    def compute_energy(self, molecule):
         """
         Performs calculation of XTB energy.
 
         :param molecule:
             The molecule.
-        :param xtb_drv:
-            The xTB driver.
         """
 
-        xtb_drv.ostream.mute()
         self.ostream.mute()
-
-        xtb_drv.compute(molecule)
-
-        xtb_drv.ostream.unmute()
+        self.xtb_driver.compute(molecule)
         self.ostream.unmute()
 
-        return xtb_drv.get_energy()
+        return self.xtb_driver.get_energy()

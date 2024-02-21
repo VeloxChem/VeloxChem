@@ -1226,13 +1226,12 @@ class ForceFieldGenerator:
             # XTB optimization
             self.ostream.print_info('Optimizing molecule using XTB...')
             self.ostream.flush()
-            xtb_drv = XtbDriver(self.comm)
-            xtb_drv.mute()
-            xtb_grad_drv = XtbGradientDriver(self.comm)
-            xtb_grad_drv.ostream.state = False
+
+            xtb_drv = XtbDriver(self.comm, self.ostream)
+            xtb_grad_drv = XtbGradientDriver(xtb_drv)
             xtb_opt_drv = OptimizationDriver(xtb_grad_drv)
             xtb_opt_drv.filename = self.molecule_name
-            self.molecule = xtb_opt_drv.compute(self.molecule, xtb_drv)
+            self.molecule = xtb_opt_drv.compute(self.molecule)
 
             # XTB Hessian
             self.ostream.print_info('Computing Hessian using XTB...')

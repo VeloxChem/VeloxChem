@@ -375,8 +375,8 @@ def main():
         if run_ground_state_gradient:
 
             if use_xtb:
-                grad_drv = XtbGradientDriver(task.mpi_comm, task.ostream)
-                grad_drv.compute(task.molecule, xtb_drv)
+                grad_drv = XtbGradientDriver(xtb_drv)
+                grad_drv.compute(task.molecule)
             elif scf_drv.scf_type == 'restricted':
                 grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream)
                 grad_drv.compute(task.molecule, task.ao_basis, scf_drv)
@@ -443,10 +443,10 @@ def main():
         if run_ground_state_gradient:
 
             if use_xtb:
-                grad_drv = XtbGradientDriver(task.mpi_comm, task.ostream)
+                grad_drv = XtbGradientDriver(xtb_drv)
                 opt_drv = OptimizationDriver(grad_drv)
                 opt_drv.update_settings(opt_dict)
-                opt_drv.compute(task.molecule, xtb_drv)
+                opt_drv.compute(task.molecule)
 
             elif scf_drv.scf_type == 'restricted':
                 grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream)
