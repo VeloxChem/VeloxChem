@@ -239,6 +239,67 @@ def _Molecule_get_connectivity_matrix(self, factor=1.3):
     return connectivity_matrix
 
 
+def _Molecule_get_dihedral(self, dihedral_indices_one_based):
+    """
+    Gets dihedral angle in degree.
+
+    :param dihedral_indices_one_based:
+        The dihedral indices (1-based).
+
+    :return:
+        The dihedral angle in degree.
+    """
+
+    a = dihedral_indices_one_based[0] - 1
+    b = dihedral_indices_one_based[1] - 1
+    c = dihedral_indices_one_based[2] - 1
+    d = dihedral_indices_one_based[3] - 1
+
+    coords_in_au = self.get_coordinates_in_bohr()
+
+    # J. Comput. Chem. 2000, 21, 553-561
+
+    v21 = coords_in_au[a] - coords_in_au[b]
+    v32 = coords_in_au[b] - coords_in_au[c]
+    v43 = coords_in_au[c] - coords_in_au[d]
+
+    u21 = v21 / np.linalg.norm(v21)
+    u32 = v32 / np.linalg.norm(v32)
+    u43 = v43 / np.linalg.norm(v43)
+
+    cos_theta_123 = -np.vdot(u21, u32)
+    cos_theta_234 = -np.vdot(u32, u43)
+
+    sin_theta_123 = math.sqrt(1.0 - cos_theta_123**2)
+    sin_theta_234 = math.sqrt(1.0 - cos_theta_234**2)
+
+    cos_phi = ((cos_theta_123 * cos_theta_234 - np.vdot(u21, u43)) /
+               (sin_theta_123 * sin_theta_234))
+    sin_phi = -(np.vdot(u43, np.cross(u21, u32)) /
+                (sin_theta_123 * sin_theta_234))
+
+    phi = math.acos(cos_phi) * 180.0 / math.pi
+    if sin_phi < 0.0:
+        phi *= -1.0
+
+    return phi
+
+
+def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle):
+    """
+    Sets dihedral angle in degree.
+
+    :param dihedral_indices_one_based:
+        The dihedral indices (1-based).
+    :param target_angle:
+        The target value of dihedral angle.
+    """
+
+    phi = self.get_dihedral(dihedral_indices_one_based)
+
+    self.rotate_dihedral(dihedral_indices_one_based, target_angle - phi)
+
+
 def _Molecule_rotate_dihedral(self, dihedral_indices_one_based, rotation_angle):
     """
     Rotates a bond.
@@ -257,28 +318,28 @@ def _Molecule_rotate_dihedral(self, dihedral_indices_one_based, rotation_angle):
     i = dihedral_indices_one_based[1] - 1
     j = dihedral_indices_one_based[2] - 1
 
-    # disconnect i-j and find all atoms that at connected to i
+    # disconnect i-j and find all atoms that at connected to j
     connectivity_matrix = self.get_connectivity_matrix()
     connectivity_matrix[i, j] = 0
     connectivity_matrix[j, i] = 0
 
-    atoms_connected_to_i = set()
-    atoms_connected_to_i.add(i)
+    atoms_connected_to_j = set()
+    atoms_connected_to_j.add(j)
 
     while True:
         more_connected_atoms = set()
-        for a in atoms_connected_to_i:
+        for a in atoms_connected_to_j:
             for b in range(connectivity_matrix.shape[0]):
-                if (b not in atoms_connected_to_i and
+                if (b not in atoms_connected_to_j and
                         connectivity_matrix[a, b] == 1):
                     more_connected_atoms.add(b)
         if more_connected_atoms:
-            atoms_connected_to_i.update(more_connected_atoms)
+            atoms_connected_to_j.update(more_connected_atoms)
         else:
             break
 
     assert_msg_critical(
-        j not in atoms_connected_to_i,
+        i not in atoms_connected_to_j,
         'Molecule.rotate_dihedral: Cannot rotate dihedral (Maybe it is part of a ring?)'
     )
 
@@ -311,12 +372,8 @@ def _Molecule_rotate_dihedral(self, dihedral_indices_one_based, rotation_angle):
     new_coords_in_au = np.matmul(coords_in_au - coords_in_au[j],
                                  rotation_matrix.T) + coords_in_au[j]
 
-    # restore coordinates for atoms connected to i
-    for idx in atoms_connected_to_i:
-        new_coords_in_au[idx, :] = coords_in_au[idx, :]
-
-    # update coordinates in molecule
-    for idx in range(new_coords_in_au.shape[0]):
+    # update coordinates of atoms connected to j
+    for idx in atoms_connected_to_j:
         self.set_atom_coordinates(idx, new_coords_in_au[idx])
 
 
@@ -757,6 +814,8 @@ Molecule.read_xyz_file = _Molecule_read_xyz_file
 Molecule.read_xyz_string = _Molecule_read_xyz_string
 Molecule.from_dict = _Molecule_from_dict
 Molecule.get_connectivity_matrix = _Molecule_get_connectivity_matrix
+Molecule.get_dihedral = _Molecule_get_dihedral
+Molecule.set_dihedral = _Molecule_set_dihedral
 Molecule.rotate_dihedral = _Molecule_rotate_dihedral
 Molecule.center_of_mass = _Molecule_center_of_mass
 Molecule.center_of_mass_in_bohr = _Molecule_center_of_mass_in_bohr
