@@ -1231,7 +1231,9 @@ class ForceFieldGenerator:
             xtb_grad_drv = XtbGradientDriver(xtb_drv)
             xtb_opt_drv = OptimizationDriver(xtb_grad_drv)
             xtb_opt_drv.filename = self.molecule_name
-            self.molecule = xtb_opt_drv.compute(self.molecule)
+            xtb_opt_results = xtb_opt_drv.compute(self.molecule)
+            self.molecule = Molecule.read_xyz_string(
+                xtb_opt_results['final_geometry'])
 
             # XTB Hessian
             self.ostream.print_info('Computing Hessian using XTB...')
@@ -1879,12 +1881,11 @@ class ForceFieldGenerator:
             self.comm.barrier()
 
             # energy minimization with dihedral constraint
-            constraints = ['$set']
-            constraints += [
-                'dihedral {} {} {} {} {}'.format(dihedral[0] + 1,
-                                                 dihedral[1] + 1,
-                                                 dihedral[2] + 1,
-                                                 dihedral[3] + 1, angle)
+            constraints = [
+                'set dihedral {} {} {} {} {}'.format(dihedral[0] + 1,
+                                                     dihedral[1] + 1,
+                                                     dihedral[2] + 1,
+                                                     dihedral[3] + 1, angle)
             ]
             pot_energy = self.minimize_mm_energy(geom, local_top_fname,
                                                  constraints)
@@ -1922,7 +1923,8 @@ class ForceFieldGenerator:
             'filename': str(Path(top_file).parent / Path(top_file).stem),
             'keep_files': self.keep_files,
         })
-        final_mol = opt_drv.compute(molecule)
+        opt_results = opt_drv.compute(molecule)
+        final_mol = Molecule.read_xyz_string(opt_results['final_geometry'])
         self.ostream.unmute()
 
         openmm_drv.compute(final_mol)

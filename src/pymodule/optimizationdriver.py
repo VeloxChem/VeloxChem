@@ -185,6 +185,14 @@ class OptimizationDriver:
             assert_msg_critical(hasattr(geometric, 'normal_modes'), err_msg)
 
         self.print_header()
+
+        valstr = f'Using geomeTRIC for geometry optimization.'
+        self.ostream.print_info(valstr)
+        self.ostream.print_blank()
+        self.ostream.print_reference(self.get_geometric_reference())
+        self.ostream.print_blank()
+        self.ostream.flush()
+
         start_time = tm.time()
 
         opt_engine = OptimizationEngine(self.grad_drv, molecule, *args)
@@ -216,9 +224,20 @@ class OptimizationDriver:
 
         if self.constraints:
             constr_file = Path(filename + '.constr.txt')
+            constr_dict = {'freeze': [], 'set': [], 'scan': []}
+            for line in self.constraints:
+                content = line.strip().split()
+                key, val = content[0], ' '.join(content[1:])
+                assert_msg_critical(
+                    key in ['freeze', 'set', 'scan'],
+                    'OptimizationDriver: Invalid constraint {:s}'.format(key))
+                constr_dict[key].append(val)
             with constr_file.open('w') as fh:
-                for line in self.constraints:
-                    print(line, file=fh)
+                for key in ['freeze', 'set', 'scan']:
+                    if constr_dict[key]:
+                        print(f'${key}', file=fh)
+                        for line in constr_dict[key]:
+                            print(line, file=fh)
             constr_filename = constr_file.as_posix()
         else:
             constr_filename = None
@@ -273,7 +292,13 @@ class OptimizationDriver:
 
                 self.ostream.print_block(final_mol.get_string())
 
-                if self.constraints and '$scan' in self.constraints:
+                is_scan_job = False
+                if self.constraints:
+                    for line in self.constraints:
+                        key = line.strip().split()[0]
+                        is_scan_job = (key == 'scan')
+
+                if is_scan_job:
                     self.print_scan_result(m)
 
                     all_energies = []
@@ -675,6 +700,13 @@ class OptimizationDriver:
 
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def get_geometric_reference(self):
+        """
+        Gets reference string for geomeTRIC.
+        """
+
+        return 'L.-P. Wang and C.C. Song, J. Chem. Phys. 2016, 144, 214108'
 
     def cna_analysis(self, last_mol, start_mol, ref_mol):
         """
