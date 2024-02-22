@@ -148,10 +148,10 @@ def write_2d_array_hdf5(fname, arrays, labels=[], atom_index=None):
     hf.close()
     return True
 
-def import_integral(molecule, basis, int_type, atom1, shell1,
-                    atom2, shell2, atom3=None, shell3=None,
+def import_integral(molecule, basis, int_type, atom1=None, shell1=None,
+                    atom2=None, shell2=None, atom3=None, shell3=None,
                     atom4=None, shell4=None, xi1=None, xi2=None,
-                    chk_file=None, return_block=True, full_deriv=False,
+                    chk_file=None, return_block=False, full_deriv=False,
                     delta_h=1e-5, omega=None):
     """
     Imports integrals and integral derivatives from pyscf and converts 
@@ -205,11 +205,13 @@ def import_integral(molecule, basis, int_type, atom1, shell1,
 
     pyscf_int_type = get_pyscf_integral_type(int_type)
 
-    if 'int2e' in pyscf_int_type:
-        if (atom3 is None) or (shell3 is None) or (atom4 is None) or (shell4 is None):
-            errtxt = "Not enough shells defined for a two-electron integral. "
-            errtxt += "Please define atom3, shell3, atom4, shell4."
-            raise ValueError(errtxt, atom3, shell3, atom4, shell4)
+    print("\nImporting...: ", int_type, pyscf_int_type, "\n")
+
+    #if 'int2e' in pyscf_int_type:
+    #    if (atom3 is None) or (shell3 is None) or (atom4 is None) or (shell4 is None):
+    #        errtxt = "Not enough shells defined for a two-electron integral. "
+    #        errtxt += "Please define atom3, shell3, atom4, shell4."
+    #        raise ValueError(errtxt, atom3, shell3, atom4, shell4)
 
     if 'derivative' in int_type and xi1 is None:
         errtxt = "Please set the index of the atom (xi1) with respect to which"
@@ -225,31 +227,31 @@ def import_integral(molecule, basis, int_type, atom1, shell1,
     if 'derivative' in int_type:
         if 'second' in int_type:
             if '2_0' in int_type:
-                if 'int2e' in pyscf_int_type:
-                    return import_2e_integral_derivative(molecule, basis,
-                        int_type, atomi=xi1, atom1=atom1, shell1=shell1,
-                        atom2=atom2, shell2=shell2, atom3=atom3, shell3=shell3,
-                        atom4=atom4, shell4=shell4, chk_file=chk_file,
-                        return_block=return_block, full_deriv=full_deriv)
-                else:
+            #    if 'int2e' in pyscf_int_type:
+            #        print("HERE!")
+            #        return import_2e_integral_derivative(molecule, basis,
+            #            int_type, atomi=xi1, atom1=atom1, shell1=shell1,
+            #            atom2=atom2, shell2=shell2, atom3=atom3, shell3=shell3,
+            #            atom4=atom4, shell4=shell4, chk_file=chk_file,
+            #            return_block=return_block, full_deriv=full_deriv)
+                if 'int1e' in pyscf_int_type:
                     return import_1e_integral_derivative(molecule, basis,
-                        int_type, atomi=xi1, atom1=atom1, shell1=shell1,
-                        atom2=atom2, shell2=shell2, chk_file=chk_file,
-                        return_block=return_block, full_deriv=full_deriv)
+                           int_type, atomi=xi1, atom1=atom1, shell1=shell1,
+                           atom2=atom2, shell2=shell2, chk_file=chk_file,
+                           return_block=return_block, full_deriv=full_deriv)
+            if 'int2e' in pyscf_int_type:
+                return import_2e_second_order_integral_derivative(molecule,
+                    basis, int_type, atomi=xi1, atomj=xi2, atom1=atom1,
+                    shell1=shell1, atom2=atom2, shell2=shell2, atom3=atom3,
+                    shell3=shell3, atom4=atom4, shell4=shell4,
+                    chk_file=chk_file, return_block=return_block,
+                    full_deriv=full_deriv)
             else:
-                if 'int2e' in pyscf_int_type:
-                    return import_2e_second_order_integral_derivative(molecule,
-                        basis, int_type, atomi=xi1, atomj=xi2, atom1=atom1,
-                        shell1=shell1, atom2=atom2, shell2=shell2, atom3=atom3,
-                        shell3=shell3, atom4=atom4, shell4=shell4,
-                        chk_file=chk_file, return_block=return_block,
-                        full_deriv=full_deriv)
-                else:
-                    return import_1e_second_order_integral_derivative(molecule,
-                        basis, int_type, atomi=xi1, atomj=xi2, atom1=atom1,
-                        shell1=shell1, atom2=atom2, shell2=shell2,
-                        chk_file=chk_file, return_block=return_block,
-                        full_deriv=full_deriv)
+                return import_1e_second_order_integral_derivative(molecule,
+                    basis, int_type, atomi=xi1, atomj=xi2, atom1=atom1,
+                    shell1=shell1, atom2=atom2, shell2=shell2,
+                    chk_file=chk_file, return_block=return_block,
+                    full_deriv=full_deriv)
 
         else:
             if 'int2e' in pyscf_int_type:
@@ -282,9 +284,9 @@ def import_integral(molecule, basis, int_type, atom1, shell1,
                        chk_file=chk_file, return_block=return_block)
 
 
-def import_1e_integral(molecule, basis, int_type, atom1=1, shell1=None,
-                       atom2=1, shell2=None, chk_file=None,
-                       unit="au", return_block=True):
+def import_1e_integral(molecule, basis, int_type, atom1=None, shell1=None,
+                       atom2=None, shell2=None, chk_file=None,
+                       unit="au", return_block=False):
     """
     Imports one electron integrals from pyscf and converts to veloxchem format.
     Specific atoms and shells can be selected.
@@ -347,64 +349,164 @@ def import_1e_integral(molecule, basis, int_type, atom1=1, shell1=None,
     rows = []
     columns = []
     k = 0
-    for ao in ao_basis_map:
-        parts = ao.split()
-        atom = int(parts[0])
-        shell = parts[2]
-        if atom1 == atom:
-            if shell1 is not None:
-                for s in shell1:
-                    if s in shell:
-                        rows.append(k)
-            else:
-                rows.append(k)
-        if atom2 == atom:
-            if shell2 is not None:
-                for s in shell2:
-                    if s in shell:
-                        columns.append(k)
-            else:
-                columns.append(k)
-        k += 1
-    if rows == []:
-        raise ValueError("Atom or shell(s) not found.", atom1, shell1)
-    if columns == []:
-        raise ValueError("Atom or shell(s) not found.", atom2, shell2)
-    
 
-    if pyscf_int_type in ["int1e_r", "int1e_rr", "int1e_rrr"]:
-        vlx_int_block = np.zeros((dof, len(rows), len(columns)))
-    else:
-        vlx_int_block = np.zeros((len(rows), len(columns)))
-    
-    for i in range(len(rows)):
-        for j in range(len(columns)):
-            if pyscf_int_type in ["int1e_r", "int1e_rr", "int1e_rrr"]:
-                vlx_int_block[:,i,j] = vlx_int[:, rows[i], columns[j]] 
-            else:
-                vlx_int_block[i,j] = vlx_int[rows[i], columns[j]]
-   
-    label = int_type+'_atom%d' % (atom1)
-    if shell1 is not None:
-        for s1 in shell1:
-            label += "_%s" % (s1)
-    label += "_atom%d" % (atom2)
-    if shell2 is not None:
-        for s2 in shell2:
-            label += "_%s" % (s2)
-
-    print(label) 
-    if chk_file is not None:
-        write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
+    if atom1 is None:
+        return_block = False
+    if atom2 is None:
+        return_block = False
 
     if return_block:
-        return vlx_int_block
+        for ao in ao_basis_map:
+            parts = ao.split()
+            atom = int(parts[0])
+            shell = parts[2]
+            if atom1 == atom:
+                if shell1 is not None:
+                    for s in shell1:
+                        if s in shell:
+                            rows.append(k)
+                else:
+                    rows.append(k)
+            if atom2 == atom:
+                if shell2 is not None:
+                    for s in shell2:
+                        if s in shell:
+                            columns.append(k)
+                else:
+                    columns.append(k)
+            k += 1
+        if rows == []:
+            raise ValueError("Atom or shell(s) not found.", atom1, shell1)
+        if columns == []:
+            raise ValueError("Atom or shell(s) not found.", atom2, shell2)
+        
+
+        if pyscf_int_type in ["int1e_r", "int1e_rr", "int1e_rrr"]:
+            vlx_int_block = np.zeros((dof, len(rows), len(columns)))
+        else:
+            vlx_int_block = np.zeros((len(rows), len(columns)))
+        
+        for i in range(len(rows)):
+            for j in range(len(columns)):
+                if pyscf_int_type in ["int1e_r", "int1e_rr", "int1e_rrr"]:
+                    vlx_int_block[:,i,j] = vlx_int[:, rows[i], columns[j]] 
+                else:
+                    vlx_int_block[i,j] = vlx_int[rows[i], columns[j]]
+   
+        label = int_type+'_atom%d' % (atom1)
+        if shell1 is not None:
+            for s1 in shell1:
+                label += "_%s" % (s1)
+        label += "_atom%d" % (atom2)
+        if shell2 is not None:
+            for s2 in shell2:
+                label += "_%s" % (s2)
+
+        print(label) 
+        if chk_file is not None:
+            write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
+
+        if return_block:
+            return vlx_int_block
     else:
         return vlx_int
 
 
-def import_2e_integral(molecule, basis, int_type, atom1=1, shell1=None,
-                       atom2=1, shell2=None, atom3=1, shell3=None,
+def import_2e_integral_braket(bra1_molecule, bra1_basis, bra2_molecule, bra2_basis,
+                              ket1_molecule, ket1_basis, ket2_molecule, ket2_basis,
+                              int_type, unit="au", omega=None):
+    """
+    Imports two electron integrals from pyscf and converts to veloxchem format.
+    Specific atoms and shells can be selected.
+
+   :param bra_molecule:
+        the vlx molecule object for the bra side.
+    :param bra_basis:
+        the vlx basis object for the bra side.
+    :param ket_molecule:
+        the vlx molecule object for the bra side.
+    :param ket_basis:
+        the vlx basis object for the bra side.
+    :param int_type:
+        the type of one-electron integral: overlap, kinetic_energy,
+                                           nuclear_attraction 
+    :param omega:
+        Error function parameter for range-separated Coulomb integrals.
+
+
+    :return:
+        a numpy array corresponding to a specified block of
+        the selected two electron integral
+    """
+
+    bra1_molecule_string = get_molecule_string(bra1_molecule)
+    bra1_basis_set_label = bra1_basis.get_label()
+    bra2_molecule_string = get_molecule_string(bra2_molecule)
+    bra2_basis_set_label = bra2_basis.get_label()
+    ket1_molecule_string = get_molecule_string(ket1_molecule)
+    ket1_basis_set_label = ket1_basis.get_label()
+    ket2_molecule_string = get_molecule_string(ket2_molecule)
+    ket2_basis_set_label = ket2_basis.get_label()
+
+    bra1_pyscf_basis = translate_to_pyscf(bra1_basis_set_label)
+    bra1_pyscf_molecule = pyscf.gto.M(atom=bra1_molecule_string,
+                                 basis=bra1_pyscf_basis, unit=unit,
+                                 charge=bra1_molecule.get_charge())
+    ket1_pyscf_basis = translate_to_pyscf(ket1_basis_set_label)
+    ket1_pyscf_molecule = pyscf.gto.M(atom=ket1_molecule_string,
+                                 basis=ket1_pyscf_basis, unit=unit,
+                                 charge=ket1_molecule.get_charge())
+
+    bra2_pyscf_basis = translate_to_pyscf(bra2_basis_set_label)
+    bra2_pyscf_molecule = pyscf.gto.M(atom=bra2_molecule_string,
+                                 basis=bra2_pyscf_basis, unit=unit,
+                                 charge=bra2_molecule.get_charge())
+    ket2_pyscf_basis = translate_to_pyscf(ket2_basis_set_label)
+    ket2_pyscf_molecule = pyscf.gto.M(atom=ket2_molecule_string,
+                                 basis=ket2_pyscf_basis, unit=unit,
+                                 charge=ket2_molecule.get_charge())
+
+    pyscf_int_type = get_pyscf_integral_type(int_type)
+    sign = get_sign(pyscf_int_type)
+    if 'erf' in int_type:
+        with pyscf_molecule.with_range_coulomb(omega):
+            pyscf_int = sign * pyscf_molecule.intor(pyscf_int_type, aosym='s1')
+    else:
+        pyscf_int = sign * pyscf.gto.intor_cross_2e(pyscf_int_type,
+                                                 bra1_pyscf_molecule,
+                                                 bra2_pyscf_molecule,
+                                                 ket1_pyscf_molecule,
+                                                 ket2_pyscf_molecule)
+
+    print("Import 2e integral ", int_type, sign, pyscf_int_type)
+
+    nao1 = bra1_pyscf_molecule.nao
+    nao2 = bra2_pyscf_molecule.nao
+    nao3 = ket1_pyscf_molecule.nao
+    nao4 = ket2_pyscf_molecule.nao
+
+    # Transform integral to veloxchem format
+    vlx_int = np.zeros_like(pyscf_int)
+
+    basis_set_map1 = bra1_basis.get_index_map(bra1_molecule)
+    basis_set_map2 = bra2_basis.get_index_map(bra2_molecule)
+    basis_set_map3 = ket1_basis.get_index_map(ket1_molecule)
+    basis_set_map4 = ket2_basis.get_index_map(ket2_molecule)
+
+    for m in range(nao1):
+        for n in range(nao2):
+            for t in range(nao3):
+                for p in range(nao4):
+                    vm = basis_set_map1[m]
+                    vn = basis_set_map2[n]
+                    vt = basis_set_map3[t]
+                    vp = basis_set_map4[p]
+                    vlx_int[vm,vn,vt,vp] = pyscf_int[m,n,t,p]
+
+    return vlx_int
+
+def import_2e_integral(molecule, basis, int_type, atom1=None, shell1=None,
+                       atom2=None, shell2=None, atom3=None, shell3=None,
                        atom4=1, shell4=None, chk_file=None,
                        unit="au", return_block=True, omega=None):
     """
@@ -489,89 +591,98 @@ def import_2e_integral(molecule, basis, int_type, atom1=1, shell1=None,
     index3 = []
     index4 = []
     k = 0
-    for ao in ao_basis_map:
-        parts = ao.split()
-        atom = int(parts[0])
-        shell = parts[2]
-        if atom1 == atom:
-            if shell1 is not None:
-                for s in shell1:
-                    if s in shell:
-                        index1.append(k)
-            else:
-                index1.append(k)
-        if atom2 == atom:
-            if shell2 is not None:
-                for s in shell2:
-                    if s in shell:
-                        index2.append(k)
-            else:
-                index2.append(k)
-        if atom3 == atom:
-            if shell3 is not None:
-                for s in shell3:
-                    if s in shell:
-                        index3.append(k)
-            else:
-                index3.append(k)
-        if atom4 == atom:
-            if shell4 is not None:
-                for s in shell4:
-                    if s in shell:
-                        index4.append(k)
-            else:
-                index4.append(k)
-        k += 1
-    if index1 == []:
-        raise ValueError("Atom or shell(s) not found.", atom1, shell1)
-    if index2 == []:
-        raise ValueError("Atom or shell(s) not found.", atom2, shell2)
-    if index3 == []:
-        raise ValueError("Atom or shell(s) not found.", atom3, shell3)
-    if index4 == []:
-        raise ValueError("Atom or shell(s) not found.", atom4, shell4)
-    
-    vlx_int_block = np.zeros((len(index1), len(index2),
-                              len(index3), len(index4)))
-    
-    for i in range(len(index1)):
-        for j in range(len(index2)):
-            for k in range(len(index3)):
-                for l in range(len(index4)):
-                    vlx_int_block[i,j,k,l] = vlx_int[index1[i], index2[j],
-                                                     index3[k], index4[l]]
-   
-    label = int_type+'_atom%d' % (atom1)
-    if shell1 is not None:
-        for s1 in shell1:
-            label += "_%s" % (s1)
 
-    label += "_atom%d" % (atom2)
-    if shell2 is not None:
-        for s2 in shell2:
-            label += "_%s" % (s2)
-
-    label += "_atom%d" % (atom3)
-    if shell3 is not None:
-        for s3 in shell3:
-            label += "_%s" % (s3)
-
-    label += "_atom%d" % (atom4)
-    if shell4 is not None:
-        for s4 in shell4:
-            label += "_%s" % (s4)
-
-    print(label) 
-    if chk_file is not None:
-        write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
+    if atom1 is None:
+        return_block = False
+    if atom2 is None:
+        return_block = False
+    if atom3 is None:
+        return_block = False
+    if atom4 is None:
+        return_block = False
 
     if return_block:
+        for ao in ao_basis_map:
+            parts = ao.split()
+            atom = int(parts[0])
+            shell = parts[2]
+            if atom1 == atom:
+                if shell1 is not None:
+                    for s in shell1:
+                        if s in shell:
+                            index1.append(k)
+                else:
+                    index1.append(k)
+            if atom2 == atom:
+                if shell2 is not None:
+                    for s in shell2:
+                        if s in shell:
+                            index2.append(k)
+                else:
+                    index2.append(k)
+            if atom3 == atom:
+                if shell3 is not None:
+                    for s in shell3:
+                        if s in shell:
+                            index3.append(k)
+                else:
+                    index3.append(k)
+            if atom4 == atom:
+                if shell4 is not None:
+                    for s in shell4:
+                        if s in shell:
+                            index4.append(k)
+                else:
+                    index4.append(k)
+            k += 1
+        if index1 == []:
+            raise ValueError("Atom or shell(s) not found.", atom1, shell1)
+        if index2 == []:
+            raise ValueError("Atom or shell(s) not found.", atom2, shell2)
+        if index3 == []:
+            raise ValueError("Atom or shell(s) not found.", atom3, shell3)
+        if index4 == []:
+            raise ValueError("Atom or shell(s) not found.", atom4, shell4)
+        
+        vlx_int_block = np.zeros((len(index1), len(index2),
+                                  len(index3), len(index4)))
+        
+        for i in range(len(index1)):
+            for j in range(len(index2)):
+                for k in range(len(index3)):
+                    for l in range(len(index4)):
+                        vlx_int_block[i,j,k,l] = vlx_int[index1[i], index2[j],
+                                                         index3[k], index4[l]]
+   
+        label = int_type+'_atom%d' % (atom1)
+        if shell1 is not None:
+            for s1 in shell1:
+                label += "_%s" % (s1)
+
+        label += "_atom%d" % (atom2)
+        if shell2 is not None:
+            for s2 in shell2:
+                label += "_%s" % (s2)
+
+        label += "_atom%d" % (atom3)
+        if shell3 is not None:
+            for s3 in shell3:
+                label += "_%s" % (s3)
+
+        label += "_atom%d" % (atom4)
+        if shell4 is not None:
+            for s4 in shell4:
+                label += "_%s" % (s4)
+
+        print(label) 
+        if chk_file is not None:
+            write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
         return vlx_int_block
     else:
         return vlx_int
 
-def import_1e_integral_derivative(molecule, basis, int_type, atomi=1, atom1=1,
-                                  shell1=None, atom2=1, shell2=None,
+def import_1e_integral_derivative(molecule, basis, int_type, atomi=1, atom1=None,
+                                  shell1=None, atom2=None, shell2=None,
                                   chk_file=None, unit="au", return_block=True,
                                   full_deriv=False):
     """
@@ -681,50 +792,55 @@ def import_1e_integral_derivative(molecule, basis, int_type, atomi=1, atom1=1,
     rows = []
     columns = []
     k = 0
-    for ao in ao_basis_map:
-        parts = ao.split()
-        atom = int(parts[0])
-        shell = parts[2]
-        if atom1 == atom:
-            if shell1 is not None:
-                for s in shell1:
-                    if s in shell:
-                        rows.append(k)
-            else:
-                rows.append(k)
-        if atom2 == atom:
-            if shell2 is not None:
-                for s in shell2:
-                    if s in shell:
-                        columns.append(k)
-            else:
-                columns.append(k)
-        k += 1
-    if rows == []:
-        raise ValueError("Atom or shell(s) not found.", atom1, shell1)
-    if columns == []:
-        raise ValueError("Atom or shell(s) not found.", atom2, shell2)
-    
 
-    vlx_int_block = np.zeros((vlx_int_deriv.shape[0], len(rows), len(columns)))
-
-    for k in range(len(rows)):
-        for l in range(len(columns)):
-            vlx_int_block[:, k, l] = vlx_int_deriv[:, rows[k], columns[l]]
-   
-    label = int_type+'_wrt_atom%d_shells_atom%d' % (atomi, atom1)
-    if shell1 is not None:
-        for s1 in shell1:
-            label += "_%s" % (s1)
-    label += "_atom%d" % (atom2)
-    if shell2 is not None:
-        for s2 in shell2:
-            label += "_%s" % (s2)
-
-    if chk_file is not None:
-        write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
+    if atom1 is None:
+        return_block = False
+    if atom2 is None:
+        return_block = False
 
     if return_block:
+        for ao in ao_basis_map:
+            parts = ao.split()
+            atom = int(parts[0])
+            shell = parts[2]
+            if atom1 == atom:
+                if shell1 is not None:
+                    for s in shell1:
+                        if s in shell:
+                            rows.append(k)
+                else:
+                    rows.append(k)
+            if atom2 == atom:
+                if shell2 is not None:
+                    for s in shell2:
+                        if s in shell:
+                            columns.append(k)
+                else:
+                    columns.append(k)
+            k += 1
+        if rows == []:
+            raise ValueError("Atom or shell(s) not found.", atom1, shell1)
+        if columns == []:
+            raise ValueError("Atom or shell(s) not found.", atom2, shell2)
+        
+
+        vlx_int_block = np.zeros((vlx_int_deriv.shape[0], len(rows), len(columns)))
+
+        for k in range(len(rows)):
+            for l in range(len(columns)):
+                vlx_int_block[:, k, l] = vlx_int_deriv[:, rows[k], columns[l]]
+   
+        label = int_type+'_wrt_atom%d_shells_atom%d' % (atomi, atom1)
+        if shell1 is not None:
+            for s1 in shell1:
+                label += "_%s" % (s1)
+        label += "_atom%d" % (atom2)
+        if shell2 is not None:
+            for s2 in shell2:
+                label += "_%s" % (s2)
+
+        if chk_file is not None:
+            write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
         return vlx_int_block
     else:
         return vlx_int_deriv
@@ -821,57 +937,61 @@ def numerical_electric_dipole_derivatives(molecule, ao_basis, int_type,
     rows = []
     columns = []
     k = 0
-    for ao in ao_basis_map:
-        parts = ao.split()
-        atom = int(parts[0])
-        shell = parts[2]
-        if atom1 == atom:
-            if shell1 is not None:
-                for s in shell1:
-                    if s in shell:
-                        rows.append(k)
-            else:
-                rows.append(k)
-        if atom2 == atom:
-            if shell2 is not None:
-                for s in shell2:
-                    if s in shell:
-                        columns.append(k)
-            else:
-                columns.append(k)
-        k += 1
-    if rows == []:
-        raise ValueError("Atom or shell(s) not found.", atom1, shell1)
-    if columns == []:
-        raise ValueError("Atom or shell(s) not found.", atom2, shell2)
-    
 
-    vlx_int_block = np.zeros((vlx_int_deriv.shape[0], len(rows), len(columns)))
-
-    for k in range(len(rows)):
-        for l in range(len(columns)):
-            vlx_int_block[:, k, l] = vlx_int_deriv[:, rows[k], columns[l]]
-   
-    label = int_type+'_wrt_atom%d_shells_atom%d' % (atomi, atom1)
-    if shell1 is not None:
-        for s1 in shell1:
-            label += "_%s" % (s1)
-    label += "_atom%d" % (atom2)
-    if shell2 is not None:
-        for s2 in shell2:
-            label += "_%s" % (s2)
-
-    if chk_file is not None:
-        write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
+    if atom1 is None:
+        return_blcok = False
+    if atom2 is None:
+        return_block = False
 
     if return_block:
+        for ao in ao_basis_map:
+            parts = ao.split()
+            atom = int(parts[0])
+            shell = parts[2]
+            if atom1 == atom:
+                if shell1 is not None:
+                    for s in shell1:
+                        if s in shell:
+                            rows.append(k)
+                else:
+                    rows.append(k)
+            if atom2 == atom:
+                if shell2 is not None:
+                    for s in shell2:
+                        if s in shell:
+                            columns.append(k)
+                else:
+                    columns.append(k)
+            k += 1
+        if rows == []:
+            raise ValueError("Atom or shell(s) not found.", atom1, shell1)
+        if columns == []:
+            raise ValueError("Atom or shell(s) not found.", atom2, shell2)
+        
+
+        vlx_int_block = np.zeros((vlx_int_deriv.shape[0], len(rows), len(columns)))
+
+        for k in range(len(rows)):
+            for l in range(len(columns)):
+                vlx_int_block[:, k, l] = vlx_int_deriv[:, rows[k], columns[l]]
+   
+        label = int_type+'_wrt_atom%d_shells_atom%d' % (atomi, atom1)
+        if shell1 is not None:
+            for s1 in shell1:
+                label += "_%s" % (s1)
+        label += "_atom%d" % (atom2)
+        if shell2 is not None:
+            for s2 in shell2:
+                label += "_%s" % (s2)
+
+        if chk_file is not None:
+            write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
         return vlx_int_block
     else:
         return vlx_int_deriv
 
-def import_1e_second_order_integral_derivative_braket(bra_molecule,
-                                  bra_basis, ket_molecule, ket_basis, int_type,
-                                  atomi, atomj, unit="au", full_deriv=False):
+def import_1e_second_order_integral_derivative_braket(bra_molecule, bra_basis, ket_molecule,
+                                                      ket_basis, int_type, atomi, atomj, unit="au"):
     """
     Imports one electron integral derivatives from pyscf and converts
     to veloxchem format. Specific atoms and shells can be selected.
@@ -879,6 +999,10 @@ def import_1e_second_order_integral_derivative_braket(bra_molecule,
     :param bra_molecule:
         the vlx molecule object for the bra side.
     :param bra_basis:
+        the vlx basis object for the bra side.
+    :param ket_molecule:
+        the vlx molecule object for the bra side.
+    :param ket_basis:
         the vlx basis object for the bra side.
     :param int_type:
         the type of one-electron integral: overlap, kinetic_energy,
@@ -892,10 +1016,6 @@ def import_1e_second_order_integral_derivative_braket(bra_molecule,
     :param unit:
         the units to be used for the molecular geometry;
         possible values: "au" (default), "Angstrom"
-    :param full_deriv:
-        if to calculate the full derivative
-        (nabla m | operator | n) + (m | operator | nabla n) (for debugging).
-
 
     :return:
         a numpy array corresponding to a specified block of 
@@ -920,6 +1040,8 @@ def import_1e_second_order_integral_derivative_braket(bra_molecule,
     i = atomi - 1 # to use pyscf indexing
     j = atomj - 1
 
+    #print("Python indexing atoms: ", i, j)
+
     pyscf_int_type = get_pyscf_integral_type(int_type)
     sign = get_sign(pyscf_int_type)
 
@@ -929,16 +1051,16 @@ def import_1e_second_order_integral_derivative_braket(bra_molecule,
         sign *= molecule.elem_ids_to_numpy()[j] # Z-number
         # (nabla_i m | nabla_j operator | n)
         with pyscf_molecule.with_rinv_at_nucleus(j): 
-            pyscf_int_deriv = sign * pyscf_molecule.intor(pyscf_int_type,
-                                                        bra_pyscf_molecule,
-                                                        ket_pyscf_molecule)
+            pyscf_int_deriv = sign * pyscf.gto.intor_cross(pyscf_int_type,
+                                                           bra_pyscf_molecule,
+                                                           ket_pyscf_molecule)
     else:
         pyscf_int_deriv = sign * pyscf.gto.intor_cross(pyscf_int_type,
                                                        bra_pyscf_molecule,
-                                                    ket_pyscf_molecule)
+                                                       ket_pyscf_molecule)
 
 
-    print("Integral type and sign", sign, pyscf_int_type)
+    #print("Integral type and sign", sign, pyscf_int_type)
     
     bra_ao_slices = bra_pyscf_molecule.aoslice_by_atom()
     ket_ao_slices = ket_pyscf_molecule.aoslice_by_atom()
@@ -954,36 +1076,6 @@ def import_1e_second_order_integral_derivative_braket(bra_molecule,
     else:
         pyscf_int_deriv_atoms_ij[:,ki:kf,kj:kg] = pyscf_int_deriv[:,ki:kf,kj:kg]
 
-
-    # (nabla**2 m | operator | n) + (m | operator | nabla**2 n)
-    # or (nabla m | operator | nabla n) + (nabla n | operator | nabla m)
-    # TODO: remove
-    #nao = pyscf_molecule.nao
-    ##if full_deriv:
-    ##    pyscf_int_deriv_atoms_ij += pyscf_int_deriv_atoms_ij.transpose(0,2,1)
-    ##    if pyscf_int_type in ["int1e_iprinvip"]:
-    ##        sign = get_sign(pyscf_int_type) * molecule.elem_ids_to_numpy()[i]
-    ##        # (nabla_j m | nabla_i operator | n)
-    ##        with pyscf_molecule.with_rinv_at_nucleus(i): 
-    ##            new_pyscf_int_deriv = sign * pyscf_molecule.intor(pyscf_int_type,
-    ##                                            aosym='s1').reshape((3,3,nao,nao))
-    ##        transposed_new_pyscf_int_deriv = new_pyscf_int_deriv.transpose(1,0,2,3)
-    ##        reshaped_new_pyscf_int_deriv = transposed_new_pyscf_int_deriv.reshape((3*3,nao,nao))
-    ##        new_pyscf_int_deriv_atoms_ij = np.zeros(pyscf_int_deriv.shape)
-    ##        new_pyscf_int_deriv_atoms_ij[:,kj:kg] += reshaped_new_pyscf_int_deriv[:,kj:kg]
-    ##        new_pyscf_int_deriv_atoms_ij += new_pyscf_int_deriv_atoms_ij.transpose(0,2,1)
-    ##        pyscf_int_deriv_atoms_ij += new_pyscf_int_deriv_atoms_ij
-    ##    elif pyscf_int_type in ["int1e_ipiprinv"]:
-    ##        sign = get_sign(pyscf_int_type) * molecule.elem_ids_to_numpy()[i]
-    ##        # (nabla_j m | nabla_i operator | n)
-    ##        with pyscf_molecule.with_rinv_at_nucleus(i): 
-    ##            new_pyscf_int_deriv = sign * pyscf_molecule.intor(pyscf_int_type,
-    ##                                            aosym='s1')
-    ##        new_pyscf_int_deriv_atoms_ij = np.zeros(pyscf_int_deriv.shape)
-    ##        new_pyscf_int_deriv_atoms_ij[:,kj:kg] += new_pyscf_int_deriv[:,kj:kg]
-    ##        new_pyscf_int_deriv_atoms_ij += new_pyscf_int_deriv_atoms_ij.transpose(0,2,1)
-    ##        pyscf_int_deriv_atoms_ij += new_pyscf_int_deriv_atoms_ij
-
     # Transform integral to veloxchem format
     vlx_int_deriv = np.zeros_like(pyscf_int_deriv_atoms_ij)
 
@@ -998,8 +1090,8 @@ def import_1e_second_order_integral_derivative_braket(bra_molecule,
 
 
 def import_1e_second_order_integral_derivative(molecule, basis, int_type,
-                                  atomi, atomj, atom1=1, shell1=None,
-                                  atom2=1, shell2=None, chk_file=None,
+                                  atomi, atomj, atom1=None, shell1=None,
+                                  atom2=None, shell2=None, chk_file=None,
                                   unit="au", return_block=True,
                                   full_deriv=False):
     """
@@ -1130,57 +1222,184 @@ def import_1e_second_order_integral_derivative(molecule, basis, int_type,
     rows = []
     columns = []
     k = 0
-    for ao in ao_basis_map:
-        parts = ao.split()
-        atom = int(parts[0])
-        shell = parts[2]
-        if atom1 == atom:
-            if shell1 is not None:
-                for s in shell1:
-                    if s in shell:
-                        rows.append(k)
-            else:
-                rows.append(k)
-        if atom2 == atom:
-            if shell2 is not None:
-                for s in shell2:
-                    if s in shell:
-                        columns.append(k)
-            else:
-                columns.append(k)
-        k += 1
-    if rows == []:
-        raise ValueError("Atom or shell(s) not found.", atom1, shell1)
-    if columns == []:
-        raise ValueError("Atom or shell(s) not found.", atom2, shell2)
-    
 
-    vlx_int_block = np.zeros((n_deriv, len(rows), len(columns)))
-
-    for k in range(len(rows)):
-        for l in range(len(columns)):
-            vlx_int_block[:, k, l] = vlx_int_deriv[:, rows[k], columns[l]]
-   
-    label = int_type+'_wrt_atom%d_atom%d_shells_atom%d' % (atomi, atomj, atom1)
-    if shell1 is not None:
-        for s1 in shell1:
-            label += "_%s" % (s1)
-    label += "_atom%d" % (atom2)
-    if shell2 is not None:
-        for s2 in shell2:
-            label += "_%s" % (s2)
-
-    if chk_file is not None:
-        write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
+    if atom1 is None:
+        return_block = False
+    if atom2 is None:
+        return_block = False
 
     if return_block:
+        for ao in ao_basis_map:
+            parts = ao.split()
+            atom = int(parts[0])
+            shell = parts[2]
+            if atom1 == atom:
+                if shell1 is not None:
+                    for s in shell1:
+                        if s in shell:
+                            rows.append(k)
+                else:
+                    rows.append(k)
+            if atom2 == atom:
+                if shell2 is not None:
+                    for s in shell2:
+                        if s in shell:
+                            columns.append(k)
+                else:
+                    columns.append(k)
+            k += 1
+        if rows == []:
+            raise ValueError("Atom or shell(s) not found.", atom1, shell1)
+        if columns == []:
+            raise ValueError("Atom or shell(s) not found.", atom2, shell2)
+        
+
+        vlx_int_block = np.zeros((n_deriv, len(rows), len(columns)))
+
+        for k in range(len(rows)):
+            for l in range(len(columns)):
+                vlx_int_block[:, k, l] = vlx_int_deriv[:, rows[k], columns[l]]
+   
+        label = int_type+'_wrt_atom%d_atom%d_shells_atom%d' % (atomi, atomj, atom1)
+        if shell1 is not None:
+            for s1 in shell1:
+                label += "_%s" % (s1)
+        label += "_atom%d" % (atom2)
+        if shell2 is not None:
+            for s2 in shell2:
+                label += "_%s" % (s2)
+
+        if chk_file is not None:
+            write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
         return vlx_int_block
     else:
         return vlx_int_deriv
 
-def import_2e_integral_derivative(molecule, basis, int_type, atomi, atom1=1,
-                        shell1=None, atom2=1, shell2=None, atom3=1, shell3=None,
-                        atom4=1, shell4=None, chk_file=None,
+def import_2e_integral_derivative_braket(bra1_molecule, bra1_basis, bra2_molecule, bra2_basis,
+                                         ket1_molecule, ket1_basis, ket2_molecule, ket2_basis,
+                                         int_type, atomi, unit="au"):
+    """
+    Imports two electron integral derivatives from pyscf and converts 
+    them to veloxchem format.
+
+    (mu nu | theta phi) with mu in bra1_molecule, nu in bra2_molecule,
+    theta in ket1_molecule, phi in ket2_molecule.
+
+    :param bra1_molecule:
+        the vlx molecule object for the bra side, first AO.
+    :param bra1_basis:
+        the vlx basis object for the bra side, first AO.
+    :param bra2_molecule:
+        the vlx molecule object for the bra side, second AO.
+    :param bra2_basis:
+        the vlx basis object for the bra side, second AO.
+    :param ket1_molecule:
+        the vlx molecule object for the ket side, first AO.
+    :param ket1_basis:
+        the vlx basis object for the bra side, first AO.
+    :param ket2_molecule:
+        the vlx molecule object for the ket side, second AO.
+    :param ket2_basis:
+        the vlx basis object for the ket side, second AO.
+    :param int_type:
+        the type of one-electron integral: overlap, kinetic_energy,
+                                           nuclear_attraction
+    :param atomi:
+        the index of the atom with respect to which the derivatives
+        are taken (indexing starts at 1) 
+    :param unit:
+        the units to be used for the molecular geometry;
+        possible values: "au" (default), "Angstrom"
+
+    :return:
+        a numpy array corresponding to a specified block of 
+        the selected two electron integral derivative matrix.
+    """
+
+    bra1_molecule_string = get_molecule_string(bra1_molecule)
+    bra1_basis_set_label = bra1_basis.get_label()
+    bra2_molecule_string = get_molecule_string(bra2_molecule)
+    bra2_basis_set_label = bra2_basis.get_label()
+    ket1_molecule_string = get_molecule_string(ket1_molecule)
+    ket1_basis_set_label = ket1_basis.get_label()
+    ket2_molecule_string = get_molecule_string(ket2_molecule)
+    ket2_basis_set_label = ket2_basis.get_label()
+
+    bra1_pyscf_basis = translate_to_pyscf(bra1_basis_set_label)
+    bra1_pyscf_molecule = pyscf.gto.M(atom=bra1_molecule_string,
+                                 basis=bra1_pyscf_basis, unit=unit,
+                                 charge=bra1_molecule.get_charge())
+    ket1_pyscf_basis = translate_to_pyscf(ket1_basis_set_label)
+    ket1_pyscf_molecule = pyscf.gto.M(atom=ket1_molecule_string,
+                                 basis=ket1_pyscf_basis, unit=unit,
+                                 charge=ket1_molecule.get_charge())
+
+    bra2_pyscf_basis = translate_to_pyscf(bra2_basis_set_label)
+    bra2_pyscf_molecule = pyscf.gto.M(atom=bra2_molecule_string,
+                                 basis=bra2_pyscf_basis, unit=unit,
+                                 charge=bra2_molecule.get_charge())
+    ket2_pyscf_basis = translate_to_pyscf(ket2_basis_set_label)
+    ket2_pyscf_molecule = pyscf.gto.M(atom=ket2_molecule_string,
+                                 basis=ket2_pyscf_basis, unit=unit,
+                                 charge=ket2_molecule.get_charge())
+
+    # Get the AO indeces corresponding to atom i
+    i = atomi - 1 # to use pyscf indexing
+
+    pyscf_int_type = get_pyscf_integral_type(int_type)
+    sign = get_sign(pyscf_int_type)
+
+
+    print("VLX layer: ", pyscf_int_type)
+
+    pyscf_int_deriv = sign * pyscf.gto.intor_cross_2e(pyscf_int_type,
+                                                   bra1_pyscf_molecule,
+                                                   bra2_pyscf_molecule,
+                                                   ket1_pyscf_molecule,
+                                                   ket2_pyscf_molecule)
+
+    nao1 = bra1_pyscf_molecule.nao
+    nao2 = bra2_pyscf_molecule.nao
+    nao3 = ket1_pyscf_molecule.nao
+    nao4 = ket2_pyscf_molecule.nao
+
+    bra1_ao_slices = bra1_pyscf_molecule.aoslice_by_atom()
+    ket1_ao_slices = ket1_pyscf_molecule.aoslice_by_atom()
+
+    bra2_ao_slices = bra1_pyscf_molecule.aoslice_by_atom()
+    ket2_ao_slices = ket1_pyscf_molecule.aoslice_by_atom()
+
+    # Get the AO indeces corresponding to atom i
+    ki, kf = bra1_ao_slices[i, 2:]
+
+    pyscf_int_deriv_atom_i = np.zeros(pyscf_int_deriv.shape)
+
+    pyscf_int_deriv_atom_i[:, ki:kf] = pyscf_int_deriv[:, ki:kf]
+
+    # Transform integral to veloxchem format
+    vlx_int_deriv = np.zeros_like(pyscf_int_deriv_atom_i)
+
+    basis_set_map1 = bra1_basis.get_index_map(bra1_molecule)
+    basis_set_map2 = bra2_basis.get_index_map(bra2_molecule)
+    basis_set_map3 = ket1_basis.get_index_map(ket1_molecule)
+    basis_set_map4 = ket2_basis.get_index_map(ket2_molecule)
+
+    for m in range(nao1):
+        for n in range(nao2):
+            for t in range(nao3):
+                for p in range(nao4):
+                    vm = basis_set_map1[m]
+                    vn = basis_set_map2[n]
+                    vt = basis_set_map3[t]
+                    vp = basis_set_map4[p]
+                    vlx_int_deriv[:,vm,vn,vt,vp] = (
+                                    pyscf_int_deriv_atom_i[:,m,n,t,p] )
+
+    return vlx_int_deriv
+
+def import_2e_integral_derivative(molecule, basis, int_type, atomi, atom1=None,
+                        shell1=None, atom2=None, shell2=None, atom3=None, shell3=None,
+                        atom4=None, shell4=None, chk_file=None,
                         unit="au", return_block=True, full_deriv=False):
     """
     Imports two electron integral derivatives from pyscf and converts 
@@ -1280,91 +1499,231 @@ def import_2e_integral_derivative(molecule, basis, int_type, atomi, atom1=1,
     index3 = []
     index4 = []
     k = 0
-    for ao in ao_basis_map:
-        parts = ao.split()
-        atom = int(parts[0])
-        shell = parts[2]
-        if atom1 == atom:
-            if shell1 is not None:
-                for s in shell1:
-                    if s in shell:
-                        index1.append(k)
-            else:
-                index1.append(k)
-        if atom2 == atom:
-            if shell2 is not None:
-                for s in shell2:
-                    if s in shell:
-                        index2.append(k)
-            else:
-                index2.append(k)
-        if atom3 == atom:
-            if shell3 is not None:
-                for s in shell3:
-                    if s in shell:
-                        index3.append(k)
-            else:
-                index3.append(k)
-        if atom4 == atom:
-            if shell4 is not None:
-                for s in shell4:
-                    if s in shell:
-                        index4.append(k)
-            else:
-                index4.append(k)
-        k += 1
-    if index1 == []:
-        raise ValueError("Atom or shell(s) not found.", atom1, shell1)
-    if index2 == []:
-        raise ValueError("Atom or shell(s) not found.", atom2, shell2)
-    if index3 == []:
-        raise ValueError("Atom or shell(s) not found.", atom3, shell3)
-    if index4 == []:
-        raise ValueError("Atom or shell(s) not found.", atom4, shell4)
-   
-    n_deriv = pyscf_int_deriv_atom_i.shape[0]
-    vlx_int_block = np.zeros((n_deriv, len(index1), len(index2),
-                              len(index3), len(index4)))
-    
-    for k in range(len(index1)):
-        for l in range(len(index2)):
-            for m in range(len(index3)):
-                for n in range(len(index4)):
-                    vlx_int_block[:,k,l,m,n] = vlx_int_deriv[:,index1[k],
-                                                       index2[l], index3[m],
-                                                       index4[n]]
-   
-    label = int_type+'_atom%d_shells_atom%d' % (atomi, atom1)
-    if shell1 is not None:
-        for s1 in shell1:
-            label += "_%s" % (s1)
 
-    label += "_atom%d" % (atom2)
-    if shell2 is not None:
-        for s2 in shell2:
-            label += "_%s" % (s2)
-
-    label += "_atom%d" % (atom3)
-    if shell3 is not None:
-        for s3 in shell3:
-            label += "_%s" % (s3)
-
-    label += "_atom%d" % (atom4)
-    if shell4 is not None:
-        for s4 in shell4:
-            label += "_%s" % (s4)
-
-    if chk_file is not None:
-        write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
+    if atom1 is None:
+        return_block = False
+    if atom2 is None:
+        return_block = False
+    if atom3 is None:
+        return_block = False
+    if atom4 is None:
+        return_block = False
 
     if return_block:
+        for ao in ao_basis_map:
+            parts = ao.split()
+            atom = int(parts[0])
+            shell = parts[2]
+            if atom1 == atom:
+                if shell1 is not None:
+                    for s in shell1:
+                        if s in shell:
+                            index1.append(k)
+                else:
+                    index1.append(k)
+            if atom2 == atom:
+                if shell2 is not None:
+                    for s in shell2:
+                        if s in shell:
+                            index2.append(k)
+                else:
+                    index2.append(k)
+            if atom3 == atom:
+                if shell3 is not None:
+                    for s in shell3:
+                        if s in shell:
+                            index3.append(k)
+                else:
+                    index3.append(k)
+            if atom4 == atom:
+                if shell4 is not None:
+                    for s in shell4:
+                        if s in shell:
+                            index4.append(k)
+                else:
+                    index4.append(k)
+            k += 1
+        if index1 == []:
+            raise ValueError("Atom or shell(s) not found.", atom1, shell1)
+        if index2 == []:
+            raise ValueError("Atom or shell(s) not found.", atom2, shell2)
+        if index3 == []:
+            raise ValueError("Atom or shell(s) not found.", atom3, shell3)
+        if index4 == []:
+            raise ValueError("Atom or shell(s) not found.", atom4, shell4)
+   
+        n_deriv = pyscf_int_deriv_atom_i.shape[0]
+        vlx_int_block = np.zeros((n_deriv, len(index1), len(index2),
+                                  len(index3), len(index4)))
+        
+        for k in range(len(index1)):
+            for l in range(len(index2)):
+                for m in range(len(index3)):
+                    for n in range(len(index4)):
+                        vlx_int_block[:,k,l,m,n] = vlx_int_deriv[:,index1[k],
+                                                           index2[l], index3[m],
+                                                           index4[n]]
+   
+        label = int_type+'_atom%d_shells_atom%d' % (atomi, atom1)
+        if shell1 is not None:
+            for s1 in shell1:
+                label += "_%s" % (s1)
+
+        label += "_atom%d" % (atom2)
+        if shell2 is not None:
+            for s2 in shell2:
+                label += "_%s" % (s2)
+
+        label += "_atom%d" % (atom3)
+        if shell3 is not None:
+            for s3 in shell3:
+                label += "_%s" % (s3)
+
+        label += "_atom%d" % (atom4)
+        if shell4 is not None:
+            for s4 in shell4:
+                label += "_%s" % (s4)
+
+        if chk_file is not None:
+            write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
+
         return vlx_int_block
     else:
         return vlx_int_deriv
 
+def import_2e_second_order_integral_derivative_braket(bra1_molecule, bra1_basis, bra2_molecule, bra2_basis,
+                                                      ket1_molecule, ket1_basis, ket2_molecule, ket2_basis,
+                                                      int_type, atomi, atomj, unit="au"):
+    """
+    Imports two electron integral derivatives from pyscf and converts 
+    them to veloxchem format.
+
+    (mu nu | theta phi) with mu in bra1_molecule, nu in bra2_molecule,
+    theta in ket1_molecule, phi in ket2_molecule.
+
+    :param bra1_molecule:
+        the vlx molecule object for the bra side, first AO.
+    :param bra1_basis:
+        the vlx basis object for the bra side, first AO.
+    :param bra2_molecule:
+        the vlx molecule object for the bra side, second AO.
+    :param bra2_basis:
+        the vlx basis object for the bra side, second AO.
+    :param ket1_molecule:
+        the vlx molecule object for the ket side, first AO.
+    :param ket1_basis:
+        the vlx basis object for the bra side, first AO.
+    :param ket2_molecule:
+        the vlx molecule object for the ket side, second AO.
+    :param ket2_basis:
+        the vlx basis object for the ket side, second AO.
+    :param int_type:
+        the type of one-electron integral: overlap, kinetic_energy,
+                                           nuclear_attraction
+    :param atomi:
+        the index of the first atom with respect to which the derivatives
+        are taken (indexing starts at 1)
+    :param atomj:
+        the index of the second atom with respect to which the derivatives
+        are taken (indexing starts at 1) 
+
+    :return:
+        a numpy array corresponding to a specified block of 
+        the selected two electron integral derivative matrix.
+    """
+
+    bra1_molecule_string = get_molecule_string(bra1_molecule)
+    bra1_basis_set_label = bra1_basis.get_label()
+    bra2_molecule_string = get_molecule_string(bra2_molecule)
+    bra2_basis_set_label = bra2_basis.get_label()
+    ket1_molecule_string = get_molecule_string(ket1_molecule)
+    ket1_basis_set_label = ket1_basis.get_label()
+    ket2_molecule_string = get_molecule_string(ket2_molecule)
+    ket2_basis_set_label = ket2_basis.get_label()
+
+    bra1_pyscf_basis = translate_to_pyscf(bra1_basis_set_label)
+    bra1_pyscf_molecule = pyscf.gto.M(atom=bra1_molecule_string,
+                                 basis=bra1_pyscf_basis, unit=unit,
+                                 charge=bra1_molecule.get_charge())
+    ket1_pyscf_basis = translate_to_pyscf(ket1_basis_set_label)
+    ket1_pyscf_molecule = pyscf.gto.M(atom=ket1_molecule_string,
+                                 basis=ket1_pyscf_basis, unit=unit,
+                                 charge=ket1_molecule.get_charge())
+
+    bra2_pyscf_basis = translate_to_pyscf(bra2_basis_set_label)
+    bra2_pyscf_molecule = pyscf.gto.M(atom=bra2_molecule_string,
+                                 basis=bra2_pyscf_basis, unit=unit,
+                                 charge=bra2_molecule.get_charge())
+    ket2_pyscf_basis = translate_to_pyscf(ket2_basis_set_label)
+    ket2_pyscf_molecule = pyscf.gto.M(atom=ket2_molecule_string,
+                                 basis=ket2_pyscf_basis, unit=unit,
+                                 charge=ket2_molecule.get_charge())
+
+    # Get the indices corresponding to atom i, j
+    i = atomi - 1 # to use pyscf indexing
+    j = atomj - 1
+
+    pyscf_int_type = get_pyscf_integral_type(int_type)
+    sign = get_sign(pyscf_int_type)
+
+    pyscf_int_deriv = sign * pyscf.gto.intor_cross_2e(pyscf_int_type,
+                                                   bra1_pyscf_molecule,
+                                                   bra2_pyscf_molecule,
+                                                   ket1_pyscf_molecule,
+                                                   ket2_pyscf_molecule)
+
+    nao1 = bra1_pyscf_molecule.nao
+    nao2 = bra2_pyscf_molecule.nao
+    nao3 = ket1_pyscf_molecule.nao
+    nao4 = ket2_pyscf_molecule.nao
+
+    bra1_ao_slices = bra1_pyscf_molecule.aoslice_by_atom()
+    ket1_ao_slices = ket1_pyscf_molecule.aoslice_by_atom()
+
+    bra2_ao_slices = bra1_pyscf_molecule.aoslice_by_atom()
+    ket2_ao_slices = ket1_pyscf_molecule.aoslice_by_atom()
+
+    # Get the AO indeces corresponding to atom i
+    ki, kf = bra1_ao_slices[i, 2:]
+
+    pyscf_int_deriv_atoms_ij = np.zeros(pyscf_int_deriv.shape)
+
+    if pyscf_int_type in ["int2e_ipvip1"]:
+        # ( nabla m nabla n | p q )
+        kj, kg = bra2_ao_slices[j, 2:]
+        pyscf_int_deriv_atoms_ij[:, ki:kf, kj:kg] = pyscf_int_deriv[:, ki:kf, kj:kg]
+    elif pyscf_int_type in ["int2e_ipip1"]:
+        # ( nabla^2 m n | p q )
+        if i == j: 
+            pyscf_int_deriv_atoms_ij[:, ki:kf] = pyscf_int_deriv[:, ki:kf]
+    else:
+        # ( nabla m n | nabla p q )
+        kj, kg = ket1_ao_slices[j, 2:]
+        pyscf_int_deriv_atoms_ij[:, ki:kf, :, kj:kg] = pyscf_int_deriv[:, ki:kf, :, kj:kg]
+
+    # Transform integral to veloxchem format
+    vlx_int_deriv = np.zeros_like(pyscf_int_deriv_atoms_ij)
+
+    basis_set_map1 = bra1_basis.get_index_map(bra1_molecule)
+    basis_set_map2 = bra2_basis.get_index_map(bra2_molecule)
+    basis_set_map3 = ket1_basis.get_index_map(ket1_molecule)
+    basis_set_map4 = ket2_basis.get_index_map(ket2_molecule)
+    for m in range(nao1):
+        for n in range(nao2):
+            for t in range(nao3):
+                for p in range(nao4):
+                    vm = basis_set_map1[m]
+                    vn = basis_set_map2[n]
+                    vt = basis_set_map3[t]
+                    vp = basis_set_map4[p]
+                    vlx_int_deriv[:,vm,vn,vt,vp] = (
+                                    pyscf_int_deriv_atoms_ij[:,m,n,t,p] )
+
+    return vlx_int_deriv
+
 def import_2e_second_order_integral_derivative(molecule, basis, int_type,
-                        atomi, atomj, atom1=1, shell1=None, atom2=1,
-                        shell2=None, atom3=1, shell3=None, atom4=1,
+                        atomi, atomj, atom1=None, shell1=None, atom2=None,
+                        shell2=None, atom3=None, shell3=None, atom4=None,
                         shell4=None, chk_file=None, unit="au",
                         return_block=True, full_deriv=False):
     """
@@ -1431,7 +1790,11 @@ def import_2e_second_order_integral_derivative(molecule, basis, int_type,
 
     pyscf_int_deriv = sign * pyscf_molecule.intor(pyscf_int_type, aosym='s1')
 
+    #print("\n\nImporting...: ", int_type, sign, pyscf_int_type, "\n\n")
+
     nao = pyscf_molecule.nao
+
+    #print("\n2e INT\n", pyscf_int_deriv.reshape(3, 3, nao, nao, nao, nao)[0,0], "\n\n")
 
     ao_slices = pyscf_molecule.aoslice_by_atom()
 
@@ -1444,17 +1807,23 @@ def import_2e_second_order_integral_derivative(molecule, basis, int_type,
     if pyscf_int_type in ["int2e_ipvip1"]:
         # ( nabla m nabla n | p q ) 
         pyscf_int_deriv_atoms_ij[:, ki:kf, kj:kg] = pyscf_int_deriv[:, ki:kf, kj:kg]
+    elif pyscf_int_type in ["int2e_ipip1"]:
+        # ( nabla^2 m n | p q ) 
+        #print("HERE!")
+        pyscf_int_deriv_atoms_ij[:, ki:kf] = pyscf_int_deriv[:, ki:kf]
     else:
         # ( nabla m n | nabla p q )
         pyscf_int_deriv_atoms_ij[:, ki:kf, :, kj:kg] = pyscf_int_deriv[:, ki:kf, :, kj:kg]
 
+    #print("\n2e INT\n", pyscf_int_deriv_atoms_ij.reshape(3, 3, nao, nao, nao, nao)[0,0], "\n\n")
+
     if full_deriv:
-        if pyscf_int_type in ["int2e_ipvip1"]:
+        if pyscf_int_type in ["int2e_ipvip1", "int2e_ipip1"]:
             #   (nabla_i m nabla_j n | p t ) + ( nabla_j m nabla_i n | p t )
             # + (m n | nabla_i p  nabla_j t) + ( m n | nabla_j p nabla_i t)
             pyscf_int_deriv_atoms_ij += ( pyscf_int_deriv_atoms_ij.transpose(0,2,1,4,3)
-                             + pyscf_int_deriv_atoms_ij.transpose(0,3,4,1,2)
-                             + pyscf_int_deriv_atoms_ij.transpose(0,4,3,2,1) )
+                                        + pyscf_int_deriv_atoms_ij.transpose(0,3,4,1,2)
+                                        + pyscf_int_deriv_atoms_ij.transpose(0,4,3,2,1) )
 
         elif pyscf_int_type in ["int2e_ip1ip2"]:
             #   (nabla_i m n | nabla_j p t ) + ( m nabla_i n | nabla_j p t )
@@ -1490,84 +1859,94 @@ def import_2e_second_order_integral_derivative(molecule, basis, int_type,
     index3 = []
     index4 = []
     k = 0
-    for ao in ao_basis_map:
-        parts = ao.split()
-        atom = int(parts[0])
-        shell = parts[2]
-        if atom1 == atom:
-            if shell1 is not None:
-                for s in shell1:
-                    if s in shell:
-                        index1.append(k)
-            else:
-                index1.append(k)
-        if atom2 == atom:
-            if shell2 is not None:
-                for s in shell2:
-                    if s in shell:
-                        index2.append(k)
-            else:
-                index2.append(k)
-        if atom3 == atom:
-            if shell3 is not None:
-                for s in shell3:
-                    if s in shell:
-                        index3.append(k)
-            else:
-                index3.append(k)
-        if atom4 == atom:
-            if shell4 is not None:
-                for s in shell4:
-                    if s in shell:
-                        index4.append(k)
-            else:
-                index4.append(k)
-        k += 1
-    if index1 == []:
-        raise ValueError("Atom or shell(s) not found.", atom1, shell1)
-    if index2 == []:
-        raise ValueError("Atom or shell(s) not found.", atom2, shell2)
-    if index3 == []:
-        raise ValueError("Atom or shell(s) not found.", atom3, shell3)
-    if index4 == []:
-        raise ValueError("Atom or shell(s) not found.", atom4, shell4)
-   
-    n_deriv = pyscf_int_deriv_atoms_ij.shape[0]
-    vlx_int_block = np.zeros((n_deriv, len(index1), len(index2),
-                              len(index3), len(index4)))
     
-    for k in range(len(index1)):
-        for l in range(len(index2)):
-            for m in range(len(index3)):
-                for n in range(len(index4)):
-                    vlx_int_block[:,k,l,m,n] = vlx_int_deriv[:,index1[k],
-                                                       index2[l], index3[m],
-                                                       index4[n]]
-   
-    label = int_type+'_atom%d_atom%d_shells_atom%d' % (atomi, atomj, atom1)
-    if shell1 is not None:
-        for s1 in shell1:
-            label += "_%s" % (s1)
-
-    label += "_atom%d" % (atom2)
-    if shell2 is not None:
-        for s2 in shell2:
-            label += "_%s" % (s2)
-
-    label += "_atom%d" % (atom3)
-    if shell3 is not None:
-        for s3 in shell3:
-            label += "_%s" % (s3)
-
-    label += "_atom%d" % (atom4)
-    if shell4 is not None:
-        for s4 in shell4:
-            label += "_%s" % (s4)
-
-    if chk_file is not None:
-        write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
+    if atom1 is None:
+        return_block = False
+    if atom2 is None:
+        return_block = False
+    if atom3 is None:
+        return_block = False
+    if atom4 is None:
+        return_block = False
 
     if return_block:
+        for ao in ao_basis_map:
+            parts = ao.split()
+            atom = int(parts[0])
+            shell = parts[2]
+            if atom1 == atom:
+                if shell1 is not None:
+                    for s in shell1:
+                        if s in shell:
+                            index1.append(k)
+                else:
+                    index1.append(k)
+            if atom2 == atom:
+                if shell2 is not None:
+                    for s in shell2:
+                        if s in shell:
+                            index2.append(k)
+                else:
+                    index2.append(k)
+            if atom3 == atom:
+                if shell3 is not None:
+                    for s in shell3:
+                        if s in shell:
+                            index3.append(k)
+                else:
+                    index3.append(k)
+            if atom4 == atom:
+                if shell4 is not None:
+                    for s in shell4:
+                        if s in shell:
+                            index4.append(k)
+                else:
+                    index4.append(k)
+            k += 1
+        if index1 == []:
+            raise ValueError("Atom or shell(s) not found.", atom1, shell1)
+        if index2 == []:
+            raise ValueError("Atom or shell(s) not found.", atom2, shell2)
+        if index3 == []:
+            raise ValueError("Atom or shell(s) not found.", atom3, shell3)
+        if index4 == []:
+            raise ValueError("Atom or shell(s) not found.", atom4, shell4)
+   
+        n_deriv = pyscf_int_deriv_atoms_ij.shape[0]
+        vlx_int_block = np.zeros((n_deriv, len(index1), len(index2),
+                                  len(index3), len(index4)))
+        
+        for k in range(len(index1)):
+            for l in range(len(index2)):
+                for m in range(len(index3)):
+                    for n in range(len(index4)):
+                        vlx_int_block[:,k,l,m,n] = vlx_int_deriv[:,index1[k],
+                                                           index2[l], index3[m],
+                                                           index4[n]]
+   
+        label = int_type+'_atom%d_atom%d_shells_atom%d' % (atomi, atomj, atom1)
+        if shell1 is not None:
+            for s1 in shell1:
+                label += "_%s" % (s1)
+
+        label += "_atom%d" % (atom2)
+        if shell2 is not None:
+            for s2 in shell2:
+                label += "_%s" % (s2)
+
+        label += "_atom%d" % (atom3)
+        if shell3 is not None:
+            for s3 in shell3:
+                label += "_%s" % (s3)
+
+        label += "_atom%d" % (atom4)
+        if shell4 is not None:
+            for s4 in shell4:
+                label += "_%s" % (s4)
+
+        if chk_file is not None:
+            write_2d_array_hdf5(chk_file, [vlx_int_block], labels=[label])
+
         return vlx_int_block
     else:
         return vlx_int_deriv
@@ -2861,6 +3240,8 @@ def eri_second_deriv_archetypes(molecule, basis, i=0, j=0, unit="au"):
     pyscf_eri_deriv_ii = pyscf_molecule.intor('int2e_ipip1', aosym='s1').reshape(
                                 3, 3, nao, nao, nao, nao)
 
+    #print("\n\nARCHETYPES:\n", pyscf_eri_deriv_ii[0, 0], "\n")
+
     # terms with two nablas on same side
     pyscf_eri_deriv_ij = pyscf_molecule.intor('int2e_ipvip1', aosym='s1').reshape(
                                 3, 3, nao, nao, nao, nao)
@@ -2882,6 +3263,8 @@ def eri_second_deriv_archetypes(molecule, basis, i=0, j=0, unit="au"):
     #   (nabla**2 m n | t p) + ( m nabla**2 n | t p)
     # + (m n | nabla**2 t p) + (m n | t nabla**2 p)
     eri_deriv_atom_ii[:, :, ki:kf] = pyscf_eri_deriv_ii[:, :, ki:kf]
+    #print("\n\nARCHETYPES:\n", eri_deriv_atom_ii[0, 0], "\n")
+
     eri_deriv_atom_ii += ( eri_deriv_atom_ii.transpose(0,1,3,2,5,4)
                          + eri_deriv_atom_ii.transpose(0,1,4,5,2,3)
                          + eri_deriv_atom_ii.transpose(0,1,5,4,3,2) )
