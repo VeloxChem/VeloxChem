@@ -250,6 +250,8 @@ class OptimizationDriver:
                 self.print_vib_analysis(filename, 'vdata_first')
             final_mol = molecule
 
+            opt_results = {'final_geometry': final_mol.get_xyz_string()}
+
         else:
             coords = m.xyzs[-1] / geometric.nifty.bohr2ang
             labels = molecule.get_labels()
@@ -262,6 +264,8 @@ class OptimizationDriver:
                 final_mol = Molecule()
             final_mol.broadcast(self.rank, self.comm)
 
+            opt_results = {'final_geometry': final_mol.get_xyz_string()}
+
             if self.rank == mpi_master():
                 self.grad_drv.ostream.print_info(
                     'Geometry optimization completed.')
@@ -271,8 +275,42 @@ class OptimizationDriver:
 
                 if self.constraints and '$scan' in self.constraints:
                     self.print_scan_result(m)
+
+                    all_energies = []
+                    all_coords_au = []
+                    for step, energy, xyz in zip(m.comms, m.qm_energies,
+                                                 m.xyzs):
+                        if step.split()[:2] == ['Iteration', '0']:
+                            all_energies.append([])
+                            all_coords_au.append([])
+                        all_energies[-1].append(energy)
+                        all_coords_au[-1].append(xyz / geometric.nifty.bohr2ang)
+
+                    opt_results['scan_energies'] = [
+                        opt_energies[-1] for opt_energies in all_energies
+                    ]
+
+                    opt_results['scan_geometries'] = []
+                    labels = molecule.get_labels()
+                    for opt_coords_au in all_coords_au:
+                        mol = Molecule(labels, opt_coords_au[-1], units='au')
+                        opt_results['scan_geometries'].append(
+                            mol.get_xyz_string())
+
                 else:
                     self.print_opt_result(m)
+
+                    opt_results['opt_energies'] = list(m.qm_energies)
+
+                    opt_results['opt_geometries'] = []
+                    labels = molecule.get_labels()
+                    for xyz in m.xyzs:
+                        mol = Molecule(labels,
+                                       xyz / geometric.nifty.bohr2ang,
+                                       units='au')
+                        opt_results['opt_geometries'].append(
+                            mol.get_xyz_string())
+
                     if self.ref_xyz:
                         self.print_ic_rmsd(final_mol, self.ref_xyz)
                     else:
@@ -290,12 +328,14 @@ class OptimizationDriver:
                 self.ostream.print_blank()
                 self.ostream.flush()
 
+            opt_results = self.comm.bcast(opt_results, root=mpi_master())
+
         try:
             temp_dir.cleanup()
         except (NotADirectoryError, PermissionError):
             pass
 
-        return final_mol
+        return opt_results
 
     def conv_flags(self):
         """

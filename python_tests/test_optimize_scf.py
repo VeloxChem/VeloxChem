@@ -5,6 +5,7 @@ import pytest
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.veloxchemlib import bohr_in_angstrom
 from veloxchem.mpitask import MpiTask
+from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfgradientdriver import ScfGradientDriver
@@ -41,9 +42,10 @@ class TestOptimizeSCF:
             'filename': task.input_dict['filename'],
             'keep_files': 'no',
         })
-        opt_mol = opt_drv.compute(task.molecule, task.ao_basis)
+        opt_results = opt_drv.compute(task.molecule, task.ao_basis)
 
         if is_mpi_master(task.mpi_comm):
+            opt_mol = Molecule.read_xyz_string(opt_results['final_geometry'])
             opt_coords = opt_mol.get_coordinates_in_bohr()
             assert np.max(np.abs(opt_coords - ref_coords)) < 1.0e-6
 
