@@ -223,6 +223,7 @@ export_moldata(py::module& m)
         .def("check_proximity", &CMolecule_check_proximity, "Checks proximity of atoms.", "minDistance"_a)
         .def("get_elemental_composition", &CMolecule::getElementalComposition, "Gets set of unique chemical elements in molecule.")
         .def("get_atom_coordinates", &CMolecule::getAtomCoordinates, "Gets coordinates (x,y,z) of atom.", "iAtom"_a)
+        .def("set_atom_coordinates", &CMolecule::setAtomCoordinates, "Sets coordinates (x,y,z) of atom.", "iAtom"_a, "xyz"_a)
         .def("nuclear_repulsion_energy",
              &CMolecule::getNuclearRepulsionEnergy,
              "Gets nuclear repulsion energy for molecule assuming point charge model for nucleus.")

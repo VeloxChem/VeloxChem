@@ -247,9 +247,6 @@ def _Molecule_rotate_dihedral(self, dihedral_indices_one_based, rotation_angle):
         The dihedral indices (1-based).
     :param rotation_angle:
         The rotation angle.
-
-    :return:
-        The new molecule after rotation of dihedral angle.
     """
 
     assert_msg_critical(
@@ -287,7 +284,6 @@ def _Molecule_rotate_dihedral(self, dihedral_indices_one_based, rotation_angle):
 
     # rotate whole molecule around unit vector i->j
     coords_in_au = self.get_coordinates_in_bohr()
-    labels = self.get_labels()
 
     vij = coords_in_au[j] - coords_in_au[i]
     uij = vij / np.linalg.norm(vij)
@@ -313,13 +309,15 @@ def _Molecule_rotate_dihedral(self, dihedral_indices_one_based, rotation_angle):
     rotation_matrix[0, 2] = m_cos_theta * uij[0] * uij[2] + sin_theta * uij[1]
 
     new_coords_in_au = np.matmul(coords_in_au - coords_in_au[j],
-                                 rotation_matrix) + coords_in_au[j]
+                                 rotation_matrix.T) + coords_in_au[j]
 
-    # restore coordinates for atoms coneected to i
+    # restore coordinates for atoms connected to i
     for idx in atoms_connected_to_i:
         new_coords_in_au[idx, :] = coords_in_au[idx, :]
 
-    return Molecule(labels, new_coords_in_au, 'bohr')
+    # update coordinates in molecule
+    for idx in range(new_coords_in_au.shape[0]):
+        self.set_atom_coordinates(idx, new_coords_in_au[idx])
 
 
 def _Molecule_center_of_mass(self):
