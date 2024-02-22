@@ -140,9 +140,8 @@ class XtbHessianDriver(HessianDriver):
                     new_mol.set_multiplicity(multiplicity)
                     # create a new XTB driver object;
                     # without this the energy is always zero...;
-                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv = XtbDriver(self.comm, self.ostream)
                     new_xtb_drv.set_method(self.xtb_driver.get_method())
-                    new_xtb_drv.ostream.mute()
                     new_xtb_drv.compute(new_mol)
 
                     grad_plus = new_xtb_drv.get_gradient()
@@ -153,9 +152,8 @@ class XtbHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
-                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv = XtbDriver(self.comm, self.ostream)
                     new_xtb_drv.set_method(self.xtb_driver.get_method())
-                    new_xtb_drv.ostream.mute()
                     new_xtb_drv.compute(new_mol)
 
                     grad_minus = new_xtb_drv.get_gradient()
@@ -182,9 +180,8 @@ class XtbHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
-                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv = XtbDriver(self.comm, self.ostream)
                     new_xtb_drv.set_method(self.xtb_driver.get_method())
-                    new_xtb_drv.ostream.mute()
                     new_xtb_drv.compute(new_mol)
 
                     grad_plus1 = new_xtb_drv.get_gradient()
@@ -195,9 +192,8 @@ class XtbHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
-                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv = XtbDriver(self.comm, self.ostream)
                     new_xtb_drv.set_method(self.xtb_driver.get_method())
-                    new_xtb_drv.ostream.mute()
                     new_xtb_drv.compute(new_mol)
 
                     grad_plus2 = new_xtb_drv.get_gradient()
@@ -208,9 +204,8 @@ class XtbHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
-                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv = XtbDriver(self.comm, self.ostream)
                     new_xtb_drv.set_method(self.xtb_driver.get_method())
-                    new_xtb_drv.ostream.mute()
                     new_xtb_drv.compute(new_mol)
 
                     grad_minus1 = new_xtb_drv.get_gradient()
@@ -221,9 +216,8 @@ class XtbHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
-                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv = XtbDriver(self.comm, self.ostream)
                     new_xtb_drv.set_method(self.xtb_driver.get_method())
-                    new_xtb_drv.ostream.mute()
                     new_xtb_drv.compute(new_mol)
 
                     grad_minus2 = new_xtb_drv.get_gradient()
