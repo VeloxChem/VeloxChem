@@ -25,6 +25,7 @@
 
 from pathlib import Path
 import numpy as np
+import math
 
 from .veloxchemlib import Molecule
 from .veloxchemlib import ChemicalElement
@@ -208,6 +209,119 @@ def _Molecule_from_dict(mol_dict):
     return mol
 
 
+def _Molecule_get_connectivity_matrix(self, factor=1.3):
+    """
+    Gets connectivity matrix.
+
+    :param factor:
+        Scaling factor for the covalent radii to account for the bond
+        threshold.
+
+    :return:
+        The connectivity matrix as a numpy array of integers.
+    """
+
+    coords_in_au = self.get_coordinates_in_bohr()
+    covalent_radii_in_au = self.covalent_radii_to_numpy()
+
+    natoms = coords_in_au.shape[0]
+    connectivity_matrix = np.zeros((natoms, natoms), dtype='int32')
+
+    for i in range(natoms):
+        for j in range(i + 1, natoms):
+            distance = np.linalg.norm(coords_in_au[j] - coords_in_au[i])
+            threshold = (covalent_radii_in_au[i] +
+                         covalent_radii_in_au[j]) * 1.3
+            if distance <= threshold:
+                connectivity_matrix[i, j] = 1
+                connectivity_matrix[j, i] = 1
+
+    return connectivity_matrix
+
+
+def _Molecule_rotate_dihedral(self, dihedral_indices_one_based, rotation_angle):
+    """
+    Rotates a bond.
+
+    :param dihedral_indices_one_based:
+        The dihedral indices (1-based).
+    :param rotation_angle:
+        The rotation angle.
+
+    :return:
+        The new molecule after rotation of dihedral angle.
+    """
+
+    assert_msg_critical(
+        len(dihedral_indices_one_based) == 4,
+        'Molecule.rotate_dihedral: Expecting four atom indices (1-based)')
+
+    # get the 0-based atom indices for central bond
+    i = dihedral_indices_one_based[1] - 1
+    j = dihedral_indices_one_based[2] - 1
+
+    # disconnect i-j and find all atoms that at connected to i
+    connectivity_matrix = self.get_connectivity_matrix()
+    connectivity_matrix[i, j] = 0
+    connectivity_matrix[j, i] = 0
+
+    atoms_connected_to_i = set()
+    atoms_connected_to_i.add(i)
+
+    while True:
+        more_connected_atoms = set()
+        for a in atoms_connected_to_i:
+            for b in range(connectivity_matrix.shape[0]):
+                if (b not in atoms_connected_to_i and
+                        connectivity_matrix[a, b] == 1):
+                    more_connected_atoms.add(b)
+        if more_connected_atoms:
+            atoms_connected_to_i.update(more_connected_atoms)
+        else:
+            break
+
+    assert_msg_critical(
+        j not in atoms_connected_to_i,
+        'Molecule.rotate_dihedral: Cannot rotate dihedral (Maybe it is part of a ring?)'
+    )
+
+    # rotate whole molecule around unit vector i->j
+    coords_in_au = self.get_coordinates_in_bohr()
+    labels = self.get_labels()
+
+    vij = coords_in_au[j] - coords_in_au[i]
+    uij = vij / np.linalg.norm(vij)
+
+    theta = math.pi * rotation_angle / 180.0
+    cos_theta = math.cos(theta)
+    sin_theta = math.sin(theta)
+    m_cos_theta = 1.0 - cos_theta
+
+    rotation_matrix = np.zeros((3, 3))
+
+    rotation_matrix[0, 0] = cos_theta + m_cos_theta * uij[0]**2
+    rotation_matrix[1, 1] = cos_theta + m_cos_theta * uij[1]**2
+    rotation_matrix[2, 2] = cos_theta + m_cos_theta * uij[2]**2
+
+    rotation_matrix[0, 1] = m_cos_theta * uij[0] * uij[1] - sin_theta * uij[2]
+    rotation_matrix[1, 0] = m_cos_theta * uij[1] * uij[0] + sin_theta * uij[2]
+
+    rotation_matrix[1, 2] = m_cos_theta * uij[1] * uij[2] - sin_theta * uij[0]
+    rotation_matrix[2, 1] = m_cos_theta * uij[2] * uij[1] + sin_theta * uij[0]
+
+    rotation_matrix[2, 0] = m_cos_theta * uij[2] * uij[0] - sin_theta * uij[1]
+    rotation_matrix[0, 2] = m_cos_theta * uij[0] * uij[2] + sin_theta * uij[1]
+
+    new_coords_in_au = np.matmul(coords_in_au - coords_in_au[j],
+                                 rotation_matrix) + coords_in_au[j]
+
+    # restore coordinates for atoms coneected to i
+    for idx in atoms_connected_to_i:
+        new_coords_in_au[idx, :] = coords_in_au[idx, :]
+
+    return Molecule(labels, new_coords_in_au, 'bohr')
+
+
 def _Molecule_center_of_mass(self):
     """
     Computes center of mass of a molecule in Bohr (for backward compatibility).
@@ -389,7 +503,11 @@ def _Molecule_write_xyz_file(self, xyz_filename):
         fh.write(self.get_xyz_string())
 
 
-def _Molecule_show(self, width=400, height=300):
+def _Molecule_show(self,
+                   width=400,
+                   height=300,
+                   atom_indices=False,
+                   atom_labels=False):
     """
     Creates a 3D view with py3dmol.
 
@@ -397,6 +515,10 @@ def _Molecule_show(self, width=400, height=300):
         The width.
     :param height:
         The height.
+    :param atom_indices:
+        The flag for showing atom indices (1-based).
+    :param atom_labels:
+        The flag for showing atom labels.
     """
 
     try:
@@ -405,6 +527,27 @@ def _Molecule_show(self, width=400, height=300):
         viewer.addModel(self.get_xyz_string())
         viewer.setViewStyle({"style": "outline", "width": 0.05})
         viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
+        if atom_indices or atom_labels:
+            coords = self.get_coordinates_in_angstrom()
+            labels = self.get_labels()
+            for i in range(coords.shape[0]):
+                text = ''
+                if atom_labels:
+                    text += f'{labels[i]}'
+                if atom_indices:
+                    text += f'{i + 1}'
+                viewer.addLabel(
+                    text, {
+                        'position': {
+                            'x': coords[i, 0],
+                            'y': coords[i, 1],
+                            'z': coords[i, 2],
+                        },
+                        'alignment': 'center',
+                        'fontColor': 0x000000,
+                        'backgroundColor': 0xffffff,
+                        'backgroundOpacity': 0.0,
+                    })
         viewer.zoomTo()
         viewer.show()
 
@@ -615,6 +758,8 @@ Molecule.read_molecule_string = _Molecule_read_molecule_string
 Molecule.read_xyz_file = _Molecule_read_xyz_file
 Molecule.read_xyz_string = _Molecule_read_xyz_string
 Molecule.from_dict = _Molecule_from_dict
+Molecule.get_connectivity_matrix = _Molecule_get_connectivity_matrix
+Molecule.rotate_dihedral = _Molecule_rotate_dihedral
 Molecule.center_of_mass = _Molecule_center_of_mass
 Molecule.center_of_mass_in_bohr = _Molecule_center_of_mass_in_bohr
 Molecule.center_of_mass_in_angstrom = _Molecule_center_of_mass_in_angstrom

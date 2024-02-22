@@ -30,7 +30,7 @@ import networkx as nx
 import sys
 import re
 
-from .veloxchemlib import mpi_master, bohr_in_angstrom
+from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 
 
@@ -98,35 +98,6 @@ class AtomTypeIdentifier:
 
         # GAFF version
         self.gaff_version = None
-
-    def create_connectivity_matrix(self, factor=1.3):
-        """
-        Creates a connectivity matrix for the molecule based on the atomic
-        coordinates and covalent radii, determining which atoms are bonded.
-
-        :param factor:
-            A scaling factor for the covalent radii to account for the bond
-            threshold.  Default value is 1.3.
-        """
-
-        num_atoms = self.coordinates.shape[0]
-
-        self.connectivity_matrix = np.zeros((num_atoms, num_atoms),
-                                            dtype='int32')
-        self.distance_matrix = np.zeros((num_atoms, num_atoms))
-
-        for i in range(num_atoms):
-            for j in range(i + 1, num_atoms):
-                distance = self.measure_length(self.coordinates[i],
-                                               self.coordinates[j])
-                adjusted_threshold = (self.covalent_radii[i] +
-                                      self.covalent_radii[j]) * factor
-
-                if distance <= adjusted_threshold:
-                    self.connectivity_matrix[i][j] = 1
-                    self.connectivity_matrix[j][i] = 1
-                    self.distance_matrix[i][j] = distance
-                    self.distance_matrix[j][i] = distance
 
     def plot_connectivity_map_3D(self):
         """
@@ -1961,9 +1932,10 @@ class AtomTypeIdentifier:
         # Workflow of the method
         self.coordinates = molecule.get_coordinates_in_angstrom()
         self.atomic_symbols = molecule.get_labels()
-        self.covalent_radii = (molecule.covalent_radii_to_numpy() *
-                               bohr_in_angstrom())
-        self.create_connectivity_matrix()
+
+        self.connectivity_matrix = molecule.get_connectivity_matrix()
+        self.distance_matrix = molecule.get_distance_matrix_in_angstrom()
+
         self.detect_closed_cyclic_structures()
         self.create_atom_info_dict()
         self.decide_atom_type()
