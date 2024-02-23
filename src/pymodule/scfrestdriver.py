@@ -89,11 +89,10 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
+
+            # TODO: do the following 3 lines in one shot on GPU
             fds = matmul_gpu(fock_mat, matmul_gpu(den_mat.alpha_to_numpy(0), ovl_mat))
-
-            # TODO: use hipblas
             fds = fds - fds.T
-
             e_mat = matmul_gpu(oao_mat.T, matmul_gpu(fds, oao_mat))
 
             e_mat_shape = e_mat.shape
@@ -166,41 +165,6 @@ class ScfRestrictedDriver(ScfDriver):
             self._fock_matrices_alpha.append(fock_mat)
             self._density_matrices_alpha.append(den_mat.alpha_to_numpy(0))
 
-    def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
-        """
-        Computes effective spin restricted closed shell Fock/Kohn-Sham matrix
-        in OAO basis by applying Lowdin or canonical orthogonalization to AO
-        Fock/Kohn-Sham matrix. Overloaded base class method.
-
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
-        :param ovl_mat:
-            The overlap matrix.
-        :param oao_mat:
-            The orthogonalization matrix.
-
-        :return:
-            The effective Fock/Kohn-Sham matrix.
-        """
-
-        if self.rank == mpi_master():
-
-            if len(self._fock_matrices_alpha) == 1:
-                return np.copy(self._fock_matrices_alpha[0])
-
-            if len(self._fock_matrices_alpha) > 1:
-                acc_diis = CTwoDiis()
-                acc_diis.compute_error_vectors_restricted(
-                    self._fock_matrices_alpha, self._density_matrices_alpha,
-                    ovl_mat, oao_mat)
-                weights = acc_diis.compute_weights()
-
-                return self._get_scaled_fock(weights)
-
-            return fock_mat
-
-        return None
-
     def _get_scaled_fock(self, weights):
         """
         Computes effective spin restricted closed shell Fock/Kohn-Sham matrix
@@ -240,12 +204,12 @@ class ScfRestrictedDriver(ScfDriver):
         if self.rank == mpi_master():
             tmat = oao_mat
 
+            # TODO: do the following 4 lines in one shot on GPU
             fmo = matmul_gpu(tmat.T, matmul_gpu(fock_mat, tmat))
-
             eigs, evecs_T = eigh_gpu(fmo)
             evecs = evecs_T.T
-
             orb_coefs = matmul_gpu(tmat, evecs)
+
             orb_coefs, eigs = self._delete_mos(orb_coefs, eigs)
 
             occa = molecule.get_aufbau_alpha_occupation(eigs.size)

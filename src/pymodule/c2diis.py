@@ -25,7 +25,7 @@
 
 import numpy as np
 
-from .veloxchemlib import matmul_gpu, weighted_sum_gpu, dot_product_gpu
+from .veloxchemlib import weighted_sum_gpu, dot_product_gpu
 
 
 class CTwoDiis:
@@ -91,36 +91,6 @@ class CTwoDiis:
             weights = self.compute_weights()
             effmat = weighted_sum_gpu(weights, self.fock_matrices)
             return effmat
-
-    def compute_error_vectors_restricted(self, fock_matrices, density_matrices,
-                                         overlap_matrix, oao_matrix):
-        """
-        Computes error vectors for list of AO Fock matrices using (FDS - SDF)
-        in orthogonal AO basis.
-
-        :param fock_matrices:
-            The list of AO Fock matrices.
-        :param density_matrices:
-            The list of AO density matrices.
-        :param overlap_matrix:
-            The overlap matrix.
-        :param oao_matrix:
-            The orthogonalization matrix.
-        """
-
-        smat = overlap_matrix
-        tmat = oao_matrix
-
-        self.error_vectors.clear()
-
-        for fmat, dmat in zip(fock_matrices, density_matrices):
-
-            fds = matmul_gpu(fmat, matmul_gpu(dmat, smat))
-
-            # TODO: use hipblas
-            fds = fds - fds.T
-
-            self.error_vectors.append(matmul_gpu(tmat.T, matmul_gpu(fds, tmat)))
 
     def compute_error_vectors_restricted_openshell(self, fock_matrices,
                                                    fock_matrices_beta,

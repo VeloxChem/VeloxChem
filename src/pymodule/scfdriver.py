@@ -1157,7 +1157,6 @@ class ScfDriver:
 
             eff_fock_t0 = tm.time()
 
-            #eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
             if self.rank == mpi_master():
                 eff_fock_mat = acc_diis.get_effective_fock(fock_mat)
             else:
@@ -1924,24 +1923,6 @@ class ScfDriver:
         """
 
         return
-
-    def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
-        """
-        Computes effective Fock/Kohn-Sham matrix in OAO basis by applying
-        Lowdin or canonical orthogonalization to AO Fock/Kohn-Sham matrix.
-
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
-        :param ovl_mat:
-            The overlap matrix.
-        :param oao_mat:
-            The orthogonalization matrix.
-
-        :return:
-            The effective Fock/Kohn-Sham matrix.
-        """
-
-        return None
 
     def _gen_molecular_orbitals(self, molecule, fock_mat, oao_mat):
         """

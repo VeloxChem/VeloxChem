@@ -276,9 +276,8 @@ class MolecularOrbitals:
 
             occ = self.occa_to_numpy()
 
-            # TODO: use hipblas
+            # TODO: do the following 2 lines in one shot on GPU
             occ_mo = occ * mo
-
             dens = matmul_gpu(occ_mo, occ_mo.T)
 
             return AODensityMatrix([dens], denmat.rest)
