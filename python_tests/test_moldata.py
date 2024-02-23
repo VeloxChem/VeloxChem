@@ -392,3 +392,24 @@ class TestMolData:
 
             if fpath.is_file():
                 fpath.unlink()
+
+    def test_dihedral(self):
+
+        xyz_string = """
+            9
+            xyz
+            O    1.0869000    0.1138800   -0.0607300
+            C    2.4552500    0.1321200   -0.0713900
+            C    3.1716739   -0.8387881    0.4963898
+            C    2.4950671   -1.9681057    1.1567992
+            O    1.6690694   -2.6538656    0.5680047
+            H    0.7865200   -0.6862400    0.4071700
+            H    2.8715536    0.9951677   -0.5760745
+            H    4.2543242   -0.8400731    0.4971660
+            H    2.7731563   -2.1600957    2.2063667
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        assert abs(mol.get_dihedral_in_degree((2, 3, 4, 5)) - 55.0) < 1e-4
+
+        mol.set_dihedral_in_degree((2, 3, 4, 5), 270.0)
+        assert abs(mol.get_dihedral_in_degree((2, 3, 4, 5)) + 90.0) < 1e-4

@@ -239,7 +239,7 @@ def _Molecule_get_connectivity_matrix(self, factor=1.3):
     return connectivity_matrix
 
 
-def _Molecule_get_dihedral(self, dihedral_indices_one_based):
+def _Molecule_get_dihedral_in_degree(self, dihedral_indices_one_based):
     """
     Gets dihedral angle in degree.
 
@@ -285,7 +285,8 @@ def _Molecule_get_dihedral(self, dihedral_indices_one_based):
     return phi
 
 
-def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle):
+def _Molecule_set_dihedral_in_degree(self, dihedral_indices_one_based,
+                                     target_angle):
     """
     Sets dihedral angle in degree.
 
@@ -295,12 +296,14 @@ def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle):
         The target value of dihedral angle.
     """
 
-    phi = self.get_dihedral(dihedral_indices_one_based)
+    phi = self.get_dihedral_in_degree(dihedral_indices_one_based)
 
-    self.rotate_dihedral(dihedral_indices_one_based, target_angle - phi)
+    self.rotate_dihedral_in_degree(dihedral_indices_one_based,
+                                   target_angle - phi)
 
 
-def _Molecule_rotate_dihedral(self, dihedral_indices_one_based, rotation_angle):
+def _Molecule_rotate_dihedral_in_degree(self, dihedral_indices_one_based,
+                                        rotation_angle):
     """
     Rotates a bond.
 
@@ -312,7 +315,8 @@ def _Molecule_rotate_dihedral(self, dihedral_indices_one_based, rotation_angle):
 
     assert_msg_critical(
         len(dihedral_indices_one_based) == 4,
-        'Molecule.rotate_dihedral: Expecting four atom indices (1-based)')
+        'Molecule.rotate_dihedral_in_degree: Expecting four atom indices (1-based)'
+    )
 
     # get the 0-based atom indices for central bond
     i = dihedral_indices_one_based[1] - 1
@@ -340,8 +344,8 @@ def _Molecule_rotate_dihedral(self, dihedral_indices_one_based, rotation_angle):
 
     assert_msg_critical(
         i not in atoms_connected_to_j,
-        'Molecule.rotate_dihedral: Cannot rotate dihedral (Maybe it is part of a ring?)'
-    )
+        'Molecule.rotate_dihedral_in_degree: Cannot rotate dihedral ' +
+        '(Maybe it is part of a ring?)')
 
     # rotate whole molecule around unit vector i->j
     coords_in_au = self.get_coordinates_in_bohr()
@@ -814,9 +818,9 @@ Molecule.read_xyz_file = _Molecule_read_xyz_file
 Molecule.read_xyz_string = _Molecule_read_xyz_string
 Molecule.from_dict = _Molecule_from_dict
 Molecule.get_connectivity_matrix = _Molecule_get_connectivity_matrix
-Molecule.get_dihedral = _Molecule_get_dihedral
-Molecule.set_dihedral = _Molecule_set_dihedral
-Molecule.rotate_dihedral = _Molecule_rotate_dihedral
+Molecule.get_dihedral_in_degree = _Molecule_get_dihedral_in_degree
+Molecule.set_dihedral_in_degree = _Molecule_set_dihedral_in_degree
+Molecule.rotate_dihedral_in_degree = _Molecule_rotate_dihedral_in_degree
 Molecule.center_of_mass = _Molecule_center_of_mass
 Molecule.center_of_mass_in_bohr = _Molecule_center_of_mass_in_bohr
 Molecule.center_of_mass_in_angstrom = _Molecule_center_of_mass_in_angstrom
