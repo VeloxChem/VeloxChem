@@ -41,7 +41,7 @@ from .veloxchemlib import AOKohnShamMatrix, DenseMatrix
 from .veloxchemlib import ScreeningData, GpuDevices
 from .veloxchemlib import mpi_master
 from .veloxchemlib import xcfun
-from .veloxchemlib import compute_fock_gpu, eigh_gpu, dot_product_gpu
+from .veloxchemlib import (compute_fock_gpu, eigh_gpu, weighted_sum_gpu, dot_product_gpu)
 from .veloxchemlib import compute_one_electron_integrals_gpu
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
@@ -1829,14 +1829,12 @@ class ScfDriver:
             D = den_mat.alpha_to_numpy(0)
             T = kin_mat
             V = npot_mat
-            e_ee = dot_product_gpu(D, fock_mat)
-            e_kin = 2.0 * dot_product_gpu(D, T)
-            e_en = -2.0 * dot_product_gpu(D, V)
+            Hcore_plus_full_Fock = weighted_sum_gpu([2.0, -2.0, 1.0], [T, V, fock_mat])
+            e_sum = dot_product_gpu(D, Hcore_plus_full_Fock)
             if self._dft and not self._first_step:
-                e_ee += vxc_mat.get_energy()
+                e_sum += vxc_mat.get_energy()
             if self._pe and not self._first_step:
-                e_ee += e_pe
-            e_sum = e_ee + e_kin + e_en
+                e_sum += e_pe
         else:
             e_sum = 0.0
         e_sum = self.comm.bcast(e_sum, root=mpi_master())

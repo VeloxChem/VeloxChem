@@ -135,9 +135,9 @@ class Profiler:
             import io
             self.pr.disable()
             s = io.StringIO()
-            sortby = 'cumulative'
+            sortby = 'time'
             ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
-            ps.print_stats(30)
+            ps.print_stats(50)
 
             valstr = 'Profiling summary'
             ostream.print_info('   ' + valstr)

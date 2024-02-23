@@ -156,14 +156,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
     // std::cout << ss.str();
 
-    if (gpu_rank % 8 == 0) hipSafe(hipSetDevice(4));
-    if (gpu_rank % 8 == 1) hipSafe(hipSetDevice(5));
-    if (gpu_rank % 8 == 2) hipSafe(hipSetDevice(2));
-    if (gpu_rank % 8 == 3) hipSafe(hipSetDevice(3));
-    if (gpu_rank % 8 == 4) hipSafe(hipSetDevice(6));
-    if (gpu_rank % 8 == 5) hipSafe(hipSetDevice(7));
-    if (gpu_rank % 8 == 6) hipSafe(hipSetDevice(0));
-    if (gpu_rank % 8 == 7) hipSafe(hipSetDevice(1));
+    hipSafe(hipSetDevice(gpu_rank % num_gpus_per_node));
 
     // Boys function (tabulated for order 0-28)
 
@@ -541,14 +534,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // ss << "\n(Prep.) rank " << rank << ",  gpu_rank " << gpu_rank << "\n";
     // std::cout << ss.str();
 
-    if (gpu_rank % 8 == 0) hipSafe(hipSetDevice(4));
-    if (gpu_rank % 8 == 1) hipSafe(hipSetDevice(5));
-    if (gpu_rank % 8 == 2) hipSafe(hipSetDevice(2));
-    if (gpu_rank % 8 == 3) hipSafe(hipSetDevice(3));
-    if (gpu_rank % 8 == 4) hipSafe(hipSetDevice(6));
-    if (gpu_rank % 8 == 5) hipSafe(hipSetDevice(7));
-    if (gpu_rank % 8 == 6) hipSafe(hipSetDevice(0));
-    if (gpu_rank % 8 == 7) hipSafe(hipSetDevice(1));
+    hipSafe(hipSetDevice(gpu_rank % num_gpus_per_node));
 
     CMultiTimer timer;
 
@@ -614,45 +600,23 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     const auto all_prim_count = s_prim_count + p_prim_count * 3;
 
-    // TODO double check the criteria
-    if (all_prim_count < 8192)
-    {
-        dim3 threads_per_block(TILE_DIM, TILE_DIM);
+    hipblasHandle_t handle;
+    hipblasSafe(hipblasCreate(&handle));
 
-        dim3 num_blocks((all_prim_count + threads_per_block.x - 1) / threads_per_block.x, (all_prim_count + threads_per_block.y - 1) / threads_per_block.y);
+    double alpha = 1.0, beta = 0.0;
 
-        hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_matrix_C, d_matrix_A, d_matrix_B,
-                static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count));
+    auto n = static_cast<int32_t>(all_prim_count);
 
-        hipSafe(hipDeviceSynchronize());
-
-        hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_matrix_B, d_matrix_C, d_matrix_A,
-                static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count));
-
-        hipSafe(hipMemcpy(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements() * sizeof(double), hipMemcpyDeviceToHost));
-    }
-    else
-    {
-        hipblasHandle_t handle;
-        hipblasSafe(hipblasCreate(&handle));
-
-        double alpha = 1.0, beta = 0.0;
-
-        auto n = static_cast<int32_t>(all_prim_count);
-
-        // compute A^T * (B^T * A^T) since hipblas is column-major
-        hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_B, n, d_matrix_A, n, &beta, d_matrix_C, n));
-
-        hipSafe(hipDeviceSynchronize());
-
-        hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
-
-        hipSafe(hipMemcpy(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements() * sizeof(double), hipMemcpyDeviceToHost));
-
-        hipblasSafe(hipblasDestroy(handle));
-    }
+    // compute A^T * (B^T * A^T) since hipblas is column-major
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_B, n, d_matrix_A, n, &beta, d_matrix_C, n));
 
     hipSafe(hipDeviceSynchronize());
+
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
+
+    hipSafe(hipMemcpy(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements() * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipblasSafe(hipblasDestroy(handle));
 
     hipSafe(hipFree(d_matrix_A));
     hipSafe(hipFree(d_matrix_B));
@@ -706,14 +670,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
     // std::cout << ss.str();
 
-    if (gpu_rank % 8 == 0) hipSafe(hipSetDevice(4));
-    if (gpu_rank % 8 == 1) hipSafe(hipSetDevice(5));
-    if (gpu_rank % 8 == 2) hipSafe(hipSetDevice(2));
-    if (gpu_rank % 8 == 3) hipSafe(hipSetDevice(3));
-    if (gpu_rank % 8 == 4) hipSafe(hipSetDevice(6));
-    if (gpu_rank % 8 == 5) hipSafe(hipSetDevice(7));
-    if (gpu_rank % 8 == 6) hipSafe(hipSetDevice(0));
-    if (gpu_rank % 8 == 7) hipSafe(hipSetDevice(1));
+    hipSafe(hipSetDevice(gpu_rank % num_gpus_per_node));
 
     CMultiTimer timer;
 
@@ -1889,6 +1846,13 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 auto
 computeDotProduct(const double* A, const double* B, const int64_t size) -> double
 {
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+
+    std::string errmpirank("gpu::computeDotProduct: Should only be called from MPI master rank");
+    errors::assertMsgCritical(rank == mpi::master(), errmpirank);
+
+    hipSafe(hipSetDevice(0));
+
     auto n = static_cast<int32_t>(size);
 
     double *d_A, *d_B;
@@ -1907,8 +1871,6 @@ computeDotProduct(const double* A, const double* B, const int64_t size) -> doubl
 
     hipblasSafe(hipblasDestroy(handle));
 
-    hipSafe(hipDeviceSynchronize());
-
     hipSafe(hipFree(d_A));
     hipSafe(hipFree(d_B));
 
@@ -1918,6 +1880,13 @@ computeDotProduct(const double* A, const double* B, const int64_t size) -> doubl
 auto
 computeWeightedSum(double* weighted_data, const std::vector<double>& weights, const std::vector<const double*>& data_pointers, const int64_t size) -> void
 {
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+
+    std::string errmpirank("gpu::computeWeightedSum: Should only be called from MPI master rank");
+    errors::assertMsgCritical(rank == mpi::master(), errmpirank);
+
+    hipSafe(hipSetDevice(0));
+
     auto n = static_cast<int32_t>(size);
 
     double *d_X, *d_Y;
@@ -1943,8 +1912,6 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
 
     hipSafe(hipMemcpy(weighted_data, d_Y, n * sizeof(double), hipMemcpyDeviceToHost));
 
-    hipSafe(hipDeviceSynchronize());
-
     hipSafe(hipFree(d_X));
     hipSafe(hipFree(d_Y));
 }
@@ -1962,7 +1929,7 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
 
     // TODO: matmul on multiple GPUs
 
-    hipSafe(hipSetDevice(4));
+    hipSafe(hipSetDevice(0));
 
     auto m = static_cast<int32_t>(m_inp);
     auto k = static_cast<int32_t>(k_inp);
@@ -1997,8 +1964,6 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
 
     hipblasSafe(hipblasDestroy(handle));
 
-    hipSafe(hipDeviceSynchronize());
-
     hipSafe(hipFree(d_A));
     hipSafe(hipFree(d_B));
     hipSafe(hipFree(d_C));
@@ -2014,11 +1979,11 @@ diagonalizeMatrix(double* A, double* W, const int64_t nrows_A) -> void
     std::string errmpirank("gpu::diagonalizeMatrix: Should only be called from MPI master rank");
     errors::assertMsgCritical(rank == mpi::master(), errmpirank);
 
-    hipSafe(hipSetDevice(4));
+    hipSafe(hipSetDevice(0));
 
     magmaSafe(magma_init());
 
-    magma_setdevice(4);
+    magma_setdevice(0);
 
     magma_int_t n = static_cast<magma_int_t>(nrows_A);
     //magma_int_t ldda = magma_roundup(n, 32);
@@ -2053,8 +2018,6 @@ diagonalizeMatrix(double* A, double* W, const int64_t nrows_A) -> void
 
     //hipblasSafe(hipblasGetMatrix(n, n, sizeof(double), d_A, ldda, A, n));
     hipSafe(hipMemcpy(A, d_A, n * n * sizeof(double), hipMemcpyDeviceToHost));
-
-    hipSafe(hipDeviceSynchronize());
 
     hipSafe(hipFree(d_A));
 
@@ -2103,8 +2066,6 @@ diagonalizeMatrixMultiGPU(double* A, double* W, const int64_t nrows_A) -> void
         errors::assertMsgCritical(false, ss.str());
     }
 
-    hipSafe(hipDeviceSynchronize());
-
     hipSafe(hipHostFree(wA));
     hipSafe(hipHostFree(work));
     hipSafe(hipHostFree(iwork));
@@ -2116,7 +2077,7 @@ diagonalizeMatrixMultiGPU(double* A, double* W, const int64_t nrows_A) -> void
 auto
 diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
 {
-    hipSafe(hipSetDevice(4));
+    hipSafe(hipSetDevice(0));
 
     auto n = static_cast<int32_t>(nrows_A);
     int32_t lwork;
@@ -2147,8 +2108,6 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
     hipSafe(hipMemcpy(&h_info, d_info, sizeof(int32_t), hipMemcpyDeviceToHost));
     hipSafe(hipMemcpy(A, d_A, n * n * sizeof(double), hipMemcpyDeviceToHost));
     hipSafe(hipMemcpy(D, d_D, n * sizeof(double), hipMemcpyDeviceToHost));
-
-    hipSafe(hipDeviceSynchronize());
 
     hipSafe(hipFree(d_A));
     hipSafe(hipFree(d_D));

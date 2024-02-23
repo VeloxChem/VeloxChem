@@ -867,6 +867,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 {
     auto rank = mpi::rank(MPI_COMM_WORLD);
 
+    // TODO: use gpu_rank % num_gpus_per_node
     if (rank % 8 == 0) hipSafe(hipSetDevice(4));
     if (rank % 8 == 1) hipSafe(hipSetDevice(5));
     if (rank % 8 == 2) hipSafe(hipSetDevice(2));
@@ -1173,6 +1174,7 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 {
     auto rank = mpi::rank(MPI_COMM_WORLD);
 
+    // TODO: use gpu_rank % num_gpus_per_node
     if (rank % 8 == 0) hipSafe(hipSetDevice(4));
     if (rank % 8 == 1) hipSafe(hipSetDevice(5));
     if (rank % 8 == 2) hipSafe(hipSetDevice(2));
