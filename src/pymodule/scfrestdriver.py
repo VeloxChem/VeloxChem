@@ -26,6 +26,7 @@
 from mpi4py import MPI
 from copy import deepcopy
 import numpy as np
+import time as tm
 import sys
 import os
 
@@ -36,7 +37,6 @@ from .veloxchemlib import matmul_gpu, eigh_gpu, dot_product_gpu
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
-from .c2diis import CTwoDiis
 
 
 class ScfRestrictedDriver(ScfDriver):
@@ -90,10 +90,18 @@ class ScfRestrictedDriver(ScfDriver):
 
         if self.rank == mpi_master():
 
-            # TODO: do the following 3 lines in one shot on GPU
+            # TODO: do the following block in one shot on GPU
+
+            t0 = tm.time()
             fds = matmul_gpu(fock_mat, matmul_gpu(den_mat.alpha_to_numpy(0), ovl_mat))
+            t1 = tm.time()
             fds = fds - fds.T
+            t2 = tm.time()
             e_mat = matmul_gpu(oao_mat.T, matmul_gpu(fds, oao_mat))
+            t3 = tm.time()
+            self.ostream.print_info(f'    FDS          : {t1-t0:.2f} sec')
+            self.ostream.print_info(f'    FDS-SDF      : {t2-t1:.2f} sec')
+            self.ostream.print_info(f'    X^T(FDS-SDF)X: {t3-t2:.2f} sec')
 
             e_mat_shape = e_mat.shape
             e_grad = 2.0 * np.linalg.norm(e_mat)
@@ -205,10 +213,18 @@ class ScfRestrictedDriver(ScfDriver):
             tmat = oao_mat
 
             # TODO: do the following 4 lines in one shot on GPU
+
+            t0 = tm.time()
             fmo = matmul_gpu(tmat.T, matmul_gpu(fock_mat, tmat))
+            t1 = tm.time()
             eigs, evecs_T = eigh_gpu(fmo)
             evecs = evecs_T.T
+            t2 = tm.time()
             orb_coefs = matmul_gpu(tmat, evecs)
+            t3 = tm.time()
+            self.ostream.print_info(f'    X^T(F)X      : {t1-t0:.2f} sec')
+            self.ostream.print_info(f'    eigh         : {t2-t1:.2f} sec')
+            self.ostream.print_info(f'    MOs          : {t3-t2:.2f} sec')
 
             orb_coefs, eigs = self._delete_mos(orb_coefs, eigs)
 

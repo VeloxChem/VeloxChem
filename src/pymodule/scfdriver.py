@@ -51,7 +51,7 @@ from .subcommunicators import SubCommunicators
 from .signalhandler import SignalHandler
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
-from .c2diis import CTwoDiis
+from .diis import Diis
 from .dftutils import get_default_grid_level
 from .sanitychecks import molecule_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
@@ -945,7 +945,7 @@ class ScfDriver:
         #self._density_matrices_beta.clear()
 
         if self.rank == mpi_master():
-            acc_diis = CTwoDiis(self.max_err_vecs, self.diis_thresh)
+            acc_diis = Diis(self.max_err_vecs, self.diis_thresh)
 
         if self.use_split_comm:
             self.use_split_comm = ((self._dft or self._pe) and self.nodes >= 8)
@@ -1066,13 +1066,17 @@ class ScfDriver:
 
             profiler.start_timer('CompEnergy')
 
+            t0_comp_energy = tm.time()
             e_el = self._comp_energy(fock_mat, vxc_mat, e_pe, kin_mat, npot_mat,
                                      den_mat)
+            t1_comp_energy = tm.time()
 
             self.ostream.print_info(f'Elec. energy:      {e_el} a.u.')
             self.ostream.flush()
 
+            t0_comp_full_fock = tm.time()
             fock_mat = self._comp_full_fock(fock_mat, vxc_mat, V_pe, kin_mat, npot_mat)
+            t1_comp_full_fock = tm.time()
 
             if self.rank == mpi_master() and self.electric_field is not None:
                 efpot = sum([
@@ -1099,15 +1103,19 @@ class ScfDriver:
                         elem_ids[i] * (coords[i] - self._dipole_origin),
                         self.electric_field)
 
+            t0_comp_gradient = tm.time()
             e_mat, e_grad, max_grad = self._comp_gradient(fock_mat, ovl_mat, den_mat,
                                                           oao_mat)
+            t1_comp_gradient = tm.time()
 
             self.ostream.print_info(f'e_grad:            {e_grad}')
             self.ostream.flush()
 
             # compute density change and energy change
 
+            t0_comp_density_change = tm.time()
             diff_den = self._comp_density_change(den_mat, self.density)
+            t1_comp_density_change = tm.time()
 
             self.ostream.print_info(f'diff_den:          {diff_den}')
             self.ostream.flush()
@@ -1130,6 +1138,11 @@ class ScfDriver:
             self._density = AODensityMatrix(den_mat)
 
             self._scf_energy = e_scf
+
+            self.ostream.print_info(f'    energy       : {t1_comp_energy-t0_comp_energy:.2f} sec')
+            self.ostream.print_info(f'    full_fock    : {t1_comp_full_fock-t0_comp_full_fock:.2f} sec')
+            self.ostream.print_info(f'    gradient     : {t1_comp_gradient-t0_comp_gradient:.2f} sec')
+            self.ostream.print_info(f'    diff_den     : {t1_comp_density_change-t0_comp_density_change:.2f} sec')
 
             profiler.stop_timer('CompEnergy')
             profiler.check_memory_usage('Iteration {:d} Fock build'.format(
@@ -1158,7 +1171,7 @@ class ScfDriver:
             eff_fock_t0 = tm.time()
 
             if self.rank == mpi_master():
-                eff_fock_mat = acc_diis.get_effective_fock(fock_mat)
+                eff_fock_mat = acc_diis.get_effective_fock(fock_mat, self.ostream)
             else:
                 eff_fock_mat = None
 
@@ -1189,7 +1202,7 @@ class ScfDriver:
             new_den_t0 = tm.time()
 
             if self.rank == mpi_master():
-                den_mat = self.molecular_orbitals.get_density(molecule)
+                den_mat = self.molecular_orbitals.get_density(molecule, 'restricted', self.ostream)
                 den_mat_np = den_mat.alpha_to_numpy(0)
                 naos = den_mat_np.shape[0]
             else:

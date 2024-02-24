@@ -24,11 +24,12 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import time as tm
 
 from .veloxchemlib import weighted_sum_gpu, dot_product_gpu
 
 
-class CTwoDiis:
+class Diis:
     """
     Implements direct inversion of the iterative subspace in C2 form proposed
     by H. Seller.
@@ -73,11 +74,11 @@ class CTwoDiis:
             n_vecs = len(self.error_vectors)
             for i in range(n_vecs):
                 fij = dot_product_gpu(self.error_vectors[i],
-                              self.error_vectors[n_vecs - 1])
+                                      self.error_vectors[n_vecs - 1])
                 self.b_matrix[i, n_vecs - 1] = fij
                 self.b_matrix[n_vecs - 1, i] = fij
 
-    def get_effective_fock(self, fock_mat):
+    def get_effective_fock(self, fock_mat, ostream=None):
 
         n_vecs = len(self.error_vectors)
 
@@ -88,8 +89,14 @@ class CTwoDiis:
             return self.fock_matrices[0]
 
         else:
+            t0 = tm.time()
             weights = self.compute_weights()
+            t1 = tm.time()
             effmat = weighted_sum_gpu(weights, self.fock_matrices)
+            t2 = tm.time()
+            if ostream is not None:
+                ostream.print_info(f'    weights      : {t1-t0:.2f} sec')
+                ostream.print_info(f'    eff_fock     : {t2-t1:.2f} sec')
             return effmat
 
     def compute_error_vectors_restricted_openshell(self, fock_matrices,
@@ -185,54 +192,15 @@ class CTwoDiis:
         """
 
         n_vecs = len(self.error_vectors)
-        bmat = self.b_matrix[:n_vecs, :n_vecs].copy()
 
-        beigs, bvecs = np.linalg.eigh(bmat)
-        weights = self._pick_weights(self._norm_bvectors(bvecs))
+        bmat = np.zeros((n_vecs + 1, n_vecs + 1))
+        bmat[:n_vecs, :n_vecs] = self.b_matrix[:n_vecs, :n_vecs]
+        bmat[n_vecs, :n_vecs] = -1.0
+        bmat[:n_vecs, n_vecs] = -1.0
+        bmat[n_vecs, n_vecs] = 0.0
 
-        return weights
+        bvec = np.zeros(n_vecs + 1)
+        bvec[:n_vecs] = 0.0
+        bvec[n_vecs] = -1.0
 
-    def _norm_bvectors(self, bvectors):
-        """
-        Normalizes B-matrix eigenvectors by rescaling them to 1.0.
-
-        :param bvectors:
-            The array of B-matrix eigenvectors.
-
-        :return:
-            The normalized B-matrix eigenvectors.
-        """
-
-        sum_vecs = np.sum(bvectors, axis=0)
-
-        norm_vecs = []
-
-        for i in range(len(sum_vecs)):
-            if abs(sum_vecs[i]) > 1.0e-6:
-                norm_vecs.append(bvectors[:, i] / sum_vecs[i])
-
-        return norm_vecs
-
-    def _pick_weights(self, weights):
-        """
-        Picks normalize B-matrix eigenvector with smallest residual error by
-        computing residual error for all eigenvectors of B_matrix.
-
-        :param bvectors:
-            The array of B-matrix eigenvectors.
-
-        :return:
-            The normalized B-matrix eigenvector.
-        """
-
-        fmin = 1.0e+8
-        wmin = weights[0]
-
-        for w in weights:
-            evec = weighted_sum_gpu(w, self.error_vectors)
-            fact = dot_product_gpu(evec, evec)
-            if fmin > fact:
-                fmin = fact
-                wmin = w
-
-        return wmin
+        return np.linalg.solve(bmat, bvec)[:n_vecs]
