@@ -1199,11 +1199,12 @@ class ScfDriver:
 
             profiler.start_timer('NewDens')
 
-            new_den_t0 = tm.time()
-
             if self.rank == mpi_master():
+                new_den_t0 = tm.time()
                 den_mat = self.molecular_orbitals.get_density(molecule, 'restricted', self.ostream)
+                new_den_t1 = tm.time()
                 den_mat_np = den_mat.alpha_to_numpy(0)
+                new_den_t2 = tm.time()
                 naos = den_mat_np.shape[0]
             else:
                 naos = None
@@ -1212,11 +1213,17 @@ class ScfDriver:
             if self.rank != mpi_master():
                 den_mat_np = np.zeros((naos, naos))
 
+            new_den_t3 = tm.time()
             self.comm.Bcast(den_mat_np, root=mpi_master())
+            new_den_t4 = tm.time()
             den_mat = AODensityMatrix([den_mat_np], denmat.rest)
+            new_den_t5 = tm.time()
 
-            new_den_t1 = tm.time()
-            self.ostream.print_info(f'New density computed in {new_den_t1-new_den_t0:.2f} sec')
+            if self.rank == mpi_master():
+                self.ostream.print_info(f'New density AODens in {new_den_t1-new_den_t0:.2f} sec')
+                self.ostream.print_info(f'New density numpy  in {new_den_t2-new_den_t1:.2f} sec')
+            self.ostream.print_info(f'New density bcast  in {new_den_t4-new_den_t3:.2f} sec')
+            self.ostream.print_info(f'New density AODens in {new_den_t5-new_den_t4:.2f} sec')
             self.ostream.flush()
 
             profiler.stop_timer('NewDens')

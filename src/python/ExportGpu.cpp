@@ -132,6 +132,38 @@ export_gpu(py::module& m)
         "Computes weighted sum of matrices.");
 
     m.def(
+        "compute_error_vector_gpu",
+        [](const py::array_t<double>& X, const py::array_t<double>& F, const py::array_t<double>& D, const py::array_t<double>& S) -> py::array_t<double> {
+            std::string errshape("compute_error_vector_gpu: Mismatch in matrix shape");
+            std::string errstyle("compute_error_vector_gpu: Expecting contiguous numpy array");
+
+            errors::assertMsgCritical((X.shape(0) == F.shape(0)) && (X.shape(0) == F.shape(1)), errshape);
+            errors::assertMsgCritical((X.shape(0) == D.shape(0)) && (X.shape(0) == D.shape(1)), errshape);
+            errors::assertMsgCritical((X.shape(0) == S.shape(0)) && (X.shape(0) == S.shape(1)), errshape);
+
+            auto c_style_X = py::detail::check_flags(X.ptr(), py::array::c_style);
+            auto f_style_X = py::detail::check_flags(X.ptr(), py::array::f_style);
+            errors::assertMsgCritical(c_style_X | f_style_X, errstyle);
+
+            const auto trans_X = c_style_X ? std::string("N") : std::string("T");
+
+            auto c_style_F = py::detail::check_flags(F.ptr(), py::array::c_style);
+            auto c_style_D = py::detail::check_flags(D.ptr(), py::array::c_style);
+            auto c_style_S = py::detail::check_flags(S.ptr(), py::array::c_style);
+            errors::assertMsgCritical(c_style_F & c_style_D & c_style_S, errstyle);
+
+            const auto nao = static_cast<int64_t>(X.shape(0));
+            const auto nmo = static_cast<int64_t>(X.shape(1));
+
+            std::vector<double> errvec(nmo * nmo);
+
+            gpu::computeErrorVector(errvec.data(), X.data(), F.data(), D.data(), S.data(), nmo, nao, trans_X);
+
+            return vlx_general::pointer_to_numpy(errvec.data(), {nmo, nmo});
+        },
+        "Computes error vector using GPU.");
+
+    m.def(
         "matmul_gpu",
         [](const py::array_t<double>& A, const py::array_t<double>& B) -> py::array_t<double> {
             std::string errshape("matmul_gpu: Mismatch in matrix shape");

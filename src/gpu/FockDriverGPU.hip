@@ -1917,6 +1917,84 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
 }
 
 auto
+computeErrorVector(double* errvec, const double* X, const double* F, const double* D, const double* S,
+                   const int64_t nmo_inp, const int64_t nao_inp, const std::string& trans_X) -> void
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+
+    std::string errmpirank("gpu::computeErrorVector: Should only be called from MPI master rank");
+    errors::assertMsgCritical(rank == mpi::master(), errmpirank);
+
+    hipSafe(hipSetDevice(0));
+
+    hipblasHandle_t handle;
+    hipblasSafe(hipblasCreate(&handle));
+
+    auto nmo = static_cast<int32_t>(nmo_inp);
+    auto nao = static_cast<int32_t>(nao_inp);
+
+    double *d_A, *d_B, *d_C;
+
+    hipSafe(hipMalloc(&d_A, nao * nao * sizeof(double)));
+    hipSafe(hipMalloc(&d_B, nao * nao * sizeof(double)));
+    hipSafe(hipMalloc(&d_C, nao * nao * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_A, F, nao * nao * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_B, D, nao * nao * sizeof(double), hipMemcpyHostToDevice));
+
+    double alpha = 1.0, beta = 0.0;
+
+    // Note: we compute C^T = B^T * A^T since hipblas is column-major
+
+    // D^T F^T (=> FD)
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, nao, nao, nao, &alpha, d_B, nao, d_A, nao, &beta, d_C, nao));
+
+    // S^T(FD)^T (=> FDS)
+    hipSafe(hipMemcpy(d_A, S, nao * nao * sizeof(double), hipMemcpyHostToDevice));
+
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, nao, nao, nao, &alpha, d_A, nao, d_C, nao, &beta, d_B, nao));
+
+    hipSafe(hipDeviceSynchronize());
+
+    // FDS - (FDS)^T
+    beta = -1.0;
+
+    hipblasSafe(hipblasDgeam(handle, HIPBLAS_OP_N, HIPBLAS_OP_T, nao, nao, &alpha, d_B, nao, &beta, d_B, nao, d_C, nao));
+
+    // X^T (FDS - (FDS)^T) X
+    double* d_X = d_A;  // note: nao >= nmo
+    double* d_Y = d_B;  // note: nao >= nmo
+
+    hipSafe(hipMemcpy(d_X, X, nmo * nao * sizeof(double), hipMemcpyHostToDevice));
+
+    auto op_X = (trans_X == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
+    auto lda_X = (trans_X == std::string("N")) ? nmo : nao;
+
+    auto op_XT = (trans_X == std::string("N")) ? HIPBLAS_OP_T : HIPBLAS_OP_N;
+    auto lda_XT = (trans_X == std::string("N")) ? nao : nmo;
+
+    beta = 0.0;
+
+    // TODO: double check using linear dependent basis set
+    // let E == (FDS - SDF)
+    // X^T E^T (=> EX)
+    hipblasSafe(hipblasDgemm(handle, op_X, HIPBLAS_OP_N, nmo, nao, nao, &alpha, d_X, lda_X, d_C, nao, &beta, d_Y, nmo));
+
+    hipSafe(hipDeviceSynchronize());
+
+    // (EX)^T X (=> X^T(E)X)
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_XT, &beta, d_C, nmo));
+
+    hipSafe(hipMemcpy(errvec, d_C, nmo * nmo * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipblasSafe(hipblasDestroy(handle));
+
+    hipSafe(hipFree(d_A));
+    hipSafe(hipFree(d_B));
+    hipSafe(hipFree(d_C));
+}
+
+auto
 computeMatrixMultiplication(double* C, const double* A, const double* B, const std::string& trans_A, const std::string& trans_B,
                             const int64_t m_inp, const int64_t k_inp, const int64_t n_inp) -> void
 {
