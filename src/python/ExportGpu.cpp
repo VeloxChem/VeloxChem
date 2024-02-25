@@ -164,6 +164,38 @@ export_gpu(py::module& m)
         "Computes error vector using GPU.");
 
     m.def(
+        "compute_molecular_orbitals_gpu",
+        [](const py::array_t<double>& X, const py::array_t<double>& F) -> py::list {
+            std::string errshape("compute_molecular_orbitals_gpu: Mismatch in matrix shape");
+            std::string errstyle("compute_molecular_orbitals_gpu: Expecting contiguous numpy array");
+
+            errors::assertMsgCritical((X.shape(0) == F.shape(0)) && (X.shape(0) == F.shape(1)), errshape);
+
+            auto c_style_X = py::detail::check_flags(X.ptr(), py::array::c_style);
+            auto f_style_X = py::detail::check_flags(X.ptr(), py::array::f_style);
+            errors::assertMsgCritical(c_style_X | f_style_X, errstyle);
+
+            const auto trans_X = c_style_X ? std::string("N") : std::string("T");
+
+            auto c_style_F = py::detail::check_flags(F.ptr(), py::array::c_style);
+            errors::assertMsgCritical(c_style_F, errstyle);
+
+            const auto nao = static_cast<int64_t>(X.shape(0));
+            const auto nmo = static_cast<int64_t>(X.shape(1));
+
+            py::array_t<double> orb_enes(nmo);
+            py::array_t<double> orb_coefs({nao, nmo});
+
+            gpu::computeMolecularOrbitals(orb_enes.mutable_data(), orb_coefs.mutable_data(), X.data(), F.data(), nmo, nao, trans_X);
+
+            py::list result;
+            result.append(orb_enes);
+            result.append(orb_coefs);
+            return result;
+        },
+        "Computes molecular orbitals using GPU.");
+
+    m.def(
         "matmul_gpu",
         [](const py::array_t<double>& A, const py::array_t<double>& B) -> py::array_t<double> {
             std::string errshape("matmul_gpu: Mismatch in matrix shape");

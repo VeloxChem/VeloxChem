@@ -273,21 +273,26 @@ class MolecularOrbitals:
         if self.get_orbitals_type() == molorb.rest and (
                 scf_type is None or scf_type == 'restricted'):
 
+            t0 = tm.time()
             mo = self.alpha_to_numpy()
-
             occ = self.occa_to_numpy()
 
             # TODO: do the following 2 lines in one shot on GPU
-            t0 = tm.time()
-            occ_mo = occ * mo
             t1 = tm.time()
-            dens = matmul_gpu(occ_mo, occ_mo.T)
+            occ_mo = occ * mo
             t2 = tm.time()
-            if ostream is not None:
-                ostream.print_info(f'    occ*MO       : {t1-t0:.2f} sec')
-                ostream.print_info(f'    Dens         : {t2-t1:.2f} sec')
+            dens = matmul_gpu(occ_mo, occ_mo.T)
+            t3 = tm.time()
+            ao_dens_mat = AODensityMatrix([dens], denmat.rest)
+            t4 = tm.time()
 
-            return AODensityMatrix([dens], denmat.rest)
+            if ostream is not None:
+                ostream.print_info(f'    occ&MO       : {t1-t0:.2f} sec')
+                ostream.print_info(f'    occ*MO       : {t2-t1:.2f} sec')
+                ostream.print_info(f'    Dens         : {t3-t2:.2f} sec')
+                ostream.print_info(f'    AODen        : {t4-t3:.2f} sec')
+
+            return ao_dens_mat
 
         elif self.get_orbitals_type() == molorb.unrest and (
                 scf_type is None or scf_type == 'unrestricted'):
