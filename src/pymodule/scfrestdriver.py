@@ -35,7 +35,7 @@ from .veloxchemlib import fock_t as fockmat
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import matmul_gpu, eigh_gpu, dot_product_gpu
 from .veloxchemlib import compute_error_vector_gpu
-from .veloxchemlib import compute_molecular_orbitals_gpu
+from .veloxchemlib import transform_matrix_gpu
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
@@ -205,12 +205,19 @@ class ScfRestrictedDriver(ScfDriver):
 
         if self.rank == mpi_master():
             t0 = tm.time()
-            eigs, orb_coefs = compute_molecular_orbitals_gpu(oao_mat, fock_mat)
+            fmo = transform_matrix_gpu(oao_mat, fock_mat)
             t1 = tm.time()
-            orb_coefs, eigs = self._delete_mos(orb_coefs, eigs)
+            eigs, evecs_T = eigh_gpu(fmo)
+            evecs = evecs_T.T
             t2 = tm.time()
-            self.ostream.print_info(f'    genMOs       : {t1-t0:.2f} sec')
-            self.ostream.print_info(f'    deleteMOs    : {t2-t1:.2f} sec')
+            orb_coefs = matmul_gpu(oao_mat, evecs)
+            t3 = tm.time()
+            orb_coefs, eigs = self._delete_mos(orb_coefs, eigs)
+            t4 = tm.time()
+            self.ostream.print_info(f'    X^T(F)X      : {t1-t0:.2f} sec')
+            self.ostream.print_info(f'    eigh         : {t2-t1:.2f} sec')
+            self.ostream.print_info(f'    MOs          : {t3-t2:.2f} sec')
+            self.ostream.print_info(f'    deleteMOs    : {t4-t3:.2f} sec')
 
             occa = molecule.get_aufbau_alpha_occupation(eigs.size)
 

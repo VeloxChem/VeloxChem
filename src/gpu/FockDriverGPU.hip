@@ -1995,12 +1995,12 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
 }
 
 auto
-computeMolecularOrbitals(double* orb_enes, double* orb_coefs, const double* X, const double* F,
-                         const int64_t nmo_inp, const int64_t nao_inp, const std::string& trans_X) -> void
+transformMatrix(double* transformed_F, const double* X, const double* F,
+                const int64_t nmo_inp, const int64_t nao_inp, const std::string& trans_X) -> void
 {
     auto rank = mpi::rank(MPI_COMM_WORLD);
 
-    std::string errmpirank("gpu::computeMolecularOrbitals: Should only be called from MPI master rank");
+    std::string errmpirank("gpu::transformMatrix: Should only be called from MPI master rank");
     errors::assertMsgCritical(rank == mpi::master(), errmpirank);
 
     hipSafe(hipSetDevice(0));
@@ -2022,15 +2022,13 @@ computeMolecularOrbitals(double* orb_enes, double* orb_coefs, const double* X, c
 
     double alpha = 1.0, beta = 0.0;
 
-    // Note: we compute C^T = B^T * A^T since hipblas is column-major
-
-    // X^T (FDS - (FDS)^T) X
-
     auto op_X = (trans_X == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
     auto lda_X = (trans_X == std::string("N")) ? nmo : nao;
 
     auto op_XT = (trans_X == std::string("N")) ? HIPBLAS_OP_T : HIPBLAS_OP_N;
     auto lda_XT = (trans_X == std::string("N")) ? nao : nmo;
+
+    // Note: we compute C^T = B^T * A^T since hipblas is column-major
 
     // TODO: double check using linear dependent basis set
     // X^T F^T (=> FX)
@@ -2041,44 +2039,7 @@ computeMolecularOrbitals(double* orb_enes, double* orb_coefs, const double* X, c
     // (FX)^T X (=> X^T(F)X)
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_XT, &beta, d_F, nmo));
 
-    hipSafe(hipDeviceSynchronize());
-
-    // diagonalize X^T(F)X
-    magmaSafe(magma_init());
-    magma_setdevice(0);
-    magma_int_t n = static_cast<magma_int_t>(nmo);
-
-    auto nb = magma_get_dsytrd_nb(n);
-    auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));
-    auto liwork = 3 + 5*n;
-
-    double *wA, *work;
-    magma_int_t *iwork;
-
-    hipSafe(hipHostMalloc(&wA, n * n * sizeof(double)));
-    hipSafe(hipHostMalloc(&work, lwork * sizeof(double)));
-    hipSafe(hipHostMalloc(&iwork, liwork * sizeof(magma_int_t)));
-
-    magma_int_t info;
-    magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_F, n, orb_enes, wA, n, work, lwork, iwork, liwork, &info);
-
-    if (info != 0)
-    {
-        std::stringstream ss;
-        ss << "gpu::computeMolecularOrbitals: (magma error) " << magma_strerror(info);
-        errors::assertMsgCritical(false, ss.str());
-    }
-
-    hipSafe(hipHostFree(wA));
-    hipSafe(hipHostFree(work));
-    hipSafe(hipHostFree(iwork));
-
-    magmaSafe(magma_finalize());
-
-    // eigvecsT X^T (=> X eigvecsT^T)
-    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_T, op_X, nmo, nao, nao, &alpha, d_F, nmo, d_X, lda_X, &beta, d_Y, nmo));
-
-    hipSafe(hipMemcpy(orb_coefs, d_Y, nmo * nao * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(transformed_F, d_F, nmo * nmo * sizeof(double), hipMemcpyDeviceToHost));
 
     hipblasSafe(hipblasDestroy(handle));
 
