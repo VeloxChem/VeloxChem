@@ -43,6 +43,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import xcfun
 from .veloxchemlib import (compute_fock_gpu, eigh_gpu, dot_product_gpu)
 from .veloxchemlib import compute_one_electron_integrals_gpu
+from .veloxchemlib import integrate_vxc_fock_gpu
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -1592,7 +1593,10 @@ class ScfDriver:
 
         eri_t0 = tm.time()
 
-        fock_mat = compute_fock_gpu(molecule, basis, den_mat, screener)
+        if self._dft and not self._first_step:
+            fock_mat = compute_fock_gpu(molecule, basis, den_mat, self.xcfun.get_frac_exact_exchange(), screener)
+        else:
+            fock_mat = compute_fock_gpu(molecule, basis, den_mat, 1.0, screener)
 
         eri_t1 = tm.time()
 
@@ -1625,8 +1629,10 @@ class ScfDriver:
 
             if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga, xcfun.mgga]:
                 xc_drv = XCIntegrator(self.comm)
-                vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, den_mat,
-                                                    self._mol_grid, self.xcfun)
+                vxc_mat = integrate_vxc_fock_gpu(molecule, basis, den_mat,
+                                                 self._mol_grid,
+                                                 self.xcfun.get_func_label(),
+                                                 screener.get_num_gpus_per_node())
             else:
                 assert_msg_critical(
                     False, 'SCF driver: Unsupported XC functional type')

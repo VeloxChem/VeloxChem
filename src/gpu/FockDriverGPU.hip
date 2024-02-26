@@ -519,7 +519,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 }
 
 auto
-computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix, CScreeningData& screening) -> CDenseMatrix
+computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix, const double frac_exact_exchange, CScreeningData& screening) -> CDenseMatrix
 {
     auto rank = mpi::rank(MPI_COMM_WORLD);
     auto nnodes = mpi::nodes(MPI_COMM_WORLD);
@@ -1499,9 +1499,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = s_prim_aoinds[i];
             const auto k_cgto = s_prim_aoinds[k];
 
-            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0) * frac_exact_exchange;
 
-            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0) * frac_exact_exchange;
         }
 
         timer.stop("  K block SS");
@@ -1643,8 +1643,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             // TODO: think about the ordering of cartesian components
             const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
 
-            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
-            mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0) * frac_exact_exchange;
+            mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0) * frac_exact_exchange;
         }
 
         timer.stop("  K block SP");
@@ -1778,9 +1778,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
             const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
 
-            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0) * frac_exact_exchange;
 
-            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0) * frac_exact_exchange;
         }
 
         timer.stop("  K block PP");

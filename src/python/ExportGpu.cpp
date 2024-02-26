@@ -59,7 +59,9 @@ export_gpu(py::module& m)
     // CScreeningData class
 
     py::class_<CScreeningData, std::shared_ptr<CScreeningData>>(m, "ScreeningData")
-        .def(py::init<const CMolecule&, const CMolecularBasis&, const int64_t>());
+        .def(py::init<const CMolecule&, const CMolecularBasis&, const int64_t>())
+        .def("get_num_gpus_per_node", &CScreeningData::getNumGpusPerNode)
+        ;
 
     m.def(
         "compute_gto_values",
@@ -275,7 +277,7 @@ export_gpu(py::module& m)
             },
         "Diagonalizes matrix using GPU.");
 
-    m.def("integrate_vxc_fock", &gpu::integrateVxcFock, "Integrates Vxc matrix using GPU.");
+    m.def("integrate_vxc_fock_gpu", &gpu::integrateVxcFock, "Integrates Vxc matrix using GPU.");
 
     m.def("compute_fock_gpu", &gpu::computeFockOnGPU, "Computes Fock matrix using GPU.");
 

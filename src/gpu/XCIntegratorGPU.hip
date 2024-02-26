@@ -25,6 +25,8 @@
 
 #include <hip/hip_runtime.h>
 
+#include <omp.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -863,19 +865,18 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
                        const CAODensityMatrix& densityMatrix,
                        const CMolecularGrid&   molecularGrid,
                        const CXCFunctional&    xcFunctional,
-                       const std::string&      flag) -> CAOKohnShamMatrix
+                       const int64_t           numGpusPerNode) -> CAOKohnShamMatrix
 {
     auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
-    // TODO: use gpu_rank % num_gpus_per_node
-    if (rank % 8 == 0) hipSafe(hipSetDevice(4));
-    if (rank % 8 == 1) hipSafe(hipSetDevice(5));
-    if (rank % 8 == 2) hipSafe(hipSetDevice(2));
-    if (rank % 8 == 3) hipSafe(hipSetDevice(3));
-    if (rank % 8 == 4) hipSafe(hipSetDevice(6));
-    if (rank % 8 == 5) hipSafe(hipSetDevice(7));
-    if (rank % 8 == 6) hipSafe(hipSetDevice(0));
-    if (rank % 8 == 7) hipSafe(hipSetDevice(1));
+    auto nthreads = omp_get_max_threads();
+    auto num_gpus_per_node = numGpusPerNode;
+    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+
+    auto gpu_rank = rank * num_gpus_per_node;
+
+    hipSafe(hipSetDevice(gpu_rank % num_gpus_per_node));
 
     CMultiTimer timer;
 
@@ -912,7 +913,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     // Kohn-Sham matrix
 
-    bool closedshell = (fstr::upcase(flag) == std::string("CLOSEDSHELL"));
+    auto closedshell = densityMatrix.isClosedShell();
 
     CAOKohnShamMatrix mat_Vxc(naos, naos, closedshell);
 
@@ -1170,19 +1171,18 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
                        const CAODensityMatrix& densityMatrix,
                        const CMolecularGrid&   molecularGrid,
                        const CXCFunctional&    xcFunctional,
-                       const std::string&      flag) -> CAOKohnShamMatrix
+                       const int64_t           numGpusPerNode) -> CAOKohnShamMatrix
 {
     auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
-    // TODO: use gpu_rank % num_gpus_per_node
-    if (rank % 8 == 0) hipSafe(hipSetDevice(4));
-    if (rank % 8 == 1) hipSafe(hipSetDevice(5));
-    if (rank % 8 == 2) hipSafe(hipSetDevice(2));
-    if (rank % 8 == 3) hipSafe(hipSetDevice(3));
-    if (rank % 8 == 4) hipSafe(hipSetDevice(6));
-    if (rank % 8 == 5) hipSafe(hipSetDevice(7));
-    if (rank % 8 == 6) hipSafe(hipSetDevice(0));
-    if (rank % 8 == 7) hipSafe(hipSetDevice(1));
+    auto nthreads = omp_get_max_threads();
+    auto num_gpus_per_node = numGpusPerNode;
+    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+
+    auto gpu_rank = rank * num_gpus_per_node;
+
+    hipSafe(hipSetDevice(gpu_rank % num_gpus_per_node));
 
     CMultiTimer timer;
 
@@ -1219,7 +1219,7 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
     // Kohn-Sham matrix
 
-    bool closedshell = (fstr::upcase(flag) == std::string("CLOSEDSHELL"));
+    auto closedshell = densityMatrix.isClosedShell();
 
     CAOKohnShamMatrix mat_Vxc(naos, naos, closedshell);
 
@@ -1527,24 +1527,23 @@ integrateVxcFock(const CMolecule&        molecule,
                  const CMolecularBasis&  basis,
                  const CAODensityMatrix& densityMatrix,
                  const CMolecularGrid&   molecularGrid,
-                 const std::string&      xcFuncLabel) -> CAOKohnShamMatrix
+                 const std::string&      xcFuncLabel,
+                 const int64_t           numGpusPerNode) -> CAOKohnShamMatrix
 {
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
 
-    auto flag = densityMatrix.isClosedShell() ? std::string("CLOSEDSHELL") : std::string("OPENSHELL");
-
     std::string erropenshell("gpu::integrateVxcFock: Only implemented for closed-shell");
 
     errors::assertMsgCritical(densityMatrix.isClosedShell(), erropenshell);
 
-    if (xcfuntype == xcfun::lda) return gpu::integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, fvxc, flag);
+    if (xcfuntype == xcfun::lda) return gpu::integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode);
 
-    if (xcfuntype == xcfun::gga) return gpu::integrateVxcFockForGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, flag);
+    if (xcfuntype == xcfun::gga) return gpu::integrateVxcFockForGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode);
 
     /*
-    if (xcfuntype == xcfun::mgga) return gpu::integrateVxcFockForMGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, flag);
+    if (xcfuntype == xcfun::mgga) return gpu::integrateVxcFockForMGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode);
 
     std::string errxcfuntype("gpu::integrateVxcFock: Only implemented for LDA/GGA/meta-GGA");
 
