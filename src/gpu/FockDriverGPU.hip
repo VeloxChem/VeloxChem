@@ -1377,7 +1377,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     // K: S-S block
 
-    if (pair_inds_count_for_K_ss > 0)
+    if ((pair_inds_count_for_K_ss > 0) && (std::fabs(frac_exact_exchange) > 1.0e-13))
     {
         timer.start("  K block SS");
 
@@ -1512,7 +1512,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     // K: S-P block
 
-    if (pair_inds_count_for_K_sp > 0)
+    if ((pair_inds_count_for_K_sp > 0) && (std::fabs(frac_exact_exchange) > 1.0e-13))
     {
         timer.start("  K block SP");
 
@@ -1655,7 +1655,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     // K: P-P block
 
-    if (pair_inds_count_for_K_pp > 0)
+    if ((pair_inds_count_for_K_pp > 0) && (std::fabs(frac_exact_exchange) > 1.0e-13))
     {
         timer.start("  K block PP");
 

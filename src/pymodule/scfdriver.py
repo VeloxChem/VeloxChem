@@ -1595,7 +1595,10 @@ class ScfDriver:
         eri_t0 = tm.time()
 
         if self._dft and not self._first_step:
-            fock_mat = compute_fock_gpu(molecule, basis, den_mat, self.xcfun.get_frac_exact_exchange(), screener)
+            if self.xcfun.is_hybrid():
+                fock_mat = compute_fock_gpu(molecule, basis, den_mat, self.xcfun.get_frac_exact_exchange(), screener)
+            else:
+                fock_mat = compute_fock_gpu(molecule, basis, den_mat, 0.0, screener)
         else:
             fock_mat = compute_fock_gpu(molecule, basis, den_mat, 1.0, screener)
 
@@ -1624,10 +1627,6 @@ class ScfDriver:
         vxc_t0 = tm.time()
 
         if self._dft and not self._first_step:
-            if not self.xcfun.is_hybrid():
-                if self.scf_type == 'restricted':
-                    fock_mat *= 2.0
-
             if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga, xcfun.mgga]:
                 xc_drv = XCIntegrator(self.comm)
                 vxc_mat = integrate_vxc_fock_gpu(molecule, basis, den_mat,

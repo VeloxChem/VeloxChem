@@ -688,6 +688,8 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
         }
     }
 
+    hipSafe(hipDeviceSynchronize());
+
     hipSafe(hipFree(d_gto_info));
     hipSafe(hipFree(d_gaos));
     hipSafe(hipFree(d_grid_x));
@@ -847,6 +849,8 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
         }
     }
 
+    hipSafe(hipDeviceSynchronize());
+
     hipSafe(hipFree(d_gto_info));
     hipSafe(hipFree(d_gaos));
     hipSafe(hipFree(d_gaox));
@@ -874,15 +878,6 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     auto num_gpus_per_node = numGpusPerNode;
     auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
-    auto gpu_rank = rank * num_gpus_per_node;
-
-    // TODO: make number of GPUs per compute node (not per MPI process) adjustable
-    hipSafe(hipSetDevice(gpu_rank % 8));
-
-    CMultiTimer timer;
-
-    timer.start("Total timing");
-
     // GTOs blocks and number of AOs
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
@@ -904,6 +899,41 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         max_npgtos = std::max(npgtos, max_npgtos);
     }
 
+    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
+
+    // Kohn-Sham matrix
+
+    auto closedshell = densityMatrix.isClosedShell();
+
+    CAOKohnShamMatrix mat_Vxc_sum(naos, naos, closedshell);
+
+    for (int64_t ind = 0; ind < naos * naos; ind++)
+    {
+        mat_Vxc_sum.getPointerToAlphaValues()[ind] = 0.0;
+    }
+
+    std::vector<CAOKohnShamMatrix> mat_Vxc_omp(num_gpus_per_node);
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        mat_Vxc_omp[gpu_id] = CAOKohnShamMatrix(naos, naos, closedshell);
+    }
+
+#pragma omp parallel
+    {
+    auto thread_id = omp_get_thread_num();
+
+    if (thread_id % num_threads_per_gpu == 0)
+    {
+    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
+    auto gpu_count = nnodes * num_gpus_per_node;
+
+    // TODO: make number of GPUs per compute node (not per MPI process) adjustable
+    hipSafe(hipSetDevice(gpu_rank % 8));
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+
     double* d_gto_info;
 
     hipSafe(hipMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
@@ -914,15 +944,9 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     // Kohn-Sham matrix
 
-    auto closedshell = densityMatrix.isClosedShell();
-
-    CAOKohnShamMatrix mat_Vxc(naos, naos, closedshell);
-
-    mat_Vxc.zero();
+    mat_Vxc_omp[gpu_id].zero();
 
     // GTOs on grid points
-
-    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
     double *d_mat_Vxc_full, *d_den_mat_full, *d_den_mat, *d_gto_values, *d_mat_F;
 
@@ -942,7 +966,9 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     // density and functional derivatives
 
-    auto       ldafunc = xcFunctional.getFunctionalPointerToLdaComponent();
+    auto xcfun_copy = vxcfuncs::getExchangeCorrelationFunctional(xcFunctional.getFunctionalLabel());
+
+    auto       ldafunc = xcfun_copy.getFunctionalPointerToLdaComponent();
     const auto dim     = &(ldafunc->dim);
 
     std::vector<double> rho_data(dim->rho * max_npoints_per_box);
@@ -993,7 +1019,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     auto displacements = molecularGrid.getGridPointDisplacements();
 
-    for (size_t box_id = 0; box_id < counts.size(); box_id++)
+    for (size_t box_id = gpu_id; box_id < counts.size(); box_id += num_gpus_per_node)
     {
         // grid points in box
 
@@ -1086,7 +1112,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         hipSafe(hipMemcpy(rho, d_rho, 2 * npoints * sizeof(double), hipMemcpyDeviceToHost));
 
-        xcFunctional.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
+        xcfun_copy.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
         hipSafe(hipMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), hipMemcpyHostToDevice));
         hipSafe(hipMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), hipMemcpyHostToDevice));
@@ -1133,7 +1159,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         }
     }
 
-    hipSafe(hipMemcpy(mat_Vxc.getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), hipMemcpyDeviceToHost));
 
     hipSafe(hipFree(d_gto_info));
     hipSafe(hipFree(d_ao_inds));
@@ -1153,17 +1179,35 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     hipSafe(hipFree(d_grid_z));
     hipSafe(hipFree(d_grid_w));
 
-    mat_Vxc.setNumberOfElectrons(nele);
+    mat_Vxc_omp[gpu_id].setNumberOfElectrons(nele);
 
-    mat_Vxc.setExchangeCorrelationEnergy(xcene);
+    mat_Vxc_omp[gpu_id].setExchangeCorrelationEnergy(xcene);
 
-    timer.stop("Total timing");
+    }}
 
-    std::cout << "\nTiming of GPU integrator\n";
-    std::cout << "------------------------\n";
-    std::cout << timer.getSummary() << std::endl;
+    auto p_mat_Vxc = mat_Vxc_sum.getPointerToAlphaValues();
 
-    return mat_Vxc;
+    double nele_sum = 0.0, xcene_sum = 0.0;
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        auto p_mat_v = mat_Vxc_omp[gpu_id].getPointerToAlphaValues();
+
+        for (int64_t ind = 0; ind < naos * naos; ind++)
+        {
+            p_mat_Vxc[ind] += p_mat_v[ind];
+        }
+
+        nele_sum += mat_Vxc_omp[gpu_id].getNumberOfElectrons();
+
+        xcene_sum += mat_Vxc_omp[gpu_id].getExchangeCorrelationEnergy();
+    }
+
+    mat_Vxc_sum.setNumberOfElectrons(nele_sum);
+
+    mat_Vxc_sum.setExchangeCorrelationEnergy(xcene_sum);
+
+    return mat_Vxc_sum;
 }
 
 static auto
@@ -1180,15 +1224,6 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = numGpusPerNode;
     auto num_threads_per_gpu = nthreads / num_gpus_per_node;
-
-    auto gpu_rank = rank * num_gpus_per_node;
-
-    // TODO: make number of GPUs per compute node (not per MPI process) adjustable
-    hipSafe(hipSetDevice(gpu_rank % 8));
-
-    CMultiTimer timer;
-
-    timer.start("Total timing");
 
     // GTOs blocks and number of AOs
 
@@ -1211,6 +1246,41 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
         max_npgtos = std::max(npgtos, max_npgtos);
     }
 
+    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
+
+    // Kohn-Sham matrix
+
+    auto closedshell = densityMatrix.isClosedShell();
+
+    CAOKohnShamMatrix mat_Vxc_sum(naos, naos, closedshell);
+
+    for (int64_t ind = 0; ind < naos * naos; ind++)
+    {
+        mat_Vxc_sum.getPointerToAlphaValues()[ind] = 0.0;
+    }
+
+    std::vector<CAOKohnShamMatrix> mat_Vxc_omp(num_gpus_per_node);
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        mat_Vxc_omp[gpu_id] = CAOKohnShamMatrix(naos, naos, closedshell);
+    }
+
+#pragma omp parallel
+    {
+    auto thread_id = omp_get_thread_num();
+
+    if (thread_id % num_threads_per_gpu == 0)
+    {
+    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
+    auto gpu_count = nnodes * num_gpus_per_node;
+
+    // TODO: make number of GPUs per compute node (not per MPI process) adjustable
+    hipSafe(hipSetDevice(gpu_rank % 8));
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+
     double* d_gto_info;
 
     hipSafe(hipMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
@@ -1221,15 +1291,9 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
     // Kohn-Sham matrix
 
-    auto closedshell = densityMatrix.isClosedShell();
-
-    CAOKohnShamMatrix mat_Vxc(naos, naos, closedshell);
-
-    mat_Vxc.zero();
+    mat_Vxc_omp[gpu_id].zero();
 
     // GTOs on grid points
-
-    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
     double *d_mat_Vxc_full, *d_den_mat_full, *d_den_mat, *d_gto_values, *d_gto_values_x, *d_gto_values_y, *d_gto_values_z, *d_mat_F;
 
@@ -1252,7 +1316,9 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
     // density and functional derivatives
 
-    auto       ggafunc = xcFunctional.getFunctionalPointerToGgaComponent();
+    auto xcfun_copy = vxcfuncs::getExchangeCorrelationFunctional(xcFunctional.getFunctionalLabel());
+
+    auto       ggafunc = xcfun_copy.getFunctionalPointerToGgaComponent();
     const auto dim     = &(ggafunc->dim);
 
     std::vector<double> rho_data(dim->rho * max_npoints_per_box);
@@ -1313,7 +1379,7 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
     auto displacements = molecularGrid.getGridPointDisplacements();
 
-    for (size_t box_id = 0; box_id < counts.size(); box_id++)
+    for (size_t box_id = gpu_id; box_id < counts.size(); box_id += num_gpus_per_node)
     {
         // grid points in box
 
@@ -1428,7 +1494,7 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
         hipSafe(hipMemcpy(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), hipMemcpyDeviceToHost));
         hipSafe(hipMemcpy(sigma, d_sigma, dim->sigma * npoints * sizeof(double), hipMemcpyDeviceToHost));
 
-        xcFunctional.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
+        xcfun_copy.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
 
         hipSafe(hipMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), hipMemcpyHostToDevice));
         hipSafe(hipMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), hipMemcpyHostToDevice));
@@ -1481,11 +1547,13 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
         }
     }
 
-    hipSafe(hipMemcpy(mat_Vxc.getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), hipMemcpyDeviceToHost));
 
     // Note: symmetrize mat_Vxc
 
-    mat_Vxc.symmetrizeAndScale(0.5);
+    mat_Vxc_omp[gpu_id].symmetrizeAndScale(0.5);
+
+    hipSafe(hipDeviceSynchronize());
 
     hipSafe(hipFree(d_gto_info));
     hipSafe(hipFree(d_ao_inds));
@@ -1511,17 +1579,35 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
     hipSafe(hipFree(d_grid_z));
     hipSafe(hipFree(d_grid_w));
 
-    mat_Vxc.setNumberOfElectrons(nele);
+    mat_Vxc_omp[gpu_id].setNumberOfElectrons(nele);
 
-    mat_Vxc.setExchangeCorrelationEnergy(xcene);
+    mat_Vxc_omp[gpu_id].setExchangeCorrelationEnergy(xcene);
 
-    timer.stop("Total timing");
+    }}
 
-    std::cout << "\nTiming of GPU integrator\n";
-    std::cout << "------------------------\n";
-    std::cout << timer.getSummary() << std::endl;
+    auto p_mat_Vxc = mat_Vxc_sum.getPointerToAlphaValues();
 
-    return mat_Vxc;
+    double nele_sum = 0.0, xcene_sum = 0.0;
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        auto p_mat_v = mat_Vxc_omp[gpu_id].getPointerToAlphaValues();
+
+        for (int64_t ind = 0; ind < naos * naos; ind++)
+        {
+            p_mat_Vxc[ind] += p_mat_v[ind];
+        }
+
+        nele_sum += mat_Vxc_omp[gpu_id].getNumberOfElectrons();
+
+        xcene_sum += mat_Vxc_omp[gpu_id].getExchangeCorrelationEnergy();
+    }
+
+    mat_Vxc_sum.setNumberOfElectrons(nele_sum);
+
+    mat_Vxc_sum.setExchangeCorrelationEnergy(xcene_sum);
+
+    return mat_Vxc_sum;
 }
 
 auto
