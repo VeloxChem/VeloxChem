@@ -876,7 +876,8 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     auto gpu_rank = rank * num_gpus_per_node;
 
-    hipSafe(hipSetDevice(gpu_rank % num_gpus_per_node));
+    // TODO: make number of GPUs per compute node (not per MPI process) adjustable
+    hipSafe(hipSetDevice(gpu_rank % 8));
 
     CMultiTimer timer;
 
@@ -1182,7 +1183,8 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
     auto gpu_rank = rank * num_gpus_per_node;
 
-    hipSafe(hipSetDevice(gpu_rank % num_gpus_per_node));
+    // TODO: make number of GPUs per compute node (not per MPI process) adjustable
+    hipSafe(hipSetDevice(gpu_rank % 8));
 
     CMultiTimer timer;
 

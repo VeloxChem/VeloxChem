@@ -156,7 +156,8 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
     // std::cout << ss.str();
 
-    hipSafe(hipSetDevice(gpu_rank % num_gpus_per_node));
+    // TODO: make number of GPUs per compute node (not per MPI process) adjustable
+    hipSafe(hipSetDevice(gpu_rank % 8));
 
     // Boys function (tabulated for order 0-28)
 
@@ -534,7 +535,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // ss << "\n(Prep.) rank " << rank << ",  gpu_rank " << gpu_rank << "\n";
     // std::cout << ss.str();
 
-    hipSafe(hipSetDevice(gpu_rank % num_gpus_per_node));
+    // TODO: make number of GPUs per compute node (not per MPI process) adjustable
+    hipSafe(hipSetDevice(gpu_rank % 8));
 
     CMultiTimer timer;
 
@@ -670,7 +672,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
     // std::cout << ss.str();
 
-    hipSafe(hipSetDevice(gpu_rank % num_gpus_per_node));
+    // TODO: make number of GPUs per compute node (not per MPI process) adjustable
+    hipSafe(hipSetDevice(gpu_rank % 8));
 
     CMultiTimer timer;
 
