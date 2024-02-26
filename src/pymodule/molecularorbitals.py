@@ -256,7 +256,7 @@ class MolecularOrbitals:
         if curidx > 0:
             ostream.print_header(valstr.ljust(92))
 
-    def get_density(self, molecule, scf_type=None, ostream=None):
+    def get_density(self, molecule, scf_type=None):
         """
         Gets AO density matrix from molecular orbitals.
 
@@ -276,16 +276,8 @@ class MolecularOrbitals:
             mo = self.alpha_to_numpy()
             occ = self.occa_to_numpy()
 
-            # TODO: do the following block in one shot on GPU
-            t0 = tm.time()
             occ_mo = occ * mo
-            t1 = tm.time()
             dens = matmul_gpu(occ_mo, occ_mo.T)
-            t2 = tm.time()
-
-            if ostream is not None:
-                ostream.print_info(f'    occ*MO       : {t1-t0:.2f} sec')
-                ostream.print_info(f'    Dens         : {t2-t1:.2f} sec')
 
             return AODensityMatrix([dens], denmat.rest)
 

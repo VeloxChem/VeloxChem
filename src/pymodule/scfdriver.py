@@ -41,9 +41,9 @@ from .veloxchemlib import AOKohnShamMatrix, DenseMatrix
 from .veloxchemlib import ScreeningData, GpuDevices
 from .veloxchemlib import mpi_master
 from .veloxchemlib import xcfun
-from .veloxchemlib import (compute_fock_gpu, eigh_gpu, dot_product_gpu)
-from .veloxchemlib import compute_one_electron_integrals_gpu
-from .veloxchemlib import integrate_vxc_fock_gpu
+from .veloxchemlib import (compute_fock_gpu, matmul_gpu, eigh_gpu,
+                           dot_product_gpu, integrate_vxc_fock_gpu,
+                           compute_one_electron_integrals_gpu)
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -61,7 +61,7 @@ from .checkpoint import create_hdf5, write_scf_tensors
 
 class ScfDriver:
     """
-    Implements SCF method with C2-DIIS and two-level C2-DIIS convergence
+    Implements SCF method with DIIS and two-level DIIS convergence
     accelerators.
 
     :param comm:
@@ -74,12 +74,12 @@ class ScfDriver:
         - acc_type: The type of SCF convergence accelerator.
         - max_err_vecs: The maximum number of error vectors.
         - max_iter: The maximum number of SCF iterations.
-        - first_step: The flag for first step in two-level C2-DIIS convergence
+        - first_step: The flag for first step in two-level DIIS convergence
           acceleration.
         - conv_thresh: The SCF convergence threshold.
         - eri_thresh: The electron repulsion integrals screening threshold.
         - ovl_thresh: The atomic orbitals linear dependency threshold.
-        - diis_thresh: The C2-DIIS switch on threshold.
+        - diis_thresh: The DIIS switch on threshold.
         - iter_data: The dictionary of SCF iteration data (scf energy, scf
           energy change, gradient, density change, etc.).
         - is_converged: The flag for SCF convergence.
@@ -597,7 +597,7 @@ class ScfDriver:
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
 
-        # C2-DIIS method
+        # DIIS method
         if self.acc_type.upper() == 'DIIS':
 
             if self.rank == mpi_master():
@@ -617,7 +617,7 @@ class ScfDriver:
 
             self._comp_diis(molecule, ao_basis, min_basis, den_mat, profiler)
 
-        # two level C2-DIIS method
+        # two level DIIS method
         if self.acc_type.upper() == 'L2_DIIS':
 
             # first step
@@ -916,7 +916,7 @@ class ScfDriver:
 
     def _comp_diis(self, molecule, ao_basis, min_basis, den_mat, profiler):
         """
-        Performs SCF calculation with C2-DIIS acceleration.
+        Performs SCF calculation with DIIS acceleration.
 
         :param molecule:
             The molecule.
@@ -1202,10 +1202,12 @@ class ScfDriver:
 
             if self.rank == mpi_master():
                 new_den_t0 = tm.time()
-                den_mat = self.molecular_orbitals.get_density(molecule, 'restricted', self.ostream)
+                # TODO unrestricted and restricted open-shell
+                mo = self.molecular_orbitals.alpha_to_numpy()
+                occ = self.molecular_orbitals.occa_to_numpy()
+                occ_mo = occ * mo
+                den_mat_np = matmul_gpu(occ_mo, occ_mo.T)
                 new_den_t1 = tm.time()
-                den_mat_np = den_mat.alpha_to_numpy(0)
-                new_den_t2 = tm.time()
                 naos = den_mat_np.shape[0]
             else:
                 naos = None
@@ -1221,8 +1223,7 @@ class ScfDriver:
             new_den_t5 = tm.time()
 
             if self.rank == mpi_master():
-                self.ostream.print_info(f'New density AODens in {new_den_t1-new_den_t0:.2f} sec')
-                self.ostream.print_info(f'New density numpy  in {new_den_t2-new_den_t1:.2f} sec')
+                self.ostream.print_info(f'New density numpy  in {new_den_t1-new_den_t0:.2f} sec')
             self.ostream.print_info(f'New density bcast  in {new_den_t4-new_den_t3:.2f} sec')
             self.ostream.print_info(f'New density AODens in {new_den_t5-new_den_t4:.2f} sec')
             self.ostream.flush()
