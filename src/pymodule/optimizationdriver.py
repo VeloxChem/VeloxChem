@@ -34,6 +34,14 @@ from .veloxchemlib import CommonNeighbors
 from .veloxchemlib import mpi_master, hartree_in_kcalpermol, bohr_in_angstrom
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
+from .scfrestdriver import ScfRestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
+from .scfrestopendriver import ScfRestrictedOpenDriver
+from .scfgradientdriver import ScfGradientDriver
+from .xtbdriver import XtbDriver
+from .xtbgradientdriver import XtbGradientDriver
+from .openmmdriver import OpenMMDriver
+from .openmmgradientdriver import OpenMMGradientDriver
 from .inputparser import parse_input, print_keywords, get_random_string_parallel
 from .errorhandler import assert_msg_critical
 
@@ -45,8 +53,8 @@ class OptimizationDriver:
     """
     Implements optimization driver.
 
-    :param grad_drv:
-        The gradient driver.
+    :param drv:
+        The energy or gradient driver.
 
     Instance variables
         - rank: The rank of MPI process.
@@ -65,10 +73,30 @@ class OptimizationDriver:
         - hessian: The flag for computing Hessian.
     """
 
-    def __init__(self, grad_drv):
+    def __init__(self, drv):
         """
         Initializes optimization driver.
         """
+
+        if isinstance(drv, (ScfRestrictedDriver, ScfUnrestrictedDriver,
+                            ScfRestrictedOpenDriver)):
+            grad_drv = ScfGradientDriver(drv)
+
+        elif isinstance(drv, XtbDriver):
+            grad_drv = XtbGradientDriver(drv)
+
+        elif isinstance(drv, OpenMMDriver):
+            grad_drv = OpenMMGradientDriver(drv)
+
+        elif (isinstance(drv, ScfGradientDriver) or
+              isinstance(drv, XtbGradientDriver) or
+              isinstance(drv, OpenMMGradientDriver)):
+            grad_drv = drv
+
+        else:
+            assert_msg_critical(
+                False,
+                'OptimizationDriver: Invalid argument for initialization')
 
         self.comm = grad_drv.comm
         self.rank = grad_drv.comm.Get_rank()
@@ -90,7 +118,7 @@ class OptimizationDriver:
 
         self.ref_xyz = None
 
-        self.keep_files = True
+        self.keep_files = False
 
         self.filename = 'vlx_' + get_random_string_parallel(self.comm)
         self.grad_drv = grad_drv
@@ -186,7 +214,7 @@ class OptimizationDriver:
 
         self.print_header()
 
-        valstr = f'Using geomeTRIC for geometry optimization.'
+        valstr = 'Using geomeTRIC for geometry optimization.'
         self.ostream.print_info(valstr)
         self.ostream.print_blank()
         self.ostream.print_reference(self.get_geometric_reference())

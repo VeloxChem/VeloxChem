@@ -32,7 +32,6 @@ class TestOptimizeXTB:
         opt_drv.update_settings({
             'coordsys': 'tric',
             'filename': task.input_dict['filename'],
-            'keep_files': 'no',
         })
         opt_results = opt_drv.compute(task.molecule)
 

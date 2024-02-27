@@ -1921,7 +1921,6 @@ class ForceFieldGenerator:
         opt_drv.update_settings({
             'constraints': constraints,
             'filename': str(Path(top_file).parent / Path(top_file).stem),
-            'keep_files': self.keep_files,
         })
         opt_results = opt_drv.compute(molecule)
         final_mol = Molecule.read_xyz_string(opt_results['final_geometry'])
