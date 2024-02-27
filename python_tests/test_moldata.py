@@ -1,5 +1,6 @@
 from pathlib import Path
 import numpy as np
+import math
 import pytest
 
 from veloxchem.veloxchemlib import ChemicalElement, DispersionModel
@@ -409,7 +410,11 @@ class TestMolData:
             H    2.7731563   -2.1600957    2.2063667
         """
         mol = Molecule.read_xyz_string(xyz_string)
-        assert abs(mol.get_dihedral_in_degree((2, 3, 4, 5)) - 55.0) < 1e-4
+        assert abs(mol.get_dihedral_in_degrees((2, 3, 4, 5)) - 55.0) < 1e-4
 
-        mol.set_dihedral_in_degree((2, 3, 4, 5), 270.0)
-        assert abs(mol.get_dihedral_in_degree((2, 3, 4, 5)) + 90.0) < 1e-4
+        mol.set_dihedral_in_degrees((2, 3, 4, 5), 270.0)
+        assert abs(mol.get_dihedral((2, 3, 4, 5), 'radian') +
+                   math.pi / 2.0) < 1e-4
+
+        mol.set_dihedral((2, 3, 4, 5), math.pi / 2.0, 'radian')
+        assert abs(mol.get_dihedral_in_degrees((2, 3, 4, 5)) - 90.0) < 1e-4

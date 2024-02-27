@@ -239,15 +239,31 @@ def _Molecule_get_connectivity_matrix(self, factor=1.3):
     return connectivity_matrix
 
 
-def _Molecule_get_dihedral_in_degree(self, dihedral_indices_one_based):
+def _Molecule_get_dihedral_in_degrees(self, dihedral_indices_one_based):
     """
-    Gets dihedral angle in degree.
+    Gets dihedral angle.
 
     :param dihedral_indices_one_based:
         The dihedral indices (1-based).
 
     :return:
-        The dihedral angle in degree.
+        The dihedral angle.
+    """
+
+    return self.get_dihedral(dihedral_indices_one_based, 'degree')
+
+
+def _Molecule_get_dihedral(self, dihedral_indices_one_based, angle_unit):
+    """
+    Gets dihedral angle.
+
+    :param dihedral_indices_one_based:
+        The dihedral indices (1-based).
+    :param angle_unit:
+        The unit of angle (degree or radian).
+
+    :return:
+        The dihedral angle.
     """
 
     a = dihedral_indices_one_based[0] - 1
@@ -278,17 +294,28 @@ def _Molecule_get_dihedral_in_degree(self, dihedral_indices_one_based):
     sin_phi = -(np.vdot(u43, np.cross(u21, u32)) /
                 (sin_theta_123 * sin_theta_234))
 
-    phi = math.acos(cos_phi) * 180.0 / math.pi
+    # avoid math domain error
+    if abs(cos_phi) > 1.0:
+        assert abs(abs(cos_phi) - 1.0) < 1.0e-10
+        cos_phi = 1.0 if cos_phi > 1.0 else -1.0
+
+    phi_in_radian = math.acos(cos_phi)
     if sin_phi < 0.0:
-        phi *= -1.0
+        phi_in_radian *= -1.0
 
-    return phi
+    assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
+                        'Molecule.get_dihedral: Invalid angle unit')
+
+    if angle_unit.lower() == 'degree':
+        return 180.0 * phi_in_radian / math.pi
+    else:
+        return phi_in_radian
 
 
-def _Molecule_set_dihedral_in_degree(self, dihedral_indices_one_based,
-                                     target_angle):
+def _Molecule_set_dihedral_in_degrees(self, dihedral_indices_one_based,
+                                      target_angle):
     """
-    Sets dihedral angle in degree.
+    Sets dihedral angle.
 
     :param dihedral_indices_one_based:
         The dihedral indices (1-based).
@@ -296,14 +323,30 @@ def _Molecule_set_dihedral_in_degree(self, dihedral_indices_one_based,
         The target value of dihedral angle.
     """
 
-    phi = self.get_dihedral_in_degree(dihedral_indices_one_based)
-
-    self.rotate_dihedral_in_degree(dihedral_indices_one_based,
-                                   target_angle - phi)
+    self.set_dihedral(dihedral_indices_one_based, target_angle, 'degree')
 
 
-def _Molecule_rotate_dihedral_in_degree(self, dihedral_indices_one_based,
-                                        rotation_angle):
+def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle,
+                           angle_unit):
+    """
+    Sets dihedral angle.
+
+    :param dihedral_indices_one_based:
+        The dihedral indices (1-based).
+    :param target_angle:
+        The target value of dihedral angle.
+    :param angle_unit:
+        The unit of angle (degree or radian).
+    """
+
+    phi = self.get_dihedral(dihedral_indices_one_based, angle_unit)
+
+    self.rotate_dihedral(dihedral_indices_one_based, target_angle - phi,
+                         angle_unit)
+
+
+def _Molecule_rotate_dihedral(self, dihedral_indices_one_based, rotation_angle,
+                              angle_unit):
     """
     Rotates a bond.
 
@@ -311,12 +354,21 @@ def _Molecule_rotate_dihedral_in_degree(self, dihedral_indices_one_based,
         The dihedral indices (1-based).
     :param rotation_angle:
         The rotation angle.
+    :param angle_unit:
+        The unit of angle (degree or radian).
     """
 
     assert_msg_critical(
         len(dihedral_indices_one_based) == 4,
-        'Molecule.rotate_dihedral_in_degree: Expecting four atom indices (1-based)'
-    )
+        'Molecule.rotate_dihedral: Expecting four atom indices (1-based)')
+
+    assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
+                        'Molecule.rotate_dihedral: Invalid angle unit')
+
+    if angle_unit.lower() == 'degree':
+        rotation_angle_in_radian = math.pi * rotation_angle / 180.0
+    else:
+        rotation_angle_in_radian = rotation_angle
 
     # get the 0-based atom indices for central bond
     i = dihedral_indices_one_based[1] - 1
@@ -344,7 +396,7 @@ def _Molecule_rotate_dihedral_in_degree(self, dihedral_indices_one_based,
 
     assert_msg_critical(
         i not in atoms_connected_to_j,
-        'Molecule.rotate_dihedral_in_degree: Cannot rotate dihedral ' +
+        'Molecule.rotate_dihedral: Cannot rotate dihedral ' +
         '(Maybe it is part of a ring?)')
 
     # rotate whole molecule around unit vector i->j
@@ -353,7 +405,7 @@ def _Molecule_rotate_dihedral_in_degree(self, dihedral_indices_one_based,
     vij = coords_in_au[j] - coords_in_au[i]
     uij = vij / np.linalg.norm(vij)
 
-    theta = math.pi * rotation_angle / 180.0
+    theta = rotation_angle_in_radian
     cos_theta = math.cos(theta)
     sin_theta = math.sin(theta)
     m_cos_theta = 1.0 - cos_theta
@@ -818,9 +870,11 @@ Molecule.read_xyz_file = _Molecule_read_xyz_file
 Molecule.read_xyz_string = _Molecule_read_xyz_string
 Molecule.from_dict = _Molecule_from_dict
 Molecule.get_connectivity_matrix = _Molecule_get_connectivity_matrix
-Molecule.get_dihedral_in_degree = _Molecule_get_dihedral_in_degree
-Molecule.set_dihedral_in_degree = _Molecule_set_dihedral_in_degree
-Molecule.rotate_dihedral_in_degree = _Molecule_rotate_dihedral_in_degree
+Molecule.get_dihedral = _Molecule_get_dihedral
+Molecule.set_dihedral = _Molecule_set_dihedral
+Molecule.rotate_dihedral = _Molecule_rotate_dihedral
+Molecule.get_dihedral_in_degrees = _Molecule_get_dihedral_in_degrees
+Molecule.set_dihedral_in_degrees = _Molecule_set_dihedral_in_degrees
 Molecule.center_of_mass = _Molecule_center_of_mass
 Molecule.center_of_mass_in_bohr = _Molecule_center_of_mass_in_bohr
 Molecule.center_of_mass_in_angstrom = _Molecule_center_of_mass_in_angstrom
