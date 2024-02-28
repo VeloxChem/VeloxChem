@@ -30,6 +30,7 @@
 #include <sstream>
 
 #include "ChemicalElement.hpp"
+#include "GridPartitionFuncGPU.hpp"
 #include "LebedevLaikovQuadrature.hpp"
 #include "Log3Quadrature.hpp"
 #include "MathConst.hpp"
@@ -37,7 +38,6 @@
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
 #include "MpiFunc.hpp"
-#include "PartitionFunc.hpp"
 #include "StringFormat.hpp"
 
 CGridDriver::CGridDriver(MPI_Comm comm)
@@ -61,11 +61,11 @@ CGridDriver::setLevel(const int64_t gridLevel) -> void
 }
 
 auto
-CGridDriver::generate(const CMolecule& molecule) const -> CMolecularGrid
+CGridDriver::generate(const CMolecule& molecule, const int64_t numGpusPerNode) const -> CMolecularGrid
 {
     CMolecularGrid molgrid;
 
-    molgrid = _genGridPoints(molecule);
+    molgrid = _genGridPoints(molecule, numGpusPerNode);
 
     molgrid.partitionGridPoints();
 
@@ -253,7 +253,7 @@ CGridDriver::_finishHeader(const CMolecularGrid& molecularGrid) const -> std::st
 }
 
 auto
-CGridDriver::_genGridPoints(const CMolecule& molecule) const -> CMolecularGrid
+CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerNode) const -> CMolecularGrid
 {
     // molecular data
 
@@ -289,30 +289,45 @@ CGridDriver::_genGridPoints(const CMolecule& molecule) const -> CMolecularGrid
 
     // generate atomic grid for each atom in molecule
 
-#pragma omp parallel shared(rawgrid, idselem, molcoords, molrm, natoms, nodatm, nodoff)
+    std::vector<int64_t> grid_offsets;
+
+    for (int64_t i = 0, gridoff = 0; i < nodatm; i++)
     {
-#pragma omp single nowait
-        {
-            int64_t gridoff = 0;
+        grid_offsets.push_back(gridoff);
 
-            for (int64_t i = 0; i < nodatm; i++)
-            {
-                auto iatom = nodoff + i;
+        auto ielem = idselem[nodoff + i];
 
-                auto ielem = idselem[iatom];
-
-                auto minrad = molrm[iatom];
-
-#pragma omp task firstprivate(ielem, iatom, minrad, gridoff)
-                {
-                    _genAtomGridPoints(rawgrid, minrad, gridoff, molcoords, natoms, ielem, iatom);
-                }
-
-                gridoff += _getNumberOfRadialPoints(ielem) * _getNumberOfAngularPoints(ielem);
-            }
-        }
+        gridoff += _getNumberOfRadialPoints(ielem) * _getNumberOfAngularPoints(ielem);
     }
 
+    for (int64_t i = 0; i < nodatm; i++)
+    {
+        auto iatom = nodoff + i;
+
+        auto ielem = idselem[iatom];
+
+        auto minrad = molrm[iatom];
+
+        auto gridoff = grid_offsets[i];
+
+        _genAtomGridPoints(rawgrid, minrad, gridoff, molcoords, natoms, ielem, iatom);
+
+        auto nrpoints = _getNumberOfRadialPoints(ielem);
+
+        auto napoints = _getNumberOfAngularPoints(ielem);
+
+        // apply partitioning function
+
+        gpu::applyGridPartitionFunc(rawgrid, minrad, gridoff, nrpoints * napoints, molcoords, natoms, iatom);
+    }
+
+    CMolecularGrid mg(*rawgrid);
+
+    delete rawgrid;
+
+    return mg;
+
+    /*
     // screen raw grid points & create prunned grid
 
     bpoints = _screenRawGridPoints(rawgrid);
@@ -324,6 +339,7 @@ CGridDriver::_genGridPoints(const CMolecule& molecule) const -> CMolecularGrid
     auto gathered_prngrid = mpi::gatherDenseMatricesByColumns(prngrid, _locComm);
 
     return CMolecularGrid(gathered_prngrid);
+    */
 }
 
 auto
@@ -412,7 +428,6 @@ CGridDriver::_genAtomGridPoints(CDenseMatrix*   rawGridPoints,
 
         // contract with angular quadrature
 
-#pragma omp simd
         for (int64_t j = 0; j < napoints; j++)
         {
             gx[j] = crx * rax[j] + atmx;
@@ -424,10 +439,6 @@ CGridDriver::_genAtomGridPoints(CDenseMatrix*   rawGridPoints,
             gw[j] = crw * crx * crx * raw[j];
         }
     }
-
-    // apply partitioning function
-
-    partfunc::ssf(rawGridPoints, minDistance, gridOffset, nrpoints * napoints, atomCoordinates, nAtoms, idAtomic);
 }
 
 auto

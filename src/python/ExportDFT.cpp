@@ -147,7 +147,7 @@ export_dft(py::module& m)
 
     PyClass<CGridDriver>(m, "GridDriver")
         .def(py::init(&CGridDriver_create), "comm"_a = py::none())
-        .def("generate", &CGridDriver::generate, "Generates molecular grid for molecule.", "molecule"_a)
+        .def("generate", &CGridDriver::generate, "Generates molecular grid for molecule.", "molecule"_a, "num_gpus_per_node"_a)
         .def("set_level", &CGridDriver::setLevel, "Sets accuracy level for grid generation.", "grid_level"_a);
 
     // CXCIntegrator class

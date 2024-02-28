@@ -97,7 +97,7 @@ class CGridDriver
      @param molecule the molecule.
      @return the molecular grid object.
      */
-    auto _genGridPoints(const CMolecule& molecule) const -> CMolecularGrid;
+    auto _genGridPoints(const CMolecule& molecule, const int64_t numGpusPerNode) const -> CMolecularGrid;
 
     /**
      Gets size of grid points batch.
@@ -160,7 +160,7 @@ class CGridDriver
      @param molecule the molecule.
      @return the molecular grid object.
      */
-    auto generate(const CMolecule& molecule) const -> CMolecularGrid;
+    auto generate(const CMolecule& molecule, const int64_t numGpusPerNode) const -> CMolecularGrid;
 };
 
 #endif /* GridDriver_hpp */
