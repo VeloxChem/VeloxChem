@@ -571,8 +571,10 @@ class ScfDriver:
                           if self.grid_level is None else self.grid_level)
             grid_drv.set_level(grid_level)
 
+            num_gpus_per_node = self._get_num_gpus_per_node()
+
             grid_t0 = tm.time()
-            self._mol_grid = grid_drv.generate(molecule)
+            self._mol_grid = grid_drv.generate(molecule, num_gpus_per_node)
             n_grid_points = self._mol_grid.number_of_points()
             self.ostream.print_info(
                 'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
@@ -914,6 +916,27 @@ class ScfDriver:
                 checkpoint_text += self.checkpoint_file
                 self.ostream.print_info(checkpoint_text)
 
+    def _get_num_gpus_per_node(self):
+        """
+        Gets number of GPUs per MPI process.
+
+        :return:
+            The number of GPUs per MPI process.
+        """
+
+        if 'VLX_NUM_GPUS_PER_NODE' in os.environ:
+            num_gpus_per_node = int(os.environ['VLX_NUM_GPUS_PER_NODE'])
+        else:
+            devices = GpuDevices()
+            num_gpus_per_node = devices.get_number_devices()
+            if 'SLURM_NTASKS_PER_NODE' in os.environ:
+                num_gpus_per_node //= int(os.environ['SLURM_NTASKS_PER_NODE'])
+
+        assert_msg_critical(num_gpus_per_node > 0,
+                            'SCF driver: Invalid number of GPUs per MPI process')
+
+        return num_gpus_per_node
+
     def _comp_diis(self, molecule, ao_basis, min_basis, den_mat, profiler):
         """
         Performs SCF calculation with DIIS acceleration.
@@ -964,13 +987,7 @@ class ScfDriver:
         else:
             t0 = tm.time()
 
-            if 'VLX_NUM_GPUS_PER_NODE' in os.environ:
-                num_gpus_per_node = int(os.environ['VLX_NUM_GPUS_PER_NODE'])
-            else:
-                devices = GpuDevices()
-                num_gpus_per_node = devices.get_number_devices()
-                if 'SLURM_NTASKS_PER_NODE' in os.environ:
-                    num_gpus_per_node //= int(os.environ['SLURM_NTASKS_PER_NODE'])
+            num_gpus_per_node = self._get_num_gpus_per_node()
 
             screener = ScreeningData(molecule, ao_basis, num_gpus_per_node)
 

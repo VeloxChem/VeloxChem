@@ -318,16 +318,9 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
 
         // apply partitioning function
 
-        gpu::applyGridPartitionFunc(rawgrid, minrad, gridoff, nrpoints * napoints, molcoords, natoms, iatom);
+        gpu::applyGridPartitionFunc(rawgrid, minrad, gridoff, nrpoints * napoints, molcoords, natoms, iatom, numGpusPerNode);
     }
 
-    CMolecularGrid mg(*rawgrid);
-
-    delete rawgrid;
-
-    return mg;
-
-    /*
     // screen raw grid points & create prunned grid
 
     bpoints = _screenRawGridPoints(rawgrid);
@@ -339,7 +332,6 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
     auto gathered_prngrid = mpi::gatherDenseMatricesByColumns(prngrid, _locComm);
 
     return CMolecularGrid(gathered_prngrid);
-    */
 }
 
 auto

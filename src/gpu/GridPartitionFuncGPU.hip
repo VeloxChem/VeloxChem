@@ -25,9 +25,13 @@
 
 #include <hip/hip_runtime.h>
 
+#include <omp.h>
+
 #include <iostream>
 
 #include "GridPartitionFuncGPU.hpp"
+#include "MathFunc.hpp"
+#include "MpiFunc.hpp"
 
 #define TILE_DIM 16
 
@@ -175,16 +179,42 @@ applyGridPartitionFunc(CDenseMatrix*   rawGridPoints,
                        const int64_t   nGridPoints,
                        const TPoint3D* atomCoordinates,
                        const int64_t   nAtoms,
-                       const int64_t   idAtomic) -> void
+                       const int64_t   idAtomic,
+                       const int64_t   numGpusPerNode) -> void
 {
-    hipSafe(hipSetDevice(0));
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    auto nthreads = omp_get_max_threads();
+    auto num_gpus_per_node = numGpusPerNode;
+    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+
+#pragma omp parallel
+    {
+    auto thread_id = omp_get_thread_num();
+
+    if (thread_id % num_threads_per_gpu == 0)
+    {
+    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
+    auto gpu_count = nnodes * num_gpus_per_node;
+
+    // TODO: make number of GPUs per compute node (not per MPI process) adjustable
+    hipSafe(hipSetDevice(gpu_rank % 8));
 
     // grid and atom data
 
-    auto gridx = rawGridPoints->row(0) + gridOffset;
-    auto gridy = rawGridPoints->row(1) + gridOffset;
-    auto gridz = rawGridPoints->row(2) + gridOffset;
-    auto gridw = rawGridPoints->row(3) + gridOffset;
+    auto n_points = static_cast<uint32_t>(nGridPoints);
+    auto n_atoms = static_cast<uint32_t>(nAtoms);
+    auto i_atom = static_cast<uint32_t>(idAtomic);
+
+    auto grid_batch_size = mathfunc::batch_size(n_points, gpu_id, num_gpus_per_node);
+    auto grid_batch_offset = mathfunc::batch_offset(n_points, gpu_id, num_gpus_per_node);
+
+    auto gridx = rawGridPoints->row(0) + gridOffset + grid_batch_offset;
+    auto gridy = rawGridPoints->row(1) + gridOffset + grid_batch_offset;
+    auto gridz = rawGridPoints->row(2) + gridOffset + grid_batch_offset;
+    auto gridw = rawGridPoints->row(3) + gridOffset + grid_batch_offset;
 
     std::vector<double> atom_coords(3 * nAtoms);
 
@@ -197,26 +227,21 @@ applyGridPartitionFunc(CDenseMatrix*   rawGridPoints,
 
     // grid and atom data on device
 
-    auto n_points = static_cast<uint32_t>(nGridPoints);
-
-    auto n_atoms = static_cast<uint32_t>(nAtoms);
-    auto i_atom = static_cast<uint32_t>(idAtomic);
-
     double *d_grid_x, *d_grid_y, *d_grid_z, *d_grid_w;
 
-    hipSafe(hipMalloc(&d_grid_x, n_points * sizeof(double)));
-    hipSafe(hipMalloc(&d_grid_y, n_points * sizeof(double)));
-    hipSafe(hipMalloc(&d_grid_z, n_points * sizeof(double)));
-    hipSafe(hipMalloc(&d_grid_w, n_points * sizeof(double)));
+    hipSafe(hipMalloc(&d_grid_x, grid_batch_size * sizeof(double)));
+    hipSafe(hipMalloc(&d_grid_y, grid_batch_size * sizeof(double)));
+    hipSafe(hipMalloc(&d_grid_z, grid_batch_size * sizeof(double)));
+    hipSafe(hipMalloc(&d_grid_w, grid_batch_size * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_grid_x, gridx, n_points * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_grid_y, gridy, n_points * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_grid_z, gridz, n_points * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_grid_w, gridw, n_points * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grid_x, gridx, grid_batch_size * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grid_y, gridy, grid_batch_size * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grid_z, gridz, grid_batch_size * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grid_w, gridw, grid_batch_size * sizeof(double), hipMemcpyHostToDevice));
 
     double *d_partial_weights;
 
-    hipSafe(hipMalloc(&d_partial_weights, n_atoms * n_points * sizeof(double)));
+    hipSafe(hipMalloc(&d_partial_weights, n_atoms * grid_batch_size * sizeof(double)));
 
     double *d_atom_x, *d_atom_y, *d_atom_z;
 
@@ -232,14 +257,14 @@ applyGridPartitionFunc(CDenseMatrix*   rawGridPoints,
 
     dim3 threads_per_block(TILE_DIM);
 
-    dim3 num_blocks((n_points + threads_per_block.x - 1) / threads_per_block.x);
+    dim3 num_blocks((grid_batch_size + threads_per_block.x - 1) / threads_per_block.x);
 
     hipLaunchKernelGGL(gpu::ssf, num_blocks, threads_per_block, 0, 0,
-                       d_grid_x, d_grid_y, d_grid_z, minDistance, n_points,
+                       d_grid_x, d_grid_y, d_grid_z, minDistance, grid_batch_size,
                        d_atom_x, d_atom_y, d_atom_z, n_atoms, i_atom,
                        d_partial_weights, d_grid_w);
 
-    hipSafe(hipMemcpy(gridw, d_grid_w, n_points * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(gridw, d_grid_w, grid_batch_size * sizeof(double), hipMemcpyDeviceToHost));
 
     hipSafe(hipFree(d_grid_x));
     hipSafe(hipFree(d_grid_y));
@@ -251,6 +276,8 @@ applyGridPartitionFunc(CDenseMatrix*   rawGridPoints,
     hipSafe(hipFree(d_atom_x));
     hipSafe(hipFree(d_atom_y));
     hipSafe(hipFree(d_atom_z));
+
+    }}
 }
 
 }  // namespace gpu
