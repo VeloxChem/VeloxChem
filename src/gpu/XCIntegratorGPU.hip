@@ -688,8 +688,6 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
         }
     }
 
-    hipSafe(hipDeviceSynchronize());
-
     hipSafe(hipFree(d_gto_info));
     hipSafe(hipFree(d_gaos));
     hipSafe(hipFree(d_grid_x));
@@ -848,8 +846,6 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
             std::memcpy(allgtovalues_z.row(aoinds[nu]) + gridblockpos, mat_chi_z.row(nu), npoints * sizeof(double));
         }
     }
-
-    hipSafe(hipDeviceSynchronize());
 
     hipSafe(hipFree(d_gto_info));
     hipSafe(hipFree(d_gaos));
@@ -1160,6 +1156,8 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     }
 
     hipSafe(hipMemcpy(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipSafe(hipDeviceSynchronize());
 
     hipSafe(hipFree(d_gto_info));
     hipSafe(hipFree(d_ao_inds));
