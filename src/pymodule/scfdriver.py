@@ -1240,7 +1240,7 @@ class ScfDriver:
             new_den_t5 = tm.time()
 
             if self.rank == mpi_master():
-                self.ostream.print_info(f'New density numpy  in {new_den_t1-new_den_t0:.2f} sec')
+                self.ostream.print_info(f'New density matmul in {new_den_t1-new_den_t0:.2f} sec')
             self.ostream.print_info(f'New density bcast  in {new_den_t4-new_den_t3:.2f} sec')
             self.ostream.print_info(f'New density AODens in {new_den_t5-new_den_t4:.2f} sec')
             self.ostream.flush()
@@ -1636,7 +1636,6 @@ class ScfDriver:
 
         # TODO: add beta density
         # TODO: add other fock_t/fockmat
-        # TODO: dft
         # TODO: range-separated functionals
 
         if self.timing:
@@ -1644,18 +1643,19 @@ class ScfDriver:
         vxc_t0 = tm.time()
 
         if self._dft and not self._first_step:
-            if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga, xcfun.mgga]:
-                xc_drv = XCIntegrator(self.comm)
+            # TODO: support xcfun.mgga
+            if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga]:
+                vxc_t0 = tm.time()
                 vxc_mat = integrate_vxc_fock_gpu(molecule, basis, den_mat,
                                                  self._mol_grid,
                                                  self.xcfun.get_func_label(),
                                                  screener.get_num_gpus_per_node())
+                vxc_t1 = tm.time()
+                self.ostream.print_info(f'DFT Vxc done    in {vxc_t1-vxc_t0:.2f} sec')
+                self.ostream.flush()
             else:
                 assert_msg_critical(
                     False, 'SCF driver: Unsupported XC functional type')
-
-            # TODO MPI reduce
-            # vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
         else:
             vxc_mat = None
 
@@ -1877,9 +1877,13 @@ class ScfDriver:
                 e_sum += vxc_mat.get_energy()
             if self._pe and not self._first_step:
                 e_sum += e_pe
+
         else:
             e_sum = 0.0
-        e_sum = self.comm.bcast(e_sum, root=mpi_master())
+            if self._dft and not self._first_step:
+                e_sum += vxc_mat.get_energy()
+
+        e_sum = self.comm.allreduce(e_sum, op=MPI.SUM)
 
         return e_sum
 
@@ -1901,6 +1905,16 @@ class ScfDriver:
             The nuclear potential matrix.
         """
 
+        if self._dft and not self._first_step:
+            # TODO: take care of unrestricted/restricted-open-shell case
+            vxc_t0 = tm.time()
+            vxc_mat_np_local = vxc_mat.alpha_to_numpy()
+            vxc_mat_np_sum = np.zeros(vxc_mat_np_local.shape)
+            self.comm.Reduce(vxc_mat_np_local, vxc_mat_np_sum, op=MPI.SUM, root=mpi_master())
+            vxc_t1 = tm.time()
+            self.ostream.print_info(f'DFT Vxc comm.   in {vxc_t1-vxc_t0:.2f} sec')
+            self.ostream.flush()
+
         if self.rank == mpi_master():
             # TODO: double check
             T = kin_mat
@@ -1908,7 +1922,9 @@ class ScfDriver:
             fock_mat += (T - V)
 
             if self._dft and not self._first_step:
-                fock_mat += vxc_mat.alpha_to_numpy()
+                fock_mat += vxc_mat_np_sum
+
+                # TODO: take care of unrestricted/restricted-open-shell case
                 if self.scf_type in ['unrestricted', 'restricted_openshell']:
                     fock_mat.add_matrix(vxc_mat.get_beta_matrix(), 0, 'beta')
 
