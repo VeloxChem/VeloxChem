@@ -239,6 +239,94 @@ def _Molecule_get_connectivity_matrix(self, factor=1.3):
     return connectivity_matrix
 
 
+def _Molecule_find_connected_atoms(self, atom_idx, connectivity_matrix=None):
+    """
+    Gets all atoms indices that are (directly or indirectly) connected to a
+    given atom.
+
+    :param atom_idx:
+        The index of the give atom.
+    :param connectivity_matrix:
+        The connectivity matrix.
+
+    :return:
+        A set containing all the atom indices that are connected to the given
+        atom.
+    """
+
+    if connectivity_matrix is None:
+        connectivity_matrix = self.get_connectivity_matrix()
+
+    connected_atoms = set()
+    connected_atoms.add(atom_idx)
+
+    while True:
+        more_connected_atoms = set()
+        for a in connected_atoms:
+            for b in range(connectivity_matrix.shape[0]):
+                if (b not in connected_atoms and
+                        connectivity_matrix[a, b] == 1):
+                    more_connected_atoms.add(b)
+        if more_connected_atoms:
+            connected_atoms.update(more_connected_atoms)
+        else:
+            break
+
+    return connected_atoms
+
+
+def _Molecule_rotate_around_vector(self, coords, origin, vector, rotation_angle,
+                                   angle_unit):
+    """
+    Returns coordinates after rotation around a given vector.
+
+    :param coords:
+        The coordinates.
+    :param origin:
+        The origin of the vector.
+    :param vector:
+        The vector.
+    :param rotation_angle:
+        The rotation angle.
+    :param angle_unit:
+        The unit of rotation angle.
+
+    :return:
+        The coordinates after rotation.
+    """
+
+    assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
+                        'Molecule: Invalid angle unit for rotation')
+
+    if angle_unit.lower() == 'degree':
+        rotation_angle_in_radian = math.pi * rotation_angle / 180.0
+    else:
+        rotation_angle_in_radian = rotation_angle
+
+    uvec = vector / np.linalg.norm(vector)
+
+    cos_theta = math.cos(rotation_angle_in_radian)
+    sin_theta = math.sin(rotation_angle_in_radian)
+    m_cos_theta = 1.0 - cos_theta
+
+    rotation_mat = np.zeros((3, 3))
+
+    rotation_mat[0, 0] = cos_theta + m_cos_theta * uvec[0]**2
+    rotation_mat[1, 1] = cos_theta + m_cos_theta * uvec[1]**2
+    rotation_mat[2, 2] = cos_theta + m_cos_theta * uvec[2]**2
+
+    rotation_mat[0, 1] = m_cos_theta * uvec[0] * uvec[1] - sin_theta * uvec[2]
+    rotation_mat[1, 0] = m_cos_theta * uvec[1] * uvec[0] + sin_theta * uvec[2]
+
+    rotation_mat[1, 2] = m_cos_theta * uvec[1] * uvec[2] - sin_theta * uvec[0]
+    rotation_mat[2, 1] = m_cos_theta * uvec[2] * uvec[1] + sin_theta * uvec[0]
+
+    rotation_mat[2, 0] = m_cos_theta * uvec[2] * uvec[0] - sin_theta * uvec[1]
+    rotation_mat[0, 2] = m_cos_theta * uvec[0] * uvec[2] + sin_theta * uvec[1]
+
+    return np.matmul(coords - origin, rotation_mat.T) + origin
+
+
 def _Molecule_get_dihedral_in_degrees(self, dihedral_indices_one_based):
     """
     Gets dihedral angle.
@@ -339,36 +427,9 @@ def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle,
         The unit of angle (degree or radian).
     """
 
-    phi = self.get_dihedral(dihedral_indices_one_based, angle_unit)
-
-    self.rotate_dihedral(dihedral_indices_one_based, target_angle - phi,
-                         angle_unit)
-
-
-def _Molecule_rotate_dihedral(self, dihedral_indices_one_based, rotation_angle,
-                              angle_unit):
-    """
-    Rotates a bond.
-
-    :param dihedral_indices_one_based:
-        The dihedral indices (1-based).
-    :param rotation_angle:
-        The rotation angle.
-    :param angle_unit:
-        The unit of angle (degree or radian).
-    """
-
     assert_msg_critical(
         len(dihedral_indices_one_based) == 4,
-        'Molecule.rotate_dihedral: Expecting four atom indices (1-based)')
-
-    assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
-                        'Molecule.rotate_dihedral: Invalid angle unit')
-
-    if angle_unit.lower() == 'degree':
-        rotation_angle_in_radian = math.pi * rotation_angle / 180.0
-    else:
-        rotation_angle_in_radian = rotation_angle
+        'Molecule.set_dihedral: Expecting four atom indices (1-based)')
 
     # get the 0-based atom indices for central bond
     i = dihedral_indices_one_based[1] - 1
@@ -379,54 +440,24 @@ def _Molecule_rotate_dihedral(self, dihedral_indices_one_based, rotation_angle,
     connectivity_matrix[i, j] = 0
     connectivity_matrix[j, i] = 0
 
-    atoms_connected_to_j = set()
-    atoms_connected_to_j.add(j)
-
-    while True:
-        more_connected_atoms = set()
-        for a in atoms_connected_to_j:
-            for b in range(connectivity_matrix.shape[0]):
-                if (b not in atoms_connected_to_j and
-                        connectivity_matrix[a, b] == 1):
-                    more_connected_atoms.add(b)
-        if more_connected_atoms:
-            atoms_connected_to_j.update(more_connected_atoms)
-        else:
-            break
+    atoms_connected_to_j = self._find_connected_atoms(j, connectivity_matrix)
 
     assert_msg_critical(
         i not in atoms_connected_to_j,
-        'Molecule.rotate_dihedral: Cannot rotate dihedral ' +
+        'Molecule.set_dihedral: Cannot rotate dihedral ' +
         '(Maybe it is part of a ring?)')
 
     # rotate whole molecule around unit vector i->j
     coords_in_au = self.get_coordinates_in_bohr()
 
     vij = coords_in_au[j] - coords_in_au[i]
-    uij = vij / np.linalg.norm(vij)
 
-    theta = rotation_angle_in_radian
-    cos_theta = math.cos(theta)
-    sin_theta = math.sin(theta)
-    m_cos_theta = 1.0 - cos_theta
+    rotation_angle = target_angle - self.get_dihedral(
+        dihedral_indices_one_based, angle_unit)
 
-    rotation_matrix = np.zeros((3, 3))
-
-    rotation_matrix[0, 0] = cos_theta + m_cos_theta * uij[0]**2
-    rotation_matrix[1, 1] = cos_theta + m_cos_theta * uij[1]**2
-    rotation_matrix[2, 2] = cos_theta + m_cos_theta * uij[2]**2
-
-    rotation_matrix[0, 1] = m_cos_theta * uij[0] * uij[1] - sin_theta * uij[2]
-    rotation_matrix[1, 0] = m_cos_theta * uij[1] * uij[0] + sin_theta * uij[2]
-
-    rotation_matrix[1, 2] = m_cos_theta * uij[1] * uij[2] - sin_theta * uij[0]
-    rotation_matrix[2, 1] = m_cos_theta * uij[2] * uij[1] + sin_theta * uij[0]
-
-    rotation_matrix[2, 0] = m_cos_theta * uij[2] * uij[0] - sin_theta * uij[1]
-    rotation_matrix[0, 2] = m_cos_theta * uij[0] * uij[2] + sin_theta * uij[1]
-
-    new_coords_in_au = np.matmul(coords_in_au - coords_in_au[j],
-                                 rotation_matrix.T) + coords_in_au[j]
+    new_coords_in_au = self._rotate_around_vector(coords_in_au, coords_in_au[j],
+                                                  vij, rotation_angle,
+                                                  angle_unit)
 
     # update coordinates of atoms connected to j
     for idx in atoms_connected_to_j:
@@ -860,6 +891,8 @@ def _Molecule_deepcopy(self, memo):
 
 
 Molecule._get_input_keywords = _Molecule_get_input_keywords
+Molecule._find_connected_atoms = _Molecule_find_connected_atoms
+Molecule._rotate_around_vector = _Molecule_rotate_around_vector
 
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.show = _Molecule_show
@@ -872,7 +905,6 @@ Molecule.from_dict = _Molecule_from_dict
 Molecule.get_connectivity_matrix = _Molecule_get_connectivity_matrix
 Molecule.get_dihedral = _Molecule_get_dihedral
 Molecule.set_dihedral = _Molecule_set_dihedral
-Molecule.rotate_dihedral = _Molecule_rotate_dihedral
 Molecule.get_dihedral_in_degrees = _Molecule_get_dihedral_in_degrees
 Molecule.set_dihedral_in_degrees = _Molecule_set_dihedral_in_degrees
 Molecule.center_of_mass = _Molecule_center_of_mass
