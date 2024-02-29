@@ -60,16 +60,26 @@ distance(const double aCoordX, const double aCoordY, const double aCoordZ, const
 __device__ double
 zeta(const double eRadius)
 {
+    double val = 0.0;
+
     // SSF parameter a = 0.64
 
-    if (eRadius <= -0.64) return -1.0;
-    if (eRadius >= 0.64) return 1.0;
+    if (eRadius <= -0.64)
+    {
+        val = -1.0;
+    }
+    else if (eRadius >= 0.64)
+    {
+        val = 1.0;
+    }
+    else
+    {
+        const double mab = 1.5625 * eRadius;
+        const double mab2 = mab * mab;
+        val = 0.0625 * mab * (35.0 + mab2 * (-35.0 + mab2 * (21.0 - 5.0 * mab2)));
+    }
 
-    // middle interval
-
-    const double mab = 1.5625 * eRadius;
-    const double mab2 = mab * mab;
-    return 0.0625 * mab * (35.0 + mab2 * (-35.0 + mab2 * (21.0 - 5.0 * mab2)));
+    return val;
 }
 
 __global__ void
