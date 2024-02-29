@@ -27,6 +27,7 @@
 
 #include <array>
 #include <cmath>
+#include <iostream>
 #include <sstream>
 
 #include "ChemicalElement.hpp"
@@ -39,6 +40,7 @@
 #include "Molecule.hpp"
 #include "MpiFunc.hpp"
 #include "StringFormat.hpp"
+#include "Timer.hpp"
 
 CGridDriver::CGridDriver(MPI_Comm comm)
 
@@ -255,6 +257,8 @@ CGridDriver::_finishHeader(const CMolecularGrid& molecularGrid) const -> std::st
 auto
 CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerNode) const -> CMolecularGrid
 {
+    CTimer timer;
+
     // molecular data
 
     auto natoms = molecule.getNumberOfAtoms();
@@ -300,8 +304,14 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
         gridoff += _getNumberOfRadialPoints(ielem) * _getNumberOfAngularPoints(ielem);
     }
 
+    std::cout << "*** Generating grid points for atoms ..." << std::endl;
+
+    timer.reset();
+
     for (int64_t i = 0; i < nodatm; i++)
     {
+        timer.start();
+
         auto iatom = nodoff + i;
 
         auto ielem = idselem[iatom];
@@ -319,9 +329,21 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
         // apply partitioning function
 
         gpu::applyGridPartitionFunc(rawgrid, minrad, gridoff, nrpoints * napoints, molcoords, natoms, iatom, numGpusPerNode);
+
+        timer.stop();
+
+        if ((i + 1) % 100 == 0)
+        {
+            std::cout << "    Atoms " << i + 1 << "/" << natoms << " done in " << timer.getElapsedTime() << std::endl;
+        }
     }
 
     // screen raw grid points & create prunned grid
+
+    std::cout << "*** Screening grid points ";
+
+    timer.reset();
+    timer.start();
 
     bpoints = _screenRawGridPoints(rawgrid);
 
@@ -329,7 +351,20 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
 
     delete rawgrid;
 
+    timer.stop();
+
+    std::cout << "       " << timer.getElapsedTime() << std::endl;
+
+    std::cout << "*** Communicating grid points ";
+
+    timer.reset();
+    timer.start();
+
     auto gathered_prngrid = mpi::gatherDenseMatricesByColumns(prngrid, _locComm);
+
+    timer.stop();
+
+    std::cout << "   " << timer.getElapsedTime() << std::endl;
 
     return CMolecularGrid(gathered_prngrid);
 }

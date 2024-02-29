@@ -76,19 +76,17 @@ __global__ void
 ssf(const double*  gridx,
     const double*  gridy,
     const double*  gridz,
-    const double   minDistance,
     const uint32_t nGridPoints,
     const double*  atomCoordinatesX,
     const double*  atomCoordinatesY,
     const double*  atomCoordinatesZ,
     const uint32_t nAtoms,
-    const uint32_t idAtomic,
-    double*        pweights,
-    double*        gridw)
+    double*        pweights)
 {
-    const uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;
+    const uint32_t i = blockDim.y * blockIdx.y + threadIdx.y;  // grid
+    const uint32_t j = blockDim.x * blockIdx.x + threadIdx.x;  // atom
 
-    if (i < nGridPoints)
+    if ((i < nGridPoints) && (j < nAtoms))
     {
         // grid coordinates
 
@@ -96,78 +94,30 @@ ssf(const double*  gridx,
         double rgy = gridy[i];
         double rgz = gridz[i];
 
-        // weights screening
+        double rax = atomCoordinatesX[j];
+        double ray = atomCoordinatesY[j];
+        double raz = atomCoordinatesZ[j];
 
-        double rig = gpu::distance(atomCoordinatesX[idAtomic], atomCoordinatesY[idAtomic], atomCoordinatesZ[idAtomic], rgx, rgy, rgz);
+        double rag = gpu::distance(rax, ray, raz, rgx, rgy, rgz);
 
-        // min. distance scale 0.5 * (1 - a), SSF parameter a = 0.64
+        pweights[i * nAtoms + j] = 1.0;
 
-        if (rig >= 0.18 * minDistance)
+        for (uint32_t k = 0; k < nAtoms; k++)
         {
-            // Note: partialWeights should be of size natoms * npoints
-            uint32_t gw_offset = i * nAtoms;
-
-            // initialize weights
-
-            for (uint32_t j = 0; j < nAtoms; j++)
+            if (k != j)
             {
-                pweights[j + gw_offset] = 1.0;
+                double rbx = atomCoordinatesX[k];
+                double rby = atomCoordinatesY[k];
+                double rbz = atomCoordinatesZ[k];
+
+                double rbg = gpu::distance(rbx, rby, rbz, rgx, rgy, rgz);
+
+                double rab = gpu::distance(rax, ray, raz, rbx, rby, rbz);
+
+                double mab = (rag - rbg) / rab;
+
+                pweights[i * nAtoms + j] *= 0.5 * (1.0 - gpu::zeta(mab));
             }
-
-            // outer loop over atoms
-
-            for (uint32_t j = 0; j < nAtoms; j++)
-            {
-                // molecular coodinates
-
-                double rax = atomCoordinatesX[j];
-                double ray = atomCoordinatesY[j];
-                double raz = atomCoordinatesZ[j];
-
-                // distance from grid point to j-th atom
-
-                double rag = gpu::distance(rax, ray, raz, rgx, rgy, rgz);
-
-                // loop over atoms
-
-                for (uint32_t k = j + 1; k < nAtoms; k++)
-                {
-                    // molecular coodinates
-
-                    double rbx = atomCoordinatesX[k];
-                    double rby = atomCoordinatesY[k];
-                    double rbz = atomCoordinatesZ[k];
-
-                    // distance from grid point to k-th atom
-
-                    double rbg = gpu::distance(rbx, rby, rbz, rgx, rgy, rgz);
-
-                    // distance from j-th atom to k-th atom
-
-                    double rab = gpu::distance(rax, ray, raz, rbx, rby, rbz);
-
-                    // eliptical coordinate
-
-                    double mab = (rag - rbg) / rab;
-
-                    // scale partial weight
-
-                    pweights[j + gw_offset] *= 0.5 * (1.0 - gpu::zeta(mab));
-
-                    pweights[k + gw_offset] *= 0.5 * (1.0 + gpu::zeta(mab));
-                }
-            }
-
-            //  adjust weight of i-th grid point
-
-            double wsum = 0.0;
-
-            for (uint32_t j = 0; j < nAtoms; j++)
-            {
-                wsum += pweights[j + gw_offset];
-            }
-
-            gridw[i] *= pweights[idAtomic + gw_offset] / wsum;
         }
     }
 }
@@ -204,12 +154,8 @@ applyGridPartitionFunc(CDenseMatrix*   rawGridPoints,
 
     // grid and atom data
 
-    auto n_points = static_cast<uint32_t>(nGridPoints);
-    auto n_atoms = static_cast<uint32_t>(nAtoms);
-    auto i_atom = static_cast<uint32_t>(idAtomic);
-
-    auto grid_batch_size = mathfunc::batch_size(n_points, gpu_id, num_gpus_per_node);
-    auto grid_batch_offset = mathfunc::batch_offset(n_points, gpu_id, num_gpus_per_node);
+    auto grid_batch_size = mathfunc::batch_size(nGridPoints, gpu_id, num_gpus_per_node);
+    auto grid_batch_offset = mathfunc::batch_offset(nGridPoints, gpu_id, num_gpus_per_node);
 
     auto gridx = rawGridPoints->row(0) + gridOffset + grid_batch_offset;
     auto gridy = rawGridPoints->row(1) + gridOffset + grid_batch_offset;
@@ -225,57 +171,80 @@ applyGridPartitionFunc(CDenseMatrix*   rawGridPoints,
         atom_coords[2 * nAtoms + j] = atomCoordinates[j][2];
     }
 
+    std::vector<double> partial_weights(grid_batch_size * nAtoms);
+
     // grid and atom data on device
 
-    double *d_grid_x, *d_grid_y, *d_grid_z, *d_grid_w;
+    double *d_grid_x, *d_grid_y, *d_grid_z;
 
     hipSafe(hipMalloc(&d_grid_x, grid_batch_size * sizeof(double)));
     hipSafe(hipMalloc(&d_grid_y, grid_batch_size * sizeof(double)));
     hipSafe(hipMalloc(&d_grid_z, grid_batch_size * sizeof(double)));
-    hipSafe(hipMalloc(&d_grid_w, grid_batch_size * sizeof(double)));
 
     hipSafe(hipMemcpy(d_grid_x, gridx, grid_batch_size * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_grid_y, gridy, grid_batch_size * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_grid_z, gridz, grid_batch_size * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_grid_w, gridw, grid_batch_size * sizeof(double), hipMemcpyHostToDevice));
 
     double *d_partial_weights;
 
-    hipSafe(hipMalloc(&d_partial_weights, n_atoms * grid_batch_size * sizeof(double)));
+    hipSafe(hipMalloc(&d_partial_weights, grid_batch_size * nAtoms * sizeof(double)));
 
     double *d_atom_x, *d_atom_y, *d_atom_z;
 
-    hipSafe(hipMalloc(&d_atom_x, n_atoms * sizeof(double)));
-    hipSafe(hipMalloc(&d_atom_y, n_atoms * sizeof(double)));
-    hipSafe(hipMalloc(&d_atom_z, n_atoms * sizeof(double)));
+    hipSafe(hipMalloc(&d_atom_x, nAtoms * sizeof(double)));
+    hipSafe(hipMalloc(&d_atom_y, nAtoms * sizeof(double)));
+    hipSafe(hipMalloc(&d_atom_z, nAtoms * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_atom_x, atom_coords.data() + 0 * n_atoms, n_atoms * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_atom_y, atom_coords.data() + 1 * n_atoms, n_atoms * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_atom_z, atom_coords.data() + 2 * n_atoms, n_atoms * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_atom_x, atom_coords.data() + 0 * nAtoms, nAtoms * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_atom_y, atom_coords.data() + 1 * nAtoms, nAtoms * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_atom_z, atom_coords.data() + 2 * nAtoms, nAtoms * sizeof(double), hipMemcpyHostToDevice));
 
     // update weights using GPU
 
-    dim3 threads_per_block(TILE_DIM);
+    dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-    dim3 num_blocks((grid_batch_size + threads_per_block.x - 1) / threads_per_block.x);
+    dim3 num_blocks((nAtoms + threads_per_block.x - 1) / threads_per_block.x,
+                    (grid_batch_size + threads_per_block.y - 1) / threads_per_block.y);
 
     hipLaunchKernelGGL(gpu::ssf, num_blocks, threads_per_block, 0, 0,
-                       d_grid_x, d_grid_y, d_grid_z, minDistance, grid_batch_size,
-                       d_atom_x, d_atom_y, d_atom_z, n_atoms, i_atom,
-                       d_partial_weights, d_grid_w);
+                       d_grid_x, d_grid_y, d_grid_z, static_cast<uint32_t>(grid_batch_size),
+                       d_atom_x, d_atom_y, d_atom_z, static_cast<uint32_t>(nAtoms),
+                       d_partial_weights);
 
-    hipSafe(hipMemcpy(gridw, d_grid_w, grid_batch_size * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(partial_weights.data(), d_partial_weights, grid_batch_size * nAtoms * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipSafe(hipDeviceSynchronize());
 
     hipSafe(hipFree(d_grid_x));
     hipSafe(hipFree(d_grid_y));
     hipSafe(hipFree(d_grid_z));
-    hipSafe(hipFree(d_grid_w));
 
     hipSafe(hipFree(d_partial_weights));
 
     hipSafe(hipFree(d_atom_x));
     hipSafe(hipFree(d_atom_y));
     hipSafe(hipFree(d_atom_z));
+
+    for (int64_t i = 0; i < grid_batch_size; i++)
+    {
+        double rig = mathfunc::distance(atomCoordinates[idAtomic][0],
+                                        atomCoordinates[idAtomic][1],
+                                        atomCoordinates[idAtomic][2],
+                                        gridx[i],
+                                        gridy[i],
+                                        gridz[i]);
+
+        if (rig < 0.18 * minDistance) continue;
+
+        double wsum = 0.0;
+
+        for (int64_t j = 0; j < nAtoms; j++)
+        {
+            wsum += partial_weights[i * nAtoms + j];
+        }
+
+        gridw[i] *= partial_weights[i * nAtoms + idAtomic] / wsum;
+    }
 
     }}
 }
