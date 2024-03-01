@@ -1009,6 +1009,8 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     hipSafe(hipMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), hipMemcpyHostToDevice));
 
+    hipSafe(hipDeviceSynchronize());
+
     // counts and displacements of grid points in boxes
 
     auto counts = molecularGrid.getGridPointCounts();
@@ -1155,9 +1157,9 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         }
     }
 
-    hipSafe(hipMemcpy(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), hipMemcpyDeviceToHost));
-
     hipSafe(hipDeviceSynchronize());
+
+    hipSafe(hipMemcpy(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), hipMemcpyDeviceToHost));
 
     hipSafe(hipFree(d_gto_info));
     hipSafe(hipFree(d_ao_inds));
@@ -1371,6 +1373,8 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
     hipSafe(hipMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), hipMemcpyHostToDevice));
 
+    hipSafe(hipDeviceSynchronize());
+
     // counts and displacements of grid points in boxes
 
     auto counts = molecularGrid.getGridPointCounts();
@@ -1545,13 +1549,13 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
         }
     }
 
+    hipSafe(hipDeviceSynchronize());
+
     hipSafe(hipMemcpy(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), hipMemcpyDeviceToHost));
 
     // Note: symmetrize mat_Vxc
 
     mat_Vxc_omp[gpu_id].symmetrizeAndScale(0.5);
-
-    hipSafe(hipDeviceSynchronize());
 
     hipSafe(hipFree(d_gto_info));
     hipSafe(hipFree(d_ao_inds));

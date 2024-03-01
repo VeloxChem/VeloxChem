@@ -263,9 +263,9 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
     hipSafe(hipMemcpy(d_atom_y, atom_coords.data() + 1 * nAtoms * 2, nAtoms * 2 * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_atom_z, atom_coords.data() + 2 * nAtoms * 2, nAtoms * 2 * sizeof(double), hipMemcpyHostToDevice));
 
-    hipSafe(hipDeviceSynchronize());
-
     // update weights using GPU
+
+    hipSafe(hipDeviceSynchronize());
 
     dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -276,9 +276,9 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
                        d_atom_x, d_atom_y, d_atom_z, static_cast<uint32_t>(nAtoms),
                        d_partial_weights);
 
-    hipSafe(hipMemcpy(partial_weights.data(), d_partial_weights, grid_batch_size * sizeof(double), hipMemcpyDeviceToHost));
-
     hipSafe(hipDeviceSynchronize());
+
+    hipSafe(hipMemcpy(partial_weights.data(), d_partial_weights, grid_batch_size * sizeof(double), hipMemcpyDeviceToHost));
 
     hipSafe(hipFree(d_grid_x));
     hipSafe(hipFree(d_grid_y));

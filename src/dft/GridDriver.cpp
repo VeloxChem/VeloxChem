@@ -307,7 +307,7 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
     std::vector<uint32_t> atom_ids_of_points(bpoints);
     std::vector<double> atom_min_distances(bpoints);
 
-    std::cout << "*** Generating grid points for atoms ..." << std::endl;
+    if (rank == mpi::master()) std::cout << "* Info * Generating grid points for atoms ..." << std::endl;
 
     timer.reset();
     timer.start();
@@ -337,7 +337,7 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
 
     timer.stop();
 
-    std::cout << "    Grid points generated in        " << timer.getElapsedTime() << std::endl;
+    if (rank == mpi::master()) std::cout << "    Grid points generated in     " << timer.getElapsedTime() << std::endl;
 
     timer.reset();
     timer.start();
@@ -346,11 +346,11 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
 
     timer.stop();
 
-    std::cout << "    Grid weights determined in      " << timer.getElapsedTime() << std::endl;
+    if (rank == mpi::master()) std::cout << "    Grid weights determined in   " << timer.getElapsedTime() << std::endl;
 
     // screen raw grid points & create prunned grid
 
-    std::cout << "*** Screening grid points ";
+    if (rank == mpi::master()) std::cout << "* Info * Screening grid points ";
 
     timer.reset();
     timer.start();
@@ -363,9 +363,9 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
 
     timer.stop();
 
-    std::cout << "       " << timer.getElapsedTime() << std::endl;
+    if (rank == mpi::master()) std::cout << "       " << timer.getElapsedTime() << std::endl;
 
-    std::cout << "*** Communicating grid points ";
+    if (rank == mpi::master()) std::cout << "* Info * Communicating grid points ";
 
     timer.reset();
     timer.start();
@@ -374,7 +374,7 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
 
     timer.stop();
 
-    std::cout << "   " << timer.getElapsedTime() << std::endl;
+    if (rank == mpi::master()) std::cout << "   " << timer.getElapsedTime() << std::endl;
 
     return CMolecularGrid(gathered_prngrid);
 }

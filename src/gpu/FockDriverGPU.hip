@@ -306,6 +306,8 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
     hipSafe(hipMemcpy(d_points_info, points_info.data(), natoms * 4 * sizeof(double), hipMemcpyHostToDevice));
 
+    hipSafe(hipDeviceSynchronize());
+
     // compute S
 
     // S: SS
@@ -903,7 +905,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         mat_Fock_omp[gpu_id].values()[ind] = 0.0;
     }
 
-    // auto& mat_Fock = mat_Fock_omp[gpu_id];
+    hipSafe(hipDeviceSynchronize());
 
     timer.start("J computation");
 
@@ -1256,6 +1258,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         timer.stop("  J block PP");
     }
 
+    timer.stop("J computation");
+
     hipSafe(hipDeviceSynchronize());
 
     hipSafe(hipFree(d_mat_D));
@@ -1282,8 +1286,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipFree(d_sp_second_inds_local));
     hipSafe(hipFree(d_pp_first_inds_local));
     hipSafe(hipFree(d_pp_second_inds_local));
-
-    timer.stop("J computation");
 
     timer.start("Exchange prep.");
 
@@ -1370,6 +1372,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipMemcpy(d_density_inds_for_K_pp, density_inds_for_K_pp.data(), p_prim_count * 3 * p_prim_count * 3 * sizeof(uint32_t), hipMemcpyHostToDevice));
 
     timer.stop("Exchange prep.");
+
+    hipSafe(hipDeviceSynchronize());
 
     timer.start("K computation");
 
