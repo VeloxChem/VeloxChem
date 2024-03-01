@@ -94,13 +94,29 @@ ssf(const double*  gridx,
     const uint32_t idAtomic,
     double*        pweights)
 {
-    const uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;  // grid
+    __shared__ double pweights_local[TILE_DIM][TILE_DIM + 1];
+    __shared__ double pweights_sum[TILE_DIM][TILE_DIM + 1];
 
-    if (i < nGridPoints)
+    const uint32_t i = blockDim.y * blockIdx.y + threadIdx.y;  // grid
+
+    if (threadIdx.x == 0)
     {
-        double pweight_local = 0.0, pweight_sum = 0.0;
+        pweights_local[threadIdx.y][TILE_DIM] = 0.0;
+        pweights_sum[threadIdx.y][TILE_DIM] = 0.0;
+    }
 
-        for (uint32_t j = 0; j < nAtoms; j++)
+    __syncthreads();
+
+    for (uint32_t m = 0; m < (nAtoms + TILE_DIM - 1) / TILE_DIM; m++)
+    {
+        pweights_local[threadIdx.y][threadIdx.x] = 0.0;
+        pweights_sum[threadIdx.y][threadIdx.x] = 0.0;
+
+        __syncthreads();
+
+        const uint32_t j = m * TILE_DIM + threadIdx.x;  // atom
+
+        if ((i < nGridPoints) && (j < nAtoms))
         {
             // grid coordinates
 
@@ -132,11 +148,27 @@ ssf(const double*  gridx,
                 pweight_j *= 0.5 * (1.0 - gpu::zeta(mab));
             }
 
-            pweight_local += static_cast<double>(j == idAtomic) * pweight_j;
-            pweight_sum += pweight_j;
+            pweights_local[threadIdx.y][threadIdx.x] += static_cast<double>(j == idAtomic) * pweight_j;
+            pweights_sum[threadIdx.y][threadIdx.x] += pweight_j;
         }
 
-        pweights[i] = pweight_local / pweight_sum;
+        __syncthreads();
+
+        if (threadIdx.x == 0)
+        {
+            for (uint32_t n = 0; n < TILE_DIM; n++)
+            {
+                pweights_local[threadIdx.y][TILE_DIM] += pweights_local[threadIdx.y][n];
+                pweights_sum[threadIdx.y][TILE_DIM]   += pweights_sum[threadIdx.y][n];
+            }
+        }
+
+        __syncthreads();
+    }
+
+    if ((threadIdx.x == 0) && (i < nGridPoints))
+    {
+        pweights[i] = pweights_local[threadIdx.y][TILE_DIM] / pweights_sum[threadIdx.y][TILE_DIM];
     }
 }
 
@@ -219,9 +251,9 @@ applyGridPartitionFunc(CDenseMatrix*   rawGridPoints,
 
     // update weights using GPU
 
-    dim3 threads_per_block(TILE_DIM);
+    dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-    dim3 num_blocks((grid_batch_size + threads_per_block.x - 1) / threads_per_block.x);
+    dim3 num_blocks(1, (grid_batch_size + threads_per_block.x - 1) / threads_per_block.x);
 
     hipLaunchKernelGGL(gpu::ssf, num_blocks, threads_per_block, 0, 0,
                        d_grid_x, d_grid_y, d_grid_z, static_cast<uint32_t>(grid_batch_size),
