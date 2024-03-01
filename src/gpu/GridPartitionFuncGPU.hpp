@@ -26,19 +26,20 @@
 #ifndef GridPartitionFuncGPU_hpp
 #define GridPartitionFuncGPU_hpp
 
+#include <vector>
+
 #include "DenseMatrix.hpp"
 #include "Point.hpp"
 
 namespace gpu {
 
-auto applyGridPartitionFunc(CDenseMatrix*   rawGridPoints,
-                            const double    minDistance,
-                            const int64_t   gridOffset,
-                            const int64_t   nGridPoints,
-                            const TPoint3D* atomCoordinates,
-                            const int64_t   nAtoms,
-                            const int64_t   idAtomic,
-                            const int64_t   numGpusPerNode) -> void;
+auto applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
+                            const std::vector<uint32_t>& atomIdsOfGridPoints,
+                            const std::vector<double>&   atomMinDistances,
+                            const int64_t                nGridPoints,
+                            const TPoint3D*              atomCoordinates,
+                            const int64_t                nAtoms,
+                            const int64_t                numGpusPerNode) -> void;
 
 }  // namespace gpu
 

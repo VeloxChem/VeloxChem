@@ -304,14 +304,16 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
         gridoff += _getNumberOfRadialPoints(ielem) * _getNumberOfAngularPoints(ielem);
     }
 
+    std::vector<uint32_t> atom_ids_of_points(bpoints);
+    std::vector<double> atom_min_distances(bpoints);
+
     std::cout << "*** Generating grid points for atoms ..." << std::endl;
 
     timer.reset();
+    timer.start();
 
     for (int64_t i = 0; i < nodatm; i++)
     {
-        timer.start();
-
         auto iatom = nodoff + i;
 
         auto ielem = idselem[iatom];
@@ -328,15 +330,23 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
 
         // apply partitioning function
 
-        gpu::applyGridPartitionFunc(rawgrid, minrad, gridoff, nrpoints * napoints, molcoords, natoms, iatom, numGpusPerNode);
+        std::fill(atom_ids_of_points.data() + gridoff, atom_ids_of_points.data() + gridoff + nrpoints * napoints, iatom);
 
-        timer.stop();
-
-        if ((i + 1) % 100 == 0)
-        {
-            std::cout << "    Atoms " << i + 1 << "/" << natoms << " done in " << timer.getElapsedTime() << std::endl;
-        }
+        std::fill(atom_min_distances.data() + gridoff, atom_min_distances.data() + gridoff + nrpoints * napoints, minrad);
     }
+
+    timer.stop();
+
+    std::cout << "    Grid points generated in        " << timer.getElapsedTime() << std::endl;
+
+    timer.reset();
+    timer.start();
+
+    gpu::applyGridPartitionFunc(rawgrid, atom_ids_of_points, atom_min_distances, bpoints, molcoords, natoms, numGpusPerNode);
+
+    timer.stop();
+
+    std::cout << "    Grid weights determined in      " << timer.getElapsedTime() << std::endl;
 
     // screen raw grid points & create prunned grid
 
