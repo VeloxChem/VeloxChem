@@ -59,7 +59,7 @@ def safe_arccos(val):
     if abs(val) > 1.0:
         # avoid math domain error
         assert_msg_critical(
-            abs(abs(val) - 1.0) < 1.0e-10, 'arccos: Invalid cosine value')
+            abs(abs(val) - 1.0) < 1.0e-12, 'arccos: Invalid cosine value')
         cos_phi = 1.0 if val > 1.0 else -1.0
     else:
         cos_phi = val

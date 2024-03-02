@@ -40,7 +40,7 @@ from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .inputparser import parse_input, get_random_string_parallel
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, safe_arccos
 from .seminario import Seminario
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
@@ -721,7 +721,7 @@ class ForceFieldGenerator:
 
             a = coords[i] - coords[j]
             b = coords[k] - coords[j]
-            theta_eq = np.arccos(
+            theta_eq = safe_arccos(
                 np.dot(a, b) / np.linalg.norm(a) /
                 np.linalg.norm(b)) * 180 / np.pi
 
@@ -1342,7 +1342,7 @@ class ForceFieldGenerator:
 
             a = coords_in_au[i] - coords_in_au[j]
             b = coords_in_au[k] - coords_in_au[j]
-            new_equilibrium = np.arccos(
+            new_equilibrium = safe_arccos(
                 np.dot(a, b) / np.linalg.norm(a) /
                 np.linalg.norm(b)) * 180 / np.pi
 

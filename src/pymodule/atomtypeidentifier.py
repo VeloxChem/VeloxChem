@@ -32,6 +32,7 @@ import re
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
+from .errorhandler import safe_arccos
 
 
 class AtomTypeIdentifier:
@@ -1202,7 +1203,7 @@ class AtomTypeIdentifier:
                             vec_jk = (
                                 self.coordinates[connected_atoms_numbers[1] - 1]
                                 - self.coordinates[info['AtomNumber'] - 1])
-                            theta_ijk = np.arccos(
+                            theta_ijk = safe_arccos(
                                 np.dot(vec_ji, vec_jk) /
                                 (np.linalg.norm(vec_ji) *
                                  np.linalg.norm(vec_jk)))
