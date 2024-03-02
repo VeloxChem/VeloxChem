@@ -24,6 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+import math
 
 from .veloxchemlib import assert_msg_critical as vlx_assert
 
@@ -42,3 +43,25 @@ def assert_msg_critical(condition, msg=''):
         assert condition, msg
     else:
         vlx_assert(condition, msg)
+
+
+def safe_arccos(val):
+    """
+    Safely uses math.acos and avoids the math domain error.
+
+    :param val:
+        The cosine value.
+
+    :return:
+        The angle in radian.
+    """
+
+    if abs(val) > 1.0:
+        # avoid math domain error
+        assert_msg_critical(
+            abs(abs(val) - 1.0) < 1.0e-10, 'arccos: Invalid cosine value')
+        cos_phi = 1.0 if val > 1.0 else -1.0
+    else:
+        cos_phi = val
+
+    return math.acos(cos_phi)

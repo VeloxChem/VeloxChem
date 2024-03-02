@@ -33,7 +33,7 @@ from .veloxchemlib import bohr_in_angstrom
 
 from .outputstream import OutputStream
 from .inputparser import print_keywords
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, safe_arccos
 
 
 @staticmethod
@@ -382,12 +382,7 @@ def _Molecule_get_dihedral(self, dihedral_indices_one_based, angle_unit):
     sin_phi = -(np.vdot(u43, np.cross(u21, u32)) /
                 (sin_theta_123 * sin_theta_234))
 
-    # avoid math domain error
-    if abs(cos_phi) > 1.0:
-        assert abs(abs(cos_phi) - 1.0) < 1.0e-10
-        cos_phi = 1.0 if cos_phi > 1.0 else -1.0
-
-    phi_in_radian = math.acos(cos_phi)
+    phi_in_radian = safe_arccos(cos_phi)
     if sin_phi < 0.0:
         phi_in_radian *= -1.0
 
