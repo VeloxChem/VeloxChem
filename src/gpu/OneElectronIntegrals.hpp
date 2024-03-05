@@ -51,6 +51,17 @@ computeOverlapAndKineticEnergySP(double*         mat_S,
                                  const uint32_t  sp_prim_pair_count_local);
 
 __global__ void
+computeOverlapAndKineticEnergySD(double*         mat_S,
+                                 double*         mat_T,
+                                 const double*   s_prim_info,
+                                 const uint32_t  s_prim_count,
+                                 const double*   d_prim_info,
+                                 const uint32_t  d_prim_count,
+                                 const uint32_t* sd_first_inds_local,
+                                 const uint32_t* sd_second_inds_local,
+                                 const uint32_t  sd_prim_pair_count_local);
+
+__global__ void
 computeOverlapAndKineticEnergyPP(double*         mat_S,
                                  double*         mat_T,
                                  const double*   p_prim_info,

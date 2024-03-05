@@ -261,7 +261,7 @@ CGtoBlock::getCartesianToSphericalMappingForD() const -> std::unordered_map<int6
     cart_sph_comp_map[1] = std::vector<std::pair<int64_t, double>>({{0, f2_3}});
     cart_sph_comp_map[2] = std::vector<std::pair<int64_t, double>>({{3, f2_3}});
     cart_sph_comp_map[3] = std::vector<std::pair<int64_t, double>>({{2, -1.0}, {4, -0.5 * f2_3}});
-    cart_sph_comp_map[4] = std::vector<std::pair<int64_t, double>>({{4, f2_3}});
+    cart_sph_comp_map[4] = std::vector<std::pair<int64_t, double>>({{1, f2_3}});
     cart_sph_comp_map[5] = std::vector<std::pair<int64_t, double>>({{2, 2.0}});
 
     for (const auto& [cart_comp, sph_comp_coef_vec] : cart_sph_comp_map)

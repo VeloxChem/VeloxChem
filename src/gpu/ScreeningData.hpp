@@ -45,18 +45,22 @@ class CScreeningData
 
     CDenseMatrix _Q_matrix_ss;
     CDenseMatrix _Q_matrix_sp;
+    CDenseMatrix _Q_matrix_sd;
     CDenseMatrix _Q_matrix_pp;
 
     std::vector<std::vector<uint32_t>> _ss_first_inds_local;
     std::vector<std::vector<uint32_t>> _sp_first_inds_local;
+    std::vector<std::vector<uint32_t>> _sd_first_inds_local;
     std::vector<std::vector<uint32_t>> _pp_first_inds_local;
 
     std::vector<std::vector<uint32_t>> _ss_second_inds_local;
     std::vector<std::vector<uint32_t>> _sp_second_inds_local;
+    std::vector<std::vector<uint32_t>> _sd_second_inds_local;
     std::vector<std::vector<uint32_t>> _pp_second_inds_local;
 
     std::vector<std::vector<double>> _ss_mat_Q_local;
     std::vector<std::vector<double>> _sp_mat_Q_local;
+    std::vector<std::vector<double>> _sd_mat_Q_local;
     std::vector<std::vector<double>> _pp_mat_Q_local;
 
     std::vector<uint32_t> _ss_first_inds;
@@ -100,7 +104,7 @@ class CScreeningData
 
     auto _computeQMatrices(const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
-    auto _sortQ(const int64_t s_prim_count, const int64_t p_prim_count) -> void;
+    auto _sortQ(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) -> void;
 
    public:
     CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node);
@@ -109,16 +113,19 @@ class CScreeningData
 
     auto getQMatrixSS() const -> const CDenseMatrix&;
     auto getQMatrixSP() const -> const CDenseMatrix&;
+    auto getQMatrixSD() const -> const CDenseMatrix&;
     auto getQMatrixPP() const -> const CDenseMatrix&;
 
     auto sortQD(const int64_t s_prim_count, const int64_t p_prim_count, const std::vector<uint32_t>& s_prim_aoinds, const std::vector<uint32_t>& p_prim_aoinds, const int64_t naos, const double* dens_ptr) -> void;
 
     auto get_ss_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
     auto get_sp_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
+    auto get_sd_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
     auto get_pp_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
 
     auto get_ss_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
     auto get_sp_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
+    auto get_sd_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
     auto get_pp_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
 
     auto get_ss_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>&;

@@ -205,6 +205,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     // Cartesian to spherical index mapping for P
 
     std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_p;
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_d;
 
     for (const auto& gto_block : gto_blocks)
     {
@@ -217,6 +218,15 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
             for (const auto& [cart_ind, sph_ind_coef] : p_map)
             {
                 cart_sph_p[cart_ind] = sph_ind_coef;
+            }
+        }
+        else if (gto_ang == 2)
+        {
+            auto d_map = gto_block.getCartesianToSphericalMappingForD();
+
+            for (const auto& [cart_ind, sph_ind_coef] : d_map)
+            {
+                cart_sph_d[cart_ind] = sph_ind_coef;
             }
         }
     }
@@ -264,17 +274,20 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
     const auto& ss_first_inds_local = screening.get_ss_first_inds_local(gpu_id);
     const auto& sp_first_inds_local = screening.get_sp_first_inds_local(gpu_id);
+    const auto& sd_first_inds_local = screening.get_sd_first_inds_local(gpu_id);
     const auto& pp_first_inds_local = screening.get_pp_first_inds_local(gpu_id);
 
     const auto& ss_second_inds_local = screening.get_ss_second_inds_local(gpu_id);
     const auto& sp_second_inds_local = screening.get_sp_second_inds_local(gpu_id);
+    const auto& sd_second_inds_local = screening.get_sd_second_inds_local(gpu_id);
     const auto& pp_second_inds_local = screening.get_pp_second_inds_local(gpu_id);
 
     const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
     const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
+    const auto sd_prim_pair_count_local = static_cast<int64_t>(sd_first_inds_local.size());
     const auto pp_prim_pair_count_local = static_cast<int64_t>(pp_first_inds_local.size());
 
-    const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local, pp_prim_pair_count_local});
+    const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local, sd_prim_pair_count_local, pp_prim_pair_count_local});
 
     std::vector<double> mat_S(max_prim_pair_count_local);
     std::vector<double> mat_T(max_prim_pair_count_local);
@@ -286,6 +299,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
     uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
     uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
+    uint32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
     uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
 
     hipSafe(hipMalloc(&d_mat_S, max_prim_pair_count_local * sizeof(double)));
@@ -298,6 +312,9 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     hipSafe(hipMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
 
+    hipSafe(hipMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+
     hipSafe(hipMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
 
@@ -306,6 +323,9 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
     hipSafe(hipMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
 
     hipSafe(hipMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
@@ -463,6 +483,59 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
         }
     }
 
+    // S: SD
+
+    if (sd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergySD, num_blocks, threads_per_block, 0, 0, d_mat_S,
+                                                     d_mat_T,
+                                                     d_s_prim_info,
+                                                     static_cast<uint32_t>(s_prim_count),
+                                                     d_d_prim_info,
+                                                     static_cast<uint32_t>(d_prim_count),
+                                                     d_sd_first_inds_local,
+                                                     d_sd_second_inds_local,
+                                                     static_cast<uint32_t>(sd_prim_pair_count_local));
+
+        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        // TODO: gpu::computeNuclearPotentialSD
+
+        for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
+        {
+            const auto i = sd_first_inds_local[ij];
+            const auto j = sd_second_inds_local[ij];
+
+            const auto i_cgto = s_prim_aoinds[i];
+
+            // TODO: think about the ordering of cartesian components
+            const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+            // Cartesian to spherical
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto coef_sph = j_cgto_sph_ind_coef.second;
+
+                mat_overlap.row(i_cgto)[j_cgto_sph] += mat_S[ij] * coef_sph;
+                mat_overlap.row(j_cgto_sph)[i_cgto] += mat_S[ij] * coef_sph;
+
+                // TODO
+                //mat_kinetic_energy.row(i_cgto)[j_cgto_sph] += mat_T[ij] * coef_sph;
+                //mat_kinetic_energy.row(j_cgto_sph)[i_cgto] += mat_T[ij] * coef_sph;
+
+                // TODO
+                //mat_nuclear_potential.row(i_cgto)[j_cgto_sph] += mat_V[ij] * coef_sph;
+                //mat_nuclear_potential.row(j_cgto_sph)[i_cgto] += mat_V[ij] * coef_sph;
+            }
+        }
+    }
+
     // S: PP
 
     if (pp_prim_pair_count_local > 0)
@@ -550,6 +623,8 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     hipSafe(hipFree(d_ss_second_inds_local));
     hipSafe(hipFree(d_sp_first_inds_local));
     hipSafe(hipFree(d_sp_second_inds_local));
+    hipSafe(hipFree(d_sd_first_inds_local));
+    hipSafe(hipFree(d_sd_second_inds_local));
     hipSafe(hipFree(d_pp_first_inds_local));
     hipSafe(hipFree(d_pp_second_inds_local));
 
