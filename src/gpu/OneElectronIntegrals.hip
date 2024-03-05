@@ -169,7 +169,9 @@ computeOverlapAndKineticEnergySS(double*         mat_S,
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-        const auto K_ij_00 = 3.0 * a_i * a_j / (a_i + a_j) - 2.0 * a_i * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * r2_ij;
+        const auto ksi = a_i * a_j / (a_i + a_j);
+
+        const auto K_ij_00 = ksi * (3.0 - 2.0 * ksi * r2_ij);
 
         mat_S[ij] = S_ij_00;
 
@@ -287,7 +289,13 @@ computeOverlapAndKineticEnergySD(double*         mat_S,
 
         const auto K_ij_00 = ksi * (3.0 - 2.0 * ksi * r2_ij);
 
-        mat_T[ij] = ((PB_0 * PB_1 + static_cast<double>(j_cart_0 == j_cart_1) * (0.5 / (a_i + a_j))) * K_ij_00 + 4.0 * ksi * PB_0 * PB_1) * S_ij_00;
+        mat_T[ij] = (
+
+                (PB_0 * PB_1 + static_cast<double>(j_cart_0 == j_cart_1) * (0.5 / (a_i + a_j))) * K_ij_00
+
+                + 4.0 * ksi * PB_0 * PB_1
+
+                ) * S_ij_00;
     }
 }
 
@@ -508,12 +516,45 @@ computeOverlapAndKineticEnergyDD(double*         mat_S,
 
                 + (static_cast<double>(i_cart_0 == i_cart_1) * static_cast<double>(j_cart_0 == j_cart_1)
                  + static_cast<double>(i_cart_0 == j_cart_1) * static_cast<double>(i_cart_1 == j_cart_0)
-                 + static_cast<double>(i_cart_0 == j_cart_0) * static_cast<double>(i_cart_1 == j_cart_1)) * (0.5 / (a_i + a_j)) * (0.5 / (a_i + a_j))
+                 + static_cast<double>(i_cart_0 == j_cart_0) * static_cast<double>(i_cart_1 == j_cart_1)) * (0.25 / ((a_i + a_j) * (a_i + a_j)))
 
                 ) * S_ij_00;
 
-        // TODO
-        mat_T[ij] = 0.0;
+        const auto ksi = a_i * a_j / (a_i + a_j);
+
+        const auto K_ij_00 = ksi * (3.0 - 2.0 * ksi * r2_ij);
+
+        mat_T[ij] = (
+
+                (PA_0 * PA_1 * PB_0 * PB_1
+
+                 + (PA_1 * PA_0 * static_cast<double>(j_cart_0 == j_cart_1)
+                  + PA_1 * PB_1 * static_cast<double>(i_cart_0 == j_cart_0)
+                  + PA_1 * PB_0 * static_cast<double>(i_cart_0 == j_cart_1)
+                  + PA_0 * PB_1 * static_cast<double>(i_cart_1 == j_cart_0)
+                  + PA_0 * PB_0 * static_cast<double>(i_cart_1 == j_cart_1)
+                  + PB_1 * PB_0 * static_cast<double>(i_cart_0 == i_cart_1)) * (0.5 / (a_i + a_j))
+
+                 + (static_cast<double>(i_cart_0 == i_cart_1) * static_cast<double>(j_cart_0 == j_cart_1)
+                  + static_cast<double>(i_cart_0 == j_cart_1) * static_cast<double>(i_cart_1 == j_cart_0)
+                  + static_cast<double>(i_cart_0 == j_cart_0) * static_cast<double>(i_cart_1 == j_cart_1)) * (0.25 / ((a_i + a_j) * (a_i + a_j)))
+
+                 ) * K_ij_00
+
+                + ksi * (8.0 * PA_0 * PA_1 * PB_0 * PB_1
+
+                       + (4.0 * PA_1 * PA_0 * static_cast<double>(j_cart_0 == j_cart_1)
+                        + 6.0 * PA_1 * PB_1 * static_cast<double>(i_cart_0 == j_cart_0)
+                        + 6.0 * PA_1 * PB_0 * static_cast<double>(i_cart_0 == j_cart_1)
+                        + 6.0 * PA_0 * PB_1 * static_cast<double>(i_cart_1 == j_cart_0)
+                        + 6.0 * PA_0 * PB_0 * static_cast<double>(i_cart_1 == j_cart_1)
+                        + 4.0 * PB_1 * PB_0 * static_cast<double>(i_cart_0 == i_cart_1)) * (0.5 / (a_i + a_j))
+
+                       + (4.0 * static_cast<double>(i_cart_0 == j_cart_1) * static_cast<double>(i_cart_1 == j_cart_0)
+                        + 4.0 * static_cast<double>(i_cart_0 == j_cart_0) * static_cast<double>(i_cart_1 == j_cart_1)) * (0.25 / ((a_i + a_j) * (a_i + a_j)))
+                    )
+
+                ) * S_ij_00;
     }
 }
 
