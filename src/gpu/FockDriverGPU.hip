@@ -525,7 +525,20 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
         hipSafe(hipMemcpy(mat_S.data(), d_mat_S, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
         hipSafe(hipMemcpy(mat_T.data(), d_mat_T, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
-        // TODO: gpu::computeNuclearPotentialSD
+        hipLaunchKernelGGL(gpu::computeNuclearPotentialSD, num_blocks, threads_per_block, 0, 0, d_mat_V,
+                                                     d_s_prim_info,
+                                                     static_cast<uint32_t>(s_prim_count),
+                                                     d_d_prim_info,
+                                                     static_cast<uint32_t>(d_prim_count),
+                                                     d_sd_first_inds_local,
+                                                     d_sd_second_inds_local,
+                                                     static_cast<uint32_t>(sd_prim_pair_count_local),
+                                                     d_points_info,
+                                                     static_cast<uint32_t>(natoms),
+                                                     d_boys_func_table,
+                                                     d_boys_func_ft);
+
+        hipSafe(hipMemcpy(mat_V.data(), d_mat_V, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
         {
@@ -549,9 +562,8 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                 mat_kinetic_energy.row(i_cgto)[j_cgto_sph] += mat_T[ij] * coef_sph;
                 mat_kinetic_energy.row(j_cgto_sph)[i_cgto] += mat_T[ij] * coef_sph;
 
-                // TODO
-                //mat_nuclear_potential.row(i_cgto)[j_cgto_sph] += mat_V[ij] * coef_sph;
-                //mat_nuclear_potential.row(j_cgto_sph)[i_cgto] += mat_V[ij] * coef_sph;
+                mat_nuclear_potential.row(i_cgto)[j_cgto_sph] += mat_V[ij] * coef_sph;
+                mat_nuclear_potential.row(j_cgto_sph)[i_cgto] += mat_V[ij] * coef_sph;
             }
         }
     }

@@ -117,6 +117,20 @@ computeNuclearPotentialSP(double*         mat_V,
                           const double*   boys_func_ft);
 
 __global__ void
+computeNuclearPotentialSD(double*         mat_V,
+                          const double*   s_prim_info,
+                          const uint32_t  s_prim_count,
+                          const double*   d_prim_info,
+                          const uint32_t  d_prim_count,
+                          const uint32_t* sd_first_inds_local,
+                          const uint32_t* sd_second_inds_local,
+                          const uint32_t  sd_prim_pair_count_local,
+                          const double*   points_info,
+                          const uint32_t  npoints,
+                          const double*   boys_func_table,
+                          const double*   boys_func_ft);
+
+__global__ void
 computeNuclearPotentialPP(double*         mat_V,
                           const double*   p_prim_info,
                           const uint32_t  p_prim_count,

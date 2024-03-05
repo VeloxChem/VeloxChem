@@ -701,6 +701,105 @@ computeNuclearPotentialSP(double*         mat_V,
 }
 
 __global__ void
+computeNuclearPotentialSD(double*         mat_V,
+                          const double*   s_prim_info,
+                          const uint32_t  s_prim_count,
+                          const double*   d_prim_info,
+                          const uint32_t  d_prim_count,
+                          const uint32_t* sd_first_inds_local,
+                          const uint32_t* sd_second_inds_local,
+                          const uint32_t  sd_prim_pair_count_local,
+                          const double*   points_info,
+                          const uint32_t  npoints,
+                          const double*   boys_func_table,
+                          const double*   boys_func_ft)
+{
+    // each thread computes a primitive S/T matrix element
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (ij < sd_prim_pair_count_local)
+    {
+        const auto i = sd_first_inds_local[ij];
+        const auto j = sd_second_inds_local[ij];
+
+        const auto a_i = s_prim_info[i + s_prim_count * 0];
+        const auto c_i = s_prim_info[i + s_prim_count * 1];
+        const auto x_i = s_prim_info[i + s_prim_count * 2];
+        const auto y_i = s_prim_info[i + s_prim_count * 3];
+        const auto z_i = s_prim_info[i + s_prim_count * 4];
+
+        const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
+        const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
+        const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
+        const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+
+        // TODO: used shared memory?
+        const uint32_t d_cart_inds_0[6] = {0,0,0,1,1,2};
+        const uint32_t d_cart_inds_1[6] = {0,1,2,1,2,2};
+
+        const auto j_cart_0 = d_cart_inds_0[j % 6];
+        const auto j_cart_1 = d_cart_inds_1[j % 6];
+
+        const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+
+        const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
+
+        // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * std::sqrt(a_i + a_j);
+
+        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[j_cart_0];
+        const auto PB_1 = (-a_i / (a_i + a_j)) * rij[j_cart_1];
+
+        double V_ij = 0.0;
+
+        for (uint32_t c = 0; c < npoints; c++)
+        {
+            const auto x_c = points_info[c + npoints * 0];
+            const auto y_c = points_info[c + npoints * 1];
+            const auto z_c = points_info[c + npoints * 2];
+            const auto q_c = points_info[c + npoints * 3];
+
+            const double rPC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                   y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
+
+            const auto r2_PC = rPC[0] * rPC[0] + rPC[1] * rPC[1] + rPC[2] * rPC[2];
+
+            double F2_t[3];
+
+            gpu::computeBoysFunction(F2_t, (a_i + a_j) * r2_PC, 2, boys_func_table, boys_func_ft);
+
+            /*
+                -0.5 / S1 * delta_b0_b1                            A_00 ( S S )^1
+                -1 * PB_b0 * PC_b1                                 A_00 ( S S )^1
+                -1 * PB_b1 * PC_b0                                 A_00 ( S S )^1
+                0.5 / S1 * delta_b0_b1                             A_00 ( S S )^0
+                PB_b0 * PB_b1                                      A_00 ( S S )^0
+                PC_b0 * PC_b1                                      A_00 ( S S )^2
+            */
+
+            V_ij += q_c * (
+
+                    F2_t[0] * (PB_0 * PB_1
+                        + 0.5 / (a_i + a_j) * static_cast<double>(j_cart_0 == j_cart_1))
+
+                    + F2_t[1] * ( rPC[j_cart_0] * PB_1
+                        + rPC[j_cart_1] * PB_0
+                        - 0.5 / (a_i + a_j) * static_cast<double>(j_cart_0 == j_cart_1))
+
+                    + F2_t[2] * rPC[j_cart_0] * rPC[j_cart_1]);
+        }
+
+        mat_V[ij] = theta * S_ij_00 * V_ij;
+    }
+}
+
+__global__ void
 computeNuclearPotentialPP(double*         mat_V,
                           const double*   p_prim_info,
                           const uint32_t  p_prim_count,
