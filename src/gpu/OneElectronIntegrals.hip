@@ -280,15 +280,13 @@ computeOverlapAndKineticEnergySD(double*         mat_S,
         const auto PB_0 = (-a_i / (a_i + a_j)) * rij[j_cart_0];
         const auto PB_1 = (-a_i / (a_i + a_j)) * rij[j_cart_1];
 
-        //const auto K_ij_00 = 3.0 * a_i * a_j / (a_i + a_j) - 2.0 * a_i * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * r2_ij;
-        //const auto K_ij_10 = -2.0 * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * (-rij[i_cart]);
-        //const auto K_ij_01 = -2.0 * a_i * a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * rij[j_cart];
-        //const auto K_ij_11 = a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * static_cast<double>(i_cart == j_cart);
-
         mat_S[ij] = (PB_0 * PB_1 + static_cast<double>(j_cart_0 == j_cart_1) * (0.5 / (a_i + a_j))) * S_ij_00;
 
-        // TODO
-        mat_T[ij] = 0.0;
+        const auto ksi = a_i * a_j / (a_i + a_j);
+
+        const auto K_ij_00 = ksi * (3.0 - 2.0 * ksi * r2_ij);
+
+        mat_T[ij] = ((PB_0 * PB_1 + static_cast<double>(j_cart_0 == j_cart_1) * (0.5 / (a_i + a_j))) * K_ij_00 + 4.0 * ksi * PB_0 * PB_1) * S_ij_00;
     }
 }
 

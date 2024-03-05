@@ -546,9 +546,8 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                 mat_overlap.row(i_cgto)[j_cgto_sph] += mat_S[ij] * coef_sph;
                 mat_overlap.row(j_cgto_sph)[i_cgto] += mat_S[ij] * coef_sph;
 
-                // TODO
-                //mat_kinetic_energy.row(i_cgto)[j_cgto_sph] += mat_T[ij] * coef_sph;
-                //mat_kinetic_energy.row(j_cgto_sph)[i_cgto] += mat_T[ij] * coef_sph;
+                mat_kinetic_energy.row(i_cgto)[j_cgto_sph] += mat_T[ij] * coef_sph;
+                mat_kinetic_energy.row(j_cgto_sph)[i_cgto] += mat_T[ij] * coef_sph;
 
                 // TODO
                 //mat_nuclear_potential.row(i_cgto)[j_cgto_sph] += mat_V[ij] * coef_sph;
