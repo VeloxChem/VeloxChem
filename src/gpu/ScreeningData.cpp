@@ -126,6 +126,7 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
     _Q_matrix_sp = CDenseMatrix(s_prim_count, p_prim_count * 3);
     _Q_matrix_sd = CDenseMatrix(s_prim_count, p_prim_count * 6);
     _Q_matrix_pp = CDenseMatrix(p_prim_count * 3, p_prim_count * 3);
+    _Q_matrix_pd = CDenseMatrix(p_prim_count * 3, p_prim_count * 6);
 
     // TODO distribute computation of Q matrices
 
@@ -324,6 +325,36 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
                 }
             }
         }
+
+        // P-D gto block pair
+
+        for (int64_t j = 0; j < d_prim_count; j++)
+        {
+            /*
+            const auto a_j = d_prim_info[j + d_prim_count * 0];
+            const auto c_j = d_prim_info[j + d_prim_count * 1];
+            const auto x_j = d_prim_info[j + d_prim_count * 2];
+            const auto y_j = d_prim_info[j + d_prim_count * 3];
+            const auto z_j = d_prim_info[j + d_prim_count * 4];
+
+            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+            const auto a_ij = a_i + a_j;
+
+            const auto S_ij_0 = c_i * c_j * std::pow(MATH_CONST_PI / a_ij, 1.5) * std::exp(-a_i * a_j / a_ij * r2_ij);
+
+            const auto Lambda = std::sqrt(4.0 * a_ij * a_ij / (a_ij + a_ij) / MATH_CONST_PI);
+            */
+
+            for (int64_t i_cart = 0; i_cart < 3; i_cart++)
+            {
+                for (int64_t j_cart = 0; j_cart < 6; j_cart++)
+                {
+                    // TODO
+                    _Q_matrix_pd.row(i * 3 + i_cart)[j * 6 + j_cart] = 1.0;
+                }
+            }
+        }
     }
 }
 
@@ -364,8 +395,7 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count, c
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_sp_mat_Q;
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_sd_mat_Q;
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_pp_mat_Q;
-
-    // S-S gto block pair and S-P gto block pair
+    std::vector<std::tuple<double, int64_t, int64_t>> sorted_pd_mat_Q;
 
     for (int64_t i = 0, ij = 0; i < s_prim_count; i++)
     {
@@ -400,10 +430,10 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count, c
         }
     }
 
-    // P-P gto block pair
-
     for (int64_t i = 0; i < p_prim_count; i++)
     {
+        // P-P gto block pair
+
         for (int64_t j = i; j < p_prim_count; j++)
         {
             for (int64_t i_cart = 0; i_cart < 3; i_cart++)
@@ -417,17 +447,33 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count, c
                 }
             }
         }
+
+        // P-D gto block pair
+
+        for (int64_t j = 0; j < d_prim_count; j++)
+        {
+            for (int64_t i_cart = 0; i_cart < 3; i_cart++)
+            {
+                for (int64_t j_cart = 0; j_cart < 6; j_cart++)
+                {
+                    const auto Q_ij = _Q_matrix_pd.row(i * 3 + i_cart)[j * 6 + j_cart];
+                    sorted_pd_mat_Q.push_back(std::make_tuple(Q_ij, i * 3 + i_cart, j * 6 + j_cart));
+                }
+            }
+        }
     }
 
     std::sort(sorted_ss_mat_Q.begin(), sorted_ss_mat_Q.end());
     std::sort(sorted_sp_mat_Q.begin(), sorted_sp_mat_Q.end());
     std::sort(sorted_sd_mat_Q.begin(), sorted_sd_mat_Q.end());
     std::sort(sorted_pp_mat_Q.begin(), sorted_pp_mat_Q.end());
+    std::sort(sorted_pd_mat_Q.begin(), sorted_pd_mat_Q.end());
 
     const auto ss_prim_pair_count = s_prim_count * (s_prim_count + 1) / 2;
     const auto sp_prim_pair_count = s_prim_count * p_prim_count * 3;
     const auto sd_prim_pair_count = s_prim_count * d_prim_count * 6;
     const auto pp_prim_pair_count = p_prim_count * 3 * (p_prim_count * 3 + 1) / 2;
+    const auto pd_prim_pair_count = p_prim_count * 3 * d_prim_count * 6;
 
     // form local vectors
 
@@ -446,6 +492,10 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count, c
     _pp_first_inds_local  = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
     _pp_second_inds_local = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
     _pp_mat_Q_local       = std::vector<std::vector<double>>(_num_gpus_per_node);
+
+    _pd_first_inds_local  = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
+    _pd_second_inds_local = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
+    _pd_mat_Q_local       = std::vector<std::vector<double>>(_num_gpus_per_node);
 
     // TODO use communicator from arguments
     auto rank = mpi::rank(MPI_COMM_WORLD);
@@ -479,6 +529,12 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count, c
         _pp_first_inds_local[gpu_id]  = std::vector<uint32_t>(pp_batch_size);
         _pp_second_inds_local[gpu_id] = std::vector<uint32_t>(pp_batch_size);
         _pp_mat_Q_local[gpu_id]       = std::vector<double>(pp_batch_size);
+
+        auto pd_batch_size = mathfunc::batch_size(pd_prim_pair_count, gpu_rank, gpu_count);
+
+        _pd_first_inds_local[gpu_id]  = std::vector<uint32_t>(pd_batch_size);
+        _pd_second_inds_local[gpu_id] = std::vector<uint32_t>(pd_batch_size);
+        _pd_mat_Q_local[gpu_id]       = std::vector<double>(pd_batch_size);
     }
 
     auto nthreads = omp_get_max_threads();
@@ -544,6 +600,19 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count, c
                 _pp_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
                 _pp_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
                 _pp_mat_Q_local[gpu_id][idx]       = Q_ij;
+            }
+
+            for (int64_t ij = gpu_rank, idx = 0; ij < pd_prim_pair_count; ij+=gpu_count, idx++)
+            {
+                const auto& vals = sorted_pd_mat_Q[pd_prim_pair_count - 1 - ij];
+
+                auto Q_ij = std::get<0>(vals);
+                auto i    = std::get<1>(vals);
+                auto j    = std::get<2>(vals);
+
+                _pd_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
+                _pd_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
+                _pd_mat_Q_local[gpu_id][idx]       = Q_ij;
             }
         }
     }
@@ -723,11 +792,13 @@ auto CScreeningData::get_ss_first_inds_local(const int64_t gpu_id) const -> cons
 auto CScreeningData::get_sp_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _sp_first_inds_local[gpu_id]; }
 auto CScreeningData::get_sd_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _sd_first_inds_local[gpu_id]; }
 auto CScreeningData::get_pp_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _pp_first_inds_local[gpu_id]; }
+auto CScreeningData::get_pd_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _pd_first_inds_local[gpu_id]; }
 
 auto CScreeningData::get_ss_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _ss_second_inds_local[gpu_id]; }
 auto CScreeningData::get_sp_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _sp_second_inds_local[gpu_id]; }
 auto CScreeningData::get_sd_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _sd_second_inds_local[gpu_id]; }
 auto CScreeningData::get_pp_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _pp_second_inds_local[gpu_id]; }
+auto CScreeningData::get_pd_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _pd_second_inds_local[gpu_id]; }
 
 auto CScreeningData::get_ss_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>& { return _ss_mat_Q_local[gpu_id]; }
 auto CScreeningData::get_sp_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>& { return _sp_mat_Q_local[gpu_id]; }

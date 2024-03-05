@@ -360,6 +360,75 @@ computeOverlapAndKineticEnergyPP(double*         mat_S,
 }
 
 __global__ void
+computeOverlapAndKineticEnergyPD(double*         mat_S,
+                                 double*         mat_T,
+                                 const double*   p_prim_info,
+                                 const uint32_t  p_prim_count,
+                                 const double*   d_prim_info,
+                                 const uint32_t  d_prim_count,
+                                 const uint32_t* pd_first_inds_local,
+                                 const uint32_t* pd_second_inds_local,
+                                 const uint32_t  pd_prim_pair_count_local)
+{
+    // each thread computes a primitive S/T matrix element
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (ij < pd_prim_pair_count_local)
+    {
+        const auto i = pd_first_inds_local[ij];
+        const auto j = pd_second_inds_local[ij];
+
+        const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
+        const auto x_i = p_prim_info[i / 3 + p_prim_count * 2];
+        const auto y_i = p_prim_info[i / 3 + p_prim_count * 3];
+        const auto z_i = p_prim_info[i / 3 + p_prim_count * 4];
+
+        const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
+        const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
+        const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
+        const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+
+        const auto i_cart = i % 3;
+
+        const uint32_t d_cart_inds_0[6] = {0,0,0,1,1,2};
+        const uint32_t d_cart_inds_1[6] = {0,1,2,1,2,2};
+
+        const auto j_cart_0 = d_cart_inds_0[j % 6];
+        const auto j_cart_1 = d_cart_inds_1[j % 6];
+
+        const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+
+        const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
+
+        // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        const auto PA = (a_j / (a_i + a_j)) * rij[i_cart];
+
+        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[j_cart_0];
+        const auto PB_1 = (-a_i / (a_i + a_j)) * rij[j_cart_1];
+
+        //const auto K_ij_00 = 3.0 * a_i * a_j / (a_i + a_j) - 2.0 * a_i * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * r2_ij;
+        //const auto K_ij_10 = -2.0 * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * (-rij[i_cart]);
+        //const auto K_ij_01 = -2.0 * a_i * a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * rij[j_cart];
+        //const auto K_ij_11 = a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * static_cast<double>(i_cart == j_cart);
+
+        mat_S[ij] = PA * (PB_0 * PB_1 * S_ij_00 + static_cast<double>(j_cart_0 == j_cart_1) * (0.5 / (a_i + a_j)))
+
+            + static_cast<double>(i_cart == j_cart_0) * (0.5 / (a_i + a_j)) * PB_1 * S_ij_00
+
+            + static_cast<double>(i_cart == j_cart_1) * (0.5 / (a_i + a_j)) * PB_0 * S_ij_00;
+
+        // TODO
+        mat_T[ij] = 0.0;
+    }
+}
+
+__global__ void
 computeNuclearPotentialSS(double*         mat_V,
                           const double*   s_prim_info,
                           const uint32_t  s_prim_count,
