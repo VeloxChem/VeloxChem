@@ -211,19 +211,15 @@ computeOverlapAndKineticEnergySP(double*         mat_S,
 
         const auto j_cart = j % 3;
 
-        const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+        const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+
+        const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
         // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto K_ij_00 = 3.0 * a_i * a_j / (a_i + a_j) - 2.0 * a_i * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * r2_ij;
-
-        // p-1: py
-        // p_0: pz
-        // p+1: px
-
-        const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
 
         const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
 
@@ -268,7 +264,9 @@ computeOverlapAndKineticEnergyPP(double*         mat_S,
         const auto i_cart = i % 3;
         const auto j_cart = j % 3;
 
-        const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+        const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+
+        const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
         // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
@@ -276,19 +274,13 @@ computeOverlapAndKineticEnergyPP(double*         mat_S,
 
         const auto K_ij_00 = 3.0 * a_i * a_j / (a_i + a_j) - 2.0 * a_i * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * r2_ij;
 
-        // p-1: py
-        // p_0: pz
-        // p+1: px
-
-        const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-
         const auto S_ij_10 = (a_j / (a_i + a_j)) * rij[i_cart] * S_ij_00;
 
         const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
 
         const auto S_ij_11 = (
 
-                (i_cart == j_cart ? 1.0 : 0.0) * (0.5 / (a_i + a_j)) +
+                static_cast<double>(i_cart == j_cart) * (0.5 / (a_i + a_j)) +
 
                 (a_i * a_j / ((a_i + a_j) * (a_i + a_j))) * (-rij[i_cart]) * rij[j_cart]
 
@@ -298,7 +290,7 @@ computeOverlapAndKineticEnergyPP(double*         mat_S,
 
         const auto K_ij_01 = -2.0 * a_i * a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * rij[j_cart];
 
-        const auto K_ij_11 = a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * (i_cart == j_cart ? 1.0 : 0.0);
+        const auto K_ij_11 = a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * static_cast<double>(i_cart == j_cart);
 
         mat_S[ij] = S_ij_11;
 
@@ -410,17 +402,13 @@ computeNuclearPotentialSP(double*         mat_V,
 
         const auto j_cart = j % 3;
 
-        const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+        const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+
+        const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
         // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-
-        // p-1: py
-        // p_0: pz
-        // p+1: px
-
-        const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
 
         const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
 
@@ -435,13 +423,9 @@ computeNuclearPotentialSP(double*         mat_V,
             const auto z_c = points_info[c + npoints * 2];
             const auto q_c = points_info[c + npoints * 3];
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double rPC[3] = {y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                   x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+            const double rPC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                   y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
             const auto r2_PC = rPC[0] * rPC[0] + rPC[1] * rPC[1] + rPC[2] * rPC[2];
 
@@ -492,17 +476,13 @@ computeNuclearPotentialPP(double*         mat_V,
         const auto i_cart = i % 3;
         const auto j_cart = j % 3;
 
-        const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+        const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+
+        const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
         // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-
-        // p-1: py
-        // p_0: pz
-        // p+1: px
-
-        const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
 
         const auto S_ij_10 = (a_j / (a_i + a_j)) * rij[i_cart] * S_ij_00;
 
@@ -510,7 +490,7 @@ computeNuclearPotentialPP(double*         mat_V,
 
         const auto S_ij_11 = (
 
-                (i_cart == j_cart ? 1.0 : 0.0) * (0.5 / (a_i + a_j)) +
+                static_cast<double>(i_cart == j_cart) * (0.5 / (a_i + a_j)) +
 
                 (a_i * a_j / ((a_i + a_j) * (a_i + a_j))) * (-rij[i_cart]) * rij[j_cart]
 
@@ -527,13 +507,9 @@ computeNuclearPotentialPP(double*         mat_V,
             const auto z_c = points_info[c + npoints * 2];
             const auto q_c = points_info[c + npoints * 3];
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double rPC[3] = {y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                   x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+            const double rPC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                   y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
             const auto r2_PC = rPC[0] * rPC[0] + rPC[1] * rPC[1] + rPC[2] * rPC[2];
 
@@ -547,7 +523,7 @@ computeNuclearPotentialPP(double*         mat_V,
 
                          + S_ij_01 * rPC[i_cart] * F2_t[1]
 
-                         + S_ij_00 * (rPC[i_cart] * rPC[j_cart] * F2_t[2] - 0.5 / (a_i + a_j) * (i_cart == j_cart ? 1.0 : 0.0) * F2_t[1]));
+                         + S_ij_00 * (rPC[i_cart] * rPC[j_cart] * F2_t[2] - 0.5 / (a_i + a_j) * static_cast<double>(i_cart == j_cart) * F2_t[1]));
         }
 
         mat_V[ij] = theta * V_ij;

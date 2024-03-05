@@ -2,6 +2,8 @@
 #define GtoBlock_hpp
 
 #include <cstdint>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "MolecularBasis.hpp"
@@ -138,6 +140,20 @@ class CGtoBlock
      @return the vector of atomic orbitals indexes of GTOs.
      */
     auto getAtomicOrbitalsIndexes() const -> std::vector<int64_t>;
+
+    /**
+     Gets vector of atomic orbitals indexes of contracted Cartesian GTOs.
+
+     @return the vector of atomic orbitals indexes of Cartesian GTOs.
+     */
+    auto getAtomicOrbitalsIndexesForCartesian() const -> std::vector<int64_t>;
+
+    /**
+     Gets Cartesian to spherical mapping for p-CGTOs.
+
+     @return the Cartesian to spherical mapping for p-CGTOs.
+     */
+    auto getCartesianToSphericalMappingForP() const -> std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>>;
 
     /**
      Gets angular momentum.

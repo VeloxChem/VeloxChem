@@ -38,6 +38,7 @@
 #include <fstream>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "ScreeningData.hpp"
@@ -197,6 +198,25 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
         if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
         if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
+    }
+
+    // Cartesian to spherical index mapping for P
+
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_p;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 1)
+        {
+            auto p_map = gto_block.getCartesianToSphericalMappingForP();
+
+            for (const auto& [cart_ind, sph_ind_coef] : p_map)
+            {
+                cart_sph_p[cart_ind] = sph_ind_coef;
+            }
+        }
     }
 
     // S gto block
@@ -410,14 +430,21 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
             // TODO: think about the ordering of cartesian components
             const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            mat_overlap.row(i_cgto)[j_cgto] += mat_S[ij];
-            mat_overlap.row(j_cgto)[i_cgto] += mat_S[ij];
+            // Cartesian to spherical
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto coef_sph = j_cgto_sph_ind_coef.second;
 
-            mat_kinetic_energy.row(i_cgto)[j_cgto] += mat_T[ij];
-            mat_kinetic_energy.row(j_cgto)[i_cgto] += mat_T[ij];
+                mat_overlap.row(i_cgto)[j_cgto_sph] += mat_S[ij] * coef_sph;
+                mat_overlap.row(j_cgto_sph)[i_cgto] += mat_S[ij] * coef_sph;
 
-            mat_nuclear_potential.row(i_cgto)[j_cgto] += mat_V[ij];
-            mat_nuclear_potential.row(j_cgto)[i_cgto] += mat_V[ij];
+                mat_kinetic_energy.row(i_cgto)[j_cgto_sph] += mat_T[ij] * coef_sph;
+                mat_kinetic_energy.row(j_cgto_sph)[i_cgto] += mat_T[ij] * coef_sph;
+
+                mat_nuclear_potential.row(i_cgto)[j_cgto_sph] += mat_V[ij] * coef_sph;
+                mat_nuclear_potential.row(j_cgto_sph)[i_cgto] += mat_V[ij] * coef_sph;
+            }
         }
     }
 
@@ -462,17 +489,32 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
             const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
             const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            mat_overlap.row(i_cgto)[j_cgto] += mat_S[ij];
+            // Cartesian to spherical
+            for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
+            {
+                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+                auto i_coef_sph = i_cgto_sph_ind_coef.second;
 
-            if (i != j) mat_overlap.row(j_cgto)[i_cgto] += mat_S[ij];
+                for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
+                {
+                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
 
-            mat_kinetic_energy.row(i_cgto)[j_cgto] += mat_T[ij];
+                    auto coef_sph = i_coef_sph * j_coef_sph;
 
-            if (i != j) mat_kinetic_energy.row(j_cgto)[i_cgto] += mat_T[ij];
+                    mat_overlap.row(i_cgto_sph)[j_cgto_sph] += mat_S[ij] * coef_sph;
 
-            mat_nuclear_potential.row(i_cgto)[j_cgto] += mat_V[ij];
+                    if (i != j) mat_overlap.row(j_cgto_sph)[i_cgto_sph] += mat_S[ij] * coef_sph;
 
-            if (i != j) mat_nuclear_potential.row(j_cgto)[i_cgto] += mat_V[ij];
+                    mat_kinetic_energy.row(i_cgto_sph)[j_cgto_sph] += mat_T[ij] * coef_sph;
+
+                    if (i != j) mat_kinetic_energy.row(j_cgto_sph)[i_cgto_sph] += mat_T[ij] * coef_sph;
+
+                    mat_nuclear_potential.row(i_cgto_sph)[j_cgto_sph] += mat_V[ij] * coef_sph;
+
+                    if (i != j) mat_nuclear_potential.row(j_cgto_sph)[i_cgto_sph] += mat_V[ij] * coef_sph;
+                }
+            }
         }
     }
 
