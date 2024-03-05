@@ -1035,4 +1035,197 @@ computeNuclearPotentialPD(double*         mat_V,
     }
 }
 
+__global__ void
+computeNuclearPotentialDD(double*         mat_V,
+                          const double*   d_prim_info,
+                          const uint32_t  d_prim_count,
+                          const uint32_t* dd_first_inds_local,
+                          const uint32_t* dd_second_inds_local,
+                          const uint32_t  dd_prim_pair_count_local,
+                          const double*   points_info,
+                          const uint32_t  npoints,
+                          const double*   boys_func_table,
+                          const double*   boys_func_ft)
+{
+    // each thread computes a primitive S/T matrix element
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (ij < dd_prim_pair_count_local)
+    {
+        const auto i = dd_first_inds_local[ij];
+        const auto j = dd_second_inds_local[ij];
+
+        const auto a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        const auto c_i = d_prim_info[i / 6 + d_prim_count * 1];
+        const auto x_i = d_prim_info[i / 6 + d_prim_count * 2];
+        const auto y_i = d_prim_info[i / 6 + d_prim_count * 3];
+        const auto z_i = d_prim_info[i / 6 + d_prim_count * 4];
+
+        const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
+        const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
+        const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
+        const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+
+        // TODO: used shared memory?
+        const uint32_t d_cart_inds_0[6] = {0,0,0,1,1,2};
+        const uint32_t d_cart_inds_1[6] = {0,1,2,1,2,2};
+
+        const auto i_cart_0 = d_cart_inds_0[i % 6];
+        const auto i_cart_1 = d_cart_inds_1[i % 6];
+
+        const auto j_cart_0 = d_cart_inds_0[j % 6];
+        const auto j_cart_1 = d_cart_inds_1[j % 6];
+
+        const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+
+        const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
+
+        // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * std::sqrt(a_i + a_j);
+
+        const auto PA_0 = (a_j / (a_i + a_j)) * rij[i_cart_0];
+        const auto PA_1 = (a_j / (a_i + a_j)) * rij[i_cart_1];
+
+        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[j_cart_0];
+        const auto PB_1 = (-a_i / (a_i + a_j)) * rij[j_cart_1];
+
+        double V_ij = 0.0;
+
+        for (uint32_t c = 0; c < npoints; c++)
+        {
+            const auto x_c = points_info[c + npoints * 0];
+            const auto y_c = points_info[c + npoints * 1];
+            const auto z_c = points_info[c + npoints * 2];
+            const auto q_c = points_info[c + npoints * 3];
+
+            const double rPC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                   y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
+
+            const auto r2_PC = rPC[0] * rPC[0] + rPC[1] * rPC[1] + rPC[2] * rPC[2];
+
+            double F4_t[5];
+
+            gpu::computeBoysFunction(F4_t, (a_i + a_j) * r2_PC, 4, boys_func_table, boys_func_ft);
+
+            V_ij += q_c * (
+
+                    F4_t[0] * (
+                            PB_0 * PB_1 * PA_0 * PA_1
+                            + 0.5 / (a_i + a_j) * (
+                                  PA_1 * PB_1 * static_cast<double>(j_cart_0 == i_cart_0)
+                                + PA_0 * PB_1 * static_cast<double>(j_cart_0 == i_cart_1)
+                                + PA_1 * PB_0 * static_cast<double>(j_cart_1 == i_cart_0)
+                                + PA_0 * PB_0 * static_cast<double>(j_cart_1 == i_cart_1)
+                                + PA_0 * PA_1 * static_cast<double>(j_cart_0 == j_cart_1)
+                                + PB_0 * PB_1 * static_cast<double>(i_cart_0 == i_cart_1)
+                                )
+                            + 0.25 / ((a_i + a_j) * (a_i + a_j)) * (
+                                  static_cast<double>(i_cart_0 == i_cart_1) * static_cast<double>(j_cart_0 == j_cart_1)
+                                + static_cast<double>(i_cart_0 == j_cart_0) * static_cast<double>(i_cart_1 == j_cart_1)
+                                + static_cast<double>(i_cart_1 == j_cart_0) * static_cast<double>(i_cart_0 == j_cart_1)
+                                )
+                            )
+
+                    + F4_t[1] * (
+                            (rPC[i_cart_0] * PA_1 + rPC[i_cart_1] * PA_0) * PB_0 * PB_1
+                            + (rPC[j_cart_0] * PB_1 + rPC[j_cart_1] * PB_0) * PA_0 * PA_1
+                            + 0.5 / (a_i + a_j) * (
+                                static_cast<double>(i_cart_0 == i_cart_1) * (
+                                    rPC[j_cart_0] * PB_1
+                                    + rPC[j_cart_1] * PB_0
+                                    - PB_0 * PB_1)
+                                + static_cast<double>(i_cart_0 == j_cart_0) * (
+                                    rPC[i_cart_1] * PB_1
+                                    + rPC[j_cart_1] * PA_1
+                                    - PB_1 * PA_1)
+                                + static_cast<double>(i_cart_0 == j_cart_1) * (
+                                    rPC[i_cart_1] * PB_0
+                                    + rPC[j_cart_0] * PA_1
+                                    - PB_0 * PA_1)
+                                + static_cast<double>(i_cart_1 == j_cart_0) * (
+                                    rPC[i_cart_0] * PB_1
+                                    + rPC[j_cart_1] * PA_0
+                                    - PB_1 * PA_0)
+                                + static_cast<double>(i_cart_1 == j_cart_1) * (
+                                    rPC[i_cart_0] * PB_0
+                                    + rPC[j_cart_0] * PA_0
+                                    - PB_0 * PA_0)
+                                + static_cast<double>(j_cart_0 == j_cart_1) * (
+                                    rPC[i_cart_0] * PA_1
+                                    + rPC[i_cart_1] * PA_0
+                                    - PA_0 * PA_1)
+                                )
+                            - 0.25 / ((a_i + a_j) * (a_i + a_j)) * (
+                                2.0 * static_cast<double>(i_cart_0 == i_cart_1) * static_cast<double>(j_cart_0 == j_cart_1)
+                                + 2.0 * static_cast<double>(i_cart_0 == j_cart_0) * static_cast<double>(i_cart_1 == j_cart_1)
+                                + 2.0 * static_cast<double>(i_cart_1 == j_cart_0) * static_cast<double>(i_cart_0 == j_cart_1)
+                                )
+                            )
+
+                    + F4_t[2] * (
+                            rPC[i_cart_0]   * rPC[i_cart_1] * PB_0 * PB_1
+                            + rPC[i_cart_0] * rPC[j_cart_0] * PA_1 * PB_1
+                            + rPC[i_cart_0] * rPC[j_cart_1] * PA_1 * PB_0
+                            + rPC[i_cart_1] * rPC[j_cart_0] * PA_0 * PB_1
+                            + rPC[i_cart_1] * rPC[j_cart_1] * PA_0 * PB_0
+                            + rPC[j_cart_0] * rPC[j_cart_1] * PA_0 * PA_1
+                            - 0.5 / (a_i + a_j) * (
+                                static_cast<double>(i_cart_0 == i_cart_1) * (
+                                    rPC[j_cart_0]   * PB_1
+                                    + rPC[j_cart_1] * PB_0
+                                    - rPC[j_cart_0] * rPC[j_cart_1])
+                                + static_cast<double>(i_cart_0 == j_cart_0) * (
+                                    rPC[i_cart_1]   * PB_1
+                                    + rPC[j_cart_1] * PA_1
+                                    - rPC[i_cart_1] * rPC[j_cart_1])
+                                + static_cast<double>(i_cart_0 == j_cart_1) * (
+                                    rPC[i_cart_1]   * PB_0
+                                    + rPC[j_cart_0] * PA_1
+                                    - rPC[i_cart_1] * rPC[j_cart_0])
+                                + static_cast<double>(i_cart_1 == j_cart_0) * (
+                                    rPC[i_cart_0]   * PB_1
+                                    + rPC[j_cart_1] * PA_0
+                                    - rPC[i_cart_0] * rPC[j_cart_1])
+                                + static_cast<double>(i_cart_1 == j_cart_1) * (
+                                    rPC[i_cart_0]   * PB_0
+                                    + rPC[j_cart_0] * PA_0
+                                    - rPC[i_cart_0] * rPC[j_cart_0])
+                                + static_cast<double>(j_cart_0 == j_cart_1) * (
+                                    rPC[i_cart_0]   * PA_1
+                                    + rPC[i_cart_1] * PA_0
+                                    - rPC[i_cart_0] * rPC[i_cart_1])
+                                )
+                            + 0.25 / ((a_i + a_j) * (a_i + a_j)) * (
+                                static_cast<double>(i_cart_0 == i_cart_1) * static_cast<double>(j_cart_0 == j_cart_1)
+                                + static_cast<double>(i_cart_0 == j_cart_0) * static_cast<double>(i_cart_1 == j_cart_1)
+                                + static_cast<double>(i_cart_0 == j_cart_1) * static_cast<double>(i_cart_1 == j_cart_0)
+                                )
+                            )
+
+                    + F4_t[3] * (
+                            rPC[i_cart_0] * rPC[i_cart_1] * (rPC[j_cart_1] * PB_0 + rPC[j_cart_0] * PB_1)
+                            + rPC[j_cart_0] * rPC[j_cart_1] * (PA_0 * rPC[i_cart_1] + PA_1 * rPC[i_cart_0])
+                            - 0.5 / (a_i + a_j) * (
+                                rPC[i_cart_0] * rPC[i_cart_1] * static_cast<double>(j_cart_0 == j_cart_1)
+                                + rPC[i_cart_0] * rPC[j_cart_0] * static_cast<double>(i_cart_1 == j_cart_1)
+                                + rPC[i_cart_0] * rPC[j_cart_1] * static_cast<double>(i_cart_1 == j_cart_0)
+                                + rPC[i_cart_1] * rPC[j_cart_0] * static_cast<double>(i_cart_0 == j_cart_1)
+                                + rPC[i_cart_1] * rPC[j_cart_1] * static_cast<double>(i_cart_0 == j_cart_0)
+                                + rPC[j_cart_0] * rPC[j_cart_1] * static_cast<double>(i_cart_0 == i_cart_1)
+                                )
+                            )
+
+                    + F4_t[4] * rPC[i_cart_0] * rPC[i_cart_1] * rPC[j_cart_0] * rPC[j_cart_1]);
+        }
+
+        mat_V[ij] = theta * S_ij_00 * V_ij;
+    }
+}
+
 }  // namespace gpu

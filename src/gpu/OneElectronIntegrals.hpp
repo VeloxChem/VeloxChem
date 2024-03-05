@@ -156,6 +156,18 @@ computeNuclearPotentialPD(double*         mat_V,
                           const double*   boys_func_table,
                           const double*   boys_func_ft);
 
+__global__ void
+computeNuclearPotentialDD(double*         mat_V,
+                          const double*   d_prim_info,
+                          const uint32_t  d_prim_count,
+                          const uint32_t* dd_first_inds_local,
+                          const uint32_t* dd_second_inds_local,
+                          const uint32_t  dd_prim_pair_count_local,
+                          const double*   points_info,
+                          const uint32_t  npoints,
+                          const double*   boys_func_table,
+                          const double*   boys_func_ft);
+
 }  // namespace gpu
 
 #endif
