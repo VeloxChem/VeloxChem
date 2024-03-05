@@ -82,6 +82,15 @@ computeOverlapAndKineticEnergyPD(double*         mat_S,
                                  const uint32_t  pd_prim_pair_count_local);
 
 __global__ void
+computeOverlapAndKineticEnergyDD(double*         mat_S,
+                                 double*         mat_T,
+                                 const double*   d_prim_info,
+                                 const uint32_t  d_prim_count,
+                                 const uint32_t* dd_first_inds_local,
+                                 const uint32_t* dd_second_inds_local,
+                                 const uint32_t  dd_prim_pair_count_local);
+
+__global__ void
 computeNuclearPotentialSS(double*         mat_V,
                           const double*   s_prim_info,
                           const uint32_t  s_prim_count,
