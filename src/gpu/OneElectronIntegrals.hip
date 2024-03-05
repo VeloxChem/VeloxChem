@@ -263,6 +263,7 @@ computeOverlapAndKineticEnergySD(double*         mat_S,
         const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
         const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
 
+        // TODO: used shared memory?
         const uint32_t d_cart_inds_0[6] = {0,0,0,1,1,2};
         const uint32_t d_cart_inds_1[6] = {0,1,2,1,2,2};
 
@@ -410,11 +411,6 @@ computeOverlapAndKineticEnergyPD(double*         mat_S,
         const auto PB_0 = (-a_i / (a_i + a_j)) * rij[j_cart_0];
         const auto PB_1 = (-a_i / (a_i + a_j)) * rij[j_cart_1];
 
-        //const auto K_ij_00 = 3.0 * a_i * a_j / (a_i + a_j) - 2.0 * a_i * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * r2_ij;
-        //const auto K_ij_10 = -2.0 * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * (-rij[i_cart]);
-        //const auto K_ij_01 = -2.0 * a_i * a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * rij[j_cart];
-        //const auto K_ij_11 = a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * static_cast<double>(i_cart == j_cart);
-
         mat_S[ij] = (PA * PB_0 * PB_1
 
                 + (PA * static_cast<double>(j_cart_0 == j_cart_1)
@@ -423,8 +419,23 @@ computeOverlapAndKineticEnergyPD(double*         mat_S,
 
                 ) * S_ij_00;
 
-        // TODO
-        mat_T[ij] = 0.0;
+        const auto ksi = a_i * a_j / (a_i + a_j);
+
+        const auto K_ij_00 = ksi * (3.0 - 2.0 * ksi * r2_ij);
+
+        mat_T[ij] = (
+
+                (PA * PB_0 * PB_1
+                 + (PA * static_cast<double>(j_cart_0 == j_cart_1)
+                  + PB_0 * static_cast<double>(i_cart == j_cart_1)
+                  + PB_1 * static_cast<double>(i_cart == j_cart_0)) * (0.5 / (a_i + a_j))) * K_ij_00
+
+                + ksi * (6.0 * PA * PB_0 * PB_1
+                       + (4.0 * PB_0 * static_cast<double>(i_cart == j_cart_1)
+                        + 4.0 * PB_1 * static_cast<double>(i_cart == j_cart_0)
+                        + 2.0 * PA * static_cast<double>(j_cart_0 == j_cart_1)) * (0.5 / (a_i + a_j)))
+
+                ) * S_ij_00;
     }
 }
 
