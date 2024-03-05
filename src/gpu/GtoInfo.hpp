@@ -33,11 +33,11 @@
 
 namespace gtoinfo {
 
-auto updatePrimitiveInfoForS(double* s_prim_info, uint32_t* s_prim_aoinds, const int64_t s_prim_count, const std::vector<CGtoBlock>& gto_blocks)
-    -> void;
+auto updatePrimitiveInfoForS(double* s_prim_info, uint32_t* s_prim_aoinds, const int64_t s_prim_count, const std::vector<CGtoBlock>& gto_blocks) -> void;
 
-auto updatePrimitiveInfoForP(double* p_prim_info, uint32_t* p_prim_aoinds, const int64_t p_prim_count, const std::vector<CGtoBlock>& gto_blocks)
-    -> void;
+auto updatePrimitiveInfoForP(double* p_prim_info, uint32_t* p_prim_aoinds, const int64_t p_prim_count, const std::vector<CGtoBlock>& gto_blocks) -> void;
+
+auto updatePrimitiveInfoForD(double* d_prim_info, uint32_t* d_prim_aoinds, const int64_t d_prim_count, const std::vector<CGtoBlock>& gto_blocks) -> void;
 
 auto getGtoInfo(const CGtoBlock gto_block) -> std::vector<double>;
 

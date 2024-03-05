@@ -156,6 +156,13 @@ class CGtoBlock
     auto getCartesianToSphericalMappingForP() const -> std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>>;
 
     /**
+     Gets Cartesian to spherical mapping for d-CGTOs.
+
+     @return the Cartesian to spherical mapping for d-CGTOs.
+     */
+    auto getCartesianToSphericalMappingForD() const -> std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>>;
+
+    /**
      Gets angular momentum.
 
      @return the angular momentum.

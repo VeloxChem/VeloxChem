@@ -188,6 +188,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
     int64_t s_prim_count = 0;
     int64_t p_prim_count = 0;
+    int64_t d_prim_count = 0;
 
     for (const auto& gto_block : gto_blocks)
     {
@@ -198,6 +199,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
         if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
         if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
+        if (gto_ang == 2) d_prim_count += npgtos * ncgtos;
     }
 
     // Cartesian to spherical index mapping for P
@@ -244,6 +246,19 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     hipSafe(hipMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
 
     hipSafe(hipMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // D gto block
+
+    std::vector<double>   d_prim_info(5 * d_prim_count);
+    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
+
+    double*   d_d_prim_info;
+
+    hipSafe(hipMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
 
     // GTO block pairs
 
@@ -524,8 +539,8 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     hipSafe(hipFree(d_boys_func_ft));
 
     hipSafe(hipFree(d_s_prim_info));
-
     hipSafe(hipFree(d_p_prim_info));
+    hipSafe(hipFree(d_d_prim_info));
 
     hipSafe(hipFree(d_mat_S));
     hipSafe(hipFree(d_mat_T));

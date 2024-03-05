@@ -110,6 +110,50 @@ updatePrimitiveInfoForP(double* p_prim_info, uint32_t* p_prim_aoinds, const int6
 }
 
 auto
+updatePrimitiveInfoForD(double* d_prim_info, uint32_t* d_prim_aoinds, const int64_t d_prim_count, const std::vector<CGtoBlock>& gto_blocks) -> void
+{
+    int64_t d_prim_offset = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 2)
+        {
+            const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+            const auto npgtos = gto_block.getNumberOfPrimitives();
+
+            const auto gto_exps   = gto_block.getExponents();
+            const auto gto_norms  = gto_block.getNormalizationFactors();
+            const auto gto_coords = gto_block.getCoordinates();
+
+            const auto gto_ao_inds_cart = gto_block.getAtomicOrbitalsIndexesForCartesian();
+
+            for (int64_t j = 0; j < npgtos; j++)
+            {
+                for (int64_t i = 0; i < ncgtos; i++)
+                {
+                    d_prim_info[d_prim_offset + i + j * ncgtos + d_prim_count * 0] = gto_exps[i + j * ncgtos];
+                    d_prim_info[d_prim_offset + i + j * ncgtos + d_prim_count * 1] = gto_norms[i + j * ncgtos];
+                    d_prim_info[d_prim_offset + i + j * ncgtos + d_prim_count * 2] = gto_coords[i][0];
+                    d_prim_info[d_prim_offset + i + j * ncgtos + d_prim_count * 3] = gto_coords[i][1];
+                    d_prim_info[d_prim_offset + i + j * ncgtos + d_prim_count * 4] = gto_coords[i][2];
+
+                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 0] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 0]);
+                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 1] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 1]);
+                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 2] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 2]);
+                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 3] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 3]);
+                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 4] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 4]);
+                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 5] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 5]);
+                }
+            }
+
+            d_prim_offset += npgtos * ncgtos;
+        }
+    }
+}
+
+auto
 getGtoInfo(const CGtoBlock gto_block) -> std::vector<double>
 {
     // set up GTOs data

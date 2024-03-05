@@ -1,6 +1,7 @@
-#include "GtoBlock.hpp"
+#include <cmath>
 
 #include "ErrorHandler.hpp"
+#include "GtoBlock.hpp"
 
 CGtoBlock::CGtoBlock(const std::vector<TPoint3D>& coordinates,
                      const std::vector<double>&   exponents,
@@ -237,6 +238,58 @@ CGtoBlock::getCartesianToSphericalMappingForP() const -> std::unordered_map<int6
     }
 
     return cart_sph_p;
+}
+
+auto
+CGtoBlock::getCartesianToSphericalMappingForD() const -> std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>>
+{
+    errors::assertMsgCritical(_angmom == 2, std::string("GtoBlock: getCartesianToSphericalMappingForD only works for d-orbitals"));
+
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_d;
+
+    const double f2_3 = 2.0 * std::sqrt(3.0);
+
+    // d-2 (0) <- dxy(1) * f2_3
+    // d-1 (1) <- dyz(4) * f2_3
+    // d_0 (2) <- dzz(5) * 2.0 - dxx(0) - dyy(3)
+    // d+1 (3) <- dxz(2) * f2_3
+    // d+2 (4) <- (dxx(0) - dyy(3)) * 0.5 * f2_3
+
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_comp_map;
+
+    cart_sph_comp_map[0] = std::vector<std::pair<int64_t, double>>({{2, -1.0}, {4, 0.5 * f2_3}});
+    cart_sph_comp_map[1] = std::vector<std::pair<int64_t, double>>({{0, f2_3}});
+    cart_sph_comp_map[2] = std::vector<std::pair<int64_t, double>>({{3, f2_3}});
+    cart_sph_comp_map[3] = std::vector<std::pair<int64_t, double>>({{2, -1.0}, {4, -0.5 * f2_3}});
+    cart_sph_comp_map[4] = std::vector<std::pair<int64_t, double>>({{4, f2_3}});
+    cart_sph_comp_map[5] = std::vector<std::pair<int64_t, double>>({{2, 2.0}});
+
+    for (const auto& [cart_comp, sph_comp_coef_vec] : cart_sph_comp_map)
+    {
+        // go through CGTOs in this block
+        // note that ind starts from 1
+        // because _orb_indexes[0] is the total number of CGTOs of _angmom
+        // which could be larger than the number of CGTOs in this block
+
+        for (size_t ind = 1; ind < _orb_indexes.size(); ind++)
+        {
+            auto cart_ind = cart_comp * _orb_indexes[0] + _orb_indexes[ind];
+
+            cart_sph_d[cart_ind] = std::vector<std::pair<int64_t, double>>();
+
+            for (const auto& sph_comp_coef : sph_comp_coef_vec)
+            {
+                auto sph_comp = sph_comp_coef.first;
+                auto sph_coef = sph_comp_coef.second;
+
+                auto sph_ind = sph_comp * _orb_indexes[0] + _orb_indexes[ind];
+
+                cart_sph_d[cart_ind].push_back(std::pair<int64_t, double>({sph_ind, sph_coef}));
+            }
+        }
+    }
+
+    return cart_sph_d;
 }
 
 auto
