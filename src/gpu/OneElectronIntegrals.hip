@@ -594,6 +594,7 @@ computeNuclearPotentialSS(double*         mat_V,
         const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
         // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
@@ -608,20 +609,20 @@ computeNuclearPotentialSS(double*         mat_V,
             const auto z_c = points_info[c + npoints * 2];
             const auto q_c = points_info[c + npoints * 3];
 
-            const double rPC[3] = {y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                   x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+            const double PC[3] = {y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                  z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                  x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
 
-            const auto r2_PC = rPC[0] * rPC[0] + rPC[1] * rPC[1] + rPC[2] * rPC[2];
+            const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
             double F0_t[1];
 
             gpu::computeBoysFunction(F0_t, (a_i + a_j) * r2_PC, 0, boys_func_table, boys_func_ft);
 
-            V_ij += q_c * S_ij_00 * F0_t[0];
+            V_ij += q_c * F0_t[0];
         }
 
-        mat_V[ij] = theta * V_ij;
+        mat_V[ij] = theta * S_ij_00 * V_ij;
     }
 }
 
@@ -660,19 +661,19 @@ computeNuclearPotentialSP(double*         mat_V,
         const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
         const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
 
-        const auto j_cart = j % 3;
+        const auto b0 = j % 3;
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
-        // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-        const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
-
         const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * std::sqrt(a_i + a_j);
+
+        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
         double V_ij = 0.0;
 
@@ -683,20 +684,26 @@ computeNuclearPotentialSP(double*         mat_V,
             const auto z_c = points_info[c + npoints * 2];
             const auto q_c = points_info[c + npoints * 3];
 
-            const double rPC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
-                                   y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
+            const double PC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                  y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                  z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
-            const auto r2_PC = rPC[0] * rPC[0] + rPC[1] * rPC[1] + rPC[2] * rPC[2];
+            const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
             double F1_t[2];
 
             gpu::computeBoysFunction(F1_t, (a_i + a_j) * r2_PC, 1, boys_func_table, boys_func_ft);
 
-            V_ij += q_c * (S_ij_01 * F1_t[0] + S_ij_00 * rPC[j_cart] * F1_t[1]);
+            V_ij += q_c * (
+
+                    F1_t[0] * PB_0
+
+                    + F1_t[1] * PC[b0]
+
+                    );
         }
 
-        mat_V[ij] = theta * V_ij;
+        mat_V[ij] = theta * S_ij_00 * V_ij;
     }
 }
 
@@ -779,11 +786,11 @@ computeNuclearPotentialSD(double*         mat_V,
             const auto z_c = points_info[c + npoints * 2];
             const auto q_c = points_info[c + npoints * 3];
 
-            const double rPC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
-                                   y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
+            const double PC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                  y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                  z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
-            const auto r2_PC = rPC[0] * rPC[0] + rPC[1] * rPC[1] + rPC[2] * rPC[2];
+            const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
             double F2_t[3];
 
@@ -792,17 +799,37 @@ computeNuclearPotentialSD(double*         mat_V,
             V_ij += q_c * (
 
                     F2_t[0] * (
-                          PB_0 * PB_1
-                        + 0.5 / (a_i + a_j) * delta[b0][b1]
+
+                        0.5 / (a_i + a_j) * (
+                            delta[b0][b1]
                         )
+
+                        + (
+                            PB_0 * PB_1
+                        )
+
+                    )
 
                     + F2_t[1] * (
-                          rPC[b0] * PB_1
-                        + rPC[b1] * PB_0
-                        - 0.5 / (a_i + a_j) * delta[b0][b1]
+
+                        -0.5 / (a_i + a_j) * (
+                            delta[b0][b1]
                         )
 
-                    + F2_t[2] * rPC[b0] * rPC[b1]
+                        + (
+                            PB_0 * PC[b1]
+                            + PB_1 * PC[b0]
+                        )
+
+                    )
+
+                    + F2_t[2] * (
+
+                        (
+                            PC[b0] * PC[b1]
+                        )
+
+                    )
 
                     );
         }
@@ -823,9 +850,20 @@ computeNuclearPotentialPP(double*         mat_V,
                           const double*   boys_func_table,
                           const double*   boys_func_ft)
 {
+    __shared__ double   delta[3][3];
+
     // each thread computes a primitive S/T matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (threadIdx.x == 0)
+    {
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+    }
+
+    __syncthreads();
 
     if (ij < pp_prim_pair_count_local)
     {
@@ -844,30 +882,22 @@ computeNuclearPotentialPP(double*         mat_V,
         const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
         const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
 
-        const auto i_cart = i % 3;
-        const auto j_cart = j % 3;
+        const auto a0 = i % 3;
+        const auto b0 = j % 3;
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
-        // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-        const auto S_ij_10 = (a_j / (a_i + a_j)) * rij[i_cart] * S_ij_00;
-
-        const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
-
-        const auto S_ij_11 = (
-
-                static_cast<double>(i_cart == j_cart) * (0.5 / (a_i + a_j)) +
-
-                (a_i * a_j / ((a_i + a_j) * (a_i + a_j))) * (-rij[i_cart]) * rij[j_cart]
-
-                ) * S_ij_00;
-
         const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * std::sqrt(a_i + a_j);
+
+        const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
+
+        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
         double V_ij = 0.0;
 
@@ -878,26 +908,55 @@ computeNuclearPotentialPP(double*         mat_V,
             const auto z_c = points_info[c + npoints * 2];
             const auto q_c = points_info[c + npoints * 3];
 
-            const double rPC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
-                                   y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
+            const double PC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                  y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                  z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
-            const auto r2_PC = rPC[0] * rPC[0] + rPC[1] * rPC[1] + rPC[2] * rPC[2];
+            const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
             double F2_t[3];
 
             gpu::computeBoysFunction(F2_t, (a_i + a_j) * r2_PC, 2, boys_func_table, boys_func_ft);
 
-            V_ij += q_c * (S_ij_11 * F2_t[0]
+            V_ij += q_c * (
 
-                         + S_ij_10 * rPC[j_cart] * F2_t[1]
+                    F2_t[0] * (
 
-                         + S_ij_01 * rPC[i_cart] * F2_t[1]
+                        0.5 / (a_i + a_j) * (
+                            delta[b0][a0]
+                        )
 
-                         + S_ij_00 * (rPC[i_cart] * rPC[j_cart] * F2_t[2] - 0.5 / (a_i + a_j) * static_cast<double>(i_cart == j_cart) * F2_t[1]));
+                        + (
+                            PB_0 * PA_0
+                        )
+
+                    )
+
+                    + F2_t[1] * (
+
+                        -0.5 / (a_i + a_j) * (
+                            delta[b0][a0]
+                        )
+
+                        + (
+                            PB_0 * PC[a0]
+                            + PA_0 * PC[b0]
+                        )
+
+                    )
+
+                    + F2_t[2] * (
+
+                        (
+                            PC[a0] * PC[b0]
+                        )
+
+                    )
+
+                    );
         }
 
-        mat_V[ij] = theta * V_ij;
+        mat_V[ij] = theta * S_ij_00 * V_ij;
     }
 }
 
@@ -984,11 +1043,11 @@ computeNuclearPotentialPD(double*         mat_V,
             const auto z_c = points_info[c + npoints * 2];
             const auto q_c = points_info[c + npoints * 3];
 
-            const double rPC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
-                                   y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
+            const double PC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                  y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                  z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
-            const auto r2_PC = rPC[0] * rPC[0] + rPC[1] * rPC[1] + rPC[2] * rPC[2];
+            const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
             double F3_t[4];
 
@@ -997,40 +1056,64 @@ computeNuclearPotentialPD(double*         mat_V,
             V_ij += q_c * (
 
                     F3_t[0] * (
-                          PB_0 * PB_1 * PA_0
 
-                        + 0.5 / (a_i + a_j) * (
-                              PB_0 * delta[a0][b1]
-                            + PB_1 * delta[a0][b0]
-                            + PA_0 * delta[b0][b1]
-                            )
+                        0.5 / (a_i + a_j) * (
+                            delta[b1][a0] * (PB_0)
+                            + delta[b0][a0] * (PB_1)
+                            + delta[b0][b1] * (PA_0)
                         )
 
-                    + F3_t[1] * (
-                              PB_0 * PB_1 * rPC[a0]
-                            + PB_0 * PA_0 * rPC[b1]
-                            + PB_1 * PA_0 * rPC[b0]
+                        + (
+                            PB_0 * PB_1 * PA_0
+                        )
 
-                            + 0.5 / (a_i + a_j) * (
-                                  delta[b0][b1] * (rPC[a0] - PA_0)
-                                + delta[a0][b1] * (rPC[b0] - PB_0)
-                                + delta[a0][b0] * (rPC[b1] - PB_1)
-                                )
-                            )
+                    )
+
+                    + F3_t[1] * (
+
+                        -0.5 / (a_i + a_j) * (
+                            delta[b1][a0] * (PB_0)
+                            + delta[b0][a0] * (PB_1)
+                            + delta[b0][b1] * (PA_0)
+                        )
+
+                        + 0.5 / (a_i + a_j) * (
+                            delta[b0][b1] * (PC[a0])
+                            + delta[b1][a0] * (PC[b0])
+                            + delta[b0][a0] * (PC[b1])
+                        )
+
+                        + (
+                            PB_0 * PB_1 * PC[a0]
+                            + PB_0 * PA_0 * PC[b1]
+                            + PB_1 * PA_0 * PC[b0]
+                        )
+
+                    )
 
                     + F3_t[2] * (
-                              PB_0 * rPC[a0] * rPC[b1]
-                            + PB_1 * rPC[a0] * rPC[b0]
-                            + PA_0 * rPC[b0] * rPC[b1]
 
-                            - 0.5 / (a_i + a_j) * (
-                                  rPC[a0] * delta[b0][b1]
-                                + rPC[b0] * delta[a0][b1]
-                                + rPC[b1] * delta[a0][b0]
-                                )
-                            )
+                        -0.5 / (a_i + a_j) * (
+                            delta[b0][b1] * (PC[a0])
+                            + delta[b1][a0] * (PC[b0])
+                            + delta[b0][a0] * (PC[b1])
+                        )
 
-                    + F3_t[3] * rPC[a0] * rPC[b0] * rPC[b1]
+                        + (
+                            PB_0 * PC[a0] * PC[b1]
+                            + PB_1 * PC[a0] * PC[b0]
+                            + PA_0 * PC[b0] * PC[b1]
+                        )
+
+                    )
+
+                    + F3_t[3] * (
+
+                        (
+                            PC[a0] * PC[b0] * PC[b1]
+                        )
+
+                    )
 
                     );
         }
@@ -1124,11 +1207,11 @@ computeNuclearPotentialDD(double*         mat_V,
             const auto z_c = points_info[c + npoints * 2];
             const auto q_c = points_info[c + npoints * 3];
 
-            const double rPC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
-                                   y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
+            const double PC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                  y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                  z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
-            const auto r2_PC = rPC[0] * rPC[0] + rPC[1] * rPC[1] + rPC[2] * rPC[2];
+            const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
             double F4_t[5];
 
@@ -1137,84 +1220,127 @@ computeNuclearPotentialDD(double*         mat_V,
             V_ij += q_c * (
 
                     F4_t[0] * (
+
+                        0.25 / ( (a_i + a_j) * (a_i + a_j) ) * (
+                            delta[a0][a1] * delta[b0][b1]
+                            + delta[b0][a0] * delta[b1][a1]
+                            + delta[b0][a1] * delta[b1][a0]
+                        )
+
+                        + 0.5 / (a_i + a_j) * (
+                            delta[a0][a1] * (PB_0 * PB_1)
+                            + delta[b1][a1] * (PB_0 * PA_0)
+                            + delta[b1][a0] * (PB_0 * PA_1)
+                            + delta[b0][a1] * (PB_1 * PA_0)
+                            + delta[b0][a0] * (PB_1 * PA_1)
+                            + delta[b0][b1] * (PA_0 * PA_1)
+                        )
+
+                        + (
                             PB_0 * PB_1 * PA_0 * PA_1
+                        )
 
-                            + 0.5 / (a_i + a_j) * (
-                                  PA_1 * PB_1 * delta[b0][a0]
-                                + PA_0 * PB_1 * delta[b0][a1]
-                                + PA_1 * PB_0 * delta[b1][a0]
-                                + PA_0 * PB_0 * delta[b1][a1]
-                                + PA_0 * PA_1 * delta[b0][b1]
-                                + PB_0 * PB_1 * delta[a0][a1]
-                                )
-
-                            + 0.25 / ((a_i + a_j) * (a_i + a_j)) * (
-                                  delta[a0][a1] * delta[b0][b1]
-                                + delta[a0][b0] * delta[a1][b1]
-                                + delta[a1][b0] * delta[a0][b1]
-                                )
-                            )
+                    )
 
                     + F4_t[1] * (
-                              (rPC[a0] * PA_1 + rPC[a1] * PA_0) * PB_0 * PB_1
-                            + (rPC[b0] * PB_1 + rPC[b1] * PB_0) * PA_0 * PA_1
 
-                            + 0.5 / (a_i + a_j) * (
-                                  delta[a0][a1] * (rPC[b0] * PB_1 + rPC[b1] * PB_0 - PB_0 * PB_1)
-                                + delta[a0][b0] * (rPC[a1] * PB_1 + rPC[b1] * PA_1 - PB_1 * PA_1)
-                                + delta[a0][b1] * (rPC[a1] * PB_0 + rPC[b0] * PA_1 - PB_0 * PA_1)
-                                + delta[a1][b0] * (rPC[a0] * PB_1 + rPC[b1] * PA_0 - PB_1 * PA_0)
-                                + delta[a1][b1] * (rPC[a0] * PB_0 + rPC[b0] * PA_0 - PB_0 * PA_0)
-                                + delta[b0][b1] * (rPC[a0] * PA_1 + rPC[a1] * PA_0 - PA_0 * PA_1)
-                                )
+                        -0.25 / ( (a_i + a_j) * (a_i + a_j) ) * (
+                            delta[a0][a1] * delta[b0][b1] * 2.0
+                            + delta[b0][a0] * delta[b1][a1] * 2.0
+                            + delta[b0][a1] * delta[b1][a0] * 2.0
+                        )
 
-                            // Note: -0.25 * 2.0
-                            - 0.5 / ((a_i + a_j) * (a_i + a_j)) * (
-                                  delta[a0][a1] * delta[b0][b1]
-                                + delta[a0][b0] * delta[a1][b1]
-                                + delta[a1][b0] * delta[a0][b1]
-                                )
-                            )
+                        -0.5 / (a_i + a_j) * (
+                            delta[a0][a1] * (PB_0 * PB_1)
+                            + delta[b1][a1] * (PB_0 * PA_0)
+                            + delta[b1][a0] * (PB_0 * PA_1)
+                            + delta[b0][a1] * (PB_1 * PA_0)
+                            + delta[b0][a0] * (PB_1 * PA_1)
+                            + delta[b0][b1] * (PA_0 * PA_1)
+                        )
+
+                        + 0.5 / (a_i + a_j) * (
+                            delta[b1][a1] * (PB_0 * PC[a0] + PA_0 * PC[b0])
+                            + delta[b1][a0] * (PB_0 * PC[a1] + PA_1 * PC[b0])
+                            + delta[a0][a1] * (PB_0 * PC[b1] + PB_1 * PC[b0])
+                            + delta[b0][a1] * (PB_1 * PC[a0] + PA_0 * PC[b1])
+                            + delta[b0][a0] * (PB_1 * PC[a1] + PA_1 * PC[b1])
+                            + delta[b0][b1] * (PA_0 * PC[a1] + PA_1 * PC[a0])
+                        )
+
+                        + (
+                            PB_0 * PB_1 * PA_0 * PC[a1]
+                            + PB_0 * PB_1 * PA_1 * PC[a0]
+                            + PB_0 * PA_0 * PA_1 * PC[b1]
+                            + PB_1 * PA_0 * PA_1 * PC[b0]
+                        )
+
+                    )
 
                     + F4_t[2] * (
-                              rPC[a0] * rPC[a1] * PB_0 * PB_1
-                            + rPC[a0] * rPC[b0] * PA_1 * PB_1
-                            + rPC[a0] * rPC[b1] * PA_1 * PB_0
-                            + rPC[a1] * rPC[b0] * PA_0 * PB_1
-                            + rPC[a1] * rPC[b1] * PA_0 * PB_0
-                            + rPC[b0] * rPC[b1] * PA_0 * PA_1
 
-                            - 0.5 / (a_i + a_j) * (
-                                  delta[a0][a1] * (rPC[b0] * PB_1 + rPC[b1] * PB_0 - rPC[b0] * rPC[b1])
-                                + delta[a0][b0] * (rPC[a1] * PB_1 + rPC[b1] * PA_1 - rPC[a1] * rPC[b1])
-                                + delta[a0][b1] * (rPC[a1] * PB_0 + rPC[b0] * PA_1 - rPC[a1] * rPC[b0])
-                                + delta[a1][b0] * (rPC[a0] * PB_1 + rPC[b1] * PA_0 - rPC[a0] * rPC[b1])
-                                + delta[a1][b1] * (rPC[a0] * PB_0 + rPC[b0] * PA_0 - rPC[a0] * rPC[b0])
-                                + delta[b0][b1] * (rPC[a0] * PA_1 + rPC[a1] * PA_0 - rPC[a0] * rPC[a1])
-                                )
+                        -0.5 / (a_i + a_j) * (
+                            delta[b1][a1] * (PB_0 * PC[a0] + PA_0 * PC[b0])
+                            + delta[b1][a0] * (PB_0 * PC[a1] + PA_1 * PC[b0])
+                            + delta[a0][a1] * (PB_0 * PC[b1] + PB_1 * PC[b0])
+                            + delta[b0][a1] * (PB_1 * PC[a0] + PA_0 * PC[b1])
+                            + delta[b0][a0] * (PB_1 * PC[a1] + PA_1 * PC[b1])
+                            + delta[b0][b1] * (PA_0 * PC[a1] + PA_1 * PC[a0])
+                        )
 
-                            + 0.25 / ((a_i + a_j) * (a_i + a_j)) * (
-                                  delta[a0][a1] * delta[b0][b1]
-                                + delta[a0][b0] * delta[a1][b1]
-                                + delta[a0][b1] * delta[a1][b0]
-                                )
-                            )
+                        + 0.25 / ( (a_i + a_j) * (a_i + a_j) ) * (
+                            delta[a0][a1] * delta[b0][b1]
+                            + delta[b0][a0] * delta[b1][a1]
+                            + delta[b0][a1] * delta[b1][a0]
+                        )
+
+                        + 0.5 / (a_i + a_j) * (
+                            delta[b0][b1] * (PC[a0] * PC[a1])
+                            + delta[b1][a1] * (PC[a0] * PC[b0])
+                            + delta[b0][a1] * (PC[a0] * PC[b1])
+                            + delta[b1][a0] * (PC[a1] * PC[b0])
+                            + delta[b0][a0] * (PC[a1] * PC[b1])
+                            + delta[a0][a1] * (PC[b0] * PC[b1])
+                        )
+
+                        + (
+                            PB_0 * PB_1 * PC[a0] * PC[a1]
+                            + PB_0 * PA_0 * PC[a1] * PC[b1]
+                            + PB_0 * PA_1 * PC[a0] * PC[b1]
+                            + PB_1 * PA_0 * PC[a1] * PC[b0]
+                            + PB_1 * PA_1 * PC[a0] * PC[b0]
+                            + PA_0 * PA_1 * PC[b0] * PC[b1]
+                        )
+
+                    )
 
                     + F4_t[3] * (
-                              rPC[a0] * rPC[a1] * (rPC[b1] * PB_0 + rPC[b0] * PB_1)
-                            + rPC[b0] * rPC[b1] * (PA_0 * rPC[a1] + PA_1 * rPC[a0])
 
-                            - 0.5 / (a_i + a_j) * (
-                                  rPC[a0] * rPC[a1] * delta[b0][b1]
-                                + rPC[a0] * rPC[b0] * delta[a1][b1]
-                                + rPC[a0] * rPC[b1] * delta[a1][b0]
-                                + rPC[a1] * rPC[b0] * delta[a0][b1]
-                                + rPC[a1] * rPC[b1] * delta[a0][b0]
-                                + rPC[b0] * rPC[b1] * delta[a0][a1]
-                                )
-                            )
+                        -0.5 / (a_i + a_j) * (
+                            delta[b0][b1] * (PC[a0] * PC[a1])
+                            + delta[b1][a1] * (PC[a0] * PC[b0])
+                            + delta[b0][a1] * (PC[a0] * PC[b1])
+                            + delta[b1][a0] * (PC[a1] * PC[b0])
+                            + delta[b0][a0] * (PC[a1] * PC[b1])
+                            + delta[a0][a1] * (PC[b0] * PC[b1])
+                        )
 
-                    + F4_t[4] * rPC[a0] * rPC[a1] * rPC[b0] * rPC[b1]
+                        + (
+                            PB_0 * PC[a0] * PC[a1] * PC[b1]
+                            + PB_1 * PC[a0] * PC[a1] * PC[b0]
+                            + PA_0 * PC[a1] * PC[b0] * PC[b1]
+                            + PA_1 * PC[a0] * PC[b0] * PC[b1]
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        (
+                            PC[a0] * PC[a1] * PC[b0] * PC[b1]
+                        )
+
+                    )
 
                     );
         }
