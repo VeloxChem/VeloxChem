@@ -166,6 +166,7 @@ computeOverlapAndKineticEnergySS(double*         mat_S,
         const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
         // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
@@ -211,25 +212,31 @@ computeOverlapAndKineticEnergySP(double*         mat_S,
         const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
         const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
 
-        const auto j_cart = j % 3;
+        const auto b0 = j % 3;
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
-        // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-        const auto K_ij_00 = 3.0 * a_i * a_j / (a_i + a_j) - 2.0 * a_i * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * r2_ij;
+        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
-        const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
+        const auto ksi = a_i * a_j / (a_i + a_j);
 
-        const auto K_ij_01 = -2.0 * a_i * a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * rij[j_cart];
+        const auto K_ij_00 = ksi * (3.0 - 2.0 * ksi * r2_ij);
 
-        mat_S[ij] = S_ij_01;
+        mat_S[ij] = S_ij_00 * PB_0;
 
-        mat_T[ij] = K_ij_01 * S_ij_00 + K_ij_00 * S_ij_01;
+        mat_T[ij] = S_ij_00 * (
+
+                ksi * 2.0 * PB_0
+
+                + K_ij_00 * PB_0
+
+                );
     }
 }
 
@@ -244,9 +251,28 @@ computeOverlapAndKineticEnergySD(double*         mat_S,
                                  const uint32_t* sd_second_inds_local,
                                  const uint32_t  sd_prim_pair_count_local)
 {
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+
     // each thread computes a primitive S/T matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (threadIdx.x == 0)
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+    }
+
+    __syncthreads();
 
     if (ij < sd_prim_pair_count_local)
     {
@@ -265,12 +291,8 @@ computeOverlapAndKineticEnergySD(double*         mat_S,
         const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
         const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
 
-        // TODO: used shared memory?
-        const uint32_t d_cart_inds_0[6] = {0,0,0,1,1,2};
-        const uint32_t d_cart_inds_1[6] = {0,1,2,1,2,2};
-
-        const auto j_cart_0 = d_cart_inds_0[j % 6];
-        const auto j_cart_1 = d_cart_inds_1[j % 6];
+        const auto b0 = d_cart_inds[j % 6][0];
+        const auto b1 = d_cart_inds[j % 6][1];
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
@@ -280,22 +302,42 @@ computeOverlapAndKineticEnergySD(double*         mat_S,
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[j_cart_0];
-        const auto PB_1 = (-a_i / (a_i + a_j)) * rij[j_cart_1];
-
-        mat_S[ij] = (PB_0 * PB_1 + static_cast<double>(j_cart_0 == j_cart_1) * (0.5 / (a_i + a_j))) * S_ij_00;
+        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
+        const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
 
         const auto ksi = a_i * a_j / (a_i + a_j);
 
         const auto K_ij_00 = ksi * (3.0 - 2.0 * ksi * r2_ij);
 
-        mat_T[ij] = (
+        mat_S[ij] = S_ij_00 * (
 
-                (PB_0 * PB_1 + static_cast<double>(j_cart_0 == j_cart_1) * (0.5 / (a_i + a_j))) * K_ij_00
+                    0.5 / (a_i + a_j) * delta[b0][b1]
 
-                + 4.0 * ksi * PB_0 * PB_1
+                    + PB_0 * PB_1
 
-                ) * S_ij_00;
+                );
+
+        mat_T[ij] = S_ij_00 * (
+
+                ksi * (
+
+                    -1.0 / (a_i + a_j) * delta[b0][b1]
+
+                    + 1.0 / (a_i + a_j) * delta[b0][b1]
+
+                    + 4.0 * PB_0 * PB_1
+
+                )
+
+                + K_ij_00 * (
+
+                    0.5 / (a_i + a_j) * delta[b0][b1]
+
+                    + PB_0 * PB_1
+
+                )
+
+                );
     }
 }
 
@@ -308,9 +350,20 @@ computeOverlapAndKineticEnergyPP(double*         mat_S,
                                  const uint32_t* pp_second_inds_local,
                                  const uint32_t  pp_prim_pair_count_local)
 {
+    __shared__ double   delta[3][3];
+
     // each thread computes a primitive S/T matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (threadIdx.x == 0)
+    {
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+    }
+
+    __syncthreads();
 
     if (ij < pp_prim_pair_count_local)
     {
@@ -329,40 +382,52 @@ computeOverlapAndKineticEnergyPP(double*         mat_S,
         const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
         const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
 
-        const auto i_cart = i % 3;
-        const auto j_cart = j % 3;
+        const auto a0 = i % 3;
+        const auto b0 = j % 3;
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
-        // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-        const auto K_ij_00 = 3.0 * a_i * a_j / (a_i + a_j) - 2.0 * a_i * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * r2_ij;
+        const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
 
-        const auto S_ij_10 = (a_j / (a_i + a_j)) * rij[i_cart] * S_ij_00;
+        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
-        const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
+        const auto ksi = a_i * a_j / (a_i + a_j);
 
-        const auto S_ij_11 = (
+        const auto K_ij_00 = ksi * (3.0 - 2.0 * ksi * r2_ij);
 
-                static_cast<double>(i_cart == j_cart) * (0.5 / (a_i + a_j)) +
+        mat_S[ij] = S_ij_00 * (
 
-                (a_i * a_j / ((a_i + a_j) * (a_i + a_j))) * (-rij[i_cart]) * rij[j_cart]
+                    0.5 / (a_i + a_j) * delta[b0][a0]
 
-                ) * S_ij_00;
+                    + PB_0 * PA_0
 
-        const auto K_ij_10 = -2.0 * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * (-rij[i_cart]);
+                );
 
-        const auto K_ij_01 = -2.0 * a_i * a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * rij[j_cart];
+        mat_T[ij] = S_ij_00 * (
 
-        const auto K_ij_11 = a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * static_cast<double>(i_cart == j_cart);
+                ksi * (
 
-        mat_S[ij] = S_ij_11;
+                    1.0 / (a_i + a_j) * delta[b0][a0]
 
-        mat_T[ij] = K_ij_11 * S_ij_00 + K_ij_10 * S_ij_01 + K_ij_01 * S_ij_10 + K_ij_00 * S_ij_11;
+                    + 4.0 * PB_0 * PA_0
+
+                )
+
+                + K_ij_00 * (
+
+                    0.5 / (a_i + a_j) * delta[b0][a0]
+
+                    + PB_0 * PA_0
+
+                )
+
+                );
     }
 }
 
@@ -377,9 +442,28 @@ computeOverlapAndKineticEnergyPD(double*         mat_S,
                                  const uint32_t* pd_second_inds_local,
                                  const uint32_t  pd_prim_pair_count_local)
 {
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+
     // each thread computes a primitive S/T matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (threadIdx.x == 0)
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+    }
+
+    __syncthreads();
 
     if (ij < pd_prim_pair_count_local)
     {
@@ -398,13 +482,10 @@ computeOverlapAndKineticEnergyPD(double*         mat_S,
         const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
         const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
 
-        const auto i_cart = i % 3;
+        const auto a0 = i % 3;
 
-        const uint32_t d_cart_inds_0[6] = {0,0,0,1,1,2};
-        const uint32_t d_cart_inds_1[6] = {0,1,2,1,2,2};
-
-        const auto j_cart_0 = d_cart_inds_0[j % 6];
-        const auto j_cart_1 = d_cart_inds_1[j % 6];
+        const auto b0 = d_cart_inds[j % 6][0];
+        const auto b1 = d_cart_inds[j % 6][1];
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
@@ -414,36 +495,64 @@ computeOverlapAndKineticEnergyPD(double*         mat_S,
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-        const auto PA = (a_j / (a_i + a_j)) * rij[i_cart];
+        const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
 
-        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[j_cart_0];
-        const auto PB_1 = (-a_i / (a_i + a_j)) * rij[j_cart_1];
-
-        mat_S[ij] = (PA * PB_0 * PB_1
-
-                + (PA * static_cast<double>(j_cart_0 == j_cart_1)
-                 + PB_1 * static_cast<double>(i_cart == j_cart_0)
-                 + PB_0 * static_cast<double>(i_cart == j_cart_1)) * (0.5 / (a_i + a_j))
-
-                ) * S_ij_00;
+        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
+        const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
 
         const auto ksi = a_i * a_j / (a_i + a_j);
 
         const auto K_ij_00 = ksi * (3.0 - 2.0 * ksi * r2_ij);
 
-        mat_T[ij] = (
+        mat_S[ij] = S_ij_00 * (
 
-                (PA * PB_0 * PB_1
-                 + (PA * static_cast<double>(j_cart_0 == j_cart_1)
-                  + PB_0 * static_cast<double>(i_cart == j_cart_1)
-                  + PB_1 * static_cast<double>(i_cart == j_cart_0)) * (0.5 / (a_i + a_j))) * K_ij_00
+                    0.5 / (a_i + a_j) * (
+                        delta[b1][a0] * (PB_0)
+                        + delta[b0][a0] * (PB_1)
+                        + delta[b0][b1] * (PA_0)
+                    )
 
-                + ksi * (6.0 * PA * PB_0 * PB_1
-                       + (4.0 * PB_0 * static_cast<double>(i_cart == j_cart_1)
-                        + 4.0 * PB_1 * static_cast<double>(i_cart == j_cart_0)
-                        + 2.0 * PA * static_cast<double>(j_cart_0 == j_cart_1)) * (0.5 / (a_i + a_j)))
+                    + (
+                        PB_0 * PB_1 * PA_0
+                    )
 
-                ) * S_ij_00;
+                );
+
+        mat_T[ij] = S_ij_00 * (
+
+                ksi * (
+
+                    -1.0 / (a_i + a_j) * (
+                        delta[b0][b1] * (PA_0)
+                    )
+
+                    + 2.0 / (a_i + a_j) * (
+                        delta[b1][a0] * PB_0
+                        + delta[b0][a0] * PB_1
+                        + delta[b0][b1] * PA_0
+                    )
+
+                    + 6.0 * (
+                        PB_0 * PB_1 * PA_0
+                    )
+
+                )
+
+                + K_ij_00 * (
+
+                    0.5 / (a_i + a_j) * (
+                        delta[b1][a0] * (PB_0)
+                        + delta[b0][a0] * (PB_1)
+                        + delta[b0][b1] * (PA_0)
+                    )
+
+                    + (
+                        PB_0 * PB_1 * PA_0
+                    )
+
+                )
+
+                );
     }
 }
 
@@ -456,9 +565,28 @@ computeOverlapAndKineticEnergyDD(double*         mat_S,
                                  const uint32_t* dd_second_inds_local,
                                  const uint32_t  dd_prim_pair_count_local)
 {
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+
     // each thread computes a primitive S/T matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (threadIdx.x == 0)
+    {
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -477,14 +605,11 @@ computeOverlapAndKineticEnergyDD(double*         mat_S,
         const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
         const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
 
-        const uint32_t d_cart_inds_0[6] = {0,0,0,1,1,2};
-        const uint32_t d_cart_inds_1[6] = {0,1,2,1,2,2};
+        const auto a0 = d_cart_inds[i % 6][0];
+        const auto a1 = d_cart_inds[i % 6][1];
 
-        const auto i_cart_0 = d_cart_inds_0[i % 6];
-        const auto i_cart_1 = d_cart_inds_1[i % 6];
-
-        const auto j_cart_0 = d_cart_inds_0[j % 6];
-        const auto j_cart_1 = d_cart_inds_1[j % 6];
+        const auto b0 = d_cart_inds[j % 6][0];
+        const auto b1 = d_cart_inds[j % 6][1];
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
@@ -494,67 +619,87 @@ computeOverlapAndKineticEnergyDD(double*         mat_S,
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-        const auto PA_0 = (a_j / (a_i + a_j)) * rij[i_cart_0];
-        const auto PA_1 = (a_j / (a_i + a_j)) * rij[i_cart_1];
+        const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
+        const auto PA_1 = (a_j / (a_i + a_j)) * rij[a1];
 
-        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[j_cart_0];
-        const auto PB_1 = (-a_i / (a_i + a_j)) * rij[j_cart_1];
-
-        //const auto K_ij_00 = 3.0 * a_i * a_j / (a_i + a_j) - 2.0 * a_i * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * r2_ij;
-        //const auto K_ij_10 = -2.0 * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * (-rij[i_cart]);
-        //const auto K_ij_01 = -2.0 * a_i * a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * rij[j_cart];
-        //const auto K_ij_11 = a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * static_cast<double>(i_cart == j_cart);
-
-        mat_S[ij] = (PA_0 * PA_1 * PB_0 * PB_1
-
-                + (PA_1 * PA_0 * static_cast<double>(j_cart_0 == j_cart_1)
-                 + PA_1 * PB_1 * static_cast<double>(i_cart_0 == j_cart_0)
-                 + PA_1 * PB_0 * static_cast<double>(i_cart_0 == j_cart_1)
-                 + PA_0 * PB_1 * static_cast<double>(i_cart_1 == j_cart_0)
-                 + PA_0 * PB_0 * static_cast<double>(i_cart_1 == j_cart_1)
-                 + PB_1 * PB_0 * static_cast<double>(i_cart_0 == i_cart_1)) * (0.5 / (a_i + a_j))
-
-                + (static_cast<double>(i_cart_0 == i_cart_1) * static_cast<double>(j_cart_0 == j_cart_1)
-                 + static_cast<double>(i_cart_0 == j_cart_1) * static_cast<double>(i_cart_1 == j_cart_0)
-                 + static_cast<double>(i_cart_0 == j_cart_0) * static_cast<double>(i_cart_1 == j_cart_1)) * (0.25 / ((a_i + a_j) * (a_i + a_j)))
-
-                ) * S_ij_00;
+        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
+        const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
 
         const auto ksi = a_i * a_j / (a_i + a_j);
 
         const auto K_ij_00 = ksi * (3.0 - 2.0 * ksi * r2_ij);
 
-        mat_T[ij] = (
+        mat_S[ij] = S_ij_00 * (
 
-                (PA_0 * PA_1 * PB_0 * PB_1
-
-                 + (PA_1 * PA_0 * static_cast<double>(j_cart_0 == j_cart_1)
-                  + PA_1 * PB_1 * static_cast<double>(i_cart_0 == j_cart_0)
-                  + PA_1 * PB_0 * static_cast<double>(i_cart_0 == j_cart_1)
-                  + PA_0 * PB_1 * static_cast<double>(i_cart_1 == j_cart_0)
-                  + PA_0 * PB_0 * static_cast<double>(i_cart_1 == j_cart_1)
-                  + PB_1 * PB_0 * static_cast<double>(i_cart_0 == i_cart_1)) * (0.5 / (a_i + a_j))
-
-                 + (static_cast<double>(i_cart_0 == i_cart_1) * static_cast<double>(j_cart_0 == j_cart_1)
-                  + static_cast<double>(i_cart_0 == j_cart_1) * static_cast<double>(i_cart_1 == j_cart_0)
-                  + static_cast<double>(i_cart_0 == j_cart_0) * static_cast<double>(i_cart_1 == j_cart_1)) * (0.25 / ((a_i + a_j) * (a_i + a_j)))
-
-                 ) * K_ij_00
-
-                + ksi * (8.0 * PA_0 * PA_1 * PB_0 * PB_1
-
-                       + (4.0 * PA_1 * PA_0 * static_cast<double>(j_cart_0 == j_cart_1)
-                        + 6.0 * PA_1 * PB_1 * static_cast<double>(i_cart_0 == j_cart_0)
-                        + 6.0 * PA_1 * PB_0 * static_cast<double>(i_cart_0 == j_cart_1)
-                        + 6.0 * PA_0 * PB_1 * static_cast<double>(i_cart_1 == j_cart_0)
-                        + 6.0 * PA_0 * PB_0 * static_cast<double>(i_cart_1 == j_cart_1)
-                        + 4.0 * PB_1 * PB_0 * static_cast<double>(i_cart_0 == i_cart_1)) * (0.5 / (a_i + a_j))
-
-                       + (4.0 * static_cast<double>(i_cart_0 == j_cart_1) * static_cast<double>(i_cart_1 == j_cart_0)
-                        + 4.0 * static_cast<double>(i_cart_0 == j_cart_0) * static_cast<double>(i_cart_1 == j_cart_1)) * (0.25 / ((a_i + a_j) * (a_i + a_j)))
+                    0.25 / ( (a_i + a_j) * (a_i + a_j) ) * (
+                        delta[a0][a1] * delta[b0][b1]
+                        + delta[b0][a0] * delta[b1][a1]
+                        + delta[b0][a1] * delta[b1][a0]
                     )
 
-                ) * S_ij_00;
+                    + 0.5 / (a_i + a_j) * (
+                        delta[a0][a1] * (PB_0 * PB_1)
+                        + delta[b1][a1] * (PB_0 * PA_0)
+                        + delta[b1][a0] * (PB_0 * PA_1)
+                        + delta[b0][a1] * (PB_1 * PA_0)
+                        + delta[b0][a0] * (PB_1 * PA_1)
+                        + delta[b0][b1] * (PA_0 * PA_1)
+                    )
+
+                    + (
+                        PB_0 * PB_1 * PA_0 * PA_1
+                    )
+
+                );
+
+        mat_T[ij] = S_ij_00 * (
+
+                ksi * (
+
+                    1.0 / ( (a_i + a_j) * (a_i + a_j) ) * (
+                        delta[b0][a0] * delta[b1][a1]
+                        + delta[b0][a1] * delta[b1][a0]
+                    )
+
+                    + 1.0 / (a_i + a_j) * (
+                        delta[a0][a1] * (PB_0 * PB_1 * 2.0)
+                        + delta[b1][a1] * (PB_0 * PA_0 * 3.0)
+                        + delta[b1][a0] * (PB_0 * PA_1 * 3.0)
+                        + delta[b0][a1] * (PB_1 * PA_0 * 3.0)
+                        + delta[b0][a0] * (PB_1 * PA_1 * 3.0)
+                        + delta[b0][b1] * (PA_0 * PA_1 * 2.0)
+                    )
+
+                    + 8.0 * (
+                        PB_0 * PB_1 * PA_0 * PA_1
+                    )
+
+                )
+
+                + K_ij_00 * (
+
+                    0.25 / ( (a_i + a_j) * (a_i + a_j) ) * (
+                        delta[a0][a1] * delta[b0][b1]
+                        + delta[b0][a0] * delta[b1][a1]
+                        + delta[b0][a1] * delta[b1][a0]
+                    )
+
+                    + 0.5 / (a_i + a_j) * (
+                        delta[a0][a1] * (PB_0 * PB_1)
+                        + delta[b1][a1] * (PB_0 * PA_0)
+                        + delta[b1][a0] * (PB_0 * PA_1)
+                        + delta[b0][a1] * (PB_1 * PA_0)
+                        + delta[b0][a0] * (PB_1 * PA_1)
+                        + delta[b0][b1] * (PA_0 * PA_1)
+                    )
+
+                    + (
+                        PB_0 * PB_1 * PA_0 * PA_1
+                    )
+
+                )
+
+                );
     }
 }
 
@@ -1161,6 +1306,8 @@ computeNuclearPotentialDD(double*         mat_V,
     {
         const auto i = dd_first_inds_local[ij];
         const auto j = dd_second_inds_local[ij];
+
+        // TODO: improve memory access pattern
 
         const auto a_i = d_prim_info[i / 6 + d_prim_count * 0];
         const auto c_i = d_prim_info[i / 6 + d_prim_count * 1];
