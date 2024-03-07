@@ -149,11 +149,25 @@ class CGtoBlock
     auto getAtomicOrbitalsIndexesForCartesian() const -> std::vector<int64_t>;
 
     /**
+     Gets spherical to Cartesian mapping for AOs.
+
+     @return the spherical to Cartesian mapping for AOs.
+     */
+    auto getSphericalToCartesianMapping() const -> std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>>;
+
+    /**
      Gets Cartesian to spherical mapping for p-CGTOs.
 
      @return the Cartesian to spherical mapping for p-CGTOs.
      */
     auto getCartesianToSphericalMappingForP() const -> std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>>;
+
+    /**
+     Gets spherical to Cartesian mapping for p-CGTOs.
+
+     @return the spherical to Cartesian mapping for p-CGTOs.
+     */
+    auto getSphericalToCartesianMappingForP() const -> std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>>;
 
     /**
      Gets Cartesian to spherical mapping for d-CGTOs.
