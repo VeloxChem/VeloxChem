@@ -1929,7 +1929,7 @@ computeExchangeFockSSSP(double*         mat_K,
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
 
     const uint32_t ik = blockIdx.x;
@@ -1967,7 +1967,7 @@ computeExchangeFockSSSP(double*         mat_K,
                     const auto j_cgto = s_prim_aoinds[j_prim];
                     const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
 
-                    const auto l_cart = l_prim % 3;
+                    const auto d0 = l_prim % 3;
 
                     const auto a_i = s_prim_info[i + s_prim_count * 0];
                     const auto c_i = s_prim_info[i + s_prim_count * 1];
@@ -2000,11 +2000,11 @@ computeExchangeFockSSSP(double*         mat_K,
                     // p_0: pz
                     // p+1: px
 
-                    const double rPQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                           (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                           (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
 
-                    const auto r2_PQ = rPQ[0] * rPQ[0] + rPQ[1] * rPQ[1] + rPQ[2] * rPQ[2];
+                    const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -2025,13 +2025,11 @@ computeExchangeFockSSSP(double*         mat_K,
 
                     const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
 
-                    const auto S_kl_01 = -(a_k / (a_k + a_l)) * rkl[l_cart] * S_kl_00;
+                    const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
-                    const double eri_ijkl = Lambda * (
+                            F1_t[0] * (-a_k / (a_k + a_l)) * rkl[d0]
 
-                            S_ij_00 * S_kl_01 * F1_t[0] +
-
-                            S_ij_00 * S_kl_00 * (-(a_i + a_j) / (a_i + a_j + a_k + a_l)) * rPQ[l_cart] * F1_t[1]
+                            + F1_t[1] * (a_i + a_j) / (a_i + a_j + a_k + a_l) * PQ[d0] * (-1.0)
 
                             );
 
@@ -2103,7 +2101,7 @@ computeExchangeFockSPSS(double*         mat_K,
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
 
     const uint32_t ik = blockIdx.x;
@@ -2141,7 +2139,7 @@ computeExchangeFockSPSS(double*         mat_K,
                     const auto j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
                     const auto l_cgto = s_prim_aoinds[l_prim];
 
-                    const auto j_cart = j_prim % 3;
+                    const auto b0 = j_prim % 3;
 
                     const auto a_i = s_prim_info[i + s_prim_count * 0];
                     const auto c_i = s_prim_info[i + s_prim_count * 1];
@@ -2174,11 +2172,11 @@ computeExchangeFockSPSS(double*         mat_K,
                     // p_0: pz
                     // p+1: px
 
-                    const double rPQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                           (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                           (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
 
-                    const auto r2_PQ = rPQ[0] * rPQ[0] + rPQ[1] * rPQ[1] + rPQ[2] * rPQ[2];
+                    const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -2199,13 +2197,11 @@ computeExchangeFockSPSS(double*         mat_K,
 
                     const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
 
-                    const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
+                    const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
-                    const double eri_ijkl = Lambda * (
+                            F1_t[0] * (-a_i / (a_i + a_j)) * rij[b0]
 
-                            S_ij_01 * S_kl_00 * F1_t[0] +
-
-                            S_ij_00 * S_kl_00 * ((a_k + a_l) / (a_i + a_j + a_k + a_l)) * rPQ[j_cart] * F1_t[1]
+                            + F1_t[1] * (a_k + a_l) / (a_i + a_j + a_k + a_l) * PQ[b0]
 
                             );
 
@@ -2275,12 +2271,22 @@ computeExchangeFockSPSP(double*         mat_K,
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
+    __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+    }
+
+    __syncthreads();
 
     for (uint32_t m = 0; m < (p_prim_count * 3 + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -2314,8 +2320,8 @@ computeExchangeFockSPSP(double*         mat_K,
                     const auto j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
                     const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
 
-                    const auto j_cart = j_prim % 3;
-                    const auto l_cart = l_prim % 3;
+                    const auto b0 = j_prim % 3;
+                    const auto d0 = l_prim % 3;
 
                     const auto a_i = s_prim_info[i + s_prim_count * 0];
                     const auto c_i = s_prim_info[i + s_prim_count * 1];
@@ -2348,11 +2354,11 @@ computeExchangeFockSPSP(double*         mat_K,
                     // p_0: pz
                     // p+1: px
 
-                    const double rPQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                           (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                           (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
 
-                    const auto r2_PQ = rPQ[0] * rPQ[0] + rPQ[1] * rPQ[1] + rPQ[2] * rPQ[2];
+                    const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -2366,6 +2372,10 @@ computeExchangeFockSPSP(double*         mat_K,
                     const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
                     const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
+                    const auto S1 = (a_i + a_j);
+                    const auto S2 = (a_k + a_l);
+                    const auto S4 = (a_i + a_j + a_k + a_l);
+
                     // p-1: py
                     // p_0: pz
                     // p+1: px
@@ -2373,24 +2383,45 @@ computeExchangeFockSPSP(double*         mat_K,
                     const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
                     const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
 
-                    const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
-                    const auto S_kl_01 = -(a_k / (a_k + a_l)) * rkl[l_cart] * S_kl_00;
+                    const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
-                    const double eri_ijkl = Lambda * (
+                    const auto QD_0 = (-a_k / (a_k + a_l)) * rkl[d0];
 
-                            S_ij_01 * S_kl_01 * F2_t[0] +
+                    const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
-                            S_ij_01 * S_kl_00 * (-(a_i + a_j) / (a_i + a_j + a_k + a_l)) * rPQ[l_cart] * F2_t[1] +
+                            F2_t[0] * (
 
-                            S_ij_00 * S_kl_01 * ((a_k + a_l) / (a_i + a_j + a_k + a_l)) * rPQ[j_cart] * F2_t[1] +
+                                (
+                                    PB_0 * QD_0
+                                )
 
-                            S_ij_00 * S_kl_00 / (a_i + a_j + a_k + a_l) * (
+                            )
 
-                                (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * (-rPQ[j_cart]) * rPQ[l_cart] * F2_t[2] +
+                            + F2_t[1] * (
 
-                                (j_cart == l_cart ? 1.0 : 0.0) * 0.5 * F2_t[1]
+                                S1 / S4 * (
+                                    PB_0 * PQ[d0] * (-1.0)
+                                )
 
-                            ));
+                                + 0.5 / S4 * (
+                                    delta[b0][d0]
+                                )
+
+                                + S2 / S4 * (
+                                    PQ[b0] * QD_0
+                                )
+
+                            )
+
+                            + F2_t[2] * (
+
+                                ( S1 * S2 ) / ( S4 * S4 ) * (
+                                    PQ[b0] * PQ[d0] * (-1.0)
+                                )
+
+                            )
+
+                            );
 
                     ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
                 }
@@ -2460,7 +2491,7 @@ computeExchangeFockSSPS(double*         mat_K,
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
 
     const uint32_t ik = blockIdx.x;
@@ -2499,7 +2530,7 @@ computeExchangeFockSSPS(double*         mat_K,
                     const auto j_cgto = s_prim_aoinds[j_prim];
                     const auto l_cgto = s_prim_aoinds[l_prim];
 
-                    const auto k_cart = k % 3;
+                    const auto c0 = k % 3;
 
                     const auto a_i = s_prim_info[i + s_prim_count * 0];
                     const auto c_i = s_prim_info[i + s_prim_count * 1];
@@ -2532,11 +2563,11 @@ computeExchangeFockSSPS(double*         mat_K,
                     // p_0: pz
                     // p+1: px
 
-                    const double rPQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                           (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                           (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
 
-                    const auto r2_PQ = rPQ[0] * rPQ[0] + rPQ[1] * rPQ[1] + rPQ[2] * rPQ[2];
+                    const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -2557,13 +2588,11 @@ computeExchangeFockSSPS(double*         mat_K,
 
                     const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
 
-                    const auto S_kl_10 = (a_l / (a_k + a_l)) * rkl[k_cart] * S_kl_00;
+                    const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
-                    const double eri_ijkl = Lambda * (
+                            F1_t[0] * (a_l / (a_k + a_l)) * rkl[c0]
 
-                            S_ij_00 * S_kl_10 * F1_t[0] +
-
-                            S_ij_00 * S_kl_00 * (-(a_i + a_j) / (a_i + a_j + a_k + a_l)) * rPQ[k_cart] * F1_t[1]
+                            + F1_t[1] * (a_i + a_j) / (a_i + a_j + a_k + a_l) * PQ[c0] * (-1.0)
 
                             );
 
@@ -2635,12 +2664,22 @@ computeExchangeFockSSPP(double*         mat_K,
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
+    __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+    }
+
+    __syncthreads();
 
     for (uint32_t m = 0; m < (s_prim_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -2673,8 +2712,8 @@ computeExchangeFockSSPP(double*         mat_K,
                     const auto j_cgto = s_prim_aoinds[j_prim];
                     const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
 
-                    const auto k_cart = k % 3;
-                    const auto l_cart = l_prim % 3;
+                    const auto c0 = k % 3;
+                    const auto d0 = l_prim % 3;
 
                     const auto a_i = s_prim_info[i + s_prim_count * 0];
                     const auto c_i = s_prim_info[i + s_prim_count * 1];
@@ -2707,11 +2746,11 @@ computeExchangeFockSSPP(double*         mat_K,
                     // p_0: pz
                     // p+1: px
 
-                    const double rPQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                           (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                           (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
 
-                    const auto r2_PQ = rPQ[0] * rPQ[0] + rPQ[1] * rPQ[1] + rPQ[2] * rPQ[2];
+                    const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -2726,41 +2765,57 @@ computeExchangeFockSSPP(double*         mat_K,
 
                     const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
+                    const auto S1 = (a_i + a_j);
+                    const auto S2 = (a_k + a_l);
+                    const auto S4 = (a_i + a_j + a_k + a_l);
+
                     // p-1: py
                     // p_0: pz
                     // p+1: px
 
                     const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-
                     const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
 
-                    const auto S_kl_10 = (a_l / (a_k + a_l)) * rkl[k_cart] * S_kl_00;
+                    const auto QC_0 = (a_l / (a_k + a_l)) * rkl[c0];
+                    const auto QD_0 = (-a_k / (a_k + a_l)) * rkl[d0];
 
-                    const auto S_kl_01 = -(a_k / (a_k + a_l)) * rkl[l_cart] * S_kl_00;
+                    const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
-                    const auto S_kl_11 = (
+                            F2_t[0] * (
 
-                            (k_cart == l_cart ? 1.0 : 0.0) * (0.5 / (a_k + a_l)) +
+                                (
 
-                            (a_k * a_l / ((a_k + a_l) * (a_k + a_l))) * (-rkl[k_cart]) * rkl[l_cart]
+                                    + QD_0 * QC_0
+                                )
 
-                            ) * S_kl_00;
+                                + 0.5 / S2 * (
+                                    delta[d0][c0]
+                                )
 
-                    const double eri_ijkl = Lambda * (
+                            )
 
-                            S_ij_00 * S_kl_11 * F2_t[0] +
+                            + F2_t[1] * (
 
-                            S_ij_00 * S_kl_10 * (-(a_i + a_j) / (a_i + a_j + a_k + a_l)) * rPQ[l_cart] * F2_t[1] +
+                                0.5 * S1 / ( S2 * S4 ) * (
+                                    delta[d0][c0] * (1.0 * (-1.0))
+                                )
 
-                            S_ij_00 * S_kl_01 * (-(a_i + a_j) / (a_i + a_j + a_k + a_l)) * rPQ[k_cart] * F2_t[1] +
+                                + S1 / S4 * (
+                                    PQ[c0] * QD_0 * (-1.0)
+                                    + PQ[d0] * QC_0 * (-1.0)
+                                )
 
-                            S_ij_00 * S_kl_00 * ((a_i + a_j) / (a_i + a_j + a_k + a_l)) * (
+                            )
 
-                                ((a_i + a_j) / (a_i + a_j + a_k + a_l)) * rPQ[k_cart] * rPQ[l_cart] * F2_t[2] -
+                            + F2_t[2] * (
 
-                                (k_cart == l_cart ? 1.0 : 0.0) * (0.5 / (a_k + a_l)) * F2_t[1]
+                                ( S1 * S1 ) / ( S4 * S4 ) * (
+                                    PQ[c0] * PQ[d0]
+                                )
 
-                            ));
+                            )
+
+                            );
 
                     ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
                 }
@@ -2830,12 +2885,22 @@ computeExchangeFockSPPS(double*         mat_K,
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
+    __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+    }
+
+    __syncthreads();
 
     for (uint32_t m = 0; m < (p_prim_count * 3 + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -2868,8 +2933,8 @@ computeExchangeFockSPPS(double*         mat_K,
                     const auto j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
                     const auto l_cgto = s_prim_aoinds[l_prim];
 
-                    const auto j_cart = j_prim % 3;
-                    const auto k_cart = k % 3;
+                    const auto b0 = j_prim % 3;
+                    const auto c0 = k % 3;
 
                     const auto a_i = s_prim_info[i + s_prim_count * 0];
                     const auto c_i = s_prim_info[i + s_prim_count * 1];
@@ -2902,11 +2967,11 @@ computeExchangeFockSPPS(double*         mat_K,
                     // p_0: pz
                     // p+1: px
 
-                    const double rPQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                           (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                           (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
 
-                    const auto r2_PQ = rPQ[0] * rPQ[0] + rPQ[1] * rPQ[1] + rPQ[2] * rPQ[2];
+                    const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -2920,6 +2985,10 @@ computeExchangeFockSPPS(double*         mat_K,
                     const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
                     const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
+                    const auto S1 = (a_i + a_j);
+                    const auto S2 = (a_k + a_l);
+                    const auto S4 = (a_i + a_j + a_k + a_l);
+
                     // p-1: py
                     // p_0: pz
                     // p+1: px
@@ -2927,24 +2996,45 @@ computeExchangeFockSPPS(double*         mat_K,
                     const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
                     const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
 
-                    const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
-                    const auto S_kl_10 = (a_l / (a_k + a_l)) * rkl[k_cart] * S_kl_00;
+                    const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
-                    const double eri_ijkl = Lambda * (
+                    const auto QC_0 = (a_l / (a_k + a_l)) * rkl[c0];
 
-                            S_ij_01 * S_kl_10 * F2_t[0] +
+                    const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
-                            S_ij_01 * S_kl_00 * (-(a_i + a_j) / (a_i + a_j + a_k + a_l)) * rPQ[k_cart] * F2_t[1] +
+                            F2_t[0] * (
 
-                            S_ij_00 * S_kl_10 * ((a_k + a_l) / (a_i + a_j + a_k + a_l)) * rPQ[j_cart] * F2_t[1] +
+                                (
+                                    PB_0 * QC_0
+                                )
 
-                            S_ij_00 * S_kl_00 / (a_i + a_j + a_k + a_l) * (
+                            )
 
-                                (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * (-rPQ[j_cart]) * rPQ[k_cart] * F2_t[2] +
+                            + F2_t[1] * (
 
-                                (j_cart == k_cart ? 1.0 : 0.0) * 0.5 * F2_t[1]
+                                S1 / S4 * (
+                                    PB_0 * PQ[c0] * (-1.0)
+                                )
 
-                            ));
+                                + 0.5 / S4 * (
+                                    delta[b0][c0]
+                                )
+
+                                + S2 / S4 * (
+                                    PQ[b0] * QC_0
+                                )
+
+                            )
+
+                            + F2_t[2] * (
+
+                                ( S1 * S2 ) / ( S4 * S4 ) * (
+                                    PQ[b0] * PQ[c0] * (-1.0)
+                                )
+
+                            )
+
+                            );
 
                     ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
                 }
@@ -3266,12 +3356,22 @@ computeExchangeFockPSPS(double*         mat_K,
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
+    __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+    }
+
+    __syncthreads();
 
     for (uint32_t m = 0; m < (s_prim_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -3305,8 +3405,8 @@ computeExchangeFockPSPS(double*         mat_K,
                     const auto j_cgto = s_prim_aoinds[j_prim];
                     const auto l_cgto = s_prim_aoinds[l_prim];
 
-                    const auto i_cart = i % 3;
-                    const auto k_cart = k % 3;
+                    const auto a0 = i % 3;
+                    const auto c0 = k % 3;
 
                     const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
                     const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
@@ -3339,11 +3439,11 @@ computeExchangeFockPSPS(double*         mat_K,
                     // p_0: pz
                     // p+1: px
 
-                    const double rPQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                           (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                           (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
 
-                    const auto r2_PQ = rPQ[0] * rPQ[0] + rPQ[1] * rPQ[1] + rPQ[2] * rPQ[2];
+                    const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -3357,6 +3457,10 @@ computeExchangeFockPSPS(double*         mat_K,
                     const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
                     const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
+                    const auto S1 = (a_i + a_j);
+                    const auto S2 = (a_k + a_l);
+                    const auto S4 = (a_i + a_j + a_k + a_l);
+
                     // p-1: py
                     // p_0: pz
                     // p+1: px
@@ -3364,24 +3468,45 @@ computeExchangeFockPSPS(double*         mat_K,
                     const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
                     const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
 
-                    const auto S_ij_10 = (a_j / (a_i + a_j)) * rij[i_cart] * S_ij_00;
-                    const auto S_kl_10 = (a_l / (a_k + a_l)) * rkl[k_cart] * S_kl_00;
+                    const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
 
-                    const double eri_ijkl = Lambda * (
+                    const auto QC_0 = (a_l / (a_k + a_l)) * rkl[c0];
 
-                            S_ij_10 * S_kl_10 * F2_t[0] +
+                    const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
-                            S_ij_10 * S_kl_00 * (-(a_i + a_j) / (a_i + a_j + a_k + a_l)) * rPQ[k_cart] * F2_t[1] +
+                            F2_t[0] * (
 
-                            S_ij_00 * S_kl_10 * ((a_k + a_l) / (a_i + a_j + a_k + a_l)) * rPQ[i_cart] * F2_t[1] +
+                                (
+                                    PA_0 * QC_0
+                                )
 
-                            S_ij_00 * S_kl_00 / (a_i + a_j + a_k + a_l) * (
+                            )
 
-                                (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * (-rPQ[i_cart]) * rPQ[k_cart] * F2_t[2] +
+                            + F2_t[1] * (
 
-                                (i_cart == k_cart ? 1.0 : 0.0) * 0.5 * F2_t[1]
+                                S1 / S4 * (
+                                    PA_0 * PQ[c0] * (-1.0)
+                                )
 
-                            ));
+                                + 0.5 / S4 * (
+                                    delta[a0][c0]
+                                )
+
+                                + S2 / S4 * (
+                                    PQ[a0] * QC_0
+                                )
+
+                            )
+
+                            + F2_t[2] * (
+
+                                ( S1 * S2 ) / ( S4 * S4 ) * (
+                                    PQ[a0] * PQ[c0] * (-1.0)
+                                )
+
+                            )
+
+                            );
 
                     ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
                 }
@@ -3451,12 +3576,22 @@ computeExchangeFockPSPP(double*         mat_K,
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
+    __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+    }
+
+    __syncthreads();
 
     for (uint32_t m = 0; m < (s_prim_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -3489,9 +3624,9 @@ computeExchangeFockPSPP(double*         mat_K,
                     const auto j_cgto = s_prim_aoinds[j_prim];
                     const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
 
-                    const auto i_cart = i % 3;
-                    const auto k_cart = k % 3;
-                    const auto l_cart = l_prim % 3;
+                    const auto a0 = i % 3;
+                    const auto c0 = k % 3;
+                    const auto d0 = l_prim % 3;
 
                     const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
                     const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
@@ -3524,11 +3659,11 @@ computeExchangeFockPSPP(double*         mat_K,
                     // p_0: pz
                     // p+1: px
 
-                    const double rPQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                           (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                           (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
 
-                    const auto r2_PQ = rPQ[0] * rPQ[0] + rPQ[1] * rPQ[1] + rPQ[2] * rPQ[2];
+                    const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -3542,6 +3677,10 @@ computeExchangeFockPSPP(double*         mat_K,
                     const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
                     const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
+                    const auto S1 = (a_i + a_j);
+                    const auto S2 = (a_k + a_l);
+                    const auto S4 = (a_i + a_j + a_k + a_l);
+
                     // p-1: py
                     // p_0: pz
                     // p+1: px
@@ -3549,62 +3688,79 @@ computeExchangeFockPSPP(double*         mat_K,
                     const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
                     const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
 
-                    const auto S_ij_10 = (a_j / (a_i + a_j)) * rij[i_cart] * S_ij_00;
+                    const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
 
-                    const auto S_kl_10 = (a_l / (a_k + a_l)) * rkl[k_cart] * S_kl_00;
-                    const auto S_kl_01 = -(a_k / (a_k + a_l)) * rkl[l_cart] * S_kl_00;
+                    const auto QC_0 = (a_l / (a_k + a_l)) * rkl[c0];
+                    const auto QD_0 = (-a_k / (a_k + a_l)) * rkl[d0];
 
-                    const auto S_kl_11 = (
+                    const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
-                            (k_cart == l_cart ? 1.0 : 0.0) * (0.5 / (a_k + a_l)) +
+                            F3_t[0] * (
 
-                            (a_k * a_l / ((a_k + a_l) * (a_k + a_l))) * (-rkl[k_cart]) * rkl[l_cart]
+                                (
 
-                            ) * S_kl_00;
+                                    + PA_0 * QD_0 * QC_0
+                                )
 
-                    const double eri_ijkl = Lambda * (
+                                + 0.5 / S2 * (
+                                    delta[d0][c0] * (PA_0)
+                                )
 
-                            S_ij_10 * S_kl_11 * F3_t[0] +
+                            )
 
-                            S_ij_00 * S_kl_11 * ((a_k + a_l) / (a_i + a_j + a_k + a_l)) * rPQ[i_cart] * F3_t[1] +
+                            + F3_t[1] * (
 
-                            S_ij_10 * S_kl_01 * (-(a_i + a_j) / (a_i + a_j + a_k + a_l)) * rPQ[k_cart] * F3_t[1] +
+                                0.5 * S1 / ( S2 * S4 ) * (
+                                    delta[d0][c0] * (PA_0 * (-1.0))
+                                )
 
-                            S_ij_00 * S_kl_01 / (a_i + a_j + a_k + a_l) * (
+                                + 0.5 / S4 * (
+                                    delta[a0][d0] * ( + QC_0)
+                                    + delta[d0][c0] * (PQ[a0])
+                                    + delta[a0][c0] * (QD_0)
+                                )
 
-                                (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * (-rPQ[i_cart]) * rPQ[k_cart] * F3_t[2] +
+                                + S1 / S4 * (
+                                    PA_0 * PQ[c0] * QD_0 * (-1.0)
+                                    + PA_0 * PQ[d0] * QC_0 * (-1.0)
+                                )
 
-                                (i_cart == k_cart ? 1.0 : 0.0) * 0.5 * F3_t[1]
+                                + S2 / S4 * (
 
-                            ) +
+                                    + PQ[a0] * QD_0 * QC_0
+                                )
 
-                            S_ij_10 * S_kl_10 * (-(a_i + a_j) / (a_i + a_j + a_k + a_l)) * rPQ[l_cart] * F3_t[1] +
+                            )
 
-                            S_ij_00 * S_kl_10 / (a_i + a_j + a_k + a_l) * (
+                            + F3_t[2] * (
 
-                                (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * (-rPQ[i_cart]) * rPQ[l_cart] * F3_t[2] +
+                                ( S1 * S1 ) / ( S4 * S4 ) * (
+                                    PA_0 * PQ[c0] * PQ[d0]
+                                )
 
-                                (i_cart == l_cart ? 1.0 : 0.0) * 0.5 * F3_t[1]
+                                + ( S1 * S2 ) / ( S4 * S4 ) * (
 
-                            ) +
+                                    + PQ[a0] * PQ[c0] * QD_0 * (-1.0)
+                                    + PQ[a0] * PQ[d0] * QC_0 * (-1.0)
+                                )
 
-                            S_ij_10 * S_kl_00 * (a_i + a_j) / (a_i + a_j + a_k + a_l) * (
+                                + 0.5 * S1 / ( S4 * S4 ) * (
+                                    delta[d0][c0] * (PQ[a0] * (-1.0))
+                                    + delta[a0][d0] * (PQ[c0] * (-1.0))
+                                    + delta[a0][c0] * (PQ[d0] * (-1.0))
+                                )
 
-                                (a_i + a_j) / (a_i + a_j + a_k + a_l) * rPQ[k_cart] * rPQ[l_cart] * F3_t[2] -
+                            )
 
-                                (k_cart == l_cart ? 1.0 : 0.0) * 0.5 / (a_k + a_l) * F3_t[1]
+                            + F3_t[3] * (
 
-                            ) +
+                                ( S1 * S1 * S2 ) / ( S4 * S4 * S4 ) * (
+                                    PQ[a0] * PQ[c0] * PQ[d0]
+                                )
 
-                            S_ij_00 * S_kl_00 * (-(a_i + a_j)) / ((a_i + a_j + a_k + a_l) * (a_i + a_j + a_k + a_l)) * (
+                            )
 
-                                (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * (-rPQ[i_cart]) * rPQ[k_cart] * rPQ[l_cart] * F3_t[3] -
-
-                                ((i_cart == k_cart ? 1.0 : 0.0) * (-rPQ[l_cart]) + 
-                                 (i_cart == l_cart ? 1.0 : 0.0) * (-rPQ[k_cart]) +
-                                 (k_cart == l_cart ? 1.0 : 0.0) * (-rPQ[i_cart])) * 0.5 * F3_t[2]
-
-                            ));
+                            );
 
                     ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
                 }
@@ -3674,12 +3830,22 @@ computeExchangeFockPPPS(double*         mat_K,
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
+    __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+    }
+
+    __syncthreads();
 
     for (uint32_t m = 0; m < (p_prim_count * 3 + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -3712,9 +3878,9 @@ computeExchangeFockPPPS(double*         mat_K,
                     const auto j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
                     const auto l_cgto = s_prim_aoinds[l_prim];
 
-                    const auto i_cart = i % 3;
-                    const auto j_cart = j_prim % 3;
-                    const auto k_cart = k % 3;
+                    const auto a0 = i % 3;
+                    const auto b0 = j_prim % 3;
+                    const auto c0 = k % 3;
 
                     const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
                     const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
@@ -3747,11 +3913,11 @@ computeExchangeFockPPPS(double*         mat_K,
                     // p_0: pz
                     // p+1: px
 
-                    const double rPQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                           (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                           (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
 
-                    const auto r2_PQ = rPQ[0] * rPQ[0] + rPQ[1] * rPQ[1] + rPQ[2] * rPQ[2];
+                    const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -3765,6 +3931,10 @@ computeExchangeFockPPPS(double*         mat_K,
                     const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
                     const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
+                    const auto S1 = (a_i + a_j);
+                    const auto S2 = (a_k + a_l);
+                    const auto S4 = (a_i + a_j + a_k + a_l);
+
                     // p-1: py
                     // p_0: pz
                     // p+1: px
@@ -3772,62 +3942,80 @@ computeExchangeFockPPPS(double*         mat_K,
                     const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
                     const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
 
-                    const auto S_ij_10 = (a_j / (a_i + a_j)) * rij[i_cart] * S_ij_00;
-                    const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
+                    const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
+                    const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
-                    const auto S_ij_11 = (
+                    const auto QC_0 = (a_l / (a_k + a_l)) * rkl[c0];
 
-                            (i_cart == j_cart ? 1.0 : 0.0) * (0.5 / (a_i + a_j)) +
+                    const double eri_ijkl = Lambda * S_kl_00 * S_ij_00 * (
 
-                            (a_i * a_j / ((a_i + a_j) * (a_i + a_j))) * (-rij[i_cart]) * rij[j_cart]
+                            F3_t[0] * (
 
-                            ) * S_ij_00;
+                                (
 
-                    const auto S_kl_10 = (a_l / (a_k + a_l)) * rkl[k_cart] * S_kl_00;
+                                    + PB_0 * PA_0 * QC_0
+                                )
 
-                    const double eri_ijkl = Lambda * (
+                                + 0.5 / S1 * (
+                                    delta[b0][a0] * (QC_0)
+                                )
 
-                            S_kl_10 * S_ij_11 * F3_t[0] +
+                            )
 
-                            S_kl_00 * S_ij_11 * (-(a_i + a_j) / (a_k + a_l + a_i + a_j)) * rPQ[k_cart] * F3_t[1] +
+                            + F3_t[1] * (
 
-                            S_kl_10 * S_ij_10 * ((a_k + a_l) / (a_k + a_l + a_i + a_j)) * rPQ[j_cart] * F3_t[1] +
+                                0.5 * S2 / ( S1 * S4 ) * (
+                                    delta[b0][a0] * (QC_0 * (-1.0))
+                                )
 
-                            S_kl_00 * S_ij_10 / (a_k + a_l + a_i + a_j) * (
+                                + 0.5 / S4 * (
+                                    delta[b0][c0] * ( + PA_0)
+                                    + delta[a0][c0] * (PB_0)
+                                    + delta[b0][a0] * (PQ[c0] * (-1.0))
+                                )
 
-                                (a_k + a_l) * (a_i + a_j) / (a_k + a_l + a_i + a_j) * (-rPQ[j_cart]) * rPQ[k_cart] * F3_t[2] +
+                                + S1 / S4 * (
 
-                                (j_cart == k_cart ? 1.0 : 0.0) * 0.5 * F3_t[1]
+                                    + PB_0 * PA_0 * PQ[c0] * (-1.0)
+                                )
 
-                            ) +
+                                + S2 / S4 * (
 
-                            S_kl_10 * S_ij_01 * ((a_k + a_l) / (a_k + a_l + a_i + a_j)) * rPQ[i_cart] * F3_t[1] +
+                                    + PB_0 * PQ[a0] * QC_0
+                                    + PA_0 * PQ[b0] * QC_0
+                                )
 
-                            S_kl_00 * S_ij_01 / (a_k + a_l + a_i + a_j) * (
+                            )
 
-                                (a_k + a_l) * (a_i + a_j) / (a_k + a_l + a_i + a_j) * (-rPQ[i_cart]) * rPQ[k_cart] * F3_t[2] +
+                            + F3_t[2] * (
 
-                                (i_cart == k_cart ? 1.0 : 0.0) * 0.5 * F3_t[1]
+                                ( S1 * S2 ) / ( S4 * S4 ) * (
 
-                            ) +
+                                    + PB_0 * PQ[a0] * PQ[c0] * (-1.0)
+                                    + PA_0 * PQ[b0] * PQ[c0] * (-1.0)
+                                )
 
-                            S_kl_10 * S_ij_00 * (a_k + a_l) / (a_k + a_l + a_i + a_j) * (
+                                + ( S2 * S2 ) / ( S4 * S4 ) * (
+                                    PQ[a0] * PQ[b0] * QC_0
+                                )
 
-                                (a_k + a_l) / (a_k + a_l + a_i + a_j) * rPQ[i_cart] * rPQ[j_cart] * F3_t[2] -
+                                + 0.5 * S2 / ( S4 * S4 ) * (
+                                    delta[b0][a0] * (PQ[c0])
+                                    + delta[b0][c0] * (PQ[a0])
+                                    + delta[a0][c0] * (PQ[b0])
+                                )
 
-                                (i_cart == j_cart ? 1.0 : 0.0) * 0.5 / (a_i + a_j) * F3_t[1]
+                            )
 
-                            ) +
+                            + F3_t[3] * (
 
-                            S_kl_00 * S_ij_00 * (-(a_k + a_l)) / ((a_k + a_l + a_i + a_j) * (a_k + a_l + a_i + a_j)) * (
+                                ( S1 * S2 * S2 ) / ( S4 * S4 * S4 ) * (
+                                    PQ[a0] * PQ[b0] * PQ[c0] * (-1.0)
+                                )
 
-                                (a_k + a_l) * (a_i + a_j) / (a_k + a_l + a_i + a_j) * rPQ[i_cart] * rPQ[j_cart] * rPQ[k_cart] * F3_t[3] +
+                            )
 
-                                ((k_cart == i_cart ? 1.0 : 0.0) * (-rPQ[j_cart]) + 
-                                 (k_cart == j_cart ? 1.0 : 0.0) * (-rPQ[i_cart]) +
-                                 (i_cart == j_cart ? 1.0 : 0.0) * (-rPQ[k_cart])) * 0.5 * F3_t[2]
-
-                            ));
+                            );
 
                     ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
                 }
