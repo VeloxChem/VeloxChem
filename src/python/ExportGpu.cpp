@@ -281,6 +281,8 @@ export_gpu(py::module& m)
 
     m.def("compute_fock_gpu", &gpu::computeFockOnGPU, "Computes Fock matrix using GPU.");
 
+    m.def("transform_density", &gpu::transformDensity, "Transforms density matrix (spherical to Cartesian).");
+
     m.def("compute_one_electron_integrals_gpu", &gpu::computeOneElectronIntegralsOnGPU, "Computes one-electron integral matrices using GPU.");
 }
 

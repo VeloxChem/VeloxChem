@@ -831,6 +831,88 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 }
 
 auto
+transformDensity(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> CDenseMatrix
+{
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    int64_t s_prim_count = 0, s_ao_count = 0;
+    int64_t p_prim_count = 0, p_ao_count = 0;
+    int64_t d_prim_count = 0, d_ao_count = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+        const auto npgtos = gto_block.getNumberOfPrimitives();
+
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 0)
+        {
+            s_prim_count += npgtos * ncgtos;
+            s_ao_count += ncgtos;
+        }
+        else if (gto_ang == 1)
+        {
+            p_prim_count += npgtos * ncgtos;
+            p_ao_count += ncgtos;
+        }
+        else if (gto_ang == 2)
+        {
+            d_prim_count += npgtos * ncgtos;
+            d_ao_count += ncgtos;
+        }
+    }
+
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> sph_cart_map;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        auto m = gto_block.getSphericalToCartesianMapping();
+
+        for (const auto& [sph_ind, cart_ind_coef] : m)
+        {
+            sph_cart_map[sph_ind] = cart_ind_coef;
+        }
+    }
+
+    const auto cart_naos = s_ao_count + p_ao_count * 3 + d_ao_count * 6; 
+
+    CDenseMatrix cart_dens_mat(cart_naos, cart_naos);
+    cart_dens_mat.zero();
+
+    auto cart_dens_ptr = cart_dens_mat.values();
+    auto sph_dens_ptr = densityMatrix.alphaDensity(0);
+
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_map_i, cart_sph_map_j;
+
+    for (int64_t i_cgto = 0; i_cgto < cart_naos; i_cgto++)
+    {
+        for (int64_t j_cgto = 0; j_cgto < cart_naos; j_cgto++)
+        {
+            for (const auto& i_cgto_cart_ind_coef : sph_cart_map[i_cgto])
+            {
+                auto i_cgto_cart = i_cgto_cart_ind_coef.first;
+                auto i_coef_cart = i_cgto_cart_ind_coef.second;
+
+                for (const auto& j_cgto_cart_ind_coef : sph_cart_map[j_cgto])
+                {
+                    auto j_cgto_cart = j_cgto_cart_ind_coef.first;
+                    auto j_coef_cart = j_cgto_cart_ind_coef.second;
+
+                    cart_dens_ptr[i_cgto_cart * cart_naos + j_cgto_cart] += 
+                        sph_dens_ptr[i_cgto * naos + j_cgto] * i_coef_cart * j_coef_cart;
+                }
+            }
+        }
+    }
+
+    return cart_dens_mat;
+}
+
+auto
 computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix, const double frac_exact_exchange, CScreeningData& screening) -> CDenseMatrix
 {
     auto rank = mpi::rank(MPI_COMM_WORLD);

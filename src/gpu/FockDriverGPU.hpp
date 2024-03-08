@@ -38,6 +38,8 @@ namespace gpu {
 
 auto computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> std::vector<CDenseMatrix>;
 
+auto transformDensity(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> CDenseMatrix;
+
 auto computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix, const double frac_exact_exchange, CScreeningData& screening) -> CDenseMatrix;
 
 auto computeDotProduct(const double* A, const double* B, const int64_t size) -> double;
