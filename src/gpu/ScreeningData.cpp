@@ -192,15 +192,11 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
             {
                 // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-                // p-1: py
-                // p_0: pz
-                // p+1: px
-
                 double S_ij_1;
 
-                if (s == 0) S_ij_1 = -(a_i / a_ij) * (y_j - y_i) * S_ij_0;
-                if (s == 1) S_ij_1 = -(a_i / a_ij) * (z_j - z_i) * S_ij_0;
-                if (s == 2) S_ij_1 = -(a_i / a_ij) * (x_j - x_i) * S_ij_0;
+                if (s == 0) S_ij_1 = -(a_i / a_ij) * (x_j - x_i) * S_ij_0;
+                if (s == 1) S_ij_1 = -(a_i / a_ij) * (y_j - y_i) * S_ij_0;
+                if (s == 2) S_ij_1 = -(a_i / a_ij) * (z_j - z_i) * S_ij_0;
 
                 const auto F1_t = boysfunc::getBoysFunction(0.0, 1, boys_func_table.data(), boys_func_ft.data());
 
@@ -270,11 +266,7 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
             const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
+            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
             for (int64_t i_cart = 0; i_cart < 3; i_cart++)
             {
@@ -388,12 +380,6 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
             const auto F2_t = boysfunc::getBoysFunction(0.0, 2, boys_func_table.data(), boys_func_ft.data());
 
             const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
             */
 
             for (int64_t i_cart = 0; i_cart < 6; i_cart++)

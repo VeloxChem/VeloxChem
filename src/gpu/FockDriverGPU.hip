@@ -118,6 +118,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     STV_matrices[1] = CDenseMatrix(naos, naos);
     STV_matrices[2] = CDenseMatrix(naos, naos);
 
+    // TODO: use zero() here and also in other places
     for (int64_t ind = 0; ind < naos * naos; ind++)
     {
         STV_matrices[0].values()[ind] = 0.0;
@@ -136,6 +137,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     std::vector<CDenseMatrix> T_matrices(num_gpus_per_node);
     std::vector<CDenseMatrix> V_matrices(num_gpus_per_node);
 
+    // TODO: use std::malloc in DenseMatrix (for numa)
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
         S_matrices[gpu_id] = CDenseMatrix(naos, naos);
@@ -351,6 +353,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     hipSafe(hipMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
 
+    // TODO: use zero() here and also in other places
     for (int64_t ind = 0; ind < naos * naos; ind++)
     {
         S_matrices[gpu_id].values()[ind] = 0.0;
@@ -490,16 +493,16 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
             for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
             {
                 auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                auto coef_sph = j_cgto_sph_ind_coef.second;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
 
-                mat_overlap.row(i_cgto)[j_cgto_sph] += mat_S[ij] * coef_sph;
-                mat_overlap.row(j_cgto_sph)[i_cgto] += mat_S[ij] * coef_sph;
+                mat_overlap.row(i_cgto)[j_cgto_sph] += mat_S[ij] * j_coef_sph;
+                mat_overlap.row(j_cgto_sph)[i_cgto] += mat_S[ij] * j_coef_sph;
 
-                mat_kinetic_energy.row(i_cgto)[j_cgto_sph] += mat_T[ij] * coef_sph;
-                mat_kinetic_energy.row(j_cgto_sph)[i_cgto] += mat_T[ij] * coef_sph;
+                mat_kinetic_energy.row(i_cgto)[j_cgto_sph] += mat_T[ij] * j_coef_sph;
+                mat_kinetic_energy.row(j_cgto_sph)[i_cgto] += mat_T[ij] * j_coef_sph;
 
-                mat_nuclear_potential.row(i_cgto)[j_cgto_sph] += mat_V[ij] * coef_sph;
-                mat_nuclear_potential.row(j_cgto_sph)[i_cgto] += mat_V[ij] * coef_sph;
+                mat_nuclear_potential.row(i_cgto)[j_cgto_sph] += mat_V[ij] * j_coef_sph;
+                mat_nuclear_potential.row(j_cgto_sph)[i_cgto] += mat_V[ij] * j_coef_sph;
             }
         }
     }
@@ -554,16 +557,16 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
             for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
             {
                 auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                auto coef_sph = j_cgto_sph_ind_coef.second;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
 
-                mat_overlap.row(i_cgto)[j_cgto_sph] += mat_S[ij] * coef_sph;
-                mat_overlap.row(j_cgto_sph)[i_cgto] += mat_S[ij] * coef_sph;
+                mat_overlap.row(i_cgto)[j_cgto_sph] += mat_S[ij] * j_coef_sph;
+                mat_overlap.row(j_cgto_sph)[i_cgto] += mat_S[ij] * j_coef_sph;
 
-                mat_kinetic_energy.row(i_cgto)[j_cgto_sph] += mat_T[ij] * coef_sph;
-                mat_kinetic_energy.row(j_cgto_sph)[i_cgto] += mat_T[ij] * coef_sph;
+                mat_kinetic_energy.row(i_cgto)[j_cgto_sph] += mat_T[ij] * j_coef_sph;
+                mat_kinetic_energy.row(j_cgto_sph)[i_cgto] += mat_T[ij] * j_coef_sph;
 
-                mat_nuclear_potential.row(i_cgto)[j_cgto_sph] += mat_V[ij] * coef_sph;
-                mat_nuclear_potential.row(j_cgto_sph)[i_cgto] += mat_V[ij] * coef_sph;
+                mat_nuclear_potential.row(i_cgto)[j_cgto_sph] += mat_V[ij] * j_coef_sph;
+                mat_nuclear_potential.row(j_cgto_sph)[i_cgto] += mat_V[ij] * j_coef_sph;
             }
         }
     }
@@ -696,14 +699,16 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                     auto j_cgto_sph = j_cgto_sph_ind_coef.first;
                     auto j_coef_sph = j_cgto_sph_ind_coef.second;
 
-                    mat_overlap.row(i_cgto_sph)[j_cgto_sph] += mat_S[ij] * i_coef_sph * j_coef_sph;
-                    mat_overlap.row(j_cgto_sph)[i_cgto_sph] += mat_S[ij] * i_coef_sph * j_coef_sph;
+                    auto coef_sph = i_coef_sph * j_coef_sph;
 
-                    mat_kinetic_energy.row(i_cgto_sph)[j_cgto_sph] += mat_T[ij] * i_coef_sph * j_coef_sph;
-                    mat_kinetic_energy.row(j_cgto_sph)[i_cgto_sph] += mat_T[ij] * i_coef_sph * j_coef_sph;
+                    mat_overlap.row(i_cgto_sph)[j_cgto_sph] += mat_S[ij] * coef_sph;
+                    mat_overlap.row(j_cgto_sph)[i_cgto_sph] += mat_S[ij] * coef_sph;
 
-                    mat_nuclear_potential.row(i_cgto_sph)[j_cgto_sph] += mat_V[ij] * i_coef_sph * j_coef_sph;
-                    mat_nuclear_potential.row(j_cgto_sph)[i_cgto_sph] += mat_V[ij] * i_coef_sph * j_coef_sph;
+                    mat_kinetic_energy.row(i_cgto_sph)[j_cgto_sph] += mat_T[ij] * coef_sph;
+                    mat_kinetic_energy.row(j_cgto_sph)[i_cgto_sph] += mat_T[ij] * coef_sph;
+
+                    mat_nuclear_potential.row(i_cgto_sph)[j_cgto_sph] += mat_V[ij] * coef_sph;
+                    mat_nuclear_potential.row(j_cgto_sph)[i_cgto_sph] += mat_V[ij] * coef_sph;
                 }
             }
         }
@@ -763,17 +768,19 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                     auto j_cgto_sph = j_cgto_sph_ind_coef.first;
                     auto j_coef_sph = j_cgto_sph_ind_coef.second;
 
-                    mat_overlap.row(i_cgto_sph)[j_cgto_sph] += mat_S[ij] * i_coef_sph * j_coef_sph;
+                    auto coef_sph = i_coef_sph * j_coef_sph;
 
-                    if (i != j) mat_overlap.row(j_cgto_sph)[i_cgto_sph] += mat_S[ij] * i_coef_sph * j_coef_sph;
+                    mat_overlap.row(i_cgto_sph)[j_cgto_sph] += mat_S[ij] * coef_sph;
 
-                    mat_kinetic_energy.row(i_cgto_sph)[j_cgto_sph] += mat_T[ij] * i_coef_sph * j_coef_sph;
+                    if (i != j) mat_overlap.row(j_cgto_sph)[i_cgto_sph] += mat_S[ij] * coef_sph;
 
-                    if (i != j) mat_kinetic_energy.row(j_cgto_sph)[i_cgto_sph] += mat_T[ij] * i_coef_sph * j_coef_sph;
+                    mat_kinetic_energy.row(i_cgto_sph)[j_cgto_sph] += mat_T[ij] * coef_sph;
 
-                    mat_nuclear_potential.row(i_cgto_sph)[j_cgto_sph] += mat_V[ij] * i_coef_sph * j_coef_sph;
+                    if (i != j) mat_kinetic_energy.row(j_cgto_sph)[i_cgto_sph] += mat_T[ij] * coef_sph;
 
-                    if (i != j) mat_nuclear_potential.row(j_cgto_sph)[i_cgto_sph] += mat_V[ij] * i_coef_sph * j_coef_sph;
+                    mat_nuclear_potential.row(i_cgto_sph)[j_cgto_sph] += mat_V[ij] * coef_sph;
+
+                    if (i != j) mat_nuclear_potential.row(j_cgto_sph)[i_cgto_sph] += mat_V[ij] * coef_sph;
                 }
             }
         }
@@ -966,15 +973,50 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         }
     }
 
+    // Cartesian to spherical index mapping for P and D
+
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_p;
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_d;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 1)
+        {
+            auto p_map = gto_block.getCartesianToSphericalMappingForP();
+
+            for (const auto& [cart_ind, sph_ind_coef] : p_map)
+            {
+                cart_sph_p[cart_ind] = sph_ind_coef;
+            }
+        }
+        else if (gto_ang == 2)
+        {
+            auto d_map = gto_block.getCartesianToSphericalMappingForD();
+
+            for (const auto& [cart_ind, sph_ind_coef] : d_map)
+            {
+                cart_sph_d[cart_ind] = sph_ind_coef;
+            }
+        }
+    }
+
+    // S gto block
+
     std::vector<double>   s_prim_info(5 * s_prim_count);
     std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
 
     gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
 
+    // P gto block
+
     std::vector<double>   p_prim_info(5 * p_prim_count);
     std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
 
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
+
+    // D gto block
 
     std::vector<double>   d_prim_info(5 * d_prim_count);
     std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
@@ -1036,9 +1078,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     timer.start("Prep. sortQD");
 
-    auto dens_ptr = densityMatrix.alphaDensity(0);
-
-    screening.sortQD(s_prim_count, p_prim_count, s_prim_aoinds, p_prim_aoinds, naos, dens_ptr);
+    screening.sortQD(s_prim_count, p_prim_count, s_prim_aoinds, p_prim_aoinds, cart_naos, cart_dens_ptr);
 
     timer.stop("Prep. sortQD");
 
@@ -1059,7 +1099,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     hipSafe(hipMemcpy(d_matrix_A, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
 
-    mat_full = screening.get_mat_D_abs_full(s_prim_count, p_prim_count, s_prim_aoinds, p_prim_aoinds, naos, dens_ptr);
+    mat_full = screening.get_mat_D_abs_full(s_prim_count, p_prim_count, s_prim_aoinds, p_prim_aoinds, cart_naos, cart_dens_ptr);
 
     hipSafe(hipMemcpy(d_matrix_B, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
 
@@ -1222,21 +1262,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     timer.stop("GTO block prep.");
 
-    timer.start("GTO block pair prep.");
-
     // GTO block pairs
-
-    auto dens_ptr = densityMatrix.alphaDensity(0);
-
-    // TODO distribute computation of Q matrices
-
-    // timer.start("  D matrices");
-
-    // screening.sortQD(s_prim_count, p_prim_count, s_prim_aoinds, p_prim_aoinds, naos, dens_ptr);
-
-    // timer.stop("  D matrices");
-
-    timer.stop("GTO block pair prep.");
 
     timer.start("Coulomb prep.");
 
@@ -1597,8 +1623,15 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             // TODO: think about the ordering of cartesian components
             const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
-            mat_Fock_omp[gpu_id].row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
+            // Cartesian to spherical
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto_sph] += mat_J[ij] * j_coef_sph * 2.0;
+                mat_Fock_omp[gpu_id].row(j_cgto_sph)[i_cgto] += mat_J[ij] * j_coef_sph * 2.0;
+            }
         }
 
         timer.stop("  J block SP");
@@ -1711,9 +1744,24 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
             const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
+            // Cartesian to spherical
+            for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
+            {
+                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+                auto i_coef_sph = i_cgto_sph_ind_coef.second;
 
-            if (i != j) mat_Fock_omp[gpu_id].row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
+                for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
+                {
+                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                    auto coef_sph = i_coef_sph * j_coef_sph;
+
+                    mat_Fock_omp[gpu_id].row(i_cgto_sph)[j_cgto_sph] += mat_J[ij] * coef_sph * 2.0;
+
+                    if (i != j) mat_Fock_omp[gpu_id].row(j_cgto_sph)[i_cgto_sph] += mat_J[ij] * coef_sph * 2.0;
+                }
+            }
         }
 
         timer.stop("  J block PP");
@@ -1808,7 +1856,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     double *d_mat_Q_for_K_ss, *d_mat_Q_for_K_sp, *d_mat_Q_for_K_ps, *d_mat_Q_for_K_pp;
     uint32_t *d_density_inds_for_K_ss, *d_density_inds_for_K_sp, *d_density_inds_for_K_ps, *d_density_inds_for_K_pp;
 
-    hipSafe(hipMalloc(&d_mat_D_full_AO, naos * naos * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_D_full_AO, cart_naos * cart_naos * sizeof(double)));
 
     hipSafe(hipMalloc(&d_mat_Q_for_K_ss, s_prim_count * s_prim_count * sizeof(double)));
     hipSafe(hipMalloc(&d_mat_Q_for_K_sp, s_prim_count * p_prim_count * 3 * sizeof(double)));
@@ -1820,7 +1868,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipMalloc(&d_density_inds_for_K_ps, p_prim_count * 3 * s_prim_count * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_density_inds_for_K_pp, p_prim_count * 3 * p_prim_count * 3 * sizeof(uint32_t)));
 
-    hipSafe(hipMemcpy(d_mat_D_full_AO, dens_ptr, naos * naos * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_mat_D_full_AO, cart_dens_ptr, cart_naos * cart_naos * sizeof(double), hipMemcpyHostToDevice));
 
     hipSafe(hipMemcpy(d_mat_Q_for_K_ss, mat_Q_for_K_ss.data(), s_prim_count * s_prim_count * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_mat_Q_for_K_sp, mat_Q_for_K_sp.data(), s_prim_count * p_prim_count * 3 * sizeof(double), hipMemcpyHostToDevice));
@@ -1877,7 +1925,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_mat_D_full_AO,
                                                      d_mat_Q_for_K_ss,
                                                      d_density_inds_for_K_ss,
-                                                     static_cast<uint32_t>(naos),
+                                                     static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
@@ -1903,7 +1951,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_mat_Q_for_K_sp,
                                                      d_density_inds_for_K_ss,
                                                      d_density_inds_for_K_sp,
-                                                     static_cast<uint32_t>(naos),
+                                                     static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
@@ -1929,7 +1977,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_mat_Q_for_K_sp,
                                                      d_density_inds_for_K_ss,
                                                      d_density_inds_for_K_sp,
-                                                     static_cast<uint32_t>(naos),
+                                                     static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
@@ -1953,7 +2001,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_mat_D_full_AO,
                                                      d_mat_Q_for_K_sp,
                                                      d_density_inds_for_K_sp,
-                                                     static_cast<uint32_t>(naos),
+                                                     static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
@@ -2017,7 +2065,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_mat_Q_for_K_ps,
                                                      d_density_inds_for_K_ss,
                                                      d_density_inds_for_K_ps,
-                                                     static_cast<uint32_t>(naos),
+                                                     static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
@@ -2043,7 +2091,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_mat_Q_for_K_pp,
                                                      d_density_inds_for_K_ss,
                                                      d_density_inds_for_K_pp,
-                                                     static_cast<uint32_t>(naos),
+                                                     static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
@@ -2069,7 +2117,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_mat_Q_for_K_ps,
                                                      d_density_inds_for_K_sp,
                                                      d_density_inds_for_K_ps,
-                                                     static_cast<uint32_t>(naos),
+                                                     static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
@@ -2095,7 +2143,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_mat_Q_for_K_pp,
                                                      d_density_inds_for_K_sp,
                                                      d_density_inds_for_K_pp,
-                                                     static_cast<uint32_t>(naos),
+                                                     static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
@@ -2111,8 +2159,15 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             // TODO: think about the ordering of cartesian components
             const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
 
-            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0) * frac_exact_exchange;
-            mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0) * frac_exact_exchange;
+            // Cartesian to spherical
+            for (const auto& k_cgto_sph_ind_coef : cart_sph_p[k_cgto])
+            {
+                auto k_cgto_sph = k_cgto_sph_ind_coef.first;
+                auto k_coef_sph = k_cgto_sph_ind_coef.second;
+
+                mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto_sph] += mat_K[ik] * k_coef_sph * (-1.0) * frac_exact_exchange;
+                mat_Fock_omp[gpu_id].row(k_cgto_sph)[i_cgto] += mat_K[ik] * k_coef_sph * (-1.0) * frac_exact_exchange;
+            }
         }
 
         timer.stop("  K block SP");
@@ -2158,7 +2213,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_mat_D_full_AO,
                                                      d_mat_Q_for_K_ps,
                                                      d_density_inds_for_K_ps,
-                                                     static_cast<uint32_t>(naos),
+                                                     static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
@@ -2184,7 +2239,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_mat_Q_for_K_pp,
                                                      d_density_inds_for_K_ps,
                                                      d_density_inds_for_K_pp,
-                                                     static_cast<uint32_t>(naos),
+                                                     static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
@@ -2210,7 +2265,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_mat_Q_for_K_pp,
                                                      d_density_inds_for_K_ps,
                                                      d_density_inds_for_K_pp,
-                                                     static_cast<uint32_t>(naos),
+                                                     static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
@@ -2231,7 +2286,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_mat_D_full_AO,
                                                      d_mat_Q_for_K_pp,
                                                      d_density_inds_for_K_pp,
-                                                     static_cast<uint32_t>(naos),
+                                                     static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
@@ -2246,9 +2301,24 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
             const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
 
-            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0) * frac_exact_exchange;
+            // Cartesian to spherical
+            for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
+            {
+                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+                auto i_coef_sph = i_cgto_sph_ind_coef.second;
 
-            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0) * frac_exact_exchange;
+                for (const auto& k_cgto_sph_ind_coef : cart_sph_p[k_cgto])
+                {
+                    auto k_cgto_sph = k_cgto_sph_ind_coef.first;
+                    auto k_coef_sph = k_cgto_sph_ind_coef.second;
+
+                    auto coef_sph = i_coef_sph * k_coef_sph;
+
+                    mat_Fock_omp[gpu_id].row(i_cgto_sph)[k_cgto_sph] += mat_K[ik] * coef_sph * (-1.0) * frac_exact_exchange;
+
+                    if (i != k) mat_Fock_omp[gpu_id].row(k_cgto_sph)[i_cgto_sph] += mat_K[ik] * coef_sph * (-1.0) * frac_exact_exchange;
+                }
+            }
         }
 
         timer.stop("  K block PP");

@@ -303,13 +303,9 @@ computeCoulombFockSSSP(double*         mat_J,
             const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
             const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                  (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+            const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                  (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
             const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -326,11 +322,7 @@ computeCoulombFockSSSP(double*         mat_J,
 
             const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+            const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -455,13 +447,9 @@ computeCoulombFockSSPP(double*         mat_J,
             const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
             const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                  (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+            const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                  (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
             const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -482,12 +470,8 @@ computeCoulombFockSSPP(double*         mat_J,
             const auto S2 = (a_k + a_l);
             const auto S4 = (a_i + a_j + a_k + a_l);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-            const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+            const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
             const auto QC_0 = (a_l / (a_k + a_l)) * rkl[c0];
             const auto QD_0 = (-a_k / (a_k + a_l)) * rkl[d0];
@@ -637,13 +621,9 @@ computeCoulombFockSPSS(double*         mat_J,
             const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
             const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                  (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+            const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                  (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
             const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -660,11 +640,7 @@ computeCoulombFockSPSS(double*         mat_J,
 
             const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
+            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -790,13 +766,9 @@ computeCoulombFockSPSP(double*         mat_J,
             const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
             const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                  (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+            const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                  (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
             const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -816,12 +788,8 @@ computeCoulombFockSPSP(double*         mat_J,
             const auto S2 = (a_k + a_l);
             const auto S4 = (a_i + a_j + a_k + a_l);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-            const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+            const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
             const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
@@ -979,13 +947,9 @@ computeCoulombFockSPPP(double*         mat_J,
             const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
             const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                  (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+            const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                  (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
             const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -1005,12 +969,8 @@ computeCoulombFockSPPP(double*         mat_J,
             const auto S2 = (a_k + a_l);
             const auto S4 = (a_i + a_j + a_k + a_l);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-            const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+            const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
             const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
@@ -1202,13 +1162,9 @@ computeCoulombFockPPSS(double*         mat_J,
             const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
             const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                  (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+            const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                  (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
             const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -1229,12 +1185,8 @@ computeCoulombFockPPSS(double*         mat_J,
             const auto S2 = (a_k + a_l);
             const auto S4 = (a_i + a_j + a_k + a_l);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-            const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+            const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
             const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
             const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
@@ -1395,13 +1347,9 @@ computeCoulombFockPPSP(double*         mat_J,
             const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
             const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                  (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+            const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                  (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
             const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -1421,12 +1369,8 @@ computeCoulombFockPPSP(double*         mat_J,
             const auto S2 = (a_k + a_l);
             const auto S4 = (a_i + a_j + a_k + a_l);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-            const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+            const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
             const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
             const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
@@ -1618,13 +1562,9 @@ computeCoulombFockPPPP(double*         mat_J,
             const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
             const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                  (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+            const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                  (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
             const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -1644,12 +1584,8 @@ computeCoulombFockPPPP(double*         mat_J,
             const auto S2 = (a_k + a_l);
             const auto S4 = (a_i + a_j + a_k + a_l);
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-            const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+            const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
             const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
             const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
@@ -2074,13 +2010,9 @@ computeExchangeFockSSSP(double*         mat_K,
                     const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
                     const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                          (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
                     const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -2097,11 +2029,7 @@ computeExchangeFockSSSP(double*         mat_K,
 
                     const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+                    const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -2246,13 +2174,9 @@ computeExchangeFockSPSS(double*         mat_K,
                     const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
                     const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                          (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
                     const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -2269,11 +2193,7 @@ computeExchangeFockSPSS(double*         mat_K,
 
                     const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
+                    const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -2428,13 +2348,9 @@ computeExchangeFockSPSP(double*         mat_K,
                     const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
                     const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                          (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
                     const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -2454,12 +2370,8 @@ computeExchangeFockSPSP(double*         mat_K,
                     const auto S2 = (a_k + a_l);
                     const auto S4 = (a_i + a_j + a_k + a_l);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-                    const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+                    const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+                    const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
                     const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
@@ -2637,13 +2549,9 @@ computeExchangeFockSSPS(double*         mat_K,
                     const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
                     const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                          (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
                     const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -2660,11 +2568,7 @@ computeExchangeFockSSPS(double*         mat_K,
 
                     const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+                    const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -2820,13 +2724,9 @@ computeExchangeFockSSPP(double*         mat_K,
                     const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
                     const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                          (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
                     const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -2847,12 +2747,8 @@ computeExchangeFockSSPP(double*         mat_K,
                     const auto S2 = (a_k + a_l);
                     const auto S4 = (a_i + a_j + a_k + a_l);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-                    const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+                    const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+                    const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
                     const auto QC_0 = (a_l / (a_k + a_l)) * rkl[c0];
                     const auto QD_0 = (-a_k / (a_k + a_l)) * rkl[d0];
@@ -3041,13 +2937,9 @@ computeExchangeFockSPPS(double*         mat_K,
                     const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
                     const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                          (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
                     const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -3067,12 +2959,8 @@ computeExchangeFockSPPS(double*         mat_K,
                     const auto S2 = (a_k + a_l);
                     const auto S4 = (a_i + a_j + a_k + a_l);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-                    const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+                    const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+                    const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
                     const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
@@ -3261,13 +3149,9 @@ computeExchangeFockSPPP(double*         mat_K,
                     const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
                     const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                          (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
                     const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -3287,12 +3171,8 @@ computeExchangeFockSPPP(double*         mat_K,
                     const auto S2 = (a_k + a_l);
                     const auto S4 = (a_i + a_j + a_k + a_l);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-                    const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+                    const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+                    const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
                     const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
@@ -3513,13 +3393,9 @@ computeExchangeFockPSPS(double*         mat_K,
                     const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
                     const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                          (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
                     const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -3539,12 +3415,8 @@ computeExchangeFockPSPS(double*         mat_K,
                     const auto S2 = (a_k + a_l);
                     const auto S4 = (a_i + a_j + a_k + a_l);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-                    const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+                    const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+                    const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
                     const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
 
@@ -3733,13 +3605,9 @@ computeExchangeFockPSPP(double*         mat_K,
                     const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
                     const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                          (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
                     const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -3759,12 +3627,8 @@ computeExchangeFockPSPP(double*         mat_K,
                     const auto S2 = (a_k + a_l);
                     const auto S4 = (a_i + a_j + a_k + a_l);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-                    const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+                    const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+                    const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
                     const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
 
@@ -3987,13 +3851,9 @@ computeExchangeFockPPPS(double*         mat_K,
                     const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
                     const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                          (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
                     const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -4013,12 +3873,8 @@ computeExchangeFockPPPS(double*         mat_K,
                     const auto S2 = (a_k + a_l);
                     const auto S4 = (a_i + a_j + a_k + a_l);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-                    const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+                    const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+                    const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
                     const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
                     const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
@@ -4238,13 +4094,9 @@ computeExchangeFockPPPP(double*         mat_K,
                     const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
                     const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double PQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                          (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+                    const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                          (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                          (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
                     const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -4264,12 +4116,8 @@ computeExchangeFockPPPP(double*         mat_K,
                     const auto S2 = (a_k + a_l);
                     const auto S4 = (a_i + a_j + a_k + a_l);
 
-                    // p-1: py
-                    // p_0: pz
-                    // p+1: px
-
-                    const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-                    const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+                    const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+                    const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
                     const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
                     const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
