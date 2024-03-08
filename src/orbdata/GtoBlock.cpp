@@ -198,7 +198,7 @@ CGtoBlock::getAtomicOrbitalsIndexesForCartesian() const -> std::vector<int64_t>
 auto
 CGtoBlock::getSphericalToCartesianMapping() const -> std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>>
 {
-    errors::assertMsgCritical((0 <= _angmom) && (_angmom <= 1), std::string("GtoBlock: getSphericalToCartesianMapping only works for s- and p-orbitals"));
+    errors::assertMsgCritical((0 <= _angmom) && (_angmom <= 2), std::string("GtoBlock: getSphericalToCartesianMapping only works for s/p/d orbitals"));
 
     std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> sph_cart_p;
 
@@ -219,6 +219,29 @@ CGtoBlock::getSphericalToCartesianMapping() const -> std::unordered_map<int64_t,
         sph_cart_comp_map[0] = std::vector<std::pair<int64_t, double>>({{1, 1.0}});
         sph_cart_comp_map[1] = std::vector<std::pair<int64_t, double>>({{2, 1.0}});
         sph_cart_comp_map[2] = std::vector<std::pair<int64_t, double>>({{0, 1.0}});
+    }
+    else if (_angmom == 2)
+    {
+        const double f2_3 = 2.0 * std::sqrt(3.0);
+
+        // d-2 (0) <- dxy(1) * f2_3
+        // d-1 (1) <- dyz(4) * f2_3
+        // d_0 (2) <- dzz(5) * 2.0 - dxx(0) - dyy(3)
+        // d+1 (3) <- dxz(2) * f2_3
+        // d+2 (4) <- (dxx(0) - dyy(3)) * 0.5 * f2_3
+
+        // d-2 (0) * 1/f2_3                 -> dxy(1)
+        // d-1 (1) * 1/f2_3                 -> dyz(4)
+        // d+1 (3) * 1/f2_3                 -> dxz(2)
+        // d_0 (2) * 0.5 + d+2 (4) * 1/f2_3 -> dxx(0)
+        // d_0 (2) * 0.5 - d+2 (4) * 1/f2_3 -> dyy(3)
+        // d_0 (2)                          -> dzz(5)
+
+        sph_cart_comp_map[0] = std::vector<std::pair<int64_t, double>>({{1, 1.0/f2_3}});
+        sph_cart_comp_map[1] = std::vector<std::pair<int64_t, double>>({{4, 1.0/f2_3}});
+        sph_cart_comp_map[2] = std::vector<std::pair<int64_t, double>>({{0, 0.5}, {3, 0.5}, {5, 1.0}});
+        sph_cart_comp_map[3] = std::vector<std::pair<int64_t, double>>({{2, 1.0/f2_3}});
+        sph_cart_comp_map[4] = std::vector<std::pair<int64_t, double>>({{0, 1.0/f2_3}, {3, -1.0/f2_3}});
     }
 
     for (const auto& [sph_comp, cart_comp_coef_vec] : sph_cart_comp_map)
