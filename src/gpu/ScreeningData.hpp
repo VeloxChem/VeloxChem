@@ -147,6 +147,8 @@ class CScreeningData
     auto getQMatrixSP() const -> const CDenseMatrix&;
     auto getQMatrixSD() const -> const CDenseMatrix&;
     auto getQMatrixPP() const -> const CDenseMatrix&;
+    auto getQMatrixPD() const -> const CDenseMatrix&;
+    auto getQMatrixDD() const -> const CDenseMatrix&;
 
     auto sortQD(const int64_t s_prim_count,
                 const int64_t p_prim_count,
@@ -173,27 +175,45 @@ class CScreeningData
 
     auto get_ss_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>&;
     auto get_sp_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>&;
+    auto get_sd_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>&;
     auto get_pp_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>&;
+    auto get_pd_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>&;
+    auto get_dd_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>&;
 
     auto get_ss_first_inds() const -> const std::vector<uint32_t>&;
     auto get_sp_first_inds() const -> const std::vector<uint32_t>&;
+    auto get_sd_first_inds() const -> const std::vector<uint32_t>&;
     auto get_pp_first_inds() const -> const std::vector<uint32_t>&;
+    auto get_pd_first_inds() const -> const std::vector<uint32_t>&;
+    auto get_dd_first_inds() const -> const std::vector<uint32_t>&;
 
     auto get_ss_second_inds() const -> const std::vector<uint32_t>&;
     auto get_sp_second_inds() const -> const std::vector<uint32_t>&;
+    auto get_sd_second_inds() const -> const std::vector<uint32_t>&;
     auto get_pp_second_inds() const -> const std::vector<uint32_t>&;
+    auto get_pd_second_inds() const -> const std::vector<uint32_t>&;
+    auto get_dd_second_inds() const -> const std::vector<uint32_t>&;
 
     auto get_ss_mat_Q() const -> const std::vector<double>&;
     auto get_sp_mat_Q() const -> const std::vector<double>&;
+    auto get_sd_mat_Q() const -> const std::vector<double>&;
     auto get_pp_mat_Q() const -> const std::vector<double>&;
+    auto get_pd_mat_Q() const -> const std::vector<double>&;
+    auto get_dd_mat_Q() const -> const std::vector<double>&;
 
     auto get_ss_mat_D() const -> const std::vector<double>&;
     auto get_sp_mat_D() const -> const std::vector<double>&;
+    auto get_sd_mat_D() const -> const std::vector<double>&;
     auto get_pp_mat_D() const -> const std::vector<double>&;
+    auto get_pd_mat_D() const -> const std::vector<double>&;
+    auto get_dd_mat_D() const -> const std::vector<double>&;
 
     auto get_ss_max_D() const -> double;
     auto get_sp_max_D() const -> double;
+    auto get_sd_max_D() const -> double;
     auto get_pp_max_D() const -> double;
+    auto get_pd_max_D() const -> double;
+    auto get_dd_max_D() const -> double;
 
     auto get_mat_Q_for_K_ss() const -> const std::vector<double>&;
     auto get_mat_Q_for_K_sp() const -> const std::vector<double>&;

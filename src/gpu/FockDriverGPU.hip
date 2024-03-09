@@ -1216,6 +1216,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     int64_t s_prim_count = 0;
     int64_t p_prim_count = 0;
+    int64_t d_prim_count = 0;
 
     for (const auto& gto_block : gto_blocks)
     {
@@ -1226,6 +1227,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
         if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
+        if (gto_ang == 2) d_prim_count += npgtos * ncgtos;
     }
 
     // S gto block
@@ -1260,6 +1262,25 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
 
+    // D gto block
+
+    std::vector<double>   d_prim_info(5 * d_prim_count);
+    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+
+    double*   d_d_prim_info;
+    uint32_t* d_d_prim_aoinds;
+
+    if (d_prim_count > 0)
+    {
+        gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
+
+        hipSafe(hipMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+        hipSafe(hipMalloc(&d_d_prim_aoinds, d_prim_aoinds.size() * sizeof(uint32_t)));
+
+        hipSafe(hipMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+        hipSafe(hipMemcpy(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    }
+
     timer.stop("GTO block prep.");
 
     // GTO block pairs
@@ -1268,51 +1289,87 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     const auto ss_mat_Q_orig = screening.getQMatrixSS();
     const auto sp_mat_Q_orig = screening.getQMatrixSP();
+    const auto sd_mat_Q_orig = screening.getQMatrixSD();
     const auto pp_mat_Q_orig = screening.getQMatrixPP();
+    const auto pd_mat_Q_orig = screening.getQMatrixPD();
+    const auto dd_mat_Q_orig = screening.getQMatrixDD();
 
     const auto& ss_first_inds_local = screening.get_ss_first_inds_local(gpu_id);
     const auto& sp_first_inds_local = screening.get_sp_first_inds_local(gpu_id);
+    const auto& sd_first_inds_local = screening.get_sd_first_inds_local(gpu_id);
     const auto& pp_first_inds_local = screening.get_pp_first_inds_local(gpu_id);
+    const auto& pd_first_inds_local = screening.get_pd_first_inds_local(gpu_id);
+    const auto& dd_first_inds_local = screening.get_dd_first_inds_local(gpu_id);
 
     const auto& ss_second_inds_local = screening.get_ss_second_inds_local(gpu_id);
     const auto& sp_second_inds_local = screening.get_sp_second_inds_local(gpu_id);
+    const auto& sd_second_inds_local = screening.get_sd_second_inds_local(gpu_id);
     const auto& pp_second_inds_local = screening.get_pp_second_inds_local(gpu_id);
+    const auto& pd_second_inds_local = screening.get_pd_second_inds_local(gpu_id);
+    const auto& dd_second_inds_local = screening.get_dd_second_inds_local(gpu_id);
 
     const auto& ss_mat_Q_local = screening.get_ss_mat_Q_local(gpu_id);
     const auto& sp_mat_Q_local = screening.get_sp_mat_Q_local(gpu_id);
+    const auto& sd_mat_Q_local = screening.get_sd_mat_Q_local(gpu_id);
     const auto& pp_mat_Q_local = screening.get_pp_mat_Q_local(gpu_id);
+    const auto& pd_mat_Q_local = screening.get_pd_mat_Q_local(gpu_id);
+    const auto& dd_mat_Q_local = screening.get_dd_mat_Q_local(gpu_id);
 
     const auto& ss_first_inds = screening.get_ss_first_inds();
     const auto& sp_first_inds = screening.get_sp_first_inds();
+    const auto& sd_first_inds = screening.get_sd_first_inds();
     const auto& pp_first_inds = screening.get_pp_first_inds();
+    const auto& pd_first_inds = screening.get_pd_first_inds();
+    const auto& dd_first_inds = screening.get_dd_first_inds();
 
     const auto& ss_second_inds = screening.get_ss_second_inds();
     const auto& sp_second_inds = screening.get_sp_second_inds();
+    const auto& sd_second_inds = screening.get_sd_second_inds();
     const auto& pp_second_inds = screening.get_pp_second_inds();
+    const auto& pd_second_inds = screening.get_pd_second_inds();
+    const auto& dd_second_inds = screening.get_dd_second_inds();
 
     const auto& ss_mat_Q = screening.get_ss_mat_Q(); 
     const auto& sp_mat_Q = screening.get_sp_mat_Q(); 
+    const auto& sd_mat_Q = screening.get_sd_mat_Q(); 
     const auto& pp_mat_Q = screening.get_pp_mat_Q(); 
+    const auto& pd_mat_Q = screening.get_pd_mat_Q(); 
+    const auto& dd_mat_Q = screening.get_dd_mat_Q(); 
 
     const auto& ss_mat_D = screening.get_ss_mat_D(); 
     const auto& sp_mat_D = screening.get_sp_mat_D(); 
+    const auto& sd_mat_D = screening.get_sd_mat_D(); 
     const auto& pp_mat_D = screening.get_pp_mat_D(); 
+    const auto& pd_mat_D = screening.get_pd_mat_D(); 
+    const auto& dd_mat_D = screening.get_dd_mat_D(); 
 
     const auto ss_max_D = screening.get_ss_max_D(); 
     const auto sp_max_D = screening.get_sp_max_D(); 
+    const auto sd_max_D = screening.get_sd_max_D(); 
     const auto pp_max_D = screening.get_pp_max_D(); 
+    const auto pd_max_D = screening.get_pd_max_D(); 
+    const auto dd_max_D = screening.get_dd_max_D(); 
 
     const auto ss_prim_pair_count = static_cast<int64_t>(ss_first_inds.size());
     const auto sp_prim_pair_count = static_cast<int64_t>(sp_first_inds.size());
+    const auto sd_prim_pair_count = static_cast<int64_t>(sd_first_inds.size());
     const auto pp_prim_pair_count = static_cast<int64_t>(pp_first_inds.size());
+    const auto pd_prim_pair_count = static_cast<int64_t>(pd_first_inds.size());
+    const auto dd_prim_pair_count = static_cast<int64_t>(dd_first_inds.size());
 
-    const auto max_prim_pair_count = std::max({ss_prim_pair_count, sp_prim_pair_count, pp_prim_pair_count});
+    const auto max_prim_pair_count = std::max({ss_prim_pair_count, sp_prim_pair_count, sd_prim_pair_count,
+                                               pp_prim_pair_count, pd_prim_pair_count, dd_prim_pair_count});
 
     const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
     const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
+    const auto sd_prim_pair_count_local = static_cast<int64_t>(sd_first_inds_local.size());
     const auto pp_prim_pair_count_local = static_cast<int64_t>(pp_first_inds_local.size());
+    const auto pd_prim_pair_count_local = static_cast<int64_t>(pd_first_inds_local.size());
+    const auto dd_prim_pair_count_local = static_cast<int64_t>(dd_first_inds_local.size());
 
-    const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local, pp_prim_pair_count_local});
+    const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local,
+                                                     sd_prim_pair_count_local, pp_prim_pair_count_local,
+                                                     pd_prim_pair_count_local, dd_prim_pair_count_local});
 
     std::vector<double> mat_J(max_prim_pair_count_local);
 

@@ -469,6 +469,18 @@ CScreeningData::getQMatrixPP() const -> const CDenseMatrix&
 }
 
 auto
+CScreeningData::getQMatrixPD() const -> const CDenseMatrix&
+{
+    return _Q_matrix_pd;
+}
+
+auto
+CScreeningData::getQMatrixDD() const -> const CDenseMatrix&
+{
+    return _Q_matrix_dd;
+}
+
+auto
 CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) -> void
 {
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_ss_mat_Q;
@@ -1093,27 +1105,45 @@ auto CScreeningData::get_dd_second_inds_local(const int64_t gpu_id) const -> con
 
 auto CScreeningData::get_ss_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>& { return _ss_mat_Q_local[gpu_id]; }
 auto CScreeningData::get_sp_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>& { return _sp_mat_Q_local[gpu_id]; }
+auto CScreeningData::get_sd_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>& { return _sd_mat_Q_local[gpu_id]; }
 auto CScreeningData::get_pp_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>& { return _pp_mat_Q_local[gpu_id]; }
+auto CScreeningData::get_pd_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>& { return _pd_mat_Q_local[gpu_id]; }
+auto CScreeningData::get_dd_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>& { return _dd_mat_Q_local[gpu_id]; }
 
 auto CScreeningData::get_ss_first_inds() const -> const std::vector<uint32_t>& { return _ss_first_inds; }
 auto CScreeningData::get_sp_first_inds() const -> const std::vector<uint32_t>& { return _sp_first_inds; }
+auto CScreeningData::get_sd_first_inds() const -> const std::vector<uint32_t>& { return _sd_first_inds; }
 auto CScreeningData::get_pp_first_inds() const -> const std::vector<uint32_t>& { return _pp_first_inds; }
+auto CScreeningData::get_pd_first_inds() const -> const std::vector<uint32_t>& { return _pd_first_inds; }
+auto CScreeningData::get_dd_first_inds() const -> const std::vector<uint32_t>& { return _dd_first_inds; }
 
 auto CScreeningData::get_ss_second_inds() const -> const std::vector<uint32_t>& { return _ss_second_inds; }
 auto CScreeningData::get_sp_second_inds() const -> const std::vector<uint32_t>& { return _sp_second_inds; }
+auto CScreeningData::get_sd_second_inds() const -> const std::vector<uint32_t>& { return _sd_second_inds; }
 auto CScreeningData::get_pp_second_inds() const -> const std::vector<uint32_t>& { return _pp_second_inds; }
+auto CScreeningData::get_pd_second_inds() const -> const std::vector<uint32_t>& { return _pd_second_inds; }
+auto CScreeningData::get_dd_second_inds() const -> const std::vector<uint32_t>& { return _dd_second_inds; }
 
 auto CScreeningData::get_ss_mat_Q() const -> const std::vector<double>& { return _ss_mat_Q; }
 auto CScreeningData::get_sp_mat_Q() const -> const std::vector<double>& { return _sp_mat_Q; }
+auto CScreeningData::get_sd_mat_Q() const -> const std::vector<double>& { return _sd_mat_Q; }
 auto CScreeningData::get_pp_mat_Q() const -> const std::vector<double>& { return _pp_mat_Q; }
+auto CScreeningData::get_pd_mat_Q() const -> const std::vector<double>& { return _pd_mat_Q; }
+auto CScreeningData::get_dd_mat_Q() const -> const std::vector<double>& { return _dd_mat_Q; }
 
 auto CScreeningData::get_ss_mat_D() const -> const std::vector<double>& { return _ss_mat_D; }
 auto CScreeningData::get_sp_mat_D() const -> const std::vector<double>& { return _sp_mat_D; }
+auto CScreeningData::get_sd_mat_D() const -> const std::vector<double>& { return _sd_mat_D; }
 auto CScreeningData::get_pp_mat_D() const -> const std::vector<double>& { return _pp_mat_D; }
+auto CScreeningData::get_pd_mat_D() const -> const std::vector<double>& { return _pd_mat_D; }
+auto CScreeningData::get_dd_mat_D() const -> const std::vector<double>& { return _dd_mat_D; }
 
 auto CScreeningData::get_ss_max_D() const -> double { return _ss_max_D; }
 auto CScreeningData::get_sp_max_D() const -> double { return _sp_max_D; }
+auto CScreeningData::get_sd_max_D() const -> double { return _sd_max_D; }
 auto CScreeningData::get_pp_max_D() const -> double { return _pp_max_D; }
+auto CScreeningData::get_pd_max_D() const -> double { return _pd_max_D; }
+auto CScreeningData::get_dd_max_D() const -> double { return _dd_max_D; }
 
 auto CScreeningData::get_mat_Q_for_K_ss() const -> const std::vector<double>& { return _mat_Q_for_K_ss; };
 auto CScreeningData::get_mat_Q_for_K_sp() const -> const std::vector<double>& { return _mat_Q_for_K_sp; };
