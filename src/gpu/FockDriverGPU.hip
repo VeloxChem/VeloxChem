@@ -895,9 +895,9 @@ transformDensity(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_map_i, cart_sph_map_j;
 
-    for (int64_t i_cgto = 0; i_cgto < cart_naos; i_cgto++)
+    for (int64_t i_cgto = 0; i_cgto < naos; i_cgto++)
     {
-        for (int64_t j_cgto = 0; j_cgto < cart_naos; j_cgto++)
+        for (int64_t j_cgto = 0; j_cgto < naos; j_cgto++)
         {
             for (const auto& i_cgto_cart_ind_coef : sph_cart_map[i_cgto])
             {
