@@ -124,10 +124,10 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
     _Q_matrix_ss = CDenseMatrix(s_prim_count, s_prim_count);
     _Q_matrix_sp = CDenseMatrix(s_prim_count, p_prim_count * 3);
-    _Q_matrix_sd = CDenseMatrix(s_prim_count, p_prim_count * 6);
+    _Q_matrix_sd = CDenseMatrix(s_prim_count, d_prim_count * 6);
     _Q_matrix_pp = CDenseMatrix(p_prim_count * 3, p_prim_count * 3);
-    _Q_matrix_pd = CDenseMatrix(p_prim_count * 3, p_prim_count * 6);
-    _Q_matrix_dd = CDenseMatrix(d_prim_count * 6, p_prim_count * 6);
+    _Q_matrix_pd = CDenseMatrix(p_prim_count * 3, d_prim_count * 6);
+    _Q_matrix_dd = CDenseMatrix(d_prim_count * 6, d_prim_count * 6);
 
     // TODO distribute computation of Q matrices
 
@@ -233,7 +233,7 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
             for (int64_t s = 0; s < 6; s++)
             {
                 // TODO
-                _Q_matrix_sd.row(i)[j * 6 + s] = 1.0;
+                _Q_matrix_sd.row(i)[j * 6 + s] = 1.0e+99;
             }
         }
     }
@@ -344,7 +344,7 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
                 for (int64_t j_cart = 0; j_cart < 6; j_cart++)
                 {
                     // TODO
-                    _Q_matrix_pd.row(i * 3 + i_cart)[j * 6 + j_cart] = 1.0;
+                    _Q_matrix_pd.row(i * 3 + i_cart)[j * 6 + j_cart] = 1.0e+99;
                 }
             }
         }
@@ -429,9 +429,9 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
                     */
 
                     // TODO
-                    _Q_matrix_dd.row(i * 6 + i_cart)[j * 6 + j_cart] = 1.0;
+                    _Q_matrix_dd.row(i * 6 + i_cart)[j * 6 + j_cart] = 1.0e+99;
 
-                    if (i * 6 + i_cart != j * 6 + j_cart) _Q_matrix_dd.row(j * 6 + j_cart)[i * 6 + i_cart] = 1.0;
+                    if (i * 6 + i_cart != j * 6 + j_cart) _Q_matrix_dd.row(j * 6 + j_cart)[i * 6 + i_cart] = 1.0e+99;
                 }
             }
         }
