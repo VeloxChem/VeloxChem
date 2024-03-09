@@ -122,8 +122,17 @@ class CScreeningData
     std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_sp;
     std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_sp;
 
+    std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_sd;
+    std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_sd;
+
     std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_pp;
     std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_pp;
+
+    std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_pd;
+    std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_pd;
+
+    std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_dd;
+    std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_dd;
 
     auto _computeQMatrices(const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
@@ -216,7 +225,7 @@ class CScreeningData
                             const double* dens_ptr) const -> CDenseMatrix;
 
     auto form_mat_Q_and_density_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count) -> void;
-    auto form_pair_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count, const CDenseMatrix& Q_prime, const double Q_prime_thresh) -> void;
+    auto form_pair_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count, const CDenseMatrix& Q_prime, const double Q_prime_thresh) -> void;
 };
 
 #endif /* ScreeningData_hpp */

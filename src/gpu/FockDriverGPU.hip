@@ -1103,7 +1103,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     hipSafe(hipMemcpy(d_matrix_B, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
 
-    const auto all_prim_count = s_prim_count + p_prim_count * 3;
+    const auto all_prim_count = mat_full.getNumberOfRows();
 
     hipblasHandle_t handle;
     hipblasSafe(hipblasCreate(&handle));
@@ -1134,7 +1134,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // auto& Q_prime = mat_full;
     const double Q_prime_thresh = 1.0e-7;
 
-    screening.form_pair_inds_for_K(s_prim_count, p_prim_count, mat_full, Q_prime_thresh);
+    screening.form_pair_inds_for_K(s_prim_count, p_prim_count, d_prim_count, mat_full, Q_prime_thresh);
 
     mat_full = CDenseMatrix();
 
