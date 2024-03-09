@@ -73,23 +73,38 @@ class CScreeningData
 
     std::vector<uint32_t> _ss_first_inds;
     std::vector<uint32_t> _sp_first_inds;
+    std::vector<uint32_t> _sd_first_inds;
     std::vector<uint32_t> _pp_first_inds;
+    std::vector<uint32_t> _pd_first_inds;
+    std::vector<uint32_t> _dd_first_inds;
 
     std::vector<uint32_t> _ss_second_inds;
     std::vector<uint32_t> _sp_second_inds;
+    std::vector<uint32_t> _sd_second_inds;
     std::vector<uint32_t> _pp_second_inds;
+    std::vector<uint32_t> _pd_second_inds;
+    std::vector<uint32_t> _dd_second_inds;
 
     std::vector<double> _ss_mat_Q;
     std::vector<double> _sp_mat_Q;
+    std::vector<double> _sd_mat_Q;
     std::vector<double> _pp_mat_Q;
+    std::vector<double> _pd_mat_Q;
+    std::vector<double> _dd_mat_Q;
 
     std::vector<double> _ss_mat_D;
     std::vector<double> _sp_mat_D;
+    std::vector<double> _sd_mat_D;
     std::vector<double> _pp_mat_D;
+    std::vector<double> _pd_mat_D;
+    std::vector<double> _dd_mat_D;
 
     double _ss_max_D;
     double _sp_max_D;
+    double _sd_max_D;
     double _pp_max_D;
+    double _pd_max_D;
+    double _dd_max_D;
 
     std::vector<double>   _mat_Q_for_K_ss;
     std::vector<double>   _mat_Q_for_K_sp;
@@ -124,7 +139,14 @@ class CScreeningData
     auto getQMatrixSD() const -> const CDenseMatrix&;
     auto getQMatrixPP() const -> const CDenseMatrix&;
 
-    auto sortQD(const int64_t s_prim_count, const int64_t p_prim_count, const std::vector<uint32_t>& s_prim_aoinds, const std::vector<uint32_t>& p_prim_aoinds, const int64_t naos, const double* dens_ptr) -> void;
+    auto sortQD(const int64_t s_prim_count,
+                const int64_t p_prim_count,
+                const int64_t d_prim_count,
+                const std::vector<uint32_t>& s_prim_aoinds,
+                const std::vector<uint32_t>& p_prim_aoinds,
+                const std::vector<uint32_t>& d_prim_aoinds,
+                const int64_t naos,
+                const double* dens_ptr) -> void;
 
     auto get_ss_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
     auto get_sp_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
