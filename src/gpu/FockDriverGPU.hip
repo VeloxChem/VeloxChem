@@ -1091,7 +1091,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     double *d_matrix_A, *d_matrix_B, *d_matrix_C;
 
-    auto mat_full = screening.get_mat_Q_full(s_prim_count, p_prim_count);
+    auto mat_full = screening.get_mat_Q_full(s_prim_count, p_prim_count, d_prim_count);
 
     hipSafe(hipMalloc(&d_matrix_A, mat_full.getNumberOfElements() * sizeof(double)));
     hipSafe(hipMalloc(&d_matrix_B, mat_full.getNumberOfElements() * sizeof(double)));

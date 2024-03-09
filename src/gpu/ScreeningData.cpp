@@ -1134,9 +1134,11 @@ auto CScreeningData::get_local_pair_inds_k_for_K_sp(const int64_t gpu_id) const 
 auto CScreeningData::get_local_pair_inds_i_for_K_pp(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _local_pair_inds_i_for_K_pp[gpu_id]; }
 auto CScreeningData::get_local_pair_inds_k_for_K_pp(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _local_pair_inds_k_for_K_pp[gpu_id]; }
 
-auto CScreeningData::get_mat_Q_full(const int64_t s_prim_count, const int64_t p_prim_count) const -> CDenseMatrix
+auto CScreeningData::get_mat_Q_full(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) const -> CDenseMatrix
 {
-    CDenseMatrix mat_Q_full(s_prim_count + p_prim_count * 3, s_prim_count + p_prim_count * 3);
+    const auto cart_naos = s_prim_count + p_prim_count * 3 + d_prim_count * 6;
+
+    CDenseMatrix mat_Q_full(cart_naos, cart_naos);
 
     for (int64_t i = 0; i < s_prim_count; i++)
     {
@@ -1147,16 +1149,50 @@ auto CScreeningData::get_mat_Q_full(const int64_t s_prim_count, const int64_t p_
 
         for (int64_t j = 0; j < p_prim_count * 3; j++)
         {
-            mat_Q_full.row(i)[s_prim_count + j] = _Q_matrix_sp.row(i)[j];
-            mat_Q_full.row(s_prim_count + j)[i] = _Q_matrix_sp.row(i)[j];
+            auto j_full = s_prim_count + j;
+
+            mat_Q_full.row(i)[j_full] = _Q_matrix_sp.row(i)[j];
+            mat_Q_full.row(j_full)[i] = _Q_matrix_sp.row(i)[j];
+        }
+
+        for (int64_t j = 0; j < d_prim_count * 6; j++)
+        {
+            auto j_full = s_prim_count + p_prim_count * 3 + j;
+
+            mat_Q_full.row(i)[j_full] = _Q_matrix_sd.row(i)[j];
+            mat_Q_full.row(j_full)[i] = _Q_matrix_sd.row(i)[j];
         }
     }
 
     for (int64_t i = 0; i < p_prim_count * 3; i++)
     {
+        auto i_full = s_prim_count + i;
+
         for (int64_t j = 0; j < p_prim_count * 3; j++)
         {
-            mat_Q_full.row(s_prim_count + i)[s_prim_count + j] = _Q_matrix_pp.row(i)[j];
+            auto j_full = s_prim_count + j;
+
+            mat_Q_full.row(i_full)[j_full] = _Q_matrix_pp.row(i)[j];
+        }
+
+        for (int64_t j = 0; j < d_prim_count * 6; j++)
+        {
+            auto j_full = s_prim_count + p_prim_count * 3 + j;
+
+            mat_Q_full.row(i_full)[j_full] = _Q_matrix_pd.row(i)[j];
+            mat_Q_full.row(j_full)[i_full] = _Q_matrix_pd.row(i)[j];
+        }
+    }
+
+    for (int64_t i = 0; i < d_prim_count * 6; i++)
+    {
+        auto i_full = s_prim_count + p_prim_count * 3 + i;
+
+        for (int64_t j = 0; j < d_prim_count * 6; j++)
+        {
+            auto j_full = s_prim_count + p_prim_count * 3 + j;
+
+            mat_Q_full.row(i_full)[j_full] = _Q_matrix_dd.row(i)[j];
         }
     }
 
