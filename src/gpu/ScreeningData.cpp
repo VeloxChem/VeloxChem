@@ -1199,9 +1199,18 @@ auto CScreeningData::get_mat_Q_full(const int64_t s_prim_count, const int64_t p_
     return mat_Q_full;
 }
 
-auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count, const int64_t p_prim_count, const std::vector<uint32_t>& s_prim_aoinds, const std::vector<uint32_t>& p_prim_aoinds, const int64_t naos, const double* dens_ptr) const -> CDenseMatrix
+auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count,
+                                        const int64_t p_prim_count,
+                                        const int64_t d_prim_count,
+                                        const std::vector<uint32_t>& s_prim_aoinds,
+                                        const std::vector<uint32_t>& p_prim_aoinds,
+                                        const std::vector<uint32_t>& d_prim_aoinds,
+                                        const int64_t naos,
+                                        const double* dens_ptr) const -> CDenseMatrix
 {
-    CDenseMatrix mat_D_abs_full(s_prim_count + p_prim_count * 3, s_prim_count + p_prim_count * 3);
+    const auto cart_naos = s_prim_count + p_prim_count * 3 + d_prim_count * 6;
+
+    CDenseMatrix mat_D_abs_full(cart_naos, cart_naos);
 
     for (int64_t i = 0; i < s_prim_count; i++)
     {
@@ -1220,8 +1229,22 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count, const int64_
 
             const auto D_ij = std::fabs(dens_ptr[i_cgto * naos + j_cgto]);
 
-            mat_D_abs_full.row(i)[s_prim_count + j] = D_ij;
-            mat_D_abs_full.row(s_prim_count + j)[i] = D_ij;
+            auto j_full = s_prim_count + j;
+
+            mat_D_abs_full.row(i)[j_full] = D_ij;
+            mat_D_abs_full.row(j_full)[i] = D_ij;
+        }
+
+        for (int64_t j = 0; j < d_prim_count * 6; j++)
+        {
+            const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+            const auto D_ij = std::fabs(dens_ptr[i_cgto * naos + j_cgto]);
+
+            auto j_full = s_prim_count + p_prim_count * 3 + j;
+
+            mat_D_abs_full.row(i)[j_full] = D_ij;
+            mat_D_abs_full.row(j_full)[i] = D_ij;
         }
     }
 
@@ -1229,11 +1252,43 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count, const int64_
     {
         const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
 
+        auto i_full = s_prim_count + i;
+
         for (int64_t j = 0; j < p_prim_count * 3; j++)
         {
             const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            mat_D_abs_full.row(s_prim_count + i)[s_prim_count + j] = std::fabs(dens_ptr[i_cgto * naos + j_cgto]);
+            auto j_full = s_prim_count + j;
+
+            mat_D_abs_full.row(i_full)[j_full] = std::fabs(dens_ptr[i_cgto * naos + j_cgto]);
+        }
+
+        for (int64_t j = 0; j < d_prim_count * 6; j++)
+        {
+            const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+            const auto D_ij = std::fabs(dens_ptr[i_cgto * naos + j_cgto]);
+
+            auto j_full = s_prim_count + p_prim_count * 3 + j;
+
+            mat_D_abs_full.row(i_full)[j_full] = D_ij;
+            mat_D_abs_full.row(j_full)[i_full] = D_ij;
+        }
+    }
+
+    for (int64_t i = 0; i < d_prim_count * 6; i++)
+    {
+        const auto i_cgto = d_prim_aoinds[(i / 6) + d_prim_count * (i % 6)];
+
+        auto i_full = s_prim_count + p_prim_count * 3 + i;
+
+        for (int64_t j = 0; j < d_prim_count * 6; j++)
+        {
+            const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+            auto j_full = s_prim_count + p_prim_count * 3 + j;
+
+            mat_D_abs_full.row(i_full)[j_full] = std::fabs(dens_ptr[i_cgto * naos + j_cgto]);
         }
     }
 
