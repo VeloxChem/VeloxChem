@@ -1535,20 +1535,20 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSSSS, num_blocks, threads_per_block, 0, 0,
-                                                     d_mat_J,
-                                                     d_s_prim_info,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_mat_D,
-                                                     d_ss_mat_Q_local,
-                                                     d_ss_mat_Q,
-                                                     d_ss_first_inds_local,
-                                                     d_ss_second_inds_local,
-                                                     static_cast<uint32_t>(ss_prim_pair_count_local),
-                                                     d_ss_first_inds,
-                                                     d_ss_second_inds,
-                                                     static_cast<uint32_t>(ss_prim_pair_count),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+                               d_mat_J,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_mat_D,
+                               d_ss_mat_Q_local,
+                               d_ss_mat_Q,
+                               d_ss_first_inds_local,
+                               d_ss_second_inds_local,
+                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               d_ss_first_inds,
+                               d_ss_second_inds,
+                               static_cast<uint32_t>(ss_prim_pair_count),
+                               d_boys_func_table,
+                               d_boys_func_ft);
         }
 
         // J: (SS|SP)
@@ -1559,22 +1559,22 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSSSP, num_blocks, threads_per_block, 0, 0,
-                                                     d_mat_J,
-                                                     d_s_prim_info,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_p_prim_info,
-                                                     static_cast<uint32_t>(p_prim_count),
-                                                     d_mat_D,
-                                                     d_ss_mat_Q_local,
-                                                     d_sp_mat_Q,
-                                                     d_ss_first_inds_local,
-                                                     d_ss_second_inds_local,
-                                                     static_cast<uint32_t>(ss_prim_pair_count_local),
-                                                     d_sp_first_inds,
-                                                     d_sp_second_inds,
-                                                     static_cast<uint32_t>(sp_prim_pair_count),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+                               d_mat_J,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_mat_D,
+                               d_ss_mat_Q_local,
+                               d_sp_mat_Q,
+                               d_ss_first_inds_local,
+                               d_ss_second_inds_local,
+                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               d_sp_first_inds,
+                               d_sp_second_inds,
+                               static_cast<uint32_t>(sp_prim_pair_count),
+                               d_boys_func_table,
+                               d_boys_func_ft);
         }
 
         // J: (SS|SD)
@@ -1585,22 +1585,22 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSSSD, num_blocks, threads_per_block, 0, 0,
-                                                     d_mat_J,
-                                                     d_s_prim_info,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_d_prim_info,
-                                                     static_cast<uint32_t>(d_prim_count),
-                                                     d_mat_D,
-                                                     d_ss_mat_Q_local,
-                                                     d_sd_mat_Q,
-                                                     d_ss_first_inds_local,
-                                                     d_ss_second_inds_local,
-                                                     static_cast<uint32_t>(ss_prim_pair_count_local),
-                                                     d_sd_first_inds,
-                                                     d_sd_second_inds,
-                                                     static_cast<uint32_t>(sd_prim_pair_count),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+                               d_mat_J,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_mat_D,
+                               d_ss_mat_Q_local,
+                               d_sd_mat_Q,
+                               d_ss_first_inds_local,
+                               d_ss_second_inds_local,
+                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               d_sd_first_inds,
+                               d_sd_second_inds,
+                               static_cast<uint32_t>(sd_prim_pair_count),
+                               d_boys_func_table,
+                               d_boys_func_ft);
         }
 
         // J: (SS|PP)
@@ -1611,22 +1611,22 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSSPP, num_blocks, threads_per_block, 0, 0,
-                                                     d_mat_J,
-                                                     d_s_prim_info,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_p_prim_info,
-                                                     static_cast<uint32_t>(p_prim_count),
-                                                     d_mat_D,
-                                                     d_ss_mat_Q_local,
-                                                     d_pp_mat_Q,
-                                                     d_ss_first_inds_local,
-                                                     d_ss_second_inds_local,
-                                                     static_cast<uint32_t>(ss_prim_pair_count_local),
-                                                     d_pp_first_inds,
-                                                     d_pp_second_inds,
-                                                     static_cast<uint32_t>(pp_prim_pair_count),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+                               d_mat_J,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_mat_D,
+                               d_ss_mat_Q_local,
+                               d_pp_mat_Q,
+                               d_ss_first_inds_local,
+                               d_ss_second_inds_local,
+                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               d_pp_first_inds,
+                               d_pp_second_inds,
+                               static_cast<uint32_t>(pp_prim_pair_count),
+                               d_boys_func_table,
+                               d_boys_func_ft);
         }
 
         // J: (SS|PD)
@@ -1637,24 +1637,24 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSSPD, num_blocks, threads_per_block, 0, 0,
-                                                     d_mat_J,
-                                                     d_s_prim_info,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_p_prim_info,
-                                                     static_cast<uint32_t>(p_prim_count),
-                                                     d_d_prim_info,
-                                                     static_cast<uint32_t>(d_prim_count),
-                                                     d_mat_D,
-                                                     d_ss_mat_Q_local,
-                                                     d_pd_mat_Q,
-                                                     d_ss_first_inds_local,
-                                                     d_ss_second_inds_local,
-                                                     static_cast<uint32_t>(ss_prim_pair_count_local),
-                                                     d_pd_first_inds,
-                                                     d_pd_second_inds,
-                                                     static_cast<uint32_t>(pd_prim_pair_count),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+                               d_mat_J,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_mat_D,
+                               d_ss_mat_Q_local,
+                               d_pd_mat_Q,
+                               d_ss_first_inds_local,
+                               d_ss_second_inds_local,
+                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               d_pd_first_inds,
+                               d_pd_second_inds,
+                               static_cast<uint32_t>(pd_prim_pair_count),
+                               d_boys_func_table,
+                               d_boys_func_ft);
         }
 
         // J: (SS|DD)
@@ -1665,22 +1665,22 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSSDD, num_blocks, threads_per_block, 0, 0,
-                                                     d_mat_J,
-                                                     d_s_prim_info,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_d_prim_info,
-                                                     static_cast<uint32_t>(d_prim_count),
-                                                     d_mat_D,
-                                                     d_ss_mat_Q_local,
-                                                     d_dd_mat_Q,
-                                                     d_ss_first_inds_local,
-                                                     d_ss_second_inds_local,
-                                                     static_cast<uint32_t>(ss_prim_pair_count_local),
-                                                     d_dd_first_inds,
-                                                     d_dd_second_inds,
-                                                     static_cast<uint32_t>(dd_prim_pair_count),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+                               d_mat_J,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_mat_D,
+                               d_ss_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_ss_first_inds_local,
+                               d_ss_second_inds_local,
+                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_boys_func_table,
+                               d_boys_func_ft);
         }
 
         hipSafe(hipMemcpy(mat_J.data(), d_mat_J, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
