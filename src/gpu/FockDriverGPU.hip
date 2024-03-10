@@ -2332,7 +2332,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     if (pd_prim_pair_count_local > 0)
     {
-        timer.start("  J block SD");
+        timer.start("  J block PD");
 
         // zeroize J on device
 
@@ -2540,9 +2540,217 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             }
         }
 
-        timer.stop("  J block PP");
-    
+        timer.stop("  J block PD");
+    }
 
+    // J: D-D block
+
+    if (dd_prim_pair_count_local > 0)
+    {
+        timer.start("  J block DD");
+
+        // zeroize J on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_J, static_cast<uint32_t>(dd_prim_pair_count_local));
+
+        // set up thread blocks for J
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+        // J: (DD|SS)
+        //     **
+
+        if (ss_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            hipLaunchKernelGGL(gpu::computeCoulombFockDDSS, num_blocks, threads_per_block, 0, 0,
+                               d_mat_J,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_mat_D,
+                               d_dd_mat_Q_local,
+                               d_ss_mat_Q,
+                               d_dd_first_inds_local,
+                               d_dd_second_inds_local,
+                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_ss_first_inds,
+                               d_ss_second_inds,
+                               static_cast<uint32_t>(ss_prim_pair_count),
+                               d_boys_func_table,
+                               d_boys_func_ft);
+        }
+
+        // J: (DD|SP)
+        //     **
+
+        if (sp_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            hipLaunchKernelGGL(gpu::computeCoulombFockDDSP, num_blocks, threads_per_block, 0, 0,
+                               d_mat_J,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_mat_D,
+                               d_dd_mat_Q_local,
+                               d_sp_mat_Q,
+                               d_dd_first_inds_local,
+                               d_dd_second_inds_local,
+                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_sp_first_inds,
+                               d_sp_second_inds,
+                               static_cast<uint32_t>(sp_prim_pair_count),
+                               d_boys_func_table,
+                               d_boys_func_ft);
+        }
+
+        // J: (DD|SD)
+        //     **
+
+        if (sd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            hipLaunchKernelGGL(gpu::computeCoulombFockDDSD, num_blocks, threads_per_block, 0, 0,
+                               d_mat_J,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_mat_D,
+                               d_dd_mat_Q_local,
+                               d_sd_mat_Q,
+                               d_dd_first_inds_local,
+                               d_dd_second_inds_local,
+                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_sd_first_inds,
+                               d_sd_second_inds,
+                               static_cast<uint32_t>(sd_prim_pair_count),
+                               d_boys_func_table,
+                               d_boys_func_ft);
+        }
+
+        // J: (DD|PP)
+        //     **
+
+        if (pp_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            hipLaunchKernelGGL(gpu::computeCoulombFockDDPP, num_blocks, threads_per_block, 0, 0,
+                               d_mat_J,
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_mat_D,
+                               d_dd_mat_Q_local,
+                               d_pp_mat_Q,
+                               d_dd_first_inds_local,
+                               d_dd_second_inds_local,
+                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_pp_first_inds,
+                               d_pp_second_inds,
+                               static_cast<uint32_t>(pp_prim_pair_count),
+                               d_boys_func_table,
+                               d_boys_func_ft);
+        }
+
+        // J: (DD|PD)
+        //     **
+
+        if (pd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            hipLaunchKernelGGL(gpu::computeCoulombFockDDPD, num_blocks, threads_per_block, 0, 0,
+                               d_mat_J,
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_mat_D,
+                               d_dd_mat_Q_local,
+                               d_pd_mat_Q,
+                               d_dd_first_inds_local,
+                               d_dd_second_inds_local,
+                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_pd_first_inds,
+                               d_pd_second_inds,
+                               static_cast<uint32_t>(pd_prim_pair_count),
+                               d_boys_func_table,
+                               d_boys_func_ft);
+        }
+
+        // J: (DD|DD)
+        //     **
+
+        if (dd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD, num_blocks, threads_per_block, 0, 0,
+                               d_mat_J,
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_mat_D,
+                               d_dd_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_dd_first_inds_local,
+                               d_dd_second_inds_local,
+                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_boys_func_table,
+                               d_boys_func_ft);
+        }
+
+        hipSafe(hipMemcpy(mat_J.data(), d_mat_J, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
+        {
+            const auto i = dd_first_inds_local[ij];
+            const auto j = dd_second_inds_local[ij];
+
+            // TODO: think about the ordering of cartesian components
+            const auto i_cgto = d_prim_aoinds[(i / 6) + d_prim_count * (i % 6)];
+            const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+            // Cartesian to spherical
+            for (const auto& i_cgto_sph_ind_coef : cart_sph_d[i_cgto])
+            {
+                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+                auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+                for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
+                {
+                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                    auto coef_sph = i_coef_sph * j_coef_sph;
+
+                    mat_Fock_omp[gpu_id].row(i_cgto_sph)[j_cgto_sph] += mat_J[ij] * coef_sph * 2.0;
+
+                    if (i != j) mat_Fock_omp[gpu_id].row(j_cgto_sph)[i_cgto_sph] += mat_J[ij] * coef_sph * 2.0;
+                }
+            }
+        }
+
+        timer.stop("  J block DD");
     }
 
     timer.stop("J computation");
