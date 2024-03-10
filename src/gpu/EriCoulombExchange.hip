@@ -2691,14 +2691,14 @@ computeCoulombFockPPSS(double*         mat_J,
                        const double*   p_prim_info,
                        const uint32_t  p_prim_count,
                        const double*   ss_mat_D,
-                       const double*   ss_mat_Q,
                        const double*   pp_mat_Q_local,
-                       const uint32_t* ss_first_inds,
-                       const uint32_t* ss_second_inds,
-                       const uint32_t  ss_prim_pair_count,
+                       const double*   ss_mat_Q,
                        const uint32_t* pp_first_inds_local,
                        const uint32_t* pp_second_inds_local,
                        const uint32_t  pp_prim_pair_count_local,
+                       const uint32_t* ss_first_inds,
+                       const uint32_t* ss_second_inds,
+                       const uint32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft)
 {
@@ -2782,7 +2782,6 @@ computeCoulombFockPPSS(double*         mat_J,
             gpu::computeBoysFunction(F2_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 2, boys_func_table, boys_func_ft);
 
             const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-
             const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
             const auto S1 = (a_i + a_j);
@@ -2795,7 +2794,7 @@ computeCoulombFockPPSS(double*         mat_J,
             const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
             const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
-            const double eri_ijkl = Lambda * S_kl_00 * S_ij_00 * (
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                     F2_t[0] * (
 
@@ -2875,14 +2874,14 @@ computeCoulombFockPPSP(double*         mat_J,
                        const double*   p_prim_info,
                        const uint32_t  p_prim_count,
                        const double*   sp_mat_D,
-                       const double*   sp_mat_Q,
                        const double*   pp_mat_Q_local,
-                       const uint32_t* sp_first_inds,
-                       const uint32_t* sp_second_inds,
-                       const uint32_t  sp_prim_pair_count,
+                       const double*   sp_mat_Q,
                        const uint32_t* pp_first_inds_local,
                        const uint32_t* pp_second_inds_local,
                        const uint32_t  pp_prim_pair_count_local,
+                       const uint32_t* sp_first_inds,
+                       const uint32_t* sp_second_inds,
+                       const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft)
 {
@@ -2978,7 +2977,6 @@ computeCoulombFockPPSP(double*         mat_J,
 
             const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
             const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-
             const auto QD_0 = (-a_k / (a_k + a_l)) * rkl[d0];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
@@ -3004,8 +3002,8 @@ computeCoulombFockPPSP(double*         mat_J,
 
                         + 0.5 / S4 * (
                             delta[b0][d0] * ( + PA_0)
-                            + delta[a0][d0] * (PB_0)
                             + delta[b0][a0] * (PQ[d0] * (-1.0))
+                            + delta[a0][d0] * (PB_0)
                         )
 
                         + S1 / S4 * (
@@ -3034,9 +3032,9 @@ computeCoulombFockPPSP(double*         mat_J,
                         )
 
                         + 0.5 * S2 / ( S4 * S4 ) * (
-                            delta[b0][a0] * (PQ[d0])
-                            + delta[b0][d0] * (PQ[a0])
+                            delta[b0][d0] * (PQ[a0])
                             + delta[a0][d0] * (PQ[b0])
+                            + delta[b0][a0] * (PQ[d0])
                         )
 
                     )
@@ -3493,7 +3491,6 @@ computeCoulombFockPPPP(double*         mat_J,
 
             const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
             const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-
             const auto QC_0 = (a_l / (a_k + a_l)) * rkl[c0];
             const auto QD_0 = (-a_k / (a_k + a_l)) * rkl[d0];
 
@@ -3543,7 +3540,7 @@ computeCoulombFockPPPP(double*         mat_J,
                             + delta[b0][d0] * ( + PA_0 * QC_0)
                             + delta[b0][c0] * ( + PA_0 * QD_0)
                             + delta[a0][d0] * ( + PB_0 * QC_0)
-                            + delta[b0][a0] * ( + PQ[c0] * QD_0 * (-1.0) + PQ[d0] * QC_0 * (-1.0))
+                            + delta[b0][a0] * (PQ[c0] * QD_0 * (-1.0) + PQ[d0] * QC_0 * (-1.0))
                             + delta[a0][c0] * (PB_0 * QD_0)
                         )
 
@@ -3593,7 +3590,7 @@ computeCoulombFockPPPP(double*         mat_J,
                         + 0.5 * S2 / ( S4 * S4 ) * (
                             delta[b0][d0] * ( + PQ[a0] * QC_0)
                             + delta[a0][d0] * ( + PQ[b0] * QC_0)
-                            + delta[b0][a0] * (PQ[c0] * QD_0 + PQ[d0] * QC_0)
+                            + delta[b0][a0] * ( + PQ[c0] * QD_0 + PQ[d0] * QC_0)
                             + delta[d0][c0] * (PQ[a0] * PQ[b0])
                             + delta[b0][c0] * (PQ[a0] * QD_0)
                             + delta[a0][c0] * (PQ[b0] * QD_0)
@@ -3616,17 +3613,18 @@ computeCoulombFockPPPP(double*         mat_J,
                         )
 
                         + ( S1 * S2 * S2 ) / ( S4 * S4 * S4 ) * (
-                            PQ[a0] * PQ[b0] * PQ[c0] * QD_0 * (-1.0)
+
+                            + PQ[a0] * PQ[b0] * PQ[c0] * QD_0 * (-1.0)
                             + PQ[a0] * PQ[b0] * PQ[d0] * QC_0 * (-1.0)
                         )
 
                         + 0.5 * ( S1 * S2 ) / ( S4 * S4 * S4 ) * (
                             delta[d0][c0] * (PQ[a0] * PQ[b0] * (-1.0))
-                            + delta[b0][a0] * (PQ[c0] * PQ[d0] * (-1.0))
                             + delta[b0][d0] * (PQ[a0] * PQ[c0] * (-1.0))
                             + delta[b0][c0] * (PQ[a0] * PQ[d0] * (-1.0))
                             + delta[a0][d0] * (PQ[b0] * PQ[c0] * (-1.0))
                             + delta[a0][c0] * (PQ[b0] * PQ[d0] * (-1.0))
+                            + delta[b0][a0] * (PQ[c0] * PQ[d0] * (-1.0))
                         )
 
                     )
