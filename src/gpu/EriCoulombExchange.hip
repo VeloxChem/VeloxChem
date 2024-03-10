@@ -1231,14 +1231,14 @@ computeCoulombFockSPSS(double*         mat_J,
                        const double*   p_prim_info,
                        const uint32_t  p_prim_count,
                        const double*   ss_mat_D,
-                       const double*   ss_mat_Q,
                        const double*   sp_mat_Q_local,
-                       const uint32_t* ss_first_inds,
-                       const uint32_t* ss_second_inds,
-                       const uint32_t  ss_prim_pair_count,
+                       const double*   ss_mat_Q,
                        const uint32_t* sp_first_inds_local,
                        const uint32_t* sp_second_inds_local,
                        const uint32_t  sp_prim_pair_count_local,
+                       const uint32_t* ss_first_inds,
+                       const uint32_t* ss_second_inds,
+                       const uint32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft)
 {
@@ -1252,7 +1252,10 @@ computeCoulombFockSPSS(double*         mat_J,
 
     double J_ij = 0.0;
 
-    if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+    }
 
     __syncthreads();
 
@@ -1313,7 +1316,6 @@ computeCoulombFockSPSS(double*         mat_J,
             gpu::computeBoysFunction(F1_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 1, boys_func_table, boys_func_ft);
 
             const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-
             const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
             const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
@@ -1468,7 +1470,6 @@ computeCoulombFockSPSP(double*         mat_J,
             const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
             const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-
             const auto QD_0 = (-a_k / (a_k + a_l)) * rkl[d0];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
@@ -1627,7 +1628,6 @@ computeCoulombFockSPSD(double*         mat_J,
             const auto z_l = d_prim_info[l / 6 + d_prim_count * 4];
 
             const auto b0 = j % 3;
-
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
@@ -1660,7 +1660,6 @@ computeCoulombFockSPSD(double*         mat_J,
             const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
             const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-
             const auto QD_0 = (-a_k / (a_k + a_l)) * rkl[d0];
             const auto QD_1 = (-a_k / (a_k + a_l)) * rkl[d1];
 
@@ -1872,7 +1871,6 @@ computeCoulombFockSPPP(double*         mat_J,
             const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
             const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-
             const auto QC_0 = (a_l / (a_k + a_l)) * rkl[c0];
             const auto QD_0 = (-a_k / (a_k + a_l)) * rkl[d0];
 
@@ -1904,8 +1902,7 @@ computeCoulombFockSPPP(double*         mat_J,
                         )
 
                         + S1 / S4 * (
-
-                            + PB_0 * PQ[c0] * QD_0 * (-1.0)
+                            PB_0 * PQ[c0] * QD_0 * (-1.0)
                             + PB_0 * PQ[d0] * QC_0 * (-1.0)
                         )
 
@@ -1923,7 +1920,8 @@ computeCoulombFockSPPP(double*         mat_J,
                         )
 
                         + ( S1 * S2 ) / ( S4 * S4 ) * (
-                            PQ[b0] * PQ[c0] * QD_0 * (-1.0)
+
+                            + PQ[b0] * PQ[c0] * QD_0 * (-1.0)
                             + PQ[b0] * PQ[d0] * QC_0 * (-1.0)
                         )
 
@@ -2066,9 +2064,7 @@ computeCoulombFockSPPD(double*         mat_J,
             const auto z_l = d_prim_info[l / 6 + d_prim_count * 4];
 
             const auto b0 = j % 3;
-
             const auto c0 = k % 3;
-
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
@@ -2101,9 +2097,7 @@ computeCoulombFockSPPD(double*         mat_J,
             const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
             const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-
             const auto QC_0 = (a_l / (a_k + a_l)) * rkl[c0];
-
             const auto QD_0 = (-a_k / (a_k + a_l)) * rkl[d0];
             const auto QD_1 = (-a_k / (a_k + a_l)) * rkl[d1];
 
@@ -2351,10 +2345,8 @@ computeCoulombFockSPDD(double*         mat_J,
             const auto z_l = d_prim_info[l / 6 + d_prim_count * 4];
 
             const auto b0 = j % 3;
-
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
-
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
@@ -2387,10 +2379,8 @@ computeCoulombFockSPDD(double*         mat_J,
             const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
             const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-
             const auto QC_0 = (a_l / (a_k + a_l)) * rkl[c0];
             const auto QC_1 = (a_l / (a_k + a_l)) * rkl[c1];
-
             const auto QD_0 = (-a_k / (a_k + a_l)) * rkl[d0];
             const auto QD_1 = (-a_k / (a_k + a_l)) * rkl[d1];
 
