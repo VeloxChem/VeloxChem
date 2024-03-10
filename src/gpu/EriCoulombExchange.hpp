@@ -178,6 +178,26 @@ computeCoulombFockSPSP(double*         mat_J,
                        const double*   boys_func_ft);
 
 __global__ void
+computeCoulombFockSPSD(double*         mat_J,
+                       const double*   s_prim_info,
+                       const uint32_t  s_prim_count,
+                       const double*   p_prim_info,
+                       const uint32_t  p_prim_count,
+                       const double*   d_prim_info,
+                       const uint32_t  d_prim_count,
+                       const double*   sd_mat_D,
+                       const double*   sp_mat_Q_local,
+                       const double*   sd_mat_Q,
+                       const uint32_t* sp_first_inds_local,
+                       const uint32_t* sp_second_inds_local,
+                       const uint32_t  sp_prim_pair_count_local,
+                       const uint32_t* sd_first_inds,
+                       const uint32_t* sd_second_inds,
+                       const uint32_t  sd_prim_pair_count,
+                       const double*   boys_func_table,
+                       const double*   boys_func_ft);
+
+__global__ void
 computeCoulombFockSPPP(double*         mat_J,
                        const double*   s_prim_info,
                        const uint32_t  s_prim_count,
@@ -192,6 +212,46 @@ computeCoulombFockSPPP(double*         mat_J,
                        const uint32_t* pp_first_inds,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
+                       const double*   boys_func_table,
+                       const double*   boys_func_ft);
+
+__global__ void
+computeCoulombFockSPPD(double*         mat_J,
+                       const double*   s_prim_info,
+                       const uint32_t  s_prim_count,
+                       const double*   p_prim_info,
+                       const uint32_t  p_prim_count,
+                       const double*   d_prim_info,
+                       const uint32_t  d_prim_count,
+                       const double*   pd_mat_D,
+                       const double*   sp_mat_Q_local,
+                       const double*   pd_mat_Q,
+                       const uint32_t* sp_first_inds_local,
+                       const uint32_t* sp_second_inds_local,
+                       const uint32_t  sp_prim_pair_count_local,
+                       const uint32_t* pd_first_inds,
+                       const uint32_t* pd_second_inds,
+                       const uint32_t  pd_prim_pair_count,
+                       const double*   boys_func_table,
+                       const double*   boys_func_ft);
+
+__global__ void
+computeCoulombFockSPDD(double*         mat_J,
+                       const double*   s_prim_info,
+                       const uint32_t  s_prim_count,
+                       const double*   p_prim_info,
+                       const uint32_t  p_prim_count,
+                       const double*   d_prim_info,
+                       const uint32_t  d_prim_count,
+                       const double*   dd_mat_D,
+                       const double*   sp_mat_Q_local,
+                       const double*   dd_mat_Q,
+                       const uint32_t* sp_first_inds_local,
+                       const uint32_t* sp_second_inds_local,
+                       const uint32_t  sp_prim_pair_count_local,
+                       const uint32_t* dd_first_inds,
+                       const uint32_t* dd_second_inds,
+                       const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft);
 
