@@ -131,6 +131,9 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
     // TODO distribute computation of Q matrices
 
+    const double delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
+    const int64_t d_cart_ind[6][2] = {{0,0}, {0,1}, {0,2}, {1,1}, {1,2}, {2,2}};
+
     // S-S and S-P block pairs
 
     for (int64_t i = 0; i < s_prim_count; i++)
@@ -152,22 +155,23 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
             const auto z_j = s_prim_info[j + s_prim_count * 4];
 
             // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+            // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
             const auto a_ij = a_i + a_j;
 
-            const auto S_ij = c_i * c_j * std::pow(MATH_CONST_PI / a_ij, 1.5) * std::exp(-a_i * a_j / a_ij * r2_ij);
+            const auto Lambda = std::sqrt(4.0 * a_ij * a_ij / (a_ij + a_ij) / MATH_CONST_PI);
+
+            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / a_ij, 1.5) * std::exp(-a_i * a_j / a_ij * r2_ij);
 
             const auto F0_t = boysfunc::getBoysFunction(0.0, 0, boys_func_table.data(), boys_func_ft.data());
 
-            const auto eri_ijij = F0_t[0] * S_ij * S_ij * std::sqrt(4.0 * a_ij * a_ij / (a_ij + a_ij) / MATH_CONST_PI);
+            const auto sqrt_eri_ijij = std::sqrt(Lambda * S_ij_00 * S_ij_00 * F0_t[0]);
 
-            const auto sqrt_ijij = std::sqrt(eri_ijij);
+            _Q_matrix_ss.row(i)[j] = sqrt_eri_ijij;
 
-            _Q_matrix_ss.row(i)[j] = sqrt_ijij;
-
-            if (i != j) _Q_matrix_ss.row(j)[i] = sqrt_ijij;
+            if (i != j) _Q_matrix_ss.row(j)[i] = sqrt_eri_ijij;
         }
 
         // S-P gto block pair
@@ -184,29 +188,32 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
             const auto a_ij = a_i + a_j;
 
-            const auto S_ij_0 = c_i * c_j * std::pow(MATH_CONST_PI / a_ij, 1.5) * std::exp(-a_i * a_j / a_ij * r2_ij);
-
             const auto Lambda = std::sqrt(4.0 * a_ij * a_ij / (a_ij + a_ij) / MATH_CONST_PI);
 
-            for (int64_t s = 0; s < 3; s++)
+            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / a_ij, 1.5) * std::exp(-a_i * a_j / a_ij * r2_ij);
+
+            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+
+            const auto F1_t = boysfunc::getBoysFunction(0.0, 1, boys_func_table.data(), boys_func_ft.data());
+
+            for (int64_t j_cart = 0; j_cart < 3; j_cart++)
             {
                 // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+                // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                double S_ij_1;
+                const auto b0 = j_cart;
 
-                if (s == 0) S_ij_1 = -(a_i / a_ij) * (x_j - x_i) * S_ij_0;
-                if (s == 1) S_ij_1 = -(a_i / a_ij) * (y_j - y_i) * S_ij_0;
-                if (s == 2) S_ij_1 = -(a_i / a_ij) * (z_j - z_i) * S_ij_0;
+                const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
-                const auto F1_t = boysfunc::getBoysFunction(0.0, 1, boys_func_table.data(), boys_func_ft.data());
+                const auto sqrt_eri_ijij = std::sqrt(Lambda * S_ij_00 * S_ij_00 * (
 
-                const double eri_ijij = Lambda * (S_ij_1 * S_ij_1 * F1_t[0] + S_ij_0 * S_ij_0 * F1_t[1] / (2.0 * (a_ij + a_ij)));
+                            F1_t[0] * PB_0 * PB_0 + F1_t[1] * 0.25 / a_ij
 
-                const auto sqrt_ijij = std::sqrt(eri_ijij);
+                            ));
 
                 // TODO: think about the ordering of cartesian components
 
-                _Q_matrix_sp.row(i)[j * 3 + s] = sqrt_ijij;
+                _Q_matrix_sp.row(i)[j * 3 + j_cart] = sqrt_eri_ijij;
             }
         }
 
@@ -214,7 +221,6 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
         for (int64_t j = 0; j < d_prim_count; j++)
         {
-            /*
             const auto a_j = d_prim_info[j + d_prim_count * 0];
             const auto c_j = d_prim_info[j + d_prim_count * 1];
             const auto x_j = d_prim_info[j + d_prim_count * 2];
@@ -223,17 +229,71 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
             const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
-            const auto a_ij = a_i + a_j;
+            // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+            // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S_ij_0 = c_i * c_j * std::pow(MATH_CONST_PI / a_ij, 1.5) * std::exp(-a_i * a_j / a_ij * r2_ij);
+            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_i + a_j) / (MATH_CONST_PI * (a_i + a_j + a_i + a_j)));
 
-            const auto Lambda = std::sqrt(4.0 * a_ij * a_ij / (a_ij + a_ij) / MATH_CONST_PI);
-            */
+            const auto F2_t = boysfunc::getBoysFunction(0.0, 2, boys_func_table.data(), boys_func_ft.data());
 
-            for (int64_t s = 0; s < 6; s++)
+            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+            const auto S1 = a_i + a_j;
+
+            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
+
+            for (int64_t j_cart = 0; j_cart < 6; j_cart++)
             {
+                const auto b0 = d_cart_ind[j_cart][0];
+                const auto b1 = d_cart_ind[j_cart][1];
+
+                const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
+                const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
+
+                const auto sqrt_eri_ijij = std::sqrt(Lambda * S_ij_00 * S_ij_00 * (
+
+                            F2_t[0] * (
+
+                                0.25 / ( S1 * S1 ) * (
+                                    delta[b0][b1] * delta[b0][b1]
+                                )
+
+                                + 0.5 / S1 * (
+                                    delta[b0][b1] * (PB_0 * PB_1 * 2.0)
+                                )
+
+                                + (
+                                    PB_0 * PB_0 * PB_1 * PB_1
+                                )
+
+                            )
+
+                            + F2_t[1] * (
+
+                                0.125 / ( S1 * S1 ) * (
+                                    delta[b0][b1] * delta[b0][b1] * (1.0 * (-2.0))
+                                )
+
+                                + 0.25 / S1 * (
+                                    + 1.0 * (PB_0 * PB_0)
+                                    + 1.0 * (PB_1 * PB_1)
+                                )
+
+                            )
+
+                            + F2_t[2] * (
+
+                                0.0625 / ( S1 * S1 ) * (
+                                    1.0
+                                    + delta[b0][b1] * delta[b0][b1] * 2.0
+                                )
+
+                            )
+
+                            ));
+
                 // TODO
-                _Q_matrix_sd.row(i)[j * 6 + s] = 1.0e+99;
+                _Q_matrix_sd.row(i)[j * 6 + j_cart] = sqrt_eri_ijij;
             }
         }
     }
@@ -259,6 +319,7 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
             const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
             // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+            // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_i + a_j) / (MATH_CONST_PI * (a_i + a_j + a_i + a_j)));
 
@@ -266,55 +327,72 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
             const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+            const auto S1 = a_i + a_j;
+
             const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
             for (int64_t i_cart = 0; i_cart < 3; i_cart++)
             {
+                const auto a0 = i_cart;
+
+                const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
+
                 auto j_cart_start = (j == i ? i_cart : 0);
 
                 for (int64_t j_cart = j_cart_start; j_cart < 3; j_cart++)
                 {
-                    const auto S_ij_10 = (a_j / (a_i + a_j)) * rij[i_cart] * S_ij_00;
-                    const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
+                    const auto b0 = j_cart;
 
-                    const auto S_ij_11 = (
+                    const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
-                            (i_cart == j_cart ? 1.0 : 0.0) * (0.5 / (a_i + a_j)) +
+                    const auto sqrt_eri_ijij = std::sqrt(Lambda * S_ij_00 * S_ij_00 * (
 
-                            (a_i * a_j / ((a_i + a_j) * (a_i + a_j))) * (-rij[i_cart]) * rij[j_cart]
+                                F2_t[0] * (
 
-                            ) * S_ij_00;
+                                    0.5 / S1 * (
+                                        delta[a0][b0] * ( + PB_0 * PA_0 * 2.0)
+                                    )
 
-                    const double eri_ijij = Lambda * (
+                                    + (
 
-                            S_ij_11 * S_ij_11 * F2_t[0]
+                                        + PB_0 * PB_0 * PA_0 * PA_0
+                                    )
 
-                            + S_ij_11 * S_ij_00 * (a_i + a_j) / (a_i + a_j + a_i + a_j) * ( -(i_cart == j_cart ? 1.0 : 0.0) * 0.5 / (a_i + a_j) * F2_t[1] )
+                                    + 0.25 / ( S1 * S1 ) * (
+                                        delta[a0][b0] * delta[a0][b0]
+                                    )
 
-                            + S_ij_10 * S_ij_10 / (a_i + a_j + a_i + a_j) * ( 0.5 * F2_t[1] )
+                                )
 
-                            + S_ij_10 * S_ij_01 / (a_i + a_j + a_i + a_j) * ( (j_cart == i_cart ? 1.0 : 0.0) * 0.5 * F2_t[1] )
+                                + F2_t[1] * (
 
-                            + S_ij_01 * S_ij_10 / (a_i + a_j + a_i + a_j) * ( (i_cart == j_cart ? 1.0 : 0.0) * 0.5 * F2_t[1] )
+                                    0.125 / ( S1 * S1 ) * (
+                                        delta[a0][b0] * delta[a0][b0] * (1.0 * (-2.0))
+                                    )
 
-                            + S_ij_01 * S_ij_01 / (a_i + a_j + a_i + a_j) * ( 0.5 * F2_t[1] )
+                                    + 0.25 / S1 * (
+                                        1.0 * ( + PA_0 * PA_0)
+                                        + 1.0 * (PB_0 * PB_0)
+                                    )
 
-                            + S_ij_00 * S_ij_11 * (a_i + a_j) / (a_i + a_j + a_i + a_j) * ( -(i_cart == j_cart ? 1.0 : 0.0) * 0.5 / (a_i + a_j) * F2_t[1] )
+                                )
 
-                            + S_ij_00 * S_ij_00 / ((a_i + a_j + a_i + a_j) * (a_i + a_j + a_i + a_j)) * (
+                                + F2_t[2] * (
 
-                                  ((i_cart == j_cart ? 1.0 : 0.0) * (i_cart == j_cart ? 1.0 : 0.0) + 1.0 +
-                                   (i_cart == j_cart ? 1.0 : 0.0) * (j_cart == i_cart ? 1.0 : 0.0)) * 0.25 * F2_t[2]
+                                    0.0625 / ( S1 * S1 ) * (
+                                        1.0
+                                        + delta[a0][b0] * delta[a0][b0] * 2.0
+                                    )
 
-                            ));
+                                )
 
-                    const auto sqrt_ijij = std::sqrt(eri_ijij);
+                                ));
 
                     // TODO: think about the ordering of cartesian components
 
-                    _Q_matrix_pp.row(i * 3 + i_cart)[j * 3 + j_cart] = sqrt_ijij;
+                    _Q_matrix_pp.row(i * 3 + i_cart)[j * 3 + j_cart] = sqrt_eri_ijij;
 
-                    if (i * 3 + i_cart != j * 3 + j_cart) _Q_matrix_pp.row(j * 3 + j_cart)[i * 3 + i_cart] = sqrt_ijij;
+                    if (i * 3 + i_cart != j * 3 + j_cart) _Q_matrix_pp.row(j * 3 + j_cart)[i * 3 + i_cart] = sqrt_eri_ijij;
                 }
             }
         }
@@ -323,7 +401,6 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
         for (int64_t j = 0; j < d_prim_count; j++)
         {
-            /*
             const auto a_j = d_prim_info[j + d_prim_count * 0];
             const auto c_j = d_prim_info[j + d_prim_count * 1];
             const auto x_j = d_prim_info[j + d_prim_count * 2];
@@ -334,17 +411,132 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
             const auto a_ij = a_i + a_j;
 
-            const auto S_ij_0 = c_i * c_j * std::pow(MATH_CONST_PI / a_ij, 1.5) * std::exp(-a_i * a_j / a_ij * r2_ij);
+            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / a_ij, 1.5) * std::exp(-a_i * a_j / a_ij * r2_ij);
 
             const auto Lambda = std::sqrt(4.0 * a_ij * a_ij / (a_ij + a_ij) / MATH_CONST_PI);
-            */
+
+            const auto F3_t = boysfunc::getBoysFunction(0.0, 3, boys_func_table.data(), boys_func_ft.data());
+
+            const auto S1 = a_ij;
+
+            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
             for (int64_t i_cart = 0; i_cart < 3; i_cart++)
             {
+                const auto a0 = i_cart;
+
+                const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
+
                 for (int64_t j_cart = 0; j_cart < 6; j_cart++)
                 {
-                    // TODO
-                    _Q_matrix_pd.row(i * 3 + i_cart)[j * 6 + j_cart] = 1.0e+99;
+                    const auto b0 = d_cart_ind[j_cart][0];
+                    const auto b1 = d_cart_ind[j_cart][1];
+
+                    const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
+                    const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
+
+                    const auto sqrt_eri_ijij = std::sqrt(Lambda * S_ij_00 * S_ij_00 * (
+
+                                F3_t[0] * (
+
+                                    0.25 / ( S1 * S1 ) * (
+                                        delta[b0][b1] * delta[b0][b1] * ( + PA_0 * PA_0)
+                                        + delta[b0][b1] * delta[a0][b1] * ( + PB_0 * PA_0 * 2.0)
+                                        + delta[a0][b0] * delta[b0][b1] * ( + PB_1 * PA_0 * 2.0)
+                                        + delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0)
+                                        + delta[a0][b0] * delta[a0][b1] * (PB_0 * PB_1 * 2.0)
+                                        + delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1)
+                                    )
+
+                                    + 0.5 / S1 * (
+                                        delta[b0][b1] * ( + PB_0 * PB_1 * PA_0 * PA_0 * 2.0)
+                                        + delta[a0][b1] * ( + PB_0 * PB_0 * PB_1 * PA_0 * 2.0)
+                                        + delta[a0][b0] * ( + PB_0 * PB_1 * PB_1 * PA_0 * 2.0)
+                                    )
+
+                                    + (
+
+                                        + PB_0 * PB_0 * PB_1 * PB_1 * PA_0 * PA_0
+                                    )
+
+                                )
+
+                                + F3_t[1] * (
+
+                                    0.125 / ( S1 * S1 ) * (
+                                        delta[b0][b1] * delta[b0][b1] * ( + PA_0 * PA_0 * (-2.0))
+                                        + delta[a0][b1] * delta[b0][b1] * ( + PB_0 * PA_0 * 2.0)
+                                        + delta[a0][b0] * ( + PB_0 * PA_0 * 2.0)
+                                        + delta[b0][b1] * delta[a0][b1] * ( + PB_0 * PA_0 * (-2.0))
+                                        + 1.0 * delta[a0][b1] * ( + PB_1 * PA_0 * 2.0)
+                                        + delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0 * (-2.0))
+                                        + delta[a0][b0] * delta[a0][b1] * (PB_0 * PB_1 * (-1.0))
+                                        + delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1 * (-2.0))
+                                        + 1.0 * delta[b0][b1] * (PB_0 * PB_1 * 2.0)
+                                        + delta[a0][b1] * delta[a0][b0] * (PB_0 * PB_1)
+                                    )
+
+                                    + 0.25 / S1 * (
+                                        1.0 * ( + PB_0 * PB_0 * PA_0 * PA_0)
+                                        + 1.0 * ( + PB_1 * PB_1 * PA_0 * PA_0)
+                                        + 1.0 * (PB_0 * PB_0 * PB_1 * PB_1)
+                                    )
+
+                                    + 0.0625 / ( S1 * S1 * S1 ) * (
+                                        1.0 * delta[b0][b1] * delta[b0][b1]
+                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * 4.0
+                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1]
+                                        + delta[a0][b0] * delta[a0][b0]
+                                        + delta[a0][b0] * delta[a0][b1] * delta[b0][b1]
+                                        + 1.0 * delta[a0][b1] * delta[a0][b1]
+                                    )
+
+                                )
+
+                                + F3_t[2] * (
+
+                                    0.03125 / ( S1 * S1 * S1 ) * (
+                                        1.0 * delta[b0][b1] * delta[b0][b1] * (1.0 * (-2.0))
+                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * (1.0 * (-8.0))
+                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1] * (1.0 * (-2.0))
+                                        + delta[a0][b0] * delta[a0][b0] * (1.0 * (-2.0))
+                                        + delta[a0][b0] * delta[a0][b1] * delta[b0][b1] * (1.0 * (-2.0))
+                                        + 1.0 * delta[a0][b1] * delta[a0][b1] * (1.0 * (-2.0))
+                                    )
+
+                                    + 0.0625 / ( S1 * S1 ) * (
+                                        1.0 * ( + PA_0 * PA_0)
+                                        + delta[b0][b1] * delta[b0][b1] * ( + PA_0 * PA_0 * 2.0)
+                                        + delta[a0][b1] * delta[b0][b1] * ( + PB_0 * PA_0 * (-1.0))
+                                        + delta[b0][b1] * delta[a0][b1] * ( + PB_0 * PA_0)
+                                        + delta[a0][b1] * ( + PB_1 * PA_0)
+                                        + 1.0 * delta[a0][b1] * ( + PB_1 * PA_0 * (-1.0))
+                                        + 1.0 * (PB_0 * PB_0)
+                                        + delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0 * 2.0)
+                                        + 1.0 * (PB_1 * PB_1)
+                                        + delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1 * 2.0)
+                                    )
+
+                                )
+
+                                + F3_t[3] * (
+
+                                    0.015625 / ( S1 * S1 * S1 ) * (
+                                        1.0
+                                        + 1.0 * delta[b0][b1] * delta[b0][b1] * 2.0
+                                        + delta[a0][b0] * delta[a0][b0] * 2.0
+                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * 5.0
+                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1] * 2.0
+                                        + delta[a0][b1] * delta[a0][b1]
+                                        + delta[a0][b0] * delta[a0][b1] * delta[b0][b1]
+                                        + 1.0 * delta[a0][b1] * delta[a0][b1]
+                                    )
+
+                                )
+
+                                ));
+
+                    _Q_matrix_pd.row(i * 3 + i_cart)[j * 6 + j_cart] = sqrt_eri_ijij;
                 }
             }
         }
@@ -354,17 +546,14 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
     for (int64_t i = 0; i < d_prim_count; i++)
     {
-        /*
         const auto a_i = d_prim_info[i + d_prim_count * 0];
         const auto c_i = d_prim_info[i + d_prim_count * 1];
         const auto x_i = d_prim_info[i + d_prim_count * 2];
         const auto y_i = d_prim_info[i + d_prim_count * 3];
         const auto z_i = d_prim_info[i + d_prim_count * 4];
-        */
 
         for (int64_t j = i; j < d_prim_count; j++)
         {
-            /*
             const auto a_j = d_prim_info[j + d_prim_count * 0];
             const auto c_j = d_prim_info[j + d_prim_count * 1];
             const auto x_j = d_prim_info[j + d_prim_count * 2];
@@ -374,64 +563,558 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
             const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
             // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+            // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_i + a_j) / (MATH_CONST_PI * (a_i + a_j + a_i + a_j)));
 
-            const auto F2_t = boysfunc::getBoysFunction(0.0, 2, boys_func_table.data(), boys_func_ft.data());
+            const auto F4_t = boysfunc::getBoysFunction(0.0, 4, boys_func_table.data(), boys_func_ft.data());
 
             const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-            */
+
+            const auto S1 = a_i + a_j;
+
+            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
             for (int64_t i_cart = 0; i_cart < 6; i_cart++)
             {
+                const auto a0 = d_cart_ind[i_cart][0];
+                const auto a1 = d_cart_ind[i_cart][1];
+
+                const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
+                const auto PA_1 = (a_j / (a_i + a_j)) * rij[a1];
+
                 auto j_cart_start = (j == i ? i_cart : 0);
 
                 for (int64_t j_cart = j_cart_start; j_cart < 6; j_cart++)
                 {
-                    /*
-                    const auto S_ij_10 = (a_j / (a_i + a_j)) * rij[i_cart] * S_ij_00;
-                    const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
+                    const auto b0 = d_cart_ind[j_cart][0];
+                    const auto b1 = d_cart_ind[j_cart][1];
 
-                    const auto S_ij_11 = (
+                    const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
+                    const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
 
-                            (i_cart == j_cart ? 1.0 : 0.0) * (0.5 / (a_i + a_j)) +
+                    const auto sqrt_eri_ijij = std::sqrt(Lambda * S_ij_00 * S_ij_00 * (
 
-                            (a_i * a_j / ((a_i + a_j) * (a_i + a_j))) * (-rij[i_cart]) * rij[j_cart]
+                                F4_t[0] * (
 
-                            ) * S_ij_00;
+                                    0.125 / ( S1 * S1 * S1 ) * (
+                                        delta[a0][a1] * delta[b0][b1] * delta[b0][b1] * ( + PA_0 * PA_1 * 2.0)
+                                        + delta[a0][b0] * delta[b0][b1] * delta[a1][b1] * ( + PA_0 * PA_1 * 2.0)
+                                        + delta[a1][b0] * delta[b0][b1] * delta[a0][b1] * ( + PA_0 * PA_1 * 2.0)
+                                        + delta[a0][a1] * delta[b0][b1] * delta[a1][b1] * ( + PB_0 * PA_0 * 2.0)
+                                        + delta[a0][b0] * delta[a1][b1] * delta[a1][b1] * ( + PB_0 * PA_0 * 2.0)
+                                        + delta[a1][b0] * delta[a0][b1] * delta[a1][b1] * ( + PB_0 * PA_0 * 2.0)
+                                        + delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * ( + PB_1 * PA_0 * 2.0)
+                                        + delta[a0][b0] * delta[a1][b0] * delta[a1][b1] * ( + PB_1 * PA_0 * 2.0)
+                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * ( + PB_1 * PA_0 * 2.0)
+                                        + delta[a0][a1] * delta[b0][b1] * delta[a0][b1] * ( + PB_0 * PA_1 * 2.0)
+                                        + delta[a0][b0] * delta[a0][b1] * delta[a1][b1] * ( + PB_0 * PA_1 * 2.0)
+                                        + delta[a1][b0] * delta[a0][b1] * delta[a0][b1] * ( + PB_0 * PA_1 * 2.0)
+                                        + delta[a0][a1] * delta[a0][b0] * delta[b0][b1] * ( + PB_1 * PA_1 * 2.0)
+                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * ( + PB_1 * PA_1 * 2.0)
+                                        + delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * ( + PB_1 * PA_1 * 2.0)
+                                        + delta[a0][a1] * delta[a0][a1] * delta[b0][b1] * (PB_0 * PB_1 * 2.0)
+                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b1] * (PB_0 * PB_1 * 2.0)
+                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b1] * (PB_0 * PB_1 * 2.0)
+                                    )
 
-                    const double eri_ijij = Lambda * (
+                                    + 0.25 / ( S1 * S1 ) * (
+                                        delta[b0][b1] * delta[b0][b1] * ( + PA_0 * PA_0 * PA_1 * PA_1)
+                                        + delta[b0][b1] * delta[a1][b1] * ( + PB_0 * PA_0 * PA_0 * PA_1 * 2.0)
+                                        + delta[a1][b0] * delta[b0][b1] * ( + PB_1 * PA_0 * PA_0 * PA_1 * 2.0)
+                                        + delta[a1][b1] * delta[a1][b1] * ( + PB_0 * PB_0 * PA_0 * PA_0)
+                                        + delta[a1][b0] * delta[a1][b1] * ( + PB_0 * PB_1 * PA_0 * PA_0 * 2.0)
+                                        + delta[a1][b0] * delta[a1][b0] * ( + PB_1 * PB_1 * PA_0 * PA_0)
+                                        + delta[b0][b1] * delta[a0][b1] * ( + PB_0 * PA_0 * PA_1 * PA_1 * 2.0)
+                                        + delta[a0][b0] * delta[b0][b1] * ( + PB_1 * PA_0 * PA_1 * PA_1 * 2.0)
+                                        + delta[a0][b1] * delta[a1][b1] * ( + PB_0 * PB_0 * PA_0 * PA_1 * 2.0)
+                                        + delta[a0][a1] * delta[b0][b1] * ( + PB_0 * PB_1 * PA_0 * PA_1 * 4.0)
+                                        + delta[a0][b0] * delta[a1][b1] * ( + PB_0 * PB_1 * PA_0 * PA_1 * 4.0)
+                                        + delta[a1][b0] * delta[a0][b1] * ( + PB_0 * PB_1 * PA_0 * PA_1 * 4.0)
+                                        + delta[a0][b0] * delta[a1][b0] * ( + PB_1 * PB_1 * PA_0 * PA_1 * 2.0)
+                                        + delta[a0][a1] * delta[a1][b1] * ( + PB_0 * PB_0 * PB_1 * PA_0 * 2.0)
+                                        + delta[a0][a1] * delta[a1][b0] * ( + PB_0 * PB_1 * PB_1 * PA_0 * 2.0)
+                                        + delta[a0][b1] * delta[a0][b1] * ( + PB_0 * PB_0 * PA_1 * PA_1)
+                                        + delta[a0][b0] * delta[a0][b1] * ( + PB_0 * PB_1 * PA_1 * PA_1 * 2.0)
+                                        + delta[a0][b0] * delta[a0][b0] * ( + PB_1 * PB_1 * PA_1 * PA_1)
+                                        + delta[a0][a1] * delta[a0][b1] * ( + PB_0 * PB_0 * PB_1 * PA_1 * 2.0)
+                                        + delta[a0][a1] * delta[a0][b0] * ( + PB_0 * PB_1 * PB_1 * PA_1 * 2.0)
+                                        + delta[a0][a1] * delta[a0][a1] * (PB_0 * PB_0 * PB_1 * PB_1)
+                                    )
 
-                            S_ij_11 * S_ij_11 * F2_t[0]
+                                    + 0.5 / S1 * (
+                                        delta[b0][b1] * ( + PB_0 * PB_1 * PA_0 * PA_0 * PA_1 * PA_1 * 2.0)
+                                        + delta[a1][b1] * ( + PB_0 * PB_0 * PB_1 * PA_0 * PA_0 * PA_1 * 2.0)
+                                        + delta[a1][b0] * ( + PB_0 * PB_1 * PB_1 * PA_0 * PA_0 * PA_1 * 2.0)
+                                        + delta[a0][b1] * ( + PB_0 * PB_0 * PB_1 * PA_0 * PA_1 * PA_1 * 2.0)
+                                        + delta[a0][b0] * ( + PB_0 * PB_1 * PB_1 * PA_0 * PA_1 * PA_1 * 2.0)
+                                        + delta[a0][a1] * ( + PB_0 * PB_0 * PB_1 * PB_1 * PA_0 * PA_1 * 2.0)
+                                    )
 
-                            + S_ij_11 * S_ij_00 * (a_i + a_j) / (a_i + a_j + a_i + a_j) * ( -(i_cart == j_cart ? 1.0 : 0.0) * 0.5 / (a_i + a_j) * F2_t[1] )
+                                    + (
 
-                            + S_ij_10 * S_ij_10 / (a_i + a_j + a_i + a_j) * ( 0.5 * F2_t[1] )
+                                        + PB_0 * PB_0 * PB_1 * PB_1 * PA_0 * PA_0 * PA_1 * PA_1
+                                    )
 
-                            + S_ij_10 * S_ij_01 / (a_i + a_j + a_i + a_j) * ( (j_cart == i_cart ? 1.0 : 0.0) * 0.5 * F2_t[1] )
+                                    + 0.0625 / ( S1 * S1 * S1 * S1 ) * (
+                                        delta[a0][a1] * delta[a0][a1] * delta[b0][b1] * delta[b0][b1]
+                                        + delta[a0][a1] * delta[a0][b0] * delta[b0][b1] * delta[a1][b1] * 2.0
+                                        + delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * delta[a0][b1] * 2.0
+                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * delta[a1][b1]
+                                        + delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * delta[a1][b1] * 2.0
+                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * delta[a0][b1]
+                                    )
 
-                            + S_ij_01 * S_ij_10 / (a_i + a_j + a_i + a_j) * ( (i_cart == j_cart ? 1.0 : 0.0) * 0.5 * F2_t[1] )
+                                )
 
-                            + S_ij_01 * S_ij_01 / (a_i + a_j + a_i + a_j) * ( 0.5 * F2_t[1] )
+                                + F4_t[1] * (
 
-                            + S_ij_00 * S_ij_11 * (a_i + a_j) / (a_i + a_j + a_i + a_j) * ( -(i_cart == j_cart ? 1.0 : 0.0) * 0.5 / (a_i + a_j) * F2_t[1] )
+                                    0.03125 / ( S1 * S1 * S1 * S1 ) * (
+                                        delta[a0][a1] * delta[a0][a1] * delta[b0][b1] * delta[b0][b1] * (1.0 * (-4.0))
+                                        + delta[a0][a1] * delta[a0][b0] * delta[b0][b1] * delta[a1][b1] * (1.0 * (-8.0))
+                                        + delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * delta[a0][b1] * (1.0 * (-8.0))
+                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * delta[a1][b1] * (1.0 * (-4.0))
+                                        + delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * delta[a1][b1] * (1.0 * (-8.0))
+                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * delta[a0][b1] * (1.0 * (-4.0))
+                                    )
 
-                            + S_ij_00 * S_ij_00 / ((a_i + a_j + a_i + a_j) * (a_i + a_j + a_i + a_j)) * (
+                                    + 0.0625 / ( S1 * S1 * S1 ) * (
+                                        1.0 * delta[b0][b1] * delta[b0][b1] * ( + PA_0 * PA_0)
+                                        + delta[a1][b0] * delta[b0][b1] * delta[a1][b1] * ( + PA_0 * PA_0 * 4.0)
+                                        + delta[a1][b1] * delta[a1][b0] * delta[b0][b1] * ( + PA_0 * PA_0)
+                                        + delta[a1][b0] * delta[a1][b0] * ( + PA_0 * PA_0)
+                                        + delta[a1][b0] * delta[a1][b1] * delta[b0][b1] * ( + PA_0 * PA_0)
+                                        + 1.0 * delta[a1][b1] * delta[a1][b1] * ( + PA_0 * PA_0)
+                                        + delta[a0][a1] * delta[b0][b1] * delta[b0][b1] * ( + PA_0 * PA_1 * (-4.0))
+                                        + delta[a0][b0] * delta[b0][b1] * delta[a1][b1] * ( + PA_0 * PA_1 * (-2.0))
+                                        + delta[a0][b1] * delta[a1][b0] * delta[b0][b1] * ( + PA_0 * PA_1)
+                                        + delta[a1][b0] * delta[b0][b1] * delta[a0][b1] * ( + PA_0 * PA_1 * (-2.0))
+                                        + delta[a1][b1] * delta[a0][b0] * delta[b0][b1] * ( + PA_0 * PA_1)
+                                        + delta[a0][b0] * delta[a1][b0] * ( + PA_0 * PA_1 * 2.0)
+                                        + delta[a0][b0] * delta[a1][b1] * delta[b0][b1] * ( + PA_0 * PA_1)
+                                        + delta[a1][b0] * delta[a0][b1] * delta[b0][b1] * ( + PA_0 * PA_1)
+                                        + 1.0 * delta[a0][b1] * delta[a1][b1] * ( + PA_0 * PA_1 * 2.0)
+                                        + delta[a0][a1] * delta[b0][b1] * delta[a1][b1] * ( + PB_0 * PA_0 * (-2.0))
+                                        + delta[a0][b0] * delta[a1][b1] * delta[a1][b1] * ( + PB_0 * PA_0 * (-4.0))
+                                        + delta[a0][b1] * delta[a1][b0] * delta[a1][b1] * ( + PB_0 * PA_0)
+                                        + delta[a0][a1] * delta[a1][b1] * delta[b0][b1] * ( + PB_0 * PA_0 * 2.0)
+                                        + delta[a0][a1] * delta[a1][b0] * ( + PB_0 * PA_0 * 2.0)
+                                        + 1.0 * delta[b0][b1] * delta[a0][b1] * ( + PB_0 * PA_0 * 2.0)
+                                        + delta[a1][b0] * delta[a0][b1] * delta[a1][b1] * ( + PB_0 * PA_0 * (-2.0))
+                                        + delta[a1][b1] * delta[a1][b0] * delta[a0][b1] * ( + PB_0 * PA_0)
+                                        + delta[a0][b0] * delta[a1][b0] * delta[a1][b1] * ( + PB_1 * PA_0 * (-2.0))
+                                        + delta[a0][b1] * delta[a1][b0] * delta[a1][b0] * ( + PB_1 * PA_0)
+                                        + delta[a0][a1] * delta[a1][b1] * ( + PB_1 * PA_0 * 2.0)
+                                        + 1.0 * delta[a0][b0] * delta[b0][b1] * ( + PB_1 * PA_0 * 2.0)
+                                        + delta[a1][b0] * delta[a0][b0] * delta[a1][b1] * ( + PB_1 * PA_0)
+                                        + delta[a1][b1] * delta[a0][b0] * delta[a1][b0] * ( + PB_1 * PA_0)
+                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * ( + PB_1 * PA_0 * (-5.0))
+                                        + 1.0 * delta[b0][b1] * delta[b0][b1] * ( + PA_1 * PA_1)
+                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * ( + PA_1 * PA_1 * 4.0)
+                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1] * ( + PA_1 * PA_1)
+                                        + delta[a0][b0] * delta[a0][b0] * ( + PA_1 * PA_1)
+                                        + delta[a0][b0] * delta[a0][b1] * delta[b0][b1] * ( + PA_1 * PA_1)
+                                        + 1.0 * delta[a0][b1] * delta[a0][b1] * ( + PA_1 * PA_1)
+                                        + 1.0 * delta[b0][b1] * delta[a1][b1] * ( + PB_0 * PA_1 * 2.0)
+                                        + delta[a0][a1] * delta[b0][b1] * delta[a0][b1] * ( + PB_0 * PA_1 * (-2.0))
+                                        + delta[a0][b0] * delta[a0][b1] * delta[a1][b1] * ( + PB_0 * PA_1 * (-2.0))
+                                        + delta[a0][b1] * delta[a0][a1] * delta[b0][b1] * ( + PB_0 * PA_1)
+                                        + delta[a0][b1] * delta[a0][b0] * delta[a1][b1] * ( + PB_0 * PA_1)
+                                        + delta[a0][a1] * delta[a0][b0] * ( + PB_0 * PA_1 * 2.0)
+                                        + delta[a0][a1] * delta[a0][b1] * delta[b0][b1] * ( + PB_0 * PA_1)
+                                        + delta[a1][b0] * delta[a0][b1] * delta[a0][b1] * ( + PB_0 * PA_1 * (-4.0))
+                                        + delta[a1][b1] * delta[a0][b0] * delta[a0][b1] * ( + PB_0 * PA_1)
+                                        + 1.0 * delta[a1][b0] * delta[b0][b1] * ( + PB_1 * PA_1 * 2.0)
+                                        + delta[a0][a1] * delta[a0][b0] * delta[b0][b1] * ( + PB_1 * PA_1 * (-1.0))
+                                        + delta[a0][b0] * delta[a0][a1] * delta[b0][b1] * ( + PB_1 * PA_1)
+                                        + delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * ( + PB_1 * PA_1 * (-2.0))
+                                        + delta[a0][b1] * delta[a0][b0] * delta[a1][b0] * ( + PB_1 * PA_1)
+                                        + delta[a0][a1] * delta[a0][b1] * ( + PB_1 * PA_1 * 2.0)
+                                        + delta[a1][b0] * delta[a0][b0] * delta[a0][b1] * ( + PB_1 * PA_1)
+                                        + delta[a1][b1] * delta[a0][b0] * delta[a0][b0] * ( + PB_1 * PA_1)
+                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * ( + PB_1 * PA_1 * (-5.0))
+                                        + delta[a0][a1] * delta[a0][a1] * delta[b0][b1] * (PB_0 * PB_1 * (-4.0))
+                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b1] * (PB_0 * PB_1 * (-2.0))
+                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b1] * (PB_0 * PB_1 * (-1.0))
+                                        + 1.0 * delta[a1][b1] * delta[a1][b1] * (PB_0 * PB_0)
+                                        + delta[a0][a1] * delta[a0][b1] * delta[a1][b1] * (PB_0 * PB_0 * 4.0)
+                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b1] * (PB_0 * PB_0)
+                                        + delta[a0][a1] * delta[a0][a1] * (PB_0 * PB_0)
+                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b1] * (PB_0 * PB_0)
+                                        + 1.0 * delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0)
+                                        + 1.0 * delta[a1][b0] * delta[a1][b1] * (PB_0 * PB_1 * 2.0)
+                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b1] * (PB_0 * PB_1)
+                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b0] * (PB_0 * PB_1)
+                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b0] * (PB_0 * PB_1)
+                                        + 1.0 * delta[a0][b0] * delta[a0][b1] * (PB_0 * PB_1 * 2.0)
+                                        + 1.0 * delta[a1][b0] * delta[a1][b0] * (PB_1 * PB_1)
+                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b0] * (PB_1 * PB_1 * 4.0)
+                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b0] * (PB_1 * PB_1)
+                                        + delta[a0][a1] * delta[a0][a1] * (PB_1 * PB_1)
+                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b0] * (PB_1 * PB_1)
+                                        + 1.0 * delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1)
+                                    )
 
-                                  ((i_cart == j_cart ? 1.0 : 0.0) * (i_cart == j_cart ? 1.0 : 0.0) + 1.0 +
-                                   (i_cart == j_cart ? 1.0 : 0.0) * (j_cart == i_cart ? 1.0 : 0.0)) * 0.25 * F2_t[2]
+                                    + 0.125 / ( S1 * S1 ) * (
+                                        delta[b0][b1] * delta[b0][b1] * ( + PA_0 * PA_0 * PA_1 * PA_1 * (-2.0))
+                                        + delta[a1][b1] * delta[b0][b1] * ( + PB_0 * PA_0 * PA_0 * PA_1 * 2.0)
+                                        + delta[a1][b0] * ( + PB_0 * PA_0 * PA_0 * PA_1 * 2.0)
+                                        + delta[b0][b1] * delta[a1][b1] * ( + PB_0 * PA_0 * PA_0 * PA_1 * (-2.0))
+                                        + 1.0 * delta[a1][b1] * ( + PB_1 * PA_0 * PA_0 * PA_1 * 2.0)
+                                        + delta[a1][b1] * delta[a1][b1] * ( + PB_0 * PB_0 * PA_0 * PA_0 * (-2.0))
+                                        + 1.0 * delta[b0][b1] * ( + PB_0 * PB_1 * PA_0 * PA_0 * 2.0)
+                                        + delta[a1][b0] * delta[a1][b1] * ( + PB_0 * PB_1 * PA_0 * PA_0 * (-1.0))
+                                        + delta[a1][b1] * delta[a1][b0] * ( + PB_0 * PB_1 * PA_0 * PA_0)
+                                        + delta[a1][b0] * delta[a1][b0] * ( + PB_1 * PB_1 * PA_0 * PA_0 * (-2.0))
+                                        + delta[a0][b1] * delta[b0][b1] * ( + PB_0 * PA_0 * PA_1 * PA_1 * 2.0)
+                                        + delta[a0][b0] * ( + PB_0 * PA_0 * PA_1 * PA_1 * 2.0)
+                                        + delta[b0][b1] * delta[a0][b1] * ( + PB_0 * PA_0 * PA_1 * PA_1 * (-2.0))
+                                        + 1.0 * delta[a0][b1] * ( + PB_1 * PA_0 * PA_1 * PA_1 * 2.0)
+                                        + delta[a0][b1] * delta[a1][b1] * ( + PB_0 * PB_0 * PA_0 * PA_1 * (-1.0))
+                                        + delta[a0][a1] * ( + PB_0 * PB_0 * PA_0 * PA_1 * 2.0)
+                                        + delta[a1][b1] * delta[a0][b1] * ( + PB_0 * PB_0 * PA_0 * PA_1)
+                                        + delta[a0][b0] * delta[a1][b1] * ( + PB_0 * PB_1 * PA_0 * PA_1 * (-2.0))
+                                        + delta[a0][b1] * delta[a1][b0] * ( + PB_0 * PB_1 * PA_0 * PA_1 * 2.0)
+                                        + delta[a1][b0] * delta[a0][b1] * ( + PB_0 * PB_1 * PA_0 * PA_1 * (-2.0))
+                                        + delta[a1][b1] * delta[a0][b0] * ( + PB_0 * PB_1 * PA_0 * PA_1 * 2.0)
+                                        + delta[a0][b0] * delta[a1][b0] * ( + PB_1 * PB_1 * PA_0 * PA_1 * (-1.0))
+                                        + delta[a0][a1] * ( + PB_1 * PB_1 * PA_0 * PA_1 * 2.0)
+                                        + delta[a1][b0] * delta[a0][b0] * ( + PB_1 * PB_1 * PA_0 * PA_1)
+                                        + 1.0 * delta[a0][b1] * ( + PB_0 * PB_0 * PB_1 * PA_0 * 2.0)
+                                        + 1.0 * delta[a0][b0] * ( + PB_0 * PB_1 * PB_1 * PA_0 * 2.0)
+                                        + delta[a0][b1] * delta[a0][b1] * ( + PB_0 * PB_0 * PA_1 * PA_1 * (-2.0))
+                                        + 1.0 * delta[b0][b1] * ( + PB_0 * PB_1 * PA_1 * PA_1 * 2.0)
+                                        + delta[a0][b0] * delta[a0][b1] * ( + PB_0 * PB_1 * PA_1 * PA_1 * (-1.0))
+                                        + delta[a0][b1] * delta[a0][b0] * ( + PB_0 * PB_1 * PA_1 * PA_1)
+                                        + delta[a0][b0] * delta[a0][b0] * ( + PB_1 * PB_1 * PA_1 * PA_1 * (-2.0))
+                                        + 1.0 * delta[a1][b1] * ( + PB_0 * PB_0 * PB_1 * PA_1 * 2.0)
+                                        + delta[a0][a1] * delta[a0][b1] * ( + PB_0 * PB_0 * PB_1 * PA_1 * (-1.0))
+                                        + delta[a0][b1] * delta[a0][a1] * ( + PB_0 * PB_0 * PB_1 * PA_1)
+                                        + 1.0 * delta[a1][b0] * ( + PB_0 * PB_1 * PB_1 * PA_1 * 2.0)
+                                        + delta[a0][a1] * delta[a0][b0] * ( + PB_0 * PB_1 * PB_1 * PA_1 * (-1.0))
+                                        + delta[a0][b0] * delta[a0][a1] * ( + PB_0 * PB_1 * PB_1 * PA_1)
+                                        + delta[a0][a1] * delta[a0][a1] * (PB_0 * PB_0 * PB_1 * PB_1 * (-2.0))
+                                    )
 
-                            ));
+                                    + 0.25 / S1 * (
+                                        1.0 * ( + PB_0 * PB_0 * PA_0 * PA_0 * PA_1 * PA_1)
+                                        + 1.0 * ( + PB_1 * PB_1 * PA_0 * PA_0 * PA_1 * PA_1)
+                                        + 1.0 * ( + PB_0 * PB_0 * PB_1 * PB_1 * PA_0 * PA_0)
+                                        + 1.0 * ( + PB_0 * PB_0 * PB_1 * PB_1 * PA_1 * PA_1)
+                                    )
 
-                    const auto sqrt_ijij = std::sqrt(eri_ijij);
+                                )
 
-                    // TODO: think about the ordering of cartesian components
-                    */
+                                + F4_t[2] * (
 
-                    // TODO
-                    _Q_matrix_dd.row(i * 6 + i_cart)[j * 6 + j_cart] = 1.0e+99;
+                                    0.03125 / ( S1 * S1 * S1 ) * (
+                                        1.0 * delta[b0][b1] * delta[b0][b1] * ( + PA_0 * PA_0 * (-2.0))
+                                        + delta[a1][b0] * delta[b0][b1] * delta[a1][b1] * ( + PA_0 * PA_0 * (-8.0))
+                                        + delta[a1][b1] * delta[a1][b0] * delta[b0][b1] * ( + PA_0 * PA_0 * (-2.0))
+                                        + delta[a1][b0] * delta[a1][b0] * ( + PA_0 * PA_0 * (-2.0))
+                                        + delta[a1][b0] * delta[a1][b1] * delta[b0][b1] * ( + PA_0 * PA_0 * (-2.0))
+                                        + 1.0 * delta[a1][b1] * delta[a1][b1] * ( + PA_0 * PA_0 * (-2.0))
+                                        + delta[a0][a1] * delta[b0][b1] * delta[b0][b1] * ( + PA_0 * PA_1 * 4.0)
+                                        + delta[a0][b0] * delta[a1][b0] * ( + PA_0 * PA_1 * (-1.0))
+                                        + delta[a0][b0] * delta[b0][b1] * delta[a1][b1] * ( + PA_0 * PA_1)
+                                        + delta[a0][b1] * delta[a1][b1] * ( + PA_0 * PA_1)
+                                        + delta[a0][a1] * ( + PA_0 * PA_1 * 2.0)
+                                        + delta[a1][b0] * delta[a0][b0] * ( + PA_0 * PA_1)
+                                        + delta[a1][b0] * delta[b0][b1] * delta[a0][b1] * ( + PA_0 * PA_1)
+                                        + delta[a1][b1] * delta[a0][b0] * delta[b0][b1] * ( + PA_0 * PA_1 * (-1.0))
+                                        + delta[a1][b1] * delta[a0][b1] * ( + PA_0 * PA_1)
+                                        + delta[a1][b0] * delta[a0][b1] * delta[b0][b1] * ( + PA_0 * PA_1 * (-1.0))
+                                        + 1.0 * delta[a0][b1] * delta[a1][b1] * ( + PA_0 * PA_1 * (-2.0))
+                                        + delta[a0][a1] * delta[a1][b1] * delta[b0][b1] * ( + PB_0 * PA_0 * (-1.0))
+                                        + delta[a0][a1] * delta[b0][b1] * delta[a1][b1] * ( + PB_0 * PA_0)
+                                        + delta[a0][b0] * delta[a1][b1] * delta[a1][b1] * ( + PB_0 * PA_0 * 2.0)
+                                        + delta[a0][b1] * delta[b0][b1] * ( + PB_0 * PA_0)
+                                        + 1.0 * delta[a0][b0] * ( + PB_0 * PA_0 * 2.0)
+                                        + 1.0 * delta[b0][b1] * delta[a0][b1] * ( + PB_0 * PA_0 * (-2.0))
+                                        + 1.0 * delta[a0][b1] * delta[b0][b1] * ( + PB_0 * PA_0)
+                                        + delta[a1][b1] * delta[a0][b0] * delta[a1][b1] * ( + PB_0 * PA_0 * 2.0)
+                                        + delta[a0][a1] * delta[a1][b1] * ( + PB_1 * PA_0 * (-1.0))
+                                        + delta[a0][b0] * delta[b0][b1] * ( + PB_1 * PA_0)
+                                        + delta[a0][b1] * delta[a1][b0] * delta[a1][b0] * ( + PB_1 * PA_0 * (-2.0))
+                                        + delta[a0][a1] * delta[a1][b1] * ( + PB_1 * PA_0)
+                                        + 1.0 * delta[a0][b0] * delta[b0][b1] * ( + PB_1 * PA_0 * (-1.0))
+                                        + 1.0 * delta[a0][b1] * ( + PB_1 * PA_0 * 2.0)
+                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * ( + PB_1 * PA_0 * 6.0)
+                                        + 1.0 * delta[b0][b1] * delta[b0][b1] * ( + PA_1 * PA_1 * (-2.0))
+                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * ( + PA_1 * PA_1 * (-8.0))
+                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1] * ( + PA_1 * PA_1 * (-2.0))
+                                        + delta[a0][b0] * delta[a0][b0] * ( + PA_1 * PA_1 * (-2.0))
+                                        + delta[a0][b0] * delta[a0][b1] * delta[b0][b1] * ( + PA_1 * PA_1 * (-2.0))
+                                        + 1.0 * delta[a0][b1] * delta[a0][b1] * ( + PA_1 * PA_1 * (-2.0))
+                                        + 1.0 * delta[a1][b1] * delta[b0][b1] * ( + PB_0 * PA_1 * 2.0)
+                                        + 1.0 * delta[a1][b0] * ( + PB_0 * PA_1 * 2.0)
+                                        + 1.0 * delta[b0][b1] * delta[a1][b1] * ( + PB_0 * PA_1 * (-2.0))
+                                        + delta[a0][a1] * delta[a0][b0] * ( + PB_0 * PA_1 * (-1.0))
+                                        + delta[a0][a1] * delta[b0][b1] * delta[a0][b1] * ( + PB_0 * PA_1)
+                                        + delta[a0][a1] * delta[a0][b1] * delta[b0][b1] * ( + PB_0 * PA_1 * (-1.0))
+                                        + delta[a0][b0] * delta[a0][a1] * ( + PB_0 * PA_1)
+                                        + delta[a0][b1] * delta[a1][b0] * delta[a0][b1] * ( + PB_0 * PA_1 * 2.0)
+                                        + delta[a1][b0] * delta[a0][b1] * delta[a0][b1] * ( + PB_0 * PA_1 * 2.0)
+                                        + 1.0 * delta[a1][b1] * ( + PB_1 * PA_1 * 2.0)
+                                        + delta[a0][a1] * delta[a0][b1] * ( + PB_1 * PA_1 * (-1.0))
+                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * ( + PB_1 * PA_1 * 6.0)
+                                        + delta[a0][b1] * delta[a0][a1] * ( + PB_1 * PA_1)
+                                        + delta[a1][b1] * delta[a0][b0] * delta[a0][b0] * ( + PB_1 * PA_1 * (-2.0))
+                                        + 1.0 * delta[a1][b1] * delta[a1][b1] * (PB_0 * PB_0 * (-2.0))
+                                        + delta[a0][a1] * delta[a0][b1] * delta[a1][b1] * (PB_0 * PB_0 * (-8.0))
+                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b1] * (PB_0 * PB_0 * (-2.0))
+                                        + delta[a0][a1] * delta[a0][a1] * (PB_0 * PB_0 * (-2.0))
+                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b1] * (PB_0 * PB_0 * (-2.0))
+                                        + 1.0 * delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0 * (-2.0))
+                                        + 1.0 * delta[a1][b0] * delta[a1][b1] * (PB_0 * PB_1 * (-1.0))
+                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b1] * (PB_0 * PB_1)
+                                        + delta[a0][a1] * delta[a0][a1] * delta[b0][b1] * (PB_0 * PB_1 * 4.0)
+                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b0] * (PB_0 * PB_1 * (-1.0))
+                                        + 1.0 * delta[a0][b0] * delta[a0][b1] * (PB_0 * PB_1 * (-2.0))
+                                        + 1.0 * delta[a1][b0] * delta[a1][b0] * (PB_1 * PB_1 * (-2.0))
+                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b0] * (PB_1 * PB_1 * (-8.0))
+                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b0] * (PB_1 * PB_1 * (-2.0))
+                                        + delta[a0][a1] * delta[a0][a1] * (PB_1 * PB_1 * (-2.0))
+                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b0] * (PB_1 * PB_1 * (-2.0))
+                                        + 1.0 * delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1 * (-2.0))
+                                        + 1.0 * delta[b0][b1] * (PB_0 * PB_1 * 2.0)
+                                        + 1.0 * delta[a1][b1] * delta[a1][b0] * (PB_0 * PB_1)
+                                        + delta[a0][b0] * delta[a0][b1] * (PB_0 * PB_1)
+                                        + delta[a0][b1] * delta[a0][b0] * (PB_0 * PB_1)
+                                    )
 
-                    if (i * 6 + i_cart != j * 6 + j_cart) _Q_matrix_dd.row(j * 6 + j_cart)[i * 6 + i_cart] = 1.0e+99;
+                                    + 0.0625 / ( S1 * S1 ) * (
+                                        1.0 * ( + PA_0 * PA_0 * PA_1 * PA_1)
+                                        + delta[b0][b1] * delta[b0][b1] * ( + PA_0 * PA_0 * PA_1 * PA_1 * 2.0)
+                                        + delta[a1][b1] * delta[b0][b1] * ( + PB_0 * PA_0 * PA_0 * PA_1 * (-1.0))
+                                        + delta[b0][b1] * delta[a1][b1] * ( + PB_0 * PA_0 * PA_0 * PA_1)
+                                        + delta[a1][b1] * ( + PB_1 * PA_0 * PA_0 * PA_1)
+                                        + 1.0 * delta[a1][b1] * ( + PB_1 * PA_0 * PA_0 * PA_1 * (-1.0))
+                                        + 1.0 * ( + PB_0 * PB_0 * PA_0 * PA_0)
+                                        + delta[a1][b1] * delta[a1][b1] * ( + PB_0 * PB_0 * PA_0 * PA_0 * 2.0)
+                                        + 1.0 * ( + PB_1 * PB_1 * PA_0 * PA_0)
+                                        + delta[a1][b0] * delta[a1][b0] * ( + PB_1 * PB_1 * PA_0 * PA_0 * 2.0)
+                                        + delta[a0][b1] * delta[b0][b1] * ( + PB_0 * PA_0 * PA_1 * PA_1 * (-1.0))
+                                        + delta[b0][b1] * delta[a0][b1] * ( + PB_0 * PA_0 * PA_1 * PA_1)
+                                        + delta[a0][b1] * ( + PB_1 * PA_0 * PA_1 * PA_1)
+                                        + 1.0 * delta[a0][b1] * ( + PB_1 * PA_0 * PA_1 * PA_1 * (-1.0))
+                                        + delta[a0][b0] * delta[a1][b1] * ( + PB_0 * PB_1 * PA_0 * PA_1)
+                                        + delta[a1][b1] * delta[a0][b0] * ( + PB_0 * PB_1 * PA_0 * PA_1 * (-1.0))
+                                        + delta[a0][b1] * ( + PB_0 * PB_0 * PB_1 * PA_0)
+                                        + 1.0 * delta[a0][b1] * ( + PB_0 * PB_0 * PB_1 * PA_0 * (-1.0))
+                                        + delta[a0][b0] * ( + PB_0 * PB_1 * PB_1 * PA_0)
+                                        + 1.0 * delta[a0][b0] * ( + PB_0 * PB_1 * PB_1 * PA_0 * (-1.0))
+                                        + 1.0 * ( + PB_0 * PB_0 * PA_1 * PA_1)
+                                        + delta[a0][b1] * delta[a0][b1] * ( + PB_0 * PB_0 * PA_1 * PA_1 * 2.0)
+                                        + 1.0 * ( + PB_1 * PB_1 * PA_1 * PA_1)
+                                        + delta[a0][b0] * delta[a0][b0] * ( + PB_1 * PB_1 * PA_1 * PA_1 * 2.0)
+                                        + 1.0 * (PB_0 * PB_0 * PB_1 * PB_1)
+                                        + delta[a0][a1] * delta[a0][a1] * (PB_0 * PB_0 * PB_1 * PB_1 * 2.0)
+                                    )
+
+                                    + 0.015625 / ( S1 * S1 * S1 * S1 ) * (
+                                        1.0 * delta[b0][b1] * delta[b0][b1]
+                                        + 1.0 * delta[a1][b0] * delta[b0][b1] * delta[a1][b1] * 4.0
+                                        + 1.0 * delta[a1][b1] * delta[a1][b0] * delta[b0][b1]
+                                        + 1.0 * delta[a1][b0] * delta[a1][b0]
+                                        + 1.0 * delta[a1][b0] * delta[a1][b1] * delta[b0][b1]
+                                        + 1.0 * delta[a1][b1] * delta[a1][b1]
+                                        + delta[a0][a1] * delta[a0][a1] * delta[b0][b1] * delta[b0][b1] * 8.0
+                                        + delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * delta[a0][b1] * 19.0
+                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b0] * delta[b0][b1] * 2.0
+                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b0] * 4.0
+                                        + delta[a0][a1] * delta[a0][b0] * delta[b0][b1] * delta[a1][b1] * 17.0
+                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b1] * delta[b0][b1] * 2.0
+                                        + delta[a0][a1] * delta[a0][b1] * delta[a1][b1] * 4.0
+                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b1] * delta[b0][b1]
+                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b0]
+                                        + delta[a0][b0] * delta[a0][a1] * delta[b0][b1] * delta[a1][b1] * 2.0
+                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1]
+                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * delta[a1][b1] * 7.0
+                                        + delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * delta[a1][b1] * 15.0
+                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * 3.0
+                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b1]
+                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1]
+                                        + delta[a0][b1] * delta[a0][b0] * delta[a1][b0] * delta[a1][b1] * 3.0
+                                        + delta[a0][b1] * delta[a1][b0] * delta[a1][b0] * delta[a0][b1]
+                                        + delta[a0][a1] * delta[a0][a1]
+                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b0]
+                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b1]
+                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b1] * delta[b0][b1] * 2.0
+                                        + 1.0 * delta[a0][b0] * delta[a0][b0]
+                                        + 1.0 * delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * 3.0
+                                        + 1.0 * delta[a0][b0] * delta[a0][b1] * delta[b0][b1]
+                                        + 1.0 * delta[a0][b1] * delta[a0][b1]
+                                        + delta[a1][b0] * delta[a0][b0] * delta[a0][b1] * delta[a1][b1] * 3.0
+                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * delta[a0][b1] * 7.0
+                                        + delta[a1][b1] * delta[a0][b0] * delta[a0][b0] * delta[a1][b1]
+                                        + delta[a1][b1] * delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * 3.0
+                                    )
+
+                                )
+
+                                + F4_t[3] * (
+
+                                    0.0078125 / ( S1 * S1 * S1 * S1 ) * (
+                                        1.0 * delta[b0][b1] * delta[b0][b1] * (1.0 * (-2.0))
+                                        + 1.0 * delta[a1][b0] * delta[b0][b1] * delta[a1][b1] * (1.0 * (-8.0))
+                                        + 1.0 * delta[a1][b1] * delta[a1][b0] * delta[b0][b1] * (1.0 * (-2.0))
+                                        + 1.0 * delta[a1][b0] * delta[a1][b0] * (1.0 * (-2.0))
+                                        + 1.0 * delta[a1][b0] * delta[a1][b1] * delta[b0][b1] * (1.0 * (-2.0))
+                                        + 1.0 * delta[a1][b1] * delta[a1][b1] * (1.0 * (-2.0))
+                                        + delta[a0][a1] * delta[a0][a1] * delta[b0][b1] * delta[b0][b1] * (1.0 * (-8.0))
+                                        + delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * delta[a0][b1] * (1.0 * (-22.0))
+                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b0] * delta[b0][b1] * (1.0 * (-4.0))
+                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b0] * (1.0 * (-8.0))
+                                        + delta[a0][a1] * delta[a0][b0] * delta[b0][b1] * delta[a1][b1] * (1.0 * (-18.0))
+                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b1] * delta[b0][b1] * (1.0 * (-4.0))
+                                        + delta[a0][a1] * delta[a0][b1] * delta[a1][b1] * (1.0 * (-8.0))
+                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b1] * delta[b0][b1] * (1.0 * (-2.0))
+                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b0] * (1.0 * (-2.0))
+                                        + delta[a0][b0] * delta[a0][a1] * delta[b0][b1] * delta[a1][b1] * (1.0 * (-4.0))
+                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * (1.0 * (-2.0))
+                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * delta[a1][b1] * (1.0 * (-6.0))
+                                        + delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * delta[a1][b1] * (1.0 * (-14.0))
+                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * (1.0 * (-6.0))
+                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b1] * (1.0 * (-2.0))
+                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1] * (1.0 * (-2.0))
+                                        + delta[a0][b1] * delta[a0][b0] * delta[a1][b0] * delta[a1][b1] * (1.0 * (-6.0))
+                                        + delta[a0][b1] * delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * (1.0 * (-2.0))
+                                        + delta[a0][a1] * delta[a0][a1] * (1.0 * (-2.0))
+                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b0] * (1.0 * (-2.0))
+                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b1] * (1.0 * (-2.0))
+                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b1] * delta[b0][b1] * (1.0 * (-4.0))
+                                        + 1.0 * delta[a0][b0] * delta[a0][b0] * (1.0 * (-2.0))
+                                        + 1.0 * delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * (1.0 * (-6.0))
+                                        + 1.0 * delta[a0][b0] * delta[a0][b1] * delta[b0][b1] * (1.0 * (-2.0))
+                                        + 1.0 * delta[a0][b1] * delta[a0][b1] * (1.0 * (-2.0))
+                                        + delta[a1][b0] * delta[a0][b0] * delta[a0][b1] * delta[a1][b1] * (1.0 * (-6.0))
+                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * delta[a0][b1] * (1.0 * (-6.0))
+                                        + delta[a1][b1] * delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * (1.0 * (-2.0))
+                                        + delta[a1][b1] * delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * (1.0 * (-6.0))
+                                    )
+
+                                    + 0.015625 / ( S1 * S1 * S1 ) * (
+                                        1.0 * ( + PA_0 * PA_0)
+                                        + 1.0 * delta[b0][b1] * delta[b0][b1] * ( + PA_0 * PA_0 * 2.0)
+                                        + delta[a1][b0] * delta[a1][b0] * ( + PA_0 * PA_0 * 2.0)
+                                        + delta[a1][b0] * delta[b0][b1] * delta[a1][b1] * ( + PA_0 * PA_0 * 5.0)
+                                        + delta[a1][b1] * delta[a1][b0] * delta[b0][b1] * ( + PA_0 * PA_0 * 2.0)
+                                        + delta[a1][b1] * delta[a1][b1] * ( + PA_0 * PA_0)
+                                        + delta[a1][b0] * delta[a1][b1] * delta[b0][b1] * ( + PA_0 * PA_0)
+                                        + 1.0 * delta[a1][b1] * delta[a1][b1] * ( + PA_0 * PA_0)
+                                        + delta[a0][b0] * delta[a1][b1] * delta[b0][b1] * ( + PA_0 * PA_1 * (-1.0))
+                                        + delta[a1][b1] * delta[a0][b0] * delta[b0][b1] * ( + PA_0 * PA_1)
+                                        + delta[a0][b0] * ( + PB_0 * PA_0)
+                                        + delta[a0][b0] * delta[a1][b1] * delta[a1][b1] * ( + PB_0 * PA_0)
+                                        + 1.0 * delta[a0][b0] * ( + PB_0 * PA_0 * (-1.0))
+                                        + 1.0 * delta[b0][b1] * delta[a0][b1] * ( + PB_0 * PA_0)
+                                        + 1.0 * delta[a0][b1] * delta[b0][b1] * ( + PB_0 * PA_0 * (-1.0))
+                                        + delta[a1][b1] * delta[a0][b0] * delta[a1][b1] * ( + PB_0 * PA_0 * (-1.0))
+                                        + delta[a0][b0] * delta[a1][b1] * delta[a1][b0] * ( + PB_1 * PA_0)
+                                        + delta[a0][b1] * ( + PB_1 * PA_0)
+                                        + delta[a0][b1] * delta[a1][b0] * delta[a1][b0] * ( + PB_1 * PA_0 * 2.0)
+                                        + 1.0 * delta[a0][b1] * ( + PB_1 * PA_0 * (-1.0))
+                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * ( + PB_1 * PA_0 * (-2.0))
+                                        + delta[a1][b1] * delta[a0][b0] * delta[a1][b0] * ( + PB_1 * PA_0 * (-1.0))
+                                        + 1.0 * ( + PA_1 * PA_1)
+                                        + 1.0 * delta[b0][b1] * delta[b0][b1] * ( + PA_1 * PA_1 * 2.0)
+                                        + delta[a0][b0] * delta[a0][b0] * ( + PA_1 * PA_1 * 2.0)
+                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * ( + PA_1 * PA_1 * 5.0)
+                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1] * ( + PA_1 * PA_1 * 2.0)
+                                        + delta[a0][b1] * delta[a0][b1] * ( + PA_1 * PA_1)
+                                        + delta[a0][b0] * delta[a0][b1] * delta[b0][b1] * ( + PA_1 * PA_1)
+                                        + 1.0 * delta[a0][b1] * delta[a0][b1] * ( + PA_1 * PA_1)
+                                        + 1.0 * delta[a1][b1] * delta[b0][b1] * ( + PB_0 * PA_1 * (-1.0))
+                                        + 1.0 * delta[b0][b1] * delta[a1][b1] * ( + PB_0 * PA_1)
+                                        + delta[a0][b0] * delta[a1][b1] * delta[a0][b1] * ( + PB_0 * PA_1)
+                                        + delta[a1][b1] * delta[a0][b0] * delta[a0][b1] * ( + PB_0 * PA_1 * (-1.0))
+                                        + 1.0 * delta[a1][b1] * ( + PB_1 * PA_1)
+                                        + 1.0 * delta[a1][b1] * ( + PB_1 * PA_1 * (-1.0))
+                                        + delta[a0][b0] * delta[a1][b1] * delta[a0][b0] * ( + PB_1 * PA_1)
+                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * ( + PB_1 * PA_1 * (-2.0))
+                                        + delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * ( + PB_1 * PA_1)
+                                        + delta[a0][b1] * delta[a1][b0] * delta[a0][b0] * ( + PB_1 * PA_1)
+                                        + delta[a0][b1] * delta[a0][b0] * delta[a1][b0] * ( + PB_1 * PA_1 * (-1.0))
+                                        + delta[a1][b0] * delta[a0][b0] * delta[a0][b1] * ( + PB_1 * PA_1 * (-1.0))
+                                        + delta[a1][b1] * delta[a0][b0] * delta[a0][b0] * ( + PB_1 * PA_1)
+                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b0] * (PB_0 * PB_1)
+                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b1] * (PB_0 * PB_1 * (-1.0))
+                                        + 1.0 * (PB_0 * PB_0)
+                                        + 1.0 * delta[a1][b1] * delta[a1][b1] * (PB_0 * PB_0 * 2.0)
+                                        + delta[a0][a1] * delta[a0][a1] * (PB_0 * PB_0 * 2.0)
+                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b1] * (PB_0 * PB_0 * 2.0)
+                                        + delta[a0][a1] * delta[a0][b1] * delta[a1][b1] * (PB_0 * PB_0 * 4.0)
+                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b1] * (PB_0 * PB_0 * 2.0)
+                                        + delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0)
+                                        + 1.0 * delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0)
+                                        + 1.0 * (PB_1 * PB_1)
+                                        + 1.0 * delta[a1][b0] * delta[a1][b0] * (PB_1 * PB_1 * 2.0)
+                                        + delta[a0][a1] * delta[a0][a1] * (PB_1 * PB_1 * 2.0)
+                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b0] * (PB_1 * PB_1 * 2.0)
+                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b0] * (PB_1 * PB_1 * 4.0)
+                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b0] * (PB_1 * PB_1 * 2.0)
+                                        + delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1)
+                                        + 1.0 * delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1)
+                                    )
+
+                                )
+
+                                + F4_t[4] * (
+
+                                    0.00390625 / ( S1 * S1 * S1 * S1 ) * (
+                                        1.0
+                                        + 1.0 * delta[b0][b1] * delta[b0][b1] * 2.0
+                                        + 1.0 * delta[a1][b0] * delta[a1][b0] * 2.0
+                                        + 1.0 * delta[a1][b0] * delta[b0][b1] * delta[a1][b1] * 5.0
+                                        + 1.0 * delta[a1][b1] * delta[a1][b0] * delta[b0][b1] * 2.0
+                                        + 1.0 * delta[a1][b1] * delta[a1][b1]
+                                        + 1.0 * delta[a1][b0] * delta[a1][b1] * delta[b0][b1]
+                                        + 1.0 * delta[a1][b1] * delta[a1][b1]
+                                        + delta[a0][a1] * delta[a0][a1] * 2.0
+                                        + delta[a0][a1] * delta[a0][a1] * delta[b0][b1] * delta[b0][b1] * 4.0
+                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b0] * 2.0
+                                        + delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * delta[a0][b1] * 10.0
+                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b0] * delta[b0][b1] * 3.0
+                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b1] * 2.0
+                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b0] * 4.0
+                                        + delta[a0][a1] * delta[a0][b0] * delta[b0][b1] * delta[a1][b1] * 7.0
+                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b1] * delta[b0][b1] * 2.0
+                                        + delta[a0][a1] * delta[a0][b1] * delta[a1][b1] * 4.0
+                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b1] * delta[b0][b1]
+                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b0] * 2.0
+                                        + delta[a0][b0] * delta[a0][a1] * delta[b0][b1] * delta[a1][b1] * 3.0
+                                        + delta[a0][b0] * delta[a0][b0]
+                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * 2.0
+                                        + delta[a0][b0] * delta[a1][b1] * delta[a0][b0] * delta[a1][b1]
+                                        + delta[a0][b0] * delta[a1][b1] * delta[a1][b0] * delta[a0][b1]
+                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * delta[a1][b1] * 2.0
+                                        + delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * delta[a1][b1] * 5.0
+                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * 4.0
+                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b1] * 2.0
+                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1] * 2.0
+                                        + delta[a0][b1] * delta[a0][b1]
+                                        + delta[a0][b1] * delta[a1][b0] * delta[a0][b0] * delta[a1][b1]
+                                        + delta[a0][b1] * delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * 2.0
+                                        + delta[a0][b1] * delta[a0][b0] * delta[a1][b0] * delta[a1][b1] * 3.0
+                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b1] * delta[b0][b1] * 2.0
+                                        + 1.0 * delta[a0][b0] * delta[a0][b0]
+                                        + 1.0 * delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * 3.0
+                                        + 1.0 * delta[a0][b0] * delta[a0][b1] * delta[b0][b1]
+                                        + 1.0 * delta[a0][b1] * delta[a0][b1]
+                                        + delta[a1][b0] * delta[a0][b0] * delta[a0][b1] * delta[a1][b1] * 3.0
+                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * delta[a0][b1] * 2.0
+                                        + delta[a1][b1] * delta[a0][b0] * delta[a0][b0] * delta[a1][b1]
+                                        + delta[a1][b1] * delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * 3.0
+                                    )
+
+                                )
+
+                                ));
+
+                    _Q_matrix_dd.row(i * 6 + i_cart)[j * 6 + j_cart] = sqrt_eri_ijij;
+
+                    if (i * 6 + i_cart != j * 6 + j_cart) _Q_matrix_dd.row(j * 6 + j_cart)[i * 6 + i_cart] = sqrt_eri_ijij;
                 }
             }
         }
