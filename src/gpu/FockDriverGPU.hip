@@ -1521,6 +1521,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_J, static_cast<uint32_t>(ss_prim_pair_count_local));
 
+        hipSafe(hipDeviceSynchronize());
+
         // set up thread blocks for J
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
@@ -1533,6 +1535,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         if (ss_prim_pair_count > 0)
         {
             hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            hipSafe(hipDeviceSynchronize());
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSSSS, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
@@ -1549,6 +1553,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (SS|SP)
@@ -1557,6 +1563,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         if (sp_prim_pair_count > 0)
         {
             hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            hipSafe(hipDeviceSynchronize());
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSSSP, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
@@ -1575,6 +1583,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (SS|SD)
@@ -1583,6 +1593,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         if (sd_prim_pair_count > 0)
         {
             hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            hipSafe(hipDeviceSynchronize());
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSSSD, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
@@ -1601,6 +1613,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (SS|PP)
@@ -1609,6 +1623,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         if (pp_prim_pair_count > 0)
         {
             hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            hipSafe(hipDeviceSynchronize());
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSSPP, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
@@ -1627,6 +1643,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (SS|PD)
@@ -1635,6 +1653,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         if (pd_prim_pair_count > 0)
         {
             hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            hipSafe(hipDeviceSynchronize());
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSSPD, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
@@ -1655,6 +1675,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (SS|DD)
@@ -1663,6 +1685,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         if (dd_prim_pair_count > 0)
         {
             hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            hipSafe(hipDeviceSynchronize());
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSSDD, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
@@ -1681,6 +1705,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         hipSafe(hipMemcpy(mat_J.data(), d_mat_J, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
@@ -1714,6 +1740,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
         hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_J, static_cast<uint32_t>(sp_prim_pair_count_local));
+
+        hipSafe(hipDeviceSynchronize());
 
         // set up thread blocks for J
 
@@ -1922,6 +1950,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
         hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_J, static_cast<uint32_t>(pp_prim_pair_count_local));
+
+        hipSafe(hipDeviceSynchronize());
 
         // set up thread blocks for J
 
@@ -2133,6 +2163,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_J, static_cast<uint32_t>(sd_prim_pair_count_local));
 
+        hipSafe(hipDeviceSynchronize());
+
         // set up thread blocks for J
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
@@ -2340,6 +2372,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
         hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_J, static_cast<uint32_t>(pd_prim_pair_count_local));
+
+        hipSafe(hipDeviceSynchronize());
 
         // set up thread blocks for J
 
@@ -2555,6 +2589,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
         hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_J, static_cast<uint32_t>(dd_prim_pair_count_local));
+
+        hipSafe(hipDeviceSynchronize());
 
         // set up thread blocks for J
 
