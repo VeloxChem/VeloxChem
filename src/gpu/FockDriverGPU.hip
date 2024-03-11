@@ -1536,8 +1536,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         {
             hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
-            hipSafe(hipDeviceSynchronize());
-
             hipLaunchKernelGGL(gpu::computeCoulombFockSSSS, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
                                d_s_prim_info,
@@ -1563,8 +1561,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         if (sp_prim_pair_count > 0)
         {
             hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
-
-            hipSafe(hipDeviceSynchronize());
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSSSP, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
@@ -1594,8 +1590,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         {
             hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
-            hipSafe(hipDeviceSynchronize());
-
             hipLaunchKernelGGL(gpu::computeCoulombFockSSSD, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
                                d_s_prim_info,
@@ -1624,8 +1618,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         {
             hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
-            hipSafe(hipDeviceSynchronize());
-
             hipLaunchKernelGGL(gpu::computeCoulombFockSSPP, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
                                d_s_prim_info,
@@ -1653,8 +1645,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         if (pd_prim_pair_count > 0)
         {
             hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
-
-            hipSafe(hipDeviceSynchronize());
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSSPD, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
@@ -1685,8 +1675,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         if (dd_prim_pair_count > 0)
         {
             hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
-
-            hipSafe(hipDeviceSynchronize());
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSSDD, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
@@ -1773,6 +1761,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (SP|SP)
@@ -1799,6 +1789,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (SP|SD)
@@ -1827,6 +1819,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (SP|PP)
@@ -1853,6 +1847,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (SP|PD)
@@ -1881,6 +1877,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (SP|DD)
@@ -1909,6 +1907,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         hipSafe(hipMemcpy(mat_J.data(), d_mat_J, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
@@ -1983,6 +1983,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (PP|SP)
@@ -2009,6 +2011,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (PP|SD)
@@ -2037,6 +2041,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (PP|PP)
@@ -2061,6 +2067,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (PP|PD)
@@ -2087,6 +2095,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (PP|DD)
@@ -2113,6 +2123,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         hipSafe(hipMemcpy(mat_J.data(), d_mat_J, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
@@ -2195,6 +2207,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (SD|SP)
@@ -2223,6 +2237,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (SD|SD)
@@ -2249,6 +2265,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (SD|PP)
@@ -2277,6 +2295,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (SD|PD)
@@ -2305,6 +2325,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (SD|DD)
@@ -2331,6 +2353,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         hipSafe(hipMemcpy(mat_J.data(), d_mat_J, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
@@ -2407,6 +2431,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (PD|SP)
@@ -2435,6 +2461,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (PD|SD)
@@ -2463,6 +2491,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (PD|PP)
@@ -2489,6 +2519,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (PD|PD)
@@ -2515,6 +2547,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (PD|DD)
@@ -2541,6 +2575,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         hipSafe(hipMemcpy(mat_J.data(), d_mat_J, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
@@ -2622,6 +2658,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (DD|SP)
@@ -2650,6 +2688,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (DD|SD)
@@ -2676,6 +2716,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (DD|PP)
@@ -2702,6 +2744,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (DD|PD)
@@ -2728,6 +2772,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         // J: (DD|DD)
@@ -2752,6 +2798,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft);
+
+            hipSafe(hipDeviceSynchronize());
         }
 
         hipSafe(hipMemcpy(mat_J.data(), d_mat_J, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
