@@ -292,7 +292,6 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
                             ));
 
-                // TODO
                 _Q_matrix_sd.row(i)[j * 6 + j_cart] = sqrt_eri_ijij;
             }
         }

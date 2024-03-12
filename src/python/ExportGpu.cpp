@@ -61,6 +61,12 @@ export_gpu(py::module& m)
     py::class_<CScreeningData, std::shared_ptr<CScreeningData>>(m, "ScreeningData")
         .def(py::init<const CMolecule&, const CMolecularBasis&, const int64_t>())
         .def("get_num_gpus_per_node", &CScreeningData::getNumGpusPerNode)
+        .def("get_q_matrix",
+        [](CScreeningData& self, const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) -> py::array_t<double> {
+            const auto q_mat = self.get_mat_Q_full(s_prim_count, p_prim_count, d_prim_count);
+            return vlx_general::pointer_to_numpy(q_mat.values(), {q_mat.getNumberOfRows(), q_mat.getNumberOfColumns()});
+        },
+        "Gets Q matrix.")
         ;
 
     m.def(
@@ -284,6 +290,8 @@ export_gpu(py::module& m)
     m.def("transform_density", &gpu::transformDensity, "Transforms density matrix (spherical to Cartesian).");
 
     m.def("compute_one_electron_integrals_gpu", &gpu::computeOneElectronIntegralsOnGPU, "Computes one-electron integral matrices using GPU.");
+
+    m.def("compute_q_matrix_gpu", &gpu::computeQMatrixOnGPU, "Computes Q matrix using GPU.");
 }
 
 }  // namespace vlx_gpu
