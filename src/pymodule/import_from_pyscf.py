@@ -284,6 +284,68 @@ def import_integral(molecule, basis, int_type, atom1=None, shell1=None,
                        chk_file=chk_file, return_block=return_block)
 
 
+def import_1e_integral_braket(bra_molecule, bra_basis, ket_molecule, ket_basis,
+                       int_type, unit="au"):
+    """
+    Imports one electron integrals from pyscf and converts to veloxchem format.
+    Specific atoms and shells can be selected.
+
+   :param bra_molecule:
+        the vlx molecule object for the bra side.
+    :param bra_basis:
+        the vlx basis object for the bra side.
+    :param ket_molecule:
+        the vlx molecule object for the bra side.
+    :param ket_basis:
+        the vlx basis object for the bra side.
+    :param int_type:
+        the type of two-electron integral: overlap, kinetic_energy,
+                                           nuclear_attraction
+    :param unit:
+        the units.
+
+    :return:
+        a numpy array corresponding to a specified block of 
+        the selected 1e integral matrix.
+    """
+
+    bra_molecule_string = get_molecule_string(bra_molecule)
+    bra_basis_set_label = bra_basis.get_label()
+    ket_molecule_string = get_molecule_string(ket_molecule)
+    ket_basis_set_label = ket_basis.get_label()
+
+    bra_pyscf_basis = translate_to_pyscf(bra_basis_set_label)
+    bra_pyscf_molecule = pyscf.gto.M(atom=bra_molecule_string,
+                                 basis=bra_pyscf_basis, unit=unit,
+                                 charge=bra_molecule.get_charge())
+
+    ket_pyscf_basis = translate_to_pyscf(ket_basis_set_label)
+    ket_pyscf_molecule = pyscf.gto.M(atom=ket_molecule_string,
+                                 basis=ket_pyscf_basis, unit=unit,
+                                 charge=ket_molecule.get_charge())
+
+    pyscf_int_type = get_pyscf_integral_type(int_type)
+    sign = get_sign(pyscf_int_type)
+
+    pyscf_int = sign * pyscf.gto.intor_cross(pyscf_int_type,
+                                             bra_pyscf_molecule,
+                                             ket_pyscf_molecule)
+
+    # Transform integral to veloxchem format
+    if pyscf_int_type in ["int1e_r", "int1e_rr", "int1e_rrr"]:
+        vlx_int = np.zeros_like(pyscf_int)
+        dof = vlx_int.shape[0]
+        for x in range(dof):
+            vlx_int[x] = ao_matrix_to_veloxchem(
+                                 DenseMatrix(pyscf_int[x]),
+                                 bra_basis, bra_molecule).to_numpy()
+    else:
+        vlx_int = ao_matrix_to_veloxchem(
+                                 DenseMatrix(pyscf_int),
+                                 bra_basis, bra_molecule).to_numpy()
+    return vlx_int
+
+
 def import_1e_integral(molecule, basis, int_type, atom1=None, shell1=None,
                        atom2=None, shell2=None, chk_file=None,
                        unit="au", return_block=False):
@@ -428,7 +490,7 @@ def import_2e_integral_braket(bra1_molecule, bra1_basis, bra2_molecule, bra2_bas
     :param ket_basis:
         the vlx basis object for the bra side.
     :param int_type:
-        the type of one-electron integral: overlap, kinetic_energy,
+        the type of two-electron integral: overlap, kinetic_energy,
                                            nuclear_attraction 
     :param omega:
         Error function parameter for range-separated Coulomb integrals.
