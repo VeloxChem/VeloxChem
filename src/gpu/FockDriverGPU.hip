@@ -1167,8 +1167,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
         hipSafe(hipMemcpy(mat_V.data(), d_mat_V, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
-        // TODO: gpu::computeNuclearPotentialPD
-
         for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
         {
             const auto i = pd_first_inds_local[ij];
@@ -1235,8 +1233,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                                                      d_boys_func_ft);
 
         hipSafe(hipMemcpy(mat_V.data(), d_mat_V, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-
-        // TODO: gpu::computeNuclearPotentialDD
 
         for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
         {
@@ -3330,32 +3326,50 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     hipSafe(hipDeviceSynchronize());
 
-    // TODO: update hipFree for d-orbitals
+    // TODO: update hip free for d-orbitals
 
     hipSafe(hipFree(d_mat_D));
     hipSafe(hipFree(d_mat_J));
 
     hipSafe(hipFree(d_ss_mat_Q));
     hipSafe(hipFree(d_sp_mat_Q));
+    hipSafe(hipFree(d_sd_mat_Q));
     hipSafe(hipFree(d_pp_mat_Q));
+    hipSafe(hipFree(d_pd_mat_Q));
+    hipSafe(hipFree(d_dd_mat_Q));
 
     hipSafe(hipFree(d_ss_first_inds));
     hipSafe(hipFree(d_ss_second_inds));
     hipSafe(hipFree(d_sp_first_inds));
     hipSafe(hipFree(d_sp_second_inds));
+    hipSafe(hipFree(d_sd_first_inds));
+    hipSafe(hipFree(d_sd_second_inds));
     hipSafe(hipFree(d_pp_first_inds));
     hipSafe(hipFree(d_pp_second_inds));
+    hipSafe(hipFree(d_pd_first_inds));
+    hipSafe(hipFree(d_pd_second_inds));
+    hipSafe(hipFree(d_dd_first_inds));
+    hipSafe(hipFree(d_dd_second_inds));
 
     hipSafe(hipFree(d_ss_mat_Q_local));
     hipSafe(hipFree(d_sp_mat_Q_local));
+    hipSafe(hipFree(d_sd_mat_Q_local));
     hipSafe(hipFree(d_pp_mat_Q_local));
+    hipSafe(hipFree(d_pd_mat_Q_local));
+    hipSafe(hipFree(d_dd_mat_Q_local));
 
     hipSafe(hipFree(d_ss_first_inds_local));
     hipSafe(hipFree(d_ss_second_inds_local));
     hipSafe(hipFree(d_sp_first_inds_local));
     hipSafe(hipFree(d_sp_second_inds_local));
+    hipSafe(hipFree(d_sd_first_inds_local));
+    hipSafe(hipFree(d_sd_second_inds_local));
     hipSafe(hipFree(d_pp_first_inds_local));
     hipSafe(hipFree(d_pp_second_inds_local));
+    hipSafe(hipFree(d_pd_first_inds_local));
+    hipSafe(hipFree(d_pd_second_inds_local));
+    hipSafe(hipFree(d_dd_first_inds_local));
+    hipSafe(hipFree(d_dd_second_inds_local));
 
     timer.start("Exchange prep.");
 
@@ -3897,6 +3911,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     hipSafe(hipFree(d_p_prim_info));
     hipSafe(hipFree(d_p_prim_aoinds));
+
+    hipSafe(hipFree(d_d_prim_info));
+    hipSafe(hipFree(d_d_prim_aoinds));
 
     hipSafe(hipFree(d_mat_K));
 
