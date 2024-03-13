@@ -72,7 +72,7 @@ gtoValuesGgaRecS(double*        gto_values_0,
             const auto gr_y = g_y - r_y;
             const auto gr_z = g_z - r_z;
 
-            const auto g0 = fnorm * std::exp(-fexp * (gr_x * gr_x + gr_y * gr_y + gr_z * gr_z));
+            const auto g0 = fnorm * exp(-fexp * (gr_x * gr_x + gr_y * gr_y + gr_z * gr_z));
 
             const auto g1 = -2.0 * fexp * g0;
 
@@ -141,7 +141,7 @@ gtoValuesGgaRecP(double*        gto_values_p3_0,
             const auto gr_y = g_y - r_y;
             const auto gr_z = g_z - r_z;
 
-            const auto f00 = fnorm * std::exp(-fexp * (gr_x * gr_x + gr_y * gr_y + gr_z * gr_z));
+            const auto f00 = fnorm * exp(-fexp * (gr_x * gr_x + gr_y * gr_y + gr_z * gr_z));
 
             const auto fg0 = -2.0 * fexp;
 
@@ -248,7 +248,7 @@ gtoValuesGgaRecD(double*        gto_values_d5_0,
             const auto gr_y = g_y - r_y;
             const auto gr_z = g_z - r_z;
 
-            const auto f00 = fnorm * std::exp(-fexp * (gr_x * gr_x + gr_y * gr_y + gr_z * gr_z));
+            const auto f00 = fnorm * exp(-fexp * (gr_x * gr_x + gr_y * gr_y + gr_z * gr_z));
 
             const auto fg0 = -2.0 * fexp;
 

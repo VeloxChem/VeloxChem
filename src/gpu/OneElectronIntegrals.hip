@@ -87,7 +87,7 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
 
         const double f2a = fa + fa;
 
-        const double fx = std::exp(-fa);
+        const double fx = exp(-fa);
 
         for (uint32_t j = 0; j < N; j++)
         {
@@ -100,7 +100,7 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
 
         double pf = 0.5 * fia;
 
-        values[0] = MATH_CONST_HALF_SQRT_PI * std::sqrt(fia);
+        values[0] = MATH_CONST_HALF_SQRT_PI * sqrt(fia);
 
         if (pnt < 921)
         {
@@ -108,7 +108,7 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
 
             const double f = 0.4999489092 * fia - 0.2473631686 * fia2 + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
-            const double fx = std::exp(-fa);
+            const double fx = exp(-fa);
 
             values[0] -= f * fx;
 
@@ -168,7 +168,7 @@ computeOverlapAndKineticEnergySS(double*         mat_S,
         // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto ksi = a_i * a_j / (a_i + a_j);
 
@@ -220,7 +220,7 @@ computeOverlapAndKineticEnergySP(double*         mat_S,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
@@ -300,7 +300,7 @@ computeOverlapAndKineticEnergySD(double*         mat_S,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
         const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
@@ -391,7 +391,7 @@ computeOverlapAndKineticEnergyPP(double*         mat_S,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
 
@@ -493,7 +493,7 @@ computeOverlapAndKineticEnergyPD(double*         mat_S,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
 
@@ -617,7 +617,7 @@ computeOverlapAndKineticEnergyDD(double*         mat_S,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
         const auto PA_1 = (a_j / (a_i + a_j)) * rij[a1];
@@ -741,9 +741,9 @@ computeNuclearPotentialSS(double*         mat_V,
         // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * std::sqrt(a_i + a_j);
+        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j);
 
         double V_ij = 0.0;
 
@@ -814,9 +814,9 @@ computeNuclearPotentialSP(double*         mat_V,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * std::sqrt(a_i + a_j);
+        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j);
 
         const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
 
@@ -915,9 +915,9 @@ computeNuclearPotentialSD(double*         mat_V,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * std::sqrt(a_i + a_j);
+        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j);
 
         const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
         const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
@@ -1036,9 +1036,9 @@ computeNuclearPotentialPP(double*         mat_V,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * std::sqrt(a_i + a_j);
+        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j);
 
         const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
 
@@ -1170,9 +1170,9 @@ computeNuclearPotentialPD(double*         mat_V,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * std::sqrt(a_i + a_j);
+        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j);
 
         const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
 
@@ -1333,9 +1333,9 @@ computeNuclearPotentialDD(double*         mat_V,
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * std::sqrt(a_i + a_j);
+        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j);
 
         const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
         const auto PA_1 = (a_j / (a_i + a_j)) * rij[a1];

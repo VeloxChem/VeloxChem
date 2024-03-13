@@ -66,7 +66,7 @@ gtoValuesLdaRecS(double*        gto_values,
             const auto gr_y = g_y - r_y;
             const auto gr_z = g_z - r_z;
 
-            s0 += fnorm * std::exp(-fexp * (gr_x * gr_x + gr_y * gr_y + gr_z * gr_z));
+            s0 += fnorm * exp(-fexp * (gr_x * gr_x + gr_y * gr_y + gr_z * gr_z));
         }
 
         gto_values[g + (i + row_offset) * ncols] = s0;
@@ -110,7 +110,7 @@ gtoValuesLdaRecP(double*        gto_values_p3,
             const auto gr_y = g_y - r_y;
             const auto gr_z = g_z - r_z;
 
-            const auto fss = fnorm * std::exp(-fexp * (gr_x * gr_x + gr_y * gr_y + gr_z * gr_z));
+            const auto fss = fnorm * exp(-fexp * (gr_x * gr_x + gr_y * gr_y + gr_z * gr_z));
 
             px += gr_x * fss;
             py += gr_y * fss;
@@ -168,7 +168,7 @@ gtoValuesLdaRecD(double*        gto_values_d5,
             const auto gr_y = g_y - r_y;
             const auto gr_z = g_z - r_z;
 
-            const auto fss = fnorm * std::exp(-fexp * (gr_x * gr_x + gr_y * gr_y + gr_z * gr_z));
+            const auto fss = fnorm * exp(-fexp * (gr_x * gr_x + gr_y * gr_y + gr_z * gr_z));
 
             dxx += gr_x * gr_x * fss;
             dxy += gr_x * gr_y * fss;
