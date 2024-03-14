@@ -23,7 +23,7 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#define TILE_DIM 16
+#define TILE_DIM 32
 
 #define MATH_CONST_PI 3.14159265358979323846
 
