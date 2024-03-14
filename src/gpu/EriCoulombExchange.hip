@@ -25,11 +25,7 @@
 
 #include <hip/hip_runtime.h>
 
-#define TILE_DIM 16
-
-#define MATH_CONST_PI 3.14159265358979323846
-
-#define MATH_CONST_HALF_SQRT_PI 0.88622692545275794096
+#include "GpuConstants.hpp"
 
 namespace gpu {  // gpu namespace
 

@@ -40,6 +40,8 @@
 #include "DftSubMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "FunctionalParser.hpp"
+#include "GpuConstants.hpp"
+#include "GpuSafeChecks.hpp"
 #include "GtoFunc.hpp"
 #include "GtoInfo.hpp"
 #include "GtoValuesGgaGPU.hpp"
@@ -51,18 +53,6 @@
 #include "Prescreener.hpp"
 #include "StringFormat.hpp"
 #include "XCIntegratorGPU.hpp"
-
-#define TILE_DIM 16
-
-#define hipSafe(e)                                                                                                      \
-    {                                                                                                                   \
-        hipError_t err = (e);                                                                                           \
-        if (err != hipSuccess)                                                                                          \
-        {                                                                                                               \
-            std::cerr << "HIP error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl; \
-            std::exit(EXIT_FAILURE);                                                                                    \
-        }                                                                                                               \
-    }
 
 namespace gpu {  // gpu namespace
 

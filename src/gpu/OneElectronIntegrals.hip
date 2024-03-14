@@ -36,6 +36,8 @@
 #include "BoysFuncTable.hpp"
 #include "OneElectronIntegrals.hpp"
 #include "ErrorHandler.hpp"
+#include "GpuConstants.hpp"
+#include "GpuSafeChecks.hpp"
 #include "GtoFunc.hpp"
 #include "GtoInfo.hpp"
 #include "MathConst.hpp"
@@ -44,24 +46,6 @@
 #include "MpiFunc.hpp"
 #include "MultiTimer.hpp"
 #include "StringFormat.hpp"
-
-#define TILE_DIM 16
-
-#define MATH_CONST_PI 3.14159265358979323846
-
-#define MATH_CONST_HALF_SQRT_PI 0.88622692545275794096
-
-#define MATH_CONST_TWO_OVER_SQRT_PI 1.12837916709551255856
-
-#define hipSafe(e)                                                                                                      \
-    {                                                                                                                   \
-        hipError_t err = (e);                                                                                           \
-        if (err != hipSuccess)                                                                                          \
-        {                                                                                                               \
-            std::cerr << "HIP error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl; \
-            std::exit(EXIT_FAILURE);                                                                                    \
-        }                                                                                                               \
-    }
 
 namespace gpu {  // gpu namespace
 

@@ -47,6 +47,8 @@
 #include "FockDriverGPU.hpp"
 #include "EriCoulombExchange.hpp"
 #include "ErrorHandler.hpp"
+#include "GpuConstants.hpp"
+#include "GpuSafeChecks.hpp"
 #include "GtoFunc.hpp"
 #include "GtoInfo.hpp"
 #include "MathConst.hpp"
@@ -56,53 +58,6 @@
 #include "MultiTimer.hpp"
 #include "OneElectronIntegrals.hpp"
 #include "StringFormat.hpp"
-
-#define TILE_DIM 16
-
-#define MATH_CONST_PI 3.14159265358979323846
-
-#define MATH_CONST_HALF_SQRT_PI 0.88622692545275794096
-
-#define hipSafe(e)                                                                                                       \
-    {                                                                                                                    \
-        hipError_t err = (e);                                                                                            \
-        if (err != hipSuccess)                                                                                           \
-        {                                                                                                                \
-            std::cerr << "HIP error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl;  \
-            std::exit(EXIT_FAILURE);                                                                                     \
-        }                                                                                                                \
-    }
-
-#define hipblasSafe(e)                                                                            \
-    {                                                                                             \
-        hipblasStatus_t err = (e);                                                                \
-        if (err != HIPBLAS_STATUS_SUCCESS)                                                        \
-        {                                                                                         \
-            std::cerr << "hipBLAS error in " << __FILE__ << ":" << __LINE__ << ": " << std::endl; \
-            std::exit(EXIT_FAILURE);                                                              \
-        }                                                                                         \
-    }
-
-#define magmaSafe(e)                                                                                                   \
-    {                                                                                                                  \
-        magma_int_t err = (e);                                                                                         \
-        if (err != MAGMA_SUCCESS) {                                                                                    \
-            std::cerr << "MAGMA error in " << __FILE__ << ":" << __LINE__ << ": " << magma_strerror(err) << std::endl; \
-            std::exit(EXIT_FAILURE);                                                                                   \
-        }                                                                                                              \
-    }
-
-/*
-#define hipsolverSafe(e)                                                                            \
-    {                                                                                               \
-        hipsolverStatus_t err = (e);                                                                \
-        if (err != HIPSOLVER_STATUS_SUCCESS)                                                        \
-        {                                                                                           \
-            std::cerr << "hipSolver error in " << __FILE__ << ":" << __LINE__ << ": " << std::endl; \
-            std::exit(EXIT_FAILURE);                                                                \
-        }                                                                                           \
-    }
-*/
 
 namespace gpu {  // gpu namespace
 

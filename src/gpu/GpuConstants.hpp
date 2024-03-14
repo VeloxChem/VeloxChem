@@ -23,37 +23,10 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include <hip/hip_runtime.h>
+#define TILE_DIM 16
 
-#include "DeviceProp.hpp"
-#include "GpuSafeChecks.hpp"
+#define MATH_CONST_PI 3.14159265358979323846
 
-namespace gpu {  // gpu namespace
+#define MATH_CONST_HALF_SQRT_PI 0.88622692545275794096
 
-void
-getDevicesProperty(std::vector<std::string>& namesOfDevices,
-                   std::vector<int64_t>&     globalMemoryOfDevices,
-                   std::vector<int64_t>&     computeMajorCapabilityOfDevices,
-                   std::vector<int64_t>&     computeMinorCapabilityOfDevices)
-{
-    int device_count = 0;
-
-    hipSafe(hipGetDeviceCount(&device_count));
-
-    for (int i = 0; i < device_count; i++)
-    {
-        hipDeviceProp_t prop;
-
-        hipSafe(hipGetDeviceProperties(&prop, i));
-
-        namesOfDevices.push_back(std::string(prop.name));
-
-        globalMemoryOfDevices.push_back(static_cast<int64_t>(prop.totalGlobalMem));
-
-        computeMajorCapabilityOfDevices.push_back(static_cast<int64_t>(prop.major));
-
-        computeMinorCapabilityOfDevices.push_back(static_cast<int64_t>(prop.minor));
-    }
-}
-
-}  // namespace gpu
+#define MATH_CONST_TWO_OVER_SQRT_PI 1.12837916709551255856
