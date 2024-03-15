@@ -127,6 +127,8 @@ from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .numerovdriver import NumerovDriver
+from .mmdriver import MMDriver
+from .mmgradientdriver import MMGradientDriver
 
 # for backward compatibility
 from .veloxchemlib import XCIntegrator as XCNewIntegrator

@@ -929,7 +929,7 @@ class ForceFieldGenerator:
 
                 valid_phases = True
                 for phase in dih['phase']:
-                    if not (abs(phase) < 1.0e-3 or abs(phase - 180.0) < 1.0e-3):
+                    if not (abs(phase) < 1.0e-6 or abs(phase - 180.0) < 1.0e-6):
                         valid_phases = False
                         break
 
@@ -948,7 +948,7 @@ class ForceFieldGenerator:
                 for barrier, phase, periodicity in zip(dih['barrier'],
                                                        dih['phase'],
                                                        dih['periodicity']):
-                    if abs(phase) < 1.0e-3:
+                    if abs(phase) < 1.0e-6:
                         # phase == 0 degree
                         F_coefs[abs(periodicity)] += barrier
                     else:

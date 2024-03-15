@@ -42,6 +42,8 @@ from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
+from .mmdriver import MMDriver
+from .mmgradientdriver import MMGradientDriver
 from .inputparser import parse_input, print_keywords, get_random_string_parallel
 from .errorhandler import assert_msg_critical
 
@@ -88,9 +90,13 @@ class OptimizationDriver:
         elif isinstance(drv, OpenMMDriver):
             grad_drv = OpenMMGradientDriver(drv)
 
+        elif isinstance(drv, MMDriver):
+            grad_drv = MMGradientDriver(drv)
+
         elif (isinstance(drv, ScfGradientDriver) or
               isinstance(drv, XtbGradientDriver) or
-              isinstance(drv, OpenMMGradientDriver)):
+              isinstance(drv, OpenMMGradientDriver) or
+              isinstance(drv, MMGradientDriver)):
             grad_drv = drv
 
         else:
