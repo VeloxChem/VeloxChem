@@ -5275,6 +5275,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
+        hipSafe(hipDeviceSynchronize());
+
         // K: (SS|SD)
         //     *  *
 
@@ -5548,6 +5550,151 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SS|PD)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSSPD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_sp,
+                           d_pair_inds_k_for_K_sp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           sd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_ss,
+                           d_mat_Q_for_K_pd,
+                           d_density_inds_for_K_ss,
+                           d_density_inds_for_K_pd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SD|PS)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDPS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_sp,
+                           d_pair_inds_k_for_K_sp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           ds_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_sd,
+                           d_mat_Q_for_K_ps,
+                           d_density_inds_for_K_sd,
+                           d_density_inds_for_K_ps,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SP|PD)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSPPD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_sp,
+                           d_pair_inds_k_for_K_sp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_sp,
+                           d_mat_Q_for_K_pd,
+                           d_density_inds_for_K_sp,
+                           d_density_inds_for_K_pd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SD|PP)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDPP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_sp,
+                           d_pair_inds_k_for_K_sp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dp_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_sd,
+                           d_mat_Q_for_K_pp,
+                           d_density_inds_for_K_sd,
+                           d_density_inds_for_K_pp,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SD|PD)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDPD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_sp,
+                           d_pair_inds_k_for_K_sp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_sd,
+                           d_mat_Q_for_K_pd,
+                           d_density_inds_for_K_sd,
+                           d_density_inds_for_K_pd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp * sizeof(double), hipMemcpyDeviceToHost));
 
