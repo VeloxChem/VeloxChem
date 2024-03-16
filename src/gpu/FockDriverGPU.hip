@@ -5007,12 +5007,22 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto& mat_Q_for_K_ss = screening.get_mat_Q_for_K_ss();
     const auto& mat_Q_for_K_sp = screening.get_mat_Q_for_K_sp();
     const auto& mat_Q_for_K_ps = screening.get_mat_Q_for_K_ps();
+    const auto& mat_Q_for_K_sd = screening.get_mat_Q_for_K_sd();
+    const auto& mat_Q_for_K_ds = screening.get_mat_Q_for_K_ds();
     const auto& mat_Q_for_K_pp = screening.get_mat_Q_for_K_pp();
+    const auto& mat_Q_for_K_pd = screening.get_mat_Q_for_K_pd();
+    const auto& mat_Q_for_K_dp = screening.get_mat_Q_for_K_dp();
+    const auto& mat_Q_for_K_dd = screening.get_mat_Q_for_K_dd();
 
     const auto& density_inds_for_K_ss = screening.get_density_inds_for_K_ss();
     const auto& density_inds_for_K_sp = screening.get_density_inds_for_K_sp();
     const auto& density_inds_for_K_ps = screening.get_density_inds_for_K_ps();
+    const auto& density_inds_for_K_sd = screening.get_density_inds_for_K_sd();
+    const auto& density_inds_for_K_ds = screening.get_density_inds_for_K_ds();
     const auto& density_inds_for_K_pp = screening.get_density_inds_for_K_pp();
+    const auto& density_inds_for_K_pd = screening.get_density_inds_for_K_pd();
+    const auto& density_inds_for_K_dp = screening.get_density_inds_for_K_dp();
+    const auto& density_inds_for_K_dd = screening.get_density_inds_for_K_dd();
 
     const auto& pair_inds_i_for_K_ss = screening.get_local_pair_inds_i_for_K_ss(gpu_id);
     const auto& pair_inds_k_for_K_ss = screening.get_local_pair_inds_k_for_K_ss(gpu_id);
@@ -5020,19 +5030,35 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto& pair_inds_i_for_K_sp = screening.get_local_pair_inds_i_for_K_sp(gpu_id);
     const auto& pair_inds_k_for_K_sp = screening.get_local_pair_inds_k_for_K_sp(gpu_id);
 
+    const auto& pair_inds_i_for_K_sd = screening.get_local_pair_inds_i_for_K_sd(gpu_id);
+    const auto& pair_inds_k_for_K_sd = screening.get_local_pair_inds_k_for_K_sd(gpu_id);
+
     const auto& pair_inds_i_for_K_pp = screening.get_local_pair_inds_i_for_K_pp(gpu_id);
     const auto& pair_inds_k_for_K_pp = screening.get_local_pair_inds_k_for_K_pp(gpu_id);
 
+    const auto& pair_inds_i_for_K_pd = screening.get_local_pair_inds_i_for_K_pd(gpu_id);
+    const auto& pair_inds_k_for_K_pd = screening.get_local_pair_inds_k_for_K_pd(gpu_id);
+
+    const auto& pair_inds_i_for_K_dd = screening.get_local_pair_inds_i_for_K_dd(gpu_id);
+    const auto& pair_inds_k_for_K_dd = screening.get_local_pair_inds_k_for_K_dd(gpu_id);
+
     auto pair_inds_count_for_K_ss = static_cast<uint32_t>(pair_inds_i_for_K_ss.size());
     auto pair_inds_count_for_K_sp = static_cast<uint32_t>(pair_inds_i_for_K_sp.size());
+    auto pair_inds_count_for_K_sd = static_cast<uint32_t>(pair_inds_i_for_K_sd.size());
     auto pair_inds_count_for_K_pp = static_cast<uint32_t>(pair_inds_i_for_K_pp.size());
+    auto pair_inds_count_for_K_pd = static_cast<uint32_t>(pair_inds_i_for_K_pd.size());
+    auto pair_inds_count_for_K_dd = static_cast<uint32_t>(pair_inds_i_for_K_dd.size());
 
     double*   d_mat_K;
     uint32_t *d_pair_inds_i_for_K_ss, *d_pair_inds_k_for_K_ss;
     uint32_t *d_pair_inds_i_for_K_sp, *d_pair_inds_k_for_K_sp;
+    uint32_t *d_pair_inds_i_for_K_sd, *d_pair_inds_k_for_K_sd;
     uint32_t *d_pair_inds_i_for_K_pp, *d_pair_inds_k_for_K_pp;
+    uint32_t *d_pair_inds_i_for_K_pd, *d_pair_inds_k_for_K_pd;
+    uint32_t *d_pair_inds_i_for_K_dd, *d_pair_inds_k_for_K_dd;
 
-    const auto max_pair_inds_count = std::max({pair_inds_count_for_K_ss, pair_inds_count_for_K_sp, pair_inds_count_for_K_pp});
+    const auto max_pair_inds_count = std::max({pair_inds_count_for_K_ss, pair_inds_count_for_K_sp, pair_inds_count_for_K_pp,
+                                               pair_inds_count_for_K_sd, pair_inds_count_for_K_pd, pair_inds_count_for_K_dd});
 
     std::vector<double> mat_K(max_pair_inds_count);
 
@@ -5044,8 +5070,17 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipMalloc(&d_pair_inds_i_for_K_sp, pair_inds_count_for_K_sp * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_pair_inds_k_for_K_sp, pair_inds_count_for_K_sp * sizeof(uint32_t)));
 
+    hipSafe(hipMalloc(&d_pair_inds_i_for_K_sd, pair_inds_count_for_K_sd * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_inds_k_for_K_sd, pair_inds_count_for_K_sd * sizeof(uint32_t)));
+
     hipSafe(hipMalloc(&d_pair_inds_i_for_K_pp, pair_inds_count_for_K_pp * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_pair_inds_k_for_K_pp, pair_inds_count_for_K_pp * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pair_inds_i_for_K_pd, pair_inds_count_for_K_pd * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_inds_k_for_K_pd, pair_inds_count_for_K_pd * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pair_inds_i_for_K_dd, pair_inds_count_for_K_dd * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_inds_k_for_K_dd, pair_inds_count_for_K_dd * sizeof(uint32_t)));
 
     hipSafe(hipMemcpy(d_pair_inds_i_for_K_ss, pair_inds_i_for_K_ss.data(), pair_inds_count_for_K_ss * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_pair_inds_k_for_K_ss, pair_inds_k_for_K_ss.data(), pair_inds_count_for_K_ss * sizeof(uint32_t), hipMemcpyHostToDevice));
@@ -5053,36 +5088,67 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipMemcpy(d_pair_inds_i_for_K_sp, pair_inds_i_for_K_sp.data(), pair_inds_count_for_K_sp * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_pair_inds_k_for_K_sp, pair_inds_k_for_K_sp.data(), pair_inds_count_for_K_sp * sizeof(uint32_t), hipMemcpyHostToDevice));
 
+    hipSafe(hipMemcpy(d_pair_inds_i_for_K_sd, pair_inds_i_for_K_sd.data(), pair_inds_count_for_K_sd * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_inds_k_for_K_sd, pair_inds_k_for_K_sd.data(), pair_inds_count_for_K_sd * sizeof(uint32_t), hipMemcpyHostToDevice));
+
     hipSafe(hipMemcpy(d_pair_inds_i_for_K_pp, pair_inds_i_for_K_pp.data(), pair_inds_count_for_K_pp * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_pair_inds_k_for_K_pp, pair_inds_k_for_K_pp.data(), pair_inds_count_for_K_pp * sizeof(uint32_t), hipMemcpyHostToDevice));
 
+    hipSafe(hipMemcpy(d_pair_inds_i_for_K_pd, pair_inds_i_for_K_pd.data(), pair_inds_count_for_K_pd * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_inds_k_for_K_pd, pair_inds_k_for_K_pd.data(), pair_inds_count_for_K_pd * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pair_inds_i_for_K_dd, pair_inds_i_for_K_dd.data(), pair_inds_count_for_K_dd * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_inds_k_for_K_dd, pair_inds_k_for_K_dd.data(), pair_inds_count_for_K_dd * sizeof(uint32_t), hipMemcpyHostToDevice));
+
     double* d_mat_D_full_AO;
     double *d_mat_Q_for_K_ss, *d_mat_Q_for_K_sp, *d_mat_Q_for_K_ps, *d_mat_Q_for_K_pp;
+    double *d_mat_Q_for_K_sd, *d_mat_Q_for_K_ds, *d_mat_Q_for_K_pd, *d_mat_Q_for_K_dp, *d_mat_Q_for_K_dd;
     uint32_t *d_density_inds_for_K_ss, *d_density_inds_for_K_sp, *d_density_inds_for_K_ps, *d_density_inds_for_K_pp;
+    uint32_t *d_density_inds_for_K_sd, *d_density_inds_for_K_ds, *d_density_inds_for_K_pd, *d_density_inds_for_K_dp, *d_density_inds_for_K_dd;
 
     hipSafe(hipMalloc(&d_mat_D_full_AO, cart_naos * cart_naos * sizeof(double)));
 
     hipSafe(hipMalloc(&d_mat_Q_for_K_ss, s_prim_count * s_prim_count * sizeof(double)));
     hipSafe(hipMalloc(&d_mat_Q_for_K_sp, s_prim_count * p_prim_count * 3 * sizeof(double)));
     hipSafe(hipMalloc(&d_mat_Q_for_K_ps, p_prim_count * 3 * s_prim_count * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_Q_for_K_sd, s_prim_count * d_prim_count * 6 * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_Q_for_K_ds, d_prim_count * 6 * s_prim_count * sizeof(double)));
     hipSafe(hipMalloc(&d_mat_Q_for_K_pp, p_prim_count * 3 * p_prim_count * 3 * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_Q_for_K_pd, p_prim_count * 3 * d_prim_count * 6 * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_Q_for_K_dp, d_prim_count * 6 * p_prim_count * 3 * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_Q_for_K_dd, d_prim_count * 6 * d_prim_count * 6 * sizeof(double)));
 
     hipSafe(hipMalloc(&d_density_inds_for_K_ss, s_prim_count * s_prim_count * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_density_inds_for_K_sp, s_prim_count * p_prim_count * 3 * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_density_inds_for_K_ps, p_prim_count * 3 * s_prim_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_density_inds_for_K_sd, s_prim_count * d_prim_count * 6 * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_density_inds_for_K_ds, d_prim_count * 6 * s_prim_count * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_density_inds_for_K_pp, p_prim_count * 3 * p_prim_count * 3 * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_density_inds_for_K_pd, p_prim_count * 3 * d_prim_count * 6 * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_density_inds_for_K_dp, d_prim_count * 6 * p_prim_count * 3 * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_density_inds_for_K_dd, d_prim_count * 6 * d_prim_count * 6 * sizeof(uint32_t)));
 
     hipSafe(hipMemcpy(d_mat_D_full_AO, cart_dens_ptr, cart_naos * cart_naos * sizeof(double), hipMemcpyHostToDevice));
 
     hipSafe(hipMemcpy(d_mat_Q_for_K_ss, mat_Q_for_K_ss.data(), s_prim_count * s_prim_count * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_mat_Q_for_K_sp, mat_Q_for_K_sp.data(), s_prim_count * p_prim_count * 3 * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_mat_Q_for_K_ps, mat_Q_for_K_ps.data(), p_prim_count * 3 * s_prim_count * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_mat_Q_for_K_sd, mat_Q_for_K_sd.data(), s_prim_count * d_prim_count * 6 * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_mat_Q_for_K_ds, mat_Q_for_K_ds.data(), d_prim_count * 6 * s_prim_count * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_mat_Q_for_K_pp, mat_Q_for_K_pp.data(), p_prim_count * 3 * p_prim_count * 3 * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_mat_Q_for_K_pd, mat_Q_for_K_pd.data(), p_prim_count * 3 * d_prim_count * 6 * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_mat_Q_for_K_dp, mat_Q_for_K_dp.data(), d_prim_count * 6 * p_prim_count * 3 * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_mat_Q_for_K_dd, mat_Q_for_K_dd.data(), d_prim_count * 6 * d_prim_count * 6 * sizeof(double), hipMemcpyHostToDevice));
 
     hipSafe(hipMemcpy(d_density_inds_for_K_ss, density_inds_for_K_ss.data(), s_prim_count * s_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_density_inds_for_K_sp, density_inds_for_K_sp.data(), s_prim_count * p_prim_count * 3 * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_density_inds_for_K_ps, density_inds_for_K_ps.data(), p_prim_count * 3 * s_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_density_inds_for_K_sd, density_inds_for_K_sd.data(), s_prim_count * d_prim_count * 6 * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_density_inds_for_K_ds, density_inds_for_K_ds.data(), d_prim_count * 6 * s_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_density_inds_for_K_pp, density_inds_for_K_pp.data(), p_prim_count * 3 * p_prim_count * 3 * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_density_inds_for_K_pd, density_inds_for_K_pd.data(), p_prim_count * 3 * d_prim_count * 6 * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_density_inds_for_K_dp, density_inds_for_K_dp.data(), d_prim_count * 6 * p_prim_count * 3 * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_density_inds_for_K_dd, density_inds_for_K_dd.data(), d_prim_count * 6 * d_prim_count * 6 * sizeof(uint32_t), hipMemcpyHostToDevice));
 
     timer.stop("Exchange prep.");
 
@@ -5208,6 +5274,138 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
+
+        // K: (SS|SD)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSSSD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_ss,
+                           d_pair_inds_k_for_K_ss,
+                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           sd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_ss,
+                           d_mat_Q_for_K_sd,
+                           d_density_inds_for_K_ss,
+                           d_density_inds_for_K_sd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SD|SS)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDSS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_ss,
+                           d_pair_inds_k_for_K_ss,
+                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           ds_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_sd,
+                           d_mat_Q_for_K_ss,
+                           d_density_inds_for_K_sd,
+                           d_density_inds_for_K_ss,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SP|SD)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSPSD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_ss,
+                           d_pair_inds_k_for_K_ss,
+                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_sp,
+                           d_mat_Q_for_K_sd,
+                           d_density_inds_for_K_sp,
+                           d_density_inds_for_K_sd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SD|SP)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDSP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_ss,
+                           d_pair_inds_k_for_K_ss,
+                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dp_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_sd,
+                           d_mat_Q_for_K_sp,
+                           d_density_inds_for_K_sd,
+                           d_density_inds_for_K_sp,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SD|SD)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDSD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_ss,
+                           d_pair_inds_k_for_K_ss,
+                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_sd,
+                           d_density_inds_for_K_sd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -5558,12 +5756,22 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipFree(d_mat_Q_for_K_ss));
     hipSafe(hipFree(d_mat_Q_for_K_sp));
     hipSafe(hipFree(d_mat_Q_for_K_ps));
+    hipSafe(hipFree(d_mat_Q_for_K_sd));
+    hipSafe(hipFree(d_mat_Q_for_K_ds));
     hipSafe(hipFree(d_mat_Q_for_K_pp));
+    hipSafe(hipFree(d_mat_Q_for_K_pd));
+    hipSafe(hipFree(d_mat_Q_for_K_dp));
+    hipSafe(hipFree(d_mat_Q_for_K_dd));
 
     hipSafe(hipFree(d_density_inds_for_K_ss));
     hipSafe(hipFree(d_density_inds_for_K_sp));
     hipSafe(hipFree(d_density_inds_for_K_ps));
+    hipSafe(hipFree(d_density_inds_for_K_sd));
+    hipSafe(hipFree(d_density_inds_for_K_ds));
     hipSafe(hipFree(d_density_inds_for_K_pp));
+    hipSafe(hipFree(d_density_inds_for_K_pd));
+    hipSafe(hipFree(d_density_inds_for_K_dp));
+    hipSafe(hipFree(d_density_inds_for_K_dd));
 
     timer.stop("Total timing");
 
