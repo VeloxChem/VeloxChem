@@ -1797,6 +1797,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto pd_max_D = screening.get_pd_max_D(); 
     const auto dd_max_D = screening.get_dd_max_D(); 
 
+    // Note: assuming symmetric D
     const auto ps_max_D = screening.get_sp_max_D(); 
     const auto ds_max_D = screening.get_sd_max_D(); 
     const auto dp_max_D = screening.get_pd_max_D(); 
