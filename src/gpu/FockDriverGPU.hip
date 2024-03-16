@@ -45,7 +45,8 @@
 #include "BoysFuncTable.hpp"
 #include "DenseLinearAlgebra.hpp"
 #include "FockDriverGPU.hpp"
-#include "EriCoulombExchange.hpp"
+#include "EriCoulomb.hpp"
+#include "EriExchange.hpp"
 #include "ErrorHandler.hpp"
 #include "GpuConstants.hpp"
 #include "GpuSafeChecks.hpp"
@@ -60,6 +61,14 @@
 #include "StringFormat.hpp"
 
 namespace gpu {  // gpu namespace
+
+__global__ void
+zeroData(double* d_data, const uint32_t n)
+{
+    const uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (i < n) d_data[i] = 0.0;
+}
 
 auto
 computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> CDenseMatrix

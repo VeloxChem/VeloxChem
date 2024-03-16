@@ -23,6 +23,9 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+#ifndef GpuConstants_hpp
+#define GpuConstants_hpp
+
 #define TILE_DIM 32
 
 #define MATH_CONST_PI 3.14159265358979323846
@@ -30,3 +33,5 @@
 #define MATH_CONST_HALF_SQRT_PI 0.88622692545275794096
 
 #define MATH_CONST_TWO_OVER_SQRT_PI 1.12837916709551255856
+
+#endif /* GpuConstants_hpp */

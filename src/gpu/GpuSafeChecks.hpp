@@ -23,6 +23,9 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+#ifndef GpuSafeChecks_hpp
+#define GpuSafeChecks_hpp
+
 #include <iostream>
 
 #define hipSafe(e)                                                                                                       \
@@ -65,3 +68,5 @@
         }                                                                                           \
     }
 */
+
+#endif /* GpuSafeChecks_hpp */
