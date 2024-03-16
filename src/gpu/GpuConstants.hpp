@@ -26,7 +26,7 @@
 #ifndef GpuConstants_hpp
 #define GpuConstants_hpp
 
-#define TILE_DIM 32
+#define TILE_DIM 16
 
 #define MATH_CONST_PI 3.14159265358979323846
 
