@@ -5370,7 +5370,7 @@ computeExchangeFockPSPS(double*         mat_K,
                         const double*   boys_func_table,
                         const double*   boys_func_ft)
 {
-    // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
@@ -5418,7 +5418,6 @@ computeExchangeFockPSPS(double*         mat_K,
                     const auto j_prim = density_inds_for_K_ps[i * s_prim_count + j];
                     const auto l_prim = density_inds_for_K_ps[k * s_prim_count + l];
 
-                    // TODO: p_prim_aoinds not needed
                     const auto j_cgto = s_prim_aoinds[j_prim];
                     const auto l_cgto = s_prim_aoinds[l_prim];
 
@@ -5478,7 +5477,6 @@ computeExchangeFockPSPS(double*         mat_K,
                     const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
                     const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
-
                     const auto QC_0 = (a_l / (a_k + a_l)) * rkl[c0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
@@ -5486,7 +5484,8 @@ computeExchangeFockPSPS(double*         mat_K,
                             F2_t[0] * (
 
                                 (
-                                    PA_0 * QC_0
+
+                                    + PA_0 * QC_0
                                 )
 
                             )
@@ -5494,15 +5493,17 @@ computeExchangeFockPSPS(double*         mat_K,
                             + F2_t[1] * (
 
                                 S1 / S4 * (
-                                    PA_0 * PQ[c0] * (-1.0)
+
+                                    + PA_0 * PQ[c0] * (-1.0)
+                                )
+
+                                + S2 / S4 * (
+
+                                    + PQ[a0] * QC_0
                                 )
 
                                 + 0.5 / S4 * (
                                     delta[a0][c0]
-                                )
-
-                                + S2 / S4 * (
-                                    PQ[a0] * QC_0
                                 )
 
                             )
@@ -5582,7 +5583,7 @@ computeExchangeFockPSPP(double*         mat_K,
                         const double*   boys_func_table,
                         const double*   boys_func_ft)
 {
-    // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
@@ -5690,7 +5691,6 @@ computeExchangeFockPSPP(double*         mat_K,
                     const double rkl[3] = {x_l - x_k, y_l - y_k, z_l - z_k};
 
                     const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
-
                     const auto QC_0 = (a_l / (a_k + a_l)) * rkl[c0];
                     const auto QD_0 = (-a_k / (a_k + a_l)) * rkl[d0];
 
@@ -5698,13 +5698,13 @@ computeExchangeFockPSPP(double*         mat_K,
 
                             F3_t[0] * (
 
-                                (
-
-                                    + PA_0 * QD_0 * QC_0
+                                0.5 / S2 * (
+                                    delta[c0][d0] * (PA_0)
                                 )
 
-                                + 0.5 / S2 * (
-                                    delta[d0][c0] * PA_0
+                                + (
+
+                                    + PA_0 * QD_0 * QC_0
                                 )
 
                             )
@@ -5712,17 +5712,18 @@ computeExchangeFockPSPP(double*         mat_K,
                             + F3_t[1] * (
 
                                 0.5 * S1 / ( S2 * S4 ) * (
-                                    delta[d0][c0] * (PA_0 * (-1.0))
+                                    delta[c0][d0] * (PA_0 * (-1.0))
                                 )
 
                                 + 0.5 / S4 * (
-                                    delta[a0][d0] * QC_0
-                                    + delta[d0][c0] * (PQ[a0])
-                                    + delta[a0][c0] * QD_0
+                                    delta[a0][d0] * (QC_0)
+                                    + delta[c0][d0] * (PQ[a0])
+                                    + delta[a0][c0] * (QD_0)
                                 )
 
                                 + S1 / S4 * (
-                                    PA_0 * PQ[c0] * QD_0 * (-1.0)
+
+                                    + PA_0 * PQ[c0] * QD_0 * (-1.0)
                                     + PA_0 * PQ[d0] * QC_0 * (-1.0)
                                 )
 
@@ -5736,7 +5737,8 @@ computeExchangeFockPSPP(double*         mat_K,
                             + F3_t[2] * (
 
                                 ( S1 * S1 ) / ( S4 * S4 ) * (
-                                    PA_0 * PQ[c0] * PQ[d0]
+
+                                    + PA_0 * PQ[c0] * PQ[d0]
                                 )
 
                                 + ( S1 * S2 ) / ( S4 * S4 ) * (
@@ -5746,7 +5748,7 @@ computeExchangeFockPSPP(double*         mat_K,
                                 )
 
                                 + 0.5 * S1 / ( S4 * S4 ) * (
-                                    delta[d0][c0] * (PQ[a0] * (-1.0))
+                                    delta[c0][d0] * (PQ[a0] * (-1.0))
                                     + delta[a0][d0] * (PQ[c0] * (-1.0))
                                     + delta[a0][c0] * (PQ[d0] * (-1.0))
                                 )
@@ -5820,15 +5822,15 @@ computeExchangeFockPPPS(double*         mat_K,
                         const uint32_t  p_prim_count,
                         const double    max_D,
                         const double*   mat_D_full_AO,
-                        const double*   mat_Q_for_K_ps,
                         const double*   mat_Q_for_K_pp,
-                        const uint32_t* density_inds_for_K_ps,
+                        const double*   mat_Q_for_K_ps,
                         const uint32_t* density_inds_for_K_pp,
+                        const uint32_t* density_inds_for_K_ps,
                         const uint32_t  naos,
                         const double*   boys_func_table,
                         const double*   boys_func_ft)
 {
-    // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
@@ -5937,20 +5939,19 @@ computeExchangeFockPPPS(double*         mat_K,
 
                     const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
                     const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-
                     const auto QC_0 = (a_l / (a_k + a_l)) * rkl[c0];
 
-                    const double eri_ijkl = Lambda * S_kl_00 * S_ij_00 * (
+                    const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                             F3_t[0] * (
 
-                                (
-
-                                    + PB_0 * PA_0 * QC_0
+                                0.5 / S1 * (
+                                    delta[a0][b0] * (QC_0)
                                 )
 
-                                + 0.5 / S1 * (
-                                    delta[b0][a0] * QC_0
+                                + (
+
+                                    + PB_0 * PA_0 * QC_0
                                 )
 
                             )
@@ -5958,13 +5959,13 @@ computeExchangeFockPPPS(double*         mat_K,
                             + F3_t[1] * (
 
                                 0.5 * S2 / ( S1 * S4 ) * (
-                                    delta[b0][a0] * (QC_0 * (-1.0))
+                                    delta[a0][b0] * (QC_0 * (-1.0))
                                 )
 
                                 + 0.5 / S4 * (
-                                    delta[b0][c0] * PA_0
-                                    + delta[a0][c0] * PB_0
-                                    + delta[b0][a0] * (PQ[c0] * (-1.0))
+                                    delta[b0][c0] * (PA_0)
+                                    + delta[a0][b0] * (PQ[c0] * (-1.0))
+                                    + delta[a0][c0] * (PB_0)
                                 )
 
                                 + S1 / S4 * (
@@ -5989,13 +5990,14 @@ computeExchangeFockPPPS(double*         mat_K,
                                 )
 
                                 + ( S2 * S2 ) / ( S4 * S4 ) * (
-                                    PQ[a0] * PQ[b0] * QC_0
+
+                                    + PQ[a0] * PQ[b0] * QC_0
                                 )
 
                                 + 0.5 * S2 / ( S4 * S4 ) * (
-                                    delta[b0][a0] * (PQ[c0])
-                                    + delta[b0][c0] * (PQ[a0])
+                                    delta[b0][c0] * (PQ[a0])
                                     + delta[a0][c0] * (PQ[b0])
+                                    + delta[a0][b0] * (PQ[c0])
                                 )
 
                             )
@@ -6070,7 +6072,7 @@ computeExchangeFockPPPP(double*         mat_K,
                         const double*   boys_func_table,
                         const double*   boys_func_ft)
 {
-    // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
+    // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
@@ -6180,7 +6182,6 @@ computeExchangeFockPPPP(double*         mat_K,
 
                     const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
                     const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-
                     const auto QC_0 = (a_l / (a_k + a_l)) * rkl[c0];
                     const auto QD_0 = (-a_k / (a_k + a_l)) * rkl[d0];
 
@@ -6189,11 +6190,11 @@ computeExchangeFockPPPP(double*         mat_K,
                             F4_t[0] * (
 
                                 0.5 / S1 * (
-                                    delta[b0][a0] * (QD_0 * QC_0)
+                                    delta[a0][b0] * (QD_0 * QC_0)
                                 )
 
                                 + 0.5 / S2 * (
-                                    delta[d0][c0] * (PB_0 * PA_0)
+                                    delta[c0][d0] * (PB_0 * PA_0)
                                 )
 
                                 + (
@@ -6202,7 +6203,7 @@ computeExchangeFockPPPP(double*         mat_K,
                                 )
 
                                 + 0.25 / ( S1 * S2 ) * (
-                                    delta[b0][a0] * delta[d0][c0]
+                                    delta[a0][b0] * delta[c0][d0]
                                 )
 
                             )
@@ -6210,27 +6211,27 @@ computeExchangeFockPPPP(double*         mat_K,
                             + F4_t[1] * (
 
                                 0.25 / ( S1 * S4 ) * (
-                                    delta[b0][a0] * delta[d0][c0] * (-1.0)
+                                    delta[a0][b0] * delta[c0][d0] * (-1.0)
                                 )
 
                                 + 0.25 / ( S2 * S4 ) * (
-                                    delta[b0][a0] * delta[d0][c0] * (-1.0)
+                                    delta[a0][b0] * delta[c0][d0] * (-1.0)
                                 )
 
                                 + 0.5 * S1 / ( S2 * S4 ) * (
-                                    delta[d0][c0] * (PB_0 * PA_0 * (-1.0))
+                                    delta[c0][d0] * (PB_0 * PA_0 * (-1.0))
                                 )
 
                                 + 0.5 * S2 / ( S1 * S4 ) * (
-                                    delta[b0][a0] * (QD_0 * QC_0 * (-1.0))
+                                    delta[a0][b0] * (QD_0 * QC_0 * (-1.0))
                                 )
 
                                 + 0.5 / S4 * (
-                                    delta[d0][c0] * (PB_0 * PQ[a0] + PA_0 * PQ[b0])
+                                    delta[c0][d0] * (PB_0 * PQ[a0] + PA_0 * PQ[b0])
                                     + delta[b0][d0] * (PA_0 * QC_0)
                                     + delta[b0][c0] * (PA_0 * QD_0)
                                     + delta[a0][d0] * (PB_0 * QC_0)
-                                    + delta[b0][a0] * (PQ[c0] * QD_0 * (-1.0) + PQ[d0] * QC_0 * (-1.0))
+                                    + delta[a0][b0] * (PQ[c0] * QD_0 * (-1.0) + PQ[d0] * QC_0 * (-1.0))
                                     + delta[a0][c0] * (PB_0 * QD_0)
                                 )
 
@@ -6269,19 +6270,19 @@ computeExchangeFockPPPP(double*         mat_K,
                                 )
 
                                 + 0.5 * S1 / ( S4 * S4 ) * (
-                                    delta[d0][c0] * (PB_0 * PQ[a0] * (-1.0) + PA_0 * PQ[b0] * (-1.0))
+                                    delta[c0][d0] * (PB_0 * PQ[a0] * (-1.0) + PA_0 * PQ[b0] * (-1.0))
                                     + delta[b0][d0] * (PA_0 * PQ[c0] * (-1.0))
                                     + delta[b0][c0] * (PA_0 * PQ[d0] * (-1.0))
                                     + delta[a0][d0] * (PB_0 * PQ[c0] * (-1.0))
                                     + delta[a0][c0] * (PB_0 * PQ[d0] * (-1.0))
-                                    + delta[b0][a0] * (PQ[c0] * PQ[d0])
+                                    + delta[a0][b0] * (PQ[c0] * PQ[d0])
                                 )
 
                                 + 0.5 * S2 / ( S4 * S4 ) * (
                                     delta[b0][d0] * (PQ[a0] * QC_0)
                                     + delta[a0][d0] * (PQ[b0] * QC_0)
-                                    + delta[b0][a0] * (PQ[c0] * QD_0 + PQ[d0] * QC_0)
-                                    + delta[d0][c0] * (PQ[a0] * PQ[b0])
+                                    + delta[a0][b0] * (PQ[c0] * QD_0 + PQ[d0] * QC_0)
+                                    + delta[c0][d0] * (PQ[a0] * PQ[b0])
                                     + delta[b0][c0] * (PQ[a0] * QD_0)
                                     + delta[a0][c0] * (PQ[b0] * QD_0)
                                 )
@@ -6289,7 +6290,7 @@ computeExchangeFockPPPP(double*         mat_K,
                                 + 0.25 / ( S4 * S4 ) * (
                                     delta[a0][c0] * delta[b0][d0]
                                     + delta[a0][d0] * delta[b0][c0]
-                                    + delta[b0][a0] * delta[d0][c0]
+                                    + delta[a0][b0] * delta[c0][d0]
                                 )
 
                             )
@@ -6303,17 +6304,18 @@ computeExchangeFockPPPP(double*         mat_K,
                                 )
 
                                 + ( S1 * S2 * S2 ) / ( S4 * S4 * S4 ) * (
-                                    PQ[a0] * PQ[b0] * PQ[c0] * QD_0 * (-1.0)
+
+                                    + PQ[a0] * PQ[b0] * PQ[c0] * QD_0 * (-1.0)
                                     + PQ[a0] * PQ[b0] * PQ[d0] * QC_0 * (-1.0)
                                 )
 
                                 + 0.5 * ( S1 * S2 ) / ( S4 * S4 * S4 ) * (
-                                    delta[d0][c0] * (PQ[a0] * PQ[b0] * (-1.0))
-                                    + delta[b0][a0] * (PQ[c0] * PQ[d0] * (-1.0))
+                                    delta[c0][d0] * (PQ[a0] * PQ[b0] * (-1.0))
                                     + delta[b0][d0] * (PQ[a0] * PQ[c0] * (-1.0))
                                     + delta[b0][c0] * (PQ[a0] * PQ[d0] * (-1.0))
                                     + delta[a0][d0] * (PQ[b0] * PQ[c0] * (-1.0))
                                     + delta[a0][c0] * (PQ[b0] * PQ[d0] * (-1.0))
+                                    + delta[a0][b0] * (PQ[c0] * PQ[d0] * (-1.0))
                                 )
 
                             )

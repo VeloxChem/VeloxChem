@@ -1788,6 +1788,10 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto pd_max_D = screening.get_pd_max_D(); 
     const auto dd_max_D = screening.get_dd_max_D(); 
 
+    const auto ps_max_D = screening.get_sp_max_D(); 
+    const auto ds_max_D = screening.get_sd_max_D(); 
+    const auto dp_max_D = screening.get_pd_max_D(); 
+
     const auto ss_prim_pair_count = static_cast<int64_t>(ss_first_inds.size());
     const auto sp_prim_pair_count = static_cast<int64_t>(sp_first_inds.size());
     const auto sd_prim_pair_count = static_cast<int64_t>(sd_first_inds.size());
@@ -5389,23 +5393,23 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         //     *  *
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPSPS, num_blocks, threads_per_block, 0, 0,
-                                                     d_mat_K,
-                                                     d_pair_inds_i_for_K_pp,
-                                                     d_pair_inds_k_for_K_pp,
-                                                     static_cast<uint32_t>(pair_inds_count_for_K_pp),
-                                                     d_s_prim_info,
-                                                     d_s_prim_aoinds,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_p_prim_info,
-                                                     d_p_prim_aoinds,
-                                                     static_cast<uint32_t>(p_prim_count),
-                                                     ss_max_D,
-                                                     d_mat_D_full_AO,
-                                                     d_mat_Q_for_K_ps,
-                                                     d_density_inds_for_K_ps,
-                                                     static_cast<uint32_t>(cart_naos),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+                           d_mat_K,
+                           d_pair_inds_i_for_K_pp,
+                           d_pair_inds_k_for_K_pp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           ss_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_ps,
+                           d_density_inds_for_K_ps,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -5413,25 +5417,25 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         //     *  *
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPSPP, num_blocks, threads_per_block, 0, 0,
-                                                     d_mat_K,
-                                                     d_pair_inds_i_for_K_pp,
-                                                     d_pair_inds_k_for_K_pp,
-                                                     static_cast<uint32_t>(pair_inds_count_for_K_pp),
-                                                     d_s_prim_info,
-                                                     d_s_prim_aoinds,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_p_prim_info,
-                                                     d_p_prim_aoinds,
-                                                     static_cast<uint32_t>(p_prim_count),
-                                                     sp_max_D,
-                                                     d_mat_D_full_AO,
-                                                     d_mat_Q_for_K_ps,
-                                                     d_mat_Q_for_K_pp,
-                                                     d_density_inds_for_K_ps,
-                                                     d_density_inds_for_K_pp,
-                                                     static_cast<uint32_t>(cart_naos),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+                           d_mat_K,
+                           d_pair_inds_i_for_K_pp,
+                           d_pair_inds_k_for_K_pp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           sp_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_ps,
+                           d_mat_Q_for_K_pp,
+                           d_density_inds_for_K_ps,
+                           d_density_inds_for_K_pp,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -5439,25 +5443,25 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         //     *  *
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPPS, num_blocks, threads_per_block, 0, 0,
-                                                     d_mat_K,
-                                                     d_pair_inds_i_for_K_pp,
-                                                     d_pair_inds_k_for_K_pp,
-                                                     static_cast<uint32_t>(pair_inds_count_for_K_pp),
-                                                     d_s_prim_info,
-                                                     d_s_prim_aoinds,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_p_prim_info,
-                                                     d_p_prim_aoinds,
-                                                     static_cast<uint32_t>(p_prim_count),
-                                                     sp_max_D,
-                                                     d_mat_D_full_AO,
-                                                     d_mat_Q_for_K_ps,
-                                                     d_mat_Q_for_K_pp,
-                                                     d_density_inds_for_K_ps,
-                                                     d_density_inds_for_K_pp,
-                                                     static_cast<uint32_t>(cart_naos),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+                           d_mat_K,
+                           d_pair_inds_i_for_K_pp,
+                           d_pair_inds_k_for_K_pp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           ps_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_pp,
+                           d_mat_Q_for_K_ps,
+                           d_density_inds_for_K_pp,
+                           d_density_inds_for_K_ps,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -5465,20 +5469,20 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         //     *  *
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPPP, num_blocks, threads_per_block, 0, 0,
-                                                     d_mat_K,
-                                                     d_pair_inds_i_for_K_pp,
-                                                     d_pair_inds_k_for_K_pp,
-                                                     static_cast<uint32_t>(pair_inds_count_for_K_pp),
-                                                     d_p_prim_info,
-                                                     d_p_prim_aoinds,
-                                                     static_cast<uint32_t>(p_prim_count),
-                                                     pp_max_D,
-                                                     d_mat_D_full_AO,
-                                                     d_mat_Q_for_K_pp,
-                                                     d_density_inds_for_K_pp,
-                                                     static_cast<uint32_t>(cart_naos),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+                           d_mat_K,
+                           d_pair_inds_i_for_K_pp,
+                           d_pair_inds_k_for_K_pp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           pp_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_pp,
+                           d_density_inds_for_K_pp,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp * sizeof(double), hipMemcpyDeviceToHost));
 
