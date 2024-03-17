@@ -4026,7 +4026,11 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         {
             hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDPP0, num_blocks, threads_per_block, 0, 0,
+            dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
+
+            dim3 dd_num_blocks ((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+            hipLaunchKernelGGL(gpu::computeCoulombFockDDPP0, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4144,7 +4148,11 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         {
             hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDPD0, num_blocks, threads_per_block, 0, 0,
+            dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
+
+            dim3 dd_num_blocks ((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+            hipLaunchKernelGGL(gpu::computeCoulombFockDDPD0, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4406,7 +4414,11 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         {
             hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD0, num_blocks, threads_per_block, 0, 0,
+            dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
+
+            dim3 dd_num_blocks ((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD0, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
