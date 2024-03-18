@@ -3812,7 +3812,11 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
             hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDSS, num_blocks, threads_per_block, 0, 0,
+            dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
+
+            dim3 dd_num_blocks ((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+            hipLaunchKernelGGL(gpu::computeCoulombFockDDSS, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),

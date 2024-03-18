@@ -3507,7 +3507,7 @@ computeCoulombFockDDSS(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -3534,9 +3534,9 @@ computeCoulombFockDDSS(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
         if ((kl < ss_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > 1.0e-13))
         {
@@ -3740,7 +3740,7 @@ computeCoulombFockDDSS(double*         mat_J,
 
         if (threadIdx.y == 0)
         {
-            for (uint32_t n = 0; n < TILE_DIM; n++)
+            for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
             {
                 J_ij += ERIs[n][threadIdx.x];
             }
