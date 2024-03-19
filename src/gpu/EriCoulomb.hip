@@ -3507,7 +3507,7 @@ computeCoulombFockDDSS(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -3777,7 +3777,7 @@ computeCoulombFockDDPD0(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -4120,7 +4120,7 @@ computeCoulombFockDDPD1(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -4350,7 +4350,7 @@ computeCoulombFockDDPD2(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -4580,7 +4580,7 @@ computeCoulombFockDDPD3(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -4960,7 +4960,7 @@ computeCoulombFockDDPD4(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -5295,7 +5295,7 @@ computeCoulombFockDDPD5(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -5600,7 +5600,7 @@ computeCoulombFockDDPD6(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -5824,7 +5824,7 @@ computeCoulombFockDDPD7(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -6153,7 +6153,7 @@ computeCoulombFockDDPD8(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -6431,7 +6431,7 @@ computeCoulombFockDDPD9(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -6661,7 +6661,7 @@ computeCoulombFockDDPD10(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -7053,7 +7053,7 @@ computeCoulombFockDDPD11(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -7247,7 +7247,7 @@ computeCoulombFockDDPD12(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -7486,7 +7486,7 @@ computeCoulombFockDDPD13(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -7839,7 +7839,7 @@ computeCoulombFockDDPD14(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -8147,7 +8147,7 @@ computeCoulombFockDDPD15(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -8485,7 +8485,7 @@ computeCoulombFockDDPD16(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -8844,7 +8844,7 @@ computeCoulombFockDDPD17(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -9064,7 +9064,7 @@ computeCoulombFockDDPD18(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -9266,7 +9266,7 @@ computeCoulombFockDDDD0(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -9595,7 +9595,7 @@ computeCoulombFockDDDD1(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -9841,7 +9841,7 @@ computeCoulombFockDDDD2(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -10195,7 +10195,7 @@ computeCoulombFockDDDD3(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -10411,7 +10411,7 @@ computeCoulombFockDDDD4(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -10672,7 +10672,7 @@ computeCoulombFockDDDD5(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -10963,7 +10963,7 @@ computeCoulombFockDDDD6(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -11305,7 +11305,7 @@ computeCoulombFockDDDD7(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -11731,7 +11731,7 @@ computeCoulombFockDDDD8(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -12181,7 +12181,7 @@ computeCoulombFockDDDD9(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -12442,7 +12442,7 @@ computeCoulombFockDDDD10(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -12703,7 +12703,7 @@ computeCoulombFockDDDD11(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -13087,7 +13087,7 @@ computeCoulombFockDDDD12(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -13319,7 +13319,7 @@ computeCoulombFockDDDD13(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -13661,7 +13661,7 @@ computeCoulombFockDDDD14(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -14088,7 +14088,7 @@ computeCoulombFockDDDD15(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -14514,7 +14514,7 @@ computeCoulombFockDDDD16(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -14940,7 +14940,7 @@ computeCoulombFockDDDD17(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -15534,7 +15534,7 @@ computeCoulombFockDDDD18(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -15795,7 +15795,7 @@ computeCoulombFockDDDD19(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -16056,7 +16056,7 @@ computeCoulombFockDDDD20(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -16440,7 +16440,7 @@ computeCoulombFockDDDD21(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -16824,7 +16824,7 @@ computeCoulombFockDDDD22(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -17041,7 +17041,7 @@ computeCoulombFockDDDD23(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -17243,7 +17243,7 @@ computeCoulombFockDDDD24(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -17580,7 +17580,7 @@ computeCoulombFockDDDD25(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -18174,7 +18174,7 @@ computeCoulombFockDDDD26(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -18768,7 +18768,7 @@ computeCoulombFockDDDD27(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -19152,7 +19152,7 @@ computeCoulombFockDDDD28(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -19536,7 +19536,7 @@ computeCoulombFockDDDD29(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -19920,7 +19920,7 @@ computeCoulombFockDDDD30(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -20122,7 +20122,7 @@ computeCoulombFockDDDD31(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -20324,7 +20324,7 @@ computeCoulombFockDDDD32(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -20526,7 +20526,7 @@ computeCoulombFockDDDD33(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -20938,7 +20938,7 @@ computeCoulombFockDDDD34(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -21532,7 +21532,7 @@ computeCoulombFockDDDD35(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -21916,7 +21916,7 @@ computeCoulombFockDDDD36(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -22337,7 +22337,7 @@ computeCoulombFockDDDD37(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -22539,7 +22539,7 @@ computeCoulombFockDDDD38(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -22798,7 +22798,7 @@ computeCoulombFockDDDD39(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -23000,7 +23000,7 @@ computeCoulombFockDDDD40(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -23202,7 +23202,7 @@ computeCoulombFockDDDD41(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -23614,7 +23614,7 @@ computeCoulombFockDDDD42(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -23828,7 +23828,7 @@ computeCoulombFockDDPP0(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -24169,7 +24169,7 @@ computeCoulombFockDDPP1(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -24496,7 +24496,7 @@ computeCoulombFockDDPP2(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -24788,7 +24788,7 @@ computeCoulombFockDDPP3(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -25145,7 +25145,7 @@ computeCoulombFockDDPP4(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -25416,7 +25416,7 @@ computeCoulombFockDDPP5(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -25741,7 +25741,7 @@ computeCoulombFockDDSD0(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -26081,7 +26081,7 @@ computeCoulombFockDDSD1(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -26449,7 +26449,7 @@ computeCoulombFockDDSD2(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -26722,7 +26722,7 @@ computeCoulombFockDDSD3(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -27000,7 +27000,7 @@ computeCoulombFockDDSD4(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -27279,7 +27279,7 @@ computeCoulombFockDDSD5(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -27648,7 +27648,7 @@ computeCoulombFockDDSP0(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -27973,7 +27973,7 @@ computeCoulombFockDDSP1(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -28235,7 +28235,7 @@ computeCoulombFockDDSP2(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -28506,7 +28506,7 @@ computeCoulombFockPDDD0(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -28850,7 +28850,7 @@ computeCoulombFockPDDD1(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -29054,7 +29054,7 @@ computeCoulombFockPDDD2(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -29312,7 +29312,7 @@ computeCoulombFockPDDD3(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -29657,7 +29657,7 @@ computeCoulombFockPDDD4(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -29924,7 +29924,7 @@ computeCoulombFockPDDD5(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -30194,7 +30194,7 @@ computeCoulombFockPDDD6(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -30473,7 +30473,7 @@ computeCoulombFockPDDD7(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -30739,7 +30739,7 @@ computeCoulombFockPDDD8(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -31055,7 +31055,7 @@ computeCoulombFockPDDD9(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -31334,7 +31334,7 @@ computeCoulombFockPDDD10(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -31565,7 +31565,7 @@ computeCoulombFockPDDD11(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -31844,7 +31844,7 @@ computeCoulombFockPDDD12(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -32168,7 +32168,7 @@ computeCoulombFockPDDD13(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -32426,7 +32426,7 @@ computeCoulombFockPDDD14(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -32747,7 +32747,7 @@ computeCoulombFockPDDD15(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -33026,7 +33026,7 @@ computeCoulombFockPDDD16(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -33335,7 +33335,7 @@ computeCoulombFockPDDD17(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -33560,7 +33560,7 @@ computeCoulombFockPDDD18(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -33835,7 +33835,7 @@ computeCoulombFockPDDD19(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -34181,7 +34181,7 @@ computeCoulombFockPDPD0(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -34462,7 +34462,7 @@ computeCoulombFockPDPD1(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -34785,7 +34785,7 @@ computeCoulombFockPDPD2(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -35001,7 +35001,7 @@ computeCoulombFockPDPD3(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -35300,7 +35300,7 @@ computeCoulombFockPDPD4(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -35619,7 +35619,7 @@ computeCoulombFockPDPD5(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -35922,7 +35922,7 @@ computeCoulombFockPDPD6(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -36245,7 +36245,7 @@ computeCoulombFockPDPP0(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -36660,7 +36660,7 @@ computeCoulombFockPDPP1(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -36998,7 +36998,7 @@ computeCoulombFockPDSD0(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -37414,7 +37414,7 @@ computeCoulombFockPDSD1(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -37747,7 +37747,7 @@ computeCoulombFockSDDD0(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -38197,7 +38197,7 @@ computeCoulombFockSDDD1(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -38471,7 +38471,7 @@ computeCoulombFockSDDD2(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -38803,7 +38803,7 @@ computeCoulombFockSDDD3(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -39101,7 +39101,7 @@ computeCoulombFockSDDD4(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -39379,7 +39379,7 @@ computeCoulombFockSDDD5(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM_LARGE][TILE_DIM_SMALL + 1];
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
