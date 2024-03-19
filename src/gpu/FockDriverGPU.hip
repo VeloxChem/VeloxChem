@@ -3001,7 +3001,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
             dim3 sd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 sd_num_blocks ((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+            dim3 sd_num_blocks ((sd_prim_pair_count_local + sd_threads_per_block.x - 1) / sd_threads_per_block.x, 1);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSDDD0, sd_num_blocks, sd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3235,7 +3235,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
             dim3 pd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 pd_num_blocks ((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+            dim3 pd_num_blocks ((pd_prim_pair_count_local + pd_threads_per_block.x - 1) / pd_threads_per_block.x, 1);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDSD0, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3293,7 +3293,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
             dim3 pd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 pd_num_blocks ((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+            dim3 pd_num_blocks ((pd_prim_pair_count_local + pd_threads_per_block.x - 1) / pd_threads_per_block.x, 1);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDPP0, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3347,7 +3347,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
             dim3 pd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 pd_num_blocks ((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+            dim3 pd_num_blocks ((pd_prim_pair_count_local + pd_threads_per_block.x - 1) / pd_threads_per_block.x, 1);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDPD0, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3491,7 +3491,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
             dim3 pd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 pd_num_blocks ((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+            dim3 pd_num_blocks ((pd_prim_pair_count_local + pd_threads_per_block.x - 1) / pd_threads_per_block.x, 1);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD0, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3924,7 +3924,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 dd_num_blocks ((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+            dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDSS, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3960,7 +3960,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 dd_num_blocks ((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+            dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDSP0, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4038,7 +4038,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 dd_num_blocks ((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+            dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDSD0, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4164,7 +4164,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 dd_num_blocks ((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+            dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPP0, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4290,7 +4290,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 dd_num_blocks ((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+            dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD0, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4650,7 +4650,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
-            dim3 dd_num_blocks ((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+            dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD0, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
