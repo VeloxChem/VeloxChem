@@ -2193,24 +2193,6 @@ computeCoulombFockPDPP1(double*         mat_J,
                        const double*   boys_func_ft);
 
 __global__ void
-computeCoulombFockPDPP2(double*         mat_J,
-                       const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   pp_mat_D,
-                       const double*   pd_mat_Q_local,
-                       const double*   pp_mat_Q,
-                       const uint32_t* pd_first_inds_local,
-                       const uint32_t* pd_second_inds_local,
-                       const uint32_t  pd_prim_pair_count_local,
-                       const uint32_t* pp_first_inds,
-                       const uint32_t* pp_second_inds,
-                       const uint32_t  pp_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft);
-
-__global__ void
 computeCoulombFockPDSD0(double*         mat_J,
                        const double*   s_prim_info,
                        const uint32_t  s_prim_count,
