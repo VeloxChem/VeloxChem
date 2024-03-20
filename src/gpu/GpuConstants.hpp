@@ -27,6 +27,7 @@
 #define GpuConstants_hpp
 
 #define TILE_DIM_SMALL 1
+#define TILE_DIM_HALF 8
 #define TILE_DIM 16
 #define TILE_DIM_LARGE 256
 

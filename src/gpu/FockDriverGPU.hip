@@ -6444,7 +6444,11 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         // K: (PD|PD)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDPD0, num_blocks, threads_per_block, 0, 0,
+        dim3 pdpd_threads_per_block (TILE_DIM_HALF, TILE_DIM_HALF);
+
+        dim3 pdpd_num_blocks (pair_inds_count_for_K_pp, 1);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDPD0, pdpd_num_blocks, pdpd_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6463,7 +6467,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDPD1, num_blocks, threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDPD1, pdpd_num_blocks, pdpd_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6482,7 +6486,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDPD2, num_blocks, threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDPD2, pdpd_num_blocks, pdpd_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6501,7 +6505,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDPD3, num_blocks, threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDPD3, pdpd_num_blocks, pdpd_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6520,7 +6524,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDPD4, num_blocks, threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDPD4, pdpd_num_blocks, pdpd_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6539,7 +6543,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDPD5, num_blocks, threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDPD5, pdpd_num_blocks, pdpd_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
