@@ -2635,9 +2635,15 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         if (dd_prim_pair_count > 0)
         {
+            timer.start("    J block PPDD");
+
             hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPPDD0, num_blocks, threads_per_block, 0, 0,
+            dim3 pp_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
+
+            dim3 pp_num_blocks ((pp_prim_pair_count_local + pp_threads_per_block.x - 1) / pp_threads_per_block.x, 1);
+
+            hipLaunchKernelGGL(gpu::computeCoulombFockPPDD0, pp_num_blocks, pp_threads_per_block, 0, 0,
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -2655,7 +2661,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_boys_func_table,
                                d_boys_func_ft);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPPDD1, num_blocks, threads_per_block, 0, 0,
+            hipLaunchKernelGGL(gpu::computeCoulombFockPPDD1, pp_num_blocks, pp_threads_per_block, 0, 0,
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -2673,7 +2679,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_boys_func_table,
                                d_boys_func_ft);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPPDD2, num_blocks, threads_per_block, 0, 0,
+            hipLaunchKernelGGL(gpu::computeCoulombFockPPDD2, pp_num_blocks, pp_threads_per_block, 0, 0,
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -2691,7 +2697,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_boys_func_table,
                                d_boys_func_ft);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPPDD3, num_blocks, threads_per_block, 0, 0,
+            hipLaunchKernelGGL(gpu::computeCoulombFockPPDD3, pp_num_blocks, pp_threads_per_block, 0, 0,
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -2709,7 +2715,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_boys_func_table,
                                d_boys_func_ft);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPPDD4, num_blocks, threads_per_block, 0, 0,
+            hipLaunchKernelGGL(gpu::computeCoulombFockPPDD4, pp_num_blocks, pp_threads_per_block, 0, 0,
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -2727,7 +2733,61 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_boys_func_table,
                                d_boys_func_ft);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPPDD5, num_blocks, threads_per_block, 0, 0,
+            hipLaunchKernelGGL(gpu::computeCoulombFockPPDD5, pp_num_blocks, pp_threads_per_block, 0, 0,
+                               d_mat_J,
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_mat_D,
+                               d_pp_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_pp_first_inds_local,
+                               d_pp_second_inds_local,
+                               static_cast<uint32_t>(pp_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_boys_func_table,
+                               d_boys_func_ft);
+
+            hipLaunchKernelGGL(gpu::computeCoulombFockPPDD6, pp_num_blocks, pp_threads_per_block, 0, 0,
+                               d_mat_J,
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_mat_D,
+                               d_pp_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_pp_first_inds_local,
+                               d_pp_second_inds_local,
+                               static_cast<uint32_t>(pp_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_boys_func_table,
+                               d_boys_func_ft);
+
+            hipLaunchKernelGGL(gpu::computeCoulombFockPPDD7, pp_num_blocks, pp_threads_per_block, 0, 0,
+                               d_mat_J,
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_mat_D,
+                               d_pp_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_pp_first_inds_local,
+                               d_pp_second_inds_local,
+                               static_cast<uint32_t>(pp_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_boys_func_table,
+                               d_boys_func_ft);
+
+            hipLaunchKernelGGL(gpu::computeCoulombFockPPDD8, pp_num_blocks, pp_threads_per_block, 0, 0,
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -2746,6 +2806,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_boys_func_ft);
 
             hipSafe(hipDeviceSynchronize());
+
+            timer.stop("    J block PPDD");
         }
 
         hipSafe(hipMemcpy(mat_J.data(), d_mat_J, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
