@@ -61,6 +61,21 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
         hf.create_dataset('atom_coordinates',
                           data=molecule.get_coordinates_in_bohr())
 
+        hf.create_dataset('number_of_atoms',
+                          data=np.array([molecule.number_of_atoms()]))
+
+        hf.create_dataset('number_of_alpha_electrons',
+                          data=np.array([molecule.number_of_alpha_electrons()]))
+
+        hf.create_dataset('number_of_beta_electrons',
+                          data=np.array([molecule.number_of_beta_electrons()]))
+
+        hf.create_dataset('molecular_charge',
+                          data=np.array([molecule.get_charge()]))
+
+        hf.create_dataset('spin_multiplicity',
+                          data=np.array([molecule.get_multiplicity()]))
+
         hf.create_dataset('basis_set', data=np.string_([basis.get_label()]))
 
         hf.create_dataset('dft_func_label', data=np.string_([dft_func_label]))
