@@ -6727,8 +6727,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         // K: (SS|DS)
         //     *  *
 
-        timer.start("    K block SSDS");
-
         hipLaunchKernelGGL(gpu::computeExchangeFockSSDS, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
@@ -6752,12 +6750,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block SSDS");
-
         // K: (SS|DP)
         //     *  *
-
-        timer.start("    K block SSDP");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSSDP, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -6785,12 +6779,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block SSDP");
-
         // K: (SP|DS)
         //     *  *
-
-        timer.start("    K block SPDS");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSPDS, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -6818,12 +6808,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block SPDS");
-
         // K: (SP|DP)
         //     *  *
-
-        timer.start("    K block SPDP");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSPDP, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -6850,8 +6836,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_ft);
 
         hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block SPDP");
 
         // K: (SS|DD)
         //     *  *
@@ -7281,8 +7265,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         // K: (PS|DS)
         //     *  *
 
-        timer.start("    K block PSDS");
-
         hipLaunchKernelGGL(gpu::computeExchangeFockPSDS, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
@@ -7309,12 +7291,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PSDS");
-
         // K: (PS|DP)
         //     *  *
-
-        timer.start("    K block PSDP");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPSDP, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7342,12 +7320,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PSDP");
-
         // K: (PP|DS)
         //     *  *
-
-        timer.start("    K block PPDS");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDS, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7374,8 +7348,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_ft);
 
         hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PPDS");
 
         // K: (PS|DD)
         //     *  *
@@ -8287,8 +8259,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         // K: (DS|DS)
         //     *  *
 
-        timer.start("    K block DSDS");
-
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDS, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
@@ -8310,12 +8280,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block DSDS");
-
         // K: (DS|DP)
         //     *  *
-
-        timer.start("    K block DSDP");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDP0, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8391,12 +8357,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block DSDP");
-
         // K: (DP|DS)
         //     *  *
-
-        timer.start("    K block DPDS");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDS0, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8471,8 +8433,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_ft);
 
         hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block DPDS");
 
         // K: (DS|DD)
         //     *  *
@@ -8757,7 +8717,11 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         timer.start("    K block DPDP");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDP0, num_blocks, threads_per_block, 0, 0,
+        dim3 dpdp_threads_per_block (TILE_DIM_HALF, TILE_DIM_HALF);
+
+        dim3 dpdp_num_blocks (pair_inds_count_for_K_dd, 1);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDP0, dpdp_num_blocks, dpdp_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -8776,7 +8740,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDP1, num_blocks, threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDP1, dpdp_num_blocks, dpdp_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -8795,7 +8759,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDP2, num_blocks, threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDP2, dpdp_num_blocks, dpdp_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -8814,7 +8778,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDP3, num_blocks, threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDP3, dpdp_num_blocks, dpdp_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -8833,7 +8797,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDP4, num_blocks, threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDP4, dpdp_num_blocks, dpdp_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -8852,7 +8816,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDP5, num_blocks, threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDP5, dpdp_num_blocks, dpdp_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,

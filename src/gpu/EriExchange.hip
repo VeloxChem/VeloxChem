@@ -57644,7 +57644,7 @@ computeExchangeFockDPDP0(double*         mat_K,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_HALF][TILE_DIM_HALF + 1];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -57670,9 +57670,9 @@ computeExchangeFockDPDP0(double*         mat_K,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (p_prim_count * 3 + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (p_prim_count * 3 + TILE_DIM_HALF - 1) / TILE_DIM_HALF; m++)
     {
-        const uint32_t j = m * TILE_DIM + threadIdx.y;
+        const uint32_t j = m * TILE_DIM_HALF + threadIdx.y;
 
         // to avoid memory hazard
         __syncthreads();
@@ -57681,9 +57681,9 @@ computeExchangeFockDPDP0(double*         mat_K,
 
         __syncthreads();
 
-        for (uint32_t n = 0; n < (p_prim_count * 3 + TILE_DIM - 1) / TILE_DIM; n++)
+        for (uint32_t n = 0; n < (p_prim_count * 3 + TILE_DIM_HALF - 1) / TILE_DIM_HALF; n++)
         {
-            const uint32_t l = n * TILE_DIM + threadIdx.x;
+            const uint32_t l = n * TILE_DIM_HALF + threadIdx.x;
 
             if ((ik < pair_inds_count_for_K_dd) && (j < p_prim_count * 3) && (l < p_prim_count * 3))
             {
@@ -57948,9 +57948,9 @@ computeExchangeFockDPDP0(double*         mat_K,
 
             if ((threadIdx.y == 0) && (threadIdx.x == 0))
             {
-                for (uint32_t y = 0; y < TILE_DIM; y++)
+                for (uint32_t y = 0; y < TILE_DIM_HALF; y++)
                 {
-                    for (uint32_t x = 0; x < TILE_DIM; x++)
+                    for (uint32_t x = 0; x < TILE_DIM_HALF; x++)
                     {
                         K_ik += ERIs[y][x];
                     }
@@ -57990,7 +57990,7 @@ computeExchangeFockDPDP1(double*         mat_K,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_HALF][TILE_DIM_HALF + 1];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -58016,9 +58016,9 @@ computeExchangeFockDPDP1(double*         mat_K,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (p_prim_count * 3 + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (p_prim_count * 3 + TILE_DIM_HALF - 1) / TILE_DIM_HALF; m++)
     {
-        const uint32_t j = m * TILE_DIM + threadIdx.y;
+        const uint32_t j = m * TILE_DIM_HALF + threadIdx.y;
 
         // to avoid memory hazard
         __syncthreads();
@@ -58027,9 +58027,9 @@ computeExchangeFockDPDP1(double*         mat_K,
 
         __syncthreads();
 
-        for (uint32_t n = 0; n < (p_prim_count * 3 + TILE_DIM - 1) / TILE_DIM; n++)
+        for (uint32_t n = 0; n < (p_prim_count * 3 + TILE_DIM_HALF - 1) / TILE_DIM_HALF; n++)
         {
-            const uint32_t l = n * TILE_DIM + threadIdx.x;
+            const uint32_t l = n * TILE_DIM_HALF + threadIdx.x;
 
             if ((ik < pair_inds_count_for_K_dd) && (j < p_prim_count * 3) && (l < p_prim_count * 3))
             {
@@ -58291,9 +58291,9 @@ computeExchangeFockDPDP1(double*         mat_K,
 
             if ((threadIdx.y == 0) && (threadIdx.x == 0))
             {
-                for (uint32_t y = 0; y < TILE_DIM; y++)
+                for (uint32_t y = 0; y < TILE_DIM_HALF; y++)
                 {
-                    for (uint32_t x = 0; x < TILE_DIM; x++)
+                    for (uint32_t x = 0; x < TILE_DIM_HALF; x++)
                     {
                         K_ik += ERIs[y][x];
                     }
@@ -58333,7 +58333,7 @@ computeExchangeFockDPDP2(double*         mat_K,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_HALF][TILE_DIM_HALF + 1];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -58359,9 +58359,9 @@ computeExchangeFockDPDP2(double*         mat_K,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (p_prim_count * 3 + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (p_prim_count * 3 + TILE_DIM_HALF - 1) / TILE_DIM_HALF; m++)
     {
-        const uint32_t j = m * TILE_DIM + threadIdx.y;
+        const uint32_t j = m * TILE_DIM_HALF + threadIdx.y;
 
         // to avoid memory hazard
         __syncthreads();
@@ -58370,9 +58370,9 @@ computeExchangeFockDPDP2(double*         mat_K,
 
         __syncthreads();
 
-        for (uint32_t n = 0; n < (p_prim_count * 3 + TILE_DIM - 1) / TILE_DIM; n++)
+        for (uint32_t n = 0; n < (p_prim_count * 3 + TILE_DIM_HALF - 1) / TILE_DIM_HALF; n++)
         {
-            const uint32_t l = n * TILE_DIM + threadIdx.x;
+            const uint32_t l = n * TILE_DIM_HALF + threadIdx.x;
 
             if ((ik < pair_inds_count_for_K_dd) && (j < p_prim_count * 3) && (l < p_prim_count * 3))
             {
@@ -58635,9 +58635,9 @@ computeExchangeFockDPDP2(double*         mat_K,
 
             if ((threadIdx.y == 0) && (threadIdx.x == 0))
             {
-                for (uint32_t y = 0; y < TILE_DIM; y++)
+                for (uint32_t y = 0; y < TILE_DIM_HALF; y++)
                 {
-                    for (uint32_t x = 0; x < TILE_DIM; x++)
+                    for (uint32_t x = 0; x < TILE_DIM_HALF; x++)
                     {
                         K_ik += ERIs[y][x];
                     }
@@ -58677,7 +58677,7 @@ computeExchangeFockDPDP3(double*         mat_K,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_HALF][TILE_DIM_HALF + 1];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -58703,9 +58703,9 @@ computeExchangeFockDPDP3(double*         mat_K,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (p_prim_count * 3 + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (p_prim_count * 3 + TILE_DIM_HALF - 1) / TILE_DIM_HALF; m++)
     {
-        const uint32_t j = m * TILE_DIM + threadIdx.y;
+        const uint32_t j = m * TILE_DIM_HALF + threadIdx.y;
 
         // to avoid memory hazard
         __syncthreads();
@@ -58714,9 +58714,9 @@ computeExchangeFockDPDP3(double*         mat_K,
 
         __syncthreads();
 
-        for (uint32_t n = 0; n < (p_prim_count * 3 + TILE_DIM - 1) / TILE_DIM; n++)
+        for (uint32_t n = 0; n < (p_prim_count * 3 + TILE_DIM_HALF - 1) / TILE_DIM_HALF; n++)
         {
-            const uint32_t l = n * TILE_DIM + threadIdx.x;
+            const uint32_t l = n * TILE_DIM_HALF + threadIdx.x;
 
             if ((ik < pair_inds_count_for_K_dd) && (j < p_prim_count * 3) && (l < p_prim_count * 3))
             {
@@ -58994,9 +58994,9 @@ computeExchangeFockDPDP3(double*         mat_K,
 
             if ((threadIdx.y == 0) && (threadIdx.x == 0))
             {
-                for (uint32_t y = 0; y < TILE_DIM; y++)
+                for (uint32_t y = 0; y < TILE_DIM_HALF; y++)
                 {
-                    for (uint32_t x = 0; x < TILE_DIM; x++)
+                    for (uint32_t x = 0; x < TILE_DIM_HALF; x++)
                     {
                         K_ik += ERIs[y][x];
                     }
@@ -59036,7 +59036,7 @@ computeExchangeFockDPDP4(double*         mat_K,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_HALF][TILE_DIM_HALF + 1];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -59062,9 +59062,9 @@ computeExchangeFockDPDP4(double*         mat_K,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (p_prim_count * 3 + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (p_prim_count * 3 + TILE_DIM_HALF - 1) / TILE_DIM_HALF; m++)
     {
-        const uint32_t j = m * TILE_DIM + threadIdx.y;
+        const uint32_t j = m * TILE_DIM_HALF + threadIdx.y;
 
         // to avoid memory hazard
         __syncthreads();
@@ -59073,9 +59073,9 @@ computeExchangeFockDPDP4(double*         mat_K,
 
         __syncthreads();
 
-        for (uint32_t n = 0; n < (p_prim_count * 3 + TILE_DIM - 1) / TILE_DIM; n++)
+        for (uint32_t n = 0; n < (p_prim_count * 3 + TILE_DIM_HALF - 1) / TILE_DIM_HALF; n++)
         {
-            const uint32_t l = n * TILE_DIM + threadIdx.x;
+            const uint32_t l = n * TILE_DIM_HALF + threadIdx.x;
 
             if ((ik < pair_inds_count_for_K_dd) && (j < p_prim_count * 3) && (l < p_prim_count * 3))
             {
@@ -59326,9 +59326,9 @@ computeExchangeFockDPDP4(double*         mat_K,
 
             if ((threadIdx.y == 0) && (threadIdx.x == 0))
             {
-                for (uint32_t y = 0; y < TILE_DIM; y++)
+                for (uint32_t y = 0; y < TILE_DIM_HALF; y++)
                 {
-                    for (uint32_t x = 0; x < TILE_DIM; x++)
+                    for (uint32_t x = 0; x < TILE_DIM_HALF; x++)
                     {
                         K_ik += ERIs[y][x];
                     }
@@ -59368,7 +59368,7 @@ computeExchangeFockDPDP5(double*         mat_K,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double   ERIs[TILE_DIM_HALF][TILE_DIM_HALF + 1];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
@@ -59394,9 +59394,9 @@ computeExchangeFockDPDP5(double*         mat_K,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (p_prim_count * 3 + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (p_prim_count * 3 + TILE_DIM_HALF - 1) / TILE_DIM_HALF; m++)
     {
-        const uint32_t j = m * TILE_DIM + threadIdx.y;
+        const uint32_t j = m * TILE_DIM_HALF + threadIdx.y;
 
         // to avoid memory hazard
         __syncthreads();
@@ -59405,9 +59405,9 @@ computeExchangeFockDPDP5(double*         mat_K,
 
         __syncthreads();
 
-        for (uint32_t n = 0; n < (p_prim_count * 3 + TILE_DIM - 1) / TILE_DIM; n++)
+        for (uint32_t n = 0; n < (p_prim_count * 3 + TILE_DIM_HALF - 1) / TILE_DIM_HALF; n++)
         {
-            const uint32_t l = n * TILE_DIM + threadIdx.x;
+            const uint32_t l = n * TILE_DIM_HALF + threadIdx.x;
 
             if ((ik < pair_inds_count_for_K_dd) && (j < p_prim_count * 3) && (l < p_prim_count * 3))
             {
@@ -59678,9 +59678,9 @@ computeExchangeFockDPDP5(double*         mat_K,
 
             if ((threadIdx.y == 0) && (threadIdx.x == 0))
             {
-                for (uint32_t y = 0; y < TILE_DIM; y++)
+                for (uint32_t y = 0; y < TILE_DIM_HALF; y++)
                 {
-                    for (uint32_t x = 0; x < TILE_DIM; x++)
+                    for (uint32_t x = 0; x < TILE_DIM_HALF; x++)
                     {
                         K_ik += ERIs[y][x];
                     }
