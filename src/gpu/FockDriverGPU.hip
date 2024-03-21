@@ -6444,6 +6444,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         // K: (PD|PD)
         //     *  *
 
+        timer.start("    K block PDPD");
+
         dim3 pdpd_threads_per_block (TILE_DIM_HALF, TILE_DIM_HALF);
 
         dim3 pdpd_num_blocks (pair_inds_count_for_K_pp, 1);
@@ -6561,6 +6563,10 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
                            d_boys_func_ft);
+
+        hipSafe(hipDeviceSynchronize());
+
+        timer.stop("    K block PDPD");
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -7352,6 +7358,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         // K: (DP|DP)
         //     *  *
 
+        timer.start("    K block DPDP");
+
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDP0, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
@@ -7467,6 +7475,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_ft);
 
         hipSafe(hipDeviceSynchronize());
+
+        timer.stop("    K block DPDP");
 
         // K: (DP|DD)
         //     *  *

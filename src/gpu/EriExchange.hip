@@ -33497,6 +33497,7 @@ computeExchangeFockPDPD0(double*         mat_K,
 
                 const auto Q_ij = mat_Q_for_K_pd[i * d_prim_count * 6 + j];
                 const auto Q_kl = mat_Q_for_K_pd[k * d_prim_count * 6 + l];
+
                 if (fabs(Q_ij * Q_kl * dd_max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_pd[i * d_prim_count * 6 + j];
@@ -33843,6 +33844,7 @@ computeExchangeFockPDPD1(double*         mat_K,
 
                 const auto Q_ij = mat_Q_for_K_pd[i * d_prim_count * 6 + j];
                 const auto Q_kl = mat_Q_for_K_pd[k * d_prim_count * 6 + l];
+
                 if (fabs(Q_ij * Q_kl * dd_max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_pd[i * d_prim_count * 6 + j];
@@ -34186,6 +34188,7 @@ computeExchangeFockPDPD2(double*         mat_K,
 
                 const auto Q_ij = mat_Q_for_K_pd[i * d_prim_count * 6 + j];
                 const auto Q_kl = mat_Q_for_K_pd[k * d_prim_count * 6 + l];
+
                 if (fabs(Q_ij * Q_kl * dd_max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_pd[i * d_prim_count * 6 + j];
@@ -34530,6 +34533,7 @@ computeExchangeFockPDPD3(double*         mat_K,
 
                 const auto Q_ij = mat_Q_for_K_pd[i * d_prim_count * 6 + j];
                 const auto Q_kl = mat_Q_for_K_pd[k * d_prim_count * 6 + l];
+
                 if (fabs(Q_ij * Q_kl * dd_max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_pd[i * d_prim_count * 6 + j];
@@ -34889,6 +34893,7 @@ computeExchangeFockPDPD4(double*         mat_K,
 
                 const auto Q_ij = mat_Q_for_K_pd[i * d_prim_count * 6 + j];
                 const auto Q_kl = mat_Q_for_K_pd[k * d_prim_count * 6 + l];
+
                 if (fabs(Q_ij * Q_kl * dd_max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_pd[i * d_prim_count * 6 + j];
@@ -35221,6 +35226,7 @@ computeExchangeFockPDPD5(double*         mat_K,
 
                 const auto Q_ij = mat_Q_for_K_pd[i * d_prim_count * 6 + j];
                 const auto Q_kl = mat_Q_for_K_pd[k * d_prim_count * 6 + l];
+
                 if (fabs(Q_ij * Q_kl * dd_max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_pd[i * d_prim_count * 6 + j];
@@ -35501,4 +35507,5 @@ computeExchangeFockPDPD5(double*         mat_K,
         mat_K[ik] += K_ik;
     }
 }
+
 }  // namespace gpu
