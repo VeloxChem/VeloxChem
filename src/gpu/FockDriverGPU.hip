@@ -6313,7 +6313,13 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         // K: (PP|PP)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPPPP, num_blocks, threads_per_block, 0, 0,
+        timer.start("    K block PPPP");
+
+        dim3 pppp_threads_per_block (TILE_DIM_HALF, TILE_DIM_HALF);
+
+        dim3 pppp_num_blocks (pair_inds_count_for_K_pp, 1);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPPPP, pppp_num_blocks, pppp_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6330,6 +6336,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_ft);
 
         hipSafe(hipDeviceSynchronize());
+
+        timer.stop("    K block PPPP");
 
         // K: (PS|PD)
         //     *  *
