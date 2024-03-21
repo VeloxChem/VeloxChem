@@ -6740,7 +6740,13 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         // K: (SS|DD)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSDD, num_blocks, threads_per_block, 0, 0,
+        timer.start("    K block SSDD");
+
+        dim3 ssdd_threads_per_block (TILE_DIM_HALF, TILE_DIM_HALF);
+
+        dim3 ssdd_num_blocks (pair_inds_count_for_K_sd, 1);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSSDD, ssdd_num_blocks, ssdd_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6763,10 +6769,18 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         hipSafe(hipDeviceSynchronize());
 
+        timer.stop("    K block SSDD");
+
         // K: (SD|DS)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDDS, num_blocks, threads_per_block, 0, 0,
+        timer.start("    K block SDDS");
+
+        dim3 sdds_threads_per_block (TILE_DIM_HALF, TILE_DIM_HALF);
+
+        dim3 sdds_num_blocks (pair_inds_count_for_K_sd, 1);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDDS, sdds_num_blocks, sdds_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6788,6 +6802,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_ft);
 
         hipSafe(hipDeviceSynchronize());
+
+        timer.stop("    K block SDDS");
 
         // K: (SP|DD)
         //     *  *
