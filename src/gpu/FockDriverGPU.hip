@@ -7093,7 +7093,118 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         // K: (PP|DD)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPPDD, num_blocks, threads_per_block, 0, 0,
+        timer.start("    K block PPDD");
+
+        dim3 ppdd_threads_per_block (TILE_DIM_HALF, TILE_DIM_HALF);
+
+        dim3 ppdd_num_blocks (pair_inds_count_for_K_pd, 1);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPPDD0, ppdd_num_blocks, ppdd_threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_pp,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_pp,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPPDD1, ppdd_num_blocks, ppdd_threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_pp,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_pp,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPPDD2, ppdd_num_blocks, ppdd_threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_pp,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_pp,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPPDD3, ppdd_num_blocks, ppdd_threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_pp,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_pp,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPPDD4, ppdd_num_blocks, ppdd_threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_pp,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_pp,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPPDD5, ppdd_num_blocks, ppdd_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -7115,6 +7226,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_ft);
 
         hipSafe(hipDeviceSynchronize());
+
+        timer.stop("    K block PPDD");
 
         // K: (PD|DP)
         //     *  *
