@@ -6850,7 +6850,13 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         // K: (SD|DD)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDDD, num_blocks, threads_per_block, 0, 0,
+        timer.start("    K block SDDD");
+
+        dim3 sddd_threads_per_block (TILE_DIM_HALF, TILE_DIM_HALF);
+
+        dim3 sddd_num_blocks (pair_inds_count_for_K_sd, 1);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDDD0, sddd_num_blocks, sddd_threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6870,6 +6876,115 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
                            d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDDD1, sddd_num_blocks, sddd_threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_sd,
+                           d_pair_inds_k_for_K_sd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_sd,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_sd,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDDD2, sddd_num_blocks, sddd_threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_sd,
+                           d_pair_inds_k_for_K_sd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_sd,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_sd,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDDD3, sddd_num_blocks, sddd_threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_sd,
+                           d_pair_inds_k_for_K_sd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_sd,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_sd,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDDD4, sddd_num_blocks, sddd_threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_sd,
+                           d_pair_inds_k_for_K_sd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_sd,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_sd,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDDD5, sddd_num_blocks, sddd_threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_sd,
+                           d_pair_inds_k_for_K_sd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_sd,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_sd,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipSafe(hipDeviceSynchronize());
+
+        timer.stop("    K block SDDD");
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sd * sizeof(double), hipMemcpyDeviceToHost));
 
