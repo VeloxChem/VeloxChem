@@ -7248,7 +7248,57 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         // K: (DS|DP)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDSDP, num_blocks, threads_per_block, 0, 0,
+        timer.start("    K block DSDP");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDSDP0, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           sp_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_ds,
+                           d_mat_Q_for_K_dp,
+                           d_density_inds_for_K_ds,
+                           d_density_inds_for_K_dp,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDSDP1, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           sp_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_ds,
+                           d_mat_Q_for_K_dp,
+                           d_density_inds_for_K_ds,
+                           d_density_inds_for_K_dp,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDSDP2, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7274,10 +7324,62 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         hipSafe(hipDeviceSynchronize());
 
+        timer.stop("    K block DSDP");
+
         // K: (DP|DS)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDS, num_blocks, threads_per_block, 0, 0,
+        timer.start("    K block DPDS");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDS0, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           ps_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_dp,
+                           d_mat_Q_for_K_ds,
+                           d_density_inds_for_K_dp,
+                           d_density_inds_for_K_ds,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDS1, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           ps_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_dp,
+                           d_mat_Q_for_K_ds,
+                           d_density_inds_for_K_dp,
+                           d_density_inds_for_K_ds,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDS2, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7302,6 +7404,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_ft);
 
         hipSafe(hipDeviceSynchronize());
+
+        timer.stop("    K block DPDS");
 
         // K: (DS|DD)
         //     *  *
