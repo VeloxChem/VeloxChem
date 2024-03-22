@@ -5666,14 +5666,18 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         // set up thread blocks for K
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        threads_per_block = dim3(TILE_DIM_HALF, TILE_DIM_HALF);
 
         num_blocks = dim3(pair_inds_count_for_K_ss, 1);
 
         // K: (SS|SS)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSSS, num_blocks, threads_per_block, 0, 0,
+        dim3 ssss_threads_per_block (TILE_DIM_HALF, TILE_DIM_HALF);
+
+        dim3 ssss_num_blocks (pair_inds_count_for_K_ss, 1);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSSSS, ssss_num_blocks, ssss_threads_per_block, 0, 0,
                                                      d_mat_K,
                                                      d_pair_inds_i_for_K_ss,
                                                      d_pair_inds_k_for_K_ss,
@@ -5935,7 +5939,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         // set up thread blocks for K
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        threads_per_block = dim3(TILE_DIM_HALF, TILE_DIM_HALF);
 
         num_blocks = dim3(pair_inds_count_for_K_sp, 1);
 
@@ -6230,7 +6234,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         // set up thread blocks for K
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        threads_per_block = dim3(TILE_DIM_HALF, TILE_DIM_HALF);
 
         num_blocks = dim3(pair_inds_count_for_K_pp, 1);
 
@@ -6768,7 +6772,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         // set up thread blocks for K
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        threads_per_block = dim3(TILE_DIM_HALF, TILE_DIM_HALF);
 
         num_blocks = dim3(pair_inds_count_for_K_sd, 1);
 
@@ -7314,7 +7318,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         // set up thread blocks for K
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        threads_per_block = dim3(TILE_DIM_HALF, TILE_DIM_HALF);
 
         num_blocks = dim3(pair_inds_count_for_K_pd, 1);
 
@@ -8332,7 +8336,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         // set up thread blocks for K
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        threads_per_block = dim3(TILE_DIM_HALF, TILE_DIM_HALF);
 
         num_blocks = dim3(pair_inds_count_for_K_dd, 1);
 
