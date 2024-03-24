@@ -9416,6 +9416,7 @@ computeExchangeFockSDDP2(double*         mat_K,
     }
 }
 
+
 __global__ void
 computeExchangeFockSDDD0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
@@ -9543,9 +9544,9 @@ computeExchangeFockSDDD0(double*         mat_K,
 
                     const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
-                    double F6_t[2];
+                    double F6_t[3];
 
-                    gpu::computeBoysFunction(F6_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 1, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunction(F6_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 2, boys_func_table, boys_func_ft);
 
                     const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
                     const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
@@ -9728,6 +9729,125 @@ computeExchangeFockSDDD0(double*         mat_K,
                                     + delta[b0][c0] * delta[c1][d0] * (PB_1 * QD_1)
                                     + delta[b0][c1] * delta[c0][d0] * (PB_1 * QD_1)
                                     + delta[b0][d0] * delta[c0][c1] * (PB_1 * QD_1)
+                                )
+        
+                            )
+
+                            +
+
+                            F6_t[1] * (
+        
+                                0.5 * S1 / ( S2 * S4 ) * (
+                                    delta[d0][d1] * (PB_0 * PB_1 * PQ[c0] * QC_1 * (-1.0) + PB_0 * PB_1 * PQ[c1] * QC_0 * (-1.0) + PB_0 * PB_1 * QC_0 * QC_1 * (-1.0))
+                                    + delta[c1][d1] * (PB_0 * PB_1 * PQ[c0] * QD_0 * (-1.0) + PB_0 * PB_1 * PQ[d0] * QC_0 * (-1.0) + PB_0 * PB_1 * QD_0 * QC_0 * (-1.0))
+                                    + delta[c1][d0] * (PB_0 * PB_1 * PQ[c0] * QD_1 * (-1.0) + PB_0 * PB_1 * PQ[d1] * QC_0 * (-1.0) + PB_0 * PB_1 * QD_1 * QC_0 * (-1.0))
+                                    + delta[c0][d1] * (PB_0 * PB_1 * PQ[c1] * QD_0 * (-1.0) + PB_0 * PB_1 * PQ[d0] * QC_1 * (-1.0) + PB_0 * PB_1 * QD_0 * QC_1 * (-1.0))
+                                    + delta[c0][d0] * (PB_0 * PB_1 * PQ[c1] * QD_1 * (-1.0) + PB_0 * PB_1 * PQ[d1] * QC_1 * (-1.0) + PB_0 * PB_1 * QD_1 * QC_1 * (-1.0))
+                                    + delta[c0][c1] * (PB_0 * PB_1 * PQ[d0] * QD_1 * (-1.0) + PB_0 * PB_1 * PQ[d1] * QD_0 * (-1.0) + PB_0 * PB_1 * QD_0 * QD_1 * (-1.0))
+                                )
+        
+                            )
+
+                            +
+
+                            F6_t[1] * (
+        
+                                0.5 * S2 / ( S1 * S4 ) * (
+                                    delta[b0][b1] * (QD_0 * QD_1 * QC_0 * QC_1 * (-1.0))
+                                )
+        
+                            )
+
+                            +
+
+                            F6_t[1] * (
+        
+                                0.5 / S4 * (
+                                    delta[d0][d1] * (PB_0 * PQ[b1] * QC_0 * QC_1 + PB_1 * PQ[b0] * QC_0 * QC_1)
+                                    + delta[c1][d1] * (PB_0 * PQ[b1] * QD_0 * QC_0 + PB_1 * PQ[b0] * QD_0 * QC_0)
+                                    + delta[c1][d0] * (PB_0 * PQ[b1] * QD_1 * QC_0 + PB_1 * PQ[b0] * QD_1 * QC_0)
+                                    + delta[c0][d1] * (PB_0 * PQ[b1] * QD_0 * QC_1 + PB_1 * PQ[b0] * QD_0 * QC_1)
+                                    + delta[c0][d0] * (PB_0 * PQ[b1] * QD_1 * QC_1 + PB_1 * PQ[b0] * QD_1 * QC_1)
+                                    + delta[b1][d1] * (PB_0 * QD_0 * QC_0 * QC_1)
+                                    + delta[b1][d0] * (PB_0 * QD_1 * QC_0 * QC_1)
+                                    + delta[b1][c1] * (PB_0 * QD_0 * QD_1 * QC_0)
+                                    + delta[b1][c0] * (PB_0 * QD_0 * QD_1 * QC_1)
+                                    + delta[b0][d1] * (PB_1 * QD_0 * QC_0 * QC_1)
+                                    + delta[b0][d0] * (PB_1 * QD_1 * QC_0 * QC_1)
+                                    + delta[b0][c1] * (PB_1 * QD_0 * QD_1 * QC_0)
+                                    + delta[b0][c0] * (PB_1 * QD_0 * QD_1 * QC_1)
+                                    + delta[b0][b1] * (PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0))
+                                    + delta[c0][c1] * (PB_0 * PQ[b1] * QD_0 * QD_1 + PB_1 * PQ[b0] * QD_0 * QD_1)
+                                )
+        
+                            )
+
+                            +
+
+                            F6_t[1] * (
+        
+                                S1 / S4 * (
+                                    
+                                    + PB_0 * PB_1 * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
+                                    + PB_0 * PB_1 * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0)
+                                    + PB_0 * PB_1 * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
+                                    + PB_0 * PB_1 * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
+                                )
+        
+                            )
+
+                            +
+
+                            F6_t[1] * (
+        
+                                S2 / S4 * (
+                                    
+                                    + PB_0 * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1
+                                    + PB_1 * PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1
+                                )
+        
+                            )
+
+                            +
+
+                            F6_t[2] * (
+        
+                                ( S1 * S1 ) / ( S4 * S4 ) * (
+                                    PB_0 * PB_1 * PQ[c0] * PQ[c1] * QD_0 * QD_1
+                                    + PB_0 * PB_1 * PQ[c0] * PQ[d0] * QD_1 * QC_1
+                                    + PB_0 * PB_1 * PQ[c0] * PQ[d1] * QD_0 * QC_1
+                                    + PB_0 * PB_1 * PQ[c1] * PQ[d0] * QD_1 * QC_0
+                                    + PB_0 * PB_1 * PQ[c1] * PQ[d1] * QD_0 * QC_0
+                                    + PB_0 * PB_1 * PQ[d0] * PQ[d1] * QC_0 * QC_1
+                                )
+        
+                            )
+
+                            +
+
+                            F6_t[2] * (
+        
+                                ( S1 * S2 ) / ( S4 * S4 ) * (
+                                    
+                                    + PB_0 * PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
+                                    + PB_0 * PQ[b1] * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0)
+                                    + PB_0 * PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
+                                    + PB_0 * PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
+                                    + PB_1 * PQ[b0] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
+                                    + PB_1 * PQ[b0] * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0)
+                                    + PB_1 * PQ[b0] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
+                                    + PB_1 * PQ[b0] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
+                                )
+        
+                            )
+
+                            +
+
+                            F6_t[2] * (
+        
+                                ( S2 * S2 ) / ( S4 * S4 ) * (
+                                    
+                                    + PQ[b0] * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1
                                 )
         
                             )
@@ -9928,125 +10048,6 @@ computeExchangeFockSDDD1(double*         mat_K,
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
-                            F6_t[1] * (
-        
-                                0.5 * S1 / ( S2 * S4 ) * (
-                                    delta[d0][d1] * (PB_0 * PB_1 * PQ[c0] * QC_1 * (-1.0) + PB_0 * PB_1 * PQ[c1] * QC_0 * (-1.0) + PB_0 * PB_1 * QC_0 * QC_1 * (-1.0))
-                                    + delta[c1][d1] * (PB_0 * PB_1 * PQ[c0] * QD_0 * (-1.0) + PB_0 * PB_1 * PQ[d0] * QC_0 * (-1.0) + PB_0 * PB_1 * QD_0 * QC_0 * (-1.0))
-                                    + delta[c1][d0] * (PB_0 * PB_1 * PQ[c0] * QD_1 * (-1.0) + PB_0 * PB_1 * PQ[d1] * QC_0 * (-1.0) + PB_0 * PB_1 * QD_1 * QC_0 * (-1.0))
-                                    + delta[c0][d1] * (PB_0 * PB_1 * PQ[c1] * QD_0 * (-1.0) + PB_0 * PB_1 * PQ[d0] * QC_1 * (-1.0) + PB_0 * PB_1 * QD_0 * QC_1 * (-1.0))
-                                    + delta[c0][d0] * (PB_0 * PB_1 * PQ[c1] * QD_1 * (-1.0) + PB_0 * PB_1 * PQ[d1] * QC_1 * (-1.0) + PB_0 * PB_1 * QD_1 * QC_1 * (-1.0))
-                                    + delta[c0][c1] * (PB_0 * PB_1 * PQ[d0] * QD_1 * (-1.0) + PB_0 * PB_1 * PQ[d1] * QD_0 * (-1.0) + PB_0 * PB_1 * QD_0 * QD_1 * (-1.0))
-                                )
-        
-                            )
-
-                            +
-
-                            F6_t[1] * (
-        
-                                0.5 * S2 / ( S1 * S4 ) * (
-                                    delta[b0][b1] * (QD_0 * QD_1 * QC_0 * QC_1 * (-1.0))
-                                )
-        
-                            )
-
-                            +
-
-                            F6_t[1] * (
-        
-                                0.5 / S4 * (
-                                    delta[d0][d1] * (PB_0 * PQ[b1] * QC_0 * QC_1 + PB_1 * PQ[b0] * QC_0 * QC_1)
-                                    + delta[c1][d1] * (PB_0 * PQ[b1] * QD_0 * QC_0 + PB_1 * PQ[b0] * QD_0 * QC_0)
-                                    + delta[c1][d0] * (PB_0 * PQ[b1] * QD_1 * QC_0 + PB_1 * PQ[b0] * QD_1 * QC_0)
-                                    + delta[c0][d1] * (PB_0 * PQ[b1] * QD_0 * QC_1 + PB_1 * PQ[b0] * QD_0 * QC_1)
-                                    + delta[c0][d0] * (PB_0 * PQ[b1] * QD_1 * QC_1 + PB_1 * PQ[b0] * QD_1 * QC_1)
-                                    + delta[b1][d1] * (PB_0 * QD_0 * QC_0 * QC_1)
-                                    + delta[b1][d0] * (PB_0 * QD_1 * QC_0 * QC_1)
-                                    + delta[b1][c1] * (PB_0 * QD_0 * QD_1 * QC_0)
-                                    + delta[b1][c0] * (PB_0 * QD_0 * QD_1 * QC_1)
-                                    + delta[b0][d1] * (PB_1 * QD_0 * QC_0 * QC_1)
-                                    + delta[b0][d0] * (PB_1 * QD_1 * QC_0 * QC_1)
-                                    + delta[b0][c1] * (PB_1 * QD_0 * QD_1 * QC_0)
-                                    + delta[b0][c0] * (PB_1 * QD_0 * QD_1 * QC_1)
-                                    + delta[b0][b1] * (PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0))
-                                    + delta[c0][c1] * (PB_0 * PQ[b1] * QD_0 * QD_1 + PB_1 * PQ[b0] * QD_0 * QD_1)
-                                )
-        
-                            )
-
-                            +
-
-                            F6_t[1] * (
-        
-                                S1 / S4 * (
-                                    
-                                    + PB_0 * PB_1 * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
-                                    + PB_0 * PB_1 * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0)
-                                    + PB_0 * PB_1 * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
-                                    + PB_0 * PB_1 * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
-                                )
-        
-                            )
-
-                            +
-
-                            F6_t[1] * (
-        
-                                S2 / S4 * (
-                                    
-                                    + PB_0 * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1
-                                    + PB_1 * PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1
-                                )
-        
-                            )
-
-                            +
-
-                            F6_t[2] * (
-        
-                                ( S1 * S1 ) / ( S4 * S4 ) * (
-                                    PB_0 * PB_1 * PQ[c0] * PQ[c1] * QD_0 * QD_1
-                                    + PB_0 * PB_1 * PQ[c0] * PQ[d0] * QD_1 * QC_1
-                                    + PB_0 * PB_1 * PQ[c0] * PQ[d1] * QD_0 * QC_1
-                                    + PB_0 * PB_1 * PQ[c1] * PQ[d0] * QD_1 * QC_0
-                                    + PB_0 * PB_1 * PQ[c1] * PQ[d1] * QD_0 * QC_0
-                                    + PB_0 * PB_1 * PQ[d0] * PQ[d1] * QC_0 * QC_1
-                                )
-        
-                            )
-
-                            +
-
-                            F6_t[2] * (
-        
-                                ( S1 * S2 ) / ( S4 * S4 ) * (
-                                    
-                                    + PB_0 * PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
-                                    + PB_0 * PQ[b1] * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0)
-                                    + PB_0 * PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
-                                    + PB_0 * PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
-                                    + PB_1 * PQ[b0] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
-                                    + PB_1 * PQ[b0] * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0)
-                                    + PB_1 * PQ[b0] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
-                                    + PB_1 * PQ[b0] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
-                                )
-        
-                            )
-
-                            +
-
-                            F6_t[2] * (
-        
-                                ( S2 * S2 ) / ( S4 * S4 ) * (
-                                    
-                                    + PQ[b0] * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1
-                                )
-        
-                            )
-
-                            +
-
                             F6_t[2] * (
         
                                 0.25 * S1 / ( S2 * S4 * S4 ) * (
@@ -10083,6 +10084,60 @@ computeExchangeFockSDDD1(double*         mat_K,
                                     + delta[b0][b1] * delta[c1][d0] * (PQ[c0] * PQ[d1] + PQ[c0] * QD_1 + PQ[d1] * QC_0)
                                     + delta[b0][b1] * delta[c0][d0] * (PQ[c1] * PQ[d1] + PQ[c1] * QD_1 + PQ[d1] * QC_1)
                                     + delta[b0][b1] * delta[c0][c1] * (PQ[d0] * PQ[d1] + PQ[d0] * QD_1 + PQ[d1] * QD_0)
+                                )
+        
+                            )
+
+                            +
+
+                            F6_t[2] * (
+        
+                                0.25 / ( S4 * S4 ) * (
+                                    delta[b1][c1] * delta[d0][d1] * (PQ[b0] * QC_0)
+                                    + delta[b1][d0] * delta[c1][d1] * (PQ[b0] * QC_0)
+                                    + delta[b1][d1] * delta[c1][d0] * (PQ[b0] * QC_0)
+                                    + delta[b1][c0] * delta[d0][d1] * (PQ[b0] * QC_1)
+                                    + delta[b1][d0] * delta[c0][d1] * (PQ[b0] * QC_1)
+                                    + delta[b1][d1] * delta[c0][d0] * (PQ[b0] * QC_1)
+                                    + delta[b0][c1] * delta[d0][d1] * (PQ[b1] * QC_0)
+                                    + delta[b0][d0] * delta[c1][d1] * (PQ[b1] * QC_0)
+                                    + delta[b0][d1] * delta[c1][d0] * (PQ[b1] * QC_0)
+                                    + delta[b0][c0] * delta[d0][d1] * (PQ[b1] * QC_1)
+                                    + delta[b0][d0] * delta[c0][d1] * (PQ[b1] * QC_1)
+                                    + delta[b0][d1] * delta[c0][d0] * (PQ[b1] * QC_1)
+                                    + delta[b0][b1] * delta[d0][d1] * (PQ[c0] * QC_1 + PQ[c1] * QC_0 + QC_0 * QC_1)
+                                    + delta[b0][b1] * delta[c1][d1] * (PQ[c0] * QD_0 + PQ[d0] * QC_0 + QD_0 * QC_0)
+                                    + delta[b0][b1] * delta[c0][d1] * (PQ[c1] * QD_0 + PQ[d0] * QC_1 + QD_0 * QC_1)
+                                    + delta[b0][b1] * delta[c1][d0] * (PQ[c0] * QD_1 + PQ[d1] * QC_0 + QD_1 * QC_0)
+                                    + delta[b0][b1] * delta[c0][d0] * (PQ[c1] * QD_1 + PQ[d1] * QC_1 + QD_1 * QC_1)
+                                    + delta[b0][d0] * delta[b1][d1] * (QC_0 * QC_1)
+                                    + delta[b0][d1] * delta[b1][d0] * (QC_0 * QC_1)
+                                    + delta[b0][c1] * delta[b1][d1] * (QD_0 * QC_0)
+                                    + delta[b0][d1] * delta[b1][c1] * (QD_0 * QC_0)
+                                    + delta[b0][c1] * delta[b1][d0] * (QD_1 * QC_0)
+                                    + delta[b0][d0] * delta[b1][c1] * (QD_1 * QC_0)
+                                    + delta[b0][c0] * delta[b1][d1] * (QD_0 * QC_1)
+                                    + delta[b0][d1] * delta[b1][c0] * (QD_0 * QC_1)
+                                    + delta[b0][c0] * delta[b1][d0] * (QD_1 * QC_1)
+                                    + delta[b0][d0] * delta[b1][c0] * (QD_1 * QC_1)
+                                    + delta[c0][c1] * delta[d0][d1] * (PQ[b0] * PQ[b1])
+                                    + delta[c0][d0] * delta[c1][d1] * (PQ[b0] * PQ[b1])
+                                    + delta[c1][d0] * delta[c0][d1] * (PQ[b0] * PQ[b1])
+                                    + delta[b1][c0] * delta[c1][d1] * (PQ[b0] * QD_0)
+                                    + delta[b1][c1] * delta[c0][d1] * (PQ[b0] * QD_0)
+                                    + delta[b1][d1] * delta[c0][c1] * (PQ[b0] * QD_0)
+                                    + delta[b1][c0] * delta[c1][d0] * (PQ[b0] * QD_1)
+                                    + delta[b1][c1] * delta[c0][d0] * (PQ[b0] * QD_1)
+                                    + delta[b1][d0] * delta[c0][c1] * (PQ[b0] * QD_1)
+                                    + delta[b0][c0] * delta[c1][d1] * (PQ[b1] * QD_0)
+                                    + delta[b0][c1] * delta[c0][d1] * (PQ[b1] * QD_0)
+                                    + delta[b0][d1] * delta[c0][c1] * (PQ[b1] * QD_0)
+                                    + delta[b0][c0] * delta[c1][d0] * (PQ[b1] * QD_1)
+                                    + delta[b0][c1] * delta[c0][d0] * (PQ[b1] * QD_1)
+                                    + delta[b0][d0] * delta[c0][c1] * (PQ[b1] * QD_1)
+                                    + delta[b0][b1] * delta[c0][c1] * (PQ[d0] * QD_1 + PQ[d1] * QD_0 + QD_0 * QD_1)
+                                    + delta[b0][c0] * delta[b1][c1] * (QD_0 * QD_1)
+                                    + delta[b0][c1] * delta[b1][c0] * (QD_0 * QD_1)
                                 )
         
                             )
@@ -10260,9 +10315,9 @@ computeExchangeFockSDDD2(double*         mat_K,
 
                     const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
-                    double F6_t[3];
+                    double F6_t[4];
 
-                    gpu::computeBoysFunction(F6_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 2, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunction(F6_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
                     const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
@@ -10282,60 +10337,6 @@ computeExchangeFockSDDD2(double*         mat_K,
                     const auto QD_1 = (-a_k / (a_k + a_l)) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
-                            F6_t[2] * (
-        
-                                0.25 / ( S4 * S4 ) * (
-                                    delta[b1][c1] * delta[d0][d1] * (PQ[b0] * QC_0)
-                                    + delta[b1][d0] * delta[c1][d1] * (PQ[b0] * QC_0)
-                                    + delta[b1][d1] * delta[c1][d0] * (PQ[b0] * QC_0)
-                                    + delta[b1][c0] * delta[d0][d1] * (PQ[b0] * QC_1)
-                                    + delta[b1][d0] * delta[c0][d1] * (PQ[b0] * QC_1)
-                                    + delta[b1][d1] * delta[c0][d0] * (PQ[b0] * QC_1)
-                                    + delta[b0][c1] * delta[d0][d1] * (PQ[b1] * QC_0)
-                                    + delta[b0][d0] * delta[c1][d1] * (PQ[b1] * QC_0)
-                                    + delta[b0][d1] * delta[c1][d0] * (PQ[b1] * QC_0)
-                                    + delta[b0][c0] * delta[d0][d1] * (PQ[b1] * QC_1)
-                                    + delta[b0][d0] * delta[c0][d1] * (PQ[b1] * QC_1)
-                                    + delta[b0][d1] * delta[c0][d0] * (PQ[b1] * QC_1)
-                                    + delta[b0][b1] * delta[d0][d1] * (PQ[c0] * QC_1 + PQ[c1] * QC_0 + QC_0 * QC_1)
-                                    + delta[b0][b1] * delta[c1][d1] * (PQ[c0] * QD_0 + PQ[d0] * QC_0 + QD_0 * QC_0)
-                                    + delta[b0][b1] * delta[c0][d1] * (PQ[c1] * QD_0 + PQ[d0] * QC_1 + QD_0 * QC_1)
-                                    + delta[b0][b1] * delta[c1][d0] * (PQ[c0] * QD_1 + PQ[d1] * QC_0 + QD_1 * QC_0)
-                                    + delta[b0][b1] * delta[c0][d0] * (PQ[c1] * QD_1 + PQ[d1] * QC_1 + QD_1 * QC_1)
-                                    + delta[b0][d0] * delta[b1][d1] * (QC_0 * QC_1)
-                                    + delta[b0][d1] * delta[b1][d0] * (QC_0 * QC_1)
-                                    + delta[b0][c1] * delta[b1][d1] * (QD_0 * QC_0)
-                                    + delta[b0][d1] * delta[b1][c1] * (QD_0 * QC_0)
-                                    + delta[b0][c1] * delta[b1][d0] * (QD_1 * QC_0)
-                                    + delta[b0][d0] * delta[b1][c1] * (QD_1 * QC_0)
-                                    + delta[b0][c0] * delta[b1][d1] * (QD_0 * QC_1)
-                                    + delta[b0][d1] * delta[b1][c0] * (QD_0 * QC_1)
-                                    + delta[b0][c0] * delta[b1][d0] * (QD_1 * QC_1)
-                                    + delta[b0][d0] * delta[b1][c0] * (QD_1 * QC_1)
-                                    + delta[c0][c1] * delta[d0][d1] * (PQ[b0] * PQ[b1])
-                                    + delta[c0][d0] * delta[c1][d1] * (PQ[b0] * PQ[b1])
-                                    + delta[c1][d0] * delta[c0][d1] * (PQ[b0] * PQ[b1])
-                                    + delta[b1][c0] * delta[c1][d1] * (PQ[b0] * QD_0)
-                                    + delta[b1][c1] * delta[c0][d1] * (PQ[b0] * QD_0)
-                                    + delta[b1][d1] * delta[c0][c1] * (PQ[b0] * QD_0)
-                                    + delta[b1][c0] * delta[c1][d0] * (PQ[b0] * QD_1)
-                                    + delta[b1][c1] * delta[c0][d0] * (PQ[b0] * QD_1)
-                                    + delta[b1][d0] * delta[c0][c1] * (PQ[b0] * QD_1)
-                                    + delta[b0][c0] * delta[c1][d1] * (PQ[b1] * QD_0)
-                                    + delta[b0][c1] * delta[c0][d1] * (PQ[b1] * QD_0)
-                                    + delta[b0][d1] * delta[c0][c1] * (PQ[b1] * QD_0)
-                                    + delta[b0][c0] * delta[c1][d0] * (PQ[b1] * QD_1)
-                                    + delta[b0][c1] * delta[c0][d0] * (PQ[b1] * QD_1)
-                                    + delta[b0][d0] * delta[c0][c1] * (PQ[b1] * QD_1)
-                                    + delta[b0][b1] * delta[c0][c1] * (PQ[d0] * QD_1 + PQ[d1] * QD_0 + QD_0 * QD_1)
-                                    + delta[b0][c0] * delta[b1][c1] * (QD_0 * QD_1)
-                                    + delta[b0][c1] * delta[b1][c0] * (QD_0 * QD_1)
-                                )
-        
-                            )
-
-                            +
 
                             F6_t[2] * (
         
@@ -10430,6 +10431,91 @@ computeExchangeFockSDDD2(double*         mat_K,
                                     + delta[b0][d1] * delta[b1][c0] * delta[c1][d0]
                                     + delta[b0][d1] * delta[b1][c1] * delta[c0][d0]
                                     + delta[b0][d1] * delta[b1][d0] * delta[c0][c1]
+                                )
+        
+                            )
+
+                            +
+
+                            F6_t[2] * (
+        
+                                0.25 * ( S1 * S1 ) / ( S2 * S2 * S4 * S4 ) * (
+                                    delta[c0][c1] * delta[d0][d1] * (PB_0 * PB_1)
+                                    + delta[c0][d0] * delta[c1][d1] * (PB_0 * PB_1)
+                                    + delta[c1][d0] * delta[c0][d1] * (PB_0 * PB_1)
+                                )
+        
+                            )
+
+                            +
+
+                            F6_t[3] * (
+        
+                                ( S1 * S1 * S1 ) / ( S4 * S4 * S4 ) * (
+                                    
+                                    + PB_0 * PB_1 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0)
+                                    + PB_0 * PB_1 * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0)
+                                    + PB_0 * PB_1 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0)
+                                    + PB_0 * PB_1 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0)
+                                )
+        
+                            )
+
+                            +
+
+                            F6_t[3] * (
+        
+                                ( S1 * S1 * S2 ) / ( S4 * S4 * S4 ) * (
+                                    PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * QD_1
+                                    + PB_0 * PQ[b1] * PQ[c0] * PQ[d0] * QD_1 * QC_1
+                                    + PB_0 * PQ[b1] * PQ[c0] * PQ[d1] * QD_0 * QC_1
+                                    + PB_0 * PQ[b1] * PQ[c1] * PQ[d0] * QD_1 * QC_0
+                                    + PB_0 * PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0
+                                    + PB_0 * PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1
+                                    + PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * QD_0 * QD_1
+                                    + PB_1 * PQ[b0] * PQ[c0] * PQ[d0] * QD_1 * QC_1
+                                    + PB_1 * PQ[b0] * PQ[c0] * PQ[d1] * QD_0 * QC_1
+                                    + PB_1 * PQ[b0] * PQ[c1] * PQ[d0] * QD_1 * QC_0
+                                    + PB_1 * PQ[b0] * PQ[c1] * PQ[d1] * QD_0 * QC_0
+                                    + PB_1 * PQ[b0] * PQ[d0] * PQ[d1] * QC_0 * QC_1
+                                )
+        
+                            )
+
+                            +
+
+                            F6_t[3] * (
+        
+                                ( S1 * S2 * S2 ) / ( S4 * S4 * S4 ) * (
+                                    
+                                    + PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
+                                    + PQ[b0] * PQ[b1] * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0)
+                                    + PQ[b0] * PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
+                                    + PQ[b0] * PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
+                                )
+        
+                            )
+
+                            +
+
+                            F6_t[3] * (
+        
+                                0.125 * S1 / ( S2 * S4 * S4 * S4 ) * (
+                                    delta[b0][b1] * delta[c0][c1] * delta[d0][d1] * (-1.0)
+                                    + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] * (-1.0)
+                                    + delta[b0][b1] * delta[c1][d0] * delta[c0][d1] * (-1.0)
+                                    + delta[b0][c0] * delta[b1][c1] * delta[d0][d1] * (-1.0)
+                                    + delta[b0][c0] * delta[b1][d0] * delta[c1][d1] * (-1.0)
+                                    + delta[b0][c0] * delta[b1][d1] * delta[c1][d0] * (-1.0)
+                                    + delta[b0][c1] * delta[b1][c0] * delta[d0][d1] * (-1.0)
+                                    + delta[b0][c1] * delta[b1][d0] * delta[c0][d1] * (-1.0)
+                                    + delta[b0][c1] * delta[b1][d1] * delta[c0][d0] * (-1.0)
+                                    + delta[b0][d0] * delta[b1][c0] * delta[c1][d1] * (-1.0)
+                                    + delta[b0][d0] * delta[b1][c1] * delta[c0][d1] * (-1.0)
+                                    + delta[b0][d0] * delta[b1][d1] * delta[c0][c1] * (-1.0)
+                                    + delta[b0][d1] * delta[b1][c0] * delta[c1][d0] * (-1.0)
+                                    + delta[b0][d1] * delta[b1][c1] * delta[c0][d0] * (-1.0)
+                                    + delta[b0][d1] * delta[b1][d0] * delta[c0][c1] * (-1.0)
                                 )
         
                             )
@@ -10629,91 +10715,6 @@ computeExchangeFockSDDD3(double*         mat_K,
                     const auto QD_1 = (-a_k / (a_k + a_l)) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
-                            F6_t[2] * (
-        
-                                0.25 * ( S1 * S1 ) / ( S2 * S2 * S4 * S4 ) * (
-                                    delta[c0][c1] * delta[d0][d1] * (PB_0 * PB_1)
-                                    + delta[c0][d0] * delta[c1][d1] * (PB_0 * PB_1)
-                                    + delta[c1][d0] * delta[c0][d1] * (PB_0 * PB_1)
-                                )
-        
-                            )
-
-                            +
-
-                            F6_t[3] * (
-        
-                                ( S1 * S1 * S1 ) / ( S4 * S4 * S4 ) * (
-                                    
-                                    + PB_0 * PB_1 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0)
-                                    + PB_0 * PB_1 * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0)
-                                    + PB_0 * PB_1 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0)
-                                    + PB_0 * PB_1 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0)
-                                )
-        
-                            )
-
-                            +
-
-                            F6_t[3] * (
-        
-                                ( S1 * S1 * S2 ) / ( S4 * S4 * S4 ) * (
-                                    PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * QD_1
-                                    + PB_0 * PQ[b1] * PQ[c0] * PQ[d0] * QD_1 * QC_1
-                                    + PB_0 * PQ[b1] * PQ[c0] * PQ[d1] * QD_0 * QC_1
-                                    + PB_0 * PQ[b1] * PQ[c1] * PQ[d0] * QD_1 * QC_0
-                                    + PB_0 * PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0
-                                    + PB_0 * PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1
-                                    + PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * QD_0 * QD_1
-                                    + PB_1 * PQ[b0] * PQ[c0] * PQ[d0] * QD_1 * QC_1
-                                    + PB_1 * PQ[b0] * PQ[c0] * PQ[d1] * QD_0 * QC_1
-                                    + PB_1 * PQ[b0] * PQ[c1] * PQ[d0] * QD_1 * QC_0
-                                    + PB_1 * PQ[b0] * PQ[c1] * PQ[d1] * QD_0 * QC_0
-                                    + PB_1 * PQ[b0] * PQ[d0] * PQ[d1] * QC_0 * QC_1
-                                )
-        
-                            )
-
-                            +
-
-                            F6_t[3] * (
-        
-                                ( S1 * S2 * S2 ) / ( S4 * S4 * S4 ) * (
-                                    
-                                    + PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
-                                    + PQ[b0] * PQ[b1] * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0)
-                                    + PQ[b0] * PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
-                                    + PQ[b0] * PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
-                                )
-        
-                            )
-
-                            +
-
-                            F6_t[3] * (
-        
-                                0.125 * S1 / ( S2 * S4 * S4 * S4 ) * (
-                                    delta[b0][b1] * delta[c0][c1] * delta[d0][d1] * (-1.0)
-                                    + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] * (-1.0)
-                                    + delta[b0][b1] * delta[c1][d0] * delta[c0][d1] * (-1.0)
-                                    + delta[b0][c0] * delta[b1][c1] * delta[d0][d1] * (-1.0)
-                                    + delta[b0][c0] * delta[b1][d0] * delta[c1][d1] * (-1.0)
-                                    + delta[b0][c0] * delta[b1][d1] * delta[c1][d0] * (-1.0)
-                                    + delta[b0][c1] * delta[b1][c0] * delta[d0][d1] * (-1.0)
-                                    + delta[b0][c1] * delta[b1][d0] * delta[c0][d1] * (-1.0)
-                                    + delta[b0][c1] * delta[b1][d1] * delta[c0][d0] * (-1.0)
-                                    + delta[b0][d0] * delta[b1][c0] * delta[c1][d1] * (-1.0)
-                                    + delta[b0][d0] * delta[b1][c1] * delta[c0][d1] * (-1.0)
-                                    + delta[b0][d0] * delta[b1][d1] * delta[c0][c1] * (-1.0)
-                                    + delta[b0][d1] * delta[b1][c0] * delta[c1][d0] * (-1.0)
-                                    + delta[b0][d1] * delta[b1][c1] * delta[c0][d0] * (-1.0)
-                                    + delta[b0][d1] * delta[b1][d0] * delta[c0][c1] * (-1.0)
-                                )
-        
-                            )
-
-                            +
 
                             F6_t[3] * (
         
@@ -11133,30 +11134,6 @@ computeExchangeFockSDDD4(double*         mat_K,
         
                             )
 
-                            +
-
-                            F6_t[4] * (
-        
-                                0.5 * ( S1 * S1 * S2 ) / ( S4 * S4 * S4 * S4 ) * (
-                                    delta[d0][d1] * (PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] + PQ[b0] * PQ[b1] * PQ[c0] * QC_1 + PQ[b0] * PQ[b1] * PQ[c1] * QC_0)
-                                    + delta[c1][d1] * (PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] + PQ[b0] * PQ[b1] * PQ[c0] * QD_0 + PQ[b0] * PQ[b1] * PQ[d0] * QC_0)
-                                    + delta[c0][d1] * (PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] + PQ[b0] * PQ[b1] * PQ[c1] * QD_0 + PQ[b0] * PQ[b1] * PQ[d0] * QC_1)
-                                    + delta[c1][d0] * (PQ[b0] * PQ[b1] * PQ[c0] * PQ[d1] + PQ[b0] * PQ[b1] * PQ[c0] * QD_1 + PQ[b0] * PQ[b1] * PQ[d1] * QC_0)
-                                    + delta[c0][d0] * (PQ[b0] * PQ[b1] * PQ[c1] * PQ[d1] + PQ[b0] * PQ[b1] * PQ[c1] * QD_1 + PQ[b0] * PQ[b1] * PQ[d1] * QC_1)
-                                    + delta[b1][d1] * (PQ[b0] * PQ[c0] * PQ[c1] * QD_0 + PQ[b0] * PQ[c0] * PQ[d0] * QC_1 + PQ[b0] * PQ[c1] * PQ[d0] * QC_0)
-                                    + delta[b1][d0] * (PQ[b0] * PQ[c0] * PQ[c1] * QD_1 + PQ[b0] * PQ[c0] * PQ[d1] * QC_1 + PQ[b0] * PQ[c1] * PQ[d1] * QC_0)
-                                    + delta[b1][c1] * (PQ[b0] * PQ[c0] * PQ[d0] * QD_1 + PQ[b0] * PQ[c0] * PQ[d1] * QD_0 + PQ[b0] * PQ[d0] * PQ[d1] * QC_0)
-                                    + delta[b1][c0] * (PQ[b0] * PQ[c1] * PQ[d0] * QD_1 + PQ[b0] * PQ[c1] * PQ[d1] * QD_0 + PQ[b0] * PQ[d0] * PQ[d1] * QC_1)
-                                    + delta[b0][d1] * (PQ[b1] * PQ[c0] * PQ[c1] * QD_0 + PQ[b1] * PQ[c0] * PQ[d0] * QC_1 + PQ[b1] * PQ[c1] * PQ[d0] * QC_0)
-                                    + delta[b0][d0] * (PQ[b1] * PQ[c0] * PQ[c1] * QD_1 + PQ[b1] * PQ[c0] * PQ[d1] * QC_1 + PQ[b1] * PQ[c1] * PQ[d1] * QC_0)
-                                    + delta[b0][c1] * (PQ[b1] * PQ[c0] * PQ[d0] * QD_1 + PQ[b1] * PQ[c0] * PQ[d1] * QD_0 + PQ[b1] * PQ[d0] * PQ[d1] * QC_0)
-                                    + delta[b0][c0] * (PQ[b1] * PQ[c1] * PQ[d0] * QD_1 + PQ[b1] * PQ[c1] * PQ[d1] * QD_0 + PQ[b1] * PQ[d0] * PQ[d1] * QC_1)
-                                    + delta[b0][b1] * (PQ[c0] * PQ[c1] * PQ[d0] * QD_1 + PQ[c0] * PQ[c1] * PQ[d1] * QD_0 + PQ[c0] * PQ[d0] * PQ[d1] * QC_1 + PQ[c1] * PQ[d0] * PQ[d1] * QC_0)
-                                    + delta[c0][c1] * (PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] + PQ[b0] * PQ[b1] * PQ[d0] * QD_1 + PQ[b0] * PQ[b1] * PQ[d1] * QD_0)
-                                )
-        
-                            )
-
                             );
 
                     ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
@@ -11355,6 +11332,30 @@ computeExchangeFockSDDD5(double*         mat_K,
 
                             F6_t[4] * (
         
+                                0.5 * ( S1 * S1 * S2 ) / ( S4 * S4 * S4 * S4 ) * (
+                                    delta[d0][d1] * (PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] + PQ[b0] * PQ[b1] * PQ[c0] * QC_1 + PQ[b0] * PQ[b1] * PQ[c1] * QC_0)
+                                    + delta[c1][d1] * (PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] + PQ[b0] * PQ[b1] * PQ[c0] * QD_0 + PQ[b0] * PQ[b1] * PQ[d0] * QC_0)
+                                    + delta[c0][d1] * (PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] + PQ[b0] * PQ[b1] * PQ[c1] * QD_0 + PQ[b0] * PQ[b1] * PQ[d0] * QC_1)
+                                    + delta[c1][d0] * (PQ[b0] * PQ[b1] * PQ[c0] * PQ[d1] + PQ[b0] * PQ[b1] * PQ[c0] * QD_1 + PQ[b0] * PQ[b1] * PQ[d1] * QC_0)
+                                    + delta[c0][d0] * (PQ[b0] * PQ[b1] * PQ[c1] * PQ[d1] + PQ[b0] * PQ[b1] * PQ[c1] * QD_1 + PQ[b0] * PQ[b1] * PQ[d1] * QC_1)
+                                    + delta[b1][d1] * (PQ[b0] * PQ[c0] * PQ[c1] * QD_0 + PQ[b0] * PQ[c0] * PQ[d0] * QC_1 + PQ[b0] * PQ[c1] * PQ[d0] * QC_0)
+                                    + delta[b1][d0] * (PQ[b0] * PQ[c0] * PQ[c1] * QD_1 + PQ[b0] * PQ[c0] * PQ[d1] * QC_1 + PQ[b0] * PQ[c1] * PQ[d1] * QC_0)
+                                    + delta[b1][c1] * (PQ[b0] * PQ[c0] * PQ[d0] * QD_1 + PQ[b0] * PQ[c0] * PQ[d1] * QD_0 + PQ[b0] * PQ[d0] * PQ[d1] * QC_0)
+                                    + delta[b1][c0] * (PQ[b0] * PQ[c1] * PQ[d0] * QD_1 + PQ[b0] * PQ[c1] * PQ[d1] * QD_0 + PQ[b0] * PQ[d0] * PQ[d1] * QC_1)
+                                    + delta[b0][d1] * (PQ[b1] * PQ[c0] * PQ[c1] * QD_0 + PQ[b1] * PQ[c0] * PQ[d0] * QC_1 + PQ[b1] * PQ[c1] * PQ[d0] * QC_0)
+                                    + delta[b0][d0] * (PQ[b1] * PQ[c0] * PQ[c1] * QD_1 + PQ[b1] * PQ[c0] * PQ[d1] * QC_1 + PQ[b1] * PQ[c1] * PQ[d1] * QC_0)
+                                    + delta[b0][c1] * (PQ[b1] * PQ[c0] * PQ[d0] * QD_1 + PQ[b1] * PQ[c0] * PQ[d1] * QD_0 + PQ[b1] * PQ[d0] * PQ[d1] * QC_0)
+                                    + delta[b0][c0] * (PQ[b1] * PQ[c1] * PQ[d0] * QD_1 + PQ[b1] * PQ[c1] * PQ[d1] * QD_0 + PQ[b1] * PQ[d0] * PQ[d1] * QC_1)
+                                    + delta[b0][b1] * (PQ[c0] * PQ[c1] * PQ[d0] * QD_1 + PQ[c0] * PQ[c1] * PQ[d1] * QD_0 + PQ[c0] * PQ[d0] * PQ[d1] * QC_1 + PQ[c1] * PQ[d0] * PQ[d1] * QC_0)
+                                    + delta[c0][c1] * (PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] + PQ[b0] * PQ[b1] * PQ[d0] * QD_1 + PQ[b0] * PQ[b1] * PQ[d1] * QD_0)
+                                )
+        
+                            )
+
+                            +
+
+                            F6_t[4] * (
+        
                                 0.25 * ( S1 * S1 ) / ( S4 * S4 * S4 * S4 ) * (
                                     delta[c0][c1] * delta[d0][d1] * (PQ[b0] * PQ[b1])
                                     + delta[c0][d0] * delta[c1][d1] * (PQ[b0] * PQ[b1])
@@ -11509,6 +11510,7 @@ computeExchangeFockSDDD5(double*         mat_K,
         mat_K[ik] += K_ik;
     }
 }
+
 
 __global__ void
 computeExchangeFockPSPD(double*         mat_K,

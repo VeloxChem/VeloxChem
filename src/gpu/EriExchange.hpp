@@ -3289,6 +3289,7 @@ computeExchangeFockPDDS2(double*         mat_K,
                         const double*   boys_func_table,
                         const double*   boys_func_ft);
 
+
 __global__ void
 computeExchangeFockSDDD0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
@@ -3414,6 +3415,7 @@ computeExchangeFockSDDD5(double*         mat_K,
                         const uint32_t  naos,
                         const double*   boys_func_table,
                         const double*   boys_func_ft);
+
 
 __global__ void
 computeExchangeFockSPDD0(double*         mat_K,
