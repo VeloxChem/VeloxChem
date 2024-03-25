@@ -440,82 +440,82 @@ class PolOrbitalResponse(CphfSolver):
                     for y in range(dof):
                         tmp_real = np.linalg.multi_dot([fock_ao_rhs_x_plus_y_real[x], 
                                     (x_plus_y_ao_real[y] + x_plus_y_ao_imag[y])])
-                        fock_mo_rhs_2dm_real[x,y] = np.linalg.multi_dot([
+                        fock_mo_rhs_2dm_real[x,y] += np.linalg.multi_dot([
                            mo_occ.T, tmp_real, ovlp, mo_vir 
                         ])
                         tmp_real = np.linalg.multi_dot([fock_ao_rhs_x_minus_y_real[x],
                                     (x_minus_y_ao_real[y] + x_minus_y_ao_imag[y])])
-                        fock_mo_rhs_2dm_real[x,y] = -1.0 * np.linalg.multi_dot([
+                        fock_mo_rhs_2dm_real[x,y] += -1.0 * np.linalg.multi_dot([
                             mo_occ.T, tmp_real, ovlp, mo_vir
                         ])
                         tmp_real = np.linalg.multi_dot([(x_plus_y_ao_real[x].T + x_plus_y_ao_imag[x].T),
                                     fock_ao_rhs_x_plus_y_real[y].T])
-                        fock_mo_rhs_2dm_real[x,y] = np.linalg.multi_dot([
+                        fock_mo_rhs_2dm_real[x,y] += np.linalg.multi_dot([
                             mo_occ.T, tmp_real, ovlp, mo_vir
                         ])
                         tmp_real = np.linalg.multi_dot([(x_minus_y_ao_real[x].T + x_minus_y_ao_imag[x].T),
                                     fock_ao_rhs_x_minus_y_real[y].T])
-                        fock_mo_rhs_2dm_real[x,y] = -1.0 * np.linalg.multi_dot([
+                        fock_mo_rhs_2dm_real[x,y] += -1.0 * np.linalg.multi_dot([
                             mo_occ.T, tmp_real, ovlp, mo_vir
                         ])
                         tmp_real = np.linalg.multi_dot([fock_ao_rhs_x_plus_y_real[x].T, 
                                     (x_plus_y_ao_real[y] + x_plus_y_ao_imag[y])])
-                        fock_mo_rhs_2dm_real[x,y] = -1.0 * np.linalg.multi_dot([
+                        fock_mo_rhs_2dm_real[x,y] += -1.0 * np.linalg.multi_dot([
                             mo_occ.T, tmp_real, ovlp, mo_vir
                         ])
                         tmp_real = np.linalg.multi_dot([fock_ao_rhs_x_minus_y_real[x].T, 
                                     (x_minus_y_ao_real[y] + x_minus_y_ao_imag[y])])
-                        fock_mo_rhs_2dm_real[x,y] = -1.0 * np.linalg.multi_dot([
+                        fock_mo_rhs_2dm_real[x,y] += -1.0 * np.linalg.multi_dot([
                             mo_occ.T, tmp_real, ovlp, mo_vir
                         ])
                         tmp_real = np.linalg.multi_dot([(x_plus_y_ao_real[x].T + x_plus_y_ao_imag[x].T), 
                                     fock_ao_rhs_x_plus_y_real[y]])
-                        fock_mo_rhs_2dm_real[x,y] = -1.0 * np.linalg.multi_dot([
+                        fock_mo_rhs_2dm_real[x,y] += -1.0 * np.linalg.multi_dot([
                             mo_occ.T, tmp_real, ovlp, mo_vir
                         ])
                         tmp_real = np.linalg.multi_dot([(x_minus_y_ao_real[x].T + x_minus_y_ao_imag[x].T),
                                     fock_ao_rhs_x_minus_y_real[y]])
-                        fock_mo_rhs_2dm_real[x,y] = -1.0 * np.linalg.multi_dot([
+                        fock_mo_rhs_2dm_real[x,y] += -1.0 * np.linalg.multi_dot([
                             mo_occ.T, tmp_real, ovlp, mo_vir
                         ])
                         tmp_real = np.linalg.multi_dot([fock_ao_rhs_x_plus_y_real[x], 
                                     (x_plus_y_ao_real[y].T + x_plus_y_ao_imag[y].T)]).T
-                        fock_mo_rhs_2dm_real[x,y] = np.linalg.multi_dot([
+                        fock_mo_rhs_2dm_real[x,y] += np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp_real, mo_vir 
                         ])
                         tmp_real = np.linalg.multi_dot([fock_ao_rhs_x_minus_y_real[x], 
                                     (x_minus_y_ao_real[y].T + x_minus_y_ao_imag[y].T)]).T
-                        fock_mo_rhs_2dm_real[x,y] = np.linalg.multi_dot([
+                        fock_mo_rhs_2dm_real[x,y] += np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp_real, mo_vir 
                         ])
                         tmp_real = np.linalg.multi_dot([(x_plus_y_ao_real[x] + x_plus_y_ao_imag[x]),
                                     fock_ao_rhs_x_plus_y_real[y].T])
-                        fock_mo_rhs_2dm_real[x,y] = np.linalg.multi_dot([
+                        fock_mo_rhs_2dm_real[x,y] += np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp_real, mo_vir 
                         ])
                         tmp_real = np.linalg.multi_dot([(x_minus_y_ao_real[x] + x_minus_y_ao_imag[x]),
                                     fock_ao_rhs_x_minus_y_real[y].T])
-                        fock_mo_rhs_2dm_real[x,y] = np.linalg.multi_dot([
+                        fock_mo_rhs_2dm_real[x,y] += np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp_real, mo_vir 
                         ])
                         tmp_real = np.linalg.multi_dot([fock_ao_rhs_x_plus_y_real[x].T,
                                     (x_plus_y_ao_real[y].T + x_plus_y_ao_imag[y].T)])
-                        fock_mo_rhs_2dm_real[x,y] = -1.0 * np.linalg.multi_dot([
+                        fock_mo_rhs_2dm_real[x,y] += -1.0 * np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp_real.T, mo_vir 
                         ])
                         tmp_real = np.linalg.multi_dot([fock_ao_rhs_x_minus_y_real[x].T,
                                      (x_minus_y_ao_real[y].T + x_minus_y_ao_imag[y].T)])
-                        fock_mo_rhs_2dm_real[x,y] = np.linalg.multi_dot([
+                        fock_mo_rhs_2dm_real[x,y] += np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp_real.T, mo_vir 
                         ])
                         tmp_real = np.linalg.multi_dot([(x_plus_y_ao_real[x] + x_plus_y_ao_imag[x]),
                                     fock_ao_rhs_x_plus_y_real[y]]).T
-                        fock_mo_rhs_2dm_real[x,y] = -1.0 * np.linalg.multi_dot([
+                        fock_mo_rhs_2dm_real[x,y] += -1.0 * np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp_real.T, mo_vir 
                         ])
                         tmp_real = np.linalg.multi_dot([(x_minus_y_ao_real[x] + x_minus_y_ao_imag[x]),
                                     fock_ao_rhs_x_minus_y_real[y]]).T
-                        fock_mo_rhs_2dm_real[x,y] = np.linalg.multi_dot([
+                        fock_mo_rhs_2dm_real[x,y] += np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp_real.T, mo_vir 
                         ])
                 fock_mo_rhs_2dm_real = 0.25 * fock_mo_rhs_2dm_real.reshape(dof**2, nocc, nvir)
