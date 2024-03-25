@@ -2121,6 +2121,182 @@ computeExchangeFockDDDD30(double*         mat_K,
                         const double*   boys_func_ft);
 
 __global__ void
+computeExchangeFockDDDD31(double*         mat_K,
+                        const uint32_t* pair_inds_i_for_K_dd,
+                        const uint32_t* pair_inds_k_for_K_dd,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const double*   d_prim_info,
+                        const uint32_t* d_prim_aoinds,
+                        const uint32_t  d_prim_count,
+                        const double    dd_max_D,
+                        const double*   mat_D_full_AO,
+                        const double*   mat_Q_for_K_dd,
+                        const uint32_t* density_inds_for_K_dd,
+                        const uint32_t  naos,
+                        const double*   boys_func_table,
+                        const double*   boys_func_ft);
+
+__global__ void
+computeExchangeFockDDDD32(double*         mat_K,
+                        const uint32_t* pair_inds_i_for_K_dd,
+                        const uint32_t* pair_inds_k_for_K_dd,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const double*   d_prim_info,
+                        const uint32_t* d_prim_aoinds,
+                        const uint32_t  d_prim_count,
+                        const double    dd_max_D,
+                        const double*   mat_D_full_AO,
+                        const double*   mat_Q_for_K_dd,
+                        const uint32_t* density_inds_for_K_dd,
+                        const uint32_t  naos,
+                        const double*   boys_func_table,
+                        const double*   boys_func_ft);
+
+__global__ void
+computeExchangeFockDDDD33(double*         mat_K,
+                        const uint32_t* pair_inds_i_for_K_dd,
+                        const uint32_t* pair_inds_k_for_K_dd,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const double*   d_prim_info,
+                        const uint32_t* d_prim_aoinds,
+                        const uint32_t  d_prim_count,
+                        const double    dd_max_D,
+                        const double*   mat_D_full_AO,
+                        const double*   mat_Q_for_K_dd,
+                        const uint32_t* density_inds_for_K_dd,
+                        const uint32_t  naos,
+                        const double*   boys_func_table,
+                        const double*   boys_func_ft);
+
+__global__ void
+computeExchangeFockDDDD34(double*         mat_K,
+                        const uint32_t* pair_inds_i_for_K_dd,
+                        const uint32_t* pair_inds_k_for_K_dd,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const double*   d_prim_info,
+                        const uint32_t* d_prim_aoinds,
+                        const uint32_t  d_prim_count,
+                        const double    dd_max_D,
+                        const double*   mat_D_full_AO,
+                        const double*   mat_Q_for_K_dd,
+                        const uint32_t* density_inds_for_K_dd,
+                        const uint32_t  naos,
+                        const double*   boys_func_table,
+                        const double*   boys_func_ft);
+
+__global__ void
+computeExchangeFockDDDD35(double*         mat_K,
+                        const uint32_t* pair_inds_i_for_K_dd,
+                        const uint32_t* pair_inds_k_for_K_dd,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const double*   d_prim_info,
+                        const uint32_t* d_prim_aoinds,
+                        const uint32_t  d_prim_count,
+                        const double    dd_max_D,
+                        const double*   mat_D_full_AO,
+                        const double*   mat_Q_for_K_dd,
+                        const uint32_t* density_inds_for_K_dd,
+                        const uint32_t  naos,
+                        const double*   boys_func_table,
+                        const double*   boys_func_ft);
+
+__global__ void
+computeExchangeFockDDDD36(double*         mat_K,
+                        const uint32_t* pair_inds_i_for_K_dd,
+                        const uint32_t* pair_inds_k_for_K_dd,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const double*   d_prim_info,
+                        const uint32_t* d_prim_aoinds,
+                        const uint32_t  d_prim_count,
+                        const double    dd_max_D,
+                        const double*   mat_D_full_AO,
+                        const double*   mat_Q_for_K_dd,
+                        const uint32_t* density_inds_for_K_dd,
+                        const uint32_t  naos,
+                        const double*   boys_func_table,
+                        const double*   boys_func_ft);
+
+__global__ void
+computeExchangeFockDDDD37(double*         mat_K,
+                        const uint32_t* pair_inds_i_for_K_dd,
+                        const uint32_t* pair_inds_k_for_K_dd,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const double*   d_prim_info,
+                        const uint32_t* d_prim_aoinds,
+                        const uint32_t  d_prim_count,
+                        const double    dd_max_D,
+                        const double*   mat_D_full_AO,
+                        const double*   mat_Q_for_K_dd,
+                        const uint32_t* density_inds_for_K_dd,
+                        const uint32_t  naos,
+                        const double*   boys_func_table,
+                        const double*   boys_func_ft);
+
+__global__ void
+computeExchangeFockDDDD38(double*         mat_K,
+                        const uint32_t* pair_inds_i_for_K_dd,
+                        const uint32_t* pair_inds_k_for_K_dd,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const double*   d_prim_info,
+                        const uint32_t* d_prim_aoinds,
+                        const uint32_t  d_prim_count,
+                        const double    dd_max_D,
+                        const double*   mat_D_full_AO,
+                        const double*   mat_Q_for_K_dd,
+                        const uint32_t* density_inds_for_K_dd,
+                        const uint32_t  naos,
+                        const double*   boys_func_table,
+                        const double*   boys_func_ft);
+
+__global__ void
+computeExchangeFockDDDD39(double*         mat_K,
+                        const uint32_t* pair_inds_i_for_K_dd,
+                        const uint32_t* pair_inds_k_for_K_dd,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const double*   d_prim_info,
+                        const uint32_t* d_prim_aoinds,
+                        const uint32_t  d_prim_count,
+                        const double    dd_max_D,
+                        const double*   mat_D_full_AO,
+                        const double*   mat_Q_for_K_dd,
+                        const uint32_t* density_inds_for_K_dd,
+                        const uint32_t  naos,
+                        const double*   boys_func_table,
+                        const double*   boys_func_ft);
+
+__global__ void
+computeExchangeFockDDDD40(double*         mat_K,
+                        const uint32_t* pair_inds_i_for_K_dd,
+                        const uint32_t* pair_inds_k_for_K_dd,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const double*   d_prim_info,
+                        const uint32_t* d_prim_aoinds,
+                        const uint32_t  d_prim_count,
+                        const double    dd_max_D,
+                        const double*   mat_D_full_AO,
+                        const double*   mat_Q_for_K_dd,
+                        const uint32_t* density_inds_for_K_dd,
+                        const uint32_t  naos,
+                        const double*   boys_func_table,
+                        const double*   boys_func_ft);
+
+__global__ void
+computeExchangeFockDDDD41(double*         mat_K,
+                        const uint32_t* pair_inds_i_for_K_dd,
+                        const uint32_t* pair_inds_k_for_K_dd,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const double*   d_prim_info,
+                        const uint32_t* d_prim_aoinds,
+                        const uint32_t  d_prim_count,
+                        const double    dd_max_D,
+                        const double*   mat_D_full_AO,
+                        const double*   mat_Q_for_K_dd,
+                        const uint32_t* density_inds_for_K_dd,
+                        const uint32_t  naos,
+                        const double*   boys_func_table,
+                        const double*   boys_func_ft);
+
+__global__ void
 computeExchangeFockDSDD0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,

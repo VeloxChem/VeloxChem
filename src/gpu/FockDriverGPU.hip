@@ -9609,11 +9609,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         timer.start("    K block DDDD");
 
-        dim3 dddd_threads_per_block (TILE_DIM_HALF, TILE_DIM_HALF);
-
-        dim3 dddd_num_blocks (pair_inds_count_for_K_dd, 1);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD0, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD0, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9629,7 +9625,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD1, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD1, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9645,7 +9641,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD2, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD2, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9661,7 +9657,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD3, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD3, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9677,7 +9673,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD4, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD4, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9693,7 +9689,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD5, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD5, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9709,7 +9705,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD6, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD6, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9725,7 +9721,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD7, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD7, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9741,7 +9737,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD8, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD8, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9757,7 +9753,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD9, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD9, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9773,7 +9769,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD10, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD10, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9789,7 +9785,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD11, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD11, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9805,7 +9801,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD12, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD12, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9821,7 +9817,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD13, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD13, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9837,7 +9833,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD14, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD14, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9853,7 +9849,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD15, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD15, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9869,7 +9865,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD16, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD16, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9885,7 +9881,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD17, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD17, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9901,7 +9897,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD18, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD18, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9917,7 +9913,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD19, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD19, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9933,7 +9929,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD20, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD20, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9949,7 +9945,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD21, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD21, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9965,7 +9961,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD22, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD22, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9981,7 +9977,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD23, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD23, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -9997,7 +9993,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD24, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD24, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10013,7 +10009,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD25, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD25, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10029,7 +10025,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD26, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD26, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10045,7 +10041,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD27, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD27, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10061,7 +10057,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD28, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD28, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10077,7 +10073,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD29, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD29, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -10093,7 +10089,183 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD30, dddd_num_blocks, dddd_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD30, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD31, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD32, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD33, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD34, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD35, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD36, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD37, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD38, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD39, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD40, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_dd,
+                           d_density_inds_for_K_dd,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD41, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
