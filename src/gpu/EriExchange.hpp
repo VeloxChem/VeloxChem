@@ -3124,27 +3124,6 @@ computeExchangeFockPDDP4(double*         mat_K,
                         const double*   boys_func_ft);
 
 __global__ void
-computeExchangeFockPDDP5(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
-                        const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
-                        const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
-                        const double    dp_max_D,
-                        const double*   mat_D_full_AO,
-                        const double*   mat_Q_for_K_pd,
-                        const double*   mat_Q_for_K_dp,
-                        const uint32_t* density_inds_for_K_pd,
-                        const uint32_t* density_inds_for_K_dp,
-                        const uint32_t  naos,
-                        const double*   boys_func_table,
-                        const double*   boys_func_ft);
-
-__global__ void
 computeExchangeFockPPDP0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
