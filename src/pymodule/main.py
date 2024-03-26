@@ -32,7 +32,6 @@ from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
-from .firstorderprop import FirstOrderProperties
 from .forcefieldgenerator import ForceFieldGenerator
 from .respchargesdriver import RespChargesDriver
 from .excitondriver import ExcitonModelDriver
@@ -353,12 +352,6 @@ def main():
 
             if not scf_drv.is_converged:
                 return
-
-            # SCF first-order properties
-            scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
-            scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_results)
-            if task.mpi_rank == mpi_master():
-                scf_prop.print_properties(task.molecule)
 
             if (scf_drv.electric_field is not None and
                     task.molecule.get_charge() != 0):

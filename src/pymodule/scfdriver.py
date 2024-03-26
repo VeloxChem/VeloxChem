@@ -47,6 +47,7 @@ from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
 from .subcommunicators import SubCommunicators
+from .firstorderprop import FirstOrderProperties
 from .signalhandler import SignalHandler
 from .denguess import DensityGuess
 from .inputparser import (parse_input, print_keywords, print_attributes,
@@ -221,6 +222,9 @@ class ScfDriver:
 
         # scf tensors
         self._scf_tensors = None
+
+        # scf properties
+        self._scf_prop = None
 
         # timing and profiling
         self.timing = False
@@ -655,14 +659,19 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self._print_scf_energy()
+
             s2 = self.compute_s2(molecule, self.scf_tensors)
             self._print_ground_state(molecule, s2)
+
             if self.print_level == 2:
                 self.molecular_orbitals.print_orbitals(molecule, ao_basis,
                                                        False, self.ostream)
             if self.print_level == 3:
                 self.molecular_orbitals.print_orbitals(molecule, ao_basis, True,
                                                        self.ostream)
+
+            self._scf_prop.print_properties(molecule)
+
             self.ostream.flush()
 
         return self.scf_tensors
@@ -839,6 +848,8 @@ class ScfDriver:
         """
 
         self._scf_tensors = None
+
+        self._scf_prop = FirstOrderProperties(self.comm, self.ostream)
 
         self._history = []
 
@@ -1073,61 +1084,69 @@ class ScfDriver:
             self.write_checkpoint(molecule.elem_ids_to_numpy(),
                                   ao_basis.get_label())
 
-        if (self.rank == mpi_master() and (not self._first_step) and
-                self.is_converged):
-            S = ovl_mat.to_numpy()
+        if (not self._first_step) and self.is_converged:
 
-            C_alpha = self.molecular_orbitals.alpha_to_numpy()
-            C_beta = self.molecular_orbitals.beta_to_numpy()
+            if self.rank == mpi_master():
+                S = ovl_mat.to_numpy()
 
-            E_alpha = self.molecular_orbitals.ea_to_numpy()
-            E_beta = self.molecular_orbitals.eb_to_numpy()
+                C_alpha = self.molecular_orbitals.alpha_to_numpy()
+                C_beta = self.molecular_orbitals.beta_to_numpy()
 
-            D_alpha = self.density.alpha_to_numpy(0)
-            D_beta = self.density.beta_to_numpy(0)
+                E_alpha = self.molecular_orbitals.ea_to_numpy()
+                E_beta = self.molecular_orbitals.eb_to_numpy()
 
-            F_alpha = fock_mat.alpha_to_numpy(0)
-            F_beta = fock_mat.beta_to_numpy(0)
+                D_alpha = self.density.alpha_to_numpy(0)
+                D_beta = self.density.beta_to_numpy(0)
 
-            self._scf_tensors = {
-                # eri info
-                'eri_thresh': self.eri_thresh,
-                'qq_type': self.qq_type,
-                # scf info
-                'scf_type': self.scf_type,
-                'scf_energy': self.scf_energy,
-                'restart': self.restart,
-                # scf tensors
-                'S': S,
-                'C_alpha': C_alpha,
-                'C_beta': C_beta,
-                'E_alpha': E_alpha,
-                'E_beta': E_beta,
-                'D_alpha': D_alpha,
-                'D_beta': D_beta,
-                'F_alpha': F_alpha,
-                'F_beta': F_beta,
-                # for backward compatibility
-                'C': C_alpha,
-                'E': E_alpha,
-                'D': (D_alpha, D_beta),
-                'F': (F_alpha, F_beta),
-            }
+                F_alpha = fock_mat.alpha_to_numpy(0)
+                F_beta = fock_mat.beta_to_numpy(0)
 
-            if self._dft:
-                # dft info
-                self._scf_tensors['xcfun'] = self.xcfun.get_func_label()
-                if self.grid_level is not None:
-                    self._scf_tensors['grid_level'] = self.grid_level
+                self._scf_tensors = {
+                    # eri info
+                    'eri_thresh': self.eri_thresh,
+                    'qq_type': self.qq_type,
+                    # scf info
+                    'scf_type': self.scf_type,
+                    'scf_energy': self.scf_energy,
+                    'restart': self.restart,
+                    # scf tensors
+                    'S': S,
+                    'C_alpha': C_alpha,
+                    'C_beta': C_beta,
+                    'E_alpha': E_alpha,
+                    'E_beta': E_beta,
+                    'D_alpha': D_alpha,
+                    'D_beta': D_beta,
+                    'F_alpha': F_alpha,
+                    'F_beta': F_beta,
+                    # for backward compatibility
+                    'C': C_alpha,
+                    'E': E_alpha,
+                    'D': (D_alpha, D_beta),
+                    'F': (F_alpha, F_beta),
+                }
 
-            if self._pe:
-                # pe info
-                self._scf_tensors['potfile'] = self.potfile
+                if self._dft:
+                    # dft info
+                    self._scf_tensors['xcfun'] = self.xcfun.get_func_label()
+                    if self.grid_level is not None:
+                        self._scf_tensors['grid_level'] = self.grid_level
 
-            self._write_final_hdf5(molecule, ao_basis)
+                if self._pe:
+                    # pe info
+                    self._scf_tensors['potfile'] = self.potfile
 
-        else:
-            self._scf_tensors = None
+            else:
+                self._scf_tensors = None
+
+            self._scf_prop.compute_scf_prop(molecule, ao_basis,
+                                            self.scf_tensors)
+
+            if self.rank == mpi_master():
+                self._scf_tensors['dipole_moment'] = np.array(
+                    self._scf_prop.get_property('dipole_moment'))
+
+                self._write_final_hdf5(molecule, ao_basis)
 
         if self.rank == mpi_master():
             self._print_scf_finish(diis_start_time)

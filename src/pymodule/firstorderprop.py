@@ -126,8 +126,9 @@ class FirstOrderProperties:
                                     axis=1)
 
             dipole_moment = nuclear_dipole + electronic_dipole
-        dipole_moment = self.comm.bcast(dipole_moment, root = mpi_master())
+        dipole_moment = self.comm.bcast(dipole_moment, root=mpi_master())
         self.properties['dipole moment'] = dipole_moment
+        self.properties['dipole_moment'] = dipole_moment
 
     def get_property(self, key):
         """
@@ -171,7 +172,7 @@ class FirstOrderProperties:
 
         self.ostream.print_blank()
 
-        dip = self.properties['dipole moment']
+        dip = self.properties['dipole_moment']
         dip_au = list(dip) + [np.linalg.norm(dip)]
         dip_debye = [m * dipole_in_debye() for m in dip_au]
 

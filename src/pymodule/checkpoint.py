@@ -85,16 +85,16 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
         hf.close()
 
 
-def write_scf_results_to_hdf5(fname, scf_tensors, scf_history):
+def write_scf_results_to_hdf5(fname, scf_results, scf_history):
     """
     Writes SCF tensors to HDF5 file.
 
     :param fname:
         Name of the HDF5 file.
-    :param scf_tensors:
-        The dictionary of tensors from converged SCF wavefunction.
+    :param scf_results:
+        The dictionary containing SCF results.
     :param scf_history:
-        The SCF history.
+        The list containing SCF history.
     """
 
     valid_checkpoint = (fname and isinstance(fname, str) and
@@ -107,7 +107,13 @@ def write_scf_results_to_hdf5(fname, scf_tensors, scf_history):
         # write SCF tensors
         keys = ['S'] + [f'{x}_{y}' for x in 'CEDF' for y in ['alpha', 'beta']]
         for key in keys:
-            hf.create_dataset(key, data=scf_tensors[key])
+            hf.create_dataset(key, data=scf_results[key])
+
+        # write SCF energy and dipole moment
+        hf.create_dataset('scf_energy',
+                          data=np.array([scf_results['scf_energy']]))
+        hf.create_dataset('dipole_moment',
+                          data=np.array(scf_results['dipole_moment']))
 
         # write SCF history
         keys = list(scf_history[0].keys())
