@@ -102,7 +102,7 @@ class TrajectoryDriver:
         self.mm_pol_region = None
         self.mm_nonpol_region = None
 
-        self.filename = 'vlx_' + get_random_string_parallel(self.comm)
+        self.filename = None
         self.method_dict = None
         self.description = 'N/A'
 
@@ -221,7 +221,12 @@ class TrajectoryDriver:
 
         start_time = tm.time()
 
-        output_dir = Path(self.filename + '_files')
+        if self.filename is not None:
+            output_dir = Path(self.filename + '_files')
+        else:
+            name_string = get_random_string_parallel(self.comm)
+            output_dir = Path('vlx_' + name_string + '_files')
+
         if self.rank == mpi_master():
             output_dir.mkdir(parents=True, exist_ok=True)
         self.comm.barrier()
@@ -272,8 +277,7 @@ class TrajectoryDriver:
                 mm_nonpol = mm_nonpol - mm_pol
 
                 # crate pdb files
-                qm.write(output_dir / '{}_frame_{}.pdb'.format(
-                    Path(self.filename).name, ts.frame))
+                qm.write(output_dir / 'frame_{}.pdb'.format(ts.frame))
 
                 # make QM molecule whole
                 qm.unwrap()
@@ -313,8 +317,7 @@ class TrajectoryDriver:
                 qm_basis = MolecularBasis()
 
             # create potential file
-            potfile = output_dir / '{}_frame_{}.pot'.format(
-                Path(self.filename).name, ts.frame)
+            potfile = output_dir / 'frame_{}.pot'.format(ts.frame)
 
             if local_rank == mpi_master():
 
@@ -378,8 +381,7 @@ class TrajectoryDriver:
             qm_basis.broadcast(local_rank, local_comm)
 
             # setup output stream
-            output = output_dir / '{}_frame_{}.out'.format(
-                Path(self.filename).name, ts.frame)
+            output = output_dir / 'frame_{}.out'.format(ts.frame)
             ostream = OutputStream(str(output))
             self.print_molecule_and_basis(qm_mol, qm_basis, ostream)
 
