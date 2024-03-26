@@ -272,39 +272,72 @@ class PolOrbitalResponse(CphfSolver):
                 dm_vv_imag = np.zeros((dof, dof, nvir, nvir))
                 for x in range(dof):
                     for y in range(dof):
-                        dm_vv_real[x,y] = 0.25 * (np.linalg.multi_dot([
-                                (x_plus_y_real[x].T + x_plus_y_imag[x].T),
-                                (x_plus_y_real[y] + x_plus_y_imag[y])
+                        #dm_vv_real[x,y] = 0.25 * (np.linalg.multi_dot([
+                        #        (x_plus_y_real[x].T + x_plus_y_imag[x].T),
+                        #        (x_plus_y_real[y] + x_plus_y_imag[y])
+                        #    ]).T
+                        #    + np.linalg.multi_dot([
+                        #        (x_minus_y_real[x].T + x_minus_y_imag[x].T),
+                        #        (x_minus_y_real[y] + x_minus_y_imag[y])
+                        #    ]).T
+                        #    + np.linalg.multi_dot([
+                        #        (x_plus_y_real[x].T + x_plus_y_imag[x].T),
+                        #        (x_plus_y_real[y] + x_plus_y_imag[y])
+                        #    ])
+                        #    + np.linalg.multi_dot([
+                        #        (x_minus_y_real[x].T + x_minus_y_imag[x].T),
+                        #        (x_minus_y_real[y] + x_minus_y_imag[y])
+                        #    ])
+                        #)
+                        dm_vv_real[x,y] = 0.25 * ( np.linalg.multi_dot([
+                                (x_plus_y_real[x].T), (x_plus_y_real[y])
                             ]).T
                             + np.linalg.multi_dot([
-                                (x_minus_y_real[x].T + x_minus_y_imag[x].T),
-                                (x_minus_y_real[y] + x_minus_y_imag[y])
+                                (x_plus_y_imag[x].T), (x_plus_y_imag[y])
                             ]).T
                             + np.linalg.multi_dot([
-                                (x_plus_y_real[x].T + x_plus_y_imag[x].T),
-                                (x_plus_y_real[y] + x_plus_y_imag[y])
+                                (x_minus_y_real[x].T), (x_minus_y_real[y])
+                            ]).T
+                            + np.linalg.multi_dot([
+                                (x_minus_y_imag[x].T), (x_minus_y_imag[y])
+                            ]).T
+                            + np.linalg.multi_dot([
+                                (x_plus_y_real[x].T), (x_plus_y_real[y])
                             ])
                             + np.linalg.multi_dot([
-                                (x_minus_y_real[x].T + x_minus_y_imag[x].T),
-                                (x_minus_y_real[y] + x_minus_y_imag[y])
+                                (x_plus_y_imag[x].T), (x_plus_y_imag[y])
+                            ])
+                            + np.linalg.multi_dot([
+                                (x_minus_y_real[x].T), (x_minus_y_real[y])
+                            ])
+                            + np.linalg.multi_dot([
+                                (x_minus_y_imag[x].T), (x_minus_y_imag[y])
                             ])
                         )
                         dm_oo_real[x,y] = -0.25 * (
                             np.linalg.multi_dot([
-                                (x_plus_y_real[x] + x_plus_y_imag[x]),
-                                (x_plus_y_real[y].T + x_plus_y_imag[y].T)
+                                (x_plus_y_real[x]), (x_plus_y_real[y].T)
                             ])
                             + np.linalg.multi_dot([
-                                (x_minus_y_real[x] + x_minus_y_imag[x]),
-                                (x_minus_y_real[y].T + x_minus_y_imag[y].T)
+                                (x_plus_y_imag[x]), (x_plus_y_imag[y].T)
                             ])
                             + np.linalg.multi_dot([
-                                (x_plus_y_real[x] + x_plus_y_imag[x]),
-                                (x_plus_y_real[y].T + x_plus_y_imag[y].T)
+                                (x_minus_y_real[x]), (x_minus_y_real[y].T)
+                            ])
+                            + np.linalg.multi_dot([
+                                (x_minus_y_imag[x]), (x_minus_y_imag[y].T)
+                            ])
+                            + np.linalg.multi_dot([
+                                (x_plus_y_real[x]), (x_plus_y_real[y].T)
                             ]).T
                             + np.linalg.multi_dot([
-                                (x_minus_y_real[x] + x_minus_y_imag[x]),
-                                (x_minus_y_real[y].T + x_minus_y_imag[y].T)
+                                (x_plus_y_imag[x]), (x_plus_y_imag[y].T)
+                            ]).T
+                            + np.linalg.multi_dot([
+                                (x_minus_y_real[x]), (x_minus_y_real[y].T)
+                            ]).T
+                            + np.linalg.multi_dot([
+                                (x_minus_y_imag[x]), (x_minus_y_imag[y].T)
                             ]).T
                         )
 
@@ -594,6 +627,10 @@ class PolOrbitalResponse(CphfSolver):
                     'dm_vv': dm_vv,
                     'x_plus_y_ao': x_plus_y_ao,
                     'x_minus_y_ao': x_minus_y_ao,
+                    'x_plus_y_ao_real': x_plus_y_ao_real,
+                    'x_plus_y_ao_imag': x_plus_y_ao_imag,
+                    'x_minus_y_ao_real': x_minus_y_ao_real,
+                    'x_minus_y_ao_imag': x_minus_y_ao_imag,
                     'unrel_dm_ao': unrel_dm_ao,
                     'fock_ao_rhs': fock_ao_rhs_real,
                     # 'fock_ao_rhs_imag': fock_ao_rhs_imag,
