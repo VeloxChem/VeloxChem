@@ -105,11 +105,16 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
         hf = h5py.File(fname, 'a')
 
         # write SCF tensors
-        keys = ['S'] + [f'{x}_{y}' for x in 'CEDF' for y in ['alpha', 'beta']]
+        keys = ['S'] + [
+            f'{x}_{y}' for x in ['C', 'E', 'occ', 'D', 'F']
+            for y in ['alpha', 'beta']
+        ]
         for key in keys:
             hf.create_dataset(key, data=scf_results[key])
 
         # write SCF energy and dipole moment
+        hf.create_dataset('scf_type',
+                          data=np.string_([scf_results['scf_type']]))
         hf.create_dataset('scf_energy',
                           data=np.array([scf_results['scf_energy']]))
         hf.create_dataset('dipole_moment',

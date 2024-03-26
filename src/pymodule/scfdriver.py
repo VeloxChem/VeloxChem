@@ -1095,6 +1095,10 @@ class ScfDriver:
                 E_alpha = self.molecular_orbitals.ea_to_numpy()
                 E_beta = self.molecular_orbitals.eb_to_numpy()
 
+                n_mo = C_alpha.shape[1]
+                occ_alpha = molecule.get_aufbau_alpha_occupation(n_mo)
+                occ_beta = molecule.get_aufbau_beta_occupation(n_mo)
+
                 D_alpha = self.density.alpha_to_numpy(0)
                 D_beta = self.density.beta_to_numpy(0)
 
@@ -1115,6 +1119,8 @@ class ScfDriver:
                     'C_beta': C_beta,
                     'E_alpha': E_alpha,
                     'E_beta': E_beta,
+                    'occ_alpha': occ_alpha,
+                    'occ_beta': occ_beta,
                     'D_alpha': D_alpha,
                     'D_beta': D_beta,
                     'F_alpha': F_alpha,
