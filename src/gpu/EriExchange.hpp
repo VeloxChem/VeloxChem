@@ -1331,6 +1331,48 @@ computeExchangeFockDPDD14(double*         mat_K,
                         const double*   boys_func_ft);
 
 __global__ void
+computeExchangeFockDPDD15(double*         mat_K,
+                        const uint32_t* pair_inds_i_for_K_dd,
+                        const uint32_t* pair_inds_k_for_K_dd,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const double*   p_prim_info,
+                        const uint32_t* p_prim_aoinds,
+                        const uint32_t  p_prim_count,
+                        const double*   d_prim_info,
+                        const uint32_t* d_prim_aoinds,
+                        const uint32_t  d_prim_count,
+                        const double    pd_max_D,
+                        const double*   mat_D_full_AO,
+                        const double*   mat_Q_for_K_dp,
+                        const double*   mat_Q_for_K_dd,
+                        const uint32_t* density_inds_for_K_dp,
+                        const uint32_t* density_inds_for_K_dd,
+                        const uint32_t  naos,
+                        const double*   boys_func_table,
+                        const double*   boys_func_ft);
+
+__global__ void
+computeExchangeFockDPDD16(double*         mat_K,
+                        const uint32_t* pair_inds_i_for_K_dd,
+                        const uint32_t* pair_inds_k_for_K_dd,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const double*   p_prim_info,
+                        const uint32_t* p_prim_aoinds,
+                        const uint32_t  p_prim_count,
+                        const double*   d_prim_info,
+                        const uint32_t* d_prim_aoinds,
+                        const uint32_t  d_prim_count,
+                        const double    pd_max_D,
+                        const double*   mat_D_full_AO,
+                        const double*   mat_Q_for_K_dp,
+                        const double*   mat_Q_for_K_dd,
+                        const uint32_t* density_inds_for_K_dp,
+                        const uint32_t* density_inds_for_K_dd,
+                        const uint32_t  naos,
+                        const double*   boys_func_table,
+                        const double*   boys_func_ft);
+
+__global__ void
 computeExchangeFockDDDP0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
