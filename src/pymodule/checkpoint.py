@@ -85,7 +85,7 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
         hf.close()
 
 
-def write_scf_tensors(fname, scf_tensors):
+def write_scf_results_to_hdf5(fname, scf_tensors, scf_history):
     """
     Writes SCF tensors to HDF5 file.
 
@@ -93,16 +93,28 @@ def write_scf_tensors(fname, scf_tensors):
         Name of the HDF5 file.
     :param scf_tensors:
         The dictionary of tensors from converged SCF wavefunction.
+    :param scf_history:
+        The SCF history.
     """
 
     valid_checkpoint = (fname and isinstance(fname, str) and
                         Path(fname).is_file())
 
     if valid_checkpoint:
+
         hf = h5py.File(fname, 'a')
+
+        # write SCF tensors
         keys = ['S'] + [f'{x}_{y}' for x in 'CEDF' for y in ['alpha', 'beta']]
         for key in keys:
             hf.create_dataset(key, data=scf_tensors[key])
+
+        # write SCF history
+        keys = list(scf_history[0].keys())
+        for key in keys:
+            data = np.array([step[key] for step in scf_history])
+            hf.create_dataset(f'scf_history_{key}', data=data)
+
         hf.close()
 
 

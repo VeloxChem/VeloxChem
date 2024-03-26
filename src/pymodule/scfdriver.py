@@ -56,7 +56,7 @@ from .qqscheme import get_qq_scheme
 from .dftutils import get_default_grid_level, print_libxc_reference
 from .sanitychecks import molecule_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
-from .checkpoint import create_hdf5, write_scf_tensors
+from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
 
 class ScfDriver:
@@ -150,6 +150,7 @@ class ScfDriver:
         self.eri_thresh_tight = 1.0e-15
 
         # iterations data
+        self._history = None
         self._iter_data = None
         self._is_converged = False
         self._scf_energy = 0.0
@@ -369,6 +370,14 @@ class ScfDriver:
         """
 
         return self._scf_tensors
+
+    @property
+    def history(self):
+        """
+        Returns the SCF history.
+        """
+
+        return self._history
 
     @property
     def filename(self):
@@ -831,6 +840,8 @@ class ScfDriver:
 
         self._scf_tensors = None
 
+        self._history = []
+
         if not self._first_step:
             profiler.begin({
                 'timing': self.timing,
@@ -1002,6 +1013,8 @@ class ScfDriver:
                 'diff_density': diff_den,
                 'diff_energy': diff_e_scf,
             }
+
+            self._history.append(self._iter_data)
 
             # update density and energy
 
@@ -2350,7 +2363,7 @@ class ScfDriver:
             return
 
         final_h5_fname = str(
-            Path(self.checkpoint_file).with_suffix('.tensors.h5'))
+            Path(self.checkpoint_file).with_suffix('.results.h5'))
 
         if self._dft:
             xc_label = self.xcfun.get_func_label()
@@ -2364,7 +2377,8 @@ class ScfDriver:
             potfile_text = ''
 
         create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
-        write_scf_tensors(final_h5_fname, self.scf_tensors)
+        write_scf_results_to_hdf5(final_h5_fname, self.scf_tensors,
+                                  self.history)
 
         self.ostream.print_blank()
         checkpoint_text = 'SCF tensors written to file: '
