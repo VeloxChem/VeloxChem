@@ -50,8 +50,7 @@ from .subcommunicators import SubCommunicators
 from .firstorderprop import FirstOrderProperties
 from .signalhandler import SignalHandler
 from .denguess import DensityGuess
-from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_random_string_parallel)
+from .inputparser import parse_input, print_keywords, print_attributes
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .dftutils import get_default_grid_level, print_libxc_reference
@@ -239,7 +238,7 @@ class ScfDriver:
         self.program_end_time = None
 
         # filename
-        self._filename = 'vlx_' + get_random_string_parallel(self.comm)
+        self.filename = None
 
         # input keywords
         self._input_keywords = {
@@ -383,22 +382,6 @@ class ScfDriver:
 
         return self._history
 
-    @property
-    def filename(self):
-        """
-        Getter function for protected filename attribute.
-        """
-
-        return self._filename
-
-    @filename.setter
-    def filename(self, value):
-        """
-        Setter function for protected filename attribute.
-        """
-
-        self._filename = value
-
     def print_keywords(self):
         """
         Prints input keywords in SCF driver.
@@ -435,9 +418,9 @@ class ScfDriver:
         if 'program_end_time' in scf_dict:
             self.program_end_time = scf_dict['program_end_time']
         if 'filename' in scf_dict:
-            self._filename = scf_dict['filename']
+            self.filename = scf_dict['filename']
             if 'checkpoint_file' not in scf_dict:
-                self.checkpoint_file = f'{self._filename}.scf.h5'
+                self.checkpoint_file = f'{self.filename}.scf.h5'
 
         method_keywords = {
             key: val[0]
@@ -488,9 +471,9 @@ class ScfDriver:
             cppe_potfile = None
             if self.rank == mpi_master():
                 potfile = self.pe_options['potfile']
-                if not Path(potfile).is_file():
+                if not Path(potfile).is_file() and self.filename is not None:
                     potfile = str(
-                        Path(self._filename).parent / Path(potfile).name)
+                        Path(self.filename).parent / Path(potfile).name)
                 cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
             cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
             self.pe_options['potfile'] = cppe_potfile
@@ -809,8 +792,8 @@ class ScfDriver:
         # write checkpoint file and sychronize MPI processes
 
         self.restart = True
-        if self.checkpoint_file is None:
-            self.checkpoint_file = f'{self._filename}.scf.h5'
+        if self.checkpoint_file is None and self.filename is not None:
+            self.checkpoint_file = f'{self.filename}.scf.h5'
         self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
         self.comm.barrier()
 
