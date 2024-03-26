@@ -423,6 +423,10 @@ class LinearResponseSolver(LinearSolver):
                     self._graceful_exit(molecule, basis, dft_dict, pe_dict,
                                         rsp_vector_labels)
 
+            if self.force_checkpoint:
+                self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
+                                       rsp_vector_labels)
+
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
                                 scf_tensors, eri_dict, dft_dict, pe_dict,
                                 profiler)

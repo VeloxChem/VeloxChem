@@ -90,6 +90,7 @@ class LinearSolver:
         - ostream: The output stream.
         - restart: The flag for restarting from checkpoint file.
         - checkpoint_file: The name of checkpoint file.
+        - force_checkpoint: The flag for writing checkpoint every iteration.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
@@ -151,6 +152,7 @@ class LinearSolver:
         # restart information
         self.restart = True
         self.checkpoint_file = None
+        self.force_checkpoint = False
         self.save_solutions = True
 
         # timing and profiling
@@ -192,6 +194,8 @@ class LinearSolver:
                 'restart': ('bool', 'restart from checkpoint file'),
                 'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
+                'force_checkpoint':
+                    ('bool', 'flag for writing checkpoint every iteration'),
                 'save_solutions': ('bool', 'save solutions to file'),
                 'timing': ('bool', 'print timing information'),
                 'profiling': ('bool', 'print profiling information'),
