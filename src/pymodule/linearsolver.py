@@ -168,7 +168,7 @@ class LinearSolver:
         self.program_end_time = None
 
         # filename
-        self._filename = 'vlx_' + get_random_string_parallel(self.comm)
+        self.filename = None
 
         # distributed arrays
         self._dist_bger = None
@@ -260,22 +260,6 @@ class LinearSolver:
 
         return self._is_converged
 
-    @property
-    def filename(self):
-        """
-        Getter function for protected filename attribute.
-        """
-
-        return self._filename
-
-    @filename.setter
-    def filename(self, value):
-        """
-        Setter function for protected filename attribute.
-        """
-
-        self._filename = value
-
     def print_keywords(self):
         """
         Prints input keywords in linear solver.
@@ -312,9 +296,9 @@ class LinearSolver:
         if 'program_end_time' in rsp_dict:
             self.program_end_time = rsp_dict['program_end_time']
         if 'filename' in rsp_dict:
-            self._filename = rsp_dict['filename']
+            self.filename = rsp_dict['filename']
             if 'checkpoint_file' not in rsp_dict:
-                self.checkpoint_file = f'{self._filename}.rsp.h5'
+                self.checkpoint_file = f'{self.filename}.rsp.h5'
 
         method_keywords = {
             key: val[0]
@@ -365,9 +349,9 @@ class LinearSolver:
             cppe_potfile = None
             if self.rank == mpi_master():
                 potfile = self.pe_options['potfile']
-                if not Path(potfile).is_file():
+                if not Path(potfile).is_file() and self.filename is not None:
                     potfile = str(
-                        Path(self._filename).parent / Path(potfile).name)
+                        Path(self.filename).parent / Path(potfile).name)
                 cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
             cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
             self.pe_options['potfile'] = cppe_potfile
@@ -1088,8 +1072,11 @@ class LinearSolver:
             The list of labels.
         """
 
-        if self.checkpoint_file is None:
+        if self.checkpoint_file is None and self.filename is None:
             return
+
+        if self.checkpoint_file is None and self.filename is not None:
+            self.checkpoint_file = f'{self.filename}.rsp.h5'
 
         t0 = tm.time()
 
@@ -1975,6 +1962,12 @@ class LinearSolver:
 
         filenames = []
 
+        if self.filename is not None:
+            base_fname = self.filename
+        else:
+            name_string = get_random_string_parallel(self.comm)
+            base_fname = 'vlx_' + name_string
+
         vis_drv = VisualizationDriver(self.comm)
 
         if getattr(self, 'core_excitation', False):
@@ -2000,7 +1993,7 @@ class LinearSolver:
 
             if self.rank == mpi_master():
                 occ_cube_name = '{:s}_S{:d}_NTO_H{:d}.cube'.format(
-                    self._filename, root + 1, i_nto + 1)
+                    base_fname, root + 1, i_nto + 1)
                 vis_drv.write_data(occ_cube_name, cubic_grid, molecule, 'nto',
                                    ind_occ, 'alpha')
                 filenames.append(occ_cube_name)
@@ -2016,7 +2009,7 @@ class LinearSolver:
 
             if self.rank == mpi_master():
                 vir_cube_name = '{:s}_S{:d}_NTO_P{:d}.cube'.format(
-                    self._filename, root + 1, i_nto + 1)
+                    base_fname, root + 1, i_nto + 1)
                 vis_drv.write_data(vir_cube_name, cubic_grid, molecule, 'nto',
                                    ind_vir, 'alpha')
                 filenames.append(vir_cube_name)
@@ -2078,13 +2071,19 @@ class LinearSolver:
 
         filenames = []
 
+        if self.filename is not None:
+            base_fname = self.filename
+        else:
+            name_string = get_random_string_parallel(self.comm)
+            base_fname = 'vlx_' + name_string
+
         vis_drv = VisualizationDriver(self.comm)
 
         vis_drv.compute(cubic_grid, molecule, basis, dens_DA, 0, 'alpha')
 
         if self.rank == mpi_master():
             detach_cube_name = '{:s}_S{:d}_detach.cube'.format(
-                self._filename, root + 1)
+                base_fname, root + 1)
             vis_drv.write_data(detach_cube_name, cubic_grid, molecule,
                                'detachment', 0, 'alpha')
             filenames.append(detach_cube_name)
@@ -2097,7 +2096,7 @@ class LinearSolver:
 
         if self.rank == mpi_master():
             attach_cube_name = '{:s}_S{:d}_attach.cube'.format(
-                self._filename, root + 1)
+                base_fname, root + 1)
             vis_drv.write_data(attach_cube_name, cubic_grid, molecule,
                                'attachment', 1, 'alpha')
             filenames.append(attach_cube_name)
