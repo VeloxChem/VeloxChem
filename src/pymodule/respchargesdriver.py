@@ -99,7 +99,7 @@ class RespChargesDriver:
         self.ostream = ostream
 
         # filename
-        self.filename = 'vlx_' + get_random_string_parallel(self.comm)
+        self.filename = None
 
         # method
         self.xcfun = None
@@ -238,8 +238,6 @@ class RespChargesDriver:
                 isinstance(self.equal_charges, (list, tuple)),
                 'RespChargesDriver.compute: Invalid equal_charges')
 
-        output_dir = Path(self.filename).parent
-
         use_631gs_basis = (basis.get_label() in ['6-31G*', '6-31G_D_'])
 
         # sanity check for RESP
@@ -287,9 +285,6 @@ class RespChargesDriver:
             elif chg_type.lower() == 'esp':
                 q = self.compute_esp_charges([molecule], [grid_m], [esp_m],
                                              self.weights)
-            if self.fitting_points is None:
-                filename = str(output_dir / Path(self.filename).name)
-                self.write_pdb_file(filename, [molecule], q)
 
         return q
 
@@ -328,7 +323,6 @@ class RespChargesDriver:
         if not use_xyz_file:
             molecules.append(molecule)
             basis_sets.append(basis)
-            output_dir = Path(self.filename).parent
 
         else:
             errmsg = 'RespChargesDriver: The \'xyz_file\' keyword is not '
@@ -384,11 +378,6 @@ class RespChargesDriver:
             self.ostream.print_info(info_text)
             self.ostream.print_blank()
             self.ostream.flush()
-
-            output_dir = Path(self.filename + '_files')
-            if self.rank == mpi_master():
-                output_dir.mkdir(parents=True, exist_ok=True)
-            self.comm.barrier()
 
         if self.rank == mpi_master():
             if self.weights is not None and self.energies is not None:
@@ -450,11 +439,9 @@ class RespChargesDriver:
                     scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
                 else:
                     scf_drv = ScfUnrestrictedDriver(self.comm, self.ostream)
-                scf_dict = {
-                    'filename': self.filename,
-                    'checkpoint_file': self.filename + '.scf.h5'
-                }
-                scf_drv.update_settings(scf_dict, self.method_dict)
+                if self.filename is not None:
+                    scf_drv.filename = self.filename
+                    scf_drv.checkpoint_file = self.filename + '.scf.h5'
                 scf_drv.restart = self.restart
                 if (self.method_dict is None or
                         'xcfun' not in self.method_dict):
@@ -462,20 +449,27 @@ class RespChargesDriver:
                 scf_results = scf_drv.compute(mol, bas)
 
             else:
-                filename = str(
-                    output_dir /
-                    (Path(self.filename).name + f'_conformer_{ind+1}'))
-                ostream = OutputStream(filename + '.out')
+                if self.filename is not None:
+                    output_dir = Path(self.filename + '_files')
+                else:
+                    name_string = get_random_string_parallel(self.comm)
+                    output_dir = Path('vlx_' + name_string + '_files')
+
+                if self.rank == mpi_master():
+                    output_dir.mkdir(parents=True, exist_ok=True)
+                self.comm.barrier()
+
+                ostream_fname = str(output_dir / f'conformer_{ind+1}')
+                ostream = OutputStream(ostream_fname + '.out')
+
                 # select SCF driver
                 if nalpha == nbeta:
                     scf_drv = ScfRestrictedDriver(self.comm, ostream)
                 else:
                     scf_drv = ScfUnrestrictedDriver(self.comm, ostream)
-                scf_dict = {
-                    'filename': filename,
-                    'checkpoint_file': filename + '.scf.h5'
-                }
-                scf_drv.update_settings(scf_dict, self.method_dict)
+                if self.filename is not None:
+                    scf_drv.filename = self.filename
+                    scf_drv.checkpoint_file = self.filename + '.scf.h5'
                 scf_drv.restart = self.restart
                 if (self.method_dict is None or
                         'xcfun' not in self.method_dict):
@@ -512,14 +506,6 @@ class RespChargesDriver:
             elif flag.lower() == 'esp':
                 q = self.compute_esp_charges(molecules, grids, esp,
                                              self.weights)
-            if self.fitting_points is None:
-                if not use_xyz_file:
-                    filename = str(output_dir / Path(self.filename).name)
-                else:
-                    filename = str(output_dir /
-                                   (Path(self.filename).name + '_conformer'))
-
-                self.write_pdb_file(filename, molecules, q)
 
         return q
 
@@ -1268,34 +1254,6 @@ class RespChargesDriver:
         weights = [w / sum_of_weights for w in weights]
 
         return weights
-
-    def write_pdb_file(self, filename, molecules, q):
-        """
-        Writes data in PDB file.
-
-        :param filename:
-            The name of the file.
-        :param molecules:
-            The list of molecules.
-        :param q:
-            The charges.
-        """
-
-        for i, mol in enumerate(molecules):
-            if len(molecules) > 1:
-                pdb_fname = f'{filename}_{i+1}.pdb'
-            else:
-                pdb_fname = f'{filename}.pdb'
-            with open(pdb_fname, 'w') as f_pdb:
-                coords = mol.get_coordinates_in_angstrom()
-                for j in range(mol.number_of_atoms()):
-                    cur_str = '{:6s}{:5d} {:^4s} {:3s}  {:4d}    '.format(
-                        'ATOM', j + 1,
-                        mol.get_labels()[j], 'RES', 1)
-                    cur_str += '{:8.3f}{:8.3f}{:8.3f}{:6.2f}{:10.6f}'.format(
-                        coords[j][0], coords[j][1], coords[j][2], 1.0, q[j])
-                    f_pdb.write(cur_str)
-                    f_pdb.write('\n')
 
     def print_header(self, n_conf, n_points, fitting_coords=None):
         """
