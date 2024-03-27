@@ -50,7 +50,8 @@ from .subcommunicators import SubCommunicators
 from .firstorderprop import FirstOrderProperties
 from .signalhandler import SignalHandler
 from .denguess import DensityGuess
-from .inputparser import parse_input, print_keywords, print_attributes
+from .inputparser import (parse_input, print_keywords, print_attributes,
+                          get_random_string_parallel)
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .dftutils import get_default_grid_level, print_libxc_reference
@@ -792,8 +793,13 @@ class ScfDriver:
         # write checkpoint file and sychronize MPI processes
 
         self.restart = True
-        if self.checkpoint_file is None and self.filename is not None:
-            self.checkpoint_file = f'{self.filename}.scf.h5'
+        if self.checkpoint_file is None:
+            if self.filename is not None:
+                base_fname = self.filename
+            else:
+                name_string = get_random_string_parallel(self.comm)
+                base_fname = 'vlx_' + name_string
+            self.checkpoint_file = f'{base_fname}.scf.h5'
         self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
         self.comm.barrier()
 
