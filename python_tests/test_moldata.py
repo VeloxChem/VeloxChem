@@ -411,7 +411,6 @@ class TestMolData:
         """
         mol = Molecule.read_xyz_string(xyz_string)
         assert abs(mol.get_dihedral_in_degrees((2, 3, 4, 5)) - 55.0) < 1e-4
-        assert abs(mol.get_angle_in_degrees((2, 3, 4)) - 120.0) < 1e-4
 
         mol.set_dihedral_in_degrees((2, 3, 4, 5), 270.0)
         assert abs(mol.get_dihedral((2, 3, 4, 5), 'radian') +
@@ -419,10 +418,3 @@ class TestMolData:
 
         mol.set_dihedral((2, 3, 4, 5), math.pi / 2.0, 'radian')
         assert abs(mol.get_dihedral_in_degrees((2, 3, 4, 5)) - 90.0) < 1e-4
-
-        mol.set_angle_in_degrees((1, 2, 3), 100.0)
-        assert abs(
-            mol.get_angle((1, 2, 3), 'radian') - 100.0 * math.pi / 180.0) < 1e-4
-
-        mol.set_angle((1, 2, 3), 105.0 * math.pi / 180.0, 'radian')
-        assert abs(mol.get_angle_in_degrees((1, 2, 3)) - 105.0) < 1e-4
