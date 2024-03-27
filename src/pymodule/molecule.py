@@ -599,20 +599,32 @@ def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle,
 
     vij = coords_in_au[j] - coords_in_au[i]
 
-    rotation_angle = target_angle - self.get_dihedral(
-        dihedral_indices_one_based, angle_unit)
+    current_angle = self.get_dihedral(dihedral_indices_one_based, angle_unit)
 
-    new_coords_in_au = self._rotate_around_vector(coords_in_au, coords_in_au[j],
-                                                  vij, rotation_angle,
-                                                  angle_unit)
+    # make several attempts to rotate the dihedral angle, with the constraint
+    # that the connectivity matrix should not change
+    for attempt in range(10, -1, -1):
 
-    # update coordinates of atoms connected to j
-    for idx in atoms_connected_to_j:
-        self.set_atom_coordinates(idx, new_coords_in_au[idx])
+        rotation_angle = (target_angle - current_angle) * (0.1 * attempt)
+
+        new_coords_in_au = self._rotate_around_vector(coords_in_au,
+                                                      coords_in_au[j], vij,
+                                                      rotation_angle,
+                                                      angle_unit)
+
+        new_mol = Molecule(self)
+        for idx in atoms_connected_to_j:
+            new_mol.set_atom_coordinates(idx, new_coords_in_au[idx])
+
+        new_conn_mat = new_mol.get_connectivity_matrix()
+        conn_mat = self.get_connectivity_matrix()
+        if np.max(np.abs(new_conn_mat - conn_mat)) < 1.0e-10:
+            for idx in atoms_connected_to_j:
+                self.set_atom_coordinates(idx, new_coords_in_au[idx])
+            return
 
     assert_msg_critical(
-        not self._has_overlapping_atoms(),
-        'Molecule.set_dihedral: Cannot set dihedral angle due to ' +
+        False, 'Molecule.set_dihedral: Cannot set dihedral angle due to ' +
         'overlapping atoms')
 
 
