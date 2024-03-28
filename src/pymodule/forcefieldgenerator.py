@@ -24,7 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-from pathlib import Path
+from pathlib import Path, PurePath
 import numpy as np
 import tempfile
 import sys
@@ -1371,7 +1371,12 @@ class ForceFieldGenerator:
                 self.angles[(i, j, k)]['equilibrium'] = aver_theta
                 self.angles[(i, j, k)]['force_constant'] = aver_k_theta
 
-    def write_top(self, top_file, itp_file, mol_name=None):
+    def write_top(self,
+                  top_file,
+                  itp_file,
+                  mol_name=None,
+                  amber_ff=None,
+                  water_model=None):
         """
         Writes a topology file.
 
@@ -1379,6 +1384,12 @@ class ForceFieldGenerator:
             The topology file.
         :param itp_file:
             The included itp file.
+        :param mol_name:
+            The name of the molecule.
+        :param amber_ff:
+            The name of the Amber force field.
+        :param water_model:
+            The name of the water model.
         """
 
         top_fname = str(top_file)
@@ -1395,18 +1406,39 @@ class ForceFieldGenerator:
 
             # defaults
 
-            f_top.write('\n[ defaults ]\n')
-            cur_str = '; nbfunc        comb-rule       gen-pairs'
-            cur_str += '        fudgeLJ   fudgeQQ\n'
-            f_top.write(cur_str)
-            gen_pairs = 'yes' if self.gen_pairs else 'no'
-            f_top.write('{}{:16}{:>18}{:21.6f}{:10.6f}\n'.format(
-                self.nbfunc, self.comb_rule, gen_pairs, self.fudgeLJ,
-                self.fudgeQQ))
+            if amber_ff is not None:
+                assert_msg_critical(
+                    amber_ff.startswith('amber'),
+                    'ForceFieldGenerator.write_top: Invalid amber force field name'
+                )
+                ff_include = str(PurePath(f'{amber_ff}.ff') / 'forcefield.itp')
+                f_top.write(f'\n#include "{ff_include}"\n')
+            else:
+                f_top.write('\n[ defaults ]\n')
+                cur_str = '; nbfunc        comb-rule       gen-pairs'
+                cur_str += '        fudgeLJ   fudgeQQ\n'
+                f_top.write(cur_str)
+                gen_pairs = 'yes' if self.gen_pairs else 'no'
+                f_top.write('{}{:16}{:>18}{:21.6f}{:10.6f}\n'.format(
+                    self.nbfunc, self.comb_rule, gen_pairs, self.fudgeLJ,
+                    self.fudgeQQ))
 
             # include itp
 
             f_top.write('\n#include "' + Path(itp_fname).name + '"\n')
+
+            if water_model is not None:
+                # very rudimentary check for water model names
+                assert_msg_critical(
+                    water_model.startswith('tip') or
+                    water_model.startswith('spc'),
+                    'ForceFieldGenerator.write_top: Invalid water model name')
+                assert_msg_critical(
+                    amber_ff is not None, 'ForceFieldGenerator.write_top: ' +
+                    'amber_ff is required for water_model')
+                water_include = str(
+                    PurePath(f'{amber_ff}.ff') / f'{water_model}.itp')
+                f_top.write(f'\n#include "{water_include}"\n')
 
             # system
 
@@ -1617,7 +1649,12 @@ class ForceFieldGenerator:
             line_str = f'{box_dimension:10.5f}' * 3 + '\n'
             f_gro.write(line_str)
 
-    def write_gromacs_files(self, filename, mol_name=None, gro_precision=3):
+    def write_gromacs_files(self,
+                            filename,
+                            mol_name=None,
+                            amber_ff=None,
+                            water_model=None,
+                            gro_precision=3):
         """
         Writes all the needed files for a MD simulation with GROMACS.
 
@@ -1625,6 +1662,10 @@ class ForceFieldGenerator:
             The name of the molecule.
         :param mol_name:
             The name of the molecule.
+        :param amber_ff:
+            The name of the Amber force field.
+        :param water_model:
+            The name of the water model.
         :param gro_precision:
             The number of decimal places in gro file.
         """
@@ -1637,7 +1678,7 @@ class ForceFieldGenerator:
         gro_file = Path(filename).with_suffix('.gro')
 
         self.write_itp(itp_file, mol_name)
-        self.write_top(top_file, itp_file, mol_name)
+        self.write_top(top_file, itp_file, mol_name, amber_ff, water_model)
         self.write_gro(gro_file, mol_name, gro_precision)
 
     @staticmethod
