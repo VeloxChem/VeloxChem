@@ -87,7 +87,7 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
 
 def write_scf_results_to_hdf5(fname, scf_results, scf_history):
     """
-    Writes SCF tensors to HDF5 file.
+    Writes SCF results to HDF5 file.
 
     :param fname:
         Name of the HDF5 file.

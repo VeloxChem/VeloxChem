@@ -2365,7 +2365,7 @@ class ScfDriver:
 
     def _write_final_hdf5(self, molecule, ao_basis):
         """
-        Writes final HDF5 that contains SCF tensors.
+        Writes final HDF5 that contains SCF results.
 
         :param molecule:
             The molecule.
@@ -2395,6 +2395,6 @@ class ScfDriver:
                                   self.history)
 
         self.ostream.print_blank()
-        checkpoint_text = 'SCF tensors written to file: '
+        checkpoint_text = 'SCF results written to file: '
         checkpoint_text += final_h5_fname
         self.ostream.print_info(checkpoint_text)

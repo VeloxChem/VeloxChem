@@ -1035,7 +1035,7 @@ class ComplexResponse(LinearSolver):
 
     def _print_results(self, rsp_results, ostream=None):
         """
-        Prints response resutls to output stream.
+        Prints response results to output stream.
 
         :param rsp_results:
             The dictionary containing response results.

@@ -67,7 +67,7 @@ class FirstOrderProperties:
 
         self.properties = {}
 
-    def compute_scf_prop(self, molecule, basis, scf_tensors):
+    def compute_scf_prop(self, molecule, basis, scf_results):
         """
         Computes first-order properties for SCF.
 
@@ -75,11 +75,11 @@ class FirstOrderProperties:
             The molecule
         :param basis:
             The AO basis set.
-        :param scf_tensors:
-            The SCF tensors.
+        :param scf_results:
+            The dictionary containing SCF results.
         """
         if self.rank == mpi_master():
-            total_density = scf_tensors['D_alpha'] + scf_tensors['D_beta']
+            total_density = scf_results['D_alpha'] + scf_results['D_beta']
         else:
             total_density = None
 

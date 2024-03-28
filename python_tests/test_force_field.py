@@ -4,7 +4,7 @@ import pytest
 import sys
 
 try:
-    import openmm
+    import scipy
 except ImportError:
     pass
 
@@ -17,8 +17,8 @@ from veloxchem.forcefieldgenerator import ForceFieldGenerator
     'ignore:.*tostring.*tobytes:DeprecationWarning:geometric')
 class TestForceField:
 
-    @pytest.mark.skipif('openmm' not in sys.modules,
-                        reason='openmm not available')
+    @pytest.mark.skipif('scipy' not in sys.modules,
+                        reason='scipy not available')
     def test_force_field(self):
 
         # vlxtag: RKS, Force_Field_Generation
@@ -75,7 +75,7 @@ class TestForceField:
             if scf_h5_file.is_file():
                 scf_h5_file.unlink()
 
-            scf_final_h5_file = Path(inpfile).with_suffix('.scf.tensors.h5')
+            scf_final_h5_file = Path(inpfile).with_suffix('.scf.results.h5')
             if scf_final_h5_file.is_file():
                 scf_final_h5_file.unlink()
 

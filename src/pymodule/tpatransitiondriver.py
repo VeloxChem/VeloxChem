@@ -110,7 +110,7 @@ class TpaTransitionDriver(NonlinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def compute(self, molecule, ao_basis, scf_tensors):
+    def compute(self, molecule, ao_basis, scf_results):
         """
         Computes a quadratic response function.
 
@@ -118,7 +118,7 @@ class TpaTransitionDriver(NonlinearSolver):
             The molecule.
         :param basis:
             The AO basis.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -134,7 +134,7 @@ class TpaTransitionDriver(NonlinearSolver):
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # check dft setup
         dft_sanity_check(self, 'compute', 'nonlinear')
@@ -159,9 +159,9 @@ class TpaTransitionDriver(NonlinearSolver):
             'TpaTransitionDriver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            S = scf_tensors['S']
-            da = scf_tensors['D_alpha']
-            mo = scf_tensors['C_alpha']
+            S = scf_results['S']
+            da = scf_results['D_alpha']
+            mo = scf_results['C_alpha']
             d_a_mo = np.linalg.multi_dot([mo.T, S, da, S, mo])
             norb = mo.shape[1]
         else:
@@ -177,10 +177,10 @@ class TpaTransitionDriver(NonlinearSolver):
         operator = 'dipole'
         linear_solver = LinearSolver(self.comm, self.ostream)
         a_grad = linear_solver.get_complex_prop_grad(operator, 'xyz', molecule,
-                                                     ao_basis, scf_tensors)
+                                                     ao_basis, scf_results)
 
         b_grad = linear_solver.get_complex_prop_grad(operator, 'xyz', molecule,
-                                                     ao_basis, scf_tensors)
+                                                     ao_basis, scf_results)
 
         if self.rank == mpi_master():
             inv_sqrt_2 = 1.0 / np.sqrt(2.0)
@@ -210,7 +210,7 @@ class TpaTransitionDriver(NonlinearSolver):
             rpa_drv.checkpoint_file = str(
                 Path(self.checkpoint_file).with_suffix('.tpatrans_rpa.h5'))
 
-        rpa_results = rpa_drv.compute(molecule, ao_basis, scf_tensors)
+        rpa_results = rpa_drv.compute(molecule, ao_basis, scf_results)
 
         excitation_details = rpa_results['excitation_details']
         oscillator_strengths = rpa_results['oscillator_strengths']
@@ -263,7 +263,7 @@ class TpaTransitionDriver(NonlinearSolver):
             N_drv.checkpoint_file = str(
                 Path(self.checkpoint_file).with_suffix('.tpatrans_cpp.h5'))
 
-        N_results = N_drv.compute(molecule, ao_basis, scf_tensors, B)
+        N_results = N_drv.compute(molecule, ao_basis, scf_results, B)
 
         self._is_converged = N_drv.is_converged
 
@@ -274,7 +274,7 @@ class TpaTransitionDriver(NonlinearSolver):
         profiler.check_memory_usage('CPP')
 
         ret_dict = self.compute_quad_components(Focks, freqs, X, d_a_mo, Nx,
-                                                scf_tensors, molecule, ao_basis,
+                                                scf_results, molecule, ao_basis,
                                                 profiler, Xf)
 
         valstr = '*** Time spent in quadratic response calculation: '
@@ -294,7 +294,7 @@ class TpaTransitionDriver(NonlinearSolver):
 
         return ret_dict
 
-    def compute_quad_components(self, Focks, freqs, X, d_a_mo, Nx, scf_tensors,
+    def compute_quad_components(self, Focks, freqs, X, d_a_mo, Nx, scf_results,
                                 molecule, ao_basis, profiler, Xf):
         """
         Computes all the relevent terms to compute a general quadratic response function
@@ -307,7 +307,7 @@ class TpaTransitionDriver(NonlinearSolver):
             The SCF density in MO basis
         :param kX:
             A dictonary containing all the response matricies
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
             The molecule.
@@ -321,8 +321,8 @@ class TpaTransitionDriver(NonlinearSolver):
         """
 
         if self.rank == mpi_master():
-            mo = scf_tensors['C_alpha']
-            F0 = np.linalg.multi_dot([mo.T, scf_tensors['F_alpha'], mo])
+            mo = scf_results['C_alpha']
+            F0 = np.linalg.multi_dot([mo.T, scf_results['F_alpha'], mo])
             norb = mo.shape[1]
         else:
             mo = None
@@ -333,7 +333,7 @@ class TpaTransitionDriver(NonlinearSolver):
 
         nocc = molecule.number_of_alpha_electrons()
 
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # computing all compounded first-order densities
         first_order_dens, second_order_dens = self.get_densities(
@@ -358,7 +358,7 @@ class TpaTransitionDriver(NonlinearSolver):
 
         # Compute dipole vector
         scf_prop = FirstOrderProperties(self.comm, self.ostream)
-        scf_prop.compute_scf_prop(molecule, ao_basis, scf_tensors)
+        scf_prop.compute_scf_prop(molecule, ao_basis, scf_results)
 
         for w_ind, w in enumerate(freqs):
             m = np.zeros((3, 3), dtype='complex128')

@@ -39,7 +39,7 @@ class TestRespCharges:
             if scf_h5_file.is_file():
                 scf_h5_file.unlink()
             scf_final_h5_file = Path(
-                chg_drv.filename).with_suffix('.scf.tensors.h5')
+                chg_drv.filename).with_suffix('.scf.results.h5')
             if scf_final_h5_file.is_file():
                 scf_final_h5_file.unlink()
 
