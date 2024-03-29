@@ -312,11 +312,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
     hipSafe(hipDeviceSynchronize());
 
-    // TODO: use zero() here and also in other places
-    for (int64_t ind = 0; ind < all_prim_count * all_prim_count; ind++)
-    {
-        Q_omp[gpu_id].values()[ind] = 0.0;
-    }
+    Q_omp[gpu_id].zero();
 
     auto& mat_Q_omp = Q_omp[gpu_id];
 
@@ -539,11 +535,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
     CDenseMatrix Q_matrix_sum(all_prim_count, all_prim_count);
 
-    // TODO: use zero() here and also in other places
-    for (int64_t ind = 0; ind < all_prim_count * all_prim_count; ind++)
-    {
-        Q_matrix_sum.values()[ind] = 0.0;
-    }
+    Q_matrix_sum.zero();
 
     auto p_mat_Q_sum = Q_matrix_sum.values();
 
@@ -565,20 +557,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 {
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
-
-    std::vector<CDenseMatrix> STV_matrices(3);
-
-    STV_matrices[0] = CDenseMatrix(naos, naos);
-    STV_matrices[1] = CDenseMatrix(naos, naos);
-    STV_matrices[2] = CDenseMatrix(naos, naos);
-
-    // TODO: use zero() here and also in other places
-    for (int64_t ind = 0; ind < naos * naos; ind++)
-    {
-        STV_matrices[0].values()[ind] = 0.0;
-        STV_matrices[1].values()[ind] = 0.0;
-        STV_matrices[2].values()[ind] = 0.0;
-    }
 
     auto rank = mpi::rank(MPI_COMM_WORLD);
     auto nnodes = mpi::nodes(MPI_COMM_WORLD);
@@ -807,13 +785,9 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     hipSafe(hipMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
 
-    // TODO: use zero() here and also in other places
-    for (int64_t ind = 0; ind < naos * naos; ind++)
-    {
-        S_matrices[gpu_id].values()[ind] = 0.0;
-        T_matrices[gpu_id].values()[ind] = 0.0;
-        V_matrices[gpu_id].values()[ind] = 0.0;
-    }
+    S_matrices[gpu_id].zero();
+    T_matrices[gpu_id].zero();
+    V_matrices[gpu_id].zero();
 
     auto& mat_overlap = S_matrices[gpu_id];
     auto& mat_kinetic_energy = T_matrices[gpu_id];
@@ -1266,6 +1240,16 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
     }}
 
+    std::vector<CDenseMatrix> STV_matrices(3);
+
+    STV_matrices[0] = CDenseMatrix(naos, naos);
+    STV_matrices[1] = CDenseMatrix(naos, naos);
+    STV_matrices[2] = CDenseMatrix(naos, naos);
+
+    STV_matrices[0].zero();
+    STV_matrices[1].zero();
+    STV_matrices[2].zero();
+
     auto p_mat_S = STV_matrices[0].values();
     auto p_mat_T = STV_matrices[1].values();
     auto p_mat_V = STV_matrices[2].values();
@@ -1593,13 +1577,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     std::string errnaos("gpu::computeCoulombFock: Inconsistent number of AOs");
     errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)), errnaos);
 
-    CDenseMatrix mat_Fock_sum (naos, naos);
-
-    for (int64_t ind = 0; ind < naos * naos; ind++)
-    {
-        mat_Fock_sum.values()[ind] = 0.0;
-    }
-
     std::vector<CDenseMatrix> mat_Fock_omp(num_gpus_per_node);
 
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
@@ -1790,18 +1767,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto& pd_mat_D = screening.get_pd_mat_D(); 
     const auto& dd_mat_D = screening.get_dd_mat_D(); 
 
-    const auto ss_max_D = screening.get_ss_max_D(); 
-    const auto sp_max_D = screening.get_sp_max_D(); 
-    const auto sd_max_D = screening.get_sd_max_D(); 
-    const auto pp_max_D = screening.get_pp_max_D(); 
-    const auto pd_max_D = screening.get_pd_max_D(); 
-    const auto dd_max_D = screening.get_dd_max_D(); 
-
-    // Note: assuming symmetric D
-    const auto ps_max_D = screening.get_sp_max_D(); 
-    const auto ds_max_D = screening.get_sd_max_D(); 
-    const auto dp_max_D = screening.get_pd_max_D(); 
-
     const auto ss_prim_pair_count = static_cast<int64_t>(ss_first_inds.size());
     const auto sp_prim_pair_count = static_cast<int64_t>(sp_first_inds.size());
     const auto sd_prim_pair_count = static_cast<int64_t>(sd_first_inds.size());
@@ -1951,10 +1916,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     timer.stop("Coulomb prep.");
 
-    for (int64_t ind = 0; ind < naos * naos; ind++)
-    {
-        mat_Fock_omp[gpu_id].values()[ind] = 0.0;
-    }
+    mat_Fock_omp[gpu_id].zero();
 
     hipSafe(hipDeviceSynchronize());
 
@@ -5513,6 +5475,18 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto& density_inds_for_K_pd = screening.get_density_inds_for_K_pd();
     const auto& density_inds_for_K_dp = screening.get_density_inds_for_K_dp();
     const auto& density_inds_for_K_dd = screening.get_density_inds_for_K_dd();
+
+    const auto ss_max_D = screening.get_ss_max_D(); 
+    const auto sp_max_D = screening.get_sp_max_D(); 
+    const auto sd_max_D = screening.get_sd_max_D(); 
+    const auto pp_max_D = screening.get_pp_max_D(); 
+    const auto pd_max_D = screening.get_pd_max_D(); 
+    const auto dd_max_D = screening.get_dd_max_D(); 
+
+    // Note: assuming symmetric D
+    const auto ps_max_D = screening.get_sp_max_D(); 
+    const auto ds_max_D = screening.get_sd_max_D(); 
+    const auto dp_max_D = screening.get_pd_max_D(); 
 
     const auto& pair_inds_i_for_K_ss = screening.get_local_pair_inds_i_for_K_ss(gpu_id);
     const auto& pair_inds_k_for_K_ss = screening.get_local_pair_inds_k_for_K_ss(gpu_id);
@@ -10533,6 +10507,10 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     std::cout << timer.getSummary() << std::endl;
 
     }}
+
+    CDenseMatrix mat_Fock_sum (naos, naos);
+
+    mat_Fock_sum.zero();
 
     auto p_mat_F = mat_Fock_sum.values();
 
