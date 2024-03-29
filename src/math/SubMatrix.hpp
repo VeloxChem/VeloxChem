@@ -1,3 +1,28 @@
+//
+//                              VELOXCHEM
+//         ----------------------------------------------------
+//                     An Electronic Structure Code
+//
+//  Copyright © 2018-2023 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
+//
+//  SPDX-License-Identifier: LGPL-3.0-or-later
+//
+//  This file is part of VeloxChem.
+//
+//  VeloxChem is free software: you can redistribute it and/or modify it under
+//  the terms of the GNU Lesser General Public License as published by the Free
+//  Software Foundation, either version 3 of the License, or (at your option)
+//  any later version.
+//
+//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+//  License for more details.
+//
+//  You should have received a copy of the GNU Lesser General Public License
+//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 #ifndef SubMatrix_hpp
 #define SubMatrix_hpp
 
@@ -56,9 +81,44 @@ class CSubMatrix
     CSubMatrix(const CSubMatrix& other);
 
     /**
+     Creates a submatrix.
+
+     @param other the submatrix to be moved.
+     */
+    CSubMatrix(CSubMatrix&& other) noexcept;
+
+    /**
      Destroys a matrix.
      */
     ~CSubMatrix();
+
+    /**
+     Assigns a submatrix.
+
+     @param other the submatrix to be copied.
+     */
+    CSubMatrix& operator=(const CSubMatrix& source);
+
+    /**
+     Assigns a submatrix.
+
+     @param other the submatrix to be moved.
+     */
+    CSubMatrix& operator=(CSubMatrix&& source) noexcept;
+
+    /**
+     Compares submatrix with another submatrix.
+
+     @param other the submatrix to be compared with.
+     */
+    auto operator==(const CSubMatrix& other) const -> bool;
+
+    /**
+     Compares submatrix with another submatrix.
+
+     @param other the submatrix to be compared with.
+     */
+    auto operator!=(const CSubMatrix& other) const -> bool;
 
     /**
      Gets reference to specific submatirx element.
@@ -121,6 +181,11 @@ class CSubMatrix
      Set values of submatrix to zero.
      */
     auto zero() -> void;
+
+    /**
+     Symmetrizes values of square submatrix.
+     */
+    auto symmetrize() -> void;
 
     /**
      Gets dimensions of submatrix.

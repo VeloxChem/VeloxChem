@@ -40,14 +40,15 @@ CDenseMatrix::CDenseMatrix()
 {
 }
 
-CDenseMatrix::CDenseMatrix(const std::vector<double>& values, const int64_t nRows, const int64_t nColumns)
+CDenseMatrix::CDenseMatrix(const CSubMatrix& submat)
 
-    : _nRows(nRows)
-
-    , _nColumns(nColumns)
-
-    , _values(values)
+    : _values(submat)
 {
+    const auto dim = _values.getDimensions();
+
+    _nRows = dim[2];
+
+    _nColumns = dim[3];
 }
 
 CDenseMatrix::CDenseMatrix(const int64_t nRows, const int64_t nColumns)
@@ -55,9 +56,10 @@ CDenseMatrix::CDenseMatrix(const int64_t nRows, const int64_t nColumns)
     : _nRows(nRows)
 
     , _nColumns(nColumns)
-
-    , _values(std::vector<double>(nRows * nColumns, 0.0))
 {
+    T4Index dim({0, 0, _nRows, _nColumns});
+
+    _values = CSubMatrix(dim);
 }
 
 CDenseMatrix::CDenseMatrix(const CDenseMatrix& source)
@@ -133,7 +135,7 @@ CDenseMatrix::operator!=(const CDenseMatrix& other) const -> bool
 auto
 CDenseMatrix::zero() -> void
 {
-    std::fill(_values.data(), _values.data() + _nRows * _nColumns, 0.0);
+    _values.zero();
 }
 
 auto
@@ -141,7 +143,7 @@ CDenseMatrix::transpose() const -> CDenseMatrix
 {
     CDenseMatrix tmat(_nColumns, _nRows);
 
-    auto cvals = _values.data();
+    auto cvals = _values.getData();
 
     auto tvals = tmat.values();
 
@@ -159,7 +161,7 @@ CDenseMatrix::transpose() const -> CDenseMatrix
 auto
 CDenseMatrix::symmetrize() -> void
 {
-    auto fmat = _values.data();
+    auto fmat = _values.getData();
 
     if (_nRows == _nColumns)
     {
@@ -184,7 +186,7 @@ CDenseMatrix::symmetrize() -> void
 auto
 CDenseMatrix::symmetrizeAndScale(const double factor) -> void
 {
-    auto fmat = _values.data();
+    auto fmat = _values.getData();
 
     if (_nRows == _nColumns)
     {
@@ -227,13 +229,13 @@ CDenseMatrix::getNumberOfElements() const -> int64_t
 auto
 CDenseMatrix::values() const -> const double*
 {
-    return _values.data();
+    return _values.getData();
 }
 
 auto
 CDenseMatrix::values() -> double*
 {
-    return _values.data();
+    return _values.getData();
 }
 
 auto
@@ -241,7 +243,7 @@ CDenseMatrix::row(const int64_t iRow) const -> const double*
 {
     if (iRow < getNumberOfRows())
     {
-        return _values.data() + iRow * _nColumns;
+        return _values.getData() + iRow * _nColumns;
     }
     else
     {
@@ -254,7 +256,7 @@ CDenseMatrix::row(const int64_t iRow) -> double*
 {
     if (iRow < getNumberOfRows())
     {
-        return _values.data() + iRow * _nColumns;
+        return _values.getData() + iRow * _nColumns;
     }
     else
     {

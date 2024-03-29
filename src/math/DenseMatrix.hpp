@@ -29,6 +29,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "SubMatrix.hpp"
+
 /**
  Class CDenseMatrix stores dense matrix in coordinate format (zero-based
  indexing scheme) and provides set of methods for manipulating dense matrix
@@ -51,7 +53,7 @@ class CDenseMatrix
     /**
      The matrix element values.
      */
-    std::vector<double> _values;
+    CSubMatrix _values;
 
    public:
     /**
@@ -62,11 +64,9 @@ class CDenseMatrix
     /**
      Creates a dense matrix object.
 
-     @param values the vector of matrix elements.
-     @param nRows the number of rows in matrix.
-     @param nColumns the number of columns in matrix.
+     @param values the SubMatrix object to copy data from.
      */
-    CDenseMatrix(const std::vector<double>& values, const int64_t nRows, const int64_t nColumns);
+    CDenseMatrix(const CSubMatrix& submat);
 
     /**
      Creates a dense matrix object.

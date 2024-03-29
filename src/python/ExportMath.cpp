@@ -13,6 +13,7 @@
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "MathConst.hpp"
+#include "MathFunc.hpp"
 #include "Matrices.hpp"
 #include "Matrix.hpp"
 #include "MatrixFunc.hpp"
@@ -53,11 +54,19 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr) -> std::shared_ptr<CDens
 
     // create CDenseMatrix from numpy array
 
-    std::vector<double> vec(arr.size());
+    int64_t nrows = static_cast<int64_t>(arr.shape(0));
+
+    int64_t ncols = static_cast<int64_t>(arr.shape(1));
+
+    T4Index dim({0, 0, nrows, ncols});
+
+    CSubMatrix submat(dim);
+
+    auto submat_ptr = submat.getData();
 
     if (c_style)
     {
-        std::memcpy(vec.data(), arr.data(), arr.size() * sizeof(double));
+        std::memcpy(submat_ptr, arr.data(), arr.size() * sizeof(double));
     }
     else if (f_style)
     {
@@ -65,16 +74,12 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr) -> std::shared_ptr<CDens
         {
             for (py::ssize_t j = 0; j < arr.shape(1); j++)
             {
-                vec.data()[i * arr.shape(1) + j] = arr.data()[j * arr.shape(0) + i];
+                submat_ptr[i * arr.shape(1) + j] = arr.data()[j * arr.shape(0) + i];
             }
         }
     }
 
-    int64_t nrows = static_cast<int64_t>(arr.shape(0));
-
-    int64_t ncols = static_cast<int64_t>(arr.shape(1));
-
-    return std::make_shared<CDenseMatrix>(vec, nrows, ncols);
+    return std::make_shared<CDenseMatrix>(submat);
 }
 
 // Exports classes/functions in src/math to python
@@ -182,6 +187,7 @@ export_math(py::module& m) -> void
             },
             "Sets values of submatrix using numpy array.")
         .def("zero", &CSubMatrix::zero, "Sets values of submatrix to zero.")
+        .def("symmetrize", &CSubMatrix::symmetrize, "Symmetrizes values of square submatrix.")
         .def(
             "to_numpy",
             [](const CSubMatrix& self) -> py::array_t<double> {
@@ -210,6 +216,35 @@ export_math(py::module& m) -> void
         .def("add", py::overload_cast<const T4Index&, const T2Pair&>(&CMatrix::add), "Adds submatrix to matrix.")
         .def("set_type", &CMatrix::setType, "Sets matrix type.")
         .def("zero", &CMatrix::zero, "Sets values of matrix to zero.")
+        .def(
+            "set_values",
+            [](CMatrix& self, const py::array_t<double>& values) -> void {
+                if (values.ndim() == 2)
+                {
+                    const auto nrows = static_cast<py::ssize_t>(self.getNumberOfRows());
+
+                    const auto ncols = static_cast<py::ssize_t>(self.getNumberOfColumns());
+
+                    if ((nrows == values.shape(0)) && (ncols == values.shape(1)))
+                    {
+                        for (auto tpair : self.getAngularPairs())
+                        {
+                            auto submat = self.getSubMatrix(tpair);
+
+                            const auto [row_off, col_off, nrows, ncols] = submat->getDimensions();
+
+                            for (int64_t i = 0; i < nrows; i++)
+                            {
+                                for (int64_t j = 0; j < ncols; j++)
+                                {
+                                    submat->at(i, j, false) = values.at(i + row_off, j + col_off);
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "Sets values of matrix using numpy array.")
         .def("get_type", &CMatrix::getType, "Gets matrix type.")
         .def("get_angular_pairs", &CMatrix::getAngularPairs, "Gets vector of angular pairs for stored submatrices.")
         .def(
