@@ -43,6 +43,10 @@ class CScreeningData
 {
     int64_t _num_gpus_per_node{8};
 
+    double _pair_threshold{0.0};
+
+    double _density_threshold{0.0};
+
     CDenseMatrix _Q_matrix_ss;
     CDenseMatrix _Q_matrix_sp;
     CDenseMatrix _Q_matrix_sd;
@@ -149,7 +153,7 @@ class CScreeningData
     auto _sortQ(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) -> void;
 
    public:
-    CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node);
+    CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node, const double pair_threshold, const double density_threshold);
 
     auto getNumGpusPerNode() const -> const int64_t;
 
@@ -167,7 +171,8 @@ class CScreeningData
                 const std::vector<uint32_t>& p_prim_aoinds,
                 const std::vector<uint32_t>& d_prim_aoinds,
                 const int64_t naos,
-                const double* dens_ptr) -> void;
+                const double* dens_ptr,
+                const double eri_threshold) -> void;
 
     auto get_ss_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
     auto get_sp_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;

@@ -142,6 +142,11 @@ class ScfDriver:
         self.eri_thresh = 1.0e-12
         self.eri_thresh_tight = 1.0e-15
 
+        self.pair_thresh = 1.0e-10
+        self.density_thresh = 1.0e-10
+
+        self.prelink_thresh = 5.0e-6
+
         # iterations data
         self._iter_data = None
         self._is_converged = False
@@ -238,6 +243,8 @@ class ScfDriver:
                 'max_iter': ('int', 'maximum number of SCF iterations'),
                 'conv_thresh': ('float', 'SCF convergence threshold'),
                 'eri_thresh': ('float', 'ERI screening threshold'),
+                'pair_thresh': ('float', 'GTO pair screening threshold'),
+                'density_thresh': ('float', 'density screening threshold'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
@@ -989,7 +996,7 @@ class ScfDriver:
 
             num_gpus_per_node = self._get_num_gpus_per_node()
 
-            screener = ScreeningData(molecule, ao_basis, num_gpus_per_node)
+            screener = ScreeningData(molecule, ao_basis, num_gpus_per_node, self.pair_thresh, self.density_thresh)
 
             self.ostream.print_info(f'Using {num_gpus_per_node} GPU devices per MPI rank.')
             self.ostream.print_blank()
@@ -1613,11 +1620,11 @@ class ScfDriver:
 
         if self._dft and not self._first_step:
             if self.xcfun.is_hybrid():
-                fock_mat = compute_fock_gpu(molecule, basis, den_mat, self.xcfun.get_frac_exact_exchange(), screener)
+                fock_mat = compute_fock_gpu(molecule, basis, den_mat, self.xcfun.get_frac_exact_exchange(), self.eri_thresh, self.prelink_thresh, screener)
             else:
-                fock_mat = compute_fock_gpu(molecule, basis, den_mat, 0.0, screener)
+                fock_mat = compute_fock_gpu(molecule, basis, den_mat, 0.0, self.eri_thresh, self.prelink_thresh, screener)
         else:
-            fock_mat = compute_fock_gpu(molecule, basis, den_mat, 1.0, screener)
+            fock_mat = compute_fock_gpu(molecule, basis, den_mat, 1.0, self.eri_thresh, self.prelink_thresh, screener)
 
         eri_t1 = tm.time()
 

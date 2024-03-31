@@ -59,7 +59,7 @@ export_gpu(py::module& m)
     // CScreeningData class
 
     py::class_<CScreeningData, std::shared_ptr<CScreeningData>>(m, "ScreeningData")
-        .def(py::init<const CMolecule&, const CMolecularBasis&, const int64_t>())
+        .def(py::init<const CMolecule&, const CMolecularBasis&, const int64_t, const double, const double>())
         .def("get_num_gpus_per_node", &CScreeningData::getNumGpusPerNode)
         .def("get_q_matrix",
         [](CScreeningData& self, const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) -> py::array_t<double> {

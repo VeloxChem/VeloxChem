@@ -1354,7 +1354,7 @@ transformDensity(const CMolecule& molecule, const CMolecularBasis& basis, const 
 }
 
 auto
-computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix, const double frac_exact_exchange, CScreeningData& screening) -> CDenseMatrix
+computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix, const double frac_exact_exchange, const double eri_threshold, const double prelink_threshold, CScreeningData& screening) -> CDenseMatrix
 {
     auto rank = mpi::rank(MPI_COMM_WORLD);
     auto nnodes = mpi::nodes(MPI_COMM_WORLD);
@@ -1512,7 +1512,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     timer.start("Prep. sortQD");
 
-    screening.sortQD(s_prim_count, p_prim_count, d_prim_count, s_prim_aoinds, p_prim_aoinds, d_prim_aoinds, cart_naos, cart_dens_ptr);
+    screening.sortQD(s_prim_count, p_prim_count, d_prim_count, s_prim_aoinds, p_prim_aoinds, d_prim_aoinds, cart_naos, cart_dens_ptr, eri_threshold);
 
     timer.stop("Prep. sortQD");
 
@@ -1565,10 +1565,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     timer.start("Prep. preLinK");
 
-    // auto& Q_prime = mat_full;
-    const double Q_prime_thresh = 1.0e-7;
-
-    screening.form_pair_inds_for_K(s_prim_count, p_prim_count, d_prim_count, mat_full, Q_prime_thresh);
+    screening.form_pair_inds_for_K(s_prim_count, p_prim_count, d_prim_count, mat_full, prelink_threshold);
 
     mat_full = CDenseMatrix();
 

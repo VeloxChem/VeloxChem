@@ -30,6 +30,7 @@
 #include <cmath>
 #include <string>
 #include <iostream>
+#include <sstream>
 
 #include "BoysFuncTable.hpp"
 #include "ErrorHandler.hpp"
@@ -41,9 +42,13 @@
 
 #define MATH_CONST_PI 3.14159265358979323846
 
-CScreeningData::CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node)
+CScreeningData::CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node, const double pair_threshold, const double density_threshold)
 {
     _num_gpus_per_node = num_gpus_per_node;
+
+    _pair_threshold = pair_threshold;
+
+    _density_threshold = density_threshold;
 
     _computeQMatrices(molecule, basis);
 
@@ -129,6 +134,13 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
     _Q_matrix_pd = CDenseMatrix(p_prim_count * 3, d_prim_count * 6);
     _Q_matrix_dd = CDenseMatrix(d_prim_count * 6, d_prim_count * 6);
 
+    _Q_matrix_ss.zero();
+    _Q_matrix_sp.zero();
+    _Q_matrix_sd.zero();
+    _Q_matrix_pp.zero();
+    _Q_matrix_pd.zero();
+    _Q_matrix_dd.zero();
+
     // TODO distribute computation of Q matrices
 
     const double delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
@@ -169,9 +181,12 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
             const auto sqrt_eri_ijij = std::sqrt(Lambda * S_ij_00 * S_ij_00 * F0_t[0]);
 
-            _Q_matrix_ss.row(i)[j] = sqrt_eri_ijij;
+            if (sqrt_eri_ijij > _pair_threshold)
+            {
+                _Q_matrix_ss.row(i)[j] = sqrt_eri_ijij;
 
-            if (i != j) _Q_matrix_ss.row(j)[i] = sqrt_eri_ijij;
+                if (i != j) _Q_matrix_ss.row(j)[i] = sqrt_eri_ijij;
+            }
         }
 
         // S-P gto block pair
@@ -213,7 +228,10 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
                 // TODO: think about the ordering of cartesian components
 
-                _Q_matrix_sp.row(i)[j * 3 + j_cart] = sqrt_eri_ijij;
+                if (sqrt_eri_ijij > _pair_threshold)
+                {
+                    _Q_matrix_sp.row(i)[j * 3 + j_cart] = sqrt_eri_ijij;
+                }
             }
         }
 
@@ -292,7 +310,10 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
                             ));
 
-                _Q_matrix_sd.row(i)[j * 6 + j_cart] = sqrt_eri_ijij;
+                if (sqrt_eri_ijij > _pair_threshold)
+                {
+                    _Q_matrix_sd.row(i)[j * 6 + j_cart] = sqrt_eri_ijij;
+                }
             }
         }
     }
@@ -389,9 +410,12 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
                     // TODO: think about the ordering of cartesian components
 
-                    _Q_matrix_pp.row(i * 3 + i_cart)[j * 3 + j_cart] = sqrt_eri_ijij;
+                    if (sqrt_eri_ijij > _pair_threshold)
+                    {
+                        _Q_matrix_pp.row(i * 3 + i_cart)[j * 3 + j_cart] = sqrt_eri_ijij;
 
-                    if (i * 3 + i_cart != j * 3 + j_cart) _Q_matrix_pp.row(j * 3 + j_cart)[i * 3 + i_cart] = sqrt_eri_ijij;
+                        if (i * 3 + i_cart != j * 3 + j_cart) _Q_matrix_pp.row(j * 3 + j_cart)[i * 3 + i_cart] = sqrt_eri_ijij;
+                    }
                 }
             }
         }
@@ -535,7 +559,10 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
                                 ));
 
-                    _Q_matrix_pd.row(i * 3 + i_cart)[j * 6 + j_cart] = sqrt_eri_ijij;
+                    if (sqrt_eri_ijij > _pair_threshold)
+                    {
+                        _Q_matrix_pd.row(i * 3 + i_cart)[j * 6 + j_cart] = sqrt_eri_ijij;
+                    }
                 }
             }
         }
@@ -1111,9 +1138,12 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 
                                 ));
 
-                    _Q_matrix_dd.row(i * 6 + i_cart)[j * 6 + j_cart] = sqrt_eri_ijij;
+                    if (sqrt_eri_ijij > _pair_threshold)
+                    {
+                        _Q_matrix_dd.row(i * 6 + i_cart)[j * 6 + j_cart] = sqrt_eri_ijij;
 
-                    if (i * 6 + i_cart != j * 6 + j_cart) _Q_matrix_dd.row(j * 6 + j_cart)[i * 6 + i_cart] = sqrt_eri_ijij;
+                        if (i * 6 + i_cart != j * 6 + j_cart) _Q_matrix_dd.row(j * 6 + j_cart)[i * 6 + i_cart] = sqrt_eri_ijij;
+                    }
                 }
             }
         }
@@ -1179,7 +1209,7 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count, c
         for (int64_t j = i; j < s_prim_count; j++)
         {
             const auto Q_ij = _Q_matrix_ss.row(i)[j];
-            sorted_ss_mat_Q.push_back(std::make_tuple(Q_ij, i, j));
+            if (Q_ij > _pair_threshold) sorted_ss_mat_Q.push_back(std::make_tuple(Q_ij, i, j));
         }
 
         // S-P gto block pair
@@ -1189,7 +1219,7 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count, c
             for (int64_t s = 0; s < 3; s++)
             {
                 const auto Q_ij = _Q_matrix_sp.row(i)[j * 3 + s];
-                sorted_sp_mat_Q.push_back(std::make_tuple(Q_ij, i, j * 3 + s));
+                if (Q_ij > _pair_threshold) sorted_sp_mat_Q.push_back(std::make_tuple(Q_ij, i, j * 3 + s));
             }
         }
 
@@ -1200,7 +1230,7 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count, c
             for (int64_t s = 0; s < 6; s++)
             {
                 const auto Q_ij = _Q_matrix_sd.row(i)[j * 6 + s];
-                sorted_sd_mat_Q.push_back(std::make_tuple(Q_ij, i, j * 6 + s));
+                if (Q_ij > _pair_threshold) sorted_sd_mat_Q.push_back(std::make_tuple(Q_ij, i, j * 6 + s));
             }
         }
     }
@@ -1218,7 +1248,7 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count, c
                 for (int64_t j_cart = j_cart_start; j_cart < 3; j_cart++)
                 {
                     const auto Q_ij = _Q_matrix_pp.row(i * 3 + i_cart)[j * 3 + j_cart];
-                    sorted_pp_mat_Q.push_back(std::make_tuple(Q_ij, i * 3 + i_cart, j * 3 + j_cart));
+                    if (Q_ij > _pair_threshold) sorted_pp_mat_Q.push_back(std::make_tuple(Q_ij, i * 3 + i_cart, j * 3 + j_cart));
                 }
             }
         }
@@ -1232,7 +1262,7 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count, c
                 for (int64_t j_cart = 0; j_cart < 6; j_cart++)
                 {
                     const auto Q_ij = _Q_matrix_pd.row(i * 3 + i_cart)[j * 6 + j_cart];
-                    sorted_pd_mat_Q.push_back(std::make_tuple(Q_ij, i * 3 + i_cart, j * 6 + j_cart));
+                    if (Q_ij > _pair_threshold) sorted_pd_mat_Q.push_back(std::make_tuple(Q_ij, i * 3 + i_cart, j * 6 + j_cart));
                 }
             }
         }
@@ -1251,7 +1281,7 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count, c
                 for (int64_t j_cart = j_cart_start; j_cart < 6; j_cart++)
                 {
                     const auto Q_ij = _Q_matrix_dd.row(i * 6 + i_cart)[j * 6 + j_cart];
-                    sorted_dd_mat_Q.push_back(std::make_tuple(Q_ij, i * 6 + i_cart, j * 6 + j_cart));
+                    if (Q_ij > _pair_threshold) sorted_dd_mat_Q.push_back(std::make_tuple(Q_ij, i * 6 + i_cart, j * 6 + j_cart));
                 }
             }
         }
@@ -1264,12 +1294,22 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count, c
     std::sort(sorted_pd_mat_Q.begin(), sorted_pd_mat_Q.end());
     std::sort(sorted_dd_mat_Q.begin(), sorted_dd_mat_Q.end());
 
-    const auto ss_prim_pair_count = s_prim_count * (s_prim_count + 1) / 2;
-    const auto sp_prim_pair_count = s_prim_count * p_prim_count * 3;
-    const auto sd_prim_pair_count = s_prim_count * d_prim_count * 6;
-    const auto pp_prim_pair_count = p_prim_count * 3 * (p_prim_count * 3 + 1) / 2;
-    const auto pd_prim_pair_count = p_prim_count * 3 * d_prim_count * 6;
-    const auto dd_prim_pair_count = d_prim_count * 6 * (d_prim_count * 6 + 1) / 2;
+    const auto ss_prim_pair_count = static_cast<int64_t>(sorted_ss_mat_Q.size());
+    const auto sp_prim_pair_count = static_cast<int64_t>(sorted_sp_mat_Q.size());
+    const auto sd_prim_pair_count = static_cast<int64_t>(sorted_sd_mat_Q.size());
+    const auto pp_prim_pair_count = static_cast<int64_t>(sorted_pp_mat_Q.size());
+    const auto pd_prim_pair_count = static_cast<int64_t>(sorted_pd_mat_Q.size());
+    const auto dd_prim_pair_count = static_cast<int64_t>(sorted_dd_mat_Q.size());
+
+    std::stringstream ss;
+    ss << "Pair screening\n";
+    ss << "  SS pair: " << static_cast<double>(ss_prim_pair_count) / (s_prim_count * (s_prim_count + 1) / 2)<< "\n";
+    ss << "  SP pair: " << static_cast<double>(sp_prim_pair_count) / (s_prim_count * p_prim_count * 3)<< "\n";
+    ss << "  SD pair: " << static_cast<double>(sd_prim_pair_count) / (s_prim_count * d_prim_count * 6)<< "\n";
+    ss << "  PP pair: " << static_cast<double>(pp_prim_pair_count) / (p_prim_count * 3 * (p_prim_count * 3 + 1) / 2)<< "\n";
+    ss << "  PD pair: " << static_cast<double>(pd_prim_pair_count) / (p_prim_count * 3 * d_prim_count * 6)<< "\n";
+    ss << "  DD pair: " << static_cast<double>(dd_prim_pair_count) / (d_prim_count * 6 * (d_prim_count * 6 + 1) / 2)<< "\n";
+    std::cout << ss.str() << "\n";
 
     // form local vectors
 
@@ -1445,7 +1485,8 @@ CScreeningData::sortQD(const int64_t s_prim_count,
                        const std::vector<uint32_t>& p_prim_aoinds,
                        const std::vector<uint32_t>& d_prim_aoinds,
                        const int64_t naos,
-                       const double* dens_ptr) -> void
+                       const double* dens_ptr,
+                       const double eri_threshold) -> void
 {
     std::vector<std::tuple<double, int64_t, int64_t, double, double>> sorted_ss_mat_Q_D;
     std::vector<std::tuple<double, int64_t, int64_t, double, double>> sorted_sp_mat_Q_D;
@@ -1467,13 +1508,18 @@ CScreeningData::sortQD(const int64_t s_prim_count,
     if (d_prim_count > 0)
     {
         auto max_Q_sd_ptr = std::max_element(_Q_matrix_sd.values(), _Q_matrix_sd.values() + _Q_matrix_sd.getNumberOfElements());
-        auto max_Q_pd_ptr = std::max_element(_Q_matrix_pd.values(), _Q_matrix_pd.values() + _Q_matrix_pd.getNumberOfElements());
         auto max_Q_dd_ptr = std::max_element(_Q_matrix_dd.values(), _Q_matrix_dd.values() + _Q_matrix_dd.getNumberOfElements());
-        max_Q = std::max({max_Q, *max_Q_sd_ptr, *max_Q_pd_ptr, *max_Q_dd_ptr});
+        max_Q = std::max({max_Q, *max_Q_sd_ptr, *max_Q_dd_ptr});
     }
 
-    // TODO use J threshold from arguments
-    const double thresh_QD = 1.0e-13 / max_Q;
+    if ((p_prim_count > 0) && (d_prim_count > 0))
+    {
+        auto max_Q_pd_ptr = std::max_element(_Q_matrix_pd.values(), _Q_matrix_pd.values() + _Q_matrix_pd.getNumberOfElements());
+        max_Q = std::max({max_Q, *max_Q_pd_ptr});
+    }
+
+    // Coulomb: Q_bra*Q_ket*D_ket > ERI_threshold
+    const double QD_threshold = eri_threshold / max_Q;
 
     // S-S gto block pair and S-P gto block pair
 
@@ -1491,7 +1537,10 @@ CScreeningData::sortQD(const int64_t s_prim_count,
             const auto Q_ij = _Q_matrix_ss.row(i)[j];
             const auto QD_abs_ij = Q_ij * std::fabs(D_ij);
 
-            if (QD_abs_ij > thresh_QD) sorted_ss_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i, j, Q_ij, D_ij));
+            if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold))
+            {
+                sorted_ss_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i, j, Q_ij, D_ij));
+            }
         }
 
         // S-P gto block pair
@@ -1506,7 +1555,10 @@ CScreeningData::sortQD(const int64_t s_prim_count,
                 const auto Q_ij = _Q_matrix_sp.row(i)[j * 3 + j_cart];
                 const auto QD_abs_ij = Q_ij * std::fabs(D_ij);
 
-                if (QD_abs_ij > thresh_QD) sorted_sp_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i, j * 3 + j_cart, Q_ij, D_ij));
+                if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold))
+                {
+                    sorted_sp_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i, j * 3 + j_cart, Q_ij, D_ij));
+                }
             }
         }
 
@@ -1522,7 +1574,10 @@ CScreeningData::sortQD(const int64_t s_prim_count,
                 const auto Q_ij = _Q_matrix_sd.row(i)[j * 6 + j_cart];
                 const auto QD_abs_ij = Q_ij * std::fabs(D_ij);
 
-                if (QD_abs_ij > thresh_QD) sorted_sd_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i, j * 6 + j_cart, Q_ij, D_ij));
+                if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold))
+                {
+                    sorted_sd_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i, j * 6 + j_cart, Q_ij, D_ij));
+                }
             }
         }
     }
@@ -1547,7 +1602,10 @@ CScreeningData::sortQD(const int64_t s_prim_count,
                     const auto Q_ij = _Q_matrix_pp.row(i * 3 + i_cart)[j * 3 + j_cart];
                     const auto QD_abs_ij = Q_ij * std::fabs(D_ij);
 
-                    if (QD_abs_ij > thresh_QD) sorted_pp_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i * 3 + i_cart, j * 3 + j_cart, Q_ij, D_ij));
+                    if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold))
+                    {
+                        sorted_pp_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i * 3 + i_cart, j * 3 + j_cart, Q_ij, D_ij));
+                    }
                 }
             }
         }
@@ -1568,7 +1626,10 @@ CScreeningData::sortQD(const int64_t s_prim_count,
                     const auto Q_ij = _Q_matrix_pd.row(i * 3 + i_cart)[j * 6 + j_cart];
                     const auto QD_abs_ij = Q_ij * std::fabs(D_ij);
 
-                    if (QD_abs_ij > thresh_QD) sorted_pd_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i * 3 + i_cart, j * 6 + j_cart, Q_ij, D_ij));
+                    if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold))
+                    {
+                        sorted_pd_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i * 3 + i_cart, j * 6 + j_cart, Q_ij, D_ij));
+                    }
                 }
             }
         }    
@@ -1594,7 +1655,10 @@ CScreeningData::sortQD(const int64_t s_prim_count,
                     const auto Q_ij = _Q_matrix_dd.row(i * 6 + i_cart)[j * 6 + j_cart];
                     const auto QD_abs_ij = Q_ij * std::fabs(D_ij);
 
-                    if (QD_abs_ij > thresh_QD) sorted_dd_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i * 6 + i_cart, j * 6 + j_cart, Q_ij, D_ij));
+                    if ((QD_abs_ij > QD_threshold) && (Q_ij > _pair_threshold) && (std::fabs(D_ij) > _density_threshold))
+                    {
+                        sorted_dd_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i * 6 + i_cart, j * 6 + j_cart, Q_ij, D_ij));
+                    }
                 }
             }
         }
@@ -1613,17 +1677,6 @@ CScreeningData::sortQD(const int64_t s_prim_count,
     const auto pp_prim_pair_count = static_cast<int64_t>(sorted_pp_mat_Q_D.size());
     const auto pd_prim_pair_count = static_cast<int64_t>(sorted_pd_mat_Q_D.size());
     const auto dd_prim_pair_count = static_cast<int64_t>(sorted_dd_mat_Q_D.size());
-
-    // const auto ss_prim_pair_total = s_prim_count * (s_prim_count + 1) / 2;
-    // const auto sp_prim_pair_total = s_prim_count * p_prim_count * 3;
-    // const auto pp_prim_pair_total = p_prim_count * 3 * (p_prim_count * 3 + 1) / 2;
-
-    // const auto prim_pair_count = ss_prim_pair_count + sp_prim_pair_count + pp_prim_pair_count;
-    // const auto prim_pair_total = ss_prim_pair_total + sp_prim_pair_total + pp_prim_pair_total;
-
-    // std::cout << "\nJ screening total ket prim. pairs: " << prim_pair_count << "\n";
-    // std::cout << "J screening valid ket prim. pairs: " << prim_pair_total << "\n";
-    // std::cout << "J screening ratio on the ket side: " << 1.0 - static_cast<double>(prim_pair_count) / prim_pair_total << "\n";
 
     _ss_max_D = 0.0;
     _sp_max_D = 0.0;
@@ -1871,27 +1924,38 @@ auto CScreeningData::get_mat_Q_full(const int64_t s_prim_count, const int64_t p_
 
     CDenseMatrix mat_Q_full(cart_naos, cart_naos);
 
+    mat_Q_full.zero();
+
     for (int64_t i = 0; i < s_prim_count; i++)
     {
         for (int64_t j = 0; j < s_prim_count; j++)
         {
-            mat_Q_full.row(i)[j] = _Q_matrix_ss.row(i)[j];
+            if (_Q_matrix_ss.row(i)[j] > _pair_threshold)
+            {
+                mat_Q_full.row(i)[j] = _Q_matrix_ss.row(i)[j];
+            }
         }
 
         for (int64_t j = 0; j < p_prim_count * 3; j++)
         {
             auto j_full = s_prim_count + j;
 
-            mat_Q_full.row(i)[j_full] = _Q_matrix_sp.row(i)[j];
-            mat_Q_full.row(j_full)[i] = _Q_matrix_sp.row(i)[j];
+            if (_Q_matrix_sp.row(i)[j] > _pair_threshold)
+            {
+                mat_Q_full.row(i)[j_full] = _Q_matrix_sp.row(i)[j];
+                mat_Q_full.row(j_full)[i] = _Q_matrix_sp.row(i)[j];
+            }
         }
 
         for (int64_t j = 0; j < d_prim_count * 6; j++)
         {
             auto j_full = s_prim_count + p_prim_count * 3 + j;
 
-            mat_Q_full.row(i)[j_full] = _Q_matrix_sd.row(i)[j];
-            mat_Q_full.row(j_full)[i] = _Q_matrix_sd.row(i)[j];
+            if (_Q_matrix_sd.row(i)[j] > _pair_threshold)
+            {
+                mat_Q_full.row(i)[j_full] = _Q_matrix_sd.row(i)[j];
+                mat_Q_full.row(j_full)[i] = _Q_matrix_sd.row(i)[j];
+            }
         }
     }
 
@@ -1903,15 +1967,21 @@ auto CScreeningData::get_mat_Q_full(const int64_t s_prim_count, const int64_t p_
         {
             auto j_full = s_prim_count + j;
 
-            mat_Q_full.row(i_full)[j_full] = _Q_matrix_pp.row(i)[j];
+            if (_Q_matrix_pp.row(i)[j] > _pair_threshold)
+            {
+                mat_Q_full.row(i_full)[j_full] = _Q_matrix_pp.row(i)[j];
+            }
         }
 
         for (int64_t j = 0; j < d_prim_count * 6; j++)
         {
             auto j_full = s_prim_count + p_prim_count * 3 + j;
 
-            mat_Q_full.row(i_full)[j_full] = _Q_matrix_pd.row(i)[j];
-            mat_Q_full.row(j_full)[i_full] = _Q_matrix_pd.row(i)[j];
+            if (_Q_matrix_pd.row(i)[j] > _pair_threshold)
+            {
+                mat_Q_full.row(i_full)[j_full] = _Q_matrix_pd.row(i)[j];
+                mat_Q_full.row(j_full)[i_full] = _Q_matrix_pd.row(i)[j];
+            }
         }
     }
 
@@ -1923,7 +1993,10 @@ auto CScreeningData::get_mat_Q_full(const int64_t s_prim_count, const int64_t p_
         {
             auto j_full = s_prim_count + p_prim_count * 3 + j;
 
-            mat_Q_full.row(i_full)[j_full] = _Q_matrix_dd.row(i)[j];
+            if (_Q_matrix_dd.row(i)[j] > _pair_threshold)
+            {
+                mat_Q_full.row(i_full)[j_full] = _Q_matrix_dd.row(i)[j];
+            }
         }
     }
 
@@ -1943,6 +2016,8 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count,
 
     CDenseMatrix mat_D_abs_full(cart_naos, cart_naos);
 
+    mat_D_abs_full.zero();
+
     for (int64_t i = 0; i < s_prim_count; i++)
     {
         const auto i_cgto = s_prim_aoinds[i];
@@ -1951,7 +2026,12 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count,
         {
             const auto j_cgto = s_prim_aoinds[j];
 
-            mat_D_abs_full.row(i)[j] = std::fabs(dens_ptr[i_cgto * naos + j_cgto]);
+            const auto D_ij = std::fabs(dens_ptr[i_cgto * naos + j_cgto]);
+
+            if (D_ij > _density_threshold)
+            {
+                mat_D_abs_full.row(i)[j] = D_ij;
+            }
         }
 
         for (int64_t j = 0; j < p_prim_count * 3; j++)
@@ -1962,8 +2042,11 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count,
 
             auto j_full = s_prim_count + j;
 
-            mat_D_abs_full.row(i)[j_full] = D_ij;
-            mat_D_abs_full.row(j_full)[i] = D_ij;
+            if (D_ij > _density_threshold)
+            {
+                mat_D_abs_full.row(i)[j_full] = D_ij;
+                mat_D_abs_full.row(j_full)[i] = D_ij;
+            }
         }
 
         for (int64_t j = 0; j < d_prim_count * 6; j++)
@@ -1974,8 +2057,11 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count,
 
             auto j_full = s_prim_count + p_prim_count * 3 + j;
 
-            mat_D_abs_full.row(i)[j_full] = D_ij;
-            mat_D_abs_full.row(j_full)[i] = D_ij;
+            if (D_ij > _density_threshold)
+            {
+                mat_D_abs_full.row(i)[j_full] = D_ij;
+                mat_D_abs_full.row(j_full)[i] = D_ij;
+            }
         }
     }
 
@@ -1989,9 +2075,14 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count,
         {
             const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
+            const auto D_ij = std::fabs(dens_ptr[i_cgto * naos + j_cgto]);
+
             auto j_full = s_prim_count + j;
 
-            mat_D_abs_full.row(i_full)[j_full] = std::fabs(dens_ptr[i_cgto * naos + j_cgto]);
+            if (D_ij > _density_threshold)
+            {
+                mat_D_abs_full.row(i_full)[j_full] = D_ij;
+            }
         }
 
         for (int64_t j = 0; j < d_prim_count * 6; j++)
@@ -2002,8 +2093,11 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count,
 
             auto j_full = s_prim_count + p_prim_count * 3 + j;
 
-            mat_D_abs_full.row(i_full)[j_full] = D_ij;
-            mat_D_abs_full.row(j_full)[i_full] = D_ij;
+            if (D_ij > _density_threshold)
+            {
+                mat_D_abs_full.row(i_full)[j_full] = D_ij;
+                mat_D_abs_full.row(j_full)[i_full] = D_ij;
+            }
         }
     }
 
@@ -2017,9 +2111,14 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count,
         {
             const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
 
+            const auto D_ij = std::fabs(dens_ptr[i_cgto * naos + j_cgto]);
+
             auto j_full = s_prim_count + p_prim_count * 3 + j;
 
-            mat_D_abs_full.row(i_full)[j_full] = std::fabs(dens_ptr[i_cgto * naos + j_cgto]);
+            if (D_ij > _density_threshold)
+            {
+                mat_D_abs_full.row(i_full)[j_full] = D_ij;
+            }
         }
     }
 
@@ -2055,7 +2154,7 @@ auto CScreeningData::form_mat_Q_and_density_inds_for_K(const int64_t s_prim_coun
             // auto i_idx = std::get<1>(q_ij);
             auto j_idx = std::get<2>(q_ij);
 
-            _mat_Q_for_K_ss[i * s_prim_count + j]        = q_val;
+            _mat_Q_for_K_ss[i * s_prim_count + j]        = (q_val > _pair_threshold ? q_val : 0.0);
             _density_inds_for_K_ss[i * s_prim_count + j] = static_cast<uint32_t>(j_idx);
         }
     }
@@ -2087,7 +2186,7 @@ auto CScreeningData::form_mat_Q_and_density_inds_for_K(const int64_t s_prim_coun
             // auto i_idx = std::get<1>(q_ij);
             auto j_idx = std::get<2>(q_ij);
 
-            _mat_Q_for_K_sp[i * p_prim_count * 3 + j]        = q_val;
+            _mat_Q_for_K_sp[i * p_prim_count * 3 + j]        = (q_val > _pair_threshold ? q_val : 0.0);
             _density_inds_for_K_sp[i * p_prim_count * 3 + j] = static_cast<uint32_t>(j_idx);
         }
     }
@@ -2117,7 +2216,7 @@ auto CScreeningData::form_mat_Q_and_density_inds_for_K(const int64_t s_prim_coun
             // auto i_idx = std::get<1>(q_ij);
             auto j_idx = std::get<2>(q_ij);
 
-            _mat_Q_for_K_ps[i * s_prim_count + j]        = q_val;
+            _mat_Q_for_K_ps[i * s_prim_count + j]        = (q_val > _pair_threshold ? q_val : 0.0);
             _density_inds_for_K_ps[i * s_prim_count + j] = static_cast<uint32_t>(j_idx);
         }
     }
@@ -2149,7 +2248,7 @@ auto CScreeningData::form_mat_Q_and_density_inds_for_K(const int64_t s_prim_coun
             // auto i_idx = std::get<1>(q_ij);
             auto j_idx = std::get<2>(q_ij);
 
-            _mat_Q_for_K_sd[i * d_prim_count * 6 + j]        = q_val;
+            _mat_Q_for_K_sd[i * d_prim_count * 6 + j]        = (q_val > _pair_threshold ? q_val : 0.0);
             _density_inds_for_K_sd[i * d_prim_count * 6 + j] = static_cast<uint32_t>(j_idx);
         }
     
@@ -2180,7 +2279,7 @@ auto CScreeningData::form_mat_Q_and_density_inds_for_K(const int64_t s_prim_coun
             // auto i_idx = std::get<1>(q_ij);
             auto j_idx = std::get<2>(q_ij);
 
-            _mat_Q_for_K_ds[i * s_prim_count + j]        = q_val;
+            _mat_Q_for_K_ds[i * s_prim_count + j]        = (q_val > _pair_threshold ? q_val : 0.0);
             _density_inds_for_K_ds[i * s_prim_count + j] = static_cast<uint32_t>(j_idx);
         }
     }
@@ -2212,7 +2311,7 @@ auto CScreeningData::form_mat_Q_and_density_inds_for_K(const int64_t s_prim_coun
             // auto i_idx = std::get<1>(q_ij);
             auto j_idx = std::get<2>(q_ij);
 
-            _mat_Q_for_K_pp[i * p_prim_count * 3 + j]        = q_val;
+            _mat_Q_for_K_pp[i * p_prim_count * 3 + j]        = (q_val > _pair_threshold ? q_val : 0.0);
             _density_inds_for_K_pp[i * p_prim_count * 3 + j] = static_cast<uint32_t>(j_idx);
         }
     }
@@ -2244,7 +2343,7 @@ auto CScreeningData::form_mat_Q_and_density_inds_for_K(const int64_t s_prim_coun
             // auto i_idx = std::get<1>(q_ij);
             auto j_idx = std::get<2>(q_ij);
 
-            _mat_Q_for_K_pd[i * d_prim_count * 6 + j]        = q_val;
+            _mat_Q_for_K_pd[i * d_prim_count * 6 + j]        = (q_val > _pair_threshold ? q_val : 0.0);
             _density_inds_for_K_pd[i * d_prim_count * 6 + j] = static_cast<uint32_t>(j_idx);
         }
     }
@@ -2274,7 +2373,7 @@ auto CScreeningData::form_mat_Q_and_density_inds_for_K(const int64_t s_prim_coun
             // auto i_idx = std::get<1>(q_ij);
             auto j_idx = std::get<2>(q_ij);
 
-            _mat_Q_for_K_dp[i * p_prim_count * 3 + j]        = q_val;
+            _mat_Q_for_K_dp[i * p_prim_count * 3 + j]        = (q_val > _pair_threshold ? q_val : 0.0);
             _density_inds_for_K_dp[i * p_prim_count * 3 + j] = static_cast<uint32_t>(j_idx);
         }
     }
@@ -2306,7 +2405,7 @@ auto CScreeningData::form_mat_Q_and_density_inds_for_K(const int64_t s_prim_coun
             // auto i_idx = std::get<1>(q_ij);
             auto j_idx = std::get<2>(q_ij);
 
-            _mat_Q_for_K_dd[i * d_prim_count * 6 + j]        = q_val;
+            _mat_Q_for_K_dd[i * d_prim_count * 6 + j]        = (q_val > _pair_threshold ? q_val : 0.0);
             _density_inds_for_K_dd[i * d_prim_count * 6 + j] = static_cast<uint32_t>(j_idx);
         }
     }
@@ -2409,6 +2508,16 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int6
     const auto pp_pair_count_for_K = static_cast<int64_t>(pair_inds_i_for_K_pp.size());
     const auto pd_pair_count_for_K = static_cast<int64_t>(pair_inds_i_for_K_pd.size());
     const auto dd_pair_count_for_K = static_cast<int64_t>(pair_inds_i_for_K_dd.size());
+
+    std::stringstream ss;
+    ss << "preLinK screening\n";
+    ss << "  SS pair: " << static_cast<double>(ss_pair_count_for_K) / (s_prim_count * (s_prim_count + 1) / 2)<< "\n";
+    ss << "  SP pair: " << static_cast<double>(sp_pair_count_for_K) / (s_prim_count * p_prim_count * 3)<< "\n";
+    ss << "  SD pair: " << static_cast<double>(sd_pair_count_for_K) / (s_prim_count * d_prim_count * 6)<< "\n";
+    ss << "  PP pair: " << static_cast<double>(pp_pair_count_for_K) / (p_prim_count * 3 * (p_prim_count * 3 + 1) / 2)<< "\n";
+    ss << "  PD pair: " << static_cast<double>(pd_pair_count_for_K) / (p_prim_count * 3 * d_prim_count * 6)<< "\n";
+    ss << "  DD pair: " << static_cast<double>(dd_pair_count_for_K) / (d_prim_count * 6 * (d_prim_count * 6 + 1) / 2)<< "\n";
+    std::cout << ss.str() << "\n";
 
     // form local vectors
 
