@@ -51,6 +51,21 @@ computeCoulombFockSSSS(double*         mat_J,
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
+    double a_i, a_j, x_P, y_P, z_P, S_ij_00;
+
+    if (ij < ss_prim_pair_count_local)
+    {
+        a_i     = ss_pair_data_local[ij + ss_prim_pair_count_local * 0];
+        a_j     = ss_pair_data_local[ij + ss_prim_pair_count_local * 1];
+        //x_ij    = ss_pair_data_local[ij + ss_prim_pair_count_local * 2];
+        //y_ij    = ss_pair_data_local[ij + ss_prim_pair_count_local * 3];
+        //z_ij    = ss_pair_data_local[ij + ss_prim_pair_count_local * 4];
+        x_P     = ss_pair_data_local[ij + ss_prim_pair_count_local * 5];
+        y_P     = ss_pair_data_local[ij + ss_prim_pair_count_local * 6];
+        z_P     = ss_pair_data_local[ij + ss_prim_pair_count_local * 7];
+        S_ij_00 = ss_pair_data_local[ij + ss_prim_pair_count_local * 8];
+    }
+
     double J_ij = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -64,18 +79,8 @@ computeCoulombFockSSSS(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < ss_prim_pair_count) && (ij < ss_prim_pair_count_local) && (fabs(ss_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > 1.0e-12))
+        if ((kl < ss_prim_pair_count) && (ij < ss_prim_pair_count_local) && (fabs(ss_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > eri_threshold))
         {
-            const auto a_i     = ss_pair_data_local[ij + ss_prim_pair_count_local * 0];
-            const auto a_j     = ss_pair_data_local[ij + ss_prim_pair_count_local * 1];
-            //const auto x_ij    = ss_pair_data_local[ij + ss_prim_pair_count_local * 2];
-            //const auto y_ij    = ss_pair_data_local[ij + ss_prim_pair_count_local * 3];
-            //const auto z_ij    = ss_pair_data_local[ij + ss_prim_pair_count_local * 4];
-            const auto x_P     = ss_pair_data_local[ij + ss_prim_pair_count_local * 5];
-            const auto y_P     = ss_pair_data_local[ij + ss_prim_pair_count_local * 6];
-            const auto z_P     = ss_pair_data_local[ij + ss_prim_pair_count_local * 7];
-            const auto S_ij_00 = ss_pair_data_local[ij + ss_prim_pair_count_local * 8];
-
             const auto a_k     = ss_pair_data[kl + ss_prim_pair_count * 0];
             const auto a_l     = ss_pair_data[kl + ss_prim_pair_count * 1];
             //const auto x_kl    = ss_pair_data[kl + ss_prim_pair_count * 2];
@@ -173,7 +178,7 @@ computeCoulombFockSSSP(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < sp_prim_pair_count) && (ij < ss_prim_pair_count_local) && (fabs(ss_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > 1.0e-12))
+        if ((kl < sp_prim_pair_count) && (ij < ss_prim_pair_count_local) && (fabs(ss_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > eri_threshold))
         {
             const auto i = ss_first_inds_local[ij];
             const auto j = ss_second_inds_local[ij];
@@ -324,7 +329,7 @@ computeCoulombFockSSSD(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < sd_prim_pair_count) && (ij < ss_prim_pair_count_local) && (fabs(ss_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > 1.0e-12))
+        if ((kl < sd_prim_pair_count) && (ij < ss_prim_pair_count_local) && (fabs(ss_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > eri_threshold))
         {
             const auto i = ss_first_inds_local[ij];
             const auto j = ss_second_inds_local[ij];
@@ -504,7 +509,7 @@ computeCoulombFockSSPP(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < ss_prim_pair_count_local) && (fabs(ss_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-12))
+        if ((kl < pp_prim_pair_count) && (ij < ss_prim_pair_count_local) && (fabs(ss_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > eri_threshold))
         {
             const auto i = ss_first_inds_local[ij];
             const auto j = ss_second_inds_local[ij];
@@ -697,7 +702,7 @@ computeCoulombFockSSPD(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < ss_prim_pair_count_local) && (fabs(ss_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < ss_prim_pair_count_local) && (fabs(ss_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = ss_first_inds_local[ij];
             const auto j = ss_second_inds_local[ij];
@@ -910,7 +915,7 @@ computeCoulombFockSSDD(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < ss_prim_pair_count_local) && (fabs(ss_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < ss_prim_pair_count_local) && (fabs(ss_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = ss_first_inds_local[ij];
             const auto j = ss_second_inds_local[ij];
@@ -1166,7 +1171,7 @@ computeCoulombFockSPSS(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < ss_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > 1.0e-12))
+        if ((kl < ss_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > eri_threshold))
         {
             const auto i = sp_first_inds_local[ij];
             const auto j = sp_second_inds_local[ij];
@@ -1310,7 +1315,7 @@ computeCoulombFockSPSP(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < sp_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > 1.0e-12))
+        if ((kl < sp_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > eri_threshold))
         {
             const auto i = sp_first_inds_local[ij];
             const auto j = sp_second_inds_local[ij];
@@ -1500,7 +1505,7 @@ computeCoulombFockSPSD(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < sd_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > 1.0e-12))
+        if ((kl < sd_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > eri_threshold))
         {
             const auto i = sp_first_inds_local[ij];
             const auto j = sp_second_inds_local[ij];
@@ -1712,7 +1717,7 @@ computeCoulombFockSPPP(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-12))
+        if ((kl < pp_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > eri_threshold))
         {
             const auto i = sp_first_inds_local[ij];
             const auto j = sp_second_inds_local[ij];
@@ -1938,7 +1943,7 @@ computeCoulombFockSPPD(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = sp_first_inds_local[ij];
             const auto j = sp_second_inds_local[ij];
@@ -2210,7 +2215,7 @@ computeCoulombFockPPSS(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < ss_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > 1.0e-12))
+        if ((kl < ss_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > eri_threshold))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -2394,7 +2399,7 @@ computeCoulombFockPPSP(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < sp_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > 1.0e-12))
+        if ((kl < sp_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > eri_threshold))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -2618,7 +2623,7 @@ computeCoulombFockSDSS(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < ss_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > 1.0e-12))
+        if ((kl < ss_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > eri_threshold))
         {
             const auto i = sd_first_inds_local[ij];
             const auto j = sd_second_inds_local[ij];
@@ -2810,7 +2815,7 @@ computeCoulombFockSDSP(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < sp_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > 1.0e-12))
+        if ((kl < sp_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > eri_threshold))
         {
             const auto i = sd_first_inds_local[ij];
             const auto j = sd_second_inds_local[ij];
@@ -3032,7 +3037,7 @@ computeCoulombFockPDSS(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < ss_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > 1.0e-12))
+        if ((kl < ss_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -3250,7 +3255,7 @@ computeCoulombFockPDSP(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < sp_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > 1.0e-12))
+        if ((kl < sp_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -3533,7 +3538,7 @@ computeCoulombFockDDSS(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < ss_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > 1.0e-12))
+        if ((kl < ss_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -3804,7 +3809,7 @@ computeCoulombFockDDPD0(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -4148,7 +4153,7 @@ computeCoulombFockDDPD1(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -4379,7 +4384,7 @@ computeCoulombFockDDPD2(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -4610,7 +4615,7 @@ computeCoulombFockDDPD3(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -4991,7 +4996,7 @@ computeCoulombFockDDPD4(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -5327,7 +5332,7 @@ computeCoulombFockDDPD5(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -5633,7 +5638,7 @@ computeCoulombFockDDPD6(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -5858,7 +5863,7 @@ computeCoulombFockDDPD7(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -6188,7 +6193,7 @@ computeCoulombFockDDPD8(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -6467,7 +6472,7 @@ computeCoulombFockDDPD9(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -6698,7 +6703,7 @@ computeCoulombFockDDPD10(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -7091,7 +7096,7 @@ computeCoulombFockDDPD11(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -7286,7 +7291,7 @@ computeCoulombFockDDPD12(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -7526,7 +7531,7 @@ computeCoulombFockDDPD13(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -7880,7 +7885,7 @@ computeCoulombFockDDPD14(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -8189,7 +8194,7 @@ computeCoulombFockDDPD15(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -8528,7 +8533,7 @@ computeCoulombFockDDPD16(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -8888,7 +8893,7 @@ computeCoulombFockDDPD17(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -9109,7 +9114,7 @@ computeCoulombFockDDPD18(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -9312,7 +9317,7 @@ computeCoulombFockDDDD0(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -9642,7 +9647,7 @@ computeCoulombFockDDDD1(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -9889,7 +9894,7 @@ computeCoulombFockDDDD2(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -10244,7 +10249,7 @@ computeCoulombFockDDDD3(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -10461,7 +10466,7 @@ computeCoulombFockDDDD4(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -10723,7 +10728,7 @@ computeCoulombFockDDDD5(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -11015,7 +11020,7 @@ computeCoulombFockDDDD6(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -11358,7 +11363,7 @@ computeCoulombFockDDDD7(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -11785,7 +11790,7 @@ computeCoulombFockDDDD8(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -12236,7 +12241,7 @@ computeCoulombFockDDDD9(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -12498,7 +12503,7 @@ computeCoulombFockDDDD10(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -12760,7 +12765,7 @@ computeCoulombFockDDDD11(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -13145,7 +13150,7 @@ computeCoulombFockDDDD12(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -13378,7 +13383,7 @@ computeCoulombFockDDDD13(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -13721,7 +13726,7 @@ computeCoulombFockDDDD14(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -14149,7 +14154,7 @@ computeCoulombFockDDDD15(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -14576,7 +14581,7 @@ computeCoulombFockDDDD16(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -15003,7 +15008,7 @@ computeCoulombFockDDDD17(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -15598,7 +15603,7 @@ computeCoulombFockDDDD18(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -15860,7 +15865,7 @@ computeCoulombFockDDDD19(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -16122,7 +16127,7 @@ computeCoulombFockDDDD20(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -16507,7 +16512,7 @@ computeCoulombFockDDDD21(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -16892,7 +16897,7 @@ computeCoulombFockDDDD22(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -17110,7 +17115,7 @@ computeCoulombFockDDDD23(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -17313,7 +17318,7 @@ computeCoulombFockDDDD24(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -17651,7 +17656,7 @@ computeCoulombFockDDDD25(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -18246,7 +18251,7 @@ computeCoulombFockDDDD26(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -18841,7 +18846,7 @@ computeCoulombFockDDDD27(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -19226,7 +19231,7 @@ computeCoulombFockDDDD28(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -19611,7 +19616,7 @@ computeCoulombFockDDDD29(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -19996,7 +20001,7 @@ computeCoulombFockDDDD30(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -20199,7 +20204,7 @@ computeCoulombFockDDDD31(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -20402,7 +20407,7 @@ computeCoulombFockDDDD32(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -20605,7 +20610,7 @@ computeCoulombFockDDDD33(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -21018,7 +21023,7 @@ computeCoulombFockDDDD34(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -21613,7 +21618,7 @@ computeCoulombFockDDDD35(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -21998,7 +22003,7 @@ computeCoulombFockDDDD36(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -22420,7 +22425,7 @@ computeCoulombFockDDDD37(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -22623,7 +22628,7 @@ computeCoulombFockDDDD38(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -22883,7 +22888,7 @@ computeCoulombFockDDDD39(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -23086,7 +23091,7 @@ computeCoulombFockDDDD40(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -23289,7 +23294,7 @@ computeCoulombFockDDDD41(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -23702,7 +23707,7 @@ computeCoulombFockDDDD42(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -23917,7 +23922,7 @@ computeCoulombFockDDPP0(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-12))
+        if ((kl < pp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -24259,7 +24264,7 @@ computeCoulombFockDDPP1(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-12))
+        if ((kl < pp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -24587,7 +24592,7 @@ computeCoulombFockDDPP2(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-12))
+        if ((kl < pp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -24880,7 +24885,7 @@ computeCoulombFockDDPP3(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-12))
+        if ((kl < pp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -25238,7 +25243,7 @@ computeCoulombFockDDPP4(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-12))
+        if ((kl < pp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -25510,7 +25515,7 @@ computeCoulombFockDDPP5(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-12))
+        if ((kl < pp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -25836,7 +25841,7 @@ computeCoulombFockDDSD0(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < sd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > 1.0e-12))
+        if ((kl < sd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -26177,7 +26182,7 @@ computeCoulombFockDDSD1(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < sd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > 1.0e-12))
+        if ((kl < sd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -26546,7 +26551,7 @@ computeCoulombFockDDSD2(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < sd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > 1.0e-12))
+        if ((kl < sd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -26820,7 +26825,7 @@ computeCoulombFockDDSD3(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < sd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > 1.0e-12))
+        if ((kl < sd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -27099,7 +27104,7 @@ computeCoulombFockDDSD4(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < sd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > 1.0e-12))
+        if ((kl < sd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -27379,7 +27384,7 @@ computeCoulombFockDDSD5(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < sd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > 1.0e-12))
+        if ((kl < sd_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -27749,7 +27754,7 @@ computeCoulombFockDDSP0(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < sp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > 1.0e-12))
+        if ((kl < sp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -28075,7 +28080,7 @@ computeCoulombFockDDSP1(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < sp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > 1.0e-12))
+        if ((kl < sp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -28338,7 +28343,7 @@ computeCoulombFockDDSP2(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < sp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > 1.0e-12))
+        if ((kl < sp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > eri_threshold))
         {
             const auto i = dd_first_inds_local[ij];
             const auto j = dd_second_inds_local[ij];
@@ -28610,7 +28615,7 @@ computeCoulombFockPDDD0(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -28955,7 +28960,7 @@ computeCoulombFockPDDD1(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -29160,7 +29165,7 @@ computeCoulombFockPDDD2(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -29419,7 +29424,7 @@ computeCoulombFockPDDD3(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -29765,7 +29770,7 @@ computeCoulombFockPDDD4(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -30033,7 +30038,7 @@ computeCoulombFockPDDD5(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -30304,7 +30309,7 @@ computeCoulombFockPDDD6(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -30584,7 +30589,7 @@ computeCoulombFockPDDD7(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -30851,7 +30856,7 @@ computeCoulombFockPDDD8(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -31168,7 +31173,7 @@ computeCoulombFockPDDD9(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -31448,7 +31453,7 @@ computeCoulombFockPDDD10(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -31680,7 +31685,7 @@ computeCoulombFockPDDD11(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -31960,7 +31965,7 @@ computeCoulombFockPDDD12(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -32285,7 +32290,7 @@ computeCoulombFockPDDD13(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -32544,7 +32549,7 @@ computeCoulombFockPDDD14(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -32866,7 +32871,7 @@ computeCoulombFockPDDD15(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -33146,7 +33151,7 @@ computeCoulombFockPDDD16(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -33456,7 +33461,7 @@ computeCoulombFockPDDD17(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -33682,7 +33687,7 @@ computeCoulombFockPDDD18(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -33958,7 +33963,7 @@ computeCoulombFockPDDD19(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -34305,7 +34310,7 @@ computeCoulombFockPDPD0(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -34587,7 +34592,7 @@ computeCoulombFockPDPD1(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -34911,7 +34916,7 @@ computeCoulombFockPDPD2(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -35128,7 +35133,7 @@ computeCoulombFockPDPD3(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -35428,7 +35433,7 @@ computeCoulombFockPDPD4(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -35748,7 +35753,7 @@ computeCoulombFockPDPD5(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -36052,7 +36057,7 @@ computeCoulombFockPDPD6(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -36376,7 +36381,7 @@ computeCoulombFockPDPP0(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-12))
+        if ((kl < pp_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -36792,7 +36797,7 @@ computeCoulombFockPDPP1(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-12))
+        if ((kl < pp_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -37131,7 +37136,7 @@ computeCoulombFockPDSD0(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < sd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > 1.0e-12))
+        if ((kl < sd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -37548,7 +37553,7 @@ computeCoulombFockPDSD1(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < sd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > 1.0e-12))
+        if ((kl < sd_prim_pair_count) && (ij < pd_prim_pair_count_local) && (fabs(pd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pd_first_inds_local[ij];
             const auto j = pd_second_inds_local[ij];
@@ -37882,7 +37887,7 @@ computeCoulombFockSDDD0(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = sd_first_inds_local[ij];
             const auto j = sd_second_inds_local[ij];
@@ -38333,7 +38338,7 @@ computeCoulombFockSDDD1(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = sd_first_inds_local[ij];
             const auto j = sd_second_inds_local[ij];
@@ -38608,7 +38613,7 @@ computeCoulombFockSDDD2(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = sd_first_inds_local[ij];
             const auto j = sd_second_inds_local[ij];
@@ -38941,7 +38946,7 @@ computeCoulombFockSDDD3(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = sd_first_inds_local[ij];
             const auto j = sd_second_inds_local[ij];
@@ -39240,7 +39245,7 @@ computeCoulombFockSDDD4(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = sd_first_inds_local[ij];
             const auto j = sd_second_inds_local[ij];
@@ -39519,7 +39524,7 @@ computeCoulombFockSDDD5(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = sd_first_inds_local[ij];
             const auto j = sd_second_inds_local[ij];
@@ -39797,7 +39802,7 @@ computeCoulombFockSDPD0(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = sd_first_inds_local[ij];
             const auto j = sd_second_inds_local[ij];
@@ -40111,7 +40116,7 @@ computeCoulombFockSDPD1(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = sd_first_inds_local[ij];
             const auto j = sd_second_inds_local[ij];
@@ -40420,7 +40425,7 @@ computeCoulombFockSDPD2(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = sd_first_inds_local[ij];
             const auto j = sd_second_inds_local[ij];
@@ -40706,7 +40711,7 @@ computeCoulombFockSDPP(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-12))
+        if ((kl < pp_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > eri_threshold))
         {
             const auto i = sd_first_inds_local[ij];
             const auto j = sd_second_inds_local[ij];
@@ -41005,7 +41010,7 @@ computeCoulombFockSDSD(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < sd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > 1.0e-12))
+        if ((kl < sd_prim_pair_count) && (ij < sd_prim_pair_count_local) && (fabs(sd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > eri_threshold))
         {
             const auto i = sd_first_inds_local[ij];
             const auto j = sd_second_inds_local[ij];
@@ -41299,7 +41304,7 @@ computeCoulombFockPPDD0(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -41740,7 +41745,7 @@ computeCoulombFockPPDD1(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -41969,7 +41974,7 @@ computeCoulombFockPPDD2(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -42262,7 +42267,7 @@ computeCoulombFockPPDD3(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -42524,7 +42529,7 @@ computeCoulombFockPPDD4(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -42730,7 +42735,7 @@ computeCoulombFockPPDD5(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -42987,7 +42992,7 @@ computeCoulombFockPPDD6(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -43243,7 +43248,7 @@ computeCoulombFockPPDD7(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -43511,7 +43516,7 @@ computeCoulombFockPPDD8(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -43708,7 +43713,7 @@ computeCoulombFockPPPD0(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -44022,7 +44027,7 @@ computeCoulombFockPPPD1(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -44328,7 +44333,7 @@ computeCoulombFockPPPD2(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > 1.0e-12))
+        if ((kl < pd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -44606,7 +44611,7 @@ computeCoulombFockPPPP(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-12))
+        if ((kl < pp_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > eri_threshold))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -44910,7 +44915,7 @@ computeCoulombFockPPSD(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < sd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > 1.0e-12))
+        if ((kl < sd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) > eri_threshold))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -45211,7 +45216,7 @@ computeCoulombFockSPDD0(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = sp_first_inds_local[ij];
             const auto j = sp_second_inds_local[ij];
@@ -45522,7 +45527,7 @@ computeCoulombFockSPDD1(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = sp_first_inds_local[ij];
             const auto j = sp_second_inds_local[ij];
@@ -45832,7 +45837,7 @@ computeCoulombFockSPDD2(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < dd_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > 1.0e-12))
+        if ((kl < dd_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) > eri_threshold))
         {
             const auto i = sp_first_inds_local[ij];
             const auto j = sp_second_inds_local[ij];
