@@ -1536,8 +1536,8 @@ class PolOrbitalResponse(CphfSolver):
                 # TODO: MPI should this be done before loop over freqs?
                 # FIXME for now only real part is in cphf_results
                 all_cphf_ov_real = self.cphf_results['cphf_ov']
-                dof = int(all_cphf_ov_real.shape[0] / n_freqs)
-                cphf_ov_real = all_cphf_ov_real.reshape(n_freqs, dof, nocc, nvir)[f]
+                n_lambdas = int(all_cphf_ov_real.shape[0] / n_freqs)
+                cphf_ov_real = all_cphf_ov_real.reshape(n_freqs, n_lambdas, nocc, nvir)[f]
 
                 # TODO: do we keep this factor like that?
                 sqrt2 = np.sqrt(2.0)
@@ -1874,6 +1874,7 @@ class PolOrbitalResponse(CphfSolver):
                         fmat_real = (fock_cphf_real.alpha_to_numpy(m * dof + n) +
                                 fock_cphf_real.alpha_to_numpy(m * dof + n).T +
                                 fock_ao_rhs_real.alpha_to_numpy(m * dof + n))
+
                         # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2),
                         #        (2,0), (2,1), (2,2) * dof
                         # gamma_{zx} =
