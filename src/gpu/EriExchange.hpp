@@ -43,7 +43,8 @@ __global__ void computeExchangeFockSSSS(double*         mat_K,
                                         const uint32_t* density_inds_for_K,
                                         const uint32_t  naos,
                                         const double*   boys_func_table,
-                                        const double*   boys_func_ft);
+                                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void computeExchangeFockSSSP(double*         mat_K,
                                         const uint32_t* pair_inds_i_for_K_ss,
@@ -63,7 +64,8 @@ __global__ void computeExchangeFockSSSP(double*         mat_K,
                                         const uint32_t* density_inds_for_K_sp,
                                         const uint32_t  naos,
                                         const double*   boys_func_table,
-                                        const double*   boys_func_ft);
+                                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void computeExchangeFockSPSS(double*         mat_K,
                                         const uint32_t* pair_inds_i_for_K_ss,
@@ -83,7 +85,8 @@ __global__ void computeExchangeFockSPSS(double*         mat_K,
                                         const uint32_t* density_inds_for_K_sp,
                                         const uint32_t  naos,
                                         const double*   boys_func_table,
-                                        const double*   boys_func_ft);
+                                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void computeExchangeFockSPSP(double*         mat_K,
                                         const uint32_t* pair_inds_i_for_K_ss,
@@ -101,7 +104,8 @@ __global__ void computeExchangeFockSPSP(double*         mat_K,
                                         const uint32_t* density_inds_for_K_sp,
                                         const uint32_t  naos,
                                         const double*   boys_func_table,
-                                        const double*   boys_func_ft);
+                                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void computeExchangeFockSSPS(double*         mat_K,
                                         const uint32_t* pair_inds_i_for_K_sp,
@@ -121,7 +125,8 @@ __global__ void computeExchangeFockSSPS(double*         mat_K,
                                         const uint32_t* density_inds_for_K_ps,
                                         const uint32_t  naos,
                                         const double*   boys_func_table,
-                                        const double*   boys_func_ft);
+                                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void computeExchangeFockSSPP(double*         mat_K,
                                         const uint32_t* pair_inds_i_for_K_sp,
@@ -141,7 +146,8 @@ __global__ void computeExchangeFockSSPP(double*         mat_K,
                                         const uint32_t* density_inds_for_K_pp,
                                         const uint32_t  naos,
                                         const double*   boys_func_table,
-                                        const double*   boys_func_ft);
+                                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void computeExchangeFockSPPS(double*         mat_K,
                                         const uint32_t* pair_inds_i_for_K_sp,
@@ -161,7 +167,8 @@ __global__ void computeExchangeFockSPPS(double*         mat_K,
                                         const uint32_t* density_inds_for_K_ps,
                                         const uint32_t  naos,
                                         const double*   boys_func_table,
-                                        const double*   boys_func_ft);
+                                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void computeExchangeFockSPPP(double*         mat_K,
                                         const uint32_t* pair_inds_i_for_K_sp,
@@ -181,7 +188,8 @@ __global__ void computeExchangeFockSPPP(double*         mat_K,
                                         const uint32_t* density_inds_for_K_pp,
                                         const uint32_t  naos,
                                         const double*   boys_func_table,
-                                        const double*   boys_func_ft);
+                                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPSPS(double*         mat_K,
@@ -200,7 +208,8 @@ computeExchangeFockPSPS(double*         mat_K,
                         const uint32_t* density_inds_for_K_ps,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPSPP(double*         mat_K,
@@ -221,7 +230,8 @@ computeExchangeFockPSPP(double*         mat_K,
                         const uint32_t* density_inds_for_K_pp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPPPS(double*         mat_K,
@@ -242,7 +252,8 @@ computeExchangeFockPPPS(double*         mat_K,
                         const uint32_t* density_inds_for_K_ps,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPPPP(double*         mat_K,
@@ -258,7 +269,8 @@ computeExchangeFockPPPP(double*         mat_K,
                         const uint32_t* density_inds_for_K_pp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSSSD(double*         mat_K,
@@ -279,7 +291,8 @@ computeExchangeFockSSSD(double*         mat_K,
                         const uint32_t* density_inds_for_K_sd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSDSS(double*         mat_K,
@@ -300,7 +313,8 @@ computeExchangeFockSDSS(double*         mat_K,
                         const uint32_t* density_inds_for_K_ss,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSPSD(double*         mat_K,
@@ -324,7 +338,8 @@ computeExchangeFockSPSD(double*         mat_K,
                         const uint32_t* density_inds_for_K_sd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSDSP(double*         mat_K,
@@ -348,7 +363,8 @@ computeExchangeFockSDSP(double*         mat_K,
                         const uint32_t* density_inds_for_K_sp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSDSD(double*         mat_K,
@@ -367,7 +383,8 @@ computeExchangeFockSDSD(double*         mat_K,
                         const uint32_t* density_inds_for_K_sd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSSPD(double*         mat_K,
@@ -391,7 +408,8 @@ computeExchangeFockSSPD(double*         mat_K,
                         const uint32_t* density_inds_for_K_pd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSDPS(double*         mat_K,
@@ -415,7 +433,8 @@ computeExchangeFockSDPS(double*         mat_K,
                         const uint32_t* density_inds_for_K_ps,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSPPD(double*         mat_K,
@@ -439,7 +458,8 @@ computeExchangeFockSPPD(double*         mat_K,
                         const uint32_t* density_inds_for_K_pd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSDPP(double*         mat_K,
@@ -463,7 +483,8 @@ computeExchangeFockSDPP(double*         mat_K,
                         const uint32_t* density_inds_for_K_pp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSDPD0(double*         mat_K,
@@ -487,7 +508,8 @@ computeExchangeFockSDPD0(double*         mat_K,
                         const uint32_t* density_inds_for_K_pd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSDPD1(double*         mat_K,
@@ -511,7 +533,8 @@ computeExchangeFockSDPD1(double*         mat_K,
                         const uint32_t* density_inds_for_K_pd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSSDS(double*         mat_K,
@@ -532,7 +555,8 @@ computeExchangeFockSSDS(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSSDP(double*         mat_K,
@@ -556,7 +580,8 @@ computeExchangeFockSSDP(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSPDS(double*         mat_K,
@@ -580,7 +605,8 @@ computeExchangeFockSPDS(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSPDP(double*         mat_K,
@@ -604,7 +630,8 @@ computeExchangeFockSPDP(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSSDD(double*         mat_K,
@@ -625,7 +652,8 @@ computeExchangeFockSSDD(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSDDS(double*         mat_K,
@@ -646,7 +674,8 @@ computeExchangeFockSDDS(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPSPD(double*         mat_K,
@@ -670,7 +699,8 @@ computeExchangeFockPSPD(double*         mat_K,
                         const uint32_t* density_inds_for_K_pd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDPS(double*         mat_K,
@@ -694,7 +724,8 @@ computeExchangeFockPDPS(double*         mat_K,
                         const uint32_t* density_inds_for_K_ps,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPSDS(double*         mat_K,
@@ -718,7 +749,8 @@ computeExchangeFockPSDS(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPSDP(double*         mat_K,
@@ -742,7 +774,8 @@ computeExchangeFockPSDP(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPPDS(double*         mat_K,
@@ -766,7 +799,8 @@ computeExchangeFockPPDS(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDSDS(double*         mat_K,
@@ -785,7 +819,8 @@ computeExchangeFockDSDS(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDP0(double*         mat_K,
@@ -804,7 +839,8 @@ computeExchangeFockDPDP0(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDP1(double*         mat_K,
@@ -823,7 +859,8 @@ computeExchangeFockDPDP1(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDP2(double*         mat_K,
@@ -842,7 +879,8 @@ computeExchangeFockDPDP2(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDP3(double*         mat_K,
@@ -861,7 +899,8 @@ computeExchangeFockDPDP3(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDP4(double*         mat_K,
@@ -880,7 +919,8 @@ computeExchangeFockDPDP4(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDP5(double*         mat_K,
@@ -899,7 +939,8 @@ computeExchangeFockDPDP5(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDPD0(double*         mat_K,
@@ -918,7 +959,8 @@ computeExchangeFockPDPD0(double*         mat_K,
                         const uint32_t* density_inds_for_K_pd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDPD1(double*         mat_K,
@@ -937,7 +979,8 @@ computeExchangeFockPDPD1(double*         mat_K,
                         const uint32_t* density_inds_for_K_pd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDPD2(double*         mat_K,
@@ -956,7 +999,8 @@ computeExchangeFockPDPD2(double*         mat_K,
                         const uint32_t* density_inds_for_K_pd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDPD3(double*         mat_K,
@@ -975,7 +1019,8 @@ computeExchangeFockPDPD3(double*         mat_K,
                         const uint32_t* density_inds_for_K_pd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDPD4(double*         mat_K,
@@ -994,7 +1039,8 @@ computeExchangeFockPDPD4(double*         mat_K,
                         const uint32_t* density_inds_for_K_pd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDPD5(double*         mat_K,
@@ -1013,7 +1059,8 @@ computeExchangeFockPDPD5(double*         mat_K,
                         const uint32_t* density_inds_for_K_pd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD0(double*         mat_K,
@@ -1034,7 +1081,8 @@ computeExchangeFockDPDD0(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD1(double*         mat_K,
@@ -1055,7 +1103,8 @@ computeExchangeFockDPDD1(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD2(double*         mat_K,
@@ -1076,7 +1125,8 @@ computeExchangeFockDPDD2(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD3(double*         mat_K,
@@ -1097,7 +1147,8 @@ computeExchangeFockDPDD3(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD4(double*         mat_K,
@@ -1118,7 +1169,8 @@ computeExchangeFockDPDD4(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD5(double*         mat_K,
@@ -1139,7 +1191,8 @@ computeExchangeFockDPDD5(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD6(double*         mat_K,
@@ -1160,7 +1213,8 @@ computeExchangeFockDPDD6(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD7(double*         mat_K,
@@ -1181,7 +1235,8 @@ computeExchangeFockDPDD7(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD8(double*         mat_K,
@@ -1202,7 +1257,8 @@ computeExchangeFockDPDD8(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD9(double*         mat_K,
@@ -1223,7 +1279,8 @@ computeExchangeFockDPDD9(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD10(double*         mat_K,
@@ -1244,7 +1301,8 @@ computeExchangeFockDPDD10(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD11(double*         mat_K,
@@ -1265,7 +1323,8 @@ computeExchangeFockDPDD11(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD12(double*         mat_K,
@@ -1286,7 +1345,8 @@ computeExchangeFockDPDD12(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD13(double*         mat_K,
@@ -1307,7 +1367,8 @@ computeExchangeFockDPDD13(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD14(double*         mat_K,
@@ -1328,7 +1389,8 @@ computeExchangeFockDPDD14(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD15(double*         mat_K,
@@ -1349,7 +1411,8 @@ computeExchangeFockDPDD15(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDD16(double*         mat_K,
@@ -1370,7 +1433,8 @@ computeExchangeFockDPDD16(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP0(double*         mat_K,
@@ -1391,7 +1455,8 @@ computeExchangeFockDDDP0(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP1(double*         mat_K,
@@ -1412,7 +1477,8 @@ computeExchangeFockDDDP1(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP2(double*         mat_K,
@@ -1433,7 +1499,8 @@ computeExchangeFockDDDP2(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP3(double*         mat_K,
@@ -1454,7 +1521,8 @@ computeExchangeFockDDDP3(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP4(double*         mat_K,
@@ -1475,7 +1543,8 @@ computeExchangeFockDDDP4(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP5(double*         mat_K,
@@ -1496,7 +1565,8 @@ computeExchangeFockDDDP5(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP6(double*         mat_K,
@@ -1517,7 +1587,8 @@ computeExchangeFockDDDP6(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP7(double*         mat_K,
@@ -1538,7 +1609,8 @@ computeExchangeFockDDDP7(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP8(double*         mat_K,
@@ -1559,7 +1631,8 @@ computeExchangeFockDDDP8(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP9(double*         mat_K,
@@ -1580,7 +1653,8 @@ computeExchangeFockDDDP9(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP10(double*         mat_K,
@@ -1601,7 +1675,8 @@ computeExchangeFockDDDP10(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP11(double*         mat_K,
@@ -1622,7 +1697,8 @@ computeExchangeFockDDDP11(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP12(double*         mat_K,
@@ -1643,7 +1719,8 @@ computeExchangeFockDDDP12(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP13(double*         mat_K,
@@ -1664,7 +1741,8 @@ computeExchangeFockDDDP13(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP14(double*         mat_K,
@@ -1685,7 +1763,8 @@ computeExchangeFockDDDP14(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP15(double*         mat_K,
@@ -1706,7 +1785,8 @@ computeExchangeFockDDDP15(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP16(double*         mat_K,
@@ -1727,7 +1807,8 @@ computeExchangeFockDDDP16(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP17(double*         mat_K,
@@ -1748,7 +1829,8 @@ computeExchangeFockDDDP17(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP18(double*         mat_K,
@@ -1769,7 +1851,8 @@ computeExchangeFockDDDP18(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDP19(double*         mat_K,
@@ -1790,7 +1873,8 @@ computeExchangeFockDDDP19(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD0(double*         mat_K,
@@ -1806,7 +1890,8 @@ computeExchangeFockDDDD0(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD1(double*         mat_K,
@@ -1822,7 +1907,8 @@ computeExchangeFockDDDD1(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD2(double*         mat_K,
@@ -1838,7 +1924,8 @@ computeExchangeFockDDDD2(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD3(double*         mat_K,
@@ -1854,7 +1941,8 @@ computeExchangeFockDDDD3(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD4(double*         mat_K,
@@ -1870,7 +1958,8 @@ computeExchangeFockDDDD4(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD5(double*         mat_K,
@@ -1886,7 +1975,8 @@ computeExchangeFockDDDD5(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD6(double*         mat_K,
@@ -1902,7 +1992,8 @@ computeExchangeFockDDDD6(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD7(double*         mat_K,
@@ -1918,7 +2009,8 @@ computeExchangeFockDDDD7(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD8(double*         mat_K,
@@ -1934,7 +2026,8 @@ computeExchangeFockDDDD8(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD9(double*         mat_K,
@@ -1950,7 +2043,8 @@ computeExchangeFockDDDD9(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD10(double*         mat_K,
@@ -1966,7 +2060,8 @@ computeExchangeFockDDDD10(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD11(double*         mat_K,
@@ -1982,7 +2077,8 @@ computeExchangeFockDDDD11(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD12(double*         mat_K,
@@ -1998,7 +2094,8 @@ computeExchangeFockDDDD12(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD13(double*         mat_K,
@@ -2014,7 +2111,8 @@ computeExchangeFockDDDD13(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD14(double*         mat_K,
@@ -2030,7 +2128,8 @@ computeExchangeFockDDDD14(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD15(double*         mat_K,
@@ -2046,7 +2145,8 @@ computeExchangeFockDDDD15(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD16(double*         mat_K,
@@ -2062,7 +2162,8 @@ computeExchangeFockDDDD16(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD17(double*         mat_K,
@@ -2078,7 +2179,8 @@ computeExchangeFockDDDD17(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD18(double*         mat_K,
@@ -2094,7 +2196,8 @@ computeExchangeFockDDDD18(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD19(double*         mat_K,
@@ -2110,7 +2213,8 @@ computeExchangeFockDDDD19(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD20(double*         mat_K,
@@ -2126,7 +2230,8 @@ computeExchangeFockDDDD20(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD21(double*         mat_K,
@@ -2142,7 +2247,8 @@ computeExchangeFockDDDD21(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD22(double*         mat_K,
@@ -2158,7 +2264,8 @@ computeExchangeFockDDDD22(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD23(double*         mat_K,
@@ -2174,7 +2281,8 @@ computeExchangeFockDDDD23(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD24(double*         mat_K,
@@ -2190,7 +2298,8 @@ computeExchangeFockDDDD24(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD25(double*         mat_K,
@@ -2206,7 +2315,8 @@ computeExchangeFockDDDD25(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD26(double*         mat_K,
@@ -2222,7 +2332,8 @@ computeExchangeFockDDDD26(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD27(double*         mat_K,
@@ -2238,7 +2349,8 @@ computeExchangeFockDDDD27(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD28(double*         mat_K,
@@ -2254,7 +2366,8 @@ computeExchangeFockDDDD28(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD29(double*         mat_K,
@@ -2270,7 +2383,8 @@ computeExchangeFockDDDD29(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD30(double*         mat_K,
@@ -2286,7 +2400,8 @@ computeExchangeFockDDDD30(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD31(double*         mat_K,
@@ -2302,7 +2417,8 @@ computeExchangeFockDDDD31(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD32(double*         mat_K,
@@ -2318,7 +2434,8 @@ computeExchangeFockDDDD32(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD33(double*         mat_K,
@@ -2334,7 +2451,8 @@ computeExchangeFockDDDD33(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD34(double*         mat_K,
@@ -2350,7 +2468,8 @@ computeExchangeFockDDDD34(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD35(double*         mat_K,
@@ -2366,7 +2485,8 @@ computeExchangeFockDDDD35(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD36(double*         mat_K,
@@ -2382,7 +2502,8 @@ computeExchangeFockDDDD36(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD37(double*         mat_K,
@@ -2398,7 +2519,8 @@ computeExchangeFockDDDD37(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD38(double*         mat_K,
@@ -2414,7 +2536,8 @@ computeExchangeFockDDDD38(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD39(double*         mat_K,
@@ -2430,7 +2553,8 @@ computeExchangeFockDDDD39(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD40(double*         mat_K,
@@ -2446,7 +2570,8 @@ computeExchangeFockDDDD40(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDD41(double*         mat_K,
@@ -2462,7 +2587,8 @@ computeExchangeFockDDDD41(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDSDD0(double*         mat_K,
@@ -2483,7 +2609,8 @@ computeExchangeFockDSDD0(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDSDD1(double*         mat_K,
@@ -2504,7 +2631,8 @@ computeExchangeFockDSDD1(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDSDD2(double*         mat_K,
@@ -2525,7 +2653,8 @@ computeExchangeFockDSDD2(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDSDD3(double*         mat_K,
@@ -2546,7 +2675,8 @@ computeExchangeFockDSDD3(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDSDD4(double*         mat_K,
@@ -2567,7 +2697,8 @@ computeExchangeFockDSDD4(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDSDD5(double*         mat_K,
@@ -2588,7 +2719,8 @@ computeExchangeFockDSDD5(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 __global__ void
 computeExchangeFockDDDS0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
@@ -2608,7 +2740,8 @@ computeExchangeFockDDDS0(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDS1(double*         mat_K,
@@ -2629,7 +2762,8 @@ computeExchangeFockDDDS1(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDS2(double*         mat_K,
@@ -2650,7 +2784,8 @@ computeExchangeFockDDDS2(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDS3(double*         mat_K,
@@ -2671,7 +2806,8 @@ computeExchangeFockDDDS3(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDS4(double*         mat_K,
@@ -2692,7 +2828,8 @@ computeExchangeFockDDDS4(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDDDS5(double*         mat_K,
@@ -2713,7 +2850,8 @@ computeExchangeFockDDDS5(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDSDP0(double*         mat_K,
@@ -2737,7 +2875,8 @@ computeExchangeFockDSDP0(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDSDP1(double*         mat_K,
@@ -2761,7 +2900,8 @@ computeExchangeFockDSDP1(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDSDP2(double*         mat_K,
@@ -2785,7 +2925,8 @@ computeExchangeFockDSDP2(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 __global__ void
 computeExchangeFockDPDS0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
@@ -2808,7 +2949,8 @@ computeExchangeFockDPDS0(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDS1(double*         mat_K,
@@ -2832,7 +2974,8 @@ computeExchangeFockDPDS1(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockDPDS2(double*         mat_K,
@@ -2856,7 +2999,8 @@ computeExchangeFockDPDS2(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD0(double*         mat_K,
@@ -2877,7 +3021,8 @@ computeExchangeFockPDDD0(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD1(double*         mat_K,
@@ -2898,7 +3043,8 @@ computeExchangeFockPDDD1(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD2(double*         mat_K,
@@ -2919,7 +3065,8 @@ computeExchangeFockPDDD2(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD3(double*         mat_K,
@@ -2940,7 +3087,8 @@ computeExchangeFockPDDD3(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD4(double*         mat_K,
@@ -2961,7 +3109,8 @@ computeExchangeFockPDDD4(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD5(double*         mat_K,
@@ -2982,7 +3131,8 @@ computeExchangeFockPDDD5(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD6(double*         mat_K,
@@ -3003,7 +3153,8 @@ computeExchangeFockPDDD6(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD7(double*         mat_K,
@@ -3024,7 +3175,8 @@ computeExchangeFockPDDD7(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD8(double*         mat_K,
@@ -3045,7 +3197,8 @@ computeExchangeFockPDDD8(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD9(double*         mat_K,
@@ -3066,7 +3219,8 @@ computeExchangeFockPDDD9(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD10(double*         mat_K,
@@ -3087,7 +3241,8 @@ computeExchangeFockPDDD10(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD11(double*         mat_K,
@@ -3108,7 +3263,8 @@ computeExchangeFockPDDD11(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD12(double*         mat_K,
@@ -3129,7 +3285,8 @@ computeExchangeFockPDDD12(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD13(double*         mat_K,
@@ -3150,7 +3307,8 @@ computeExchangeFockPDDD13(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD14(double*         mat_K,
@@ -3171,7 +3329,8 @@ computeExchangeFockPDDD14(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD15(double*         mat_K,
@@ -3192,7 +3351,8 @@ computeExchangeFockPDDD15(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD16(double*         mat_K,
@@ -3213,7 +3373,8 @@ computeExchangeFockPDDD16(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDD17(double*         mat_K,
@@ -3234,7 +3395,8 @@ computeExchangeFockPDDD17(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPPDD0(double*         mat_K,
@@ -3255,7 +3417,8 @@ computeExchangeFockPPDD0(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPPDD1(double*         mat_K,
@@ -3276,7 +3439,8 @@ computeExchangeFockPPDD1(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPPDD2(double*         mat_K,
@@ -3297,7 +3461,8 @@ computeExchangeFockPPDD2(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPPDD3(double*         mat_K,
@@ -3318,7 +3483,8 @@ computeExchangeFockPPDD3(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPPDD4(double*         mat_K,
@@ -3339,7 +3505,8 @@ computeExchangeFockPPDD4(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPPDD5(double*         mat_K,
@@ -3360,7 +3527,8 @@ computeExchangeFockPPDD5(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDP0(double*         mat_K,
@@ -3381,7 +3549,8 @@ computeExchangeFockPDDP0(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDP1(double*         mat_K,
@@ -3402,7 +3571,8 @@ computeExchangeFockPDDP1(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDP2(double*         mat_K,
@@ -3423,7 +3593,8 @@ computeExchangeFockPDDP2(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDP3(double*         mat_K,
@@ -3444,7 +3615,8 @@ computeExchangeFockPDDP3(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDP4(double*         mat_K,
@@ -3465,7 +3637,8 @@ computeExchangeFockPDDP4(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPPDP0(double*         mat_K,
@@ -3486,7 +3659,8 @@ computeExchangeFockPPDP0(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPPDP1(double*         mat_K,
@@ -3507,7 +3681,8 @@ computeExchangeFockPPDP1(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPPDP2(double*         mat_K,
@@ -3528,7 +3703,8 @@ computeExchangeFockPPDP2(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPSDD0(double*         mat_K,
@@ -3552,7 +3728,8 @@ computeExchangeFockPSDD0(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPSDD1(double*         mat_K,
@@ -3576,7 +3753,8 @@ computeExchangeFockPSDD1(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPSDD2(double*         mat_K,
@@ -3600,7 +3778,8 @@ computeExchangeFockPSDD2(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 __global__ void
 computeExchangeFockPDDS0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
@@ -3623,7 +3802,8 @@ computeExchangeFockPDDS0(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDS1(double*         mat_K,
@@ -3647,7 +3827,8 @@ computeExchangeFockPDDS1(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDDS2(double*         mat_K,
@@ -3671,7 +3852,8 @@ computeExchangeFockPDDS2(double*         mat_K,
                         const uint32_t* density_inds_for_K_ds,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSDDD0(double*         mat_K,
@@ -3692,7 +3874,8 @@ computeExchangeFockSDDD0(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSDDD1(double*         mat_K,
@@ -3713,7 +3896,8 @@ computeExchangeFockSDDD1(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSDDD2(double*         mat_K,
@@ -3734,7 +3918,8 @@ computeExchangeFockSDDD2(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSDDD3(double*         mat_K,
@@ -3755,7 +3940,8 @@ computeExchangeFockSDDD3(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSDDD4(double*         mat_K,
@@ -3776,7 +3962,8 @@ computeExchangeFockSDDD4(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSDDD5(double*         mat_K,
@@ -3797,7 +3984,8 @@ computeExchangeFockSDDD5(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSPDD0(double*         mat_K,
@@ -3821,7 +4009,8 @@ computeExchangeFockSPDD0(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSPDD1(double*         mat_K,
@@ -3845,7 +4034,8 @@ computeExchangeFockSPDD1(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSPDD2(double*         mat_K,
@@ -3869,7 +4059,8 @@ computeExchangeFockSPDD2(double*         mat_K,
                         const uint32_t* density_inds_for_K_dd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 __global__ void
 computeExchangeFockSDDP0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
@@ -3892,7 +4083,8 @@ computeExchangeFockSDDP0(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSDDP1(double*         mat_K,
@@ -3916,7 +4108,8 @@ computeExchangeFockSDDP1(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockSDDP2(double*         mat_K,
@@ -3940,7 +4133,8 @@ computeExchangeFockSDDP2(double*         mat_K,
                         const uint32_t* density_inds_for_K_dp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPPPD0(double*         mat_K,
@@ -3961,7 +4155,8 @@ computeExchangeFockPPPD0(double*         mat_K,
                         const uint32_t* density_inds_for_K_pd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPPPD1(double*         mat_K,
@@ -3982,7 +4177,8 @@ computeExchangeFockPPPD1(double*         mat_K,
                         const uint32_t* density_inds_for_K_pd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPPPD2(double*         mat_K,
@@ -4003,7 +4199,8 @@ computeExchangeFockPPPD2(double*         mat_K,
                         const uint32_t* density_inds_for_K_pd,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 __global__ void
 computeExchangeFockPDPP0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
@@ -4023,7 +4220,8 @@ computeExchangeFockPDPP0(double*         mat_K,
                         const uint32_t* density_inds_for_K_pp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDPP1(double*         mat_K,
@@ -4044,7 +4242,8 @@ computeExchangeFockPDPP1(double*         mat_K,
                         const uint32_t* density_inds_for_K_pp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 __global__ void
 computeExchangeFockPDPP2(double*         mat_K,
@@ -4065,7 +4264,8 @@ computeExchangeFockPDPP2(double*         mat_K,
                         const uint32_t* density_inds_for_K_pp,
                         const uint32_t  naos,
                         const double*   boys_func_table,
-                        const double*   boys_func_ft);
+                        const double*   boys_func_ft,
+                        const double    eri_threshold);
 
 }  // namespace gpu
 

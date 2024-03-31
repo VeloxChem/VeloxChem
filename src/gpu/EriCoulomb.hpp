@@ -44,7 +44,8 @@ computeCoulombFockSSSS(double*         mat_J,
                        const uint32_t* ss_second_inds,
                        const uint32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSSSP(double*         mat_J,
@@ -62,7 +63,8 @@ computeCoulombFockSSSP(double*         mat_J,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSSSD(double*         mat_J,
@@ -80,7 +82,8 @@ computeCoulombFockSSSD(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSSPP(double*         mat_J,
@@ -98,7 +101,8 @@ computeCoulombFockSSPP(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSSPD(double*         mat_J,
@@ -118,7 +122,8 @@ computeCoulombFockSSPD(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSSDD(double*         mat_J,
@@ -136,7 +141,8 @@ computeCoulombFockSSDD(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSPSS(double*         mat_J,
@@ -154,7 +160,8 @@ computeCoulombFockSPSS(double*         mat_J,
                        const uint32_t* ss_second_inds,
                        const uint32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSPSP(double*         mat_J,
@@ -172,7 +179,8 @@ computeCoulombFockSPSP(double*         mat_J,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSPSD(double*         mat_J,
@@ -192,7 +200,8 @@ computeCoulombFockSPSD(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSPPP(double*         mat_J,
@@ -210,7 +219,8 @@ computeCoulombFockSPPP(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSPPD(double*         mat_J,
@@ -230,7 +240,8 @@ computeCoulombFockSPPD(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPPSS(double*         mat_J,
@@ -248,7 +259,8 @@ computeCoulombFockPPSS(double*         mat_J,
                        const uint32_t* ss_second_inds,
                        const uint32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPPSP(double*         mat_J,
@@ -266,7 +278,8 @@ computeCoulombFockPPSP(double*         mat_J,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSDSS(double*         mat_J,
@@ -284,7 +297,8 @@ computeCoulombFockSDSS(double*         mat_J,
                        const uint32_t* ss_second_inds,
                        const uint32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSDSP(double*         mat_J,
@@ -304,7 +318,8 @@ computeCoulombFockSDSP(double*         mat_J,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDSS(double*         mat_J,
@@ -324,7 +339,8 @@ computeCoulombFockPDSS(double*         mat_J,
                        const uint32_t* ss_second_inds,
                        const uint32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDSP(double*         mat_J,
@@ -344,7 +360,8 @@ computeCoulombFockPDSP(double*         mat_J,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDSS(double*         mat_J,
@@ -362,7 +379,8 @@ computeCoulombFockDDSS(double*         mat_J,
                        const uint32_t* ss_second_inds,
                        const uint32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD0(double*         mat_J,
@@ -380,7 +398,8 @@ computeCoulombFockDDPD0(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD1(double*         mat_J,
@@ -398,7 +417,8 @@ computeCoulombFockDDPD1(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD2(double*         mat_J,
@@ -416,7 +436,8 @@ computeCoulombFockDDPD2(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD3(double*         mat_J,
@@ -434,7 +455,8 @@ computeCoulombFockDDPD3(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD4(double*         mat_J,
@@ -452,7 +474,8 @@ computeCoulombFockDDPD4(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD5(double*         mat_J,
@@ -470,7 +493,8 @@ computeCoulombFockDDPD5(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD6(double*         mat_J,
@@ -488,7 +512,8 @@ computeCoulombFockDDPD6(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD7(double*         mat_J,
@@ -506,7 +531,8 @@ computeCoulombFockDDPD7(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD8(double*         mat_J,
@@ -524,7 +550,8 @@ computeCoulombFockDDPD8(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD9(double*         mat_J,
@@ -542,7 +569,8 @@ computeCoulombFockDDPD9(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD10(double*         mat_J,
@@ -560,7 +588,8 @@ computeCoulombFockDDPD10(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD11(double*         mat_J,
@@ -578,7 +607,8 @@ computeCoulombFockDDPD11(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD12(double*         mat_J,
@@ -596,7 +626,8 @@ computeCoulombFockDDPD12(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD13(double*         mat_J,
@@ -614,7 +645,8 @@ computeCoulombFockDDPD13(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD14(double*         mat_J,
@@ -632,7 +664,8 @@ computeCoulombFockDDPD14(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD15(double*         mat_J,
@@ -650,7 +683,8 @@ computeCoulombFockDDPD15(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD16(double*         mat_J,
@@ -668,7 +702,8 @@ computeCoulombFockDDPD16(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD17(double*         mat_J,
@@ -686,7 +721,8 @@ computeCoulombFockDDPD17(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPD18(double*         mat_J,
@@ -704,7 +740,8 @@ computeCoulombFockDDPD18(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD0(double*         mat_J,
@@ -720,7 +757,8 @@ computeCoulombFockDDDD0(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD1(double*         mat_J,
@@ -736,7 +774,8 @@ computeCoulombFockDDDD1(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD2(double*         mat_J,
@@ -752,7 +791,8 @@ computeCoulombFockDDDD2(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD3(double*         mat_J,
@@ -768,7 +808,8 @@ computeCoulombFockDDDD3(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD4(double*         mat_J,
@@ -784,7 +825,8 @@ computeCoulombFockDDDD4(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD5(double*         mat_J,
@@ -800,7 +842,8 @@ computeCoulombFockDDDD5(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD6(double*         mat_J,
@@ -816,7 +859,8 @@ computeCoulombFockDDDD6(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD7(double*         mat_J,
@@ -832,7 +876,8 @@ computeCoulombFockDDDD7(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD8(double*         mat_J,
@@ -848,7 +893,8 @@ computeCoulombFockDDDD8(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD9(double*         mat_J,
@@ -864,7 +910,8 @@ computeCoulombFockDDDD9(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD10(double*         mat_J,
@@ -880,7 +927,8 @@ computeCoulombFockDDDD10(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD11(double*         mat_J,
@@ -896,7 +944,8 @@ computeCoulombFockDDDD11(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD12(double*         mat_J,
@@ -912,7 +961,8 @@ computeCoulombFockDDDD12(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD13(double*         mat_J,
@@ -928,7 +978,8 @@ computeCoulombFockDDDD13(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD14(double*         mat_J,
@@ -944,7 +995,8 @@ computeCoulombFockDDDD14(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD15(double*         mat_J,
@@ -960,7 +1012,8 @@ computeCoulombFockDDDD15(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD16(double*         mat_J,
@@ -976,7 +1029,8 @@ computeCoulombFockDDDD16(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD17(double*         mat_J,
@@ -992,7 +1046,8 @@ computeCoulombFockDDDD17(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD18(double*         mat_J,
@@ -1008,7 +1063,8 @@ computeCoulombFockDDDD18(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD19(double*         mat_J,
@@ -1024,7 +1080,8 @@ computeCoulombFockDDDD19(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD20(double*         mat_J,
@@ -1040,7 +1097,8 @@ computeCoulombFockDDDD20(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD21(double*         mat_J,
@@ -1056,7 +1114,8 @@ computeCoulombFockDDDD21(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD22(double*         mat_J,
@@ -1072,7 +1131,8 @@ computeCoulombFockDDDD22(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD23(double*         mat_J,
@@ -1088,7 +1148,8 @@ computeCoulombFockDDDD23(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD24(double*         mat_J,
@@ -1104,7 +1165,8 @@ computeCoulombFockDDDD24(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD25(double*         mat_J,
@@ -1120,7 +1182,8 @@ computeCoulombFockDDDD25(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD26(double*         mat_J,
@@ -1136,7 +1199,8 @@ computeCoulombFockDDDD26(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD27(double*         mat_J,
@@ -1152,7 +1216,8 @@ computeCoulombFockDDDD27(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD28(double*         mat_J,
@@ -1168,7 +1233,8 @@ computeCoulombFockDDDD28(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD29(double*         mat_J,
@@ -1184,7 +1250,8 @@ computeCoulombFockDDDD29(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD30(double*         mat_J,
@@ -1200,7 +1267,8 @@ computeCoulombFockDDDD30(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD31(double*         mat_J,
@@ -1216,7 +1284,8 @@ computeCoulombFockDDDD31(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD32(double*         mat_J,
@@ -1232,7 +1301,8 @@ computeCoulombFockDDDD32(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD33(double*         mat_J,
@@ -1248,7 +1318,8 @@ computeCoulombFockDDDD33(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD34(double*         mat_J,
@@ -1264,7 +1335,8 @@ computeCoulombFockDDDD34(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD35(double*         mat_J,
@@ -1280,7 +1352,8 @@ computeCoulombFockDDDD35(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD36(double*         mat_J,
@@ -1296,7 +1369,8 @@ computeCoulombFockDDDD36(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD37(double*         mat_J,
@@ -1312,7 +1386,8 @@ computeCoulombFockDDDD37(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD38(double*         mat_J,
@@ -1328,7 +1403,8 @@ computeCoulombFockDDDD38(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD39(double*         mat_J,
@@ -1344,7 +1420,8 @@ computeCoulombFockDDDD39(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD40(double*         mat_J,
@@ -1360,7 +1437,8 @@ computeCoulombFockDDDD40(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD41(double*         mat_J,
@@ -1376,7 +1454,8 @@ computeCoulombFockDDDD41(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDDD42(double*         mat_J,
@@ -1392,7 +1471,8 @@ computeCoulombFockDDDD42(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPP0(double*         mat_J,
@@ -1410,7 +1490,8 @@ computeCoulombFockDDPP0(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPP1(double*         mat_J,
@@ -1428,7 +1509,8 @@ computeCoulombFockDDPP1(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPP2(double*         mat_J,
@@ -1446,7 +1528,8 @@ computeCoulombFockDDPP2(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPP3(double*         mat_J,
@@ -1464,7 +1547,8 @@ computeCoulombFockDDPP3(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPP4(double*         mat_J,
@@ -1482,7 +1566,8 @@ computeCoulombFockDDPP4(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDPP5(double*         mat_J,
@@ -1500,7 +1585,8 @@ computeCoulombFockDDPP5(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDSD0(double*         mat_J,
@@ -1518,7 +1604,8 @@ computeCoulombFockDDSD0(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDSD1(double*         mat_J,
@@ -1536,7 +1623,8 @@ computeCoulombFockDDSD1(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDSD2(double*         mat_J,
@@ -1554,7 +1642,8 @@ computeCoulombFockDDSD2(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDSD3(double*         mat_J,
@@ -1572,7 +1661,8 @@ computeCoulombFockDDSD3(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDSD4(double*         mat_J,
@@ -1590,7 +1680,8 @@ computeCoulombFockDDSD4(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDSD5(double*         mat_J,
@@ -1608,7 +1699,8 @@ computeCoulombFockDDSD5(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDSP0(double*         mat_J,
@@ -1628,7 +1720,8 @@ computeCoulombFockDDSP0(double*         mat_J,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDSP1(double*         mat_J,
@@ -1648,7 +1741,8 @@ computeCoulombFockDDSP1(double*         mat_J,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockDDSP2(double*         mat_J,
@@ -1668,7 +1762,8 @@ computeCoulombFockDDSP2(double*         mat_J,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD0(double*         mat_J,
@@ -1686,7 +1781,8 @@ computeCoulombFockPDDD0(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD1(double*         mat_J,
@@ -1704,7 +1800,8 @@ computeCoulombFockPDDD1(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD2(double*         mat_J,
@@ -1722,7 +1819,8 @@ computeCoulombFockPDDD2(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD3(double*         mat_J,
@@ -1740,7 +1838,8 @@ computeCoulombFockPDDD3(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD4(double*         mat_J,
@@ -1758,7 +1857,8 @@ computeCoulombFockPDDD4(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD5(double*         mat_J,
@@ -1776,7 +1876,8 @@ computeCoulombFockPDDD5(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD6(double*         mat_J,
@@ -1794,7 +1895,8 @@ computeCoulombFockPDDD6(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD7(double*         mat_J,
@@ -1812,7 +1914,8 @@ computeCoulombFockPDDD7(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD8(double*         mat_J,
@@ -1830,7 +1933,8 @@ computeCoulombFockPDDD8(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD9(double*         mat_J,
@@ -1848,7 +1952,8 @@ computeCoulombFockPDDD9(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD10(double*         mat_J,
@@ -1866,7 +1971,8 @@ computeCoulombFockPDDD10(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD11(double*         mat_J,
@@ -1884,7 +1990,8 @@ computeCoulombFockPDDD11(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD12(double*         mat_J,
@@ -1902,7 +2009,8 @@ computeCoulombFockPDDD12(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD13(double*         mat_J,
@@ -1920,7 +2028,8 @@ computeCoulombFockPDDD13(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD14(double*         mat_J,
@@ -1938,7 +2047,8 @@ computeCoulombFockPDDD14(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD15(double*         mat_J,
@@ -1956,7 +2066,8 @@ computeCoulombFockPDDD15(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD16(double*         mat_J,
@@ -1974,7 +2085,8 @@ computeCoulombFockPDDD16(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD17(double*         mat_J,
@@ -1992,7 +2104,8 @@ computeCoulombFockPDDD17(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD18(double*         mat_J,
@@ -2010,7 +2123,8 @@ computeCoulombFockPDDD18(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDDD19(double*         mat_J,
@@ -2028,7 +2142,8 @@ computeCoulombFockPDDD19(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDPD0(double*         mat_J,
@@ -2046,7 +2161,8 @@ computeCoulombFockPDPD0(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDPD1(double*         mat_J,
@@ -2064,7 +2180,8 @@ computeCoulombFockPDPD1(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDPD2(double*         mat_J,
@@ -2082,7 +2199,8 @@ computeCoulombFockPDPD2(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDPD3(double*         mat_J,
@@ -2100,7 +2218,8 @@ computeCoulombFockPDPD3(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDPD4(double*         mat_J,
@@ -2118,7 +2237,8 @@ computeCoulombFockPDPD4(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDPD5(double*         mat_J,
@@ -2136,7 +2256,8 @@ computeCoulombFockPDPD5(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDPD6(double*         mat_J,
@@ -2154,7 +2275,8 @@ computeCoulombFockPDPD6(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDPP0(double*         mat_J,
@@ -2172,7 +2294,8 @@ computeCoulombFockPDPP0(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDPP1(double*         mat_J,
@@ -2190,7 +2313,8 @@ computeCoulombFockPDPP1(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDSD0(double*         mat_J,
@@ -2210,7 +2334,8 @@ computeCoulombFockPDSD0(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPDSD1(double*         mat_J,
@@ -2230,7 +2355,8 @@ computeCoulombFockPDSD1(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSDDD0(double*         mat_J,
@@ -2248,7 +2374,8 @@ computeCoulombFockSDDD0(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSDDD1(double*         mat_J,
@@ -2266,7 +2393,8 @@ computeCoulombFockSDDD1(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSDDD2(double*         mat_J,
@@ -2284,7 +2412,8 @@ computeCoulombFockSDDD2(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSDDD3(double*         mat_J,
@@ -2302,7 +2431,8 @@ computeCoulombFockSDDD3(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSDDD4(double*         mat_J,
@@ -2320,7 +2450,8 @@ computeCoulombFockSDDD4(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSDDD5(double*         mat_J,
@@ -2338,7 +2469,8 @@ computeCoulombFockSDDD5(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSDPD0(double*         mat_J,
@@ -2358,7 +2490,8 @@ computeCoulombFockSDPD0(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSDPD1(double*         mat_J,
@@ -2378,7 +2511,8 @@ computeCoulombFockSDPD1(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSDPD2(double*         mat_J,
@@ -2398,7 +2532,8 @@ computeCoulombFockSDPD2(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSDPP(double*         mat_J,
@@ -2418,7 +2553,8 @@ computeCoulombFockSDPP(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSDSD(double*         mat_J,
@@ -2436,7 +2572,8 @@ computeCoulombFockSDSD(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPPDD0(double*         mat_J,
@@ -2454,7 +2591,8 @@ computeCoulombFockPPDD0(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPPDD1(double*         mat_J,
@@ -2472,7 +2610,8 @@ computeCoulombFockPPDD1(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPPDD2(double*         mat_J,
@@ -2490,7 +2629,8 @@ computeCoulombFockPPDD2(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPPDD3(double*         mat_J,
@@ -2508,7 +2648,8 @@ computeCoulombFockPPDD3(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPPDD4(double*         mat_J,
@@ -2526,7 +2667,8 @@ computeCoulombFockPPDD4(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPPDD5(double*         mat_J,
@@ -2544,7 +2686,8 @@ computeCoulombFockPPDD5(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPPDD6(double*         mat_J,
@@ -2562,7 +2705,8 @@ computeCoulombFockPPDD6(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPPDD7(double*         mat_J,
@@ -2580,7 +2724,8 @@ computeCoulombFockPPDD7(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPPDD8(double*         mat_J,
@@ -2598,7 +2743,8 @@ computeCoulombFockPPDD8(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPPPD0(double*         mat_J,
@@ -2616,7 +2762,8 @@ computeCoulombFockPPPD0(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPPPD1(double*         mat_J,
@@ -2634,7 +2781,8 @@ computeCoulombFockPPPD1(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPPPD2(double*         mat_J,
@@ -2652,7 +2800,8 @@ computeCoulombFockPPPD2(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPPPP(double*         mat_J,
@@ -2668,7 +2817,8 @@ computeCoulombFockPPPP(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockPPSD(double*         mat_J,
@@ -2688,7 +2838,8 @@ computeCoulombFockPPSD(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSPDD0(double*         mat_J,
@@ -2708,7 +2859,8 @@ computeCoulombFockSPDD0(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSPDD1(double*         mat_J,
@@ -2728,7 +2880,8 @@ computeCoulombFockSPDD1(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 __global__ void
 computeCoulombFockSPDD2(double*         mat_J,
@@ -2748,7 +2901,8 @@ computeCoulombFockSPDD2(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft);
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
 
 }  // namespace gpu
 

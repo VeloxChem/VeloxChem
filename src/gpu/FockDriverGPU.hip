@@ -1964,7 +1964,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_ss_second_inds,
                                static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -1992,7 +1993,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sp_second_inds,
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2020,7 +2022,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sd_second_inds,
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2048,7 +2051,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pp_second_inds,
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2078,7 +2082,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2106,7 +2111,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2174,7 +2180,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_ss_second_inds,
                                static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2202,7 +2209,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sp_second_inds,
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2232,7 +2240,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sd_second_inds,
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2260,7 +2269,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pp_second_inds,
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2290,7 +2300,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2320,7 +2331,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSPDD1, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
@@ -2340,7 +2352,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSPDD2, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
@@ -2360,7 +2373,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2436,7 +2450,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_ss_second_inds,
                                static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2464,7 +2479,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sp_second_inds,
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2494,7 +2510,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sd_second_inds,
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2520,7 +2537,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pp_second_inds,
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2548,7 +2566,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPPPD1, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
@@ -2566,7 +2585,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPPPD2, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
@@ -2584,7 +2604,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2618,7 +2639,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPPDD1, pp_num_blocks, pp_threads_per_block, 0, 0,
                                d_mat_J,
@@ -2636,7 +2658,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPPDD2, pp_num_blocks, pp_threads_per_block, 0, 0,
                                d_mat_J,
@@ -2654,7 +2677,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPPDD3, pp_num_blocks, pp_threads_per_block, 0, 0,
                                d_mat_J,
@@ -2672,7 +2696,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPPDD4, pp_num_blocks, pp_threads_per_block, 0, 0,
                                d_mat_J,
@@ -2690,7 +2715,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPPDD5, pp_num_blocks, pp_threads_per_block, 0, 0,
                                d_mat_J,
@@ -2708,7 +2734,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPPDD6, pp_num_blocks, pp_threads_per_block, 0, 0,
                                d_mat_J,
@@ -2726,7 +2753,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPPDD7, pp_num_blocks, pp_threads_per_block, 0, 0,
                                d_mat_J,
@@ -2744,7 +2772,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPPDD8, pp_num_blocks, pp_threads_per_block, 0, 0,
                                d_mat_J,
@@ -2762,7 +2791,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
 
@@ -2848,7 +2878,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_ss_second_inds,
                                static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2878,7 +2909,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sp_second_inds,
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2906,7 +2938,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sd_second_inds,
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2936,7 +2969,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pp_second_inds,
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -2966,7 +3000,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSDPD1, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
@@ -2986,7 +3021,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSDPD2, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
@@ -3006,7 +3042,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -3040,7 +3077,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSDDD1, sd_num_blocks, sd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3058,7 +3096,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSDDD2, sd_num_blocks, sd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3076,7 +3115,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSDDD3, sd_num_blocks, sd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3094,7 +3134,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSDDD4, sd_num_blocks, sd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3112,7 +3153,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSDDD5, sd_num_blocks, sd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3130,7 +3172,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
 
@@ -3210,7 +3253,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_ss_second_inds,
                                static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -3240,7 +3284,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sp_second_inds,
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
         }
@@ -3276,7 +3321,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sd_second_inds,
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDSD1, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3296,7 +3342,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sd_second_inds,
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
 
@@ -3332,7 +3379,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pp_second_inds,
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDPP1, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3350,7 +3398,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pp_second_inds,
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
 
@@ -3386,7 +3435,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDPD1, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3404,7 +3454,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDPD2, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3422,7 +3473,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDPD3, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3440,7 +3492,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDPD4, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3458,7 +3511,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDPD5, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3476,7 +3530,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDPD6, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3494,7 +3549,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
 
@@ -3530,7 +3586,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD1, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3548,7 +3605,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD2, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3566,7 +3624,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD3, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3584,7 +3643,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD4, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3602,7 +3662,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD5, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3620,7 +3681,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD6, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3638,7 +3700,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD7, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3656,7 +3719,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD8, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3674,7 +3738,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD9, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3692,7 +3757,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD10, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3710,7 +3776,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD11, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3728,7 +3795,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD12, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3746,7 +3814,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD13, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3764,7 +3833,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD14, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3782,7 +3852,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD15, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3800,7 +3871,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD16, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3818,7 +3890,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD17, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3836,7 +3909,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD18, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3854,7 +3928,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockPDDD19, pd_num_blocks, pd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -3872,7 +3947,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
 
@@ -3963,7 +4039,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_ss_second_inds,
                                static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
 
@@ -4001,7 +4078,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sp_second_inds,
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDSP1, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4021,7 +4099,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sp_second_inds,
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDSP2, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4041,7 +4120,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sp_second_inds,
                                static_cast<uint32_t>(sp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
 
@@ -4077,7 +4157,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sd_second_inds,
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDSD1, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4095,7 +4176,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sd_second_inds,
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDSD2, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4113,7 +4195,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sd_second_inds,
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDSD3, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4131,7 +4214,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sd_second_inds,
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDSD4, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4149,7 +4233,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sd_second_inds,
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDSD5, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4167,7 +4252,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_sd_second_inds,
                                static_cast<uint32_t>(sd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
 
@@ -4203,7 +4289,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pp_second_inds,
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPP1, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4221,7 +4308,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pp_second_inds,
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPP2, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4239,7 +4327,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pp_second_inds,
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPP3, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4257,7 +4346,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pp_second_inds,
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPP4, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4275,7 +4365,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pp_second_inds,
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPP5, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4293,7 +4384,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pp_second_inds,
                                static_cast<uint32_t>(pp_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
 
@@ -4329,7 +4421,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD1, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4347,7 +4440,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD2, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4365,7 +4459,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD3, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4383,7 +4478,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD4, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4401,7 +4497,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD5, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4419,7 +4516,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD6, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4437,7 +4535,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD7, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4455,7 +4554,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD8, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4473,7 +4573,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD9, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4491,7 +4592,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD10, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4509,7 +4611,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD11, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4527,7 +4630,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD12, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4545,7 +4649,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD13, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4563,7 +4668,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD14, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4581,7 +4687,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD15, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4599,7 +4706,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD16, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4617,7 +4725,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD17, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4635,7 +4744,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDPD18, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4653,7 +4763,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_pd_second_inds,
                                static_cast<uint32_t>(pd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
 
@@ -4687,7 +4798,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD1, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4703,7 +4815,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD2, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4719,7 +4832,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD3, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4735,7 +4849,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD4, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4751,7 +4866,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD5, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4767,7 +4883,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD6, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4783,7 +4900,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD7, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4799,7 +4917,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD8, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4815,7 +4934,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD9, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4831,7 +4951,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD10, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4847,7 +4968,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD11, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4863,7 +4985,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD12, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4879,7 +5002,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD13, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4895,7 +5019,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD14, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4911,7 +5036,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD15, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4927,7 +5053,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD16, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4943,7 +5070,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD17, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4959,7 +5087,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD18, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4975,7 +5104,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD19, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -4991,7 +5121,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD20, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5007,7 +5138,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD21, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5023,7 +5155,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD22, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5039,7 +5172,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD23, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5055,7 +5189,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD24, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5071,7 +5206,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD25, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5087,7 +5223,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD26, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5103,7 +5240,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD27, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5119,7 +5257,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD28, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5135,7 +5274,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD29, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5151,7 +5291,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD30, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5167,7 +5308,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD31, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5183,7 +5325,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD32, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5199,7 +5342,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD33, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5215,7 +5359,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD34, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5231,7 +5376,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD35, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5247,7 +5393,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD36, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5263,7 +5410,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD37, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5279,7 +5427,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD38, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5295,7 +5444,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD39, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5311,7 +5461,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD40, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5327,7 +5478,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD41, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5343,7 +5495,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipLaunchKernelGGL(gpu::computeCoulombFockDDDD42, dd_num_blocks, dd_threads_per_block, 0, 0,
                                d_mat_J,
@@ -5359,7 +5512,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                d_dd_second_inds,
                                static_cast<uint32_t>(dd_prim_pair_count),
                                d_boys_func_table,
-                               d_boys_func_ft);
+                               d_boys_func_ft,
+                               eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
 
@@ -5649,20 +5803,21 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         dim3 ssss_num_blocks (pair_inds_count_for_K_ss, 1);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSSSS, ssss_num_blocks, ssss_threads_per_block, 0, 0,
-                                                     d_mat_K,
-                                                     d_pair_inds_i_for_K_ss,
-                                                     d_pair_inds_k_for_K_ss,
-                                                     static_cast<uint32_t>(pair_inds_count_for_K_ss),
-                                                     d_s_prim_info,
-                                                     d_s_prim_aoinds,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     ss_max_D,
-                                                     d_mat_D_full_AO,
-                                                     d_mat_Q_for_K_ss,
-                                                     d_density_inds_for_K_ss,
-                                                     static_cast<uint32_t>(cart_naos),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+                           d_mat_K,
+                           d_pair_inds_i_for_K_ss,
+                           d_pair_inds_k_for_K_ss,
+                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           ss_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_ss,
+                           d_density_inds_for_K_ss,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -5670,25 +5825,26 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         //     *  *
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSSSP, num_blocks, threads_per_block, 0, 0,
-                                                     d_mat_K,
-                                                     d_pair_inds_i_for_K_ss,
-                                                     d_pair_inds_k_for_K_ss,
-                                                     static_cast<uint32_t>(pair_inds_count_for_K_ss),
-                                                     d_s_prim_info,
-                                                     d_s_prim_aoinds,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_p_prim_info,
-                                                     d_p_prim_aoinds,
-                                                     static_cast<uint32_t>(p_prim_count),
-                                                     sp_max_D,
-                                                     d_mat_D_full_AO,
-                                                     d_mat_Q_for_K_ss,
-                                                     d_mat_Q_for_K_sp,
-                                                     d_density_inds_for_K_ss,
-                                                     d_density_inds_for_K_sp,
-                                                     static_cast<uint32_t>(cart_naos),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+                           d_mat_K,
+                           d_pair_inds_i_for_K_ss,
+                           d_pair_inds_k_for_K_ss,
+                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           sp_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_ss,
+                           d_mat_Q_for_K_sp,
+                           d_density_inds_for_K_ss,
+                           d_density_inds_for_K_sp,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -5696,25 +5852,26 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         //     *  *
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSPSS, num_blocks, threads_per_block, 0, 0,
-                                                     d_mat_K,
-                                                     d_pair_inds_i_for_K_ss,
-                                                     d_pair_inds_k_for_K_ss,
-                                                     static_cast<uint32_t>(pair_inds_count_for_K_ss),
-                                                     d_s_prim_info,
-                                                     d_s_prim_aoinds,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_p_prim_info,
-                                                     d_p_prim_aoinds,
-                                                     static_cast<uint32_t>(p_prim_count),
-                                                     sp_max_D,
-                                                     d_mat_D_full_AO,
-                                                     d_mat_Q_for_K_ss,
-                                                     d_mat_Q_for_K_sp,
-                                                     d_density_inds_for_K_ss,
-                                                     d_density_inds_for_K_sp,
-                                                     static_cast<uint32_t>(cart_naos),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+                           d_mat_K,
+                           d_pair_inds_i_for_K_ss,
+                           d_pair_inds_k_for_K_ss,
+                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           sp_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_ss,
+                           d_mat_Q_for_K_sp,
+                           d_density_inds_for_K_ss,
+                           d_density_inds_for_K_sp,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -5722,23 +5879,24 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         //     *  *
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSPSP, num_blocks, threads_per_block, 0, 0,
-                                                     d_mat_K,
-                                                     d_pair_inds_i_for_K_ss,
-                                                     d_pair_inds_k_for_K_ss,
-                                                     static_cast<uint32_t>(pair_inds_count_for_K_ss),
-                                                     d_s_prim_info,
-                                                     d_s_prim_aoinds,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_p_prim_info,
-                                                     d_p_prim_aoinds,
-                                                     static_cast<uint32_t>(p_prim_count),
-                                                     pp_max_D,
-                                                     d_mat_D_full_AO,
-                                                     d_mat_Q_for_K_sp,
-                                                     d_density_inds_for_K_sp,
-                                                     static_cast<uint32_t>(cart_naos),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+                           d_mat_K,
+                           d_pair_inds_i_for_K_ss,
+                           d_pair_inds_k_for_K_ss,
+                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           pp_max_D,
+                           d_mat_D_full_AO,
+                           d_mat_Q_for_K_sp,
+                           d_density_inds_for_K_sp,
+                           static_cast<uint32_t>(cart_naos),
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -5764,7 +5922,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_sd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -5790,7 +5949,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ss,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -5819,7 +5979,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_sd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -5848,7 +6009,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_sp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -5872,7 +6034,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_sd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -5936,7 +6099,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_density_inds_for_K_ps,
                                                      static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
-                                                     d_boys_func_ft);
+                                                     d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -5962,7 +6126,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_density_inds_for_K_pp,
                                                      static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
-                                                     d_boys_func_ft);
+                                                     d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -5988,7 +6153,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_density_inds_for_K_ps,
                                                      static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
-                                                     d_boys_func_ft);
+                                                     d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6014,7 +6180,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_density_inds_for_K_pp,
                                                      static_cast<uint32_t>(cart_naos),
                                                      d_boys_func_table,
-                                                     d_boys_func_ft);
+                                                     d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6043,7 +6210,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6072,7 +6240,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ps,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6101,7 +6270,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6130,7 +6300,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6159,7 +6330,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDPD1, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -6183,7 +6355,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -6259,7 +6432,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ps,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6293,7 +6467,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6327,7 +6502,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ps,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6356,7 +6532,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6393,7 +6570,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6430,7 +6608,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ps,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6464,7 +6643,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPPD1, pppd_num_blocks, pppd_threads_per_block, 0, 0,
                            d_mat_K,
@@ -6485,7 +6665,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPPD2, pppd_num_blocks, pppd_threads_per_block, 0, 0,
                            d_mat_K,
@@ -6506,7 +6687,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6540,7 +6722,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPP1, pdpp_num_blocks, pdpp_threads_per_block, 0, 0,
                            d_mat_K,
@@ -6561,7 +6744,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPP2, pdpp_num_blocks, pdpp_threads_per_block, 0, 0,
                            d_mat_K,
@@ -6582,7 +6766,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6610,7 +6795,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPD1, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -6629,7 +6815,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPD2, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -6648,7 +6835,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPD3, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -6667,7 +6855,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPD4, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -6686,7 +6875,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPD5, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -6705,7 +6895,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_pd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6789,7 +6980,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6818,7 +7010,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6847,7 +7040,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6882,7 +7076,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6916,7 +7111,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6950,7 +7146,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -6987,7 +7184,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSPDD1, spdd_num_blocks, spdd_threads_per_block, 0, 0,
                            d_mat_K,
@@ -7011,7 +7209,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSPDD2, spdd_num_blocks, spdd_threads_per_block, 0, 0,
                            d_mat_K,
@@ -7035,7 +7234,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -7072,7 +7272,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDP1, sddp_num_blocks, sddp_threads_per_block, 0, 0,
                            d_mat_K,
@@ -7096,7 +7297,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDP2, sddp_num_blocks, sddp_threads_per_block, 0, 0,
                            d_mat_K,
@@ -7120,7 +7322,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -7150,7 +7353,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDD1, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7171,7 +7375,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDD2, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7192,7 +7397,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDD3, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7213,7 +7419,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDD4, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7234,7 +7441,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDD5, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7255,7 +7463,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -7340,7 +7549,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -7377,7 +7587,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -7414,7 +7625,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -7451,7 +7663,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPSDD1, psdd_num_blocks, psdd_threads_per_block, 0, 0,
                            d_mat_K,
@@ -7475,7 +7688,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPSDD2, psdd_num_blocks, psdd_threads_per_block, 0, 0,
                            d_mat_K,
@@ -7499,7 +7713,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -7536,7 +7751,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDS1, pdds_num_blocks, pdds_threads_per_block, 0, 0,
                            d_mat_K,
@@ -7560,7 +7776,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDS2, pdds_num_blocks, pdds_threads_per_block, 0, 0,
                            d_mat_K,
@@ -7584,7 +7801,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -7618,7 +7836,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDP1, ppdp_num_blocks, ppdp_threads_per_block, 0, 0,
                            d_mat_K,
@@ -7639,7 +7858,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDP2, ppdp_num_blocks, ppdp_threads_per_block, 0, 0,
                            d_mat_K,
@@ -7660,7 +7880,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -7690,7 +7911,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDD1, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7711,7 +7933,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDD2, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7732,7 +7955,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDD3, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7753,7 +7977,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDD4, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7774,7 +7999,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDD5, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7795,7 +8021,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -7825,7 +8052,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDP1, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7846,7 +8074,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDP2, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7867,7 +8096,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDP3, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7888,7 +8118,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDP4, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7909,7 +8140,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -7939,7 +8171,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD1, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7960,7 +8193,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD2, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7981,7 +8215,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD3, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8002,7 +8237,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD4, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8023,7 +8259,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD5, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8044,7 +8281,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD6, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8065,7 +8303,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD7, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8086,7 +8325,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD8, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8107,7 +8347,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD9, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8128,7 +8369,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD10, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8149,7 +8391,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD11, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8170,7 +8413,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD12, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8191,7 +8435,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD13, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8212,7 +8457,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD14, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8233,7 +8479,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD15, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8254,7 +8501,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD16, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8275,7 +8523,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD17, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8296,7 +8545,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -8377,7 +8627,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -8406,7 +8657,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDP1, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8430,7 +8682,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDP2, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8454,7 +8707,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -8483,7 +8737,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDS1, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8507,7 +8762,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDS2, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8531,7 +8787,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -8563,7 +8820,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDD1, dsdd_num_blocks, dsdd_threads_per_block, 0, 0,
                            d_mat_K,
@@ -8584,7 +8842,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDD2, dsdd_num_blocks, dsdd_threads_per_block, 0, 0,
                            d_mat_K,
@@ -8605,7 +8864,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDD3, dsdd_num_blocks, dsdd_threads_per_block, 0, 0,
                            d_mat_K,
@@ -8626,7 +8886,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDD4, dsdd_num_blocks, dsdd_threads_per_block, 0, 0,
                            d_mat_K,
@@ -8647,7 +8908,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDD5, dsdd_num_blocks, dsdd_threads_per_block, 0, 0,
                            d_mat_K,
@@ -8668,7 +8930,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -8702,7 +8965,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDS1, ddds_num_blocks, ddds_threads_per_block, 0, 0,
                            d_mat_K,
@@ -8723,7 +8987,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDS2, ddds_num_blocks, ddds_threads_per_block, 0, 0,
                            d_mat_K,
@@ -8744,7 +9009,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDS3, ddds_num_blocks, ddds_threads_per_block, 0, 0,
                            d_mat_K,
@@ -8765,7 +9031,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDS4, ddds_num_blocks, ddds_threads_per_block, 0, 0,
                            d_mat_K,
@@ -8786,7 +9053,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDS5, ddds_num_blocks, ddds_threads_per_block, 0, 0,
                            d_mat_K,
@@ -8807,7 +9075,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_ds,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -8839,7 +9108,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDP1, dpdp_num_blocks, dpdp_threads_per_block, 0, 0,
                            d_mat_K,
@@ -8858,7 +9128,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDP2, dpdp_num_blocks, dpdp_threads_per_block, 0, 0,
                            d_mat_K,
@@ -8877,7 +9148,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDP3, dpdp_num_blocks, dpdp_threads_per_block, 0, 0,
                            d_mat_K,
@@ -8896,7 +9168,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDP4, dpdp_num_blocks, dpdp_threads_per_block, 0, 0,
                            d_mat_K,
@@ -8915,7 +9188,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDP5, dpdp_num_blocks, dpdp_threads_per_block, 0, 0,
                            d_mat_K,
@@ -8934,7 +9208,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -8964,7 +9239,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD1, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8985,7 +9261,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD2, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9006,7 +9283,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD3, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9027,7 +9305,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD4, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9048,7 +9327,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD5, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9069,7 +9349,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD6, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9090,7 +9371,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD7, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9111,7 +9393,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD8, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9132,7 +9415,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD9, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9153,7 +9437,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD10, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9174,7 +9459,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD11, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9195,7 +9481,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD12, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9216,7 +9503,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD13, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9237,7 +9525,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD14, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9258,7 +9547,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD15, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9279,7 +9569,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD16, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9300,7 +9591,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -9330,7 +9622,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP1, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9351,7 +9644,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP2, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9372,7 +9666,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP3, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9393,7 +9688,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP4, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9414,7 +9710,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP5, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9435,7 +9732,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP6, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9456,7 +9754,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP7, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9477,7 +9776,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP8, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9498,7 +9798,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP9, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9519,7 +9820,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP10, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9540,7 +9842,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP11, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9561,7 +9864,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP12, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9582,7 +9886,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP13, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9603,7 +9908,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP14, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9624,7 +9930,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP15, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9645,7 +9952,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP16, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9666,7 +9974,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP17, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9687,7 +9996,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP18, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9708,7 +10018,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP19, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9729,7 +10040,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dp,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 
@@ -9754,7 +10066,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD1, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9770,7 +10083,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD2, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9786,7 +10100,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD3, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9802,7 +10117,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD4, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9818,7 +10134,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD5, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9834,7 +10151,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD6, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9850,7 +10168,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD7, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9866,7 +10185,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD8, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9882,7 +10202,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD9, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9898,7 +10219,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD10, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9914,7 +10236,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD11, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9930,7 +10253,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD12, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9946,7 +10270,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD13, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9962,7 +10287,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD14, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9978,7 +10304,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD15, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9994,7 +10321,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD16, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10010,7 +10338,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD17, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10026,7 +10355,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD18, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10042,7 +10372,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD19, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10058,7 +10389,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD20, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10074,7 +10406,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD21, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10090,7 +10423,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD22, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10106,7 +10440,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD23, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10122,7 +10457,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD24, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10138,7 +10474,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD25, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10154,7 +10491,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD26, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10170,7 +10508,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD27, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10186,7 +10525,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD28, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10202,7 +10542,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD29, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10218,7 +10559,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD30, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10234,7 +10576,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD31, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10250,7 +10593,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD32, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10266,7 +10610,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD33, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10282,7 +10627,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD34, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10298,7 +10644,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD35, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10314,7 +10661,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD36, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10330,7 +10678,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD37, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10346,7 +10695,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD38, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10362,7 +10712,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD39, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10378,7 +10729,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD40, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10394,7 +10746,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD41, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -10410,7 +10763,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_density_inds_for_K_dd,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
-                           d_boys_func_ft);
+                           d_boys_func_ft,
+                           eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
 

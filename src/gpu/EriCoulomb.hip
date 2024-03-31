@@ -44,7 +44,8 @@ computeCoulombFockSSSS(double*         mat_J,
                        const uint32_t* ss_second_inds,
                        const uint32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -171,7 +172,8 @@ computeCoulombFockSSSP(double*         mat_J,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -308,7 +310,8 @@ computeCoulombFockSSSD(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -495,7 +498,8 @@ computeCoulombFockSSPP(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -679,7 +683,8 @@ computeCoulombFockSSPD(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -891,7 +896,8 @@ computeCoulombFockSSDD(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -1159,7 +1165,8 @@ computeCoulombFockSPSS(double*         mat_J,
                        const uint32_t* ss_second_inds,
                        const uint32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -1297,7 +1304,8 @@ computeCoulombFockSPSP(double*         mat_J,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -1478,7 +1486,8 @@ computeCoulombFockSPSD(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -1697,7 +1706,8 @@ computeCoulombFockSPPP(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -1914,7 +1924,8 @@ computeCoulombFockSPPD(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -2193,7 +2204,8 @@ computeCoulombFockPPSS(double*         mat_J,
                        const uint32_t* ss_second_inds,
                        const uint32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -2376,7 +2388,8 @@ computeCoulombFockPPSP(double*         mat_J,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -2591,7 +2604,8 @@ computeCoulombFockSDSS(double*         mat_J,
                        const uint32_t* ss_second_inds,
                        const uint32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -2782,7 +2796,8 @@ computeCoulombFockSDSP(double*         mat_J,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -3003,7 +3018,8 @@ computeCoulombFockPDSS(double*         mat_J,
                        const uint32_t* ss_second_inds,
                        const uint32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -3220,7 +3236,8 @@ computeCoulombFockPDSP(double*         mat_J,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -3502,7 +3519,8 @@ computeCoulombFockDDSS(double*         mat_J,
                        const uint32_t* ss_second_inds,
                        const uint32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -3771,7 +3789,8 @@ computeCoulombFockDDPD0(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -4114,7 +4133,8 @@ computeCoulombFockDDPD1(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -4344,7 +4364,8 @@ computeCoulombFockDDPD2(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -4574,7 +4595,8 @@ computeCoulombFockDDPD3(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -4954,7 +4976,8 @@ computeCoulombFockDDPD4(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -5289,7 +5312,8 @@ computeCoulombFockDDPD5(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -5594,7 +5618,8 @@ computeCoulombFockDDPD6(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -5818,7 +5843,8 @@ computeCoulombFockDDPD7(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -6147,7 +6173,8 @@ computeCoulombFockDDPD8(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -6425,7 +6452,8 @@ computeCoulombFockDDPD9(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -6655,7 +6683,8 @@ computeCoulombFockDDPD10(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -7047,7 +7076,8 @@ computeCoulombFockDDPD11(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -7241,7 +7271,8 @@ computeCoulombFockDDPD12(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -7480,7 +7511,8 @@ computeCoulombFockDDPD13(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -7833,7 +7865,8 @@ computeCoulombFockDDPD14(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -8141,7 +8174,8 @@ computeCoulombFockDDPD15(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -8479,7 +8513,8 @@ computeCoulombFockDDPD16(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -8838,7 +8873,8 @@ computeCoulombFockDDPD17(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -9058,7 +9094,8 @@ computeCoulombFockDDPD18(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -9260,7 +9297,8 @@ computeCoulombFockDDDD0(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -9589,7 +9627,8 @@ computeCoulombFockDDDD1(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -9835,7 +9874,8 @@ computeCoulombFockDDDD2(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -10189,7 +10229,8 @@ computeCoulombFockDDDD3(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -10405,7 +10446,8 @@ computeCoulombFockDDDD4(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -10666,7 +10708,8 @@ computeCoulombFockDDDD5(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -10957,7 +11000,8 @@ computeCoulombFockDDDD6(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -11299,7 +11343,8 @@ computeCoulombFockDDDD7(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -11725,7 +11770,8 @@ computeCoulombFockDDDD8(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -12175,7 +12221,8 @@ computeCoulombFockDDDD9(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -12436,7 +12483,8 @@ computeCoulombFockDDDD10(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -12697,7 +12745,8 @@ computeCoulombFockDDDD11(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -13081,7 +13130,8 @@ computeCoulombFockDDDD12(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -13313,7 +13363,8 @@ computeCoulombFockDDDD13(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -13655,7 +13706,8 @@ computeCoulombFockDDDD14(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -14082,7 +14134,8 @@ computeCoulombFockDDDD15(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -14508,7 +14561,8 @@ computeCoulombFockDDDD16(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -14934,7 +14988,8 @@ computeCoulombFockDDDD17(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -15528,7 +15583,8 @@ computeCoulombFockDDDD18(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -15789,7 +15845,8 @@ computeCoulombFockDDDD19(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -16050,7 +16107,8 @@ computeCoulombFockDDDD20(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -16434,7 +16492,8 @@ computeCoulombFockDDDD21(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -16818,7 +16877,8 @@ computeCoulombFockDDDD22(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -17035,7 +17095,8 @@ computeCoulombFockDDDD23(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -17237,7 +17298,8 @@ computeCoulombFockDDDD24(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -17574,7 +17636,8 @@ computeCoulombFockDDDD25(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -18168,7 +18231,8 @@ computeCoulombFockDDDD26(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -18762,7 +18826,8 @@ computeCoulombFockDDDD27(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -19146,7 +19211,8 @@ computeCoulombFockDDDD28(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -19530,7 +19596,8 @@ computeCoulombFockDDDD29(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -19914,7 +19981,8 @@ computeCoulombFockDDDD30(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -20116,7 +20184,8 @@ computeCoulombFockDDDD31(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -20318,7 +20387,8 @@ computeCoulombFockDDDD32(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -20520,7 +20590,8 @@ computeCoulombFockDDDD33(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -20932,7 +21003,8 @@ computeCoulombFockDDDD34(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -21526,7 +21598,8 @@ computeCoulombFockDDDD35(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -21910,7 +21983,8 @@ computeCoulombFockDDDD36(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -22331,7 +22405,8 @@ computeCoulombFockDDDD37(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -22533,7 +22608,8 @@ computeCoulombFockDDDD38(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -22792,7 +22868,8 @@ computeCoulombFockDDDD39(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -22994,7 +23071,8 @@ computeCoulombFockDDDD40(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -23196,7 +23274,8 @@ computeCoulombFockDDDD41(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -23608,7 +23687,8 @@ computeCoulombFockDDDD42(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -23822,7 +23902,8 @@ computeCoulombFockDDPP0(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -24163,7 +24244,8 @@ computeCoulombFockDDPP1(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -24490,7 +24572,8 @@ computeCoulombFockDDPP2(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -24782,7 +24865,8 @@ computeCoulombFockDDPP3(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -25139,7 +25223,8 @@ computeCoulombFockDDPP4(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -25410,7 +25495,8 @@ computeCoulombFockDDPP5(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -25735,7 +25821,8 @@ computeCoulombFockDDSD0(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -26075,7 +26162,8 @@ computeCoulombFockDDSD1(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -26443,7 +26531,8 @@ computeCoulombFockDDSD2(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -26716,7 +26805,8 @@ computeCoulombFockDDSD3(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -26994,7 +27084,8 @@ computeCoulombFockDDSD4(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -27273,7 +27364,8 @@ computeCoulombFockDDSD5(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -27642,7 +27734,8 @@ computeCoulombFockDDSP0(double*         mat_J,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -27967,7 +28060,8 @@ computeCoulombFockDDSP1(double*         mat_J,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -28229,7 +28323,8 @@ computeCoulombFockDDSP2(double*         mat_J,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -28500,7 +28595,8 @@ computeCoulombFockPDDD0(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -28844,7 +28940,8 @@ computeCoulombFockPDDD1(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -29048,7 +29145,8 @@ computeCoulombFockPDDD2(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -29306,7 +29404,8 @@ computeCoulombFockPDDD3(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -29651,7 +29750,8 @@ computeCoulombFockPDDD4(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -29918,7 +30018,8 @@ computeCoulombFockPDDD5(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -30188,7 +30289,8 @@ computeCoulombFockPDDD6(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -30467,7 +30569,8 @@ computeCoulombFockPDDD7(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -30733,7 +30836,8 @@ computeCoulombFockPDDD8(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -31049,7 +31153,8 @@ computeCoulombFockPDDD9(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -31328,7 +31433,8 @@ computeCoulombFockPDDD10(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -31559,7 +31665,8 @@ computeCoulombFockPDDD11(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -31838,7 +31945,8 @@ computeCoulombFockPDDD12(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -32162,7 +32270,8 @@ computeCoulombFockPDDD13(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -32420,7 +32529,8 @@ computeCoulombFockPDDD14(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -32741,7 +32851,8 @@ computeCoulombFockPDDD15(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -33020,7 +33131,8 @@ computeCoulombFockPDDD16(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -33329,7 +33441,8 @@ computeCoulombFockPDDD17(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -33554,7 +33667,8 @@ computeCoulombFockPDDD18(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -33829,7 +33943,8 @@ computeCoulombFockPDDD19(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -34175,7 +34290,8 @@ computeCoulombFockPDPD0(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -34456,7 +34572,8 @@ computeCoulombFockPDPD1(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -34779,7 +34896,8 @@ computeCoulombFockPDPD2(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -34995,7 +35113,8 @@ computeCoulombFockPDPD3(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -35294,7 +35413,8 @@ computeCoulombFockPDPD4(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -35613,7 +35733,8 @@ computeCoulombFockPDPD5(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -35916,7 +36037,8 @@ computeCoulombFockPDPD6(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -36239,7 +36361,8 @@ computeCoulombFockPDPP0(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -36654,7 +36777,8 @@ computeCoulombFockPDPP1(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -36992,7 +37116,8 @@ computeCoulombFockPDSD0(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -37408,7 +37533,8 @@ computeCoulombFockPDSD1(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -37741,7 +37867,8 @@ computeCoulombFockSDDD0(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -38191,7 +38318,8 @@ computeCoulombFockSDDD1(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -38465,7 +38593,8 @@ computeCoulombFockSDDD2(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -38797,7 +38926,8 @@ computeCoulombFockSDDD3(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -39095,7 +39225,8 @@ computeCoulombFockSDDD4(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -39373,7 +39504,8 @@ computeCoulombFockSDDD5(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -39651,7 +39783,8 @@ computeCoulombFockSDPD0(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -39964,7 +40097,8 @@ computeCoulombFockSDPD1(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -40272,7 +40406,8 @@ computeCoulombFockSDPD2(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -40557,7 +40692,8 @@ computeCoulombFockSDPP(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -40855,7 +40991,8 @@ computeCoulombFockSDSD(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -41147,7 +41284,8 @@ computeCoulombFockPPDD0(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -41587,7 +41725,8 @@ computeCoulombFockPPDD1(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -41815,7 +41954,8 @@ computeCoulombFockPPDD2(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -42107,7 +42247,8 @@ computeCoulombFockPPDD3(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -42368,7 +42509,8 @@ computeCoulombFockPPDD4(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -42573,7 +42715,8 @@ computeCoulombFockPPDD5(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -42829,7 +42972,8 @@ computeCoulombFockPPDD6(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -43084,7 +43228,8 @@ computeCoulombFockPPDD7(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -43351,7 +43496,8 @@ computeCoulombFockPPDD8(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
@@ -43548,7 +43694,8 @@ computeCoulombFockPPPD0(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -43861,7 +44008,8 @@ computeCoulombFockPPPD1(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -44166,7 +44314,8 @@ computeCoulombFockPPPD2(double*         mat_J,
                        const uint32_t* pd_second_inds,
                        const uint32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -44451,7 +44600,8 @@ computeCoulombFockPPPP(double*         mat_J,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -44746,7 +44896,8 @@ computeCoulombFockPPSD(double*         mat_J,
                        const uint32_t* sd_second_inds,
                        const uint32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -45046,7 +45197,8 @@ computeCoulombFockSPDD0(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -45356,7 +45508,8 @@ computeCoulombFockSPDD1(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -45665,7 +45818,8 @@ computeCoulombFockSPDD2(double*         mat_J,
                        const uint32_t* dd_second_inds,
                        const uint32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
-                       const double*   boys_func_ft)
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
