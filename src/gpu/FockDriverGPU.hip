@@ -1512,7 +1512,10 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     timer.start("Prep. sortQD");
 
-    screening.sortQD(s_prim_count, p_prim_count, d_prim_count, s_prim_aoinds, p_prim_aoinds, d_prim_aoinds, cart_naos, cart_dens_ptr, eri_threshold);
+    screening.sortQD(s_prim_count, p_prim_count, d_prim_count,
+                     s_prim_aoinds, p_prim_aoinds, d_prim_aoinds,
+                     s_prim_info, p_prim_info, d_prim_info,
+                     cart_naos, cart_dens_ptr, eri_threshold);
 
     timer.stop("Prep. sortQD");
 
@@ -1736,6 +1739,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto& pd_mat_Q_local = screening.get_pd_mat_Q_local(gpu_id);
     const auto& dd_mat_Q_local = screening.get_dd_mat_Q_local(gpu_id);
 
+    const auto& ss_pair_data_local = screening.get_ss_pair_data_local(gpu_id);
+
     const auto& ss_first_inds = screening.get_ss_first_inds();
     const auto& sp_first_inds = screening.get_sp_first_inds();
     const auto& sd_first_inds = screening.get_sd_first_inds();
@@ -1763,6 +1768,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto& pp_mat_D = screening.get_pp_mat_D(); 
     const auto& pd_mat_D = screening.get_pd_mat_D(); 
     const auto& dd_mat_D = screening.get_dd_mat_D(); 
+
+    const auto& ss_pair_data = screening.get_ss_pair_data(); 
 
     const auto ss_prim_pair_count = static_cast<int64_t>(ss_first_inds.size());
     const auto sp_prim_pair_count = static_cast<int64_t>(sp_first_inds.size());
@@ -1799,6 +1806,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     uint32_t *d_pd_first_inds, *d_pd_second_inds;
     uint32_t *d_dd_first_inds, *d_dd_second_inds;
 
+    double *d_ss_pair_data;
+
     double *d_ss_mat_Q_local, *d_sp_mat_Q_local, *d_sd_mat_Q_local, *d_pp_mat_Q_local, *d_pd_mat_Q_local, *d_dd_mat_Q_local;
 
     uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
@@ -1807,6 +1816,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
     uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
     uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
+
+    double *d_ss_pair_data_local;
 
     hipSafe(hipMalloc(&d_mat_D, max_prim_pair_count * sizeof(double)));
     hipSafe(hipMalloc(&d_mat_J, max_prim_pair_count_local * sizeof(double)));
@@ -1836,6 +1847,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipMalloc(&d_dd_first_inds, dd_prim_pair_count * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_dd_second_inds, dd_prim_pair_count * sizeof(uint32_t)));
 
+    hipSafe(hipMalloc(&d_ss_pair_data, ss_prim_pair_count * 10 * sizeof(double)));
+
     hipSafe(hipMalloc(&d_ss_mat_Q_local, ss_prim_pair_count_local * sizeof(double)));
     hipSafe(hipMalloc(&d_sp_mat_Q_local, sp_prim_pair_count_local * sizeof(double)));
     hipSafe(hipMalloc(&d_sd_mat_Q_local, sd_prim_pair_count_local * sizeof(double)));
@@ -1860,6 +1873,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     hipSafe(hipMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_ss_pair_data_local, ss_prim_pair_count_local * 10 * sizeof(double)));
 
     hipSafe(hipMemcpy(d_ss_mat_Q, ss_mat_Q.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_sp_mat_Q, sp_mat_Q.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
@@ -1886,6 +1901,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipMemcpy(d_dd_first_inds, dd_first_inds.data(), dd_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_dd_second_inds, dd_second_inds.data(), dd_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
 
+    hipSafe(hipMemcpy(d_ss_pair_data, ss_pair_data.data(), ss_prim_pair_count * 10 * sizeof(double), hipMemcpyHostToDevice));
+
     hipSafe(hipMemcpy(d_ss_mat_Q_local, ss_mat_Q_local.data(), ss_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_sp_mat_Q_local, sp_mat_Q_local.data(), sp_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_sd_mat_Q_local, sd_mat_Q_local.data(), sd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
@@ -1910,6 +1927,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     hipSafe(hipMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_ss_pair_data_local, ss_pair_data_local.data(), ss_prim_pair_count_local * 10 * sizeof(double), hipMemcpyHostToDevice));
 
     timer.stop("Coulomb prep.");
 
@@ -1950,24 +1969,24 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         {
             hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
+            timer.start("    J block SSSS");
+
             hipLaunchKernelGGL(gpu::computeCoulombFockSSSS, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
-                               d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
                                d_mat_D,
                                d_ss_mat_Q_local,
                                d_ss_mat_Q,
-                               d_ss_first_inds_local,
-                               d_ss_second_inds_local,
+                               d_ss_pair_data_local,
                                static_cast<uint32_t>(ss_prim_pair_count_local),
-                               d_ss_first_inds,
-                               d_ss_second_inds,
+                               d_ss_pair_data,
                                static_cast<uint32_t>(ss_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
 
             hipSafe(hipDeviceSynchronize());
+
+            timer.stop("    J block SSSS");
         }
 
         // J: (SS|SP)

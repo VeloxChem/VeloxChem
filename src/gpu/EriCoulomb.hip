@@ -32,16 +32,12 @@ namespace gpu {  // gpu namespace
 
 __global__ void
 computeCoulombFockSSSS(double*         mat_J,
-                       const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
                        const double*   ss_mat_D,
                        const double*   ss_mat_Q_local,
                        const double*   ss_mat_Q,
-                       const uint32_t* ss_first_inds_local,
-                       const uint32_t* ss_second_inds_local,
+                       const double*   ss_pair_data_local,
                        const uint32_t  ss_prim_pair_count_local,
-                       const uint32_t* ss_first_inds,
-                       const uint32_t* ss_second_inds,
+                       const double*   ss_pair_data,
                        const uint32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
@@ -70,43 +66,28 @@ computeCoulombFockSSSS(double*         mat_J,
 
         if ((kl < ss_prim_pair_count) && (ij < ss_prim_pair_count_local) && (fabs(ss_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > 1.0e-12))
         {
-            const auto i = ss_first_inds_local[ij];
-            const auto j = ss_second_inds_local[ij];
+            const auto a_i     = ss_pair_data_local[ij + ss_prim_pair_count_local * 0];
+            const auto a_j     = ss_pair_data_local[ij + ss_prim_pair_count_local * 1];
+            //const auto x_ij    = ss_pair_data_local[ij + ss_prim_pair_count_local * 2];
+            //const auto y_ij    = ss_pair_data_local[ij + ss_prim_pair_count_local * 3];
+            //const auto z_ij    = ss_pair_data_local[ij + ss_prim_pair_count_local * 4];
+            const auto x_P     = ss_pair_data_local[ij + ss_prim_pair_count_local * 5];
+            const auto y_P     = ss_pair_data_local[ij + ss_prim_pair_count_local * 6];
+            const auto z_P     = ss_pair_data_local[ij + ss_prim_pair_count_local * 7];
+            const auto S_ij_00 = ss_pair_data_local[ij + ss_prim_pair_count_local * 8];
 
-            const auto k = ss_first_inds[kl];
-            const auto l = ss_second_inds[kl];
+            const auto a_k     = ss_pair_data[kl + ss_prim_pair_count * 0];
+            const auto a_l     = ss_pair_data[kl + ss_prim_pair_count * 1];
+            //const auto x_kl    = ss_pair_data[kl + ss_prim_pair_count * 2];
+            //const auto y_kl    = ss_pair_data[kl + ss_prim_pair_count * 3];
+            //const auto z_kl    = ss_pair_data[kl + ss_prim_pair_count * 4];
+            const auto x_Q     = ss_pair_data[kl + ss_prim_pair_count * 5];
+            const auto y_Q     = ss_pair_data[kl + ss_prim_pair_count * 6];
+            const auto z_Q     = ss_pair_data[kl + ss_prim_pair_count * 7];
+            const auto S_kl_00 = ss_pair_data[kl + ss_prim_pair_count * 8];
+            const auto sym_kl  = ss_pair_data[kl + ss_prim_pair_count * 9];
 
-            const auto a_i = s_prim_info[i + s_prim_count * 0];
-            const auto c_i = s_prim_info[i + s_prim_count * 1];
-            const auto x_i = s_prim_info[i + s_prim_count * 2];
-            const auto y_i = s_prim_info[i + s_prim_count * 3];
-            const auto z_i = s_prim_info[i + s_prim_count * 4];
-
-            const auto a_j = s_prim_info[j + s_prim_count * 0];
-            const auto c_j = s_prim_info[j + s_prim_count * 1];
-            const auto x_j = s_prim_info[j + s_prim_count * 2];
-            const auto y_j = s_prim_info[j + s_prim_count * 3];
-            const auto z_j = s_prim_info[j + s_prim_count * 4];
-
-            const auto a_k = s_prim_info[k + s_prim_count * 0];
-            const auto c_k = s_prim_info[k + s_prim_count * 1];
-            const auto x_k = s_prim_info[k + s_prim_count * 2];
-            const auto y_k = s_prim_info[k + s_prim_count * 3];
-            const auto z_k = s_prim_info[k + s_prim_count * 4];
-
-            const auto a_l = s_prim_info[l + s_prim_count * 0];
-            const auto c_l = s_prim_info[l + s_prim_count * 1];
-            const auto x_l = s_prim_info[l + s_prim_count * 2];
-            const auto y_l = s_prim_info[l + s_prim_count * 3];
-            const auto z_l = s_prim_info[l + s_prim_count * 4];
-
-
-            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
-            const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
-
-            const double PQ[3] = {(a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j),
-                                  (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                  (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
+            const double PQ[3] = {x_Q - x_P, y_Q - y_P, z_Q - z_P};
 
             const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
@@ -119,12 +100,8 @@ computeCoulombFockSSSS(double*         mat_J,
 
             gpu::computeBoysFunction(F0_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 0, boys_func_table, boys_func_ft);
 
-            const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-            const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
-
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-            //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-            ERIs[threadIdx.y][threadIdx.x] = Lambda * S_ij_00 * S_kl_00 * F0_t[0] * ss_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+            ERIs[threadIdx.y][threadIdx.x] = Lambda * S_ij_00 * S_kl_00 * F0_t[0] * ss_mat_D[kl] * sym_kl;
         }
         else
         {

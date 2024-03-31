@@ -32,16 +32,12 @@ namespace gpu {  // gpu namespace
 
 __global__ void
 computeCoulombFockSSSS(double*         mat_J,
-                       const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
                        const double*   ss_mat_D,
                        const double*   ss_mat_Q_local,
                        const double*   ss_mat_Q,
-                       const uint32_t* ss_first_inds_local,
-                       const uint32_t* ss_second_inds_local,
+                       const double*   ss_pair_data_local,
                        const uint32_t  ss_prim_pair_count_local,
-                       const uint32_t* ss_first_inds,
-                       const uint32_t* ss_second_inds,
+                       const double*   ss_pair_data,
                        const uint32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,

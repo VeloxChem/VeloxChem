@@ -75,6 +75,8 @@ class CScreeningData
     std::vector<std::vector<double>> _pd_mat_Q_local;
     std::vector<std::vector<double>> _dd_mat_Q_local;
 
+    std::vector<std::vector<double>> _ss_pair_data_local;
+
     std::vector<uint32_t> _ss_first_inds;
     std::vector<uint32_t> _sp_first_inds;
     std::vector<uint32_t> _sd_first_inds;
@@ -102,6 +104,8 @@ class CScreeningData
     std::vector<double> _pp_mat_D;
     std::vector<double> _pd_mat_D;
     std::vector<double> _dd_mat_D;
+
+    std::vector<double> _ss_pair_data;
 
     double _ss_max_D;
     double _sp_max_D;
@@ -150,7 +154,12 @@ class CScreeningData
 
     auto _computeQMatrices(const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
-    auto _sortQ(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) -> void;
+    auto _sortQ(const int64_t s_prim_count,
+                const int64_t p_prim_count,
+                const int64_t d_prim_count,
+                const std::vector<double>& s_prim_info,
+                const std::vector<double>& p_prim_info,
+                const std::vector<double>& d_prim_info) -> void;
 
    public:
     CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node, const double pair_threshold, const double density_threshold);
@@ -170,6 +179,9 @@ class CScreeningData
                 const std::vector<uint32_t>& s_prim_aoinds,
                 const std::vector<uint32_t>& p_prim_aoinds,
                 const std::vector<uint32_t>& d_prim_aoinds,
+                const std::vector<double>& s_prim_info,
+                const std::vector<double>& p_prim_info,
+                const std::vector<double>& d_prim_info,
                 const int64_t naos,
                 const double* dens_ptr,
                 const double eri_threshold) -> void;
@@ -194,6 +206,8 @@ class CScreeningData
     auto get_pp_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>&;
     auto get_pd_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>&;
     auto get_dd_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>&;
+
+    auto get_ss_pair_data_local(const int64_t gpu_id) const -> const std::vector<double>&;
 
     auto get_ss_first_inds() const -> const std::vector<uint32_t>&;
     auto get_sp_first_inds() const -> const std::vector<uint32_t>&;
@@ -229,6 +243,8 @@ class CScreeningData
     auto get_pp_max_D() const -> double;
     auto get_pd_max_D() const -> double;
     auto get_dd_max_D() const -> double;
+
+    auto get_ss_pair_data() const -> const std::vector<double>&;
 
     auto get_mat_Q_for_K_ss() const -> const std::vector<double>&;
     auto get_mat_Q_for_K_sp() const -> const std::vector<double>&;
