@@ -447,7 +447,6 @@ class PolarizabilityGradient():
         self.ostream.print_blank()
         self.ostream.flush()
 
-    # WIP
     def compute_analytical_complex(self, molecule, basis, scf_tensors, lr_results):
         """
         Performs calculation of the complex analytical polarizability gradient.
@@ -474,12 +473,11 @@ class PolarizabilityGradient():
 
         orbrsp_drv = PolOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
-        # is_complex has been set to true in the init
         orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
         orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
         all_orbrsp_results = orbrsp_drv.cphf_results
 
-        valstr = '** Time spent on orbital response for {} complex frequencies: '.format(
+        valstr = '** Time spent on orbital response for {} frequencies: '.format(
             len(self.frequencies))
         valstr += '{:.6f} sec **'.format(tm.time() - orbrsp_start_time)
         self.ostream.print_header(valstr)
@@ -510,21 +508,29 @@ class PolarizabilityGradient():
 
                 # only alpha part:
                 gs_dm = scf_tensors['D_alpha']
+
+                # spin summation already included:
+                x_plus_y = orbrsp_results['x_plus_y_ao']
+                x_minus_y = orbrsp_results['x_minus_y_ao']
+
                 # TODO: MPI should this be done before loop over freqs?
-                cphf_ov = all_orbrsp_results['cphf_ov']
-                n_lambdas = int(cphf_ov.shape[0] / n_freqs)
-                lambda_mo = cphf_ov.reshape(n_freqs, n_lambdas, nocc, nvir)[f]
+                #cphf_ov = all_orbrsp_results['cphf_ov']
+                #n_lambdas = int(cphf_ov.shape[0] / n_freqs)
+                #lambda_mo = cphf_ov.reshape(n_freqs, n_lambdas, nocc, nvir)[f]
 
                 # spin summation already included:
                 #x_plus_y = orbrsp_results['x_plus_y_ao']
                 #x_minus_y = orbrsp_results['x_minus_y_ao']
-                x_plus_y_real = orbrsp_results['x_plus_y_ao_real']
-                x_minus_y_real = orbrsp_results['x_minus_y_ao_real']
-                x_plus_y_imag = orbrsp_results['x_plus_y_ao_imag']
-                x_minus_y_imag = orbrsp_results['x_minus_y_ao_imag']
 
-                dof = x_plus_y_real.shape[0]  # Number of vector components
+                dof = x_plus_y.shape[0]  # Number of vector components
+
                 omega_ao = orbrsp_results['omega_ao'].reshape(dof, dof, nao, nao)
+                cphf_ov = all_orbrsp_results['cphf_ov']
+                len_lambdas = int(cphf_ov.shape[0] / n_freqs)
+                # select lambda for frequency with index f
+                lambda_mo = cphf_ov.reshape(n_freqs, len_lambdas, nocc, nvir)[f]
+                # reshape lambda to complex
+                lambda_mo = lambda_mo[:dof**2] + 1j * lambda_mo[dof**2:]
 
                 # transform lambda multipliers to AO basis and
                 # calculate relaxed density matrix
@@ -544,7 +550,7 @@ class PolarizabilityGradient():
                 else:
                     frac_K = 1.0
 
-                pol_gradient = np.zeros((dof, dof, natm, 3))
+                pol_gradient = np.zeros((dof, dof, natm, 3), dtype=np.complex_)
                 # loop over atoms and contract integral derivatives
                 # with density matrices
                 # add the corresponding contribution to the gradient
@@ -588,131 +594,51 @@ class PolarizabilityGradient():
                                     d_eri[a].transpose(0,3,1,2).reshape(nao**2,nao**2),
                                     2.0 * rel_dm_ao[x,y].reshape(nao**2)
                                 ])
-                                #+ 1.0* np.linalg.multi_dot([
-                                #    x_plus_y[x].reshape(nao**2), 
-                                #    d_eri[a].transpose(2,3,1,0).reshape(nao**2,nao**2), 
-                                #    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2)
-                                #])
                                 + 1.0* np.linalg.multi_dot([
-                                    x_plus_y_real[x].reshape(nao**2), 
+                                    x_plus_y[x].reshape(nao**2), 
                                     d_eri[a].transpose(2,3,1,0).reshape(nao**2,nao**2), 
-                                    (x_plus_y_real[y] - x_plus_y_real[y].T).reshape(nao**2)
+                                    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2)
                                 ])
-                                - 1.0* np.linalg.multi_dot([
-                                    x_plus_y_imag[x].reshape(nao**2), 
-                                    d_eri[a].transpose(2,3,1,0).reshape(nao**2,nao**2), 
-                                    (x_plus_y_imag[y] - x_plus_y_imag[y].T).reshape(nao**2)
-                                ])
-
-                                #- 0.5 * frac_K * np.linalg.multi_dot([
-                                #    x_plus_y[x].reshape(nao**2),
-                                #    d_eri[a].transpose(2,1,3,0).reshape(nao**2,nao**2),
-                                #    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2)
-                                #])
                                 - 0.5 * frac_K * np.linalg.multi_dot([
-                                    x_plus_y_real[x].reshape(nao**2),
+                                    x_plus_y[x].reshape(nao**2),
                                     d_eri[a].transpose(2,1,3,0).reshape(nao**2,nao**2),
-                                    (x_plus_y_real[y] - x_plus_y_real[y].T).reshape(nao**2)
+                                    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2)
                                 ])
-                                + 0.5 * frac_K * np.linalg.multi_dot([
-                                    x_plus_y_imag[x].reshape(nao**2),
-                                    d_eri[a].transpose(2,1,3,0).reshape(nao**2,nao**2),
-                                    (x_plus_y_imag[y] - x_plus_y_imag[y].T).reshape(nao**2)
-                                ])
-
-                                #+ 1.0 * np.linalg.multi_dot([
-                                #    x_minus_y[x].reshape(nao**2),
-                                #    d_eri[a].transpose(2,3,1,0).reshape(nao**2,nao**2),
-                                #    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2)
-                                #])
                                 + 1.0 * np.linalg.multi_dot([
-                                    x_minus_y_real[x].reshape(nao**2),
+                                    x_minus_y[x].reshape(nao**2),
                                     d_eri[a].transpose(2,3,1,0).reshape(nao**2,nao**2),
-                                    (x_minus_y_real[y] + x_minus_y_real[y].T).reshape(nao**2)
+                                    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2)
                                 ])
-                                - 1.0 * np.linalg.multi_dot([
-                                    x_minus_y_imag[x].reshape(nao**2),
-                                    d_eri[a].transpose(2,3,1,0).reshape(nao**2,nao**2),
-                                    (x_minus_y_imag[y] + x_minus_y_imag[y].T).reshape(nao**2)
-                                ])
-
-                                #- 0.5 * frac_K * np.linalg.multi_dot([
-                                #    x_minus_y[x].reshape(nao**2),
-                                #    d_eri[a].transpose(2,1,3,0).reshape(nao**2,nao**2),
-                                #    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2)
-                                #])
                                 - 0.5 * frac_K * np.linalg.multi_dot([
-                                    x_minus_y_real[x].reshape(nao**2),
+                                    x_minus_y[x].reshape(nao**2),
                                     d_eri[a].transpose(2,1,3,0).reshape(nao**2,nao**2),
-                                    (x_minus_y_real[y] + x_minus_y_real[y].T).reshape(nao**2)
+                                    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2)
                                 ])
-                                + 0.5 * frac_K * np.linalg.multi_dot([
-                                    x_minus_y_imag[x].reshape(nao**2),
-                                    d_eri[a].transpose(2,1,3,0).reshape(nao**2,nao**2),
-                                    (x_minus_y_imag[y] + x_minus_y_imag[y].T).reshape(nao**2)
-                                ])
-
-                                #- 2.0 * np.linalg.multi_dot([
-                                #    x_minus_y[x].reshape(nao**2),
-                                #    d_dipole[y,a].reshape(nao**2)
-                                #])
                                 - 2.0 * np.linalg.multi_dot([
-                                    x_minus_y_real[x].reshape(nao**2),
+                                    x_minus_y[x].reshape(nao**2),
                                     d_dipole[y,a].reshape(nao**2)
                                 ])
                                 )
 
                                 pol_gradient[y, x, i, a] += (
-                                #1.0 * np.linalg.multi_dot([
-                                #    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2),
-                                #    d_eri[a].transpose(1,0,2,3).reshape(nao**2,nao**2), x_plus_y[x].reshape(nao**2)
-                                #])
-                                #- 0.5 * frac_K * np.linalg.multi_dot([
-                                #    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2),
-                                #    d_eri[a].transpose(3,0,2,1).reshape(nao**2,nao**2), x_plus_y[x].reshape(nao**2)
-                                #])
-                                #+ 1.0 * np.linalg.multi_dot([
-                                #    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2),
-                                #    d_eri[a].transpose(1,0,2,3).reshape(nao**2,nao**2), x_minus_y[x].reshape(nao**2)
-                                #])
-                                #- 0.5 * frac_K * np.linalg.multi_dot([
-                                #    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2),
-                                #    d_eri[a].transpose(3,0,2,1).reshape(nao**2,nao**2), x_minus_y[x].reshape(nao**2)
-                                #])
                                 1.0 * np.linalg.multi_dot([
-                                    (x_plus_y_real[y] - x_plus_y_real[y].T).reshape(nao**2),
-                                    d_eri[a].transpose(1,0,2,3).reshape(nao**2,nao**2), x_plus_y_real[x].reshape(nao**2)
-                                ])
-                                - 1.0 * np.linalg.multi_dot([
-                                    (x_plus_y_imag[y] - x_plus_y_imag[y].T).reshape(nao**2),
-                                    d_eri[a].transpose(1,0,2,3).reshape(nao**2,nao**2), x_plus_y_imag[x].reshape(nao**2)
+                                    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2),
+                                    d_eri[a].transpose(1,0,2,3).reshape(nao**2,nao**2), x_plus_y[x].reshape(nao**2)
                                 ])
                                 - 0.5 * frac_K * np.linalg.multi_dot([
-                                    (x_plus_y_real[y] - x_plus_y_real[y].T).reshape(nao**2),
-                                    d_eri[a].transpose(3,0,2,1).reshape(nao**2,nao**2), x_plus_y_real[x].reshape(nao**2)
-                                ])
-                                - 0.5 * frac_K * np.linalg.multi_dot([
-                                    (x_plus_y_imag[y] - x_plus_y_imag[y].T).reshape(nao**2),
-                                    d_eri[a].transpose(3,0,2,1).reshape(nao**2,nao**2), x_plus_y_imag[x].reshape(nao**2)
+                                    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2),
+                                    d_eri[a].transpose(3,0,2,1).reshape(nao**2,nao**2), x_plus_y[x].reshape(nao**2)
                                 ])
                                 + 1.0 * np.linalg.multi_dot([
-                                    (x_minus_y_real[y] + x_minus_y_real[y].T).reshape(nao**2),
-                                    d_eri[a].transpose(1,0,2,3).reshape(nao**2,nao**2), x_minus_y_real[x].reshape(nao**2)
-                                ])
-                                - 1.0 * np.linalg.multi_dot([
-                                    (x_minus_y_imag[y] + x_minus_y_imag[y].T).reshape(nao**2),
-                                    d_eri[a].transpose(1,0,2,3).reshape(nao**2,nao**2), x_minus_y_imag[x].reshape(nao**2)
+                                    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2),
+                                    d_eri[a].transpose(1,0,2,3).reshape(nao**2,nao**2), x_minus_y[x].reshape(nao**2)
                                 ])
                                 - 0.5 * frac_K * np.linalg.multi_dot([
-                                    (x_minus_y_real[y] + x_minus_y_real[y].T).reshape(nao**2),
-                                    d_eri[a].transpose(3,0,2,1).reshape(nao**2,nao**2), x_minus_y_real[x].reshape(nao**2)
-                                ])
-                                - 0.5 * frac_K * np.linalg.multi_dot([
-                                    (x_minus_y_imag[y] + x_minus_y_imag[y].T).reshape(nao**2),
-                                    d_eri[a].transpose(3,0,2,1).reshape(nao**2,nao**2), x_minus_y_imag[x].reshape(nao**2)
+                                    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2),
+                                    d_eri[a].transpose(3,0,2,1).reshape(nao**2,nao**2), x_minus_y[x].reshape(nao**2)
                                 ])
                                 - 2.0 * np.linalg.multi_dot([
-                                d_dipole[y,a].reshape(nao**2), x_minus_y_real[x].reshape(nao**2)
+                                d_dipole[y,a].reshape(nao**2), x_minus_y[x].reshape(nao**2)
                                 ])
                                 )
 
