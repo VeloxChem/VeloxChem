@@ -187,8 +187,6 @@ class PolarizabilityGradient():
                 self.ostream.print_blank()
                 self.ostream.flush()
             if self.is_complex:
-                #error_message = 'Complex analytical pol. gradient not yet implemented'
-                #raise NotImplementedError(error_message)
                 self.compute_analytical_complex(molecule, basis, scf_tensors, lr_results)
             else:
                 self.compute_analytical_real(molecule, basis, scf_tensors, lr_results)
