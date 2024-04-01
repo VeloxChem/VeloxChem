@@ -144,11 +144,10 @@ class CScreeningData
 
     std::vector<uint32_t> _D_aoinds_K_ss;
 
-    std::vector<double>   _ss_pair_data_for_K;
+    std::vector<uint32_t> _pair_displs_K_ss;
+    std::vector<uint32_t> _pair_counts_K_ss;
 
-    std::vector<uint32_t> _pair_displacements_for_K_ss;
-
-    std::vector<uint32_t> _pair_counts_for_K_ss;
+    std::vector<double>   _pair_data_K_ss;
 
     std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_ss;
     std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_ss;
@@ -287,6 +286,15 @@ class CScreeningData
     auto get_density_inds_for_K_pd() const -> const std::vector<uint32_t>&;
     auto get_density_inds_for_K_dp() const -> const std::vector<uint32_t>&;
     auto get_density_inds_for_K_dd() const -> const std::vector<uint32_t>&;
+
+    auto get_Q_K_ss() const -> const std::vector<double>&;
+
+    auto get_D_aoinds_K_ss() const -> const std::vector<uint32_t>&;
+
+    auto get_pair_displs_K_ss() const -> const std::vector<uint32_t>&;
+    auto get_pair_counts_K_ss() const -> const std::vector<uint32_t>&;
+
+    auto get_pair_data_K_ss() const -> const std::vector<double>&;
 
     auto get_local_pair_inds_i_for_K_ss(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
     auto get_local_pair_inds_k_for_K_ss(const int64_t gpu_id) const -> const std::vector<uint32_t>&;

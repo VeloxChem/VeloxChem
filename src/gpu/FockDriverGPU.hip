@@ -5662,6 +5662,15 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto& density_inds_for_K_dp = screening.get_density_inds_for_K_dp();
     const auto& density_inds_for_K_dd = screening.get_density_inds_for_K_dd();
 
+    const auto& Q_K_ss = screening.get_Q_K_ss();
+
+    const auto& D_aoinds_K_ss = screening.get_D_aoinds_K_ss();
+
+    const auto& pair_displs_K_ss = screening.get_pair_displs_K_ss();
+    const auto& pair_counts_K_ss = screening.get_pair_counts_K_ss();
+
+    const auto& pair_data_K_ss = screening.get_pair_data_K_ss();
+
     const auto ss_max_D = screening.get_ss_max_D(); 
     const auto sp_max_D = screening.get_sp_max_D(); 
     const auto sd_max_D = screening.get_sd_max_D(); 
@@ -5756,6 +5765,25 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     uint32_t *d_density_inds_for_K_ss, *d_density_inds_for_K_sp, *d_density_inds_for_K_ps, *d_density_inds_for_K_pp;
     uint32_t *d_density_inds_for_K_sd, *d_density_inds_for_K_ds, *d_density_inds_for_K_pd, *d_density_inds_for_K_dp, *d_density_inds_for_K_dd;
 
+    double   *d_Q_K_ss;
+    uint32_t *d_D_aoinds_K_ss;
+    uint32_t *d_pair_displs_K_ss;
+    uint32_t *d_pair_counts_K_ss;
+    double   *d_pair_data_K_ss;
+
+    hipSafe(hipMalloc(&d_Q_K_ss, Q_K_ss.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_D_aoinds_K_ss, D_aoinds_K_ss.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_ss, pair_displs_K_ss.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_ss, pair_counts_K_ss.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_data_K_ss, pair_data_K_ss.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_Q_K_ss, Q_K_ss.data(), Q_K_ss.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_aoinds_K_ss, D_aoinds_K_ss.data(), D_aoinds_K_ss.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_ss, pair_displs_K_ss.data(), pair_displs_K_ss.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_ss, pair_counts_K_ss.data(), pair_counts_K_ss.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_ss, pair_data_K_ss.data(), pair_data_K_ss.size() * sizeof(double), hipMemcpyHostToDevice));
+
+
     hipSafe(hipMalloc(&d_mat_D_full_AO, cart_naos * cart_naos * sizeof(double)));
 
     hipSafe(hipMalloc(&d_mat_Q_for_K_ss, s_prim_count * s_prim_count * sizeof(double)));
@@ -5833,11 +5861,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         // K: (SS|SS)
         //     *  *
 
-        dim3 ssss_threads_per_block (TILE_DIM_HALF, TILE_DIM_HALF);
-
-        dim3 ssss_num_blocks (pair_inds_count_for_K_ss, 1);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSSS, ssss_num_blocks, ssss_threads_per_block, 0, 0,
+        hipLaunchKernelGGL(gpu::computeExchangeFockSSSS, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5849,6 +5873,11 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_mat_D_full_AO,
                            d_mat_Q_for_K_ss,
                            d_density_inds_for_K_ss,
+                           d_Q_K_ss,
+                           d_D_aoinds_K_ss,
+                           d_pair_displs_K_ss,
+                           d_pair_counts_K_ss,
+                           d_pair_data_K_ss,
                            static_cast<uint32_t>(cart_naos),
                            d_boys_func_table,
                            d_boys_func_ft,

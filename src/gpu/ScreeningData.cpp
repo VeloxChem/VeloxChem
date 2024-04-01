@@ -2118,6 +2118,15 @@ auto CScreeningData::get_density_inds_for_K_pd() const -> const std::vector<uint
 auto CScreeningData::get_density_inds_for_K_dp() const -> const std::vector<uint32_t>& { return _density_inds_for_K_dp; }
 auto CScreeningData::get_density_inds_for_K_dd() const -> const std::vector<uint32_t>& { return _density_inds_for_K_dd; }
 
+auto CScreeningData::get_Q_K_ss() const -> const std::vector<double>& { return _Q_K_ss; };
+
+auto CScreeningData::get_D_aoinds_K_ss() const -> const std::vector<uint32_t>& { return _D_aoinds_K_ss; };
+
+auto CScreeningData::get_pair_displs_K_ss() const -> const std::vector<uint32_t>& { return _pair_displs_K_ss; };
+auto CScreeningData::get_pair_counts_K_ss() const -> const std::vector<uint32_t>& { return _pair_counts_K_ss; };
+
+auto CScreeningData::get_pair_data_K_ss() const -> const std::vector<double>& { return _pair_data_K_ss; };
+
 auto CScreeningData::get_local_pair_inds_i_for_K_ss(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _local_pair_inds_i_for_K_ss[gpu_id]; }
 auto CScreeningData::get_local_pair_inds_k_for_K_ss(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _local_pair_inds_k_for_K_ss[gpu_id]; }
 
@@ -2370,14 +2379,12 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
     _Q_K_ss        = std::vector<double>(ss_prim_pair_count_for_K);
     _D_aoinds_K_ss = std::vector<uint32_t>(ss_prim_pair_count_for_K);
 
-    _ss_pair_data_for_K = std::vector<double>(ss_prim_pair_count_for_K * 10);
+    _pair_data_K_ss = std::vector<double>(ss_prim_pair_count_for_K * 10);
 
-    _pair_displacements_for_K_ss = std::vector<uint32_t>(s_prim_count);
-    _pair_counts_for_K_ss        = std::vector<uint32_t>(s_prim_count);
+    _pair_displs_K_ss = std::vector<uint32_t>(s_prim_count);
+    _pair_counts_K_ss = std::vector<uint32_t>(s_prim_count);
 
-    int64_t displ = 0;
-
-    for (int64_t i = 0; i < s_prim_count; i++)
+    for (int64_t i = 0, displ = 0; i < s_prim_count; i++)
     {
         std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
 
@@ -2416,11 +2423,11 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
             const auto y_i = s_prim_info[i + s_prim_count * 3];
             const auto z_i = s_prim_info[i + s_prim_count * 4];
 
-            const auto a_j = s_prim_info[j + s_prim_count * 0];
-            const auto c_j = s_prim_info[j + s_prim_count * 1];
-            const auto x_j = s_prim_info[j + s_prim_count * 2];
-            const auto y_j = s_prim_info[j + s_prim_count * 3];
-            const auto z_j = s_prim_info[j + s_prim_count * 4];
+            const auto a_j = s_prim_info[j_idx + s_prim_count * 0];
+            const auto c_j = s_prim_info[j_idx + s_prim_count * 1];
+            const auto x_j = s_prim_info[j_idx + s_prim_count * 2];
+            const auto y_j = s_prim_info[j_idx + s_prim_count * 3];
+            const auto z_j = s_prim_info[j_idx + s_prim_count * 4];
 
             const double x_ij = x_j - x_i;
             const double y_ij = y_j - y_i;
@@ -2434,20 +2441,20 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
 
             const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-            _ss_pair_data_for_K[displ * 10 + j + count * 0] = a_i;
-            _ss_pair_data_for_K[displ * 10 + j + count * 1] = a_j;
-            _ss_pair_data_for_K[displ * 10 + j + count * 2] = x_ij;
-            _ss_pair_data_for_K[displ * 10 + j + count * 3] = y_ij;
-            _ss_pair_data_for_K[displ * 10 + j + count * 4] = z_ij;
-            _ss_pair_data_for_K[displ * 10 + j + count * 5] = x_P;
-            _ss_pair_data_for_K[displ * 10 + j + count * 6] = y_P;
-            _ss_pair_data_for_K[displ * 10 + j + count * 7] = z_P;
-            _ss_pair_data_for_K[displ * 10 + j + count * 8] = S_ij_00;
-            _ss_pair_data_for_K[displ * 10 + j + count * 9] = (i == j ? 1.0 : 2.0);
+            _pair_data_K_ss[displ * 10 + j + count * 0] = a_i;
+            _pair_data_K_ss[displ * 10 + j + count * 1] = a_j;
+            _pair_data_K_ss[displ * 10 + j + count * 2] = x_ij;
+            _pair_data_K_ss[displ * 10 + j + count * 3] = y_ij;
+            _pair_data_K_ss[displ * 10 + j + count * 4] = z_ij;
+            _pair_data_K_ss[displ * 10 + j + count * 5] = x_P;
+            _pair_data_K_ss[displ * 10 + j + count * 6] = y_P;
+            _pair_data_K_ss[displ * 10 + j + count * 7] = z_P;
+            _pair_data_K_ss[displ * 10 + j + count * 8] = S_ij_00;
+            _pair_data_K_ss[displ * 10 + j + count * 9] = (i == j ? 1.0 : 2.0);
         }
 
-        _pair_displacements_for_K_ss[i] = displ;
-        _pair_counts_for_K_ss[i]        = count;
+        _pair_displs_K_ss[i] = displ;
+        _pair_counts_K_ss[i] = count;
 
         displ += count;
     }
