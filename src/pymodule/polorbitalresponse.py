@@ -205,8 +205,6 @@ class PolOrbitalResponse(CphfSolver):
             # parent class (i.e. lrsolver)?
             full_vec = ([self.get_full_solution_vector(lr_results['solutions'][
                         x, w]) for x in self.vector_components])
-            # DEBUG
-            #print('full_vec cmplx: \n', full_vec.shape)
             self.ostream.flush()
 
             if self.rank == mpi_master():
@@ -224,9 +222,6 @@ class PolOrbitalResponse(CphfSolver):
                 # de-excitation part
                 x_plus_y = exc_vec + deexc_vec
                 x_minus_y = exc_vec - deexc_vec
-                # DEBUG
-                print('xpy:\n', x_plus_y.shape)
-                print('xmy:\n', x_minus_y.shape)
                 self.ostream.flush()
 
                 mdot_start_time = tm.time()
@@ -283,10 +278,6 @@ class PolOrbitalResponse(CphfSolver):
                         )
 
                 mdot_start_time = tm.time()
-                # DEBUG
-                print('dm_oo:\n', dm_oo.shape)
-                print('dm_vv:\n', dm_vv.shape)
-                self.ostream.flush()
 
                 # Transform unrelaxed one-particle density matrix to
                 # AO basis and create a list
@@ -296,28 +287,15 @@ class PolOrbitalResponse(CphfSolver):
                         unrel_dm_ao[x,y] = (np.linalg.multi_dot([ mo_occ, dm_oo[x,y], mo_occ.T ])
                         + np.linalg.multi_dot([ mo_vir, dm_vv[x,y], mo_vir.T ])
                         )
-                # DEBUG
-                print('unrel_dm_ao:\n', unrel_dm_ao.shape)
-                self.ostream.flush()
 
                 #dm_ao_list = list(unrel_dm_ao.reshape(dof**2, nao, nao))
                 dm_ao_list_real = list(np.array(unrel_dm_ao.real).reshape(dof**2, nao, nao))
-                print('dm_ao_list_real:\n', len(dm_ao_list_real))
-                self.ostream.flush()
                 dm_ao_list_imag = list(np.array(unrel_dm_ao.imag).reshape(dof**2, nao, nao))
-                print('dm_ao_list_imag:\n', len(dm_ao_list_imag))
-                self.ostream.flush()
 
                 # 2) Construct the right-hand side
                 #dm_ao_rhs = AODensityMatrix(dm_ao_list + xpmy_ao_list, denmat.rest)
                 dm_ao_rhs_real = AODensityMatrix(dm_ao_list_real + xpmy_ao_list_real, denmat.rest)
-                # DEBUG
-                print('CHECKPOINT 2')
-                self.ostream.flush()
                 dm_ao_rhs_imag = AODensityMatrix(dm_ao_list_imag + xpmy_ao_list_imag, denmat.rest)
-                # DEBUG
-                print('CHECKPOINT 3')
-                self.ostream.flush()
 
                 if self._dft:
                     # FIXME split vectors in Re/Im for list
@@ -344,8 +322,6 @@ class PolOrbitalResponse(CphfSolver):
                     # which is zero for orbital response
                     zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
             else:
-                # DEBUG
-                print('THIS IS NOT THE MASTER NODE')
                 dof = None
                 #dm_ao_rhs = AODensityMatrix()
                 dm_ao_rhs_real = AODensityMatrix()
@@ -353,9 +329,6 @@ class PolOrbitalResponse(CphfSolver):
                 if self._dft:
                     perturbed_dm_ao = AODensityMatrix()
                     zero_dm_ao = AODensityMatrix()
-            #DEBUG
-            print('Another CHECKPOINT')
-            self.ostream.flush()
 
             dof = self.comm.bcast(dof, root=mpi_master())
 
@@ -561,7 +534,7 @@ class PolOrbitalResponse(CphfSolver):
                 mdot_start_time = tm.time()
 
                 # Contract with vectors to get dipole contribution to the RHS
-                rhs_dipole_contrib = np.zeros((dof, dof, nocc, nvir))
+                rhs_dipole_contrib = np.zeros((dof, dof, nocc, nvir), dtype=np.complex_)
                 for x in range(dof):
                     for y in range(dof):
                         rhs_dipole_contrib[x,y] = ( 
@@ -606,7 +579,8 @@ class PolOrbitalResponse(CphfSolver):
                     'x_plus_y_ao': x_plus_y_ao,
                     'x_minus_y_ao': x_minus_y_ao,
                     'unrel_dm_ao': unrel_dm_ao,
-                    'fock_ao_rhs': fock_ao_rhs_real, #FIXME also return Imag
+                    'fock_ao_rhs_real': fock_ao_rhs_real,
+                    'fock_ao_rhs_imag': fock_ao_rhs_imag,
                     'fock_gxc_ao': fock_gxc_ao,  # None if not DFT
                 }
                 if (f == 0):
