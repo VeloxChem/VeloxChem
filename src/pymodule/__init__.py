@@ -71,6 +71,7 @@ from .veloxchemlib import moints
 
 # Python classes
 from .atomtypeidentifier import AtomTypeIdentifier
+from .seminario import Seminario
 from .inputparser import InputParser
 from .outputstream import OutputStream
 from .molecule import Molecule
@@ -132,6 +133,8 @@ from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer
 from .numerovdriver import NumerovDriver
+from .mmdriver import MMDriver
+from .mmgradientdriver import MMGradientDriver
 
 # for backward compatibility
 from .veloxchemlib import XCIntegrator as XCNewIntegrator

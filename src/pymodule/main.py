@@ -32,7 +32,6 @@ from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
-from .firstorderprop import FirstOrderProperties
 from .forcefieldgenerator import ForceFieldGenerator
 from .respchargesdriver import RespChargesDriver
 from .excitondriver import ExcitonModelDriver
@@ -66,7 +65,6 @@ from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .veloxchemlib import DiagEriDriver
 from .cli import cli
-from .dftutils import print_libxc_reference
 from .errorhandler import assert_msg_critical
 
 
@@ -344,9 +342,10 @@ def main():
                 errmsg += 'in XTB calculation.'
                 if task.mpi_rank == mpi_master():
                     assert_msg_critical(False, errmsg)
-            xtb_drv = XtbDriver(task.mpi_comm)
+            xtb_drv = XtbDriver(task.mpi_comm, task.ostream)
             xtb_drv.set_method(method_dict['xtb'].lower())
-            xtb_drv.compute(task.molecule, task.ostream)
+            xtb_drv.xtb_verbose = True
+            xtb_results = xtb_drv.compute(task.molecule)
         else:
             scf_drv = select_scf_driver(task, scf_type)
             scf_drv.update_settings(scf_dict, method_dict)
@@ -358,12 +357,6 @@ def main():
 
             if not scf_drv.is_converged:
                 return
-
-            # SCF first-order properties
-            scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
-            scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_results)
-            if task.mpi_rank == mpi_master():
-                scf_prop.print_properties(task.molecule)
 
             if (scf_drv.electric_field is not None and
                     task.molecule.get_charge() != 0):
@@ -380,11 +373,12 @@ def main():
         if run_ground_state_gradient:
 
             if use_xtb:
-                grad_drv = XtbGradientDriver(task.mpi_comm, task.ostream)
-                grad_drv.compute(task.molecule, xtb_drv)
+                grad_drv = XtbGradientDriver(xtb_drv)
+                grad_drv.compute(task.molecule)
+
             elif scf_drv.scf_type == 'restricted':
-                grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream)
-                grad_drv.compute(task.molecule, task.ao_basis, scf_drv)
+                grad_drv = ScfGradientDriver(scf_drv)
+                grad_drv.compute(task.molecule, task.ao_basis)
 
         elif run_excited_state_gradient:
 
@@ -415,14 +409,14 @@ def main():
                         if 'hessian' in task.input_dict else {})
 
         if use_xtb:
-            hessian_drv = XtbHessianDriver(task.mpi_comm, task.ostream)
+            hessian_drv = XtbHessianDriver(xtb_drv)
             hessian_drv.update_settings(method_dict, hessian_dict)
-            hessian_drv.compute(task.molecule, xtb_drv)
+            hessian_drv.compute(task.molecule)
 
         elif scf_drv.scf_type == 'restricted':
-            hessian_drv = ScfHessianDriver(task.mpi_comm, task.ostream)
+            hessian_drv = ScfHessianDriver(scf_drv)
             hessian_drv.update_settings(method_dict, hessian_dict)
-            hessian_drv.compute(task.molecule, task.ao_basis, scf_drv)
+            hessian_drv.compute(task.molecule, task.ao_basis)
 
         if task.mpi_rank == mpi_master():
             hessian_drv.vibrational_analysis(task.molecule)
@@ -447,16 +441,18 @@ def main():
         if run_ground_state_gradient:
 
             if use_xtb:
-                grad_drv = XtbGradientDriver(task.mpi_comm, task.ostream)
+                grad_drv = XtbGradientDriver(xtb_drv)
                 opt_drv = OptimizationDriver(grad_drv)
+                opt_drv.keep_files = True
                 opt_drv.update_settings(opt_dict)
-                opt_drv.compute(task.molecule, xtb_drv)
+                opt_results = opt_drv.compute(task.molecule)
 
             elif scf_drv.scf_type == 'restricted':
-                grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream)
+                grad_drv = ScfGradientDriver(scf_drv)
                 opt_drv = OptimizationDriver(grad_drv)
+                opt_drv.keep_files = True
                 opt_drv.update_settings(opt_dict)
-                opt_drv.compute(task.molecule, task.ao_basis, scf_drv)
+                opt_results = opt_drv.compute(task.molecule, task.ao_basis)
 
         elif run_excited_state_gradient:
 
@@ -480,9 +476,10 @@ def main():
             tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
 
             opt_drv = OptimizationDriver(tddftgrad_drv)
+            opt_drv.keep_files = True
             opt_drv.update_settings(opt_dict)
-            opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
-                            rsp_prop.rsp_driver, rsp_prop._rsp_property)
+            opt_results = opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
+                                          rsp_prop.rsp_driver)
 
     # Ground state Hessian / Vibrational analysis
 
@@ -552,7 +549,6 @@ def main():
         polgrad_drv.compute(task.molecule, task.ao_basis, 
                             scf_drv.scf_tensors, rsp_prop._rsp_property)
     
-
     # Response
 
     if task_type == 'response' and scf_drv.scf_type == 'restricted':
@@ -743,5 +739,4 @@ def main():
 
     # All done
 
-    print_libxc_reference(method_dict.get('xcfun', None), task.ostream)
     task.finish()

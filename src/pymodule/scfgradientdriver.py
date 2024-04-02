@@ -45,23 +45,22 @@ class ScfGradientDriver(GradientDriver):
     """
     Implements SCF gradient driver.
 
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
+    :param scf_drv:
+        The SCF driver.
 
     Instance variables
         - flag: The driver flag.
         - delta_h: The displacement for finite difference.
     """
 
-    def __init__(self, comm=None, ostream=None):
+    def __init__(self, scf_drv):
         """
         Initializes gradient driver.
         """
 
-        super().__init__(comm, ostream)
+        super().__init__(scf_drv.comm, scf_drv.ostream)
 
+        self.scf_driver = scf_drv
         self.flag = 'SCF Gradient Driver'
 
     def compute(self, molecule, ao_basis, scf_drv):
@@ -72,8 +71,6 @@ class ScfGradientDriver(GradientDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param scf_drv:
-            The SCF driver.
         """
 
         dft_sanity_check(self, 'compute')
@@ -194,7 +191,7 @@ class ScfGradientDriver(GradientDriver):
         if self.rank == mpi_master():
             self.gradient += self.grad_nuc_contrib(molecule)
 
-    def compute_energy(self, molecule, ao_basis, scf_drv):
+    def compute_energy(self, molecule, ao_basis):
         """
         Computes the energy at current geometry.
 
@@ -202,23 +199,19 @@ class ScfGradientDriver(GradientDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param scf_drv:
-            The SCF driver.
 
         :return:
             The energy.
         """
 
-        scf_drv.ostream.mute()
-
-        scf_drv.restart = False
-        scf_drv.compute(molecule, ao_basis)
-        assert_msg_critical(scf_drv.is_converged,
+        self.ostream.mute()
+        self.scf_driver.restart = False
+        self.scf_driver.compute(molecule, ao_basis)
+        assert_msg_critical(self.scf_driver.is_converged,
                             'ScfGradientDriver: SCF did not converge')
+        self.ostream.unmute()
 
-        scf_drv.ostream.unmute()
-
-        return scf_drv.get_scf_energy()
+        return self.scf_driver.get_scf_energy()
 
     def __deepcopy__(self, memo):
         """

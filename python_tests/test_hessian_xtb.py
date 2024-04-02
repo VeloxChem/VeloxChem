@@ -23,15 +23,15 @@ class TestXtbHessianDriver:
 
         xtb_method = 'gfn2'
 
-        xtb_drv = XtbDriver(task.mpi_comm)
-        xtb_drv.mute()
+        xtb_drv = XtbDriver(task.mpi_comm, task.ostream)
+        xtb_drv.ostream.mute()
 
         xtb_drv.set_method(xtb_method.lower())
-        xtb_drv.compute(task.molecule, task.ostream)
+        xtb_drv.compute(task.molecule)
 
-        xtb_hessian_drv = XtbHessianDriver()
-        xtb_hessian_drv.ostream.state = False
-        xtb_hessian_drv.compute(task.molecule, xtb_drv)
+        xtb_hessian_drv = XtbHessianDriver(xtb_drv)
+        xtb_hessian_drv.ostream.mute()
+        xtb_hessian_drv.compute(task.molecule)
 
         if is_mpi_master(task.mpi_comm):
             xtb_hessian_drv.vibrational_analysis(task.molecule)

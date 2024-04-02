@@ -61,7 +61,7 @@ monkey:cron_deploy:
       python .gitlab/trigger.py \
         --tarball "$TARBALL" \
         --url "$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/$CI_JOB_ID/artifacts/$TARBALL" \
-        --commit "package={'build': '$((("$(date +"%Y")" - 2022)*53 + 22 + "$(date +"%V")"))', 'label': 'main'}"
+        --commit "package={'build': '$((("$(date +"%Y")" - 2022)*53 + 22 + 10#"$(date +"%V")"))', 'label': 'main'}"
   artifacts:
     paths:
       - "$TARBALL"

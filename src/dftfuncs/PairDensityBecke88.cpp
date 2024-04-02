@@ -48,7 +48,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double density = rho[2 * g + 0];
 
-        if (density < 1.0e-8)
+        if (density < 1.0e-16)
         {
             exc[g] = 0.0;
 
@@ -92,8 +92,8 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
         if (pair_density < -1.0e-30)
         {
             double zeta = std::sqrt(-2.0 * pair_density) / density;
-            double dzeta_drho = -M_SQRT2*sqrt(-pair_density)/pow(density, 2);
-            double dzeta_dpi = (1.0/2.0)*M_SQRT2*sqrt(-pair_density)/(density*pair_density);
+            double dzeta_drho = - sqrt(-2.0 * pair_density)/pow(density, 2);
+            double dzeta_dpi = (1.0/2.0)* sqrt(-2.0 * pair_density)/(density*pair_density);
 
             double gradI = 0.5 * sig * zeta;
             double dgradI_dzeta = (1.0/2.0)*sig;
@@ -121,7 +121,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
             double dgrada2_dpi = dgradR_dpi + dgradI_dpi;
             double dgrada2_dsig = dgradR_dsig + dgradI_dsig;
 
-            double gradb2 = gradR - gradI;
+            double gradb2 = std::max(0.0, gradR - gradI);
             double dgradb2_drho = dgradR_drho - dgradI_drho;
             double dgradb2_dpi = dgradR_dpi - dgradI_dpi;
             double dgradb2_dsig = dgradR_dsig - dgradI_dsig;
@@ -134,7 +134,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             double gradb = std::sqrt(gradb2);
             double dgradb_dgradb2 = 0.0;
-            if (rb > 1.0e-16)
+            if (gradb2 > 1.0e-16)
             {
                 dgradb_dgradb2 = (1.0/2.0)/sqrt(gradb2);
             }

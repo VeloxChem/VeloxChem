@@ -34,6 +34,16 @@ from .veloxchemlib import CommonNeighbors
 from .veloxchemlib import mpi_master, hartree_in_kcalpermol, bohr_in_angstrom
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
+from .scfrestdriver import ScfRestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
+from .scfrestopendriver import ScfRestrictedOpenDriver
+from .scfgradientdriver import ScfGradientDriver
+from .xtbdriver import XtbDriver
+from .xtbgradientdriver import XtbGradientDriver
+from .openmmdriver import OpenMMDriver
+from .openmmgradientdriver import OpenMMGradientDriver
+from .mmdriver import MMDriver
+from .mmgradientdriver import MMGradientDriver
 from .inputparser import parse_input, print_keywords, get_random_string_parallel
 from .errorhandler import assert_msg_critical
 
@@ -45,8 +55,8 @@ class OptimizationDriver:
     """
     Implements optimization driver.
 
-    :param grad_drv:
-        The gradient driver.
+    :param drv:
+        The energy or gradient driver.
 
     Instance variables
         - rank: The rank of MPI process.
@@ -65,10 +75,34 @@ class OptimizationDriver:
         - hessian: The flag for computing Hessian.
     """
 
-    def __init__(self, grad_drv):
+    def __init__(self, drv):
         """
         Initializes optimization driver.
         """
+
+        if isinstance(drv, (ScfRestrictedDriver, ScfUnrestrictedDriver,
+                            ScfRestrictedOpenDriver)):
+            grad_drv = ScfGradientDriver(drv)
+
+        elif isinstance(drv, XtbDriver):
+            grad_drv = XtbGradientDriver(drv)
+
+        elif isinstance(drv, OpenMMDriver):
+            grad_drv = OpenMMGradientDriver(drv)
+
+        elif isinstance(drv, MMDriver):
+            grad_drv = MMGradientDriver(drv)
+
+        elif (isinstance(drv, ScfGradientDriver) or
+              isinstance(drv, XtbGradientDriver) or
+              isinstance(drv, OpenMMGradientDriver) or
+              isinstance(drv, MMGradientDriver)):
+            grad_drv = drv
+
+        else:
+            assert_msg_critical(
+                False,
+                'OptimizationDriver: Invalid argument for initialization')
 
         self.comm = grad_drv.comm
         self.rank = grad_drv.comm.Get_rank()
@@ -90,9 +124,9 @@ class OptimizationDriver:
 
         self.ref_xyz = None
 
-        self.keep_files = True
+        self.keep_files = False
 
-        self.filename = 'veloxchem_opt_' + get_random_string_parallel(self.comm)
+        self.filename = 'vlx_' + get_random_string_parallel(self.comm)
         self.grad_drv = grad_drv
 
         self.cna = False
@@ -185,6 +219,14 @@ class OptimizationDriver:
             assert_msg_critical(hasattr(geometric, 'normal_modes'), err_msg)
 
         self.print_header()
+
+        valstr = 'Using geomeTRIC for geometry optimization.'
+        self.ostream.print_info(valstr)
+        self.ostream.print_blank()
+        self.ostream.print_reference(self.get_geometric_reference())
+        self.ostream.print_blank()
+        self.ostream.flush()
+
         start_time = tm.time()
 
         opt_engine = OptimizationEngine(self.grad_drv, molecule, *args)
@@ -216,9 +258,20 @@ class OptimizationDriver:
 
         if self.constraints:
             constr_file = Path(filename + '.constr.txt')
+            constr_dict = {'freeze': [], 'set': [], 'scan': []}
+            for line in self.constraints:
+                content = line.strip().split()
+                key, val = content[0], ' '.join(content[1:])
+                assert_msg_critical(
+                    key in ['freeze', 'set', 'scan'],
+                    'OptimizationDriver: Invalid constraint {:s}'.format(key))
+                constr_dict[key].append(val)
             with constr_file.open('w') as fh:
-                for line in self.constraints:
-                    print(line, file=fh)
+                for key in ['freeze', 'set', 'scan']:
+                    if constr_dict[key]:
+                        print(f'${key}', file=fh)
+                        for line in constr_dict[key]:
+                            print(line, file=fh)
             constr_filename = constr_file.as_posix()
         else:
             constr_filename = None
@@ -250,6 +303,8 @@ class OptimizationDriver:
                 self.print_vib_analysis(filename, 'vdata_first')
             final_mol = molecule
 
+            opt_results = {'final_geometry': final_mol.get_xyz_string()}
+
         else:
             coords = m.xyzs[-1] / geometric.nifty.bohr2ang
             labels = molecule.get_labels()
@@ -262,6 +317,8 @@ class OptimizationDriver:
                 final_mol = Molecule()
             final_mol.broadcast(self.rank, self.comm)
 
+            opt_results = {'final_geometry': final_mol.get_xyz_string()}
+
             if self.rank == mpi_master():
                 self.grad_drv.ostream.print_info(
                     'Geometry optimization completed.')
@@ -269,10 +326,50 @@ class OptimizationDriver:
 
                 self.ostream.print_block(final_mol.get_string())
 
-                if self.constraints and '$scan' in self.constraints:
+                is_scan_job = False
+                if self.constraints:
+                    for line in self.constraints:
+                        key = line.strip().split()[0]
+                        is_scan_job = (key == 'scan')
+
+                if is_scan_job:
                     self.print_scan_result(m)
+
+                    all_energies = []
+                    all_coords_au = []
+                    for step, energy, xyz in zip(m.comms, m.qm_energies,
+                                                 m.xyzs):
+                        if step.split()[:2] == ['Iteration', '0']:
+                            all_energies.append([])
+                            all_coords_au.append([])
+                        all_energies[-1].append(energy)
+                        all_coords_au[-1].append(xyz / geometric.nifty.bohr2ang)
+
+                    opt_results['scan_energies'] = [
+                        opt_energies[-1] for opt_energies in all_energies
+                    ]
+
+                    opt_results['scan_geometries'] = []
+                    labels = molecule.get_labels()
+                    for opt_coords_au in all_coords_au:
+                        mol = Molecule(labels, opt_coords_au[-1], units='au')
+                        opt_results['scan_geometries'].append(
+                            mol.get_xyz_string())
+
                 else:
                     self.print_opt_result(m)
+
+                    opt_results['opt_energies'] = list(m.qm_energies)
+
+                    opt_results['opt_geometries'] = []
+                    labels = molecule.get_labels()
+                    for xyz in m.xyzs:
+                        mol = Molecule(labels,
+                                       xyz / geometric.nifty.bohr2ang,
+                                       units='au')
+                        opt_results['opt_geometries'].append(
+                            mol.get_xyz_string())
+
                     if self.ref_xyz:
                         self.print_ic_rmsd(final_mol, self.ref_xyz)
                     else:
@@ -290,12 +387,14 @@ class OptimizationDriver:
                 self.ostream.print_blank()
                 self.ostream.flush()
 
+            opt_results = self.comm.bcast(opt_results, root=mpi_master())
+
         try:
             temp_dir.cleanup()
         except (NotADirectoryError, PermissionError):
             pass
 
-        return final_mol
+        return opt_results
 
     def conv_flags(self):
         """
@@ -635,6 +734,13 @@ class OptimizationDriver:
 
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def get_geometric_reference(self):
+        """
+        Gets reference string for geomeTRIC.
+        """
+
+        return 'L.-P. Wang and C.C. Song, J. Chem. Phys. 2016, 144, 214108'
 
     def cna_analysis(self, last_mol, start_mol, ref_mol):
         """

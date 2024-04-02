@@ -24,8 +24,10 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+import sys
 
 from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
+from .outputstream import OutputStream
 
 
 class OpenMMDriver:
@@ -34,6 +36,8 @@ class OpenMMDriver:
 
     :param comm:
         The MPI communicator.
+    :param ostream:
+        The output stream.
 
     Instance variables
         - integrator_temperature: The temperature.
@@ -43,7 +47,7 @@ class OpenMMDriver:
         - gradient: The gradient.
     """
 
-    def __init__(self, comm=None):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes OpenMM driver.
         """
@@ -53,9 +57,17 @@ class OpenMMDriver:
         if comm is None:
             comm = MPI.COMM_WORLD
 
+        if ostream is None:
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
+
         self.comm = comm
         self.rank = comm.Get_rank()
         self.nodes = comm.Get_size()
+
+        self.ostream = ostream
 
         self.integrator_temperature = 298.15 * kelvin
         self.integrator_friction_coeff = 1 / picosecond

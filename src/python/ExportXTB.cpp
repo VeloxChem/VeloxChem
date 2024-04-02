@@ -48,11 +48,11 @@ void
 export_xtb(py::module& m)
 {
     // CXtbDriver class
+    // Note: XtbDriver is prefixed by an underscore and will be used in xtbdriver.py
 
-    PyClass<CXtbDriver>(m, "XtbDriver")
+    PyClass<CXtbDriver>(m, "_XtbDriver")
         .def(py::init(&vlx_general::create<CXtbDriver>), "comm"_a = py::none())
         .def_static("is_available", &CXtbDriver::isAvailable, "Checks if XTB package is available.")
-        .def("is_master_node", &CXtbDriver::isMasterNode, "Checks if XTB driver is running on master node.")
         .def("set_max_iter", &CXtbDriver::setMaxIterations, "Sets maximum number of SCF iterations.", "maxIterations"_a)
         .def("set_elec_temp", &CXtbDriver::setElectronicTemp, "Sets electronic temperature for electron smearing.", "electronicTemp"_a)
         .def("set_method", &CXtbDriver::setMethod, "Sets XTB method.", "method"_a)
@@ -77,8 +77,38 @@ export_xtb(py::module& m)
                 return vlx_general::pointer_to_numpy(dipole.data(), dipole.size());
             },
             "Gets molecular dipole moment as numpy array.")
-        // prefixed by an underscore because it will be decorated in xtbdriver.py
-        .def("_compute", &CXtbDriver::compute);
+        .def(
+            "get_partial_charges",
+            [](const CXtbDriver& self) -> py::array_t<double> {
+                auto partial_charges = self.getPartialCharges();
+                return vlx_general::pointer_to_numpy(partial_charges.data(), partial_charges.size());
+            },
+            "Gets partial charges as numpy array.")
+        .def(
+            "get_bond_orders",
+            [](const CXtbDriver& self) -> py::array_t<double> {
+                auto n_atoms     = self.getNumberOfAtoms();
+                auto bond_orders = self.getBondOrders();
+                return vlx_general::pointer_to_numpy(bond_orders.data(), n_atoms, n_atoms);
+            },
+            "Gets bond orders as numpy array of shape (natoms, natoms).")
+        .def(
+            "get_orbital_energies",
+            [](const CXtbDriver& self) -> py::array_t<double> {
+                auto nao              = self.getNumberOfAOs();
+                auto orbital_energies = self.getOrbitalEnergies();
+                return vlx_general::pointer_to_numpy(orbital_energies.data(), nao);
+            },
+            "Gets orbital energies as numpy array.")
+        .def(
+            "get_orbital_occupations",
+            [](const CXtbDriver& self) -> py::array_t<double> {
+                auto nao                 = self.getNumberOfAOs();
+                auto orbital_occupations = self.getOrbitalOccupations();
+                return vlx_general::pointer_to_numpy(orbital_occupations.data(), nao);
+            },
+            "Gets orbital occupation numbers as numpy array.")
+        .def("compute", &CXtbDriver::compute);
 }
 
 }  // namespace vlx_xtb

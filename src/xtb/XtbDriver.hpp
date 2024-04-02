@@ -237,6 +237,48 @@ class CXtbDriver
      @return the molecular dipole moment.
     */
     std::vector<double> getDipole() const;
+
+    /**
+     Gets partial charges as vector (order: natoms).
+
+     @return the partial charges.
+    */
+    std::vector<double> getPartialCharges() const;
+
+    /**
+     Gets bond orders as vector (order: natoms).
+
+     @return the bond orders.
+    */
+    std::vector<double> getBondOrders() const;
+
+    /**
+     Gets number of Atoms.
+
+     @return the number of Atoms.
+    */
+    int32_t getNumberOfAtoms() const;
+
+    /**
+     Gets number of AOs.
+
+     @return the number of AOs.
+    */
+    int32_t getNumberOfAOs() const;
+
+    /**
+     Gets orbital energies as vector (order: naos).
+
+     @return the orbital energies.
+    */
+    std::vector<double> getOrbitalEnergies() const;
+
+    /**
+     Gets orbital occupation numbers as vector (order: naos).
+
+     @return the orbital occupation numbers.
+    */
+    std::vector<double> getOrbitalOccupations() const;
 };
 
 #endif /* XtbDriver_hpp */

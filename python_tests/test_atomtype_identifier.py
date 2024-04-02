@@ -4,7 +4,9 @@ from veloxchem.molecule import Molecule
 
 class TestAtomTypeIdentifier:
 
-    def run_atomtypeidentifier(self, xyz_string, expected_atomtypes):
+    def run_atomtypeidentifier(self, xyz_string, expected_atomtypes,
+                               expected_equal_charges_list,
+                               expected_equiv_atoms):
 
         atomtypeidentifier = AtomTypeIdentifier()
         atomtypeidentifier.ostream.mute()
@@ -14,9 +16,22 @@ class TestAtomTypeIdentifier:
 
         assert atomtypes == expected_atomtypes
 
+        atomtypeidentifier.identify_equivalences()
+        equal_charges_list = []
+        equal_charges = atomtypeidentifier.equivalent_charges
+        if equal_charges:
+            for eq_types in equal_charges.split(','):
+                equal_charges_list.append(
+                    sorted([int(eq_at) for eq_at in eq_types.split('=')]))
+            equal_charges_list.sort()
+
+        assert equal_charges_list == expected_equal_charges_list
+
+        assert atomtypeidentifier.equivalent_atoms == expected_equiv_atoms
+
     def test_atomtypeidentifier_1(self):
 
-        mol = """11
+        xyz_string = """11
         (1E)-1-bromo-3-isocyanato-1-propene
         Br -2.267871 -0.291954 -0.040277
         O 3.663540 -1.567304 0.108174
@@ -33,12 +48,19 @@ class TestAtomTypeIdentifier:
         expected_atomtypes = [
             'br', 'o', 'n2', 'c3', 'c2', 'c2', 'c1', 'h1', 'h1', 'ha', 'h4'
         ]
+        expected_equal_charges_list = [[8, 9]]
+        expected_equiv_atoms = [
+            'br_00', 'o_00', 'n2_00', 'c3_00', 'c2_00', 'c2_01', 'c1_00',
+            'h1_00', 'h1_00', 'ha_00', 'h4_00'
+        ]
 
-        self.run_atomtypeidentifier(mol, expected_atomtypes)
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_2(self):
 
-        mol = """16
+        xyz_string = """16
         bicyclopropyl
         C 0.000000 1.843020 0.753782
         C 0.427743 0.611952 0.000000
@@ -61,12 +83,21 @@ class TestAtomTypeIdentifier:
             'cx', 'cx', 'cx', 'cx', 'cx', 'cx', 'hc', 'hc', 'hc', 'hc', 'hc',
             'hc', 'hc', 'hc', 'hc', 'hc'
         ]
+        expected_equal_charges_list = [[1, 3, 5, 6], [2, 4],
+                                       [7, 8, 10, 11, 13, 14, 15, 16], [9, 12]]
+        expected_equiv_atoms = [
+            'cx_00', 'cx_01', 'cx_00', 'cx_01', 'cx_00', 'cx_00', 'hc_00',
+            'hc_00', 'hc_01', 'hc_00', 'hc_00', 'hc_01', 'hc_00', 'hc_00',
+            'hc_00', 'hc_00'
+        ]
 
-        self.run_atomtypeidentifier(mol, expected_atomtypes)
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_3(self):
 
-        mol = """8
+        xyz_string = """8
         carbonochloridodithioic acid
         Cl -0.142353 1.682318 0.000006
         S 0.908059 -1.112252 -0.000003
@@ -78,12 +109,19 @@ class TestAtomTypeIdentifier:
         H 2.437174 0.555726 -0.893110
         """
         expected_atomtypes = ['cl', 'ss', 's', 'cs', 'c3', 'h1', 'h1', 'h1']
+        expected_equal_charges_list = [[6, 7, 8]]
+        expected_equiv_atoms = [
+            'cl_00', 'ss_00', 's_00', 'cs_00', 'c3_00', 'h1_00', 'h1_00',
+            'h1_00'
+        ]
 
-        self.run_atomtypeidentifier(mol, expected_atomtypes)
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_4(self):
 
-        mol = """8
+        xyz_string = """8
         hexachloroethane
         C 0.000000 0.000000 0.792268
         C 0.000000 0.000000 -0.792268
@@ -95,12 +133,19 @@ class TestAtomTypeIdentifier:
         Cl 1.454268 0.839622 -1.403393
         """
         expected_atomtypes = ['c3', 'c3', 'cl', 'cl', 'cl', 'cl', 'cl', 'cl']
+        expected_equal_charges_list = [[1, 2], [3, 4, 5, 6, 7, 8]]
+        expected_equiv_atoms = [
+            'c3_00', 'c3_00', 'cl_00', 'cl_00', 'cl_00', 'cl_00', 'cl_00',
+            'cl_00'
+        ]
 
-        self.run_atomtypeidentifier(mol, expected_atomtypes)
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_5(self):
 
-        mol = """9
+        xyz_string = """9
         propanedial
         C 1.070710 -0.368234 0.146305
         C -1.282848 0.323971 -0.320122
@@ -113,40 +158,19 @@ class TestAtomTypeIdentifier:
         H -0.168069 0.776197 1.422723
         """
         expected_atomtypes = ['c', 'c', 'c3', 'o', 'o', 'h4', 'h4', 'hc', 'hc']
+        expected_equal_charges_list = [[1, 2], [4, 5], [6, 7], [8, 9]]
+        expected_equiv_atoms = [
+            'c_00', 'c_00', 'c3_00', 'o_00', 'o_00', 'h4_00', 'h4_00', 'hc_00',
+            'hc_00'
+        ]
 
-        self.run_atomtypeidentifier(mol, expected_atomtypes)
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_6(self):
 
-        mol = """16
-        1-methylcyclopentene
-        C -0.756198 0.073934 -0.002520
-        H -0.343604 2.171486 -0.066463
-        C 0.023743 1.153783 -0.022376
-        H -2.647844 -0.452806 0.859762
-        H -2.606606 -0.553100 -0.889410
-        H -2.679983 1.029419 -0.103430
-        C -2.248786 0.030965 -0.036722
-        H -0.043702 -1.617124 1.120770
-        H -0.250301 -1.964412 -0.582053
-        C 0.069948 -1.188503 0.117983
-        H 1.780513 -0.916913 -1.185058
-        H 2.249118 -1.218041 0.478619
-        C 1.515599 -0.711239 -0.147209
-        H 1.879408 1.089875 1.069321
-        H 2.101884 1.357766 -0.645531
-        C 1.489213 0.820035 0.081422
-        """
-        expected_atomtypes = [
-            'c2', 'ha', 'c2', 'hc', 'hc', 'hc', 'c3', 'hc', 'hc', 'c5', 'hc',
-            'hc', 'c5', 'hc', 'hc', 'c5'
-        ]
-
-        self.run_atomtypeidentifier(mol, expected_atomtypes)
-
-    def test_atomtypeidentifier_7(self):
-
-        mol = """10
+        xyz_string = """10
         2-bromoethylisocyanate
         Br -1.348575 -0.496729 0.033420
         O 2.744713 -1.356928 -0.005847
@@ -162,12 +186,19 @@ class TestAtomTypeIdentifier:
         expected_atomtypes = [
             'br', 'o', 'n2', 'c3', 'c3', 'c1', 'h1', 'h1', 'h1', 'h1'
         ]
+        expected_equal_charges_list = [[7, 8], [9, 10]]
+        expected_equiv_atoms = [
+            'br_00', 'o_00', 'n2_00', 'c3_00', 'c3_01', 'c1_00', 'h1_00',
+            'h1_00', 'h1_01', 'h1_01'
+        ]
 
-        self.run_atomtypeidentifier(mol, expected_atomtypes)
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
-    def test_atomtypeidentifier_8(self):
+    def test_atomtypeidentifier_7(self):
 
-        mol = """12
+        xyz_string = """12
         2-pyridinol
         N -1.176140 0.295001 0.000000
         C 0.000000 0.900809 0.000000
@@ -186,12 +217,19 @@ class TestAtomTypeIdentifier:
             'nb', 'ca', 'ca', 'ca', 'ca', 'ca', 'oh', 'ha', 'ha', 'ha', 'h4',
             'ho'
         ]
+        expected_equal_charges_list = []
+        expected_equiv_atoms = [
+            'nb_00', 'ca_00', 'ca_01', 'ca_02', 'ca_03', 'ca_04', 'oh_00',
+            'ha_00', 'ha_01', 'ha_02', 'h4_00', 'ho_00'
+        ]
 
-        self.run_atomtypeidentifier(mol, expected_atomtypes)
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
-    def test_atomtypeidentifier_9(self):
+    def test_atomtypeidentifier_8(self):
 
-        mol = """19
+        xyz_string = """19
         3-methyl-1H-indole
         C 2.400164 0.371989 0.000000
         C 2.378036 -1.032831 0.000000
@@ -217,12 +255,20 @@ class TestAtomTypeIdentifier:
             'ca', 'ca', 'ca', 'ca', 'cc', 'ca', 'cd', 'ca', 'c3', 'na', 'ha',
             'ha', 'ha', 'ha', 'h4', 'hc', 'hc', 'hc', 'hn'
         ]
+        expected_equal_charges_list = [[16, 17, 18]]
+        expected_equiv_atoms = [
+            'ca_00', 'ca_01', 'ca_02', 'ca_03', 'cc_00', 'ca_04', 'cc_01',
+            'ca_05', 'c3_00', 'na_00', 'ha_00', 'ha_01', 'ha_02', 'ha_03',
+            'h4_00', 'hc_00', 'hc_00', 'hc_00', 'hn_00'
+        ]
 
-        self.run_atomtypeidentifier(mol, expected_atomtypes)
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
-    def test_atomtypeidentifier_10(self):
+    def test_atomtypeidentifier_9(self):
 
-        mol = """22
+        xyz_string = """22
         4-propylphenol
         C -0.358008 -1.192497 -0.280254
         C -0.343198 1.192831 -0.282150
@@ -251,12 +297,22 @@ class TestAtomTypeIdentifier:
             'ca', 'ca', 'ca', 'ca', 'ca', 'ca', 'c3', 'c3', 'c3', 'oh', 'ha',
             'ha', 'ha', 'ha', 'hc', 'hc', 'hc', 'hc', 'hc', 'hc', 'hc', 'ho'
         ]
+        expected_equal_charges_list = [[1, 2], [3, 4], [11, 12], [13, 14],
+                                       [15, 16, 17], [18, 19], [20, 21]]
+        expected_equiv_atoms = [
+            'ca_00', 'ca_00', 'ca_01', 'ca_01', 'ca_02', 'ca_03', 'c3_00',
+            'c3_01', 'c3_02', 'oh_00', 'ha_00', 'ha_00', 'ha_01', 'ha_01',
+            'hc_00', 'hc_00', 'hc_00', 'hc_01', 'hc_01', 'hc_02', 'hc_02',
+            'ho_00'
+        ]
 
-        self.run_atomtypeidentifier(mol, expected_atomtypes)
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
-    def test_atomtypeidentifier_11(self):
+    def test_atomtypeidentifier_10(self):
 
-        mol = """35
+        xyz_string = """35
         hs276
         C  4.373000  0.283000 -0.025000
         C  4.415000  1.595000 -0.512000
@@ -300,5 +356,296 @@ class TestAtomTypeIdentifier:
             'cd', 'ha', 'cd', 'ha', 'ss', 'cc', 'c', 'o', 'os', 'c3', 'h1',
             'h1', 'h1'
         ]
+        expected_equal_charges_list = [[33, 34, 35]]
+        expected_equiv_atoms = [
+            'ca_00', 'ca_01', 'h4_00', 'nb_00', 'ca_02', 'h4_01', 'ca_03',
+            'ha_00', 'ca_04', 'cc_00', 'ha_01', 'cc_01', 'h4_02', 'na_00',
+            'cc_02', 'ss_00', 'cc_03', 'ha_02', 'cc_04', 'ha_03', 'cc_05',
+            'cc_06', 'cc_07', 'ha_04', 'cc_08', 'ha_05', 'ss_01', 'cc_09',
+            'c_00', 'o_00', 'os_00', 'c3_00', 'h1_00', 'h1_00', 'h1_00'
+        ]
 
-        self.run_atomtypeidentifier(mol, expected_atomtypes)
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
+
+    def test_atomtypeidentifier_hexatriene(self):
+
+        xyz_string = """14
+        hexatriene
+        C     -4.25966    -1.52840     0.04900
+        C     -2.93241    -1.66109    -0.01724
+        H     -4.74560    -1.00165     0.87382
+        H     -4.90399    -1.95396    -0.72224
+        C     -2.03936    -1.12221     0.98343
+        H     -2.49052    -2.19802    -0.86169
+        C     -0.70820    -1.27308     0.92617
+        H     -2.48902    -0.57469     1.81552
+        H     -0.25517    -1.82532     0.10111
+        C      0.18073    -0.73586     1.93157
+        C      1.50990    -0.89760     1.88986
+        H     -0.26288    -0.18121     2.75110
+        H      2.00545    -1.44399     1.09891
+        H      2.14185    -0.48639     2.66959
+        """
+        expected_atomtypes = [
+            'c2', 'ce', 'ha', 'ha', 'ce', 'ha', 'cf', 'ha', 'ha', 'cf', 'c2',
+            'ha', 'ha', 'ha'
+        ]
+        expected_equal_charges_list = [[1, 11], [2, 10], [3, 4, 13, 14], [5, 7],
+                                       [6, 12], [8, 9]]
+        expected_equiv_atoms = [
+            'c2_00', 'ce_00', 'ha_00', 'ha_00', 'ce_01', 'ha_01', 'ce_01',
+            'ha_02', 'ha_02', 'ce_00', 'c2_00', 'ha_01', 'ha_00', 'ha_00'
+        ]
+
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
+
+    def test_atomtypeidentifier_water(self):
+
+        xyz_string = """3
+        water
+        O      1.035010   -0.055790    0.042900
+        H      2.002900   -0.067860    0.087740
+        H      0.756160   -0.297060    0.939000
+        """
+        expected_atomtypes = ['ow', 'hw', 'hw']
+        expected_equal_charges_list = [[2, 3]]
+        expected_equiv_atoms = ['ow_00', 'hw_00', 'hw_00']
+
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
+
+    def test_atomtypeidentifier_butane(self):
+
+        xyz_string = """14
+        butane
+        C     -1.962049    0.121016    0.000050
+        H     -2.109257    0.754214    0.888026
+        H     -2.109343    0.754296   -0.887853
+        H     -2.751897   -0.643609    0.000052
+        C     -0.568377   -0.514088   -0.000056
+        H     -0.463006   -1.168632    0.880682
+        H     -0.463086   -1.168544   -0.880871
+        C      0.568377    0.514088   -0.000056
+        H      0.463086    1.168542   -0.880872
+        H      0.463006    1.168634    0.880681
+        C      1.962049   -0.121016    0.000051
+        H      2.109336   -0.754313   -0.887842
+        H      2.751897    0.643609    0.000031
+        H      2.109264   -0.754197    0.888037
+        """
+        expected_atomtypes = [
+            'c3', 'hc', 'hc', 'hc', 'c3', 'hc', 'hc', 'c3', 'hc', 'hc', 'c3',
+            'hc', 'hc', 'hc'
+        ]
+        expected_equal_charges_list = [[1, 11], [2, 3, 4, 12, 13, 14], [5, 8],
+                                       [6, 7, 9, 10]]
+        expected_equiv_atoms = [
+            'c3_00', 'hc_00', 'hc_00', 'hc_00', 'c3_01', 'hc_01', 'hc_01',
+            'c3_01', 'hc_01', 'hc_01', 'c3_00', 'hc_00', 'hc_00', 'hc_00'
+        ]
+
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
+
+    def test_atomtypeidentifier_noradrenaline(self):
+
+        xyz_string = """23
+        noradrenaline
+        H       -1.8193999674   -2.5097458050   -0.5507950455
+        C       -1.4355452194   -1.5284769930   -0.2951571832
+        C       -2.3089191215   -0.4593458985   -0.1886635299
+        O       -3.6690464443   -0.5422210733   -0.3841138405
+        C       -1.8255516449    0.8097372093    0.1469046451
+        C       -0.4687604354    0.9845502431    0.3694347370
+        H       -0.1169650009    1.9731850398    0.6359161766
+        C        0.4203521635   -0.0850019011    0.2563051158
+        C        1.9048341672    0.1432961237    0.4528861030
+        C       -0.0738036281   -1.3439593880   -0.0746469636
+        H        0.6049466138   -2.1813113202   -0.1482676236
+        O       -2.6753261092    1.8678164911    0.2657837532
+        H       -3.9133744651   -1.4429007059   -0.6142762974
+        H       -3.5694739457    1.5581900821    0.0765607930
+        O        2.5513450005   -0.9759063254    1.0721777983
+        H        2.0561900870    1.0385736809    1.0650086348
+        C        2.6349951121    0.3620412906   -0.8693646417
+        H        2.1445626765    1.1787081547   -1.4017612725
+        N        4.0273077512    0.7299013711   -0.6192540306
+        H        2.5065073570   -0.5476233229   -1.4727537911
+        H        4.4869804996   -0.0238192548   -0.1223947057
+        H        4.5220904955    0.8575433726   -1.4930596178
+        H        2.1653934540   -1.1046663754    1.9436295799
+        """
+        expected_atomtypes = [
+            'ha', 'ca', 'ca', 'oh', 'ca', 'ca', 'ha', 'ca', 'c3', 'ca', 'ha',
+            'oh', 'ho', 'ho', 'oh', 'h1', 'c3', 'h1', 'n8', 'h1', 'hn', 'hn',
+            'ho'
+        ]
+        expected_equal_charges_list = [[18, 20], [21, 22]]
+        expected_equiv_atoms = [
+            'ha_00', 'ca_00', 'ca_01', 'oh_00', 'ca_02', 'ca_03', 'ha_01',
+            'ca_04', 'c3_00', 'ca_05', 'ha_02', 'oh_01', 'ho_00', 'ho_01',
+            'oh_02', 'h1_00', 'c3_01', 'h1_01', 'n8_00', 'h1_01', 'hn_00',
+            'hn_00', 'ho_02'
+        ]
+
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
+
+    def test_atomtypeidentifier_cp_cq(self):
+
+        xyz_string = """32
+        xyz
+        H        1.1673441590   -0.0821866308    2.1271909485
+        C        0.6586062417   -0.0005495445    1.1771168299
+        C       -0.7218673637   -0.0512289398    1.1263803686
+        H       -1.2922480539   -0.1550274045    2.0377238497
+        C       -1.3682069297    0.0262234602   -0.0957706434
+        H       -2.4464775443   -0.0143946079   -0.1443980069
+        C       -0.6287644469    0.1611958503   -1.2558786645
+        H       -1.1305981043    0.2434344334   -2.2095647452
+        C        0.7609221227    0.2202912208   -1.2185463116
+        C        1.4153505362    0.1283553145    0.0165906712
+        C        2.8860272242    0.1286042338    0.1134558978
+        C        3.5300742505    0.9749334630    1.0113047892
+        H        2.9434445471    1.6501346714    1.6184808256
+        C        4.9092856982    0.9743426865    1.1118846260
+        H        5.3976456758    1.6427000944    1.8064445777
+        C        5.6631328744    0.1210917057    0.3242614036
+        H        6.7404109854    0.1211236916    0.4025216543
+        C        5.0300710653   -0.7344290167   -0.5621549172
+        H        5.6132956512   -1.4075405705   -1.1735783420
+        C        3.6522044767   -0.7315182035   -0.6685288459
+        H        3.1615867319   -1.4065656074   -1.3543855146
+        C        1.5064144323    0.4140453044   -2.4750979986
+        C        2.4571879071    1.4243664184   -2.5915601389
+        H        2.6500109290    2.0733627293   -1.7498760743
+        C        3.1424769108    1.6078187675   -3.7775713848
+        H        3.8769180470    2.3962173809   -3.8555811912
+        C        2.8902741230    0.7856231452   -4.8633058376
+        H        3.4303414002    0.9270458491   -5.7879590051
+        C        1.9408138716   -0.2166304037   -4.7596363743
+        H        1.7385781106   -0.8599502363   -5.6039491168
+        C        1.2497622241   -0.3983505582   -3.5756958481
+        H        0.5171222467   -1.1889186966   -3.4924774810
+        """
+        expected_atomtypes = [
+            'ha', 'ca', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'cp', 'cq', 'cq',
+            'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'cp',
+            'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha'
+        ]
+        expected_equal_charges_list = [[1, 8], [2, 7], [3, 5], [4, 6], [9, 10],
+                                       [11, 22], [12, 20, 23, 31],
+                                       [13, 21, 24, 32], [14, 18, 25, 29],
+                                       [15, 19, 26, 30], [16, 27], [17, 28]]
+        expected_equiv_atoms = [
+            'ha_00', 'ca_00', 'ca_01', 'ha_01', 'ca_01', 'ha_01', 'ca_00',
+            'ha_00', 'cp_00', 'cp_00', 'cp_01', 'ca_02', 'ha_02', 'ca_03',
+            'ha_03', 'ca_04', 'ha_04', 'ca_03', 'ha_03', 'ca_02', 'ha_02',
+            'cp_01', 'ca_02', 'ha_02', 'ca_03', 'ha_03', 'ca_04', 'ha_04',
+            'ca_03', 'ha_03', 'ca_02', 'ha_02'
+        ]
+
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
+
+    def test_atomtypeidentifier_ca(self):
+
+        xyz_string = """21
+        xyz
+        C        0.8897639463   -0.1087654484    1.0322914605
+        C       -0.4774462285   -0.0844278058    1.2524483984
+        H       -0.8695823487   -0.1506983070    2.2554761434
+        C       -1.3175925426    0.0260732885    0.1614716518
+        H       -2.3864598096    0.0467778064    0.3121273511
+        C       -0.8011433781    0.1108588749   -1.1281276916
+        H       -1.4761982453    0.1966148230   -1.9665051811
+        C        0.5610040855    0.0864636795   -1.3455290887
+        H        0.9586235234    0.1524139661   -2.3470643742
+        C        1.4287346959   -0.0241758459   -0.2627176332
+        C        2.8681996475   -0.0687984828   -0.2514214218
+        C        3.3807381806   -0.1859946729    1.0517183078
+        C        4.7432730758   -0.2461446845    1.2930569073
+        H        5.1149144347   -0.3361434012    2.3020262208
+        C        5.6055464484   -0.1881828550    0.2153118007
+        H        6.6712242092   -0.2335276601    0.3822918333
+        C        5.1153861239   -0.0720503492   -1.0820807374
+        H        5.8072005735   -0.0283577995   -1.9099898215
+        C        3.7578613784   -0.0122850155   -1.3204820193
+        H        3.3806175601    0.0777846220   -2.3279786741
+        S        2.1227346696   -0.2425447327    2.2672865678
+        """
+        expected_atomtypes = [
+            'ca', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ca',
+            'ca', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ss'
+        ]
+        expected_equal_charges_list = [[1, 12], [2, 13], [3, 14], [4, 15],
+                                       [5, 16], [6, 17], [7, 18], [8, 19],
+                                       [9, 20], [10, 11]]
+        expected_equiv_atoms = [
+            'ca_00', 'ca_01', 'ha_00', 'ca_02', 'ha_01', 'ca_03', 'ha_02',
+            'ca_04', 'ha_03', 'ca_05', 'ca_05', 'ca_00', 'ca_01', 'ha_00',
+            'ca_02', 'ha_01', 'ca_03', 'ha_02', 'ca_04', 'ha_03', 'ss_00'
+        ]
+
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
+
+    def test_atomtypeidentifier_cp(self):
+
+        xyz_string = """26
+        xyz
+        H        1.2137168024    0.0902122683    2.1092215444
+        C        0.7223202047    0.0602901529    1.1483294823
+        C       -0.6556876326    0.1559960961    1.0892283978
+        H       -1.2282384130    0.2414466534    2.0013243712
+        C       -1.2991715930    0.1463279158   -0.1359619808
+        H       -2.3757173300    0.2177414304   -0.1863201165
+        C       -0.5549456446    0.0597353253   -1.3003777877
+        H       -1.0535894891    0.0664767739   -2.2597537177
+        C        0.8258192837   -0.0296262095   -1.2530354598
+        C        1.4799708311   -0.0487288848   -0.0145285957
+        C        2.9422509352   -0.1673090514    0.0112283721
+        C        3.6281289974   -0.6685800669    1.1141541991
+        H        3.0788677991   -1.0142107532    1.9770269584
+        C        5.0080976742   -0.7536042189    1.1112411030
+        H        5.5244643908   -1.1464895305    1.9749754296
+        C        5.7254749775   -0.3398829685    0.0024339116
+        H        6.8037732184   -0.4017679549   -0.0025553806
+        C        5.0533641524    0.1406531780   -1.1086962387
+        H        5.6100474692    0.4511733059   -1.9820691787
+        C        3.6714253373    0.2236465154   -1.1190913196
+        C        1.6531074181   -0.1056740071   -2.5034558188
+        C        2.9217684286    0.7239737633   -2.3196913633
+        H        1.0796392306    0.2500540338   -3.3611283153
+        H        1.9300727528   -1.1488414730   -2.6923782047
+        H        3.5505781838    0.6708003671   -3.2100741635
+        H        2.6458720151    1.7728973393   -2.1640061282
+        """
+        expected_atomtypes = [
+            'ha', 'ca', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'cp', 'cp',
+            'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'c3', 'c3',
+            'hc', 'hc', 'hc', 'hc'
+        ]
+        expected_equal_charges_list = [[1, 13], [2, 12], [3, 14], [4, 15],
+                                       [5, 16], [6, 17], [7, 18], [8, 19],
+                                       [9, 20], [10, 11], [21, 22],
+                                       [23, 24, 25, 26]]
+        expected_equiv_atoms = [
+            'ha_00', 'ca_00', 'ca_01', 'ha_01', 'ca_02', 'ha_02', 'ca_03',
+            'ha_03', 'ca_04', 'cp_00', 'cp_00', 'ca_00', 'ha_00', 'ca_01',
+            'ha_01', 'ca_02', 'ha_02', 'ca_03', 'ha_03', 'ca_04', 'c3_00',
+            'c3_00', 'hc_00', 'hc_00', 'hc_00', 'hc_00'
+        ]
+
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)

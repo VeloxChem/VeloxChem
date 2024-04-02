@@ -37,8 +37,7 @@ from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import dft_sanity_check
 from .errorhandler import assert_msg_critical
-from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_random_string_parallel)
+from .inputparser import parse_input, print_keywords, print_attributes
 from .qqscheme import get_qq_scheme
 from .dftutils import get_default_grid_level
 from .batchsize import get_batch_size
@@ -133,8 +132,7 @@ class NonlinearSolver:
         self.program_end_time = None
 
         # filename
-        self._filename = 'veloxchem_rsp_' + get_random_string_parallel(
-            self.comm)
+        self.filename = None
 
         # input keywords
         self._input_keywords = {
@@ -208,22 +206,6 @@ class NonlinearSolver:
 
         return self._is_converged
 
-    @property
-    def filename(self):
-        """
-        Getter function for protected filename attribute.
-        """
-
-        return self._filename
-
-    @filename.setter
-    def filename(self, value):
-        """
-        Setter function for protected filename attribute.
-        """
-
-        self._filename = value
-
     def print_keywords(self):
         """
         Prints input keywords in nonlinear solver.
@@ -260,9 +242,9 @@ class NonlinearSolver:
         if 'program_end_time' in rsp_dict:
             self.program_end_time = rsp_dict['program_end_time']
         if 'filename' in rsp_dict:
-            self._filename = rsp_dict['filename']
+            self.filename = rsp_dict['filename']
             if 'checkpoint_file' not in rsp_dict:
-                self.checkpoint_file = f'{self._filename}.rsp.h5'
+                self.checkpoint_file = f'{self.filename}.rsp.h5'
 
         method_keywords = {
             key: val[0]
@@ -325,14 +307,7 @@ class NonlinearSolver:
                           if self.grid_level is None else self.grid_level)
             grid_drv.set_level(grid_level)
 
-            grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule)
-            n_grid_points = molgrid.number_of_points()
-            self.ostream.print_info(
-                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
-                format(n_grid_points,
-                       tm.time() - grid_t0))
-            self.ostream.print_blank()
 
             if self.rank == mpi_master():
                 gs_density = AODensityMatrix([scf_tensors['D_alpha']],

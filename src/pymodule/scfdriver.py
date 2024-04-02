@@ -47,16 +47,17 @@ from .aofockmatrix import AOFockMatrix
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
 from .subcommunicators import SubCommunicators
+from .firstorderprop import FirstOrderProperties
 from .signalhandler import SignalHandler
 from .denguess import DensityGuess
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
-from .dftutils import get_default_grid_level
+from .dftutils import get_default_grid_level, print_libxc_reference
 from .sanitychecks import molecule_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
-from .checkpoint import create_hdf5, write_scf_tensors
+from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
 
 class ScfDriver:
@@ -150,6 +151,7 @@ class ScfDriver:
         self.eri_thresh_tight = 1.0e-15
 
         # iterations data
+        self._history = None
         self._iter_data = None
         self._is_converged = False
         self._scf_energy = 0.0
@@ -221,6 +223,9 @@ class ScfDriver:
         # scf tensors
         self._scf_tensors = None
 
+        # scf properties
+        self._scf_prop = None
+
         # timing and profiling
         self.timing = False
         self.profiling = False
@@ -234,8 +239,7 @@ class ScfDriver:
         self.program_end_time = None
 
         # filename
-        self._filename = 'veloxchem_scf_' + get_random_string_parallel(
-            self.comm)
+        self.filename = None
 
         # input keywords
         self._input_keywords = {
@@ -372,20 +376,12 @@ class ScfDriver:
         return self._scf_tensors
 
     @property
-    def filename(self):
+    def history(self):
         """
-        Getter function for protected filename attribute.
-        """
-
-        return self._filename
-
-    @filename.setter
-    def filename(self, value):
-        """
-        Setter function for protected filename attribute.
+        Returns the SCF history.
         """
 
-        self._filename = value
+        return self._history
 
     def print_keywords(self):
         """
@@ -423,9 +419,9 @@ class ScfDriver:
         if 'program_end_time' in scf_dict:
             self.program_end_time = scf_dict['program_end_time']
         if 'filename' in scf_dict:
-            self._filename = scf_dict['filename']
+            self.filename = scf_dict['filename']
             if 'checkpoint_file' not in scf_dict:
-                self.checkpoint_file = f'{self._filename}.scf.h5'
+                self.checkpoint_file = f'{self.filename}.scf.h5'
 
         method_keywords = {
             key: val[0]
@@ -476,9 +472,9 @@ class ScfDriver:
             cppe_potfile = None
             if self.rank == mpi_master():
                 potfile = self.pe_options['potfile']
-                if not Path(potfile).is_file():
+                if not Path(potfile).is_file() and self.filename is not None:
                     potfile = str(
-                        Path(self._filename).parent / Path(potfile).name)
+                        Path(self.filename).parent / Path(potfile).name)
                 cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
             cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
             self.pe_options['potfile'] = cppe_potfile
@@ -567,6 +563,8 @@ class ScfDriver:
 
         # generate integration grid
         if self._dft:
+            print_libxc_reference(self.xcfun, self.ostream)
+
             grid_drv = GridDriver(self.comm)
             grid_level = (get_default_grid_level(self.xcfun)
                           if self.grid_level is None else self.grid_level)
@@ -645,14 +643,19 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self._print_scf_energy()
+
             s2 = self.compute_s2(molecule, self.scf_tensors)
             self._print_ground_state(molecule, s2)
+
             if self.print_level == 2:
                 self.molecular_orbitals.print_orbitals(molecule, ao_basis,
                                                        False, self.ostream)
             if self.print_level == 3:
                 self.molecular_orbitals.print_orbitals(molecule, ao_basis, True,
                                                        self.ostream)
+
+            self._scf_prop.print_properties(molecule)
+
             self.ostream.flush()
 
         return self.scf_tensors
@@ -791,7 +794,12 @@ class ScfDriver:
 
         self.restart = True
         if self.checkpoint_file is None:
-            self.checkpoint_file = f'{self._filename}.scf.h5'
+            if self.filename is not None:
+                base_fname = self.filename
+            else:
+                name_string = get_random_string_parallel(self.comm)
+                base_fname = 'vlx_' + name_string
+            self.checkpoint_file = f'{base_fname}.scf.h5'
         self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
         self.comm.barrier()
 
@@ -827,6 +835,12 @@ class ScfDriver:
         :param profiler:
             The profiler.
         """
+
+        self._scf_tensors = None
+
+        self._scf_prop = FirstOrderProperties(self.comm, self.ostream)
+
+        self._history = []
 
         if not self._first_step:
             profiler.begin({
@@ -1000,6 +1014,8 @@ class ScfDriver:
                 'diff_energy': diff_e_scf,
             }
 
+            self._history.append(self._iter_data)
+
             # update density and energy
 
             self._density = AODensityMatrix(den_mat)
@@ -1057,72 +1073,75 @@ class ScfDriver:
             self.write_checkpoint(molecule.elem_ids_to_numpy(),
                                   ao_basis.get_label())
 
-        if (self.rank == mpi_master() and (not self._first_step) and
-                self.is_converged):
-            S = ovl_mat.to_numpy()
+        if (not self._first_step) and self.is_converged:
 
-            C_alpha = self.molecular_orbitals.alpha_to_numpy()
-            C_beta = self.molecular_orbitals.beta_to_numpy()
+            if self.rank == mpi_master():
+                S = ovl_mat.to_numpy()
 
-            E_alpha = self.molecular_orbitals.ea_to_numpy()
-            E_beta = self.molecular_orbitals.eb_to_numpy()
+                C_alpha = self.molecular_orbitals.alpha_to_numpy()
+                C_beta = self.molecular_orbitals.beta_to_numpy()
 
-            D_alpha = self.density.alpha_to_numpy(0)
-            D_beta = self.density.beta_to_numpy(0)
+                E_alpha = self.molecular_orbitals.ea_to_numpy()
+                E_beta = self.molecular_orbitals.eb_to_numpy()
 
-            F_alpha = fock_mat.alpha_to_numpy(0)
-            F_beta = fock_mat.beta_to_numpy(0)
+                n_mo = C_alpha.shape[1]
+                occ_alpha = molecule.get_aufbau_alpha_occupation(n_mo)
+                occ_beta = molecule.get_aufbau_beta_occupation(n_mo)
 
-            # Saving the xc energy to be able to compute
-            # the numerical gradient.
-            if self._dft:
-                xc_energy = vxc_mat.get_energy()
-                #vxc_mat_np = vxc_mat #.alpha_to_numpy(0)
+                D_alpha = self.density.alpha_to_numpy(0)
+                D_beta = self.density.beta_to_numpy(0)
+
+                F_alpha = fock_mat.alpha_to_numpy(0)
+                F_beta = fock_mat.beta_to_numpy(0)
+
+                self._scf_tensors = {
+                    # eri info
+                    'eri_thresh': self.eri_thresh,
+                    'qq_type': self.qq_type,
+                    # scf info
+                    'scf_type': self.scf_type,
+                    'scf_energy': self.scf_energy,
+                    'restart': self.restart,
+                    # scf tensors
+                    'S': S,
+                    'C_alpha': C_alpha,
+                    'C_beta': C_beta,
+                    'E_alpha': E_alpha,
+                    'E_beta': E_beta,
+                    'occ_alpha': occ_alpha,
+                    'occ_beta': occ_beta,
+                    'D_alpha': D_alpha,
+                    'D_beta': D_beta,
+                    'F_alpha': F_alpha,
+                    'F_beta': F_beta,
+                    # for backward compatibility
+                    'C': C_alpha,
+                    'E': E_alpha,
+                    'D': (D_alpha, D_beta),
+                    'F': (F_alpha, F_beta),
+                }
+
+                if self._dft:
+                    # dft info
+                    self._scf_tensors['xcfun'] = self.xcfun.get_func_label()
+                    if self.grid_level is not None:
+                        self._scf_tensors['grid_level'] = self.grid_level
+
+                if self._pe:
+                    # pe info
+                    self._scf_tensors['potfile'] = self.potfile
+
             else:
-                xc_energy = 0
-                vxc_mat = None
+                self._scf_tensors = None
 
-            self._scf_tensors = {
-                # eri info
-                'eri_thresh': self.eri_thresh,
-                'qq_type': self.qq_type,
-                # scf info
-                'scf_type': self.scf_type,
-                'scf_energy': self.scf_energy,
-                'restart': self.restart,
-                # scf tensors
-                'S': S,
-                'C_alpha': C_alpha,
-                'C_beta': C_beta,
-                'E_alpha': E_alpha,
-                'E_beta': E_beta,
-                'D_alpha': D_alpha,
-                'D_beta': D_beta,
-                'F_alpha': F_alpha,
-                'F_beta': F_beta,
-                'xc_energy': xc_energy, # TODO: remove after analytical xc derivative works.
-                'vxc_mat': vxc_mat, # TODO: remove after analytical xc derivatives work.
-                # for backward compatibility
-                'C': C_alpha,
-                'E': E_alpha,
-                'D': (D_alpha, D_beta),
-                'F': (F_alpha, F_beta),
-            }
+            self._scf_prop.compute_scf_prop(molecule, ao_basis,
+                                            self.scf_tensors)
 
-            if self._dft:
-                # dft info
-                self._scf_tensors['xcfun'] = self.xcfun.get_func_label()
-                if self.grid_level is not None:
-                    self._scf_tensors['grid_level'] = self.grid_level
+            if self.rank == mpi_master():
+                self._scf_tensors['dipole_moment'] = np.array(
+                    self._scf_prop.get_property('dipole_moment'))
 
-            if self._pe:
-                # pe info
-                self._scf_tensors['potfile'] = self.potfile
-
-            self._write_final_hdf5(molecule, ao_basis)
-
-        else:
-            self._scf_tensors = None
+                self._write_final_hdf5(molecule, ao_basis)
 
         if self.rank == mpi_master():
             self._print_scf_finish(diis_start_time)
@@ -2346,7 +2365,7 @@ class ScfDriver:
 
     def _write_final_hdf5(self, molecule, ao_basis):
         """
-        Writes final HDF5 that contains SCF tensors.
+        Writes final HDF5 that contains SCF results.
 
         :param molecule:
             The molecule.
@@ -2358,7 +2377,7 @@ class ScfDriver:
             return
 
         final_h5_fname = str(
-            Path(self.checkpoint_file).with_suffix('.tensors.h5'))
+            Path(self.checkpoint_file).with_suffix('.results.h5'))
 
         if self._dft:
             xc_label = self.xcfun.get_func_label()
@@ -2372,9 +2391,10 @@ class ScfDriver:
             potfile_text = ''
 
         create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
-        write_scf_tensors(final_h5_fname, self.scf_tensors)
+        write_scf_results_to_hdf5(final_h5_fname, self.scf_tensors,
+                                  self.history)
 
         self.ostream.print_blank()
-        checkpoint_text = 'SCF tensors written to file: '
+        checkpoint_text = 'SCF results written to file: '
         checkpoint_text += final_h5_fname
         self.ostream.print_info(checkpoint_text)
