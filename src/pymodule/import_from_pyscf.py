@@ -79,9 +79,9 @@ def get_pyscf_integral_type(int_type):
             "nuclear_attraction_second_derivative_101"      : "int1e_ipnucip",
             "nuclear_attraction_second_derivative_020"      : "int1e_ipiprinv",
             "nuclear_attraction_second_derivative_110"      : "int1e_iprinvip",
-            "electron_repulsion_second_derivative_2_0_0_0"  : "int2e_ipip1",
-            "electron_repulsion_second_derivative_1_1_0_0"  : "int2e_ipvip1",
-            "electron_repulsion_second_derivative_1_0_1_0"  : "int2e_ip1ip2",
+            "electron_repulsion_second_derivative_2000"  : "int2e_ipip1",
+            "electron_repulsion_second_derivative_1100"  : "int2e_ipvip1",
+            "electron_repulsion_second_derivative_1010"  : "int2e_ip1ip2",
         }
     if int_type not in int_dict.keys():
         error_text = "Unrecognized integral type: " + int_type +". "
@@ -3254,7 +3254,8 @@ def eri_second_deriv(molecule, basis, i=0, j=0, unit="au"):
                          + eri_deriv_atom_12.transpose(0,1,4,5,2,3)
                          + eri_deriv_atom_12.transpose(0,1,5,4,2,3)
                          + eri_deriv_atom_12.transpose(0,1,4,5,3,2)
-                         + eri_deriv_atom_12.transpose(0,1,5,4,3,2) )
+                         + eri_deriv_atom_12.transpose(0,1,5,4,3,2) 
+						)
 
     vlx_eri_deriv_atom_ii = np.zeros(eri_deriv_atom_ii.shape)
     vlx_eri_deriv_atom_ij = np.zeros(eri_deriv_atom_ij.shape)
