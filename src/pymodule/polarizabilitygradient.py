@@ -265,9 +265,10 @@ class PolarizabilityGradient():
                 # only alpha part:
                 gs_dm = scf_tensors['D_alpha']
                 # TODO: MPI should this be done before loop over freqs?
-                cphf_ov = all_orbrsp_results['cphf_ov']
-                dof = int(cphf_ov.shape[0] / n_freqs)
-                lambda_mo = cphf_ov.reshape(n_freqs, dof, nocc, nvir)[f]
+                #cphf_ov = all_orbrsp_results['cphf_ov']
+                #dof = int(cphf_ov.shape[0] / n_freqs)
+                #lambda_mo = cphf_ov.reshape(n_freqs, dof, nocc, nvir)[f]
+                lambda_mo = orbrsp_results['lambda_mo']
 
                 # spin summation already included:
                 x_plus_y = orbrsp_results['x_plus_y_ao']
@@ -511,24 +512,16 @@ class PolarizabilityGradient():
                 x_plus_y = orbrsp_results['x_plus_y_ao']
                 x_minus_y = orbrsp_results['x_minus_y_ao']
 
-                # TODO: MPI should this be done before loop over freqs?
-                #cphf_ov = all_orbrsp_results['cphf_ov']
-                #n_lambdas = int(cphf_ov.shape[0] / n_freqs)
-                #lambda_mo = cphf_ov.reshape(n_freqs, n_lambdas, nocc, nvir)[f]
-
-                # spin summation already included:
-                #x_plus_y = orbrsp_results['x_plus_y_ao']
-                #x_minus_y = orbrsp_results['x_minus_y_ao']
-
                 dof = x_plus_y.shape[0]  # Number of vector components
 
                 omega_ao = orbrsp_results['omega_ao'].reshape(dof, dof, nao, nao)
-                cphf_ov = all_orbrsp_results['cphf_ov']
-                len_lambdas = int(cphf_ov.shape[0] / n_freqs)
-                # select lambda for frequency with index f
-                lambda_mo = cphf_ov.reshape(n_freqs, len_lambdas, nocc, nvir)[f]
-                # reshape lambda to complex
-                lambda_mo = lambda_mo[:dof**2] + 1j * lambda_mo[dof**2:]
+                # cphf_ov = all_orbrsp_results['cphf_ov']
+                # len_lambdas = int(cphf_ov.shape[0] / n_freqs)
+
+                # select lambda for frequency with index f and reshape to complex
+                # lambda_mo = cphf_ov.reshape(n_freqs, len_lambdas, nocc, nvir)[f]
+                # lambda_mo = lambda_mo[:dof**2] + 1j * lambda_mo[dof**2:]
+                lambda_mo = orbrsp_results['lambda_mo']
 
                 # transform lambda multipliers to AO basis and
                 # calculate relaxed density matrix
