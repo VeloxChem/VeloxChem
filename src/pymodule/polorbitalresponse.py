@@ -296,31 +296,62 @@ class PolOrbitalResponse(CphfSolver):
                     # XCIntegrator expects a DM with real and imaginary part,
                     # so we set the imaginary part to zero.
                     # Create lists with the corresponding vector components
-                    perturbed_dm_ao_list = []
-                    zero_dm_ao_list = []
+                    #perturbed_dm_ao_list = []
+                    #zero_dm_ao_list = []
+                    perturbed_dm_ao_list_real = []
+                    perturbed_dm_ao_list_imag = []
+                    zero_dm_ao_list_real = []
+                    zero_dm_ao_list_imag = []
                     # TODO: only upper triangular matrix and transpose?
                     for x in range(dof):
                         for y in range(dof):
-                            perturbed_dm_ao_list.extend([
-                                x_minus_y_ao[x], 0 * x_minus_y_ao[x],
-                                x_minus_y_ao[y], 0 * x_minus_y_ao[y]
-                            ])
-                            zero_dm_ao_list.extend(
-                                [0 * x_minus_y_ao[x], 0 * x_minus_y_ao[y]])
+                            #perturbed_dm_ao_list.extend([
+                            #    x_minus_y_ao[x], 0 * x_minus_y_ao[x],
+                            #    x_minus_y_ao[y], 0 * x_minus_y_ao[y]
+                            #])
+                            #zero_dm_ao_list.extend(
+                            #    [0 * x_minus_y_ao[x], 0 * x_minus_y_ao[y]])
 
-                    perturbed_dm_ao = AODensityMatrix(perturbed_dm_ao_list,
+                            perturbed_dm_ao_list_real.extend([
+                                np.array(x_minus_y_ao[x].real),
+                                np.array(0 * x_minus_y_ao[x].real),
+                                np.array(x_minus_y_ao[y].real),
+                                np.array(0 * x_minus_y_ao[y].real)])
+                            perturbed_dm_ao_list_imag.extend([
+                                np.array(x_minus_y_ao[x].imag),
+                                np.array(0 * x_minus_y_ao[x].imag),
+                                np.array(x_minus_y_ao[y].imag),
+                                np.array(0 * x_minus_y_ao[y].imag)])
+                            zero_dm_ao_list_real.extend([
+                                np.array(0 * x_minus_y_ao[x].real),
+                                np.array(0 * x_minus_y_ao[y].real)])
+                            zero_dm_ao_list_imag.extend([
+                                np.array(0 * x_minus_y_ao[x].imag),
+                                np.array(0 * x_minus_y_ao[y].imag)])
+
+                    #perturbed_dm_ao = AODensityMatrix(perturbed_dm_ao_list,
+                    #                                  denmat.rest)
+                    perturbed_dm_ao_real = AODensityMatrix(perturbed_dm_ao_list_real,
+                                                      denmat.rest)
+                    perturbed_dm_ao_imag = AODensityMatrix(perturbed_dm_ao_list_imag,
                                                       denmat.rest)
 
                     # corresponds to rho^{omega_b,omega_c} in quadratic response,
                     # which is zero for orbital response
-                    zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
+                    #zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
+                    zero_dm_ao_real = AODensityMatrix(zero_dm_ao_list_real, denmat.rest)
+                    zero_dm_ao_imag = AODensityMatrix(zero_dm_ao_list_imag, denmat.rest)
             else:
                 dof = None
                 dm_ao_rhs_real = AODensityMatrix()
                 dm_ao_rhs_imag = AODensityMatrix()
                 if self._dft:
-                    perturbed_dm_ao = AODensityMatrix()
-                    zero_dm_ao = AODensityMatrix()
+                    #perturbed_dm_ao = AODensityMatrix()
+                    #zero_dm_ao = AODensityMatrix()
+                    perturbed_dm_ao_real = AODensityMatrix()
+                    perturbed_dm_ao_imag = AODensityMatrix()
+                    zero_dm_ao_real = AODensityMatrix()
+                    zero_dm_ao_imag = AODensityMatrix()
 
             dof = self.comm.bcast(dof, root=mpi_master())
 
@@ -339,41 +370,87 @@ class PolOrbitalResponse(CphfSolver):
                 fock_ao_rhs_real.set_fock_type(fockmat.rgenjk, ifock)
                 fock_ao_rhs_imag.set_fock_type(fockmat.rgenjk, ifock)
             if self._dft:
-                perturbed_dm_ao.broadcast(self.rank, self.comm)
-                zero_dm_ao.broadcast(self.rank, self.comm)
-                fock_gxc_ao = AOFockMatrix(zero_dm_ao)
+                #perturbed_dm_ao.broadcast(self.rank, self.comm)
+                #zero_dm_ao.broadcast(self.rank, self.comm)
+                #fock_gxc_ao = AOFockMatrix(zero_dm_ao)
+                perturbed_dm_ao_real.broadcast(self.rank, self.comm)
+                perturbed_dm_ao_imag.broadcast(self.rank, self.comm)
+                zero_dm_ao_real.broadcast(self.rank, self.comm)
+                zero_dm_ao_imag.broadcast(self.rank, self.comm)
+                fock_gxc_ao_real = AOFockMatrix(zero_dm_ao_real)
+                fock_gxc_ao_imag = AOFockMatrix(zero_dm_ao_imag)
                 if self.xcfun.is_hybrid():
                     fact_xc = self.xcfun.get_frac_exact_exchange()
-                    for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
-                        fock_ao_rhs.set_scale_factor(fact_xc, ifock)
-                    for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                        fock_gxc_ao.set_scale_factor(fact_xc, ifock)
-                        fock_gxc_ao.set_fock_type(fockmat.rgenjkx, ifock)
+                    #for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
+                    #    fock_ao_rhs.set_scale_factor(fact_xc, ifock)
+                    #for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
+                    #    fock_gxc_ao.set_scale_factor(fact_xc, ifock)
+                    #    fock_gxc_ao.set_fock_type(fockmat.rgenjkx, ifock)
+                    #for ifock in range(dof**2):
+                    #    fock_ao_rhs.set_fock_type(fockmat.restjkx, ifock)
+                    #for ifock in range(dof**2, dof**2 + 2 * dof):
+                    #    fock_ao_rhs.set_fock_type(fockmat.rgenjkx, ifock)
+                    for ifock in range(fock_ao_rhs_real.number_of_fock_matrices()):
+                        fock_ao_rhs_real.set_scale_factor(fact_xc, ifock)
+                        fock_ao_rhs_imag.set_scale_factor(fact_xc, ifock)
+                    for ifock in range(fock_gxc_ao_real.number_of_fock_matrices()):
+                        fock_gxc_ao_real.set_scale_factor(fact_xc, ifock)
+                        fock_gxc_ao_imag.set_scale_factor(fact_xc, ifock)
+                        fock_gxc_ao_real.set_fock_type(fockmat.rgenjkx, ifock)
+                        fock_gxc_ao_imag.set_fock_type(fockmat.rgenjkx, ifock)
                     for ifock in range(dof**2):
-                        fock_ao_rhs.set_fock_type(fockmat.restjkx, ifock)
+                        fock_ao_rhs_real.set_fock_type(fockmat.restjkx, ifock)
+                        fock_ao_rhs_imag.set_fock_type(fockmat.restjkx, ifock)
+                        #fock_ao_rhs_real.set_fock_type(fockmat.restjkx, ifock)
+                        #fock_ao_rhs_imag.set_fock_type(fockmat.restjkx, ifock)
                     for ifock in range(dof**2, dof**2 + 2 * dof):
-                        fock_ao_rhs.set_fock_type(fockmat.rgenjkx, ifock)
+                        fock_ao_rhs_real.set_fock_type(fockmat.rgenjkx, ifock)
+                        fock_ao_rhs_imag.set_fock_type(fockmat.rgenjkx, ifock)
                 else:
+                    #for ifock in range(dof**2):
+                    #    fock_ao_rhs.set_fock_type(fockmat.restj, ifock)
+                    #for ifock in range(dof**2, dof**2 + 2 * dof):
+                    #    fock_ao_rhs.set_fock_type(fockmat.rgenj, ifock)
+                    #for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
+                    #    fock_gxc_ao.set_fock_type(fockmat.rgenj, ifock)
                     for ifock in range(dof**2):
-                        fock_ao_rhs.set_fock_type(fockmat.restj, ifock)
+                        fock_ao_rhs_real.set_fock_type(fockmat.restj, ifock)
+                        fock_ao_rhs_imag.set_fock_type(fockmat.restj, ifock)
                     for ifock in range(dof**2, dof**2 + 2 * dof):
-                        fock_ao_rhs.set_fock_type(fockmat.rgenj, ifock)
-                    for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                        fock_gxc_ao.set_fock_type(fockmat.rgenj, ifock)
+                        fock_ao_rhs_real.set_fock_type(fockmat.rgenj, ifock)
+                        fock_ao_rhs_imag.set_fock_type(fockmat.rgenj, ifock)
+                    for ifock in range(fock_gxc_ao_real.number_of_fock_matrices()):
+                        fock_gxc_ao_real.set_fock_type(fockmat.rgenj, ifock)
+                        fock_gxc_ao_imag.set_fock_type(fockmat.rgenj, ifock)
             else:
-                fock_gxc_ao = None  # None if not DFT
+                #fock_gxc_ao = None  # None if not DFT
+                fock_gxc_ao_real = None  # None if not DFT
+                fock_gxc_ao_imag = None  # None if not DFT
 
             if self._dft:
                 if not self.xcfun.is_hybrid():
-                    for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                        fock_gxc_ao.scale(2.0, ifock)
+                    #for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
+                    #    fock_gxc_ao.scale(2.0, ifock)
+                    for ifock in range(fock_gxc_ao_real.number_of_fock_matrices()):
+                        fock_gxc_ao_real.scale(2.0, ifock)
+                        fock_gxc_ao_imag.scale(2.0, ifock)
                 xc_drv = XCIntegrator(self.comm)
-                xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis,
-                                          perturbed_dm_ao, zero_dm_ao,
+                #xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis,
+                #                          perturbed_dm_ao, zero_dm_ao,
+                #                          gs_density, molgrid,
+                #                          self.xcfun.get_func_label(), "qrf")
+                xc_drv.integrate_kxc_fock(fock_gxc_ao_real, molecule, basis,
+                                          perturbed_dm_ao_real, zero_dm_ao_real,
+                                          gs_density, molgrid,
+                                          self.xcfun.get_func_label(), "qrf")
+                xc_drv.integrate_kxc_fock(fock_gxc_ao_imag, molecule, basis,
+                                          perturbed_dm_ao_imag, zero_dm_ao_imag,
                                           gs_density, molgrid,
                                           self.xcfun.get_func_label(), "qrf")
 
-                fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)
+                #fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)
+                fock_gxc_ao_real.reduce_sum(self.rank, self.nodes, self.comm)
+                fock_gxc_ao_imag.reduce_sum(self.rank, self.nodes, self.comm)
 
             self._comp_lr_fock(fock_ao_rhs_real, dm_ao_rhs_real, molecule,
                                basis, eri_dict, dft_dict, pe_dict,
@@ -541,10 +618,13 @@ class PolOrbitalResponse(CphfSolver):
 
                 # Add DFT E[3] contribution to the RHS:
                 if self._dft:
-                    gxc_ao = np.zeros((dof**2, nao, nao))
+                    #gxc_ao = np.zeros((dof**2, nao, nao))
+                    gxc_ao = np.zeros((dof**2, nao, nao), dtype=np.complex_)
 
                     for i in range(dof**2):
-                        gxc_ao[i] = fock_gxc_ao.alpha_to_numpy(2 * i)
+                        #gxc_ao[i] = fock_gxc_ao.alpha_to_numpy(2 * i)
+                        gxc_ao[i] = (fock_gxc_ao_real.alpha_to_numpy(2 * i)
+                                     + 1j * fock_gxc_ao_imag.alpha_to_numpy(2 * i))
 
                     gxc_mo = np.array([
                         np.linalg.multi_dot([mo_occ.T, gxc_ao[x], mo_vir])
@@ -566,7 +646,9 @@ class PolOrbitalResponse(CphfSolver):
                     'unrel_dm_ao': unrel_dm_ao,
                     'fock_ao_rhs_real': fock_ao_rhs_real,
                     'fock_ao_rhs_imag': fock_ao_rhs_imag,
-                    'fock_gxc_ao': fock_gxc_ao,  # None if not DFT
+                    #'fock_gxc_ao': fock_gxc_ao,  # None if not DFT
+                    'fock_gxc_ao_real': fock_gxc_ao_real,  # None if not DFT
+                    'fock_gxc_ao_imag': fock_gxc_ao_imag,  # None if not DFT
                 }
                 if (f == 0):
                     tot_rhs_mo = np.concatenate((rhs_mo.real, rhs_mo.imag))
@@ -1368,7 +1450,9 @@ class PolOrbitalResponse(CphfSolver):
                 # Get fock matrices from cphf_results
                 fock_ao_rhs_real = self.cphf_results[w]['fock_ao_rhs_real']
                 fock_ao_rhs_imag = self.cphf_results[w]['fock_ao_rhs_imag']
-                fock_gxc_ao = self.cphf_results[w]['fock_gxc_ao']
+                #fock_gxc_ao = self.cphf_results[w]['fock_gxc_ao']
+                fock_gxc_ao_real = self.cphf_results[w]['fock_gxc_ao_real']
+                fock_gxc_ao_imag = self.cphf_results[w]['fock_gxc_ao_imag']
                 dm_oo = self.cphf_results[w]['dm_oo']  # complex
                 dm_vv = self.cphf_results[w]['dm_vv']  # complex
 
@@ -1644,11 +1728,15 @@ class PolOrbitalResponse(CphfSolver):
 
                         if self._dft:
                             factor = -0.5
-                            omega[m * dof + n] += factor * np.linalg.multi_dot([
-                                D_occ,
-                                fock_gxc_ao.alpha_to_numpy(2 *
-                                                           (m * dof + n)), D_occ
-                            ])
+                            #omega[m * dof + n] += factor * np.linalg.multi_dot([
+                            #    D_occ, fock_gxc_ao.alpha_to_numpy(2 * (m * dof + n)), D_occ
+                            #])
+                            omega[m * dof + n] += factor * (
+                                    np.linalg.multi_dot([
+                                        D_occ, fock_gxc_ao_real.alpha_to_numpy(2 * (m * dof + n)), D_occ])
+                                    + 1j * np.linalg.multi_dot([
+                                        D_occ, fock_gxc_ao_imag.alpha_to_numpy(2 * (m * dof + n)), D_occ])
+                                    )
 
                 # add omega multipliers in AO basis to cphf_results dictionary
                 self.cphf_results[(w)]['omega_ao'] = omega
