@@ -144,9 +144,9 @@ class CScreeningData
     std::vector<double>   _Q_K_sp;
     std::vector<double>   _Q_K_pp;
 
-    std::vector<uint32_t> _D_aoinds_K_ss;
-    std::vector<uint32_t> _D_aoinds_K_sp;
-    std::vector<uint32_t> _D_aoinds_K_pp;
+    std::vector<uint32_t> _D_inds_K_ss;
+    std::vector<uint32_t> _D_inds_K_sp;
+    std::vector<uint32_t> _D_inds_K_pp;
 
     std::vector<uint32_t> _pair_displs_K_ss;
     std::vector<uint32_t> _pair_displs_K_sp;
@@ -159,8 +159,6 @@ class CScreeningData
     std::vector<double>   _pair_data_K_ss;
     std::vector<double>   _pair_data_K_sp;
     std::vector<double>   _pair_data_K_pp;
-
-    std::vector<uint32_t> _pair_inds_K_pp;
 
     std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_ss;
     std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_ss;
@@ -304,9 +302,9 @@ class CScreeningData
     auto get_Q_K_sp() const -> const std::vector<double>&;
     auto get_Q_K_pp() const -> const std::vector<double>&;
 
-    auto get_D_aoinds_K_ss() const -> const std::vector<uint32_t>&;
-    auto get_D_aoinds_K_sp() const -> const std::vector<uint32_t>&;
-    auto get_D_aoinds_K_pp() const -> const std::vector<uint32_t>&;
+    auto get_D_inds_K_ss() const -> const std::vector<uint32_t>&;
+    auto get_D_inds_K_sp() const -> const std::vector<uint32_t>&;
+    auto get_D_inds_K_pp() const -> const std::vector<uint32_t>&;
 
     auto get_pair_displs_K_ss() const -> const std::vector<uint32_t>&;
     auto get_pair_displs_K_sp() const -> const std::vector<uint32_t>&;
@@ -319,8 +317,6 @@ class CScreeningData
     auto get_pair_data_K_ss() const -> const std::vector<double>&;
     auto get_pair_data_K_sp() const -> const std::vector<double>&;
     auto get_pair_data_K_pp() const -> const std::vector<double>&;
-
-    auto get_pair_inds_K_pp() const -> const std::vector<uint32_t>&;
 
     auto get_local_pair_inds_i_for_K_ss(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
     auto get_local_pair_inds_k_for_K_ss(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
