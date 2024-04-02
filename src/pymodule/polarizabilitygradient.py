@@ -671,7 +671,11 @@ class PolarizabilityGradient():
 
                             rhow_dm = 1.0 * rel_dm_ao[i, i]
                             rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
-                            rhow_den_sym = AODensityMatrix([rhow_dm_sym],
+                            #rhow_den_sym = AODensityMatrix([rhow_dm_sym],
+                            #                               denmat.rest)
+                            rhow_den_sym_real = AODensityMatrix([rhow_dm_sym.real],
+                                                           denmat.rest)
+                            rhow_den_sym_imag = AODensityMatrix([rhow_dm_sym.imag],
                                                            denmat.rest)
 
                             # Takes only one vector type, but two are needed
@@ -684,20 +688,36 @@ class PolarizabilityGradient():
                             # (see contraction with two-electron integrals above).
                             x_minus_y_sym = np.sqrt(2) * 0.5 * (x_minus_y[i] +
                                                                 x_minus_y[i].T)
-                            x_minus_y_den_sym = AODensityMatrix([x_minus_y_sym],
+                            #x_minus_y_den_sym = AODensityMatrix([x_minus_y_sym],
+                            #                                    denmat.rest)
+                            x_minus_y_den_sym_real = AODensityMatrix([x_minus_y_sym_real],
+                                                                denmat.rest)
+                            x_minus_y_den_sym_imag = AODensityMatrix([x_minus_y_sym_imag],
                                                                 denmat.rest)
 
                         else:
                             gs_density = AODensityMatrix()
-                            rhow_den_sym = AODensityMatrix()
-                            x_minus_y_den_sym = AODensityMatrix()
+                            #rhow_den_sym = AODensityMatrix()
+                            rhow_den_sym_real = AODensityMatrix()
+                            rhow_den_sym_imag = AODensityMatrix()
+                            #x_minus_y_den_sym = AODensityMatrix()
+                            x_minus_y_den_sym_real = AODensityMatrix()
+                            x_minus_y_den_sym_imag = AODensityMatrix()
 
                         gs_density.broadcast(self.rank, self.comm)
-                        rhow_den_sym.broadcast(self.rank, self.comm)
-                        x_minus_y_den_sym.broadcast(self.rank, self.comm)
+                        #rhow_den_sym.broadcast(self.rank, self.comm)
+                        rhow_den_sym_real.broadcast(self.rank, self.comm)
+                        rhow_den_sym_imag.broadcast(self.rank, self.comm)
+                        #x_minus_y_den_sym.broadcast(self.rank, self.comm)
+                        x_minus_y_den_sym_real.broadcast(self.rank, self.comm)
+                        x_minus_y_den_sym_imag.broadcast(self.rank, self.comm)
 
+                        #polgrad_xcgrad = self.grad_polgrad_xc_contrib(
+                        #    molecule, basis, rhow_den_sym, x_minus_y_den_sym,
+                        #    gs_density, xcfun_label)
+                        # TODO make xc_contrib function for complex case!!
                         polgrad_xcgrad = self.grad_polgrad_xc_contrib(
-                            molecule, basis, rhow_den_sym, x_minus_y_den_sym,
+                            molecule, basis, rhow_den_sym_real, x_minus_y_den_sym_real,
                             gs_density, xcfun_label)
 
                         if self.rank == mpi_master():
