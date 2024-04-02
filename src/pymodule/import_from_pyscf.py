@@ -63,18 +63,22 @@ def get_pyscf_integral_type(int_type):
             "kinetic_energy_derivative"                     : "int1e_ipkin",
             "nuclear_attraction_derivative_operator"        : "int1e_iprinv",
             "nuclear_attraction_derivative_orbitals"        : "int1e_ipnuc",
+            "overlap_derivative_100"                        : "int1e_ipovlp",
+            "kinetic_energy_derivative_100"                 : "int1e_ipkin",
+            "nuclear_attraction_derivative_010"             : "int1e_iprinv",
+            "nuclear_attraction_derivative_100"             : "int1e_ipnuc",
             # electric dipole deriv. calculated numerically
             "numerical_electric_dipole_derivative"          : "int1e",
             "electric_dipole_derivative"                    : "int1e_irp",
             "electron_repulsion_derivative"                 : "int2e_ip1",
-            "overlap_second_derivative_2_0"                 : "int1e_ipipovlp",
-            "overlap_second_derivative_1_1"                 : "int1e_ipovlpip",
-            "kinetic_energy_second_derivative_2_0"          : "int1e_ipipkin",
-            "kinetic_energy_second_derivative_1_1"          : "int1e_ipkinip",
-            "nuclear_attraction_second_derivative_orbs_2_0" : "int1e_ipipnuc",
-            "nuclear_attraction_second_derivative_orbs_1_1" : "int1e_ipnucip",
-            "nuclear_attraction_second_derivative_op_2_0"   : "int1e_ipiprinv",
-            "nuclear_attraction_second_derivative_op_1_1"   : "int1e_iprinvip",
+            "overlap_second_derivative_200"                 : "int1e_ipipovlp",
+            "overlap_second_derivative_101"                 : "int1e_ipovlpip",
+            "kinetic_energy_second_derivative_200"          : "int1e_ipipkin",
+            "kinetic_energy_second_derivative_101"          : "int1e_ipkinip",
+            "nuclear_attraction_second_derivative_200"      : "int1e_ipipnuc",
+            "nuclear_attraction_second_derivative_101"      : "int1e_ipnucip",
+            "nuclear_attraction_second_derivative_020"      : "int1e_ipiprinv",
+            "nuclear_attraction_second_derivative_110"      : "int1e_iprinvip",
             "electron_repulsion_second_derivative_2_0_0_0"  : "int2e_ipip1",
             "electron_repulsion_second_derivative_1_1_0_0"  : "int2e_ipvip1",
             "electron_repulsion_second_derivative_1_0_1_0"  : "int2e_ip1ip2",
@@ -273,6 +277,7 @@ def import_integral(molecule, basis, int_type, atom1=None, shell1=None,
                         atom2=atom2, shell2=shell2, chk_file=chk_file,
                         return_block=return_block, full_deriv=full_deriv)
     else:
+        print("ELSE!")
         if 'int2e' in pyscf_int_type:
             return import_2e_integral(molecule, basis, int_type, atom1=atom1,
                        shell1=shell1, atom2=atom2, shell2=shell2, atom3=atom3,
@@ -629,7 +634,7 @@ def import_2e_integral(molecule, basis, int_type, atom1=None, shell1=None,
     else:
         pyscf_int = sign * pyscf_molecule.intor(pyscf_int_type, aosym='s1')
 
-    print("Import 2e integral derivatives: ", int_type, sign, pyscf_int_type)
+    print("Import 2e integral: ", int_type, sign, pyscf_int_type)
 
     nao = pyscf_molecule.nao
 
@@ -1235,10 +1240,19 @@ def import_1e_second_order_integral_derivative(molecule, basis, int_type,
     pyscf_int_deriv_atoms_ij = np.zeros(pyscf_int_deriv.shape)
 
     if pyscf_int_type in ["int1e_iprinvip", "int1e_ipiprinv"]:
-        # (nabla_i m | nabla_j operator | n)
-        pyscf_int_deriv_atoms_ij[:,ki:kf,:] = pyscf_int_deriv[:,ki:kf,:]
+        if pyscf_int_type == "int1e_iprinvip":
+            # (nabla_i m | nabla_j operator | n)
+            pyscf_int_deriv_atoms_ij[:,ki:kf,:] = pyscf_int_deriv[:,ki:kf,:]
+        else:
+            # (m | nabla_i**2 operator | n)
+            pyscf_int_deriv_atoms_ij = pyscf_int_deriv
     else:
-        pyscf_int_deriv_atoms_ij[:,ki:kf,kj:kg] = pyscf_int_deriv[:,ki:kf,kj:kg]
+        if '020' in int_type:
+            pyscf_int_deriv_atoms_ij = pyscf_int_deriv
+        elif '200' in int_type:
+            pyscf_int_deriv_atoms_ij[:,ki:kf] = pyscf_int_deriv[:,ki:kf]
+        else:
+            pyscf_int_deriv_atoms_ij[:,ki:kf,kj:kg] = pyscf_int_deriv[:,ki:kf,kj:kg]
 
 
     # (nabla**2 m | operator | n) + (m | operator | nabla**2 n)
