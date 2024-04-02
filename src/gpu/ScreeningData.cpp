@@ -1475,7 +1475,7 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
 
                 const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
-                const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
                 _ss_pair_data_local[gpu_id][idx + ss_batch_size * 0] = a_i;
                 _ss_pair_data_local[gpu_id][idx + ss_batch_size * 1] = a_j;
@@ -1528,7 +1528,7 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
 
                 const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
-                const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
                 _sp_pair_data_local[gpu_id][idx + sp_batch_size * 0] = a_i;
                 _sp_pair_data_local[gpu_id][idx + sp_batch_size * 1] = a_j;
@@ -1862,7 +1862,7 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
         const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
-        const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         _ss_pair_data[ij + ss_prim_pair_count * 0] = a_i;
         _ss_pair_data[ij + ss_prim_pair_count * 1] = a_j;
@@ -1923,7 +1923,7 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
         const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
-        const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
         _sp_pair_data[ij + sp_prim_pair_count * 0] = a_i;
         _sp_pair_data[ij + sp_prim_pair_count * 1] = a_j;
@@ -2138,7 +2138,7 @@ auto CScreeningData::get_pair_data_K_ss() const -> const std::vector<double>& { 
 auto CScreeningData::get_pair_data_K_sp() const -> const std::vector<double>& { return _pair_data_K_sp; };
 auto CScreeningData::get_pair_data_K_pp() const -> const std::vector<double>& { return _pair_data_K_pp; };
 
-auto CScreeningData::get_pair_cart_K_pp() const -> const std::vector<uint32_t>& { return _pair_cart_K_pp; };
+auto CScreeningData::get_pair_inds_K_pp() const -> const std::vector<uint32_t>& { return _pair_inds_K_pp; };
 
 auto CScreeningData::get_local_pair_inds_i_for_K_ss(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _local_pair_inds_i_for_K_ss[gpu_id]; }
 auto CScreeningData::get_local_pair_inds_k_for_K_ss(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _local_pair_inds_k_for_K_ss[gpu_id]; }
@@ -2452,7 +2452,7 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
 
             const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
-            const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
             _pair_data_K_ss[displ * 10 + j + count * 0] = a_i;
             _pair_data_K_ss[displ * 10 + j + count * 1] = a_j;
@@ -2549,7 +2549,7 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
 
             const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
-            const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
             _pair_data_K_sp[displ * 10 + j + count * 0] = a_i;
             _pair_data_K_sp[displ * 10 + j + count * 1] = a_j;
@@ -2588,7 +2588,7 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
 
     _pair_data_K_pp = std::vector<double>(pp_prim_pair_count_for_K * 10);
 
-    _pair_cart_K_pp = std::vector<uint32_t>(pp_prim_pair_count_for_K * 2);
+    _pair_inds_K_pp = std::vector<uint32_t>(pp_prim_pair_count_for_K * 2);
 
     _pair_displs_K_pp = std::vector<uint32_t>(p_prim_count * 3);
     _pair_counts_K_pp = std::vector<uint32_t>(p_prim_count * 3);
@@ -2621,7 +2621,8 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
             auto j_idx = std::get<2>(q_ij);
 
             _Q_K_pp[displ + j]        = q_val;
-            _D_aoinds_K_pp[displ + j] = p_prim_aoinds[(j_idx / 3) + p_prim_count * (j_idx % 3)];
+
+            _D_aoinds_K_pp[displ + j] = j_idx;
 
             // ij pair data:
             // a_i, a_j, x_ij, y_ij, z_ij, x_P, y_P, z_P, S_ij_00
@@ -2648,7 +2649,7 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
 
             const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
-            const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
             _pair_data_K_pp[displ * 10 + j + count * 0] = a_i;
             _pair_data_K_pp[displ * 10 + j + count * 1] = a_j;
@@ -2661,8 +2662,8 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
             _pair_data_K_pp[displ * 10 + j + count * 8] = S_ij_00;
             _pair_data_K_pp[displ * 10 + j + count * 9] = (i == j ? 1.0 : 2.0);
 
-            _pair_cart_K_pp[displ * 2 + j + count * 0] = (i % 3);
-            _pair_cart_K_pp[displ * 2 + j + count * 1] = (j_idx % 3);
+            _pair_inds_K_pp[(displ + j) * 2 + 0] = i;
+            _pair_inds_K_pp[(displ + j) * 2 + 1] = j_idx;
         }
 
         _pair_displs_K_pp[i] = displ;

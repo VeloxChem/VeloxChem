@@ -160,7 +160,7 @@ class CScreeningData
     std::vector<double>   _pair_data_K_sp;
     std::vector<double>   _pair_data_K_pp;
 
-    std::vector<uint32_t> _pair_cart_K_pp;
+    std::vector<uint32_t> _pair_inds_K_pp;
 
     std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_ss;
     std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_ss;
@@ -320,7 +320,7 @@ class CScreeningData
     auto get_pair_data_K_sp() const -> const std::vector<double>&;
     auto get_pair_data_K_pp() const -> const std::vector<double>&;
 
-    auto get_pair_cart_K_pp() const -> const std::vector<uint32_t>&;
+    auto get_pair_inds_K_pp() const -> const std::vector<uint32_t>&;
 
     auto get_local_pair_inds_i_for_K_ss(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
     auto get_local_pair_inds_k_for_K_ss(const int64_t gpu_id) const -> const std::vector<uint32_t>&;

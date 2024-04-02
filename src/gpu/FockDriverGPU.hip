@@ -5682,7 +5682,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto& pair_data_K_sp = screening.get_pair_data_K_sp();
     const auto& pair_data_K_pp = screening.get_pair_data_K_pp();
 
-    const auto& pair_cart_K_pp = screening.get_pair_cart_K_pp();
+    const auto& pair_inds_K_pp = screening.get_pair_inds_K_pp();
 
     const auto ss_max_D = screening.get_ss_max_D(); 
     const auto sp_max_D = screening.get_sp_max_D(); 
@@ -5783,7 +5783,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     uint32_t *d_pair_displs_K_ss, *d_pair_displs_K_sp, *d_pair_displs_K_pp;
     uint32_t *d_pair_counts_K_ss, *d_pair_counts_K_sp, *d_pair_counts_K_pp;
     double   *d_pair_data_K_ss, *d_pair_data_K_sp, *d_pair_data_K_pp;
-    uint32_t *d_pair_cart_K_pp;
+    uint32_t *d_pair_inds_K_pp;
 
     hipSafe(hipMalloc(&d_Q_K_ss, Q_K_ss.size() * sizeof(double)));
     hipSafe(hipMalloc(&d_D_aoinds_K_ss, D_aoinds_K_ss.size() * sizeof(uint32_t)));
@@ -5803,7 +5803,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipMalloc(&d_pair_counts_K_pp, pair_counts_K_pp.size() * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_pair_data_K_pp, pair_data_K_pp.size() * sizeof(double)));
 
-    hipSafe(hipMalloc(&d_pair_cart_K_pp, pair_cart_K_pp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_inds_K_pp, pair_inds_K_pp.size() * sizeof(uint32_t)));
 
     hipSafe(hipMemcpy(d_Q_K_ss, Q_K_ss.data(), Q_K_ss.size() * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_D_aoinds_K_ss, D_aoinds_K_ss.data(), D_aoinds_K_ss.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
@@ -5823,7 +5823,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipMemcpy(d_pair_counts_K_pp, pair_counts_K_pp.data(), pair_counts_K_pp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_pair_data_K_pp, pair_data_K_pp.data(), pair_data_K_pp.size() * sizeof(double), hipMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pair_cart_K_pp, pair_cart_K_pp.data(), pair_cart_K_pp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_inds_K_pp, pair_inds_K_pp.data(), pair_inds_K_pp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
 
 
     hipSafe(hipMalloc(&d_mat_D_full_AO, cart_naos * cart_naos * sizeof(double)));
@@ -6236,7 +6236,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                            d_pair_counts_K_pp,
                            d_pair_data_K_ss,
                            d_pair_data_K_pp,
-                           d_pair_cart_K_pp,
+                           d_pair_inds_K_pp,
                            d_boys_func_table,
                            d_boys_func_ft,
                            eri_threshold);
