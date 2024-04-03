@@ -770,7 +770,7 @@ class PolOrbitalResponse(CphfSolver):
                     #    np.linalg.multi_dot([mo_occ.T, gxc_ao_p[x], mo_vir])
                     #    for x in range(dof**2)
                     #])
-                    print('gxc_mo:\n',gxc_mo)
+                    #print('gxc_mo:\n',gxc_mo)
                     #print('\ngxc_mo_p:\n',gxc_mo_p)
                     # different factor compared to TDDFT orbital response
                     # because here vectors are scaled by 1/sqrt(2)
@@ -789,8 +789,10 @@ class PolOrbitalResponse(CphfSolver):
                     'fock_ao_rhs_real': fock_ao_rhs_real,
                     'fock_ao_rhs_imag': fock_ao_rhs_imag,
                     #'fock_gxc_ao': fock_gxc_ao,  # None if not DFT
-                    'fock_gxc_ao_real': fock_gxc_ao_rere - fock_gxc_ao_imim,  # None if not DFT
-                    'fock_gxc_ao_imag': fock_gxc_ao_reim + fock_gxc_ao_imre,  # None if not DFT
+                    'fock_gxc_ao_rere': fock_gxc_ao_rere, # None if not DFT
+                    'fock_gxc_ao_imim': fock_gxc_ao_imim, # None if not DFT
+                    'fock_gxc_ao_reim': fock_gxc_ao_reim, # None if not DFT
+                    'fock_gxc_ao_imre': fock_gxc_ao_imre, # None if not DFT
                 }
                 if (f == 0):
                     tot_rhs_mo = np.concatenate((rhs_mo.real, rhs_mo.imag))
@@ -1593,8 +1595,10 @@ class PolOrbitalResponse(CphfSolver):
                 fock_ao_rhs_real = self.cphf_results[w]['fock_ao_rhs_real']
                 fock_ao_rhs_imag = self.cphf_results[w]['fock_ao_rhs_imag']
                 #fock_gxc_ao = self.cphf_results[w]['fock_gxc_ao']
-                fock_gxc_ao_real = self.cphf_results[w]['fock_gxc_ao_real']
-                fock_gxc_ao_imag = self.cphf_results[w]['fock_gxc_ao_imag']
+                fock_gxc_ao_rere = self.cphf_results[w]['fock_gxc_ao_rere']
+                fock_gxc_ao_imim = self.cphf_results[w]['fock_gxc_ao_imim']
+                fock_gxc_ao_reim = self.cphf_results[w]['fock_gxc_ao_reim']
+                fock_gxc_ao_imre = self.cphf_results[w]['fock_gxc_ao_imre']
                 dm_oo = self.cphf_results[w]['dm_oo']  # complex
                 dm_vv = self.cphf_results[w]['dm_vv']  # complex
 
@@ -1875,9 +1879,13 @@ class PolOrbitalResponse(CphfSolver):
                             #])
                             omega[m * dof + n] += factor * (
                                     np.linalg.multi_dot([
-                                        D_occ, fock_gxc_ao_real.alpha_to_numpy(2 * (m * dof + n)), D_occ])
-                                    + 1j * np.linalg.multi_dot([
-                                        D_occ, fock_gxc_ao_imag.alpha_to_numpy(2 * (m * dof + n)), D_occ])
+                                        D_occ, fock_gxc_ao_rere.alpha_to_numpy(2 * (m * dof + n)), D_occ])
+                                    - np.linalg.multi_dot([
+                                        D_occ, fock_gxc_ao_imim.alpha_to_numpy(2 * (m * dof + n)), D_occ])
+                                    + 1j * (np.linalg.multi_dot([
+                                        D_occ, fock_gxc_ao_reim.alpha_to_numpy(2 * (m * dof + n)), D_occ])
+                                        + np.linalg.multi_dot([
+                                        D_occ, fock_gxc_ao_imre.alpha_to_numpy(2 * (m * dof + n)), D_occ]))
                                     )
 
                 # add omega multipliers in AO basis to cphf_results dictionary
