@@ -5664,27 +5664,52 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     const auto& Q_K_ss = screening.get_Q_K_ss();
     const auto& Q_K_sp = screening.get_Q_K_sp();
+    const auto& Q_K_ps = screening.get_Q_K_ps();
+    const auto& Q_K_sd = screening.get_Q_K_sd();
+    const auto& Q_K_ds = screening.get_Q_K_ds();
     const auto& Q_K_pp = screening.get_Q_K_pp();
+    const auto& Q_K_pd = screening.get_Q_K_pd();
+    const auto& Q_K_dp = screening.get_Q_K_dp();
     const auto& Q_K_dd = screening.get_Q_K_dd();
 
     const auto& D_inds_K_ss = screening.get_D_inds_K_ss();
     const auto& D_inds_K_sp = screening.get_D_inds_K_sp();
+    const auto& D_inds_K_ps = screening.get_D_inds_K_ps();
+    const auto& D_inds_K_sd = screening.get_D_inds_K_sd();
+    const auto& D_inds_K_ds = screening.get_D_inds_K_ds();
     const auto& D_inds_K_pp = screening.get_D_inds_K_pp();
+    const auto& D_inds_K_pd = screening.get_D_inds_K_pd();
+    const auto& D_inds_K_dp = screening.get_D_inds_K_dp();
     const auto& D_inds_K_dd = screening.get_D_inds_K_dd();
 
     const auto& pair_displs_K_ss = screening.get_pair_displs_K_ss();
     const auto& pair_displs_K_sp = screening.get_pair_displs_K_sp();
+    const auto& pair_displs_K_ps = screening.get_pair_displs_K_ps();
+    const auto& pair_displs_K_sd = screening.get_pair_displs_K_sd();
+    const auto& pair_displs_K_ds = screening.get_pair_displs_K_ds();
     const auto& pair_displs_K_pp = screening.get_pair_displs_K_pp();
+    const auto& pair_displs_K_pd = screening.get_pair_displs_K_pd();
+    const auto& pair_displs_K_dp = screening.get_pair_displs_K_dp();
     const auto& pair_displs_K_dd = screening.get_pair_displs_K_dd();
 
     const auto& pair_counts_K_ss = screening.get_pair_counts_K_ss();
     const auto& pair_counts_K_sp = screening.get_pair_counts_K_sp();
+    const auto& pair_counts_K_ps = screening.get_pair_counts_K_ps();
+    const auto& pair_counts_K_sd = screening.get_pair_counts_K_sd();
+    const auto& pair_counts_K_ds = screening.get_pair_counts_K_ds();
     const auto& pair_counts_K_pp = screening.get_pair_counts_K_pp();
+    const auto& pair_counts_K_pd = screening.get_pair_counts_K_pd();
+    const auto& pair_counts_K_dp = screening.get_pair_counts_K_dp();
     const auto& pair_counts_K_dd = screening.get_pair_counts_K_dd();
 
     const auto& pair_data_K_ss = screening.get_pair_data_K_ss();
     const auto& pair_data_K_sp = screening.get_pair_data_K_sp();
+    const auto& pair_data_K_ps = screening.get_pair_data_K_ps();
+    const auto& pair_data_K_sd = screening.get_pair_data_K_sd();
+    const auto& pair_data_K_ds = screening.get_pair_data_K_ds();
     const auto& pair_data_K_pp = screening.get_pair_data_K_pp();
+    const auto& pair_data_K_pd = screening.get_pair_data_K_pd();
+    const auto& pair_data_K_dp = screening.get_pair_data_K_dp();
     const auto& pair_data_K_dd = screening.get_pair_data_K_dd();
 
     const auto ss_max_D = screening.get_ss_max_D(); 
@@ -5781,60 +5806,25 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     uint32_t *d_density_inds_for_K_ss, *d_density_inds_for_K_sp, *d_density_inds_for_K_ps, *d_density_inds_for_K_pp;
     uint32_t *d_density_inds_for_K_sd, *d_density_inds_for_K_ds, *d_density_inds_for_K_pd, *d_density_inds_for_K_dp, *d_density_inds_for_K_dd;
 
-    double   *d_Q_K_ss, *d_Q_K_sp, *d_Q_K_pp, *d_Q_K_dd;
-    uint32_t *d_D_inds_K_ss, *d_D_inds_K_sp, *d_D_inds_K_pp, *d_D_inds_K_dd;
-    uint32_t *d_pair_displs_K_ss, *d_pair_displs_K_sp, *d_pair_displs_K_pp, *d_pair_displs_K_dd;
-    uint32_t *d_pair_counts_K_ss, *d_pair_counts_K_sp, *d_pair_counts_K_pp, *d_pair_counts_K_dd;
-    double   *d_pair_data_K_ss, *d_pair_data_K_sp, *d_pair_data_K_pp, *d_pair_data_K_dd;
+    double   *d_Q_K_ss, *d_Q_K_sp, *d_Q_K_ps,
+             *d_Q_K_sd, *d_Q_K_ds, *d_Q_K_pp,
+             *d_Q_K_pd, *d_Q_K_dp, *d_Q_K_dd;
 
-    hipSafe(hipMalloc(&d_Q_K_ss, Q_K_ss.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_D_inds_K_ss, D_inds_K_ss.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_displs_K_ss, pair_displs_K_ss.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_counts_K_ss, pair_counts_K_ss.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_data_K_ss, pair_data_K_ss.size() * sizeof(double)));
+    uint32_t *d_D_inds_K_ss, *d_D_inds_K_sp, *d_D_inds_K_ps,
+             *d_D_inds_K_sd, *d_D_inds_K_ds, *d_D_inds_K_pp,
+             *d_D_inds_K_pd, *d_D_inds_K_dp, *d_D_inds_K_dd;
 
-    hipSafe(hipMalloc(&d_Q_K_sp, Q_K_sp.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_D_inds_K_sp, D_inds_K_sp.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_displs_K_sp, pair_displs_K_sp.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_counts_K_sp, pair_counts_K_sp.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_data_K_sp, pair_data_K_sp.size() * sizeof(double)));
+    uint32_t *d_pair_displs_K_ss, *d_pair_displs_K_sp, *d_pair_displs_K_ps,
+             *d_pair_displs_K_sd, *d_pair_displs_K_ds, *d_pair_displs_K_pp,
+             *d_pair_displs_K_pd, *d_pair_displs_K_dp, *d_pair_displs_K_dd;
 
-    hipSafe(hipMalloc(&d_Q_K_pp, Q_K_pp.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_D_inds_K_pp, D_inds_K_pp.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_displs_K_pp, pair_displs_K_pp.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_counts_K_pp, pair_counts_K_pp.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_data_K_pp, pair_data_K_pp.size() * sizeof(double)));
+    uint32_t *d_pair_counts_K_ss, *d_pair_counts_K_sp, *d_pair_counts_K_ps,
+             *d_pair_counts_K_sd, *d_pair_counts_K_ds, *d_pair_counts_K_pp,
+             *d_pair_counts_K_pd, *d_pair_counts_K_dp, *d_pair_counts_K_dd;
 
-    hipSafe(hipMalloc(&d_Q_K_dd, Q_K_dd.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_D_inds_K_dd, D_inds_K_dd.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_displs_K_dd, pair_displs_K_dd.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_counts_K_dd, pair_counts_K_dd.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_data_K_dd, pair_data_K_dd.size() * sizeof(double)));
-
-    hipSafe(hipMemcpy(d_Q_K_ss, Q_K_ss.data(), Q_K_ss.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_D_inds_K_ss, D_inds_K_ss.data(), D_inds_K_ss.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_displs_K_ss, pair_displs_K_ss.data(), pair_displs_K_ss.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_counts_K_ss, pair_counts_K_ss.data(), pair_counts_K_ss.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_data_K_ss, pair_data_K_ss.data(), pair_data_K_ss.size() * sizeof(double), hipMemcpyHostToDevice));
-
-    hipSafe(hipMemcpy(d_Q_K_sp, Q_K_sp.data(), Q_K_sp.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_D_inds_K_sp, D_inds_K_sp.data(), D_inds_K_sp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_displs_K_sp, pair_displs_K_sp.data(), pair_displs_K_sp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_counts_K_sp, pair_counts_K_sp.data(), pair_counts_K_sp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_data_K_sp, pair_data_K_sp.data(), pair_data_K_sp.size() * sizeof(double), hipMemcpyHostToDevice));
-
-    hipSafe(hipMemcpy(d_Q_K_pp, Q_K_pp.data(), Q_K_pp.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_D_inds_K_pp, D_inds_K_pp.data(), D_inds_K_pp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_displs_K_pp, pair_displs_K_pp.data(), pair_displs_K_pp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_counts_K_pp, pair_counts_K_pp.data(), pair_counts_K_pp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_data_K_pp, pair_data_K_pp.data(), pair_data_K_pp.size() * sizeof(double), hipMemcpyHostToDevice));
-
-    hipSafe(hipMemcpy(d_Q_K_dd, Q_K_dd.data(), Q_K_dd.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_D_inds_K_dd, D_inds_K_dd.data(), D_inds_K_dd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_displs_K_dd, pair_displs_K_dd.data(), pair_displs_K_dd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_counts_K_dd, pair_counts_K_dd.data(), pair_counts_K_dd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_data_K_dd, pair_data_K_dd.data(), pair_data_K_dd.size() * sizeof(double), hipMemcpyHostToDevice));
-
+    double   *d_pair_data_K_ss, *d_pair_data_K_sp, *d_pair_data_K_ps,
+             *d_pair_data_K_sd, *d_pair_data_K_ds, *d_pair_data_K_pp,
+             *d_pair_data_K_pd, *d_pair_data_K_dp, *d_pair_data_K_dd;
 
     hipSafe(hipMalloc(&d_mat_D_full_AO, cart_naos * cart_naos * sizeof(double)));
 
@@ -5858,6 +5848,56 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipMalloc(&d_density_inds_for_K_dp, d_prim_count * 6 * p_prim_count * 3 * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_density_inds_for_K_dd, d_prim_count * 6 * d_prim_count * 6 * sizeof(uint32_t)));
 
+    hipSafe(hipMalloc(&d_Q_K_ss, Q_K_ss.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_Q_K_sp, Q_K_sp.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_Q_K_ps, Q_K_ps.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_Q_K_sd, Q_K_sd.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_Q_K_ds, Q_K_ds.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_Q_K_pp, Q_K_pp.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_Q_K_pd, Q_K_pd.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_Q_K_dp, Q_K_dp.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_Q_K_dd, Q_K_dd.size() * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_D_inds_K_ss, D_inds_K_ss.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_D_inds_K_sp, D_inds_K_sp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_D_inds_K_ps, D_inds_K_ps.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_D_inds_K_sd, D_inds_K_sd.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_D_inds_K_ds, D_inds_K_ds.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_D_inds_K_pp, D_inds_K_pp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_D_inds_K_pd, D_inds_K_pd.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_D_inds_K_dp, D_inds_K_dp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_D_inds_K_dd, D_inds_K_dd.size() * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pair_displs_K_ss, pair_displs_K_ss.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_sp, pair_displs_K_sp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_ps, pair_displs_K_ps.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_sd, pair_displs_K_sd.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_ds, pair_displs_K_ds.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_pp, pair_displs_K_pp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_pd, pair_displs_K_pd.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_dp, pair_displs_K_dp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_dd, pair_displs_K_dd.size() * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pair_counts_K_ss, pair_counts_K_ss.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_sp, pair_counts_K_sp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_ps, pair_counts_K_ps.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_sd, pair_counts_K_sd.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_ds, pair_counts_K_ds.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_pp, pair_counts_K_pp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_pd, pair_counts_K_pd.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_dp, pair_counts_K_dp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_dd, pair_counts_K_dd.size() * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pair_data_K_ss, pair_data_K_ss.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pair_data_K_sp, pair_data_K_sp.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pair_data_K_ps, pair_data_K_ps.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pair_data_K_sd, pair_data_K_sd.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pair_data_K_ds, pair_data_K_ds.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pair_data_K_pp, pair_data_K_pp.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pair_data_K_pd, pair_data_K_pd.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pair_data_K_dp, pair_data_K_dp.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pair_data_K_dd, pair_data_K_dd.size() * sizeof(double)));
+
     hipSafe(hipMemcpy(d_mat_D_full_AO, cart_dens_ptr, cart_naos * cart_naos * sizeof(double), hipMemcpyHostToDevice));
 
     hipSafe(hipMemcpy(d_mat_Q_for_K_ss, mat_Q_for_K_ss.data(), s_prim_count * s_prim_count * sizeof(double), hipMemcpyHostToDevice));
@@ -5879,6 +5919,56 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipMemcpy(d_density_inds_for_K_pd, density_inds_for_K_pd.data(), p_prim_count * 3 * d_prim_count * 6 * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_density_inds_for_K_dp, density_inds_for_K_dp.data(), d_prim_count * 6 * p_prim_count * 3 * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_density_inds_for_K_dd, density_inds_for_K_dd.data(), d_prim_count * 6 * d_prim_count * 6 * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_Q_K_ss, Q_K_ss.data(), Q_K_ss.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_Q_K_sp, Q_K_sp.data(), Q_K_sp.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_Q_K_ps, Q_K_ps.data(), Q_K_ps.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_Q_K_sd, Q_K_sd.data(), Q_K_sd.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_Q_K_ds, Q_K_ds.data(), Q_K_ds.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_Q_K_pp, Q_K_pp.data(), Q_K_pp.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_Q_K_pd, Q_K_pd.data(), Q_K_pd.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_Q_K_dp, Q_K_dp.data(), Q_K_dp.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_Q_K_dd, Q_K_dd.data(), Q_K_dd.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_D_inds_K_ss, D_inds_K_ss.data(), D_inds_K_ss.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_inds_K_sp, D_inds_K_sp.data(), D_inds_K_sp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_inds_K_ps, D_inds_K_ps.data(), D_inds_K_ps.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_inds_K_sd, D_inds_K_sd.data(), D_inds_K_sd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_inds_K_ds, D_inds_K_ds.data(), D_inds_K_ds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_inds_K_pp, D_inds_K_pp.data(), D_inds_K_pp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_inds_K_pd, D_inds_K_pd.data(), D_inds_K_pd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_inds_K_dp, D_inds_K_dp.data(), D_inds_K_dp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_inds_K_dd, D_inds_K_dd.data(), D_inds_K_dd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pair_displs_K_ss, pair_displs_K_ss.data(), pair_displs_K_ss.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_sp, pair_displs_K_sp.data(), pair_displs_K_sp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_ps, pair_displs_K_ps.data(), pair_displs_K_ps.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_sd, pair_displs_K_sd.data(), pair_displs_K_sd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_ds, pair_displs_K_ds.data(), pair_displs_K_ds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_pp, pair_displs_K_pp.data(), pair_displs_K_pp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_pd, pair_displs_K_pd.data(), pair_displs_K_pd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_dp, pair_displs_K_dp.data(), pair_displs_K_dp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_dd, pair_displs_K_dd.data(), pair_displs_K_dd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pair_counts_K_ss, pair_counts_K_ss.data(), pair_counts_K_ss.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_sp, pair_counts_K_sp.data(), pair_counts_K_sp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_ps, pair_counts_K_ps.data(), pair_counts_K_ps.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_sd, pair_counts_K_sd.data(), pair_counts_K_sd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_ds, pair_counts_K_ds.data(), pair_counts_K_ds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_pp, pair_counts_K_pp.data(), pair_counts_K_pp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_pd, pair_counts_K_pd.data(), pair_counts_K_pd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_dp, pair_counts_K_dp.data(), pair_counts_K_dp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_dd, pair_counts_K_dd.data(), pair_counts_K_dd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pair_data_K_ss, pair_data_K_ss.data(), pair_data_K_ss.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_sp, pair_data_K_sp.data(), pair_data_K_sp.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_ps, pair_data_K_ps.data(), pair_data_K_ps.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_sd, pair_data_K_sd.data(), pair_data_K_sd.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_ds, pair_data_K_ds.data(), pair_data_K_ds.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_pp, pair_data_K_pp.data(), pair_data_K_pp.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_pd, pair_data_K_pd.data(), pair_data_K_pd.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_dp, pair_data_K_dp.data(), pair_data_K_dp.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_dd, pair_data_K_dd.data(), pair_data_K_dd.size() * sizeof(double), hipMemcpyHostToDevice));
 
     timer.stop("Exchange prep.");
 
@@ -10982,6 +11072,56 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipFree(d_density_inds_for_K_pd));
     hipSafe(hipFree(d_density_inds_for_K_dp));
     hipSafe(hipFree(d_density_inds_for_K_dd));
+
+    hipSafe(hipFree(d_Q_K_ss));
+    hipSafe(hipFree(d_Q_K_sp));
+    hipSafe(hipFree(d_Q_K_ps));
+    hipSafe(hipFree(d_Q_K_sd));
+    hipSafe(hipFree(d_Q_K_ds));
+    hipSafe(hipFree(d_Q_K_pp));
+    hipSafe(hipFree(d_Q_K_pd));
+    hipSafe(hipFree(d_Q_K_dp));
+    hipSafe(hipFree(d_Q_K_dd));
+
+    hipSafe(hipFree(d_D_inds_K_ss));
+    hipSafe(hipFree(d_D_inds_K_sp));
+    hipSafe(hipFree(d_D_inds_K_ps));
+    hipSafe(hipFree(d_D_inds_K_sd));
+    hipSafe(hipFree(d_D_inds_K_ds));
+    hipSafe(hipFree(d_D_inds_K_pp));
+    hipSafe(hipFree(d_D_inds_K_pd));
+    hipSafe(hipFree(d_D_inds_K_dp));
+    hipSafe(hipFree(d_D_inds_K_dd));
+
+    hipSafe(hipFree(d_pair_displs_K_ss));
+    hipSafe(hipFree(d_pair_displs_K_sp));
+    hipSafe(hipFree(d_pair_displs_K_ps));
+    hipSafe(hipFree(d_pair_displs_K_sd));
+    hipSafe(hipFree(d_pair_displs_K_ds));
+    hipSafe(hipFree(d_pair_displs_K_pp));
+    hipSafe(hipFree(d_pair_displs_K_pd));
+    hipSafe(hipFree(d_pair_displs_K_dp));
+    hipSafe(hipFree(d_pair_displs_K_dd));
+
+    hipSafe(hipFree(d_pair_counts_K_ss));
+    hipSafe(hipFree(d_pair_counts_K_sp));
+    hipSafe(hipFree(d_pair_counts_K_ps));
+    hipSafe(hipFree(d_pair_counts_K_sd));
+    hipSafe(hipFree(d_pair_counts_K_ds));
+    hipSafe(hipFree(d_pair_counts_K_pp));
+    hipSafe(hipFree(d_pair_counts_K_pd));
+    hipSafe(hipFree(d_pair_counts_K_dp));
+    hipSafe(hipFree(d_pair_counts_K_dd));
+
+    hipSafe(hipFree(d_pair_data_K_ss));
+    hipSafe(hipFree(d_pair_data_K_sp));
+    hipSafe(hipFree(d_pair_data_K_ps));
+    hipSafe(hipFree(d_pair_data_K_sd));
+    hipSafe(hipFree(d_pair_data_K_ds));
+    hipSafe(hipFree(d_pair_data_K_pp));
+    hipSafe(hipFree(d_pair_data_K_pd));
+    hipSafe(hipFree(d_pair_data_K_dp));
+    hipSafe(hipFree(d_pair_data_K_dd));
 
     timer.stop("Total timing");
 

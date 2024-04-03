@@ -2098,15 +2098,15 @@ auto CScreeningData::get_sp_pair_data() const -> const std::vector<double>& { re
 
 auto CScreeningData::get_sp_pair_cart() const -> const std::vector<uint32_t>& { return _sp_pair_cart; }
 
-auto CScreeningData::get_mat_Q_for_K_ss() const -> const std::vector<double>& { return _mat_Q_for_K_ss; };
-auto CScreeningData::get_mat_Q_for_K_sp() const -> const std::vector<double>& { return _mat_Q_for_K_sp; };
-auto CScreeningData::get_mat_Q_for_K_ps() const -> const std::vector<double>& { return _mat_Q_for_K_ps; };
-auto CScreeningData::get_mat_Q_for_K_sd() const -> const std::vector<double>& { return _mat_Q_for_K_sd; };
-auto CScreeningData::get_mat_Q_for_K_ds() const -> const std::vector<double>& { return _mat_Q_for_K_ds; };
-auto CScreeningData::get_mat_Q_for_K_pp() const -> const std::vector<double>& { return _mat_Q_for_K_pp; };
-auto CScreeningData::get_mat_Q_for_K_pd() const -> const std::vector<double>& { return _mat_Q_for_K_pd; };
-auto CScreeningData::get_mat_Q_for_K_dp() const -> const std::vector<double>& { return _mat_Q_for_K_dp; };
-auto CScreeningData::get_mat_Q_for_K_dd() const -> const std::vector<double>& { return _mat_Q_for_K_dd; };
+auto CScreeningData::get_mat_Q_for_K_ss() const -> const std::vector<double>& { return _mat_Q_for_K_ss; }
+auto CScreeningData::get_mat_Q_for_K_sp() const -> const std::vector<double>& { return _mat_Q_for_K_sp; }
+auto CScreeningData::get_mat_Q_for_K_ps() const -> const std::vector<double>& { return _mat_Q_for_K_ps; }
+auto CScreeningData::get_mat_Q_for_K_sd() const -> const std::vector<double>& { return _mat_Q_for_K_sd; }
+auto CScreeningData::get_mat_Q_for_K_ds() const -> const std::vector<double>& { return _mat_Q_for_K_ds; }
+auto CScreeningData::get_mat_Q_for_K_pp() const -> const std::vector<double>& { return _mat_Q_for_K_pp; }
+auto CScreeningData::get_mat_Q_for_K_pd() const -> const std::vector<double>& { return _mat_Q_for_K_pd; }
+auto CScreeningData::get_mat_Q_for_K_dp() const -> const std::vector<double>& { return _mat_Q_for_K_dp; }
+auto CScreeningData::get_mat_Q_for_K_dd() const -> const std::vector<double>& { return _mat_Q_for_K_dd; }
 
 auto CScreeningData::get_density_inds_for_K_ss() const -> const std::vector<uint32_t>& { return _density_inds_for_K_ss; }
 auto CScreeningData::get_density_inds_for_K_sp() const -> const std::vector<uint32_t>& { return _density_inds_for_K_sp; }
@@ -2118,30 +2118,55 @@ auto CScreeningData::get_density_inds_for_K_pd() const -> const std::vector<uint
 auto CScreeningData::get_density_inds_for_K_dp() const -> const std::vector<uint32_t>& { return _density_inds_for_K_dp; }
 auto CScreeningData::get_density_inds_for_K_dd() const -> const std::vector<uint32_t>& { return _density_inds_for_K_dd; }
 
-auto CScreeningData::get_Q_K_ss() const -> const std::vector<double>& { return _Q_K_ss; };
-auto CScreeningData::get_Q_K_sp() const -> const std::vector<double>& { return _Q_K_sp; };
-auto CScreeningData::get_Q_K_pp() const -> const std::vector<double>& { return _Q_K_pp; };
-auto CScreeningData::get_Q_K_dd() const -> const std::vector<double>& { return _Q_K_dd; };
+auto CScreeningData::get_Q_K_ss() const -> const std::vector<double>& { return _Q_K_ss; }
+auto CScreeningData::get_Q_K_sp() const -> const std::vector<double>& { return _Q_K_sp; }
+auto CScreeningData::get_Q_K_ps() const -> const std::vector<double>& { return _Q_K_ps; }
+auto CScreeningData::get_Q_K_sd() const -> const std::vector<double>& { return _Q_K_sd; }
+auto CScreeningData::get_Q_K_ds() const -> const std::vector<double>& { return _Q_K_ds; }
+auto CScreeningData::get_Q_K_pp() const -> const std::vector<double>& { return _Q_K_pp; }
+auto CScreeningData::get_Q_K_pd() const -> const std::vector<double>& { return _Q_K_pd; }
+auto CScreeningData::get_Q_K_dp() const -> const std::vector<double>& { return _Q_K_dp; }
+auto CScreeningData::get_Q_K_dd() const -> const std::vector<double>& { return _Q_K_dd; }
 
-auto CScreeningData::get_D_inds_K_ss() const -> const std::vector<uint32_t>& { return _D_inds_K_ss; };
-auto CScreeningData::get_D_inds_K_sp() const -> const std::vector<uint32_t>& { return _D_inds_K_sp; };
-auto CScreeningData::get_D_inds_K_pp() const -> const std::vector<uint32_t>& { return _D_inds_K_pp; };
-auto CScreeningData::get_D_inds_K_dd() const -> const std::vector<uint32_t>& { return _D_inds_K_dd; };
+auto CScreeningData::get_D_inds_K_ss() const -> const std::vector<uint32_t>& { return _D_inds_K_ss; }
+auto CScreeningData::get_D_inds_K_sp() const -> const std::vector<uint32_t>& { return _D_inds_K_sp; }
+auto CScreeningData::get_D_inds_K_ps() const -> const std::vector<uint32_t>& { return _D_inds_K_ps; }
+auto CScreeningData::get_D_inds_K_sd() const -> const std::vector<uint32_t>& { return _D_inds_K_sd; }
+auto CScreeningData::get_D_inds_K_ds() const -> const std::vector<uint32_t>& { return _D_inds_K_ds; }
+auto CScreeningData::get_D_inds_K_pp() const -> const std::vector<uint32_t>& { return _D_inds_K_pp; }
+auto CScreeningData::get_D_inds_K_pd() const -> const std::vector<uint32_t>& { return _D_inds_K_pd; }
+auto CScreeningData::get_D_inds_K_dp() const -> const std::vector<uint32_t>& { return _D_inds_K_dp; }
+auto CScreeningData::get_D_inds_K_dd() const -> const std::vector<uint32_t>& { return _D_inds_K_dd; }
 
-auto CScreeningData::get_pair_displs_K_ss() const -> const std::vector<uint32_t>& { return _pair_displs_K_ss; };
-auto CScreeningData::get_pair_displs_K_sp() const -> const std::vector<uint32_t>& { return _pair_displs_K_sp; };
-auto CScreeningData::get_pair_displs_K_pp() const -> const std::vector<uint32_t>& { return _pair_displs_K_pp; };
-auto CScreeningData::get_pair_displs_K_dd() const -> const std::vector<uint32_t>& { return _pair_displs_K_dd; };
+auto CScreeningData::get_pair_displs_K_ss() const -> const std::vector<uint32_t>& { return _pair_displs_K_ss; }
+auto CScreeningData::get_pair_displs_K_sp() const -> const std::vector<uint32_t>& { return _pair_displs_K_sp; }
+auto CScreeningData::get_pair_displs_K_ps() const -> const std::vector<uint32_t>& { return _pair_displs_K_ps; }
+auto CScreeningData::get_pair_displs_K_sd() const -> const std::vector<uint32_t>& { return _pair_displs_K_sd; }
+auto CScreeningData::get_pair_displs_K_ds() const -> const std::vector<uint32_t>& { return _pair_displs_K_ds; }
+auto CScreeningData::get_pair_displs_K_pp() const -> const std::vector<uint32_t>& { return _pair_displs_K_pp; }
+auto CScreeningData::get_pair_displs_K_pd() const -> const std::vector<uint32_t>& { return _pair_displs_K_pd; }
+auto CScreeningData::get_pair_displs_K_dp() const -> const std::vector<uint32_t>& { return _pair_displs_K_dp; }
+auto CScreeningData::get_pair_displs_K_dd() const -> const std::vector<uint32_t>& { return _pair_displs_K_dd; }
 
-auto CScreeningData::get_pair_counts_K_ss() const -> const std::vector<uint32_t>& { return _pair_counts_K_ss; };
-auto CScreeningData::get_pair_counts_K_sp() const -> const std::vector<uint32_t>& { return _pair_counts_K_sp; };
-auto CScreeningData::get_pair_counts_K_pp() const -> const std::vector<uint32_t>& { return _pair_counts_K_pp; };
-auto CScreeningData::get_pair_counts_K_dd() const -> const std::vector<uint32_t>& { return _pair_counts_K_dd; };
+auto CScreeningData::get_pair_counts_K_ss() const -> const std::vector<uint32_t>& { return _pair_counts_K_ss; }
+auto CScreeningData::get_pair_counts_K_sp() const -> const std::vector<uint32_t>& { return _pair_counts_K_sp; }
+auto CScreeningData::get_pair_counts_K_ps() const -> const std::vector<uint32_t>& { return _pair_counts_K_ps; }
+auto CScreeningData::get_pair_counts_K_sd() const -> const std::vector<uint32_t>& { return _pair_counts_K_sd; }
+auto CScreeningData::get_pair_counts_K_ds() const -> const std::vector<uint32_t>& { return _pair_counts_K_ds; }
+auto CScreeningData::get_pair_counts_K_pp() const -> const std::vector<uint32_t>& { return _pair_counts_K_pp; }
+auto CScreeningData::get_pair_counts_K_pd() const -> const std::vector<uint32_t>& { return _pair_counts_K_pd; }
+auto CScreeningData::get_pair_counts_K_dp() const -> const std::vector<uint32_t>& { return _pair_counts_K_dp; }
+auto CScreeningData::get_pair_counts_K_dd() const -> const std::vector<uint32_t>& { return _pair_counts_K_dd; }
 
-auto CScreeningData::get_pair_data_K_ss() const -> const std::vector<double>& { return _pair_data_K_ss; };
-auto CScreeningData::get_pair_data_K_sp() const -> const std::vector<double>& { return _pair_data_K_sp; };
-auto CScreeningData::get_pair_data_K_pp() const -> const std::vector<double>& { return _pair_data_K_pp; };
-auto CScreeningData::get_pair_data_K_dd() const -> const std::vector<double>& { return _pair_data_K_dd; };
+auto CScreeningData::get_pair_data_K_ss() const -> const std::vector<double>& { return _pair_data_K_ss; }
+auto CScreeningData::get_pair_data_K_sp() const -> const std::vector<double>& { return _pair_data_K_sp; }
+auto CScreeningData::get_pair_data_K_ps() const -> const std::vector<double>& { return _pair_data_K_ps; }
+auto CScreeningData::get_pair_data_K_sd() const -> const std::vector<double>& { return _pair_data_K_sd; }
+auto CScreeningData::get_pair_data_K_ds() const -> const std::vector<double>& { return _pair_data_K_ds; }
+auto CScreeningData::get_pair_data_K_pp() const -> const std::vector<double>& { return _pair_data_K_pp; }
+auto CScreeningData::get_pair_data_K_pd() const -> const std::vector<double>& { return _pair_data_K_pd; }
+auto CScreeningData::get_pair_data_K_dp() const -> const std::vector<double>& { return _pair_data_K_dp; }
+auto CScreeningData::get_pair_data_K_dd() const -> const std::vector<double>& { return _pair_data_K_dd; }
 
 auto CScreeningData::get_local_pair_inds_i_for_K_ss(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _local_pair_inds_i_for_K_ss[gpu_id]; }
 auto CScreeningData::get_local_pair_inds_k_for_K_ss(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _local_pair_inds_k_for_K_ss[gpu_id]; }
@@ -2402,7 +2427,7 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
 
     for (int64_t i = 0, displ = 0; i < s_prim_count; i++)
     {
-        std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
+        std::vector<std::tuple<double, int64_t>> Q_vec_sorted;
 
         const auto Q_i = _Q_matrix_ss.row(i);
 
@@ -2410,7 +2435,7 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
         {
             if (Q_i[j] > _pair_threshold)
             {
-                Q_vec_sorted.push_back(std::make_tuple(Q_i[j], i, j));
+                Q_vec_sorted.push_back(std::make_tuple(Q_i[j], j));
             }
         }
 
@@ -2424,14 +2449,12 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
             const auto& q_ij = Q_vec_sorted[j];
 
             auto q_val = std::get<0>(q_ij);
-            // auto i_idx = std::get<1>(q_ij);
-            auto j_idx = std::get<2>(q_ij);
+            auto j_idx = std::get<1>(q_ij);
 
             _Q_K_ss[displ + j]      = q_val;
             _D_inds_K_ss[displ + j] = j_idx;
 
             // ij pair data:
-            // a_i, a_j, x_ij, y_ij, z_ij, x_P, y_P, z_P, S_ij_00
 
             const auto a_i = s_prim_info[i + s_prim_count * 0];
             const auto c_i = s_prim_info[i + s_prim_count * 1];
@@ -2482,7 +2505,7 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
 
     for (int64_t i = 0, displ = 0; i < s_prim_count; i++)
     {
-        std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
+        std::vector<std::tuple<double, int64_t>> Q_vec_sorted;
 
         const auto Q_i = _Q_matrix_sp.row(i);
 
@@ -2490,7 +2513,7 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
         {
             if (Q_i[j] > _pair_threshold)
             {
-                Q_vec_sorted.push_back(std::make_tuple(Q_i[j], i, j));
+                Q_vec_sorted.push_back(std::make_tuple(Q_i[j], j));
             }
         }
 
@@ -2504,14 +2527,12 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
             const auto& q_ij = Q_vec_sorted[j];
 
             auto q_val = std::get<0>(q_ij);
-            // auto i_idx = std::get<1>(q_ij);
-            auto j_idx = std::get<2>(q_ij);
+            auto j_idx = std::get<1>(q_ij);
 
             _Q_K_sp[displ + j]      = q_val;
             _D_inds_K_sp[displ + j] = j_idx;
 
             // ij pair data:
-            // a_i, a_j, x_ij, y_ij, z_ij, x_P, y_P, z_P, S_ij_00
 
             const auto a_i = s_prim_info[i + s_prim_count * 0];
             const auto c_i = s_prim_info[i + s_prim_count * 1];
@@ -2534,6 +2555,232 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
 
         _pair_displs_K_sp[i] = displ;
         _pair_counts_K_sp[i] = count;
+
+        displ += count;
+    }
+
+    // Q_ps and D_ps for K
+
+    int64_t ps_prim_pair_count_for_K = 0;
+
+    for (int64_t i = 0; i < p_prim_count * 3; i++)
+    {
+        for (int64_t j = 0; j < s_prim_count; j++)
+        {
+            if (_Q_matrix_sp.row(j)[i] > _pair_threshold) ps_prim_pair_count_for_K++;
+        }
+    }
+
+    _Q_K_ps      = std::vector<double>(ps_prim_pair_count_for_K);
+    _D_inds_K_ps = std::vector<uint32_t>(ps_prim_pair_count_for_K);
+
+    _pair_data_K_ps = std::vector<double>(ps_prim_pair_count_for_K);
+
+    _pair_displs_K_ps = std::vector<uint32_t>(p_prim_count * 3);
+    _pair_counts_K_ps = std::vector<uint32_t>(p_prim_count * 3);
+
+    for (int64_t i = 0, displ = 0; i < p_prim_count * 3; i++)
+    {
+        std::vector<std::tuple<double, int64_t>> Q_vec_sorted;
+
+        for (int64_t j = 0; j < s_prim_count; j++)
+        {
+            if (_Q_matrix_sp.row(j)[i] > _pair_threshold)
+            {
+                Q_vec_sorted.push_back(std::make_tuple(_Q_matrix_sp.row(j)[i], j));
+            }
+        }
+
+        std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
+        std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
+
+        const auto count = static_cast<int64_t>(Q_vec_sorted.size());
+
+        for (int64_t j = 0; j < count; j++)
+        {
+            const auto& q_ij = Q_vec_sorted[j];
+
+            auto q_val = std::get<0>(q_ij);
+            auto j_idx = std::get<1>(q_ij);
+
+            _Q_K_ps[displ + j]      = q_val;
+            _D_inds_K_ps[displ + j] = j_idx;
+
+            // ij pair data:
+
+            const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
+            const auto x_i = p_prim_info[i / 3 + p_prim_count * 2];
+            const auto y_i = p_prim_info[i / 3 + p_prim_count * 3];
+            const auto z_i = p_prim_info[i / 3 + p_prim_count * 4];
+
+            const auto a_j = s_prim_info[j_idx + s_prim_count * 0];
+            const auto c_j = s_prim_info[j_idx + s_prim_count * 1];
+            const auto x_j = s_prim_info[j_idx + s_prim_count * 2];
+            const auto y_j = s_prim_info[j_idx + s_prim_count * 3];
+            const auto z_j = s_prim_info[j_idx + s_prim_count * 4];
+
+            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+            _pair_data_K_ps[displ + j] = S_ij_00;
+        }
+
+        _pair_displs_K_ps[i] = displ;
+        _pair_counts_K_ps[i] = count;
+
+        displ += count;
+    }
+
+    // Q_sd and D_sd for K
+
+    int64_t sd_prim_pair_count_for_K = 0;
+
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
+        const auto Q_i = _Q_matrix_sd.row(i);
+
+        for (int64_t j = 0; j < d_prim_count * 6; j++)
+        {
+            if (Q_i[j] > _pair_threshold) sd_prim_pair_count_for_K++;
+        }
+    }
+
+    _Q_K_sd      = std::vector<double>(sd_prim_pair_count_for_K);
+    _D_inds_K_sd = std::vector<uint32_t>(sd_prim_pair_count_for_K);
+
+    _pair_data_K_sd = std::vector<double>(sd_prim_pair_count_for_K);
+
+    _pair_displs_K_sd = std::vector<uint32_t>(s_prim_count);
+    _pair_counts_K_sd = std::vector<uint32_t>(s_prim_count);
+
+    for (int64_t i = 0, displ = 0; i < s_prim_count; i++)
+    {
+        std::vector<std::tuple<double, int64_t>> Q_vec_sorted;
+
+        const auto Q_i = _Q_matrix_sd.row(i);
+
+        for (int64_t j = 0; j < d_prim_count * 6; j++)
+        {
+            if (Q_i[j] > _pair_threshold)
+            {
+                Q_vec_sorted.push_back(std::make_tuple(Q_i[j], j));
+            }
+        }
+
+        std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
+        std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
+
+        const auto count = static_cast<int64_t>(Q_vec_sorted.size());
+
+        for (int64_t j = 0; j < count; j++)
+        {
+            const auto& q_ij = Q_vec_sorted[j];
+
+            auto q_val = std::get<0>(q_ij);
+            auto j_idx = std::get<1>(q_ij);
+
+            _Q_K_sd[displ + j]      = q_val;
+            _D_inds_K_sd[displ + j] = j_idx;
+
+            // ij pair data:
+
+            const auto a_i = s_prim_info[i + s_prim_count * 0];
+            const auto c_i = s_prim_info[i + s_prim_count * 1];
+            const auto x_i = s_prim_info[i + s_prim_count * 2];
+            const auto y_i = s_prim_info[i + s_prim_count * 3];
+            const auto z_i = s_prim_info[i + s_prim_count * 4];
+
+            const auto a_j = d_prim_info[j_idx / 6 + d_prim_count * 0];
+            const auto c_j = d_prim_info[j_idx / 6 + d_prim_count * 1];
+            const auto x_j = d_prim_info[j_idx / 6 + d_prim_count * 2];
+            const auto y_j = d_prim_info[j_idx / 6 + d_prim_count * 3];
+            const auto z_j = d_prim_info[j_idx / 6 + d_prim_count * 4];
+
+            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+            _pair_data_K_sd[displ + j] = S_ij_00;
+        }
+
+        _pair_displs_K_sd[i] = displ;
+        _pair_counts_K_sd[i] = count;
+
+        displ += count;
+    }
+
+    // Q_ds and D_ds for K
+
+    int64_t ds_prim_pair_count_for_K = 0;
+
+    for (int64_t i = 0; i < d_prim_count * 6; i++)
+    {
+        for (int64_t j = 0; j < s_prim_count; j++)
+        {
+            if (_Q_matrix_sd.row(j)[i] > _pair_threshold) ds_prim_pair_count_for_K++;
+        }
+    }
+
+    _Q_K_ds      = std::vector<double>(ds_prim_pair_count_for_K);
+    _D_inds_K_ds = std::vector<uint32_t>(ds_prim_pair_count_for_K);
+
+    _pair_data_K_ds = std::vector<double>(ds_prim_pair_count_for_K);
+
+    _pair_displs_K_ds = std::vector<uint32_t>(d_prim_count * 6);
+    _pair_counts_K_ds = std::vector<uint32_t>(d_prim_count * 6);
+
+    for (int64_t i = 0, displ = 0; i < d_prim_count * 6; i++)
+    {
+        std::vector<std::tuple<double, int64_t>> Q_vec_sorted;
+
+        for (int64_t j = 0; j < s_prim_count; j++)
+        {
+            if (_Q_matrix_sd.row(j)[i] > _pair_threshold)
+            {
+                Q_vec_sorted.push_back(std::make_tuple(_Q_matrix_sd.row(j)[i], j));
+            }
+        }
+
+        std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
+        std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
+
+        const auto count = static_cast<int64_t>(Q_vec_sorted.size());
+
+        for (int64_t j = 0; j < count; j++)
+        {
+            const auto& q_ij = Q_vec_sorted[j];
+
+            auto q_val = std::get<0>(q_ij);
+            auto j_idx = std::get<1>(q_ij);
+
+            _Q_K_ds[displ + j]      = q_val;
+            _D_inds_K_ds[displ + j] = j_idx;
+
+            // ij pair data:
+
+            const auto a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            const auto c_i = d_prim_info[i / 6 + d_prim_count * 1];
+            const auto x_i = d_prim_info[i / 6 + d_prim_count * 2];
+            const auto y_i = d_prim_info[i / 6 + d_prim_count * 3];
+            const auto z_i = d_prim_info[i / 6 + d_prim_count * 4];
+
+            const auto a_j = s_prim_info[j_idx + s_prim_count * 0];
+            const auto c_j = s_prim_info[j_idx + s_prim_count * 1];
+            const auto x_j = s_prim_info[j_idx + s_prim_count * 2];
+            const auto y_j = s_prim_info[j_idx + s_prim_count * 3];
+            const auto z_j = s_prim_info[j_idx + s_prim_count * 4];
+
+            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+            _pair_data_K_ds[displ + j] = S_ij_00;
+        }
+
+        _pair_displs_K_ds[i] = displ;
+        _pair_counts_K_ds[i] = count;
 
         displ += count;
     }
@@ -2562,7 +2809,7 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
 
     for (int64_t i = 0, displ = 0; i < p_prim_count * 3; i++)
     {
-        std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
+        std::vector<std::tuple<double, int64_t>> Q_vec_sorted;
 
         const auto Q_i = _Q_matrix_pp.row(i);
 
@@ -2570,7 +2817,7 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
         {
             if (Q_i[j] > _pair_threshold)
             {
-                Q_vec_sorted.push_back(std::make_tuple(Q_i[j], i, j));
+                Q_vec_sorted.push_back(std::make_tuple(Q_i[j], j));
             }
         }
 
@@ -2584,14 +2831,12 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
             const auto& q_ij = Q_vec_sorted[j];
 
             auto q_val = std::get<0>(q_ij);
-            // auto i_idx = std::get<1>(q_ij);
-            auto j_idx = std::get<2>(q_ij);
+            auto j_idx = std::get<1>(q_ij);
 
             _Q_K_pp[displ + j]      = q_val;
             _D_inds_K_pp[displ + j] = j_idx;
 
             // ij pair data:
-            // a_i, a_j, x_ij, y_ij, z_ij, x_P, y_P, z_P, S_ij_00
 
             const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
             const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
@@ -2618,6 +2863,158 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
         displ += count;
     }
 
+    // Q_pd and D_pd for K
+
+    int64_t pd_prim_pair_count_for_K = 0;
+
+    for (int64_t i = 0; i < p_prim_count * 3; i++)
+    {
+        const auto Q_i = _Q_matrix_pd.row(i);
+
+        for (int64_t j = 0; j < d_prim_count * 6; j++)
+        {
+            if (Q_i[j] > _pair_threshold) pd_prim_pair_count_for_K++;
+        }
+    }
+
+    _Q_K_pd      = std::vector<double>(pd_prim_pair_count_for_K);
+    _D_inds_K_pd = std::vector<uint32_t>(pd_prim_pair_count_for_K);
+
+    _pair_data_K_pd = std::vector<double>(pd_prim_pair_count_for_K);
+
+    _pair_displs_K_pd = std::vector<uint32_t>(p_prim_count * 3);
+    _pair_counts_K_pd = std::vector<uint32_t>(p_prim_count * 3);
+
+    for (int64_t i = 0, displ = 0; i < p_prim_count * 3; i++)
+    {
+        std::vector<std::tuple<double, int64_t>> Q_vec_sorted;
+
+        const auto Q_i = _Q_matrix_pd.row(i);
+
+        for (int64_t j = 0; j < d_prim_count * 6; j++)
+        {
+            if (Q_i[j] > _pair_threshold)
+            {
+                Q_vec_sorted.push_back(std::make_tuple(Q_i[j], j));
+            }
+        }
+
+        std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
+        std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
+
+        const auto count = static_cast<int64_t>(Q_vec_sorted.size());
+
+        for (int64_t j = 0; j < count; j++)
+        {
+            const auto& q_ij = Q_vec_sorted[j];
+
+            auto q_val = std::get<0>(q_ij);
+            auto j_idx = std::get<1>(q_ij);
+
+            _Q_K_pd[displ + j]      = q_val;
+            _D_inds_K_pd[displ + j] = j_idx;
+
+            // ij pair data:
+
+            const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
+            const auto x_i = p_prim_info[i / 3 + p_prim_count * 2];
+            const auto y_i = p_prim_info[i / 3 + p_prim_count * 3];
+            const auto z_i = p_prim_info[i / 3 + p_prim_count * 4];
+
+            const auto a_j = d_prim_info[j_idx / 6 + d_prim_count * 0];
+            const auto c_j = d_prim_info[j_idx / 6 + d_prim_count * 1];
+            const auto x_j = d_prim_info[j_idx / 6 + d_prim_count * 2];
+            const auto y_j = d_prim_info[j_idx / 6 + d_prim_count * 3];
+            const auto z_j = d_prim_info[j_idx / 6 + d_prim_count * 4];
+
+            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+            _pair_data_K_pd[displ + j] = S_ij_00;
+        }
+
+        _pair_displs_K_pd[i] = displ;
+        _pair_counts_K_pd[i] = count;
+
+        displ += count;
+    }
+
+    // Q_dp and D_dp for K
+
+    int64_t dp_prim_pair_count_for_K = 0;
+
+    for (int64_t i = 0; i < d_prim_count * 6; i++)
+    {
+        for (int64_t j = 0; j < p_prim_count * 3; j++)
+        {
+            if (_Q_matrix_pd.row(j)[i] > _pair_threshold) dp_prim_pair_count_for_K++;
+        }
+    }
+
+    _Q_K_dp      = std::vector<double>(dp_prim_pair_count_for_K);
+    _D_inds_K_dp = std::vector<uint32_t>(dp_prim_pair_count_for_K);
+
+    _pair_data_K_dp = std::vector<double>(dp_prim_pair_count_for_K);
+
+    _pair_displs_K_dp = std::vector<uint32_t>(d_prim_count * 6);
+    _pair_counts_K_dp = std::vector<uint32_t>(d_prim_count * 6);
+
+    for (int64_t i = 0, displ = 0; i < d_prim_count * 6; i++)
+    {
+        std::vector<std::tuple<double, int64_t>> Q_vec_sorted;
+
+        for (int64_t j = 0; j < p_prim_count * 3; j++)
+        {
+            if (_Q_matrix_pd.row(j)[i] > _pair_threshold)
+            {
+                Q_vec_sorted.push_back(std::make_tuple(_Q_matrix_pd.row(j)[i], j));
+            }
+        }
+
+        std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
+        std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
+
+        const auto count = static_cast<int64_t>(Q_vec_sorted.size());
+
+        for (int64_t j = 0; j < count; j++)
+        {
+            const auto& q_ij = Q_vec_sorted[j];
+
+            auto q_val = std::get<0>(q_ij);
+            auto j_idx = std::get<1>(q_ij);
+
+            _Q_K_dp[displ + j]      = q_val;
+            _D_inds_K_dp[displ + j] = j_idx;
+
+            // ij pair data:
+
+            const auto a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            const auto c_i = d_prim_info[i / 6 + d_prim_count * 1];
+            const auto x_i = d_prim_info[i / 6 + d_prim_count * 2];
+            const auto y_i = d_prim_info[i / 6 + d_prim_count * 3];
+            const auto z_i = d_prim_info[i / 6 + d_prim_count * 4];
+
+            const auto a_j = p_prim_info[j_idx / 3 + p_prim_count * 0];
+            const auto c_j = p_prim_info[j_idx / 3 + p_prim_count * 1];
+            const auto x_j = p_prim_info[j_idx / 3 + p_prim_count * 2];
+            const auto y_j = p_prim_info[j_idx / 3 + p_prim_count * 3];
+            const auto z_j = p_prim_info[j_idx / 3 + p_prim_count * 4];
+
+            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+            _pair_data_K_dp[displ + j] = S_ij_00;
+        }
+
+        _pair_displs_K_dp[i] = displ;
+        _pair_counts_K_dp[i] = count;
+
+        displ += count;
+    }
+
     // Q_dd and D_dd for K
 
     int64_t dd_prim_pair_count_for_K = 0;
@@ -2632,8 +3029,8 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
         }
     }
 
-    _Q_K_dd      = std::vector<double> (dd_prim_pair_count_for_K);
-    _D_inds_K_dd = std::vector<uint32_t> (dd_prim_pair_count_for_K);
+    _Q_K_dd      = std::vector<double>(dd_prim_pair_count_for_K);
+    _D_inds_K_dd = std::vector<uint32_t>(dd_prim_pair_count_for_K);
 
     _pair_data_K_dd = std::vector<double>(dd_prim_pair_count_for_K);
 
@@ -2642,7 +3039,7 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
 
     for (int64_t i = 0, displ = 0; i < d_prim_count * 6; i++)
     {
-        std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
+        std::vector<std::tuple<double, int64_t>> Q_vec_sorted;
 
         const auto Q_i = _Q_matrix_dd.row(i);
 
@@ -2650,7 +3047,7 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
         {
             if (Q_i[j] > _pair_threshold)
             {
-                Q_vec_sorted.push_back(std::make_tuple(Q_i[j], i, j));
+                Q_vec_sorted.push_back(std::make_tuple(Q_i[j], j));
             }
         }
 
@@ -2664,14 +3061,12 @@ auto CScreeningData::new_Q_and_D_for_K(const int64_t                s_prim_count
             const auto& q_ij = Q_vec_sorted[j];
 
             auto q_val = std::get<0>(q_ij);
-            // auto i_idx = std::get<1>(q_ij);
-            auto j_idx = std::get<2>(q_ij);
+            auto j_idx = std::get<1>(q_ij);
 
             _Q_K_dd[displ + j]      = q_val;
             _D_inds_K_dd[displ + j] = j_idx;
 
             // ij pair data:
-            // a_i, a_j, x_ij, y_ij, z_ij, x_P, y_P, z_P, S_ij_00
 
             const auto a_i = d_prim_info[i / 6 + d_prim_count * 0];
             const auto c_i = d_prim_info[i / 6 + d_prim_count * 1];
