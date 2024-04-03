@@ -35,7 +35,7 @@ class TestOptimizeSCF:
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream)
+        grad_drv = ScfGradientDriver(scf_drv)
         # So far testing with the numerical gradient
         grad_drv.numerical = True
         opt_drv = OptimizationDriver(grad_drv)

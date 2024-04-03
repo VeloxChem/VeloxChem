@@ -116,8 +116,18 @@ class FirstOrderProperties:
                            dipole_mats.z_to_numpy())
 
             # electronic contribution
-            electronic_dipole = -1.0 * np.array(
-                [np.sum(dipole_ints[d] * total_density) for d in range(3)])
+            # multiple states:
+            if len(total_density.shape) > 2:
+                dof = total_density.shape[0]
+                electronic_dipole = np.zeros((dof, 3))
+                for i in range(dof):
+                    electronic_dipole[i] = -1.0 * np.array(
+                  [np.sum(dipole_ints[d] * total_density[i]) for d in range(3)])
+
+            # or single state:
+            else:
+                electronic_dipole = -1.0 * np.array(
+                  [np.sum(dipole_ints[d] * total_density) for d in range(3)])
 
             # nuclear contribution
             coords = molecule.get_coordinates_in_bohr()
@@ -143,7 +153,7 @@ class FirstOrderProperties:
 
         return self.properties[key]
 
-    def print_properties(self, molecule, title=None):
+    def print_properties(self, molecule, title=None, states=None):
         """
         Prints first-order properties.
 
@@ -152,6 +162,8 @@ class FirstOrderProperties:
         :param title:
             The title of the printout, giving information about the method,
             relaxed/unrelaxed density, which excited state.
+        :param states:
+            The excited states for which first order properties ar calculated.
         """
 
         if title is None:
@@ -173,14 +185,31 @@ class FirstOrderProperties:
         self.ostream.print_blank()
 
         dip = self.properties['dipole_moment']
-        dip_au = list(dip) + [np.linalg.norm(dip)]
-        dip_debye = [m * dipole_in_debye() for m in dip_au]
+        if states is None:
+            dip_au = list(dip) + [np.linalg.norm(dip)]
+            dip_debye = [m * dipole_in_debye() for m in dip_au]
 
-        for i, a in enumerate(['  X', '  Y', '  Z', 'Total']):
-            valstr = '{:<5s} :'.format(a)
-            valstr += '{:17.6f} a.u.'.format(dip_au[i])
-            valstr += '{:17.6f} Debye   '.format(dip_debye[i])
-            self.ostream.print_header(valstr)
+            for i, a in enumerate(['  X', '  Y', '  Z', 'Total']):
+                valstr = '{:<5s} :'.format(a)
+                valstr += '{:17.6f} a.u.'.format(dip_au[i])
+                valstr += '{:17.6f} Debye   '.format(dip_debye[i])
+                self.ostream.print_header(valstr)
+        else:
+            index = 0
+            for s in states:
+                self.ostream.print_blank()
+                state_text = 'Excited State %d' % s
+                self.ostream.print_header(state_text)
+                self.ostream.print_blank()
+                dip_au = list(dip[index]) + [np.linalg.norm(dip[index])]
+                dip_debye = [m * dipole_in_debye() for m in dip_au]
+
+                for i, a in enumerate(['  X', '  Y', '  Z', 'Total']):
+                    valstr = '{:<5s} :'.format(a)
+                    valstr += '{:17.6f} a.u.'.format(dip_au[i])
+                    valstr += '{:17.6f} Debye   '.format(dip_debye[i])
+                    self.ostream.print_header(valstr)
+                index += 1
 
         self.ostream.print_blank()
         self.ostream.flush()
