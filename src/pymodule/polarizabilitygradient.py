@@ -63,11 +63,10 @@ class PolarizabilityGradient():
         self.ostream = ostream
 
         self.polgradient = None
-        self.delta_h = 0.001
+        self.delta_h = 0.001 # for numerical complex gradient
 
         self.is_complex = False
-        self.damping = 1000.0 / hartree_in_wavenumber(
-        )  # for numerical complex gradient
+        self.damping = 1000.0 / hartree_in_wavenumber() 
 
         self.numerical = False
         self.do_four_point = False
@@ -443,7 +442,6 @@ class PolarizabilityGradient():
                         rhow_den_sym.broadcast(self.rank, self.comm)
                         x_minus_y_den_sym.broadcast(self.rank, self.comm)
 
-                        #polgrad_xcgrad = self.grad_polgrad_xc_contrib(
                         polgrad_xcgrad = self.grad_polgrad_xc_contrib_real(
                             molecule, basis, rhow_den_sym, x_minus_y_den_sym,
                             gs_density, xcfun_label)
@@ -674,8 +672,6 @@ class PolarizabilityGradient():
                             rhow_dm = 1.0 * rel_dm_ao[i, i]
                             rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
 
-                            #rhow_den_sym = AODensityMatrix([rhow_dm_sym],
-                            #                               denmat.rest)
                             rhow_dm_sym_list_real = [np.array(rhow_dm_sym.real)]
                             rhow_dm_sym_list_imag = [np.array(rhow_dm_sym.imag)]
 
@@ -697,8 +693,6 @@ class PolarizabilityGradient():
                             x_minus_y_sym_list_real = [np.array(x_minus_y_sym.real)]
                             x_minus_y_sym_list_imag = [np.array(x_minus_y_sym.imag)]
 
-                            #x_minus_y_den_sym = AODensityMatrix([x_minus_y_sym],
-                            #                                    denmat.rest)
                             x_minus_y_den_sym_real = AODensityMatrix(
                                     x_minus_y_sym_list_real, denmat.rest)
                             x_minus_y_den_sym_imag = AODensityMatrix(
@@ -706,25 +700,17 @@ class PolarizabilityGradient():
 
                         else:
                             gs_density = AODensityMatrix()
-                            #rhow_den_sym = AODensityMatrix()
                             rhow_den_sym_real = AODensityMatrix()
                             rhow_den_sym_imag = AODensityMatrix()
-                            #x_minus_y_den_sym = AODensityMatrix()
                             x_minus_y_den_sym_real = AODensityMatrix()
                             x_minus_y_den_sym_imag = AODensityMatrix()
 
                         gs_density.broadcast(self.rank, self.comm)
-                        #rhow_den_sym.broadcast(self.rank, self.comm)
                         rhow_den_sym_real.broadcast(self.rank, self.comm)
                         rhow_den_sym_imag.broadcast(self.rank, self.comm)
-                        #x_minus_y_den_sym.broadcast(self.rank, self.comm)
                         x_minus_y_den_sym_real.broadcast(self.rank, self.comm)
                         x_minus_y_den_sym_imag.broadcast(self.rank, self.comm)
 
-                        #polgrad_xcgrad = self.grad_polgrad_xc_contrib(
-                        #    molecule, basis, rhow_den_sym, x_minus_y_den_sym,
-                        #    gs_density, xcfun_label)
-                        # TODO make xc_contrib function for complex case!!
                         polgrad_xcgrad = self.grad_polgrad_xc_contrib_complex(
                             molecule, basis, rhow_den_sym_real, rhow_den_sym_imag,
                             x_minus_y_den_sym_real, x_minus_y_den_sym_imag,
@@ -1140,7 +1126,7 @@ class PolarizabilityGradient():
 
         polgrad_xcgrad_real = self.comm.reduce(polgrad_xcgrad_real, root=mpi_master())
 
-        # Real contribution
+        # Imaginary contribution
         polgrad_xcgrad_imag = xcgrad_drv.integrate_vxc_gradient( # Im DM
             molecule, ao_basis, rhow_den_imag, gs_density, mol_grid, xcfun_label)
         polgrad_xcgrad_imag += xcgrad_drv.integrate_fxc_gradient( # Im DM
@@ -1274,3 +1260,4 @@ class PolarizabilityGradient():
         """
 
         self.ostream.print_block(molecule.get_string())
+
