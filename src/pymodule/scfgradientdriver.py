@@ -63,7 +63,7 @@ class ScfGradientDriver(GradientDriver):
         self.scf_driver = scf_drv
         self.flag = 'SCF Gradient Driver'
 
-    def compute(self, molecule, ao_basis, scf_drv):
+    def compute(self, molecule, ao_basis):
         """
         Computes the analytical or numerical nuclear gradient.
 
@@ -82,11 +82,11 @@ class ScfGradientDriver(GradientDriver):
 
         # compute gradient
         if self.numerical:
-            scf_drv.ostream.mute()
-            self.compute_numerical(molecule, ao_basis, scf_drv)
-            scf_drv.ostream.unmute()
+            self.ostream.mute()
+            self.compute_numerical(molecule, ao_basis)
+            self.ostream.unmute()
         else:
-            self.compute_analytical(molecule, ao_basis, scf_drv)
+            self.compute_analytical(molecule, ao_basis)
 
         # print gradient
 
@@ -100,7 +100,7 @@ class ScfGradientDriver(GradientDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-    def compute_analytical(self, molecule, ao_basis, scf_drv):
+    def compute_analytical(self, molecule, ao_basis):
         """
         Computes the analytical nuclear gradient.
         So far only for restricted Hartree-Fock with PySCF integral derivatives...
@@ -109,8 +109,6 @@ class ScfGradientDriver(GradientDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param scf_drv:
-            The SCF driver.
         """
 
         natm = molecule.number_of_atoms()
@@ -120,12 +118,12 @@ class ScfGradientDriver(GradientDriver):
         if self.rank == mpi_master():
             nocc = molecule.number_of_alpha_electrons()
 
-            mo = scf_drv.scf_tensors['C_alpha']
+            mo = self.scf_driver.scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc].copy()
 
-            one_pdm_ao = scf_drv.scf_tensors['D_alpha']
+            one_pdm_ao = self.scf_driver.scf_tensors['D_alpha']
 
-            eo_diag = np.diag(scf_drv.scf_tensors['E_alpha'][:nocc])
+            eo_diag = np.diag(self.scf_driver.scf_tensors['E_alpha'][:nocc])
             epsilon_dm_ao = -np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
 
             for i in range(natm):
@@ -178,8 +176,8 @@ class ScfGradientDriver(GradientDriver):
                 self.ostream.flush()
         # Add the xc contribution
         if self._dft:
-            density = scf_drv.density
-            xcfun_label = scf_drv.xcfun.get_func_label()
+            density = self.scf_driver.density
+            xcfun_label = self.scf_driver.xcfun.get_func_label()
 
             vxc_contrib = self.grad_vxc_contrib(molecule, ao_basis, density,
                                                 density, xcfun_label)
