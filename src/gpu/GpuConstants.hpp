@@ -30,6 +30,8 @@
 #define TILE_DIM_Y_K 8
 #define TILE_SIZE_K 64
 
+#define TILE_SIZE_J 256
+
 #define TILE_DIM_SMALL 1
 #define TILE_DIM_HALF 8
 #define TILE_DIM 16
