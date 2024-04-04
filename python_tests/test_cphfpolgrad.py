@@ -10,6 +10,8 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 #from veloxchem.cphfsolver import CphfSolver
+from veloxchem.lrsolver import LinearResponseSolver
+from veloxchem.cppsolver import ComplexResponse
 from veloxchem.polorbitalresponse import PolOrbitalResponse
 
 try:
@@ -28,9 +30,18 @@ class TestCphfPolgrad(unittest.TestCase):
             scf_drv.xcfun = xcfun
             method_settings = {'xcfun': xcfun}
 
-        scf_drv.update_settings(scf_dict, method_dict)
+        scf_drv.update_settings(scf_dict, method_settings)
         scf_drv.ostream.mute()
         scf_tensors = scf_drv.compute(molecule, basis)
+
+        # linear response
+        rsp_settings = {'conv_thresh': 1.0e-5, 'frequencies': (0.0, 0.4)}
+        lr_drv = LinearResponseSolver()
+        lr_drv.a_operator = "electric dipole"
+        lr_drv.b_operator = "electric dipole"
+        lr_drv.update_settings(rsp_settings, method_settings)
+        lr_drv.ostream.mute()
+        lr_results = lr_drv.compute(molecule, basis, scf_tensors)
 
         # test real analytical gradient
         cphfpolgrad_solver = PolOrbitalResponse()
@@ -38,14 +49,13 @@ class TestCphfPolgrad(unittest.TestCase):
                                 'use_subspace_solver': 'no'}
         cphfpolgrad_solver.update_settings(cphfpolgrad_settings, method_settings)
         cphfpolgrad_solver.ostream.mute()
-        cphfpolgrad_solver.compute(molecule, basis, scf_tensors)
+        cphfpolgrad_solver.compute(molecule, basis, scf_tensors, lr_results)
 
         if scf_drv.rank == mpi_master():
             cphfpolgrad_results = cphfpolgrad_solver.cphf_results
             cphfpolgrad_coefficients = cphfpolgrad_results['cphf_ov']
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            label = label + '_an'
             hf_file_name = str(here /'inputs'/'cphfpolgrad_coefficients.h5')
             hf = h5py.File(hf_file_name, 'r')
             cphfpolgrad_reference = np.array(hf.get(label))
@@ -56,16 +66,28 @@ class TestCphfPolgrad(unittest.TestCase):
             self.assertTrue(np.max(np.abs(cphfpolgrad_coefficients)
                                    - np.abs(cphfpolgrad_reference)) < 1.0e-6)
 
-    def run_cphfpolgrad_real_complex(self, molecule, basis, xcfun=None, label=None):
+    def run_cphfpolgrad_complex(self, molecule, basis, xcfun=None, label=None):
         scf_drv = ScfRestrictedDriver()
+        scf_dict = {}
         method_settings = {}
         if xcfun is not None:
             scf_drv._dft = True
             scf_drv.xcfun = xcfun
             method_settings = {'xcfun': xcfun}
 
+        scf_drv.update_settings(scf_dict, method_settings)
         scf_drv.ostream.mute()
         scf_tensors = scf_drv.compute(molecule, basis)
+
+        # linear response
+        rsp_settings = {'conv_thresh': 1.0e-5, 'frequencies': (0.0, 0.4),
+                        'damping': 0.5}
+        lr_drv = ComplexResponse()
+        lr_drv.a_operator = "electric dipole"
+        lr_drv.b_operator = "electric dipole"
+        lr_drv.update_settings(rsp_settings, method_settings)
+        lr_drv.ostream.mute()
+        lr_results = lr_drv.compute(molecule, basis, scf_tensors)
 
         # test complex analytical gradient
         cphfpolgrad_solver = PolOrbitalResponse()
@@ -74,14 +96,13 @@ class TestCphfPolgrad(unittest.TestCase):
                                 'use_subspace_solver': 'no'}
         cphfpolgrad_solver.update_settings(cphfpolgrad_settings, method_settings)
         cphfpolgrad_solver.ostream.mute()
-        cphfpolgrad_solver.compute(molecule, basis, scf_tensors)
+        cphfpolgrad_solver.compute(molecule, basis, scf_tensors, lr_results)
 
         if scf_drv.rank == mpi_master():
             cphfpolgrad_results = cphfpolgrad_solver.cphf_results
             cphfpolgrad_coefficients = cphfpolgrad_results['cphf_ov']
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            label = label + '_an'
             hf_file_name = str(here /'inputs'/'cphfpolgrad_coefficients.h5')
             hf = h5py.File(hf_file_name, 'r')
             cphfpolgrad_reference = np.array(hf.get(label))
@@ -103,7 +124,7 @@ class TestCphfPolgrad(unittest.TestCase):
         """
         basis_set_label = "sto-3g"
 
-        molecule = Molecule.from_xyz_string(nh3_xyz)
+        molecule = Molecule.from_xyz_string(h2o_xyz)
         basis = MolecularBasis.read(molecule, basis_set_label)
 
         self.run_cphfpolgrad_real(molecule, basis, None, "cphfpolgrad_coefficients_real")
@@ -120,8 +141,8 @@ class TestCphfPolgrad(unittest.TestCase):
         """
         basis_set_label = "sto-3g"
 
-        molecule = Molecule.from_xyz_string(nh3_xyz)
+        molecule = Molecule.from_xyz_string(h2o_xyz)
         basis = MolecularBasis.read(molecule, basis_set_label)
 
-        self.run_cphfsolver_real(molecule, basis, "b3lyp", "cpks_coefficients_b3lyp_real")
-        self.run_cphfsolver_complex(molecule, basis, "b3lyp", "cpks_coefficients_b3lyp_complex")
+        self.run_cphfpolgrad_real(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_b3lyp_real")
+        self.run_cphfpolgrad_complex(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_b3lyp_complex")
