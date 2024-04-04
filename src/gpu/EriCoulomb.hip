@@ -79,7 +79,7 @@ computeCoulombFockSSSS(double*         mat_J,
         r_j[1] = s_prim_info[j + s_prim_count * 3];
         r_j[2] = s_prim_info[j + s_prim_count * 4];
 
-        S_ij_00 = ss_pair_data_local[ij + ss_prim_pair_count_local * 8];
+        S_ij_00 = ss_pair_data_local[ij];
     }
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -110,8 +110,7 @@ computeCoulombFockSSSS(double*         mat_J,
                                    s_prim_info[l + s_prim_count * 3],
                                    s_prim_info[l + s_prim_count * 4]};
 
-            const auto S_kl_00 = ss_pair_data[kl + ss_prim_pair_count * 8];
-            const auto sym_kl  = ss_pair_data[kl + ss_prim_pair_count * 9];
+            const auto S_kl_00 = ss_pair_data[kl];
 
             const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
                                   (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
@@ -129,7 +128,8 @@ computeCoulombFockSSSS(double*         mat_J,
             gpu::computeBoysFunction(F0_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 0, boys_func_table, boys_func_ft);
 
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-            ERIs[threadIdx.y][threadIdx.x] = Lambda * S_ij_00 * S_kl_00 * F0_t[0] * ss_mat_D[kl] * sym_kl;
+            //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
+            ERIs[threadIdx.y][threadIdx.x] = Lambda * S_ij_00 * S_kl_00 * F0_t[0] * ss_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
         }
         else
         {
@@ -1345,7 +1345,7 @@ computeCoulombFockSPSP(double*         mat_J,
         r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
         r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
 
-        S_ij_00 = sp_pair_data_local[ij + sp_prim_pair_count_local * 8];
+        S_ij_00 = sp_pair_data_local[ij];
     }
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -1380,7 +1380,7 @@ computeCoulombFockSPSP(double*         mat_J,
                                    p_prim_info[l / 3 + p_prim_count * 3],
                                    p_prim_info[l / 3 + p_prim_count * 4]};
 
-            const auto S_kl_00  =  sp_pair_data[kl + sp_prim_pair_count * 8];
+            const auto S_kl_00  =  sp_pair_data[kl];
 
             const auto b0 = j % 3;
             const auto d0 = l % 3;

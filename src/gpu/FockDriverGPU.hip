@@ -1742,8 +1742,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto& ss_pair_data_local = screening.get_ss_pair_data_local(gpu_id);
     const auto& sp_pair_data_local = screening.get_sp_pair_data_local(gpu_id);
 
-    const auto& sp_pair_cart_local = screening.get_sp_pair_cart_local(gpu_id);
-
     const auto& ss_first_inds = screening.get_ss_first_inds();
     const auto& sp_first_inds = screening.get_sp_first_inds();
     const auto& sd_first_inds = screening.get_sd_first_inds();
@@ -1774,8 +1772,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     const auto& ss_pair_data = screening.get_ss_pair_data(); 
     const auto& sp_pair_data = screening.get_sp_pair_data(); 
-
-    const auto& sp_pair_cart = screening.get_sp_pair_cart(); 
 
     const auto ss_prim_pair_count = static_cast<int64_t>(ss_first_inds.size());
     const auto sp_prim_pair_count = static_cast<int64_t>(sp_first_inds.size());
@@ -1813,7 +1809,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     uint32_t *d_dd_first_inds, *d_dd_second_inds;
 
     double *d_ss_pair_data, *d_sp_pair_data;
-    uint32_t *d_sp_pair_cart;
 
     double *d_ss_mat_Q_local, *d_sp_mat_Q_local, *d_sd_mat_Q_local, *d_pp_mat_Q_local, *d_pd_mat_Q_local, *d_dd_mat_Q_local;
 
@@ -1825,7 +1820,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
 
     double *d_ss_pair_data_local, *d_sp_pair_data_local;
-    uint32_t *d_sp_pair_cart_local;
 
     hipSafe(hipMalloc(&d_mat_D, max_prim_pair_count * sizeof(double)));
     hipSafe(hipMalloc(&d_mat_J, max_prim_pair_count_local * sizeof(double)));
@@ -1855,10 +1849,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipMalloc(&d_dd_first_inds, dd_prim_pair_count * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_dd_second_inds, dd_prim_pair_count * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_ss_pair_data, ss_prim_pair_count * 10 * sizeof(double)));
-    hipSafe(hipMalloc(&d_sp_pair_data, sp_prim_pair_count * 10 * sizeof(double)));
-
-    hipSafe(hipMalloc(&d_sp_pair_cart, sp_prim_pair_count * 1 * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_ss_pair_data, ss_pair_data.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_sp_pair_data, sp_pair_data.size() * sizeof(double)));
 
     hipSafe(hipMalloc(&d_ss_mat_Q_local, ss_prim_pair_count_local * sizeof(double)));
     hipSafe(hipMalloc(&d_sp_mat_Q_local, sp_prim_pair_count_local * sizeof(double)));
@@ -1885,10 +1877,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_ss_pair_data_local, ss_prim_pair_count_local * 10 * sizeof(double)));
-    hipSafe(hipMalloc(&d_sp_pair_data_local, sp_prim_pair_count_local * 10 * sizeof(double)));
-
-    hipSafe(hipMalloc(&d_sp_pair_cart_local, sp_prim_pair_count_local * 1 * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_ss_pair_data_local, ss_pair_data_local.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_sp_pair_data_local, sp_pair_data_local.size() * sizeof(double)));
 
     hipSafe(hipMemcpy(d_ss_mat_Q, ss_mat_Q.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_sp_mat_Q, sp_mat_Q.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
@@ -1915,10 +1905,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipMemcpy(d_dd_first_inds, dd_first_inds.data(), dd_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_dd_second_inds, dd_second_inds.data(), dd_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_ss_pair_data, ss_pair_data.data(), ss_prim_pair_count * 10 * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sp_pair_data, sp_pair_data.data(), sp_prim_pair_count * 10 * sizeof(double), hipMemcpyHostToDevice));
-
-    hipSafe(hipMemcpy(d_sp_pair_cart, sp_pair_cart.data(), sp_prim_pair_count * 1 * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_ss_pair_data, ss_pair_data.data(), ss_pair_data.size()* sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_pair_data, sp_pair_data.data(), sp_pair_data.size()* sizeof(double), hipMemcpyHostToDevice));
 
     hipSafe(hipMemcpy(d_ss_mat_Q_local, ss_mat_Q_local.data(), ss_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_sp_mat_Q_local, sp_mat_Q_local.data(), sp_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
@@ -1945,10 +1933,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_ss_pair_data_local, ss_pair_data_local.data(), ss_prim_pair_count_local * 10 * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sp_pair_data_local, sp_pair_data_local.data(), sp_prim_pair_count_local * 10 * sizeof(double), hipMemcpyHostToDevice));
-
-    hipSafe(hipMemcpy(d_sp_pair_cart_local, sp_pair_cart_local.data(), sp_prim_pair_count_local * 1 * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_ss_pair_data_local, ss_pair_data_local.data(), ss_pair_data_local.size()* sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_pair_data_local, sp_pair_data_local.data(), sp_pair_data_local.size()* sizeof(double), hipMemcpyHostToDevice));
 
     timer.stop("Coulomb prep.");
 
