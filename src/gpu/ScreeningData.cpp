@@ -1367,6 +1367,10 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
 
     _ss_pair_data_local = std::vector<std::vector<double>>(_num_gpus_per_node);
     _sp_pair_data_local = std::vector<std::vector<double>>(_num_gpus_per_node);
+    _sd_pair_data_local = std::vector<std::vector<double>>(_num_gpus_per_node);
+    _pp_pair_data_local = std::vector<std::vector<double>>(_num_gpus_per_node);
+    _pd_pair_data_local = std::vector<std::vector<double>>(_num_gpus_per_node);
+    _dd_pair_data_local = std::vector<std::vector<double>>(_num_gpus_per_node);
 
     // TODO use communicator from arguments
     auto rank = mpi::rank(MPI_COMM_WORLD);
@@ -1399,11 +1403,15 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
         _sd_second_inds_local[gpu_id] = std::vector<uint32_t>(sd_batch_size);
         _sd_mat_Q_local[gpu_id]       = std::vector<double>(sd_batch_size);
 
+        _sd_pair_data_local[gpu_id]   = std::vector<double>(sd_batch_size);
+
         auto pp_batch_size = mathfunc::batch_size(pp_prim_pair_count, gpu_rank, gpu_count);
 
         _pp_first_inds_local[gpu_id]  = std::vector<uint32_t>(pp_batch_size);
         _pp_second_inds_local[gpu_id] = std::vector<uint32_t>(pp_batch_size);
         _pp_mat_Q_local[gpu_id]       = std::vector<double>(pp_batch_size);
+
+        _pp_pair_data_local[gpu_id]   = std::vector<double>(pp_batch_size);
 
         auto pd_batch_size = mathfunc::batch_size(pd_prim_pair_count, gpu_rank, gpu_count);
 
@@ -1411,11 +1419,15 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
         _pd_second_inds_local[gpu_id] = std::vector<uint32_t>(pd_batch_size);
         _pd_mat_Q_local[gpu_id]       = std::vector<double>(pd_batch_size);
 
+        _pd_pair_data_local[gpu_id]   = std::vector<double>(pd_batch_size);
+
         auto dd_batch_size = mathfunc::batch_size(dd_prim_pair_count, gpu_rank, gpu_count);
 
         _dd_first_inds_local[gpu_id]  = std::vector<uint32_t>(dd_batch_size);
         _dd_second_inds_local[gpu_id] = std::vector<uint32_t>(dd_batch_size);
         _dd_mat_Q_local[gpu_id]       = std::vector<double>(dd_batch_size);
+
+        _dd_pair_data_local[gpu_id]   = std::vector<double>(dd_batch_size);
     }
 
     auto nthreads = omp_get_max_threads();
@@ -1431,8 +1443,6 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
             auto gpu_rank = gpu_id + rank * _num_gpus_per_node;
             auto gpu_count = nnodes * _num_gpus_per_node;
 
-            auto ss_batch_size = mathfunc::batch_size(ss_prim_pair_count, gpu_rank, gpu_count);
-
             for (int64_t ij = gpu_rank, idx = 0; ij < ss_prim_pair_count; ij+=gpu_count, idx++)
             {
                 const auto& vals = sorted_ss_mat_Q[ss_prim_pair_count - 1 - ij];
@@ -1446,7 +1456,6 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
                 _ss_mat_Q_local[gpu_id][idx]       = Q_ij;
 
                 // ij pair data:
-                // a_i, a_j, x_ij, y_ij, z_ij, x_P, y_P, z_P, S_ij_00
 
                 const auto a_i = s_prim_info[i + s_prim_count * 0];
                 const auto c_i = s_prim_info[i + s_prim_count * 1];
@@ -1467,8 +1476,6 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
                 _ss_pair_data_local[gpu_id][idx] = S_ij_00;
             }
 
-            auto sp_batch_size = mathfunc::batch_size(sp_prim_pair_count, gpu_rank, gpu_count);
-
             for (int64_t ij = gpu_rank, idx = 0; ij < sp_prim_pair_count; ij+=gpu_count, idx++)
             {
                 const auto& vals = sorted_sp_mat_Q[sp_prim_pair_count - 1 - ij];
@@ -1482,7 +1489,6 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
                 _sp_mat_Q_local[gpu_id][idx]       = Q_ij;
 
                 // ij pair data:
-                // a_i, a_j, x_ij, y_ij, z_ij, x_P, y_P, z_P, S_ij_00
 
                 const auto a_i = s_prim_info[i + s_prim_count * 0];
                 const auto c_i = s_prim_info[i + s_prim_count * 1];
@@ -1514,6 +1520,26 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
                 _sd_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
                 _sd_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
                 _sd_mat_Q_local[gpu_id][idx]       = Q_ij;
+
+                // ij pair data:
+
+                const auto a_i = s_prim_info[i + s_prim_count * 0];
+                const auto c_i = s_prim_info[i + s_prim_count * 1];
+                const auto x_i = s_prim_info[i + s_prim_count * 2];
+                const auto y_i = s_prim_info[i + s_prim_count * 3];
+                const auto z_i = s_prim_info[i + s_prim_count * 4];
+
+                const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
+                const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
+                const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
+                const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
+                const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+
+                const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+                const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+                _sd_pair_data_local[gpu_id][idx] = S_ij_00;
             }
 
             for (int64_t ij = gpu_rank, idx = 0; ij < pp_prim_pair_count; ij+=gpu_count, idx++)
@@ -1527,6 +1553,26 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
                 _pp_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
                 _pp_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
                 _pp_mat_Q_local[gpu_id][idx]       = Q_ij;
+
+                // ij pair data:
+
+                const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
+                const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
+                const auto x_i = p_prim_info[i / 3 + p_prim_count * 2];
+                const auto y_i = p_prim_info[i / 3 + p_prim_count * 3];
+                const auto z_i = p_prim_info[i / 3 + p_prim_count * 4];
+
+                const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
+                const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
+                const auto x_j = p_prim_info[j / 3 + p_prim_count * 2];
+                const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
+                const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
+
+                const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+                const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+                _pp_pair_data_local[gpu_id][idx] = S_ij_00;
             }
 
             for (int64_t ij = gpu_rank, idx = 0; ij < pd_prim_pair_count; ij+=gpu_count, idx++)
@@ -1540,6 +1586,26 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
                 _pd_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
                 _pd_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
                 _pd_mat_Q_local[gpu_id][idx]       = Q_ij;
+
+                // ij pair data:
+
+                const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
+                const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
+                const auto x_i = p_prim_info[i / 3 + p_prim_count * 2];
+                const auto y_i = p_prim_info[i / 3 + p_prim_count * 3];
+                const auto z_i = p_prim_info[i / 3 + p_prim_count * 4];
+
+                const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
+                const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
+                const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
+                const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
+                const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+
+                const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+                const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+                _pd_pair_data_local[gpu_id][idx] = S_ij_00;
             }
 
             for (int64_t ij = gpu_rank, idx = 0; ij < dd_prim_pair_count; ij+=gpu_count, idx++)
@@ -1553,6 +1619,26 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
                 _dd_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
                 _dd_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
                 _dd_mat_Q_local[gpu_id][idx]       = Q_ij;
+
+                // ij pair data:
+
+                const auto a_i = d_prim_info[i / 6 + d_prim_count * 0];
+                const auto c_i = d_prim_info[i / 6 + d_prim_count * 1];
+                const auto x_i = d_prim_info[i / 6 + d_prim_count * 2];
+                const auto y_i = d_prim_info[i / 6 + d_prim_count * 3];
+                const auto z_i = d_prim_info[i / 6 + d_prim_count * 4];
+
+                const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
+                const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
+                const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
+                const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
+                const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+
+                const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+                const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+                _dd_pair_data_local[gpu_id][idx] = S_ij_00;
             }
         }
     }
@@ -1775,7 +1861,6 @@ CScreeningData::sortQD(const int64_t s_prim_count,
     _ss_second_inds = std::vector<uint32_t>(ss_prim_pair_count);
 
     _ss_pair_data = std::vector<double>(ss_prim_pair_count);
-    _sp_pair_data = std::vector<double>(sp_prim_pair_count);
 
     for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
     {
@@ -1795,7 +1880,6 @@ CScreeningData::sortQD(const int64_t s_prim_count,
         if (std::fabs(D_ij) > _ss_max_D) _ss_max_D = std::fabs(D_ij);
 
         // ij pair data:
-        // a_i, a_j, x_ij, y_ij, z_ij, x_P, y_P, z_P, S_ij_00
 
         const auto a_i = s_prim_info[i + s_prim_count * 0];
         const auto c_i = s_prim_info[i + s_prim_count * 1];
@@ -1821,6 +1905,8 @@ CScreeningData::sortQD(const int64_t s_prim_count,
     _sp_first_inds  = std::vector<uint32_t>(sp_prim_pair_count);
     _sp_second_inds = std::vector<uint32_t>(sp_prim_pair_count);
 
+    _sp_pair_data = std::vector<double>(sp_prim_pair_count);
+
     for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
     {
         const auto& vals = sorted_sp_mat_Q_D[sp_prim_pair_count - 1 - ij];
@@ -1839,7 +1925,6 @@ CScreeningData::sortQD(const int64_t s_prim_count,
         if (std::fabs(D_ij) > _sp_max_D) _sp_max_D = std::fabs(D_ij);
 
         // ij pair data:
-        // a_i, a_j, x_ij, y_ij, z_ij, x_P, y_P, z_P, S_ij_00
 
         const auto a_i = s_prim_info[i + s_prim_count * 0];
         const auto c_i = s_prim_info[i + s_prim_count * 1];
@@ -1865,6 +1950,8 @@ CScreeningData::sortQD(const int64_t s_prim_count,
     _sd_first_inds  = std::vector<uint32_t>(sd_prim_pair_count);
     _sd_second_inds = std::vector<uint32_t>(sd_prim_pair_count);
 
+    _sd_pair_data = std::vector<double>(sd_prim_pair_count);
+
     for (int64_t ij = 0; ij < sd_prim_pair_count; ij++)
     {
         const auto& vals = sorted_sd_mat_Q_D[sd_prim_pair_count - 1 - ij];
@@ -1881,12 +1968,34 @@ CScreeningData::sortQD(const int64_t s_prim_count,
         _sd_second_inds[ij] = static_cast<uint32_t>(j);
 
         if (std::fabs(D_ij) > _sd_max_D) _sd_max_D = std::fabs(D_ij);
+
+        // ij pair data:
+
+        const auto a_i = s_prim_info[i + s_prim_count * 0];
+        const auto c_i = s_prim_info[i + s_prim_count * 1];
+        const auto x_i = s_prim_info[i + s_prim_count * 2];
+        const auto y_i = s_prim_info[i + s_prim_count * 3];
+        const auto z_i = s_prim_info[i + s_prim_count * 4];
+
+        const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
+        const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
+        const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
+        const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+
+        const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        _sd_pair_data[ij] = S_ij_00;
     }
 
     _pp_mat_Q       = std::vector<double>  (pp_prim_pair_count);
     _pp_mat_D       = std::vector<double>  (pp_prim_pair_count);
     _pp_first_inds  = std::vector<uint32_t>(pp_prim_pair_count);
     _pp_second_inds = std::vector<uint32_t>(pp_prim_pair_count);
+
+    _pp_pair_data = std::vector<double>(pp_prim_pair_count);
 
     for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
     {
@@ -1904,12 +2013,34 @@ CScreeningData::sortQD(const int64_t s_prim_count,
         _pp_second_inds[ij] = static_cast<uint32_t>(j);
 
         if (std::fabs(D_ij) > _pp_max_D) _pp_max_D = std::fabs(D_ij);
+
+        // ij pair data:
+
+        const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
+        const auto x_i = p_prim_info[i / 3 + p_prim_count * 2];
+        const auto y_i = p_prim_info[i / 3 + p_prim_count * 3];
+        const auto z_i = p_prim_info[i / 3 + p_prim_count * 4];
+
+        const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
+        const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
+        const auto x_j = p_prim_info[j / 3 + p_prim_count * 2];
+        const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
+        const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
+
+        const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        _pp_pair_data[ij] = S_ij_00;
     }
 
     _pd_mat_Q       = std::vector<double>  (pd_prim_pair_count);
     _pd_mat_D       = std::vector<double>  (pd_prim_pair_count);
     _pd_first_inds  = std::vector<uint32_t>(pd_prim_pair_count);
     _pd_second_inds = std::vector<uint32_t>(pd_prim_pair_count);
+
+    _pd_pair_data = std::vector<double>(pd_prim_pair_count);
 
     for (int64_t ij = 0; ij < pd_prim_pair_count; ij++)
     {
@@ -1927,12 +2058,34 @@ CScreeningData::sortQD(const int64_t s_prim_count,
         _pd_second_inds[ij] = static_cast<uint32_t>(j);
 
         if (std::fabs(D_ij) > _pd_max_D) _pd_max_D = std::fabs(D_ij);
+
+        // ij pair data:
+
+        const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
+        const auto x_i = p_prim_info[i / 3 + p_prim_count * 2];
+        const auto y_i = p_prim_info[i / 3 + p_prim_count * 3];
+        const auto z_i = p_prim_info[i / 3 + p_prim_count * 4];
+
+        const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
+        const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
+        const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
+        const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+
+        const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        _pd_pair_data[ij] = S_ij_00;
     }
 
     _dd_mat_Q       = std::vector<double>  (dd_prim_pair_count);
     _dd_mat_D       = std::vector<double>  (dd_prim_pair_count);
     _dd_first_inds  = std::vector<uint32_t>(dd_prim_pair_count);
     _dd_second_inds = std::vector<uint32_t>(dd_prim_pair_count);
+
+    _dd_pair_data = std::vector<double>(dd_prim_pair_count);
 
     for (int64_t ij = 0; ij < dd_prim_pair_count; ij++)
     {
@@ -1950,6 +2103,26 @@ CScreeningData::sortQD(const int64_t s_prim_count,
         _dd_second_inds[ij] = static_cast<uint32_t>(j);
 
         if (std::fabs(D_ij) > _dd_max_D) _dd_max_D = std::fabs(D_ij);
+
+        // ij pair data:
+
+        const auto a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        const auto c_i = d_prim_info[i / 6 + d_prim_count * 1];
+        const auto x_i = d_prim_info[i / 6 + d_prim_count * 2];
+        const auto y_i = d_prim_info[i / 6 + d_prim_count * 3];
+        const auto z_i = d_prim_info[i / 6 + d_prim_count * 4];
+
+        const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
+        const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
+        const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
+        const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+
+        const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        _dd_pair_data[ij] = S_ij_00;
     }
 }
 
@@ -1976,6 +2149,10 @@ auto CScreeningData::get_dd_mat_Q_local(const int64_t gpu_id) const -> const std
 
 auto CScreeningData::get_ss_pair_data_local(const int64_t gpu_id) const -> const std::vector<double>& { return _ss_pair_data_local[gpu_id]; }
 auto CScreeningData::get_sp_pair_data_local(const int64_t gpu_id) const -> const std::vector<double>& { return _sp_pair_data_local[gpu_id]; }
+auto CScreeningData::get_sd_pair_data_local(const int64_t gpu_id) const -> const std::vector<double>& { return _sd_pair_data_local[gpu_id]; }
+auto CScreeningData::get_pp_pair_data_local(const int64_t gpu_id) const -> const std::vector<double>& { return _pp_pair_data_local[gpu_id]; }
+auto CScreeningData::get_pd_pair_data_local(const int64_t gpu_id) const -> const std::vector<double>& { return _pd_pair_data_local[gpu_id]; }
+auto CScreeningData::get_dd_pair_data_local(const int64_t gpu_id) const -> const std::vector<double>& { return _dd_pair_data_local[gpu_id]; }
 
 auto CScreeningData::get_ss_first_inds() const -> const std::vector<uint32_t>& { return _ss_first_inds; }
 auto CScreeningData::get_sp_first_inds() const -> const std::vector<uint32_t>& { return _sp_first_inds; }
@@ -2014,6 +2191,10 @@ auto CScreeningData::get_dd_max_D() const -> double { return _dd_max_D; }
 
 auto CScreeningData::get_ss_pair_data() const -> const std::vector<double>& { return _ss_pair_data; }
 auto CScreeningData::get_sp_pair_data() const -> const std::vector<double>& { return _sp_pair_data; }
+auto CScreeningData::get_sd_pair_data() const -> const std::vector<double>& { return _sd_pair_data; }
+auto CScreeningData::get_pp_pair_data() const -> const std::vector<double>& { return _pp_pair_data; }
+auto CScreeningData::get_pd_pair_data() const -> const std::vector<double>& { return _pd_pair_data; }
+auto CScreeningData::get_dd_pair_data() const -> const std::vector<double>& { return _dd_pair_data; }
 
 auto CScreeningData::get_Q_K_ss() const -> const std::vector<double>& { return _Q_K_ss; }
 auto CScreeningData::get_Q_K_sp() const -> const std::vector<double>& { return _Q_K_sp; }

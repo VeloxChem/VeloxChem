@@ -77,6 +77,10 @@ class CScreeningData
 
     std::vector<std::vector<double>> _ss_pair_data_local;
     std::vector<std::vector<double>> _sp_pair_data_local;
+    std::vector<std::vector<double>> _sd_pair_data_local;
+    std::vector<std::vector<double>> _pp_pair_data_local;
+    std::vector<std::vector<double>> _pd_pair_data_local;
+    std::vector<std::vector<double>> _dd_pair_data_local;
 
     std::vector<uint32_t> _ss_first_inds;
     std::vector<uint32_t> _sp_first_inds;
@@ -108,6 +112,10 @@ class CScreeningData
 
     std::vector<double> _ss_pair_data;
     std::vector<double> _sp_pair_data;
+    std::vector<double> _sd_pair_data;
+    std::vector<double> _pp_pair_data;
+    std::vector<double> _pd_pair_data;
+    std::vector<double> _dd_pair_data;
 
     double _ss_max_D;
     double _sp_max_D;
@@ -241,6 +249,10 @@ class CScreeningData
 
     auto get_ss_pair_data_local(const int64_t gpu_id) const -> const std::vector<double>&;
     auto get_sp_pair_data_local(const int64_t gpu_id) const -> const std::vector<double>&;
+    auto get_sd_pair_data_local(const int64_t gpu_id) const -> const std::vector<double>&;
+    auto get_pp_pair_data_local(const int64_t gpu_id) const -> const std::vector<double>&;
+    auto get_pd_pair_data_local(const int64_t gpu_id) const -> const std::vector<double>&;
+    auto get_dd_pair_data_local(const int64_t gpu_id) const -> const std::vector<double>&;
 
     auto get_ss_first_inds() const -> const std::vector<uint32_t>&;
     auto get_sp_first_inds() const -> const std::vector<uint32_t>&;
@@ -279,6 +291,10 @@ class CScreeningData
 
     auto get_ss_pair_data() const -> const std::vector<double>&;
     auto get_sp_pair_data() const -> const std::vector<double>&;
+    auto get_sd_pair_data() const -> const std::vector<double>&;
+    auto get_pp_pair_data() const -> const std::vector<double>&;
+    auto get_pd_pair_data() const -> const std::vector<double>&;
+    auto get_dd_pair_data() const -> const std::vector<double>&;
 
     auto get_Q_K_ss() const -> const std::vector<double>&;
     auto get_Q_K_sp() const -> const std::vector<double>&;
