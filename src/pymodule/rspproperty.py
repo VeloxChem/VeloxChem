@@ -116,16 +116,16 @@ class ResponseProperty:
                 self._rsp_dict['residue'] == 'none' and
                 self._rsp_dict['onlystatic'] == 'no'):
 
-            if self._rsp_dict['complex'] == 'no':
+            if self._rsp_dict['is_complex'] == 'no':
                 self._rsp_driver = LinearResponseSolver(self.comm, self.ostream)
 
-            elif self._rsp_dict['complex'] == 'yes':
+            elif self._rsp_dict['is_complex'] == 'yes':
                 self._rsp_driver = ComplexResponse(self.comm, self.ostream)
 
         # Linear response real solver
         elif (self._rsp_dict['order'] == 'linear' and
               self._rsp_dict['residue'] == 'none' and
-              self._rsp_dict['complex'] == 'no'):
+              self._rsp_dict['is_complex'] == 'no'):
 
             self._rsp_driver = LinearResponseSolver(self.comm, self.ostream)
 
@@ -133,7 +133,7 @@ class ResponseProperty:
         elif (self._rsp_dict['order'] == 'linear' and
               self._rsp_dict['residue'] == 'none' and
               self._rsp_dict['onlystatic'] == 'no' and
-              self._rsp_dict['complex'] == 'yes'):
+              self._rsp_dict['is_complex'] == 'yes'):
 
             self._rsp_driver = ComplexResponse(self.comm, self.ostream)
 
@@ -159,14 +159,14 @@ class ResponseProperty:
         elif (self._rsp_dict['order'] == 'linear' and
               self._rsp_dict['residue'] == 'none' and
               self._rsp_dict['onlystatic'] == 'yes' and
-              self._rsp_dict['complex'] == 'yes'):
+              self._rsp_dict['is_complex'] == 'yes'):
 
             self._rsp_driver = C6Driver(self.comm, self.ostream)
 
         # Linear response eigensolver (RPA/TDA)
         elif (self._rsp_dict['order'] == 'linear' and
               self._rsp_dict['residue'] == 'single' and
-              self._rsp_dict['complex'] == 'no'):
+              self._rsp_dict['is_complex'] == 'no'):
 
             if self.tamm_dancoff:
                 self._rsp_driver = TdaEigenSolver(self.comm, self.ostream)
@@ -182,21 +182,21 @@ class ResponseProperty:
         elif (self.prop_type == 'custom' and
               self._rsp_dict['order'] == 'quadratic' and
               self._rsp_dict['residue'] == 'none' and
-              self._rsp_dict['complex'] == 'yes'):
+              self._rsp_dict['is_complex'] == 'yes'):
 
             self._rsp_driver = QuadraticResponseDriver(self.comm, self.ostream)
 
         # SHG (quadratic response) driver
         elif (self._rsp_dict['order'] == 'quadratic' and
               self._rsp_dict['residue'] == 'none' and
-              self._rsp_dict['complex'] == 'yes'):
+              self._rsp_dict['is_complex'] == 'yes'):
 
             self._rsp_driver = ShgDriver(self.comm, self.ostream)
 
         # TPA transition (quadratic response) driver
         elif (self._rsp_dict['order'] == 'quadratic' and
               self._rsp_dict['residue'] == 'single' and
-              self._rsp_dict['complex'] == 'yes'):
+              self._rsp_dict['is_complex'] == 'yes'):
 
             self._rsp_driver = TpaTransitionDriver(self.comm, self.ostream)
 
@@ -204,14 +204,14 @@ class ResponseProperty:
         elif (self.prop_type == 'custom' and
               self._rsp_dict['order'] == 'cubic' and
               self._rsp_dict['residue'] == 'none' and
-              self._rsp_dict['complex'] == 'yes'):
+              self._rsp_dict['is_complex'] == 'yes'):
 
             self._rsp_driver = CubicResponseDriver(self.comm, self.ostream)
 
         # TPA (cubic response) driver
         elif (self._rsp_dict['order'] == 'cubic' and
               self._rsp_dict['residue'] == 'none' and
-              self._rsp_dict['complex'] == 'yes'):
+              self._rsp_dict['is_complex'] == 'yes'):
 
             if ('tpa_type' not in self._rsp_dict or
                     self._rsp_dict['tpa_type'].lower() == 'full'):

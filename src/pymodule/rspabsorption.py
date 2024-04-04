@@ -54,7 +54,7 @@ class Absorption(ResponseProperty):
         rsp_dict['property'] = 'absorption'
         rsp_dict['order'] = 'linear'
         rsp_dict['residue'] = 'single'
-        rsp_dict['complex'] = 'no'
+        rsp_dict['is_complex'] = 'no'
 
         if 'nstates' not in rsp_dict:
             rsp_dict['nstates'] = '3'

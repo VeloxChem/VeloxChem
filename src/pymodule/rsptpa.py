@@ -54,7 +54,7 @@ class TPA(ResponseProperty):
         rsp_dict['property'] = 'tpa'
         rsp_dict['order'] = 'cubic'
         rsp_dict['residue'] = 'none'
-        rsp_dict['complex'] = 'yes'
+        rsp_dict['is_complex'] = 'yes'
 
         if 'frequencies' not in rsp_dict:
             rsp_dict['frequencies'] = '0'

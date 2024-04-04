@@ -55,7 +55,7 @@ class C6(ResponseProperty):
         rsp_dict['order'] = 'linear'
         rsp_dict['residue'] = 'none'
         rsp_dict['onlystatic'] = 'yes'
-        rsp_dict['complex'] = 'yes'
+        rsp_dict['is_complex'] = 'yes'
 
         rsp_dict['a_operator'] = 'electric dipole'
         rsp_dict['a_components'] = 'xyz'

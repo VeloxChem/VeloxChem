@@ -55,7 +55,7 @@ class CircularDichroismSpectrum(ResponseProperty):
         rsp_dict['order'] = 'linear'
         rsp_dict['residue'] = 'none'
         rsp_dict['onlystatic'] = 'no'
-        rsp_dict['complex'] = 'yes'
+        rsp_dict['is_complex'] = 'yes'
 
         rsp_dict['a_operator'] = 'magnetic dipole'
         rsp_dict['a_components'] = 'xyz'

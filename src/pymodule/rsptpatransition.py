@@ -54,7 +54,7 @@ class TpaTransition(ResponseProperty):
         rsp_dict['property'] = 'tpa transition'
         rsp_dict['order'] = 'quadratic'
         rsp_dict['residue'] = 'single'
-        rsp_dict['complex'] = 'yes'
+        rsp_dict['is_complex'] = 'yes'
 
         if 'nstates' not in rsp_dict:
             rsp_dict['nstates'] = '3'

@@ -55,8 +55,8 @@ class Polarizability(ResponseProperty):
         rsp_dict['order'] = 'linear'
         rsp_dict['residue'] = 'none'
         rsp_dict['onlystatic'] = 'no'
-        if 'complex' not in rsp_dict:
-            rsp_dict['complex'] = 'no'
+        if 'is_complex' not in rsp_dict:
+            rsp_dict['is_complex'] = 'no'
 
         rsp_dict['a_operator'] = 'electric dipole'
         if 'a_components' not in rsp_dict:
