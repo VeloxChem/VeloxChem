@@ -647,10 +647,10 @@ class PolOrbitalResponse(CphfSolver):
                     'unrel_dm_ao': unrel_dm_ao,
                     'fock_ao_rhs_real': fock_ao_rhs_real,
                     'fock_ao_rhs_imag': fock_ao_rhs_imag,
-                    'fock_gxc_ao_rere': fock_gxc_ao_rere, # None if not DFT
-                    'fock_gxc_ao_imim': fock_gxc_ao_imim, # None if not DFT
-                    'fock_gxc_ao_reim': fock_gxc_ao_reim, # None if not DFT
-                    'fock_gxc_ao_imre': fock_gxc_ao_imre, # None if not DFT
+                    'fock_gxc_ao_rere': fock_gxc_ao_rere,  # None if not DFT
+                    'fock_gxc_ao_imim': fock_gxc_ao_imim,  # None if not DFT
+                    'fock_gxc_ao_reim': fock_gxc_ao_reim,  # None if not DFT
+                    'fock_gxc_ao_imre': fock_gxc_ao_imre,  # None if not DFT
                 }
                 if (f == 0):
                     tot_rhs_mo = np.concatenate((rhs_mo.real, rhs_mo.imag))
@@ -1452,7 +1452,6 @@ class PolOrbitalResponse(CphfSolver):
                 # Get fock matrices from cphf_results
                 fock_ao_rhs_real = self.cphf_results[w]['fock_ao_rhs_real']
                 fock_ao_rhs_imag = self.cphf_results[w]['fock_ao_rhs_imag']
-                #fock_gxc_ao = self.cphf_results[w]['fock_gxc_ao']
                 fock_gxc_ao_rere = self.cphf_results[w]['fock_gxc_ao_rere']
                 fock_gxc_ao_imim = self.cphf_results[w]['fock_gxc_ao_imim']
                 fock_gxc_ao_reim = self.cphf_results[w]['fock_gxc_ao_reim']
@@ -1740,8 +1739,7 @@ class PolOrbitalResponse(CphfSolver):
                                     + 1j * (np.linalg.multi_dot([
                                         D_occ, fock_gxc_ao_reim.alpha_to_numpy(2 * (m * dof + n)), D_occ])
                                         + np.linalg.multi_dot([
-                                        D_occ, fock_gxc_ao_imre.alpha_to_numpy(2 * (m * dof + n)), D_occ]))
-                                    )
+                                        D_occ, fock_gxc_ao_imre.alpha_to_numpy(2 * (m * dof + n)), D_occ])))
 
                 # add omega multipliers in AO basis to cphf_results dictionary
                 self.cphf_results[(w)]['omega_ao'] = omega
