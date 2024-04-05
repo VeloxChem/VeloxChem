@@ -98,6 +98,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
     const auto all_prim_count = s_prim_count + p_prim_count * 3 + d_prim_count *6;
 
+    // TODO use communicator from arguments
     auto rank = mpi::rank(MPI_COMM_WORLD);
     auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
@@ -566,6 +567,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
+    // TODO use communicator from arguments
     auto rank = mpi::rank(MPI_COMM_WORLD);
     auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
@@ -1366,6 +1368,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
 
+    // TODO use communicator from arguments
     auto rank = mpi::rank(MPI_COMM_WORLD);
     auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 

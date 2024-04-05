@@ -178,6 +178,7 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
 
     const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
 
+    // TODO use communicator from arguments
     auto rank = mpi::rank(MPI_COMM_WORLD);
     auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
