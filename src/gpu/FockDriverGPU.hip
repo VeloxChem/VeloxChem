@@ -107,7 +107,6 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
     std::vector<CDenseMatrix> Q_omp(num_gpus_per_node);
 
-    // TODO: use std::malloc in DenseMatrix (for numa)
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
         Q_omp[gpu_id] = CDenseMatrix(all_prim_count, all_prim_count);
@@ -578,7 +577,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     std::vector<CDenseMatrix> T_matrices(num_gpus_per_node);
     std::vector<CDenseMatrix> V_matrices(num_gpus_per_node);
 
-    // TODO: use std::malloc in DenseMatrix (for numa)
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
         S_matrices[gpu_id] = CDenseMatrix(naos, naos);
@@ -5931,8 +5929,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     hipSafe(hipDeviceSynchronize());
 
-    // TODO: update hip free for d-orbitals
-
     hipSafe(hipFree(d_mat_D));
     hipSafe(hipFree(d_mat_J));
 
@@ -5956,6 +5952,13 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipFree(d_dd_first_inds));
     hipSafe(hipFree(d_dd_second_inds));
 
+    hipSafe(hipFree(d_ss_pair_data));
+    hipSafe(hipFree(d_sp_pair_data));
+    hipSafe(hipFree(d_sd_pair_data));
+    hipSafe(hipFree(d_pp_pair_data));
+    hipSafe(hipFree(d_pd_pair_data));
+    hipSafe(hipFree(d_dd_pair_data));
+
     hipSafe(hipFree(d_ss_mat_Q_local));
     hipSafe(hipFree(d_sp_mat_Q_local));
     hipSafe(hipFree(d_sd_mat_Q_local));
@@ -5975,6 +5978,13 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipFree(d_pd_second_inds_local));
     hipSafe(hipFree(d_dd_first_inds_local));
     hipSafe(hipFree(d_dd_second_inds_local));
+
+    hipSafe(hipFree(d_ss_pair_data_local));
+    hipSafe(hipFree(d_sp_pair_data_local));
+    hipSafe(hipFree(d_sd_pair_data_local));
+    hipSafe(hipFree(d_pp_pair_data_local));
+    hipSafe(hipFree(d_pd_pair_data_local));
+    hipSafe(hipFree(d_dd_pair_data_local));
 
     timer.start("Exchange prep.");
 
@@ -12233,8 +12243,14 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipFree(d_pair_inds_k_for_K_ss));
     hipSafe(hipFree(d_pair_inds_i_for_K_sp));
     hipSafe(hipFree(d_pair_inds_k_for_K_sp));
+    hipSafe(hipFree(d_pair_inds_i_for_K_sd));
+    hipSafe(hipFree(d_pair_inds_k_for_K_sd));
     hipSafe(hipFree(d_pair_inds_i_for_K_pp));
     hipSafe(hipFree(d_pair_inds_k_for_K_pp));
+    hipSafe(hipFree(d_pair_inds_i_for_K_pd));
+    hipSafe(hipFree(d_pair_inds_k_for_K_pd));
+    hipSafe(hipFree(d_pair_inds_i_for_K_dd));
+    hipSafe(hipFree(d_pair_inds_k_for_K_dd));
 
     hipSafe(hipFree(d_mat_D_full_AO));
 

@@ -1341,6 +1341,8 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
 
     // form local vectors
 
+    // TODO: use uint2 for pair indices
+
     _ss_first_inds_local  = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
     _ss_second_inds_local = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
     _ss_mat_Q_local       = std::vector<std::vector<double>>(_num_gpus_per_node);
@@ -1505,6 +1507,8 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
                 const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
                 const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+                // TODO: try storing x/y/z/a in double4
 
                 _sp_pair_data_local[gpu_id][idx] = S_ij_00;
             }
@@ -1855,6 +1859,8 @@ CScreeningData::sortQD(const int64_t s_prim_count,
     _pd_max_D = 0.0;
     _dd_max_D = 0.0;
 
+    // TODO: use uint2 for pair indices
+
     _ss_mat_Q       = std::vector<double>  (ss_prim_pair_count);
     _ss_mat_D       = std::vector<double>  (ss_prim_pair_count);
     _ss_first_inds  = std::vector<uint32_t>(ss_prim_pair_count);
@@ -1896,6 +1902,8 @@ CScreeningData::sortQD(const int64_t s_prim_count,
         const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        // TODO: try storing x/y/z/a in double4
 
         _ss_pair_data[ij] = S_ij_00;
     }
@@ -3175,6 +3183,8 @@ auto CScreeningData::form_Q_and_D_inds_for_K(const int64_t                s_prim
 auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count, const CDenseMatrix& Q_prime, const double Q_prime_thresh) -> void
 {
     // TODO think about sorting by Q_prime bound
+
+    // TODO: use uint2 for pair indices
 
     // ss, sp, sd blocks
 
