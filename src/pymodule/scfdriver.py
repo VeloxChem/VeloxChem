@@ -1091,17 +1091,10 @@ class ScfDriver:
 
             profiler.start_timer('CompEnergy')
 
-            t0_comp_energy = tm.time()
             e_el = self._comp_energy(fock_mat, vxc_mat, e_pe, kin_mat, npot_mat,
                                      den_mat)
-            t1_comp_energy = tm.time()
 
-            self.ostream.print_info(f'Elec. energy:      {e_el} a.u.')
-            self.ostream.flush()
-
-            t0_comp_full_fock = tm.time()
             fock_mat = self._comp_full_fock(fock_mat, vxc_mat, V_pe, kin_mat, npot_mat)
-            t1_comp_full_fock = tm.time()
 
             if self.rank == mpi_master() and self.electric_field is not None:
                 efpot = sum([
@@ -1128,22 +1121,12 @@ class ScfDriver:
                         elem_ids[i] * (coords[i] - self._dipole_origin),
                         self.electric_field)
 
-            t0_comp_gradient = tm.time()
             e_mat, e_grad, max_grad = self._comp_gradient(fock_mat, ovl_mat, den_mat,
                                                           oao_mat)
-            t1_comp_gradient = tm.time()
-
-            self.ostream.print_info(f'e_grad:            {e_grad}')
-            self.ostream.flush()
 
             # compute density change and energy change
 
-            t0_comp_density_change = tm.time()
             diff_den = self._comp_density_change(den_mat, self.density)
-            t1_comp_density_change = tm.time()
-
-            self.ostream.print_info(f'diff_den:          {diff_den}')
-            self.ostream.flush()
 
             e_scf = (e_el + self._nuc_energy + self._d4_energy +
                      self._ef_nuc_energy)
@@ -1163,11 +1146,6 @@ class ScfDriver:
             self._density = AODensityMatrix(den_mat)
 
             self._scf_energy = e_scf
-
-            self.ostream.print_info(f'    energy       : {t1_comp_energy-t0_comp_energy:.2f} sec')
-            self.ostream.print_info(f'    full_fock    : {t1_comp_full_fock-t0_comp_full_fock:.2f} sec')
-            self.ostream.print_info(f'    gradient     : {t1_comp_gradient-t0_comp_gradient:.2f} sec')
-            self.ostream.print_info(f'    diff_den     : {t1_comp_density_change-t0_comp_density_change:.2f} sec')
 
             profiler.stop_timer('CompEnergy')
             profiler.check_memory_usage('Iteration {:d} Fock build'.format(
@@ -1193,28 +1171,18 @@ class ScfDriver:
             profiler.stop_timer('StoreDIIS')
             profiler.start_timer('EffFock')
 
-            eff_fock_t0 = tm.time()
-
             if self.rank == mpi_master():
                 eff_fock_mat = acc_diis.get_effective_fock(fock_mat, self.ostream)
             else:
                 eff_fock_mat = None
 
-            eff_fock_t1 = tm.time()
-            self.ostream.print_info(f'Eff. Fock   computed in {eff_fock_t1-eff_fock_t0:.2f} sec')
-
             profiler.stop_timer('EffFock')
 
             profiler.start_timer('FockDiag')
 
-            new_mo_t0 = tm.time()
-
             self._molecular_orbitals = self._gen_molecular_orbitals(
                 molecule, eff_fock_mat, oao_mat,
                 screener.get_num_gpus_per_node())
-
-            new_mo_t1 = tm.time()
-            self.ostream.print_info(f'New MO      computed in {new_mo_t1-new_mo_t0:.2f} sec')
 
             profiler.stop_timer('FockDiag')
 
@@ -1226,13 +1194,11 @@ class ScfDriver:
             profiler.start_timer('NewDens')
 
             if self.rank == mpi_master():
-                new_den_t0 = tm.time()
                 # TODO unrestricted and restricted open-shell
                 mo = self.molecular_orbitals.alpha_to_numpy()
                 occ = self.molecular_orbitals.occa_to_numpy()
                 occ_mo = occ * mo
                 den_mat_np = matmul_gpu(occ_mo, occ_mo.T)
-                new_den_t1 = tm.time()
                 naos = den_mat_np.shape[0]
             else:
                 naos = None
@@ -1241,17 +1207,8 @@ class ScfDriver:
             if self.rank != mpi_master():
                 den_mat_np = np.zeros((naos, naos))
 
-            new_den_t3 = tm.time()
             self.comm.Bcast(den_mat_np, root=mpi_master())
-            new_den_t4 = tm.time()
             den_mat = AODensityMatrix([den_mat_np], denmat.rest)
-            new_den_t5 = tm.time()
-
-            if self.rank == mpi_master():
-                self.ostream.print_info(f'New density matmul in {new_den_t1-new_den_t0:.2f} sec')
-            self.ostream.print_info(f'New density bcast  in {new_den_t4-new_den_t3:.2f} sec')
-            self.ostream.print_info(f'New density AODens in {new_den_t5-new_den_t4:.2f} sec')
-            self.ostream.flush()
 
             profiler.stop_timer('NewDens')
 
@@ -1614,9 +1571,6 @@ class ScfDriver:
         else:
             thresh_int = int(-math.log10(self._get_dyn_threshold(e_grad)))
 
-        self.ostream.print_info(f'Fock build started...')
-        self.ostream.flush()
-
         eri_t0 = tm.time()
 
         if self._dft and not self._first_step:
@@ -1627,20 +1581,12 @@ class ScfDriver:
         else:
             fock_mat = compute_fock_gpu(molecule, basis, den_mat, 1.0, self.eri_thresh, self.prelink_thresh, screener)
 
-        eri_t1 = tm.time()
-
         naos = fock_mat.number_of_rows()
         fock_mat_np = np.zeros((naos, naos))
 
         self.comm.Reduce(fock_mat.to_numpy(), fock_mat_np, op=MPI.SUM, root=mpi_master())
 
         fock_mat = fock_mat_np
-
-        eri_t2 = tm.time()
-
-        self.ostream.print_info(f'Fock build done in {eri_t1-eri_t0:.2f} sec')
-        self.ostream.print_info(f'Fock comm. done in {eri_t2-eri_t1:.2f} sec')
-        self.ostream.flush()
 
         # TODO: add beta density
         # TODO: add other fock_t/fockmat

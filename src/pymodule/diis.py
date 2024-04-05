@@ -89,14 +89,8 @@ class Diis:
             return self.fock_matrices[0]
 
         else:
-            t0 = tm.time()
             weights = self.compute_weights()
-            t1 = tm.time()
             effmat = weighted_sum_gpu(weights, self.fock_matrices)
-            t2 = tm.time()
-            if ostream is not None:
-                ostream.print_info(f'    weights      : {t1-t0:.2f} sec')
-                ostream.print_info(f'    eff_fock     : {t2-t1:.2f} sec')
             return effmat
 
     def compute_error_vectors_restricted_openshell(self, fock_matrices,

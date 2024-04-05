@@ -26,7 +26,6 @@
 from mpi4py import MPI
 from copy import deepcopy
 import numpy as np
-import time as tm
 import sys
 import os
 
@@ -91,13 +90,9 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            t0 = tm.time()
             e_mat = compute_error_vector_gpu(oao_mat, fock_mat, den_mat.alpha_to_numpy(0), ovl_mat)
-            t1 = tm.time()
-            self.ostream.print_info(f'    X^T(FDS-SDF)X: {t1-t0:.2f} sec')
-
             e_mat_shape = e_mat.shape
-            #e_grad = 2.0 * np.linalg.norm(e_mat)
+            # e_grad = 2.0 * np.linalg.norm(e_mat)
             e_grad = 2.0 * np.sqrt(dot_product_gpu(e_mat, e_mat))
             max_grad = np.max(np.abs(e_mat))
         else:
@@ -207,20 +202,13 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            t0 = tm.time()
             fmo = transform_matrix_gpu(oao_mat, fock_mat)
-            t1 = tm.time()
+
             eigs, evecs_T = eigh_gpu(fmo, num_gpus_per_node)
             evecs = evecs_T.T
-            t2 = tm.time()
+
             orb_coefs = matmul_gpu(oao_mat, evecs)
-            t3 = tm.time()
             orb_coefs, eigs = self._delete_mos(orb_coefs, eigs)
-            t4 = tm.time()
-            self.ostream.print_info(f'    X^T(F)X      : {t1-t0:.2f} sec')
-            self.ostream.print_info(f'    eigh         : {t2-t1:.2f} sec')
-            self.ostream.print_info(f'    MOs          : {t3-t2:.2f} sec')
-            self.ostream.print_info(f'    deleteMOs    : {t4-t3:.2f} sec')
 
             occa = molecule.get_aufbau_alpha_occupation(eigs.size)
 
