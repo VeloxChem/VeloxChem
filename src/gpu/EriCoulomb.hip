@@ -26,7 +26,7 @@
 #include <hip/hip_runtime.h>
 
 #include "BoysFuncGPU.hpp"
-#include "GpuConstants.hpp"
+#include "EriCoulomb.hpp"
 
 namespace gpu {  // gpu namespace
 

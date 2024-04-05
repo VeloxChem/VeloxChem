@@ -28,9 +28,11 @@
 
 #include <cstdint>
 
+#include "GpuConstants.hpp"
+
 namespace gpu {  // gpu namespace
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSSS(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
@@ -50,7 +52,7 @@ computeExchangeFockSSSS(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSSP(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
@@ -78,7 +80,7 @@ computeExchangeFockSSSP(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPSS(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
@@ -106,7 +108,7 @@ computeExchangeFockSPSS(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPSP(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
@@ -129,7 +131,7 @@ computeExchangeFockSPSP(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSPS(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
@@ -157,7 +159,7 @@ computeExchangeFockSSPS(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSPP(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
@@ -185,7 +187,7 @@ computeExchangeFockSSPP(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPPS(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
@@ -213,7 +215,7 @@ computeExchangeFockSPPS(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPPP(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
@@ -241,7 +243,7 @@ computeExchangeFockSPPP(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSPS(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -264,7 +266,7 @@ computeExchangeFockPSPS(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSPP(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -292,7 +294,7 @@ computeExchangeFockPSPP(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPPS(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -320,7 +322,7 @@ computeExchangeFockPPPS(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPPP(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -340,7 +342,7 @@ computeExchangeFockPPPP(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSSD(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
@@ -368,7 +370,7 @@ computeExchangeFockSSSD(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDSS(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
@@ -396,7 +398,7 @@ computeExchangeFockSDSS(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPSD(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
@@ -427,7 +429,7 @@ computeExchangeFockSPSD(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDSP(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
@@ -458,7 +460,7 @@ computeExchangeFockSDSP(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDSD(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
@@ -481,7 +483,7 @@ computeExchangeFockSDSD(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSPD(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
@@ -512,7 +514,7 @@ computeExchangeFockSSPD(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDPS(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
@@ -543,7 +545,7 @@ computeExchangeFockSDPS(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPPD(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
@@ -574,7 +576,7 @@ computeExchangeFockSPPD(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDPP(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
@@ -605,7 +607,7 @@ computeExchangeFockSDPP(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDPD0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
@@ -636,7 +638,7 @@ computeExchangeFockSDPD0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDPD1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
@@ -667,7 +669,7 @@ computeExchangeFockSDPD1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSDS(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -695,7 +697,7 @@ computeExchangeFockSSDS(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSDP(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -726,7 +728,7 @@ computeExchangeFockSSDP(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPDS(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -757,7 +759,7 @@ computeExchangeFockSPDS(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPDP(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -788,7 +790,7 @@ computeExchangeFockSPDP(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSDD(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -816,7 +818,7 @@ computeExchangeFockSSDD(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDS(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -844,7 +846,7 @@ computeExchangeFockSDDS(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSPD(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -875,7 +877,7 @@ computeExchangeFockPSPD(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPS(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -906,7 +908,7 @@ computeExchangeFockPDPS(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSDS(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -937,7 +939,7 @@ computeExchangeFockPSDS(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSDP(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -968,7 +970,7 @@ computeExchangeFockPSDP(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDS(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -999,7 +1001,7 @@ computeExchangeFockPPDS(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDS(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1022,7 +1024,7 @@ computeExchangeFockDSDS(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDP0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1045,7 +1047,7 @@ computeExchangeFockDPDP0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDP1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1068,7 +1070,7 @@ computeExchangeFockDPDP1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDP2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1091,7 +1093,7 @@ computeExchangeFockDPDP2(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDP3(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1114,7 +1116,7 @@ computeExchangeFockDPDP3(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDP4(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1137,7 +1139,7 @@ computeExchangeFockDPDP4(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDP5(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1160,7 +1162,7 @@ computeExchangeFockDPDP5(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPD0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -1183,7 +1185,7 @@ computeExchangeFockPDPD0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPD1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -1206,7 +1208,7 @@ computeExchangeFockPDPD1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPD2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -1229,7 +1231,7 @@ computeExchangeFockPDPD2(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPD3(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -1252,7 +1254,7 @@ computeExchangeFockPDPD3(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPD4(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -1275,7 +1277,7 @@ computeExchangeFockPDPD4(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPD5(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -1298,7 +1300,7 @@ computeExchangeFockPDPD5(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1326,7 +1328,7 @@ computeExchangeFockDPDD0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1354,7 +1356,7 @@ computeExchangeFockDPDD1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1382,7 +1384,7 @@ computeExchangeFockDPDD2(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD3(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1410,7 +1412,7 @@ computeExchangeFockDPDD3(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD4(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1438,7 +1440,7 @@ computeExchangeFockDPDD4(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD5(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1466,7 +1468,7 @@ computeExchangeFockDPDD5(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD6(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1494,7 +1496,7 @@ computeExchangeFockDPDD6(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD7(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1522,7 +1524,7 @@ computeExchangeFockDPDD7(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD8(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1550,7 +1552,7 @@ computeExchangeFockDPDD8(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD9(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1578,7 +1580,7 @@ computeExchangeFockDPDD9(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD10(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1606,7 +1608,7 @@ computeExchangeFockDPDD10(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD11(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1634,7 +1636,7 @@ computeExchangeFockDPDD11(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD12(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1662,7 +1664,7 @@ computeExchangeFockDPDD12(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD13(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1690,7 +1692,7 @@ computeExchangeFockDPDD13(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD14(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1718,7 +1720,7 @@ computeExchangeFockDPDD14(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD15(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1746,7 +1748,7 @@ computeExchangeFockDPDD15(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD16(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1774,7 +1776,7 @@ computeExchangeFockDPDD16(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1802,7 +1804,7 @@ computeExchangeFockDDDP0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1830,7 +1832,7 @@ computeExchangeFockDDDP1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1858,7 +1860,7 @@ computeExchangeFockDDDP2(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP3(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1886,7 +1888,7 @@ computeExchangeFockDDDP3(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP4(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1914,7 +1916,7 @@ computeExchangeFockDDDP4(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP5(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1942,7 +1944,7 @@ computeExchangeFockDDDP5(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP6(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1970,7 +1972,7 @@ computeExchangeFockDDDP6(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP7(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -1998,7 +2000,7 @@ computeExchangeFockDDDP7(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP8(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2026,7 +2028,7 @@ computeExchangeFockDDDP8(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP9(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2054,7 +2056,7 @@ computeExchangeFockDDDP9(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP10(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2082,7 +2084,7 @@ computeExchangeFockDDDP10(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP11(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2110,7 +2112,7 @@ computeExchangeFockDDDP11(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP12(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2138,7 +2140,7 @@ computeExchangeFockDDDP12(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP13(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2166,7 +2168,7 @@ computeExchangeFockDDDP13(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP14(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2194,7 +2196,7 @@ computeExchangeFockDDDP14(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP15(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2222,7 +2224,7 @@ computeExchangeFockDDDP15(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP16(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2250,7 +2252,7 @@ computeExchangeFockDDDP16(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP17(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2278,7 +2280,7 @@ computeExchangeFockDDDP17(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP18(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2306,7 +2308,7 @@ computeExchangeFockDDDP18(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP19(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2334,7 +2336,7 @@ computeExchangeFockDDDP19(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2354,7 +2356,7 @@ computeExchangeFockDDDD0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2374,7 +2376,7 @@ computeExchangeFockDDDD1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2394,7 +2396,7 @@ computeExchangeFockDDDD2(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD3(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2414,7 +2416,7 @@ computeExchangeFockDDDD3(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD4(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2434,7 +2436,7 @@ computeExchangeFockDDDD4(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD5(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2454,7 +2456,7 @@ computeExchangeFockDDDD5(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD6(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2474,7 +2476,7 @@ computeExchangeFockDDDD6(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD7(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2494,7 +2496,7 @@ computeExchangeFockDDDD7(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD8(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2514,7 +2516,7 @@ computeExchangeFockDDDD8(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD9(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2534,7 +2536,7 @@ computeExchangeFockDDDD9(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD10(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2554,7 +2556,7 @@ computeExchangeFockDDDD10(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD11(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2574,7 +2576,7 @@ computeExchangeFockDDDD11(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD12(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2594,7 +2596,7 @@ computeExchangeFockDDDD12(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD13(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2614,7 +2616,7 @@ computeExchangeFockDDDD13(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD14(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2634,7 +2636,7 @@ computeExchangeFockDDDD14(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD15(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2654,7 +2656,7 @@ computeExchangeFockDDDD15(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD16(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2674,7 +2676,7 @@ computeExchangeFockDDDD16(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD17(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2694,7 +2696,7 @@ computeExchangeFockDDDD17(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD18(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2714,7 +2716,7 @@ computeExchangeFockDDDD18(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD19(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2734,7 +2736,7 @@ computeExchangeFockDDDD19(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD20(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2754,7 +2756,7 @@ computeExchangeFockDDDD20(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD21(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2774,7 +2776,7 @@ computeExchangeFockDDDD21(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD22(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2794,7 +2796,7 @@ computeExchangeFockDDDD22(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD23(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2814,7 +2816,7 @@ computeExchangeFockDDDD23(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD24(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2834,7 +2836,7 @@ computeExchangeFockDDDD24(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD25(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2854,7 +2856,7 @@ computeExchangeFockDDDD25(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD26(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2874,7 +2876,7 @@ computeExchangeFockDDDD26(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD27(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2894,7 +2896,7 @@ computeExchangeFockDDDD27(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD28(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2914,7 +2916,7 @@ computeExchangeFockDDDD28(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD29(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2934,7 +2936,7 @@ computeExchangeFockDDDD29(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD30(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2954,7 +2956,7 @@ computeExchangeFockDDDD30(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD31(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2974,7 +2976,7 @@ computeExchangeFockDDDD31(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -2994,7 +2996,7 @@ computeExchangeFockDDDD32(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD33(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3014,7 +3016,7 @@ computeExchangeFockDDDD33(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD34(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3034,7 +3036,7 @@ computeExchangeFockDDDD34(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD35(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3054,7 +3056,7 @@ computeExchangeFockDDDD35(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD36(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3074,7 +3076,7 @@ computeExchangeFockDDDD36(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD37(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3094,7 +3096,7 @@ computeExchangeFockDDDD37(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD38(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3114,7 +3116,7 @@ computeExchangeFockDDDD38(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD39(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3134,7 +3136,7 @@ computeExchangeFockDDDD39(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD40(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3154,7 +3156,7 @@ computeExchangeFockDDDD40(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD41(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3174,7 +3176,7 @@ computeExchangeFockDDDD41(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDD0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3202,7 +3204,7 @@ computeExchangeFockDSDD0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDD1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3230,7 +3232,7 @@ computeExchangeFockDSDD1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDD2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3258,7 +3260,7 @@ computeExchangeFockDSDD2(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDD3(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3286,7 +3288,7 @@ computeExchangeFockDSDD3(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDD4(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3314,7 +3316,7 @@ computeExchangeFockDSDD4(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDD5(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3341,7 +3343,7 @@ computeExchangeFockDSDD5(double*         mat_K,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDS0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3369,7 +3371,7 @@ computeExchangeFockDDDS0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDS1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3397,7 +3399,7 @@ computeExchangeFockDDDS1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDS2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3425,7 +3427,7 @@ computeExchangeFockDDDS2(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDS3(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3453,7 +3455,7 @@ computeExchangeFockDDDS3(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDS4(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3481,7 +3483,7 @@ computeExchangeFockDDDS4(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDS5(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3509,7 +3511,7 @@ computeExchangeFockDDDS5(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDP0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3540,7 +3542,7 @@ computeExchangeFockDSDP0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDP1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3571,7 +3573,7 @@ computeExchangeFockDSDP1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDP2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3601,7 +3603,7 @@ computeExchangeFockDSDP2(double*         mat_K,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDS0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3632,7 +3634,7 @@ computeExchangeFockDPDS0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDS1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3663,7 +3665,7 @@ computeExchangeFockDPDS1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDS2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
@@ -3694,7 +3696,7 @@ computeExchangeFockDPDS2(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -3722,7 +3724,7 @@ computeExchangeFockPDDD0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -3750,7 +3752,7 @@ computeExchangeFockPDDD1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -3778,7 +3780,7 @@ computeExchangeFockPDDD2(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD3(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -3806,7 +3808,7 @@ computeExchangeFockPDDD3(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD4(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -3834,7 +3836,7 @@ computeExchangeFockPDDD4(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD5(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -3862,7 +3864,7 @@ computeExchangeFockPDDD5(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD6(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -3890,7 +3892,7 @@ computeExchangeFockPDDD6(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD7(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -3918,7 +3920,7 @@ computeExchangeFockPDDD7(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD8(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -3946,7 +3948,7 @@ computeExchangeFockPDDD8(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD9(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -3974,7 +3976,7 @@ computeExchangeFockPDDD9(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD10(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4002,7 +4004,7 @@ computeExchangeFockPDDD10(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD11(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4030,7 +4032,7 @@ computeExchangeFockPDDD11(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD12(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4058,7 +4060,7 @@ computeExchangeFockPDDD12(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD13(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4086,7 +4088,7 @@ computeExchangeFockPDDD13(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD14(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4114,7 +4116,7 @@ computeExchangeFockPDDD14(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD15(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4142,7 +4144,7 @@ computeExchangeFockPDDD15(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD16(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4170,7 +4172,7 @@ computeExchangeFockPDDD16(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD17(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4198,7 +4200,7 @@ computeExchangeFockPDDD17(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDD0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4226,7 +4228,7 @@ computeExchangeFockPPDD0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDD1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4254,7 +4256,7 @@ computeExchangeFockPPDD1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDD2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4282,7 +4284,7 @@ computeExchangeFockPPDD2(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDD3(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4310,7 +4312,7 @@ computeExchangeFockPPDD3(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDD4(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4338,7 +4340,7 @@ computeExchangeFockPPDD4(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDD5(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4366,7 +4368,7 @@ computeExchangeFockPPDD5(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDP0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4394,7 +4396,7 @@ computeExchangeFockPDDP0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDP1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4422,7 +4424,7 @@ computeExchangeFockPDDP1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDP2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4450,7 +4452,7 @@ computeExchangeFockPDDP2(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDP3(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4478,7 +4480,7 @@ computeExchangeFockPDDP3(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDP4(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4506,7 +4508,7 @@ computeExchangeFockPDDP4(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDP0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4534,7 +4536,7 @@ computeExchangeFockPPDP0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDP1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4562,7 +4564,7 @@ computeExchangeFockPPDP1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDP2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4590,7 +4592,7 @@ computeExchangeFockPPDP2(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSDD0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4621,7 +4623,7 @@ computeExchangeFockPSDD0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSDD1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4652,7 +4654,7 @@ computeExchangeFockPSDD1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSDD2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4682,7 +4684,7 @@ computeExchangeFockPSDD2(double*         mat_K,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDS0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4713,7 +4715,7 @@ computeExchangeFockPDDS0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDS1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4744,7 +4746,7 @@ computeExchangeFockPDDS1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDS2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
@@ -4775,7 +4777,7 @@ computeExchangeFockPDDS2(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDD0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -4803,7 +4805,7 @@ computeExchangeFockSDDD0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDD1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -4831,7 +4833,7 @@ computeExchangeFockSDDD1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDD2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -4859,7 +4861,7 @@ computeExchangeFockSDDD2(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDD3(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -4887,7 +4889,7 @@ computeExchangeFockSDDD3(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDD4(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -4915,7 +4917,7 @@ computeExchangeFockSDDD4(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDD5(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -4943,7 +4945,7 @@ computeExchangeFockSDDD5(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPDD0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -4974,7 +4976,7 @@ computeExchangeFockSPDD0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPDD1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -5005,7 +5007,7 @@ computeExchangeFockSPDD1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPDD2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -5035,7 +5037,7 @@ computeExchangeFockSPDD2(double*         mat_K,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDP0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -5066,7 +5068,7 @@ computeExchangeFockSDDP0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDP1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -5097,7 +5099,7 @@ computeExchangeFockSDDP1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDP2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
@@ -5128,7 +5130,7 @@ computeExchangeFockSDDP2(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPPD0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -5156,7 +5158,7 @@ computeExchangeFockPPPD0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPPD1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -5184,7 +5186,7 @@ computeExchangeFockPPPD1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPPD2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -5211,7 +5213,7 @@ computeExchangeFockPPPD2(double*         mat_K,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPP0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -5239,7 +5241,7 @@ computeExchangeFockPDPP0(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPP1(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
@@ -5267,7 +5269,7 @@ computeExchangeFockPDPP1(double*         mat_K,
                         const double*   boys_func_ft,
                         const double    eri_threshold);
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPP2(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
