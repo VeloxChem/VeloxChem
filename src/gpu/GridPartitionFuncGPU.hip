@@ -32,6 +32,7 @@
 #include "GridPartitionFuncGPU.hpp"
 #include "GpuConstants.hpp"
 #include "GpuSafeChecks.hpp"
+#include "GpuDevices.hpp"
 #include "MathFunc.hpp"
 #include "MpiFunc.hpp"
 
@@ -173,6 +174,10 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
                        const int64_t                nAtoms,
                        const int64_t                numGpusPerNode) -> void
 {
+    CGpuDevices gpu_devices;
+
+    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
+
     auto rank = mpi::rank(MPI_COMM_WORLD);
     auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
@@ -190,8 +195,7 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
-    // TODO: make number of GPUs per compute node (not per MPI process) adjustable
-    hipSafe(hipSetDevice(gpu_rank % 8));
+    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     // grid and atom data
 

@@ -50,6 +50,7 @@
 #include "ErrorHandler.hpp"
 #include "GpuConstants.hpp"
 #include "GpuSafeChecks.hpp"
+#include "GpuDevices.hpp"
 #include "GtoFunc.hpp"
 #include "GtoInfo.hpp"
 #include "MathConst.hpp"
@@ -73,6 +74,10 @@ zeroData(double* d_data, const uint32_t n)
 auto
 computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> CDenseMatrix
 {
+    CGpuDevices gpu_devices;
+
+    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
+
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     int64_t s_prim_count = 0;
@@ -122,8 +127,8 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
     // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
     // std::cout << ss.str();
 
-    // TODO: make number of GPUs per compute node (not per MPI process) adjustable
-    hipSafe(hipSetDevice(gpu_rank % 8));
+    // TODO: double check by using different number of gpus per MPI
+    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     // Boys function (tabulated for order 0-28)
 
@@ -555,6 +560,10 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 auto
 computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> std::vector<CDenseMatrix>
 {
+    CGpuDevices gpu_devices;
+
+    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
+
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
@@ -591,8 +600,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
     // std::cout << ss.str();
 
-    // TODO: make number of GPUs per compute node (not per MPI process) adjustable
-    hipSafe(hipSetDevice(gpu_rank % 8));
+    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     // Boys function (tabulated for order 0-28)
 
@@ -1356,6 +1364,10 @@ transformDensity(const CMolecule& molecule, const CMolecularBasis& basis, const 
 auto
 computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix, const double frac_exact_exchange, const double eri_threshold, const double prelink_threshold, CScreeningData& screening) -> CDenseMatrix
 {
+    CGpuDevices gpu_devices;
+
+    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
+
     auto rank = mpi::rank(MPI_COMM_WORLD);
     auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
@@ -1369,8 +1381,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // ss << "\n(Prep.) rank " << rank << ",  gpu_rank " << gpu_rank << "\n";
     // std::cout << ss.str();
 
-    // TODO: make number of GPUs per compute node (not per MPI process) adjustable
-    hipSafe(hipSetDevice(gpu_rank % 8));
+    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     CMultiTimer timer;
 
@@ -1602,8 +1613,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
     // std::cout << ss.str();
 
-    // TODO: make number of GPUs per compute node (not per MPI process) adjustable
-    hipSafe(hipSetDevice(gpu_rank % 8));
+    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     CMultiTimer timer;
 
