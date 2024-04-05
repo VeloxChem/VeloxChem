@@ -1599,14 +1599,10 @@ class ScfDriver:
         if self._dft and not self._first_step:
             # TODO: support xcfun.mgga
             if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga]:
-                vxc_t0 = tm.time()
                 vxc_mat = integrate_vxc_fock_gpu(molecule, basis, den_mat,
                                                  self._mol_grid,
                                                  self.xcfun.get_func_label(),
                                                  screener.get_num_gpus_per_node())
-                vxc_t1 = tm.time()
-                self.ostream.print_info(f'DFT Vxc done    in {vxc_t1-vxc_t0:.2f} sec')
-                self.ostream.flush()
             else:
                 assert_msg_critical(
                     False, 'SCF driver: Unsupported XC functional type')
@@ -1861,13 +1857,9 @@ class ScfDriver:
 
         if self._dft and not self._first_step:
             # TODO: take care of unrestricted/restricted-open-shell case
-            vxc_t0 = tm.time()
             vxc_mat_np_local = vxc_mat.alpha_to_numpy()
             vxc_mat_np_sum = np.zeros(vxc_mat_np_local.shape)
             self.comm.Reduce(vxc_mat_np_local, vxc_mat_np_sum, op=MPI.SUM, root=mpi_master())
-            vxc_t1 = tm.time()
-            self.ostream.print_info(f'DFT Vxc comm.   in {vxc_t1-vxc_t0:.2f} sec')
-            self.ostream.flush()
 
         if self.rank == mpi_master():
             # TODO: double check

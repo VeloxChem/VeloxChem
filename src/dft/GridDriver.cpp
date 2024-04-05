@@ -257,7 +257,7 @@ CGridDriver::_finishHeader(const CMolecularGrid& molecularGrid) const -> std::st
 auto
 CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerNode) const -> CMolecularGrid
 {
-    CTimer timer;
+    // CTimer timer;
 
     // molecular data
 
@@ -307,10 +307,9 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
     std::vector<uint32_t> atom_ids_of_points(bpoints);
     std::vector<double> atom_min_distances(bpoints);
 
-    if (rank == mpi::master()) std::cout << "* Info * Generating grid points for atoms ..." << std::endl;
-
-    timer.reset();
-    timer.start();
+    // if (rank == mpi::master()) std::cout << "* Info * Generating grid points for atoms ..." << std::endl;
+    // timer.reset();
+    // timer.start();
 
     for (int64_t i = 0; i < nodatm; i++)
     {
@@ -335,25 +334,20 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
         std::fill(atom_min_distances.data() + gridoff, atom_min_distances.data() + gridoff + nrpoints * napoints, minrad);
     }
 
-    timer.stop();
-
-    if (rank == mpi::master()) std::cout << "    Grid points generated in     " << timer.getElapsedTime() << std::endl;
-
-    timer.reset();
-    timer.start();
+    // timer.stop();
+    // if (rank == mpi::master()) std::cout << "    Grid points generated in     " << timer.getElapsedTime() << std::endl;
+    // timer.reset();
+    // timer.start();
 
     gpu::applyGridPartitionFunc(rawgrid, atom_ids_of_points, atom_min_distances, bpoints, molcoords, natoms, numGpusPerNode);
 
-    timer.stop();
-
-    if (rank == mpi::master()) std::cout << "    Grid weights determined in   " << timer.getElapsedTime() << std::endl;
+    // timer.stop();
+    // if (rank == mpi::master()) std::cout << "    Grid weights determined in   " << timer.getElapsedTime() << std::endl;
+    // if (rank == mpi::master()) std::cout << "* Info * Screening grid points ";
+    // timer.reset();
+    // timer.start();
 
     // screen raw grid points & create prunned grid
-
-    if (rank == mpi::master()) std::cout << "* Info * Screening grid points ";
-
-    timer.reset();
-    timer.start();
 
     bpoints = _screenRawGridPoints(rawgrid);
 
@@ -361,20 +355,16 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
 
     delete rawgrid;
 
-    timer.stop();
-
-    if (rank == mpi::master()) std::cout << "       " << timer.getElapsedTime() << std::endl;
-
-    if (rank == mpi::master()) std::cout << "* Info * Communicating grid points ";
-
-    timer.reset();
-    timer.start();
+    // timer.stop();
+    // if (rank == mpi::master()) std::cout << "       " << timer.getElapsedTime() << std::endl;
+    // if (rank == mpi::master()) std::cout << "* Info * Communicating grid points ";
+    // timer.reset();
+    // timer.start();
 
     auto gathered_prngrid = mpi::gatherDenseMatricesByColumns(prngrid, _locComm);
 
-    timer.stop();
-
-    if (rank == mpi::master()) std::cout << "   " << timer.getElapsedTime() << std::endl;
+    // timer.stop();
+    // if (rank == mpi::master()) std::cout << "   " << timer.getElapsedTime() << std::endl;
 
     return CMolecularGrid(gathered_prngrid);
 }
