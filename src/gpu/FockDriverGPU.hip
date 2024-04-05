@@ -12649,7 +12649,7 @@ diagonalizeMatrix(double* A, double* W, const int64_t nrows_A) -> void
 }
 
 auto
-diagonalizeMatrixMultiGPU(double* A, double* W, const int64_t nrows_A) -> void
+diagonalizeMatrixMultiGPU(double* A, double* W, const int64_t nrows_A, const int64_t num_gpus_per_node) -> void
 {
     // TODO allow diagonalizeMatrix on non-master MPI rank
 
@@ -12662,8 +12662,7 @@ diagonalizeMatrixMultiGPU(double* A, double* W, const int64_t nrows_A) -> void
 
     magma_int_t n = static_cast<magma_int_t>(nrows_A);
 
-    // TODO adapt number of GPUs
-    magma_int_t ngpu = 8;
+    magma_int_t ngpu = static_cast<magma_int_t>(num_gpus_per_node);
 
     auto nb = magma_get_dsytrd_nb(n);
     auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));

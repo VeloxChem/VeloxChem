@@ -233,7 +233,7 @@ export_gpu(py::module& m)
 
     m.def(
         "eigh_gpu",
-        [](const py::array_t<double>& A) -> py::list {
+        [](const py::array_t<double>& A, const int64_t num_gpus_per_node) -> py::list {
             // check dimension and shape
 
             errors::assertMsgCritical(A.ndim() == 2, "eigh_gpu: Invalid shape of matrix A");
@@ -269,7 +269,7 @@ export_gpu(py::module& m)
             }
             else
             {
-                gpu::diagonalizeMatrixMultiGPU(evecs, evals, static_cast<int64_t>(nrows_A));
+                gpu::diagonalizeMatrixMultiGPU(evecs, evals, static_cast<int64_t>(nrows_A), num_gpus_per_node);
             }
 
             py::list result;

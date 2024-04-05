@@ -186,7 +186,8 @@ class ScfRestrictedDriver(ScfDriver):
 
         return effmat
 
-    def _gen_molecular_orbitals(self, molecule, fock_mat, oao_mat):
+    def _gen_molecular_orbitals(self, molecule, fock_mat, oao_mat,
+                                num_gpus_per_node):
         """
         Generates spin restricted molecular orbital by diagonalizing
         spin restricted closed shell Fock/Kohn-Sham matrix. Overloaded base
@@ -198,6 +199,8 @@ class ScfRestrictedDriver(ScfDriver):
             The Fock/Kohn-Sham matrix.
         :param oao_mat:
             The orthogonalization matrix.
+        :param num_gpus_per_node:
+            The number of GPUs per MPI process.
 
         :return:
             The molecular orbitals.
@@ -207,7 +210,7 @@ class ScfRestrictedDriver(ScfDriver):
             t0 = tm.time()
             fmo = transform_matrix_gpu(oao_mat, fock_mat)
             t1 = tm.time()
-            eigs, evecs_T = eigh_gpu(fmo)
+            eigs, evecs_T = eigh_gpu(fmo, num_gpus_per_node)
             evecs = evecs_T.T
             t2 = tm.time()
             orb_coefs = matmul_gpu(oao_mat, evecs)

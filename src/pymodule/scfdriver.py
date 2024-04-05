@@ -1018,7 +1018,7 @@ class ScfDriver:
 
             S = ovl_mat
 
-            eigvals, eigvecs_T = eigh_gpu(S)
+            eigvals, eigvecs_T = eigh_gpu(S, screener.get_num_gpus_per_node())
             eigvecs = eigvecs_T.T
 
             num_eigs = sum(eigvals > self.ovl_thresh)
@@ -1210,7 +1210,8 @@ class ScfDriver:
             new_mo_t0 = tm.time()
 
             self._molecular_orbitals = self._gen_molecular_orbitals(
-                molecule, eff_fock_mat, oao_mat)
+                molecule, eff_fock_mat, oao_mat,
+                screener.get_num_gpus_per_node())
 
             new_mo_t1 = tm.time()
             self.ostream.print_info(f'New MO      computed in {new_mo_t1-new_mo_t0:.2f} sec')
@@ -1990,7 +1991,8 @@ class ScfDriver:
 
         return
 
-    def _gen_molecular_orbitals(self, molecule, fock_mat, oao_mat):
+    def _gen_molecular_orbitals(self, molecule, fock_mat, oao_mat,
+                                num_gpus_per_node):
         """
         Generates molecular orbital by diagonalizing Fock/Kohn-Sham matrix.
 
@@ -2000,6 +2002,8 @@ class ScfDriver:
             The Fock/Kohn-Sham matrix.
         :param oao_mat:
             The orthogonalization matrix.
+        :param num_gpus_per_node:
+            The number of GPUs per MPI process.
 
         :return:
             The molecular orbitals.
