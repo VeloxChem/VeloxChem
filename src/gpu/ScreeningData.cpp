@@ -1329,15 +1329,15 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
     const auto pd_prim_pair_count = static_cast<int64_t>(sorted_pd_mat_Q.size());
     const auto dd_prim_pair_count = static_cast<int64_t>(sorted_dd_mat_Q.size());
 
-    std::stringstream ss;
-    ss << "Pair screening\n";
-    ss << "  SS pair: " << static_cast<double>(ss_prim_pair_count) / (s_prim_count * (s_prim_count + 1) / 2)<< "\n";
-    ss << "  SP pair: " << static_cast<double>(sp_prim_pair_count) / (s_prim_count * p_prim_count * 3)<< "\n";
-    ss << "  SD pair: " << static_cast<double>(sd_prim_pair_count) / (s_prim_count * d_prim_count * 6)<< "\n";
-    ss << "  PP pair: " << static_cast<double>(pp_prim_pair_count) / (p_prim_count * 3 * (p_prim_count * 3 + 1) / 2)<< "\n";
-    ss << "  PD pair: " << static_cast<double>(pd_prim_pair_count) / (p_prim_count * 3 * d_prim_count * 6)<< "\n";
-    ss << "  DD pair: " << static_cast<double>(dd_prim_pair_count) / (d_prim_count * 6 * (d_prim_count * 6 + 1) / 2)<< "\n";
-    std::cout << ss.str() << "\n";
+    // std::stringstream ss;
+    // ss << "Pair screening\n";
+    // ss << "  SS pair: " << static_cast<double>(ss_prim_pair_count) / (s_prim_count * (s_prim_count + 1) / 2)<< "\n";
+    // ss << "  SP pair: " << static_cast<double>(sp_prim_pair_count) / (s_prim_count * p_prim_count * 3)<< "\n";
+    // ss << "  SD pair: " << static_cast<double>(sd_prim_pair_count) / (s_prim_count * d_prim_count * 6)<< "\n";
+    // ss << "  PP pair: " << static_cast<double>(pp_prim_pair_count) / (p_prim_count * 3 * (p_prim_count * 3 + 1) / 2)<< "\n";
+    // ss << "  PD pair: " << static_cast<double>(pd_prim_pair_count) / (p_prim_count * 3 * d_prim_count * 6)<< "\n";
+    // ss << "  DD pair: " << static_cast<double>(dd_prim_pair_count) / (d_prim_count * 6 * (d_prim_count * 6 + 1) / 2)<< "\n";
+    // std::cout << ss.str() << "\n";
 
     // form local vectors
 
@@ -3280,15 +3280,15 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int6
     const auto pd_pair_count_for_K = static_cast<int64_t>(pair_inds_i_for_K_pd.size());
     const auto dd_pair_count_for_K = static_cast<int64_t>(pair_inds_i_for_K_dd.size());
 
-    std::stringstream ss;
-    ss << "preLinK screening\n";
-    ss << "  SS pair: " << static_cast<double>(ss_pair_count_for_K) / (s_prim_count * (s_prim_count + 1) / 2)<< "\n";
-    ss << "  SP pair: " << static_cast<double>(sp_pair_count_for_K) / (s_prim_count * p_prim_count * 3)<< "\n";
-    ss << "  SD pair: " << static_cast<double>(sd_pair_count_for_K) / (s_prim_count * d_prim_count * 6)<< "\n";
-    ss << "  PP pair: " << static_cast<double>(pp_pair_count_for_K) / (p_prim_count * 3 * (p_prim_count * 3 + 1) / 2)<< "\n";
-    ss << "  PD pair: " << static_cast<double>(pd_pair_count_for_K) / (p_prim_count * 3 * d_prim_count * 6)<< "\n";
-    ss << "  DD pair: " << static_cast<double>(dd_pair_count_for_K) / (d_prim_count * 6 * (d_prim_count * 6 + 1) / 2)<< "\n";
-    std::cout << ss.str() << "\n";
+    // std::stringstream ss;
+    // ss << "preLinK screening\n";
+    // ss << "  SS pair: " << static_cast<double>(ss_pair_count_for_K) / (s_prim_count * (s_prim_count + 1) / 2)<< "\n";
+    // ss << "  SP pair: " << static_cast<double>(sp_pair_count_for_K) / (s_prim_count * p_prim_count * 3)<< "\n";
+    // ss << "  SD pair: " << static_cast<double>(sd_pair_count_for_K) / (s_prim_count * d_prim_count * 6)<< "\n";
+    // ss << "  PP pair: " << static_cast<double>(pp_pair_count_for_K) / (p_prim_count * 3 * (p_prim_count * 3 + 1) / 2)<< "\n";
+    // ss << "  PD pair: " << static_cast<double>(pd_pair_count_for_K) / (p_prim_count * 3 * d_prim_count * 6)<< "\n";
+    // ss << "  DD pair: " << static_cast<double>(dd_pair_count_for_K) / (d_prim_count * 6 * (d_prim_count * 6 + 1) / 2)<< "\n";
+    // std::cout << ss.str() << "\n";
 
     // form local vectors
 

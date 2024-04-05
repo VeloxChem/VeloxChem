@@ -1596,9 +1596,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         mat_Fock_omp[gpu_id] = CDenseMatrix(naos, naos);
     }
 
-    std::cout << "\nTiming of prep. on rank " << rank << "\n";
-    std::cout << "-------------------------\n";
-    std::cout << timer.getSummary() << std::endl;
+    // std::cout << "\nTiming of prep. on rank " << rank << "\n";
+    // std::cout << "-------------------------\n";
+    // std::cout << timer.getSummary() << std::endl;
 
 #pragma omp parallel
     {
@@ -12309,9 +12309,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     timer.stop("Total timing");
 
-    std::cout << "\nTiming of ERIs on GPU " << gpu_rank << "\n";
-    std::cout << "-----------------------\n";
-    std::cout << timer.getSummary() << std::endl;
+    // std::cout << "\nTiming of ERIs on GPU " << gpu_rank << "\n";
+    // std::cout << "-----------------------\n";
+    // std::cout << timer.getSummary() << std::endl;
 
     }}
 
