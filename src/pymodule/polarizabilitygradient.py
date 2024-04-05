@@ -409,45 +409,47 @@ class PolarizabilityGradient():
                 # for now by looping over each component of the polarizability
                 if self._dft:
                     xcfun_label = self.xcfun.get_func_label()
-                    for i in range(dof):
-                        # for j in range(dof):
-                        # TODO:  include as soon as non-diagonal terms are available
-                        if self.rank == mpi_master():
-                            gs_density = AODensityMatrix([gs_dm], denmat.rest)
+                    for m in range(dof):
+                        for n in range(dof):
+                            if self.rank == mpi_master():
+                                gs_density = AODensityMatrix([gs_dm], denmat.rest)
 
-                            rhow_dm = 1.0 * rel_dm_ao[i, i]
-                            rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
-                            rhow_den_sym = AODensityMatrix([rhow_dm_sym],
-                                                           denmat.rest)
+                                rhow_dm = 1.0 * rel_dm_ao[m, n]
+                                rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
+                                rhow_den_sym = AODensityMatrix([rhow_dm_sym],
+                                                               denmat.rest)
 
-                            # Takes only one vector type, but two are needed
-                            # to account for the different {x,y,z} components
-                            # of the response vectors so we are doing only
-                            # diagonal components for now.
-                            # The sqrt2 takes into account the fact that we need to
-                            # symmetrize with respect to the polarizability
-                            # components.
-                            # (see contraction with two-electron integrals above).
-                            x_minus_y_sym = np.sqrt(2) * 0.5 * (x_minus_y[i] +
-                                                                x_minus_y[i].T)
-                            x_minus_y_den_sym = AODensityMatrix([x_minus_y_sym],
-                                                                denmat.rest)
+                                # The sqrt2 takes into account the fact that we need to
+                                # symmetrize with respect to the polarizability
+                                # components.
+                                # (see contraction with two-electron integrals above).
+                                x_minus_y_sym_m = np.sqrt(2) * 0.5 * (x_minus_y[m] +
+                                                                    x_minus_y[m].T)
+                                x_minus_y_den_sym_m = AODensityMatrix([x_minus_y_sym_m],
+                                                                    denmat.rest)
+                                x_minus_y_sym_n = np.sqrt(2) * 0.5 * (x_minus_y[n] +
+                                                                    x_minus_y[n].T)
+                                x_minus_y_den_sym_n = AODensityMatrix([x_minus_y_sym_n],
+                                                                    denmat.rest)
 
-                        else:
-                            gs_density = AODensityMatrix()
-                            rhow_den_sym = AODensityMatrix()
-                            x_minus_y_den_sym = AODensityMatrix()
+                            else:
+                                gs_density = AODensityMatrix()
+                                rhow_den_sym = AODensityMatrix()
+                                x_minus_y_den_sym_m = AODensityMatrix()
+                                x_minus_y_den_sym_n = AODensityMatrix()
 
-                        gs_density.broadcast(self.rank, self.comm)
-                        rhow_den_sym.broadcast(self.rank, self.comm)
-                        x_minus_y_den_sym.broadcast(self.rank, self.comm)
+                            gs_density.broadcast(self.rank, self.comm)
+                            rhow_den_sym.broadcast(self.rank, self.comm)
+                            x_minus_y_den_sym_m.broadcast(self.rank, self.comm)
+                            x_minus_y_den_sym_n.broadcast(self.rank, self.comm)
 
-                        polgrad_xcgrad = self.grad_polgrad_xc_contrib_real(
-                            molecule, basis, rhow_den_sym, x_minus_y_den_sym,
-                            gs_density, xcfun_label)
+                            polgrad_xcgrad = self.grad_polgrad_xc_contrib_real(
+                                molecule, basis, rhow_den_sym,
+                                x_minus_y_den_sym_m, x_minus_y_den_sym_n,
+                                gs_density, xcfun_label)
 
-                        if self.rank == mpi_master():
-                            pol_gradient[i, i] += polgrad_xcgrad
+                            if self.rank == mpi_master():
+                                pol_gradient[m, n] += polgrad_xcgrad
 
                 polgrad_results[w] = pol_gradient.reshape(dof, dof, 3 * natm)
 
@@ -662,65 +664,77 @@ class PolarizabilityGradient():
                 # for now by looping over each component of the polarizability
                 if self._dft:
                     xcfun_label = self.xcfun.get_func_label()
-                    for i in range(dof):
-                        # for j in range(dof):
-                        # TODO:  include as soon as non-diagonal terms are available
-                        if self.rank == mpi_master():
-                            gs_density = AODensityMatrix([gs_dm], denmat.rest)
+                    for m in range(dof):
+                        for n in range(dof):
+                            if self.rank == mpi_master():
+                                gs_density = AODensityMatrix([gs_dm], denmat.rest)
 
-                            rhow_dm = 1.0 * rel_dm_ao[i, i]
-                            rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
+                                rhow_dm = 1.0 * rel_dm_ao[m, n]
+                                rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
 
-                            rhow_dm_sym_list_real = [np.array(rhow_dm_sym.real)]
-                            rhow_dm_sym_list_imag = [np.array(rhow_dm_sym.imag)]
+                                rhow_dm_sym_list_real = [np.array(rhow_dm_sym.real)]
+                                rhow_dm_sym_list_imag = [np.array(rhow_dm_sym.imag)]
 
-                            rhow_den_sym_real = AODensityMatrix(
-                                rhow_dm_sym_list_real, denmat.rest)
-                            rhow_den_sym_imag = AODensityMatrix(
-                                rhow_dm_sym_list_imag, denmat.rest)
+                                rhow_den_sym_real = AODensityMatrix(
+                                    rhow_dm_sym_list_real, denmat.rest)
+                                rhow_den_sym_imag = AODensityMatrix(
+                                    rhow_dm_sym_list_imag, denmat.rest)
 
-                            # Takes only one vector type, but two are needed
-                            # to account for the different {x,y,z} components
-                            # of the response vectors so we are doing only
-                            # diagonal components for now.
-                            # The sqrt2 takes into account the fact that we need to
-                            # symmetrize with respect to the polarizability
-                            # components.
-                            # (see contraction with two-electron integrals above).
-                            x_minus_y_sym = np.sqrt(2) * 0.5 * (x_minus_y[i] +
-                                                                x_minus_y[i].T)
-                            x_minus_y_sym_list_real = [
-                                np.array(x_minus_y_sym.real)
-                            ]
-                            x_minus_y_sym_list_imag = [
-                                np.array(x_minus_y_sym.imag)
-                            ]
+                                # The sqrt2 takes into account the fact that we need to
+                                # symmetrize with respect to the polarizability
+                                # components.
+                                # (see contraction with two-electron integrals above).
+                                x_minus_y_sym_m = np.sqrt(2) * 0.5 * (x_minus_y[m] +
+                                                                    x_minus_y[m].T)
+                                x_minus_y_sym_m_list_real = [
+                                    np.array(x_minus_y_sym_m.real)
+                                ]
+                                x_minus_y_sym_m_list_imag = [
+                                    np.array(x_minus_y_sym_m.imag)
+                                ]
 
-                            x_minus_y_den_sym_real = AODensityMatrix(
-                                x_minus_y_sym_list_real, denmat.rest)
-                            x_minus_y_den_sym_imag = AODensityMatrix(
-                                x_minus_y_sym_list_imag, denmat.rest)
+                                x_minus_y_sym_n = np.sqrt(2) * 0.5 * (x_minus_y[n] +
+                                                                    x_minus_y[n].T)
+                                x_minus_y_sym_n_list_real = [
+                                    np.array(x_minus_y_sym_n.real)
+                                ]
+                                x_minus_y_sym_n_list_imag = [
+                                    np.array(x_minus_y_sym_n.imag)
+                                ]
 
-                        else:
-                            gs_density = AODensityMatrix()
-                            rhow_den_sym_real = AODensityMatrix()
-                            rhow_den_sym_imag = AODensityMatrix()
-                            x_minus_y_den_sym_real = AODensityMatrix()
-                            x_minus_y_den_sym_imag = AODensityMatrix()
+                                x_minus_y_den_sym_real_m = AODensityMatrix(
+                                    x_minus_y_sym_m_list_real, denmat.rest)
+                                x_minus_y_den_sym_imag_m = AODensityMatrix(
+                                    x_minus_y_sym_m_list_imag, denmat.rest)
+                                x_minus_y_den_sym_real_n = AODensityMatrix(
+                                    x_minus_y_sym_n_list_real, denmat.rest)
+                                x_minus_y_den_sym_imag_n = AODensityMatrix(
+                                    x_minus_y_sym_n_list_imag, denmat.rest)
 
-                        gs_density.broadcast(self.rank, self.comm)
-                        rhow_den_sym_real.broadcast(self.rank, self.comm)
-                        rhow_den_sym_imag.broadcast(self.rank, self.comm)
-                        x_minus_y_den_sym_real.broadcast(self.rank, self.comm)
-                        x_minus_y_den_sym_imag.broadcast(self.rank, self.comm)
+                            else:
+                                gs_density = AODensityMatrix()
+                                rhow_den_sym_real = AODensityMatrix()
+                                rhow_den_sym_imag = AODensityMatrix()
+                                x_minus_y_den_sym_real_m = AODensityMatrix()
+                                x_minus_y_den_sym_imag_m = AODensityMatrix()
+                                x_minus_y_den_sym_real_n = AODensityMatrix()
+                                x_minus_y_den_sym_imag_n = AODensityMatrix()
 
-                        polgrad_xcgrad = self.grad_polgrad_xc_contrib_complex(
-                            molecule, basis, rhow_den_sym_real,
-                            rhow_den_sym_imag, x_minus_y_den_sym_real,
-                            x_minus_y_den_sym_imag, gs_density, xcfun_label)
+                            gs_density.broadcast(self.rank, self.comm)
+                            rhow_den_sym_real.broadcast(self.rank, self.comm)
+                            rhow_den_sym_imag.broadcast(self.rank, self.comm)
+                            x_minus_y_den_sym_real_m.broadcast(self.rank, self.comm)
+                            x_minus_y_den_sym_imag_m.broadcast(self.rank, self.comm)
+                            x_minus_y_den_sym_real_n.broadcast(self.rank, self.comm)
+                            x_minus_y_den_sym_imag_n.broadcast(self.rank, self.comm)
 
-                        if self.rank == mpi_master():
-                            pol_gradient[i, i] += polgrad_xcgrad
+                            polgrad_xcgrad = self.grad_polgrad_xc_contrib_complex(
+                                molecule, basis, rhow_den_sym_real,
+                                rhow_den_sym_imag, x_minus_y_den_sym_real_m, x_minus_y_den_sym_real_n,
+                                x_minus_y_den_sym_imag_m, x_minus_y_den_sym_imag_n, gs_density, xcfun_label)
+
+                            if self.rank == mpi_master():
+                                pol_gradient[m, n] += polgrad_xcgrad
 
                 polgrad_results[w] = pol_gradient.reshape(dof, dof, 3 * natm)
 
@@ -1037,8 +1051,8 @@ class PolarizabilityGradient():
         scf_drv.ostream.unmute()
         cpp_drv.ostream.unmute()
 
-    def grad_polgrad_xc_contrib_real(self, molecule, ao_basis, rhow_den,
-                                     x_minus_y_den, gs_density, xcfun_label):
+    def grad_polgrad_xc_contrib_real(self, molecule, ao_basis, rhow_den, x_minus_y_den_m,
+                                     x_minus_y_den_n, gs_density, xcfun_label):
         """
         Calculates exchange-correlation contribution to polarizability gradient.
 
@@ -1048,7 +1062,7 @@ class PolarizabilityGradient():
             The AO basis set.
         :param rhow_den:
             The perturbed density.
-        :param x_minus_y_den:
+        :param x_minus_y_den(_m/n):
             The X-Y density.
         :param gs_density:
             The ground state density.
@@ -1069,20 +1083,26 @@ class PolarizabilityGradient():
         polgrad_xcgrad += xcgrad_drv.integrate_fxc_gradient(
             molecule, ao_basis, rhow_den, gs_density, gs_density, mol_grid,
             xcfun_label)
-        polgrad_xcgrad += xcgrad_drv.integrate_fxc_gradient(
-            molecule, ao_basis, x_minus_y_den, x_minus_y_den, gs_density,
+        polgrad_xcgrad += 0.5*xcgrad_drv.integrate_fxc_gradient(
+            molecule, ao_basis, x_minus_y_den_m, x_minus_y_den_n, gs_density,
             mol_grid, xcfun_label)
-        polgrad_xcgrad += xcgrad_drv.integrate_kxc_gradient(
-            molecule, ao_basis, x_minus_y_den, x_minus_y_den, gs_density,
+        polgrad_xcgrad += 0.5*xcgrad_drv.integrate_kxc_gradient(
+            molecule, ao_basis, x_minus_y_den_m, x_minus_y_den_n, gs_density,
+            mol_grid, xcfun_label)
+        polgrad_xcgrad += 0.5*xcgrad_drv.integrate_fxc_gradient(
+            molecule, ao_basis, x_minus_y_den_n, x_minus_y_den_m, gs_density,
+            mol_grid, xcfun_label)
+        polgrad_xcgrad += 0.5*xcgrad_drv.integrate_kxc_gradient(
+            molecule, ao_basis, x_minus_y_den_n, x_minus_y_den_m, gs_density,
             mol_grid, xcfun_label)
         polgrad_xcgrad = self.comm.reduce(polgrad_xcgrad, root=mpi_master())
 
         return polgrad_xcgrad
 
     def grad_polgrad_xc_contrib_complex(self, molecule, ao_basis, rhow_den_real,
-                                        rhow_den_imag, x_minus_y_den_real,
-                                        x_minus_y_den_imag, gs_density,
-                                        xcfun_label):
+                                        rhow_den_imag, x_minus_y_den_real_m,
+                                        x_minus_y_den_real_n, x_minus_y_den_imag_m,
+                                        x_minus_y_den_imag_n, gs_density, xcfun_label):
         """
         Calculates exchange-correlation contribution to polarizability gradient.
 
@@ -1116,17 +1136,31 @@ class PolarizabilityGradient():
         polgrad_xcgrad_real += xcgrad_drv.integrate_fxc_gradient(  # Re DM
             molecule, ao_basis, rhow_den_real, gs_density, gs_density, mol_grid,
             xcfun_label)
-        polgrad_xcgrad_real += xcgrad_drv.integrate_fxc_gradient(  # ReRe
-            molecule, ao_basis, x_minus_y_den_real, x_minus_y_den_real,
+
+        polgrad_xcgrad_real += 0.5*xcgrad_drv.integrate_fxc_gradient(  # ReRe
+            molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_real_n,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_real += xcgrad_drv.integrate_kxc_gradient(  # ReRe
-            molecule, ao_basis, x_minus_y_den_real, x_minus_y_den_real,
+        polgrad_xcgrad_real += 0.5*xcgrad_drv.integrate_fxc_gradient(  # ReRe
+            molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_real_m,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_real -= xcgrad_drv.integrate_fxc_gradient(  # ImIm
-            molecule, ao_basis, x_minus_y_den_imag, x_minus_y_den_imag,
+        polgrad_xcgrad_real += 0.5*xcgrad_drv.integrate_kxc_gradient(  # ReRe
+            molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_real_n,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_real -= xcgrad_drv.integrate_kxc_gradient(  # ImIm
-            molecule, ao_basis, x_minus_y_den_imag, x_minus_y_den_imag,
+        polgrad_xcgrad_real += 0.5*xcgrad_drv.integrate_kxc_gradient(  # ReRe
+            molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_real_m,
+            gs_density, mol_grid, xcfun_label)
+
+        polgrad_xcgrad_real -= 0.5*xcgrad_drv.integrate_fxc_gradient(  # ImIm
+            molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_imag_n,
+            gs_density, mol_grid, xcfun_label)
+        polgrad_xcgrad_real -= 0.5*xcgrad_drv.integrate_fxc_gradient(  # ImIm
+            molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_imag_m,
+            gs_density, mol_grid, xcfun_label)
+        polgrad_xcgrad_real -= 0.5*xcgrad_drv.integrate_kxc_gradient(  # ImIm
+            molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_imag_n,
+            gs_density, mol_grid, xcfun_label)
+        polgrad_xcgrad_real -= 0.5*xcgrad_drv.integrate_kxc_gradient(  # ImIm
+            molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_imag_m,
             gs_density, mol_grid, xcfun_label)
 
         polgrad_xcgrad_real = self.comm.reduce(polgrad_xcgrad_real,
@@ -1139,17 +1173,31 @@ class PolarizabilityGradient():
         polgrad_xcgrad_imag += xcgrad_drv.integrate_fxc_gradient(  # Im DM
             molecule, ao_basis, rhow_den_imag, gs_density, gs_density, mol_grid,
             xcfun_label)
-        polgrad_xcgrad_imag += xcgrad_drv.integrate_fxc_gradient(  # ReIm
-            molecule, ao_basis, x_minus_y_den_real, x_minus_y_den_imag,
+
+        polgrad_xcgrad_imag += 0.5*xcgrad_drv.integrate_fxc_gradient(  # ReIm
+            molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_imag_n,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_imag += xcgrad_drv.integrate_kxc_gradient(  # ReIm
-            molecule, ao_basis, x_minus_y_den_real, x_minus_y_den_imag,
+        polgrad_xcgrad_imag += 0.5*xcgrad_drv.integrate_fxc_gradient(  # ReIm
+            molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_imag_m,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_imag += xcgrad_drv.integrate_fxc_gradient(  # ImRe
-            molecule, ao_basis, x_minus_y_den_imag, x_minus_y_den_real,
+        polgrad_xcgrad_imag += 0.5*xcgrad_drv.integrate_kxc_gradient(  # ReIm
+            molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_imag_n,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_imag += xcgrad_drv.integrate_kxc_gradient(  # ImRe
-            molecule, ao_basis, x_minus_y_den_imag, x_minus_y_den_real,
+        polgrad_xcgrad_imag += 0.5*xcgrad_drv.integrate_kxc_gradient(  # ReIm
+            molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_imag_m,
+            gs_density, mol_grid, xcfun_label)
+
+        polgrad_xcgrad_imag += 0.5*xcgrad_drv.integrate_fxc_gradient(  # ImRe
+            molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_real_n,
+            gs_density, mol_grid, xcfun_label)
+        polgrad_xcgrad_imag += 0.5*xcgrad_drv.integrate_fxc_gradient(  # ImRe
+            molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_real_m,
+            gs_density, mol_grid, xcfun_label)
+        polgrad_xcgrad_imag += 0.5*xcgrad_drv.integrate_kxc_gradient(  # ImRe
+            molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_real_n,
+            gs_density, mol_grid, xcfun_label)
+        polgrad_xcgrad_imag += 0.5*xcgrad_drv.integrate_kxc_gradient(  # ImRe
+            molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_real_m,
             gs_density, mol_grid, xcfun_label)
 
         polgrad_xcgrad_imag = self.comm.reduce(polgrad_xcgrad_imag,
