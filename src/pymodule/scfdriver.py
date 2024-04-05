@@ -1162,36 +1162,25 @@ class ScfDriver:
 
             # compute new Fock matrix, molecular orbitals and density
 
-            profiler.start_timer('StoreDIIS')
+            profiler.start_timer('FockDiag')
 
             #self._store_diis_data(fock_mat, den_mat, ovl_mat, e_grad)
             if self.rank == mpi_master():
                 acc_diis.store_diis_data(fock_mat, e_mat, e_grad)
-
-            profiler.stop_timer('StoreDIIS')
-            profiler.start_timer('EffFock')
 
             if self.rank == mpi_master():
                 eff_fock_mat = acc_diis.get_effective_fock(fock_mat, self.ostream)
             else:
                 eff_fock_mat = None
 
-            profiler.stop_timer('EffFock')
-
-            profiler.start_timer('FockDiag')
-
             self._molecular_orbitals = self._gen_molecular_orbitals(
                 molecule, eff_fock_mat, oao_mat,
                 screener.get_num_gpus_per_node())
-
-            profiler.stop_timer('FockDiag')
 
             if self._mom is not None:
                 self._apply_mom(molecule, ovl_mat)
 
             self._update_mol_orbs_phase()
-
-            profiler.start_timer('NewDens')
 
             if self.rank == mpi_master():
                 # TODO unrestricted and restricted open-shell
@@ -1210,7 +1199,7 @@ class ScfDriver:
             self.comm.Bcast(den_mat_np, root=mpi_master())
             den_mat = AODensityMatrix([den_mat_np], denmat.rest)
 
-            profiler.stop_timer('NewDens')
+            profiler.stop_timer('FockDiag')
 
             profiler.check_memory_usage('Iteration {:d} Fock diag.'.format(
                 self._num_iter))
