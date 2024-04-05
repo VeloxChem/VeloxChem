@@ -148,7 +148,7 @@ class PolarizabilityGradient():
         self.orbrsp_dict = dict(orbrsp_dict)
         self.scf_drv = scf_drv
 
-    def compute(self, molecule, basis, scf_tensors, lr_results):
+    def compute(self, molecule, basis, scf_tensors, lr_results=None):
         """
         Calls the correct function to perform the calculation of
         the polarizability gradient.
@@ -165,7 +165,6 @@ class PolarizabilityGradient():
 
         # sanity checks
         dft_sanity_check(self, 'compute')
-        polgrad_sanity_check(self, self.flag, lr_results)
 
         start_time = tm.time()
 
@@ -185,6 +184,11 @@ class PolarizabilityGradient():
             else:
                 self.compute_numerical_real(molecule, basis, self.scf_drv)
         else:
+            if lr_results is None:
+                error_message = 'PolarizabilityGradient: missing input LR results'
+                error_message += 'for analytical calculations'
+                raise ValueError(error_message)
+            polgrad_sanity_check(self, self.flag, lr_results)
             # print only on the master node
             if self.rank == mpi_master():
                 valstr = '*** Calculating analytical polarizability gradient ***'
