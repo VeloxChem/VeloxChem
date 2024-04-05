@@ -73,7 +73,7 @@ zeta(const double eRadius)
     return val;
 }
 
-__global__ void
+__global__ void __launch_bounds__(TILE_SIZE)
 ssf(const double*   gridx,
     const double*   gridy,
     const double*   gridz,
