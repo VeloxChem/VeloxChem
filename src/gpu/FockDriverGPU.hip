@@ -12458,15 +12458,13 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
 
     hipSafe(hipMemcpy(d_X, X, nmo * nao * sizeof(double), hipMemcpyHostToDevice));
 
-    auto op_X = (trans_X == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
-    auto lda_X = (trans_X == std::string("N")) ? nmo : nao;
-
+    auto op_X  = (trans_X == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
     auto op_XT = (trans_X == std::string("N")) ? HIPBLAS_OP_T : HIPBLAS_OP_N;
-    auto lda_XT = (trans_X == std::string("N")) ? nao : nmo;
+
+    auto lda_X = (trans_X == std::string("N")) ? nmo : nao;
 
     beta = 0.0;
 
-    // TODO: double check using linear dependent basis set
     // let E == (FDS - SDF)
     // X^T E^T (=> EX)
     hipblasSafe(hipblasDgemm(handle, op_X, HIPBLAS_OP_N, nmo, nao, nao, &alpha, d_X, lda_X, d_C, nao, &beta, d_Y, nmo));
@@ -12474,7 +12472,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     hipSafe(hipDeviceSynchronize());
 
     // (EX)^T X (=> X^T(E)X)
-    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_XT, &beta, d_C, nmo));
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_C, nmo));
 
     hipSafe(hipMemcpy(errvec, d_C, nmo * nmo * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -12521,14 +12519,13 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
 
     // Note: we compute C^T = B^T * A^T since hipblas is column-major
 
-    // TODO: double check using linear dependent basis set
     // X^T F^T (=> FX)
     hipblasSafe(hipblasDgemm(handle, op_X, HIPBLAS_OP_N, nmo, nao, nao, &alpha, d_X, lda_X, d_F, nao, &beta, d_Y, nmo));
 
     hipSafe(hipDeviceSynchronize());
 
     // (FX)^T X (=> X^T(F)X)
-    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_XT, &beta, d_F, nmo));
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_F, nmo));
 
     hipSafe(hipMemcpy(transformed_F, d_F, nmo * nmo * sizeof(double), hipMemcpyDeviceToHost));
 
