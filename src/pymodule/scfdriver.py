@@ -1564,11 +1564,20 @@ class ScfDriver:
 
         if self._dft and not self._first_step:
             if self.xcfun.is_hybrid():
-                fock_mat = compute_fock_gpu(molecule, basis, den_mat, self.xcfun.get_frac_exact_exchange(), self.eri_thresh, self.prelink_thresh, screener)
+                fock_mat = compute_fock_gpu(molecule, basis, den_mat,
+                                            2.0, self.xcfun.get_frac_exact_exchange(),
+                                            self.eri_thresh, self.prelink_thresh,
+                                            screener)
             else:
-                fock_mat = compute_fock_gpu(molecule, basis, den_mat, 0.0, self.eri_thresh, self.prelink_thresh, screener)
+                fock_mat = compute_fock_gpu(molecule, basis, den_mat,
+                                            2.0, 0.0,
+                                            self.eri_thresh, self.prelink_thresh,
+                                            screener)
         else:
-            fock_mat = compute_fock_gpu(molecule, basis, den_mat, 1.0, self.eri_thresh, self.prelink_thresh, screener)
+            fock_mat = compute_fock_gpu(molecule, basis, den_mat,
+                                        2.0, 1.0,
+                                        self.eri_thresh, self.prelink_thresh,
+                                        screener)
 
         naos = fock_mat.number_of_rows()
         fock_mat_np = np.zeros((naos, naos))

@@ -1362,7 +1362,14 @@ transformDensity(const CMolecule& molecule, const CMolecularBasis& basis, const 
 }
 
 auto
-computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix, const double frac_exact_exchange, const double eri_threshold, const double prelink_threshold, CScreeningData& screening) -> CDenseMatrix
+computeFockOnGPU(const CMolecule& molecule,
+                 const CMolecularBasis& basis,
+                 const CAODensityMatrix& densityMatrix,
+                 const double prefac_coulomb,
+                 const double frac_exact_exchange,
+                 const double eri_threshold,
+                 const double prelink_threshold,
+                 CScreeningData& screening) -> CDenseMatrix
 {
     CGpuDevices gpu_devices;
 
@@ -1983,6 +1990,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     // compute J
 
+    if (std::fabs(prefac_coulomb) > 1.0e-13)
+    {
+
     // J: S-S block
 
     if (ss_prim_pair_count_local > 0)
@@ -2205,9 +2215,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = s_prim_aoinds[i];
             const auto j_cgto = s_prim_aoinds[j];
 
-            mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
+            mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto] += mat_J[ij] * prefac_coulomb;
 
-            if (i != j) mat_Fock_omp[gpu_id].row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
+            if (i != j) mat_Fock_omp[gpu_id].row(j_cgto)[i_cgto] += mat_J[ij] * prefac_coulomb;
         }
 
         timer.stop("  J block SS");
@@ -2491,8 +2501,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                 auto j_cgto_sph = j_cgto_sph_ind_coef.first;
                 auto j_coef_sph = j_cgto_sph_ind_coef.second;
 
-                mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto_sph] += mat_J[ij] * j_coef_sph * 2.0;
-                mat_Fock_omp[gpu_id].row(j_cgto_sph)[i_cgto] += mat_J[ij] * j_coef_sph * 2.0;
+                mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto_sph] += mat_J[ij] * j_coef_sph * prefac_coulomb;
+                mat_Fock_omp[gpu_id].row(j_cgto_sph)[i_cgto] += mat_J[ij] * j_coef_sph * prefac_coulomb;
             }
         }
 
@@ -2949,9 +2959,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
                     auto coef_sph = i_coef_sph * j_coef_sph;
 
-                    mat_Fock_omp[gpu_id].row(i_cgto_sph)[j_cgto_sph] += mat_J[ij] * coef_sph * 2.0;
+                    mat_Fock_omp[gpu_id].row(i_cgto_sph)[j_cgto_sph] += mat_J[ij] * coef_sph * prefac_coulomb;
 
-                    if (i != j) mat_Fock_omp[gpu_id].row(j_cgto_sph)[i_cgto_sph] += mat_J[ij] * coef_sph * 2.0;
+                    if (i != j) mat_Fock_omp[gpu_id].row(j_cgto_sph)[i_cgto_sph] += mat_J[ij] * coef_sph * prefac_coulomb;
                 }
             }
         }
@@ -3350,8 +3360,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                 auto j_cgto_sph = j_cgto_sph_ind_coef.first;
                 auto j_coef_sph = j_cgto_sph_ind_coef.second;
 
-                mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto_sph] += mat_J[ij] * j_coef_sph * 2.0;
-                mat_Fock_omp[gpu_id].row(j_cgto_sph)[i_cgto] += mat_J[ij] * j_coef_sph * 2.0;
+                mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto_sph] += mat_J[ij] * j_coef_sph * prefac_coulomb;
+                mat_Fock_omp[gpu_id].row(j_cgto_sph)[i_cgto] += mat_J[ij] * j_coef_sph * prefac_coulomb;
             }
         }
 
@@ -4197,8 +4207,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
                     auto coef_sph = i_coef_sph * j_coef_sph;
 
-                    mat_Fock_omp[gpu_id].row(i_cgto_sph)[j_cgto_sph] += mat_J[ij] * coef_sph * 2.0;
-                    mat_Fock_omp[gpu_id].row(j_cgto_sph)[i_cgto_sph] += mat_J[ij] * coef_sph * 2.0;
+                    mat_Fock_omp[gpu_id].row(i_cgto_sph)[j_cgto_sph] += mat_J[ij] * coef_sph * prefac_coulomb;
+                    mat_Fock_omp[gpu_id].row(j_cgto_sph)[i_cgto_sph] += mat_J[ij] * coef_sph * prefac_coulomb;
                 }
             }
         }
@@ -5918,15 +5928,17 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
                     auto coef_sph = i_coef_sph * j_coef_sph;
 
-                    mat_Fock_omp[gpu_id].row(i_cgto_sph)[j_cgto_sph] += mat_J[ij] * coef_sph * 2.0;
+                    mat_Fock_omp[gpu_id].row(i_cgto_sph)[j_cgto_sph] += mat_J[ij] * coef_sph * prefac_coulomb;
 
-                    if (i != j) mat_Fock_omp[gpu_id].row(j_cgto_sph)[i_cgto_sph] += mat_J[ij] * coef_sph * 2.0;
+                    if (i != j) mat_Fock_omp[gpu_id].row(j_cgto_sph)[i_cgto_sph] += mat_J[ij] * coef_sph * prefac_coulomb;
                 }
             }
         }
 
         timer.stop("  J block DD");
     }
+
+    }  // end of compute J
 
     timer.stop("J computation");
 
@@ -6265,9 +6277,12 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     // compute K
 
+    if (std::fabs(frac_exact_exchange) > 1.0e-13)
+    {
+
     // K: S-S block
 
-    if ((pair_inds_count_for_K_ss > 0) && (std::fabs(frac_exact_exchange) > 1.0e-13))
+    if (pair_inds_count_for_K_ss > 0)
     {
         timer.start("  K block SS");
 
@@ -6590,7 +6605,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     // K: S-P block
 
-    if ((pair_inds_count_for_K_sp > 0) && (std::fabs(frac_exact_exchange) > 1.0e-13))
+    if (pair_inds_count_for_K_sp > 0)
     {
         timer.start("  K block SP");
 
@@ -6979,7 +6994,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     // K: P-P block
 
-    if ((pair_inds_count_for_K_pp > 0) && (std::fabs(frac_exact_exchange) > 1.0e-13))
+    if (pair_inds_count_for_K_pp > 0)
     {
         timer.start("  K block PP");
 
@@ -7583,7 +7598,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     // K: S-D block
 
-    if ((pair_inds_count_for_K_sd > 0) && (std::fabs(frac_exact_exchange) > 1.0e-13))
+    if (pair_inds_count_for_K_sd > 0)
     {
         timer.start("  K block SD");
 
@@ -8231,7 +8246,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     // K: P-D block
 
-    if ((pair_inds_count_for_K_pd > 0) && (std::fabs(frac_exact_exchange) > 1.0e-13))
+    if (pair_inds_count_for_K_pd > 0)
     {
         timer.start("  K block PD");
 
@@ -9542,7 +9557,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     // K: D-D block
 
-    if ((pair_inds_count_for_K_dd > 0) && (std::fabs(frac_exact_exchange) > 1.0e-13))
+    if (pair_inds_count_for_K_dd > 0)
     {
         timer.start("  K block DD");
 
@@ -12223,6 +12238,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         timer.stop("  K block DD");
     }
+
+    }  // end of compute K
 
     timer.stop("K computation");
 
