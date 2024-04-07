@@ -32,6 +32,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+//#include <iostream>
 
 #include "ErrorHandler.hpp"
 #include "GridScreener.hpp"
@@ -119,9 +120,29 @@ CXCFunctional::CXCFunctional(const std::string&              nameOfFunctional,
 
         double omega = 0.0, alpha = 0.0, beta = 0.0;
 
-        xc_hyb_cam_coef(funcptr, &omega, &alpha, &beta);
+        xc_hyb_cam_coef(funcptr, &_rangeSeparationParameterOmega, &_rangeSeparationParameterAlpha, &_rangeSeparationParameterBeta);
 
         errors::assertMsgCritical(std::fabs(beta) < 1.0e-13, std::string("XCFunctional: Range-separated functional is not yet supported"));
+
+        if (isRangeSeparated())
+        {
+            errors::assertMsgCritical(_components.size() == 1, "XCFunctional: Range-separated functional can only include one component");
+        }
+
+        /*
+        auto n_ext_param = xc_func_info_get_n_ext_params(funcptr->info);
+        std::cout << "n_ext_param: " << n_ext_param << std::endl;
+        for (int64_t i_param = 0; i_param < static_cast<int64_t>(n_ext_param); i_param++)
+        {
+            auto param_name = xc_func_info_get_ext_params_name(funcptr->info, i_param);
+            auto param_descr = xc_func_info_get_ext_params_description(funcptr->info, i_param);
+            auto param_value = xc_func_info_get_ext_params_default_value(funcptr->info, i_param);
+            std::cout << "  param id: " << i_param << std::endl;
+            std::cout << "        name: " << param_name << std::endl;
+            std::cout << "        descr: " << param_descr << std::endl;
+            std::cout << "        value: " << param_value << std::endl;
+        }
+        */
     }
 
     if (hasExc) _maxDerivOrder = 0;
@@ -145,7 +166,11 @@ CXCFunctional::CXCFunctional(const CXCFunctional& source)
 
     , _fractionOfExactExchange(source._fractionOfExactExchange)
 
-    , _rangeSeparationParameters(source._rangeSeparationParameters)
+    , _rangeSeparationParameterAlpha(source._rangeSeparationParameterAlpha)
+
+    , _rangeSeparationParameterBeta(source._rangeSeparationParameterBeta)
+
+    , _rangeSeparationParameterOmega(source._rangeSeparationParameterOmega)
 
     , _maxDerivOrder(source._maxDerivOrder)
 
@@ -164,7 +189,11 @@ CXCFunctional::CXCFunctional(CXCFunctional&& source) noexcept
 
     , _fractionOfExactExchange(std::move(source._fractionOfExactExchange))
 
-    , _rangeSeparationParameters(std::move(source._rangeSeparationParameters))
+    , _rangeSeparationParameterAlpha(std::move(source._rangeSeparationParameterAlpha))
+
+    , _rangeSeparationParameterBeta(std::move(source._rangeSeparationParameterBeta))
+
+    , _rangeSeparationParameterOmega(std::move(source._rangeSeparationParameterOmega))
 
     , _maxDerivOrder(std::move(source._maxDerivOrder))
 
@@ -442,7 +471,11 @@ CXCFunctional::operator=(const CXCFunctional& source)
 
     _fractionOfExactExchange = source._fractionOfExactExchange;
 
-    _rangeSeparationParameters = source._rangeSeparationParameters;
+    _rangeSeparationParameterAlpha = source._rangeSeparationParameterAlpha;
+
+    _rangeSeparationParameterBeta = source._rangeSeparationParameterBeta;
+
+    _rangeSeparationParameterOmega = source._rangeSeparationParameterOmega;
 
     _maxDerivOrder = source._maxDerivOrder;
 
@@ -468,7 +501,11 @@ CXCFunctional::operator=(CXCFunctional&& source) noexcept
 
     _fractionOfExactExchange = std::move(source._fractionOfExactExchange);
 
-    _rangeSeparationParameters = std::move(source._rangeSeparationParameters);
+    _rangeSeparationParameterAlpha = std::move(source._rangeSeparationParameterAlpha);
+
+    _rangeSeparationParameterBeta = std::move(source._rangeSeparationParameterBeta);
+
+    _rangeSeparationParameterOmega = std::move(source._rangeSeparationParameterOmega);
 
     _maxDerivOrder = std::move(source._maxDerivOrder);
 
@@ -494,7 +531,11 @@ CXCFunctional::operator==(const CXCFunctional& other) const
 
     if (_fractionOfExactExchange != other._fractionOfExactExchange) return false;
 
-    if (_rangeSeparationParameters != other._rangeSeparationParameters) return false;
+    if (_rangeSeparationParameterAlpha != other._rangeSeparationParameterAlpha) return false;
+
+    if (_rangeSeparationParameterBeta != other._rangeSeparationParameterBeta) return false;
+
+    if (_rangeSeparationParameterOmega != other._rangeSeparationParameterOmega) return false;
 
     if (_maxDerivOrder != other._maxDerivOrder) return false;
 
@@ -541,6 +582,30 @@ double
 CXCFunctional::getFractionOfExactExchange() const
 {
     return _fractionOfExactExchange;
+}
+
+bool
+CXCFunctional::isRangeSeparated() const
+{
+    return (std::fabs(_rangeSeparationParameterBeta) > 1.0e-13);
+}
+
+double
+CXCFunctional::getRangeSeparationParameterAlpha() const
+{
+    return _rangeSeparationParameterAlpha;
+}
+
+double
+CXCFunctional::getRangeSeparationParameterBeta() const
+{
+    return _rangeSeparationParameterBeta;
+}
+
+double
+CXCFunctional::getRangeSeparationParameterOmega() const
+{
+    return _rangeSeparationParameterOmega;
 }
 
 auto
@@ -3008,7 +3073,7 @@ CXCFunctional::compute_lxc_for_mgga(const int64_t np,
     }
 }
 
-const xc_func_type*
+xc_func_type*
 CXCFunctional::getFunctionalPointerToLdaComponent() const
 {
     for (const auto& xccomp : _components)
@@ -3026,7 +3091,7 @@ CXCFunctional::getFunctionalPointerToLdaComponent() const
     return nullptr;
 }
 
-const xc_func_type*
+xc_func_type*
 CXCFunctional::getFunctionalPointerToGgaComponent() const
 {
     for (const auto& xccomp : _components)
@@ -3044,7 +3109,7 @@ CXCFunctional::getFunctionalPointerToGgaComponent() const
     return nullptr;
 }
 
-const xc_func_type*
+xc_func_type*
 CXCFunctional::getFunctionalPointerToMetaGgaComponent() const
 {
     for (const auto& xccomp : _components)
@@ -3090,4 +3155,20 @@ CXCFunctional::getDimensionOfDerivatives() const
     }
 
     return 0;
+}
+
+auto
+CXCFunctional::setRangeSeparatedParameterOmega(const double omega) -> void
+{
+    errors::assertMsgCritical(isRangeSeparated(), "XCFunctional.setRangeSeparatedParameterOmega: Only applicable to range-separated functional");
+
+    errors::assertMsgCritical(_components.size() == 1, "XCFunctional.setRangeSeparatedParameterOmega: Only applicable to single-component functional");
+
+    std::string param_name("_omega");
+
+    auto funcptr = _components[0].getFunctionalPointer();
+
+    xc_func_set_ext_params_name(funcptr, param_name.c_str(), omega);
+
+    xc_hyb_cam_coef(funcptr, &_rangeSeparationParameterOmega, &_rangeSeparationParameterAlpha, &_rangeSeparationParameterBeta);
 }

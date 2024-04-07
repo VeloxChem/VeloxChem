@@ -37,6 +37,7 @@ getAvailableFunctionals()
 {
     return std::vector<std::string>({"SLATER", "SLDA",   "B88X",    "BLYP",  "B3LYP",   "BHANDH", "BHANDHLYP", "PBE",   "PBE0",   "REVPBE",
                                      "BP86",   "PW91",   "MPW1K",   "OLYP",  "O3LYP",   "X3LYP",  "B97",       "B97-1", "B97-2",  "B97-3",
+                                     "LRC-WPBEH", "CAM-B3LYP",
                                      "TPSS",   "TPSSH",  "REVTPSS", "PKZB",  "SCAN",    "RSCAN",  "R2SCAN",    "M05",   "M05-2X", "M06",
                                      "M06-2X", "M06-HF", "M06-L",   "M11-L", "MPW1B95", "MPWB1K", "PW6B95",    "PWB6K"});
 }
@@ -98,6 +99,12 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
         if (fstr::upcase(xcLabel) == "B97-2") return CXCFunctional("B97-2", {"HYB_GGA_XC_B97_2"}, {1.0});
 
         if (fstr::upcase(xcLabel) == "B97-3") return CXCFunctional("B97-3", {"HYB_GGA_XC_B97_3"}, {1.0});
+
+        // range-separated GGA
+
+        if (fstr::upcase(xcLabel) == "LRC-WPBEH") return CXCFunctional("LRC-WPBEH", {"HYB_GGA_XC_LRC_WPBEH"}, {1.0});
+
+        if (fstr::upcase(xcLabel) == "CAM-B3LYP") return CXCFunctional("CAM-B3LYP", {"HYB_GGA_XC_CAM_B3LYP"}, {1.0});
 
         // meta-GGA
 

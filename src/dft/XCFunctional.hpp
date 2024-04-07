@@ -66,7 +66,9 @@ class CXCFunctional
     double _fractionOfExactExchange{0.0};
 
     /** The range-separation parameters in functional. */
-    std::array<double, 3> _rangeSeparationParameters{0.0, 0.0, 0.0};
+    double _rangeSeparationParameterAlpha{0.0};
+    double _rangeSeparationParameterBeta{0.0};
+    double _rangeSeparationParameterOmega{0.0};
 
     /** Highest order of available derivatives. */
     int64_t _maxDerivOrder{0};
@@ -178,6 +180,18 @@ class CXCFunctional
      Gets the fraction of exact exchange.
      */
     double getFractionOfExactExchange() const;
+
+    /**
+     Determines whether the XC functional is range-separated.
+     */
+    bool isRangeSeparated() const;
+
+    /**
+     Gets the range-separation paramters.
+     */
+    double getRangeSeparationParameterAlpha() const;
+    double getRangeSeparationParameterBeta() const;
+    double getRangeSeparationParameterOmega() const;
 
     /** Computes values and first derivative of LDA exchange-correlation functional on grid.
      *
@@ -559,25 +573,31 @@ class CXCFunctional
      *
      * @return the pointer.
      */
-    const xc_func_type* getFunctionalPointerToLdaComponent() const;
+    xc_func_type* getFunctionalPointerToLdaComponent() const;
 
     /** Gets functional pointer to the first GGA component.
      *
      * @return the pointer.
      */
-    const xc_func_type* getFunctionalPointerToGgaComponent() const;
+    xc_func_type* getFunctionalPointerToGgaComponent() const;
 
     /** Gets functional pointer to the first meta-GGA component.
      *
      * @return the pointer.
      */
-    const xc_func_type* getFunctionalPointerToMetaGgaComponent() const;
+    xc_func_type* getFunctionalPointerToMetaGgaComponent() const;
 
     /** Gets dimension of derivatives.
      *
      * @return dimension of derivatives.
      */
     int64_t getDimensionOfDerivatives() const;
+
+    /** Sets omega range-separation parameter of functional.
+     *
+     * @omega the value of omega parameter.
+     */
+    auto setRangeSeparatedParameterOmega(const double omega) -> void;
 };
 
 #endif /* XCFunctional_hpp */

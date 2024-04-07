@@ -50,7 +50,7 @@ class CXCComponent
     /**
      The Libxc functional component.
      */
-    xc_func_type _func;
+    xc_func_type* _func;
 
     /**
      Whether Libxc functional component has been initalized.
@@ -146,7 +146,7 @@ class CXCComponent
 
      @return the pointer.
      */
-    const xc_func_type* getFunctionalPointer() const;
+    xc_func_type* getFunctionalPointer() const;
 
     /**
      Checks if the functional component is LDA.

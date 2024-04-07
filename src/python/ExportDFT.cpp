@@ -194,13 +194,17 @@ export_dft(py::module& m)
              "fraction_of_exact_exchange"_a = 0.0)
         .def(py::init<const CXCFunctional&>())
         .def(py::self == py::self)
+        .def("is_range_separated", &CXCFunctional::isRangeSeparated, "Determines whether the XC function is range-separated.")
         .def("is_hybrid", &CXCFunctional::isHybrid, "Determines whether the XC functional is hybrid.")
         .def("is_undefined", &CXCFunctional::isUndefined, "Determines whether the XC function is undefined.")
         .def("get_func_type", &CXCFunctional::getFunctionalType, "Gets type of XC functional.")
         .def("get_func_label", &CXCFunctional::getFunctionalLabel, "Gets name of XC functional.")
         .def("get_frac_exact_exchange", &CXCFunctional::getFractionOfExactExchange, "Gets fraction of exact Hartree-Fock exchange in XC functional.")
+        .def("get_rs_alpha", &CXCFunctional::getRangeSeparationParameterAlpha, "Gets range-separation parameter alpha.")
+        .def("get_rs_beta", &CXCFunctional::getRangeSeparationParameterBeta, "Gets range-separation parameter beta.")
+        .def("get_rs_omega", &CXCFunctional::getRangeSeparationParameterOmega, "Gets range-separation parameter omega.")
         .def("get_dimension_of_derivatives", &CXCFunctional::getDimensionOfDerivatives, "Gets dimension of derivatives.")
-        ;
+        .def("set_rs_omega", &CXCFunctional::setRangeSeparatedParameterOmega, "Sets range-separation parameter omega.");
 
     // exposing functions
 

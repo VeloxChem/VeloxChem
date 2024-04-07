@@ -71,9 +71,11 @@ CXCComponent::_init_libxc_func()
 {
     if (!_initialized)
     {
+        _func = (xc_func_type*)std::malloc(sizeof(xc_func_type));
+
         auto funcID = xc_functional_get_number(_label.c_str());
 
-        auto xc_err = xc_func_init(&_func, funcID, XC_POLARIZED);
+        auto xc_err = xc_func_init(_func, funcID, XC_POLARIZED);
 
         errors::assertMsgCritical(xc_err == 0, std::string("XCComponent: Invalid LibXC functional ") + _label);
 
@@ -86,7 +88,9 @@ CXCComponent::_end_libxc_func()
 {
     if (_initialized)
     {
-        xc_func_end(&_func);
+        xc_func_end(_func);
+
+        std::free(_func);
 
         _initialized = false;
     }
@@ -158,16 +162,16 @@ CXCComponent::getScalingFactor() const
     return _scalingFactor;
 }
 
-const xc_func_type*
+xc_func_type*
 CXCComponent::getFunctionalPointer() const
 {
-    return &_func;
+    return _func;
 }
 
 bool
 CXCComponent::isLDA() const
 {
-    auto family = _func.info->family;
+    auto family = _func->info->family;
 
     return ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA));
 }
@@ -175,7 +179,7 @@ CXCComponent::isLDA() const
 bool
 CXCComponent::isGGA() const
 {
-    auto family = _func.info->family;
+    auto family = _func->info->family;
 
     return ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA));
 }
@@ -183,7 +187,7 @@ CXCComponent::isGGA() const
 bool
 CXCComponent::isMetaGGA() const
 {
-    auto family = _func.info->family;
+    auto family = _func->info->family;
 
     return ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA));
 }
