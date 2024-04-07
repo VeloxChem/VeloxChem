@@ -1573,7 +1573,7 @@ class ScfDriver:
                     omega = self.xcfun.get_rs_omega()
 
                     fock_mat_full_k = compute_fock_gpu(molecule, basis, den_mat,
-                                                       2.0, full_k_coef, omega,
+                                                       2.0, full_k_coef, 0.0,
                                                        self.eri_thresh, self.prelink_thresh,
                                                        screener)
 
@@ -1582,7 +1582,7 @@ class ScfDriver:
                                                       self.eri_thresh, self.prelink_thresh,
                                                       screener)
 
-                    fock_mat_local = (fock_mat_full_k.to_numpy() -
+                    fock_mat_local = (fock_mat_full_k.to_numpy() +
                                       fock_mat_erf_k.to_numpy())
 
                 else:
