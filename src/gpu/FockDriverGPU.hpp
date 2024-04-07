@@ -47,6 +47,7 @@ auto computeFockOnGPU(const CMolecule& molecule,
                       const CAODensityMatrix& densityMatrix,
                       const double prefac_coulomb,
                       const double frac_exact_exchange,
+                      const double omega,
                       const double eri_threshold,
                       const double prelink_threshold,
                       CScreeningData& screening) -> CDenseMatrix;

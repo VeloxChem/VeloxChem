@@ -50,6 +50,7 @@ computeExchangeFockSSSS(double*         mat_K,
                         const double*   pair_data_K_ss,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -78,6 +79,7 @@ computeExchangeFockSSSP(double*         mat_K,
                         const double*   pair_data_K_sp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -106,6 +108,7 @@ computeExchangeFockSPSS(double*         mat_K,
                         const double*   pair_data_K_ss,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -129,6 +132,7 @@ computeExchangeFockSPSP(double*         mat_K,
                         const double*   pair_data_K_sp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -157,6 +161,7 @@ computeExchangeFockSSPS(double*         mat_K,
                         const double*   pair_data_K_ps,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -185,6 +190,7 @@ computeExchangeFockSSPP(double*         mat_K,
                         const double*   pair_data_K_pp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -213,6 +219,7 @@ computeExchangeFockSPPS(double*         mat_K,
                         const double*   pair_data_K_ps,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -241,6 +248,7 @@ computeExchangeFockSPPP(double*         mat_K,
                         const double*   pair_data_K_pp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -264,6 +272,7 @@ computeExchangeFockPSPS(double*         mat_K,
                         const double*   pair_data_K_ps,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -292,6 +301,7 @@ computeExchangeFockPSPP(double*         mat_K,
                         const double*   pair_data_K_pp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -320,6 +330,7 @@ computeExchangeFockPPPS(double*         mat_K,
                         const double*   pair_data_K_ps,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -340,6 +351,7 @@ computeExchangeFockPPPP(double*         mat_K,
                         const double*   pair_data_K_pp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -368,6 +380,7 @@ computeExchangeFockSSSD(double*         mat_K,
                         const double*   pair_data_K_sd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -396,6 +409,7 @@ computeExchangeFockSDSS(double*         mat_K,
                         const double*   pair_data_K_ss,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -427,6 +441,7 @@ computeExchangeFockSPSD(double*         mat_K,
                         const double*   pair_data_K_sd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -458,6 +473,7 @@ computeExchangeFockSDSP(double*         mat_K,
                         const double*   pair_data_K_sp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -481,6 +497,7 @@ computeExchangeFockSDSD(double*         mat_K,
                         const double*   pair_data_K_sd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -512,6 +529,7 @@ computeExchangeFockSSPD(double*         mat_K,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -543,6 +561,7 @@ computeExchangeFockSDPS(double*         mat_K,
                         const double*   pair_data_K_ps,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -574,6 +593,7 @@ computeExchangeFockSPPD(double*         mat_K,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -605,6 +625,7 @@ computeExchangeFockSDPP(double*         mat_K,
                         const double*   pair_data_K_pp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -636,6 +657,7 @@ computeExchangeFockSDPD0(double*         mat_K,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -667,6 +689,7 @@ computeExchangeFockSDPD1(double*         mat_K,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -695,6 +718,7 @@ computeExchangeFockSSDS(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -726,6 +750,7 @@ computeExchangeFockSSDP(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -757,6 +782,7 @@ computeExchangeFockSPDS(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -788,6 +814,7 @@ computeExchangeFockSPDP(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -816,6 +843,7 @@ computeExchangeFockSSDD(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -844,6 +872,7 @@ computeExchangeFockSDDS(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -875,6 +904,7 @@ computeExchangeFockPSPD(double*         mat_K,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -906,6 +936,7 @@ computeExchangeFockPDPS(double*         mat_K,
                         const double*   pair_data_K_ps,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -937,6 +968,7 @@ computeExchangeFockPSDS(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -968,6 +1000,7 @@ computeExchangeFockPSDP(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -999,6 +1032,7 @@ computeExchangeFockPPDS(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1022,6 +1056,7 @@ computeExchangeFockDSDS(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1045,6 +1080,7 @@ computeExchangeFockDPDP0(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1068,6 +1104,7 @@ computeExchangeFockDPDP1(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1091,6 +1128,7 @@ computeExchangeFockDPDP2(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1114,6 +1152,7 @@ computeExchangeFockDPDP3(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1137,6 +1176,7 @@ computeExchangeFockDPDP4(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1160,6 +1200,7 @@ computeExchangeFockDPDP5(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1183,6 +1224,7 @@ computeExchangeFockPDPD0(double*         mat_K,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1206,6 +1248,7 @@ computeExchangeFockPDPD1(double*         mat_K,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1229,6 +1272,7 @@ computeExchangeFockPDPD2(double*         mat_K,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1252,6 +1296,7 @@ computeExchangeFockPDPD3(double*         mat_K,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1275,6 +1320,7 @@ computeExchangeFockPDPD4(double*         mat_K,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1298,6 +1344,7 @@ computeExchangeFockPDPD5(double*         mat_K,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1326,6 +1373,7 @@ computeExchangeFockDPDD0(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1354,6 +1402,7 @@ computeExchangeFockDPDD1(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1382,6 +1431,7 @@ computeExchangeFockDPDD2(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1410,6 +1460,7 @@ computeExchangeFockDPDD3(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1438,6 +1489,7 @@ computeExchangeFockDPDD4(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1466,6 +1518,7 @@ computeExchangeFockDPDD5(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1494,6 +1547,7 @@ computeExchangeFockDPDD6(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1522,6 +1576,7 @@ computeExchangeFockDPDD7(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1550,6 +1605,7 @@ computeExchangeFockDPDD8(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1578,6 +1634,7 @@ computeExchangeFockDPDD9(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1606,6 +1663,7 @@ computeExchangeFockDPDD10(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1634,6 +1692,7 @@ computeExchangeFockDPDD11(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1662,6 +1721,7 @@ computeExchangeFockDPDD12(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1690,6 +1750,7 @@ computeExchangeFockDPDD13(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1718,6 +1779,7 @@ computeExchangeFockDPDD14(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1746,6 +1808,7 @@ computeExchangeFockDPDD15(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1774,6 +1837,7 @@ computeExchangeFockDPDD16(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1802,6 +1866,7 @@ computeExchangeFockDDDP0(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1830,6 +1895,7 @@ computeExchangeFockDDDP1(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1858,6 +1924,7 @@ computeExchangeFockDDDP2(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1886,6 +1953,7 @@ computeExchangeFockDDDP3(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1914,6 +1982,7 @@ computeExchangeFockDDDP4(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1942,6 +2011,7 @@ computeExchangeFockDDDP5(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1970,6 +2040,7 @@ computeExchangeFockDDDP6(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -1998,6 +2069,7 @@ computeExchangeFockDDDP7(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2026,6 +2098,7 @@ computeExchangeFockDDDP8(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2054,6 +2127,7 @@ computeExchangeFockDDDP9(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2082,6 +2156,7 @@ computeExchangeFockDDDP10(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2110,6 +2185,7 @@ computeExchangeFockDDDP11(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2138,6 +2214,7 @@ computeExchangeFockDDDP12(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2166,6 +2243,7 @@ computeExchangeFockDDDP13(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2194,6 +2272,7 @@ computeExchangeFockDDDP14(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2222,6 +2301,7 @@ computeExchangeFockDDDP15(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2250,6 +2330,7 @@ computeExchangeFockDDDP16(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2278,6 +2359,7 @@ computeExchangeFockDDDP17(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2306,6 +2388,7 @@ computeExchangeFockDDDP18(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2334,6 +2417,7 @@ computeExchangeFockDDDP19(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2354,6 +2438,7 @@ computeExchangeFockDDDD0(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2374,6 +2459,7 @@ computeExchangeFockDDDD1(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2394,6 +2480,7 @@ computeExchangeFockDDDD2(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2414,6 +2501,7 @@ computeExchangeFockDDDD3(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2434,6 +2522,7 @@ computeExchangeFockDDDD4(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2454,6 +2543,7 @@ computeExchangeFockDDDD5(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2474,6 +2564,7 @@ computeExchangeFockDDDD6(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2494,6 +2585,7 @@ computeExchangeFockDDDD7(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2514,6 +2606,7 @@ computeExchangeFockDDDD8(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2534,6 +2627,7 @@ computeExchangeFockDDDD9(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2554,6 +2648,7 @@ computeExchangeFockDDDD10(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2574,6 +2669,7 @@ computeExchangeFockDDDD11(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2594,6 +2690,7 @@ computeExchangeFockDDDD12(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2614,6 +2711,7 @@ computeExchangeFockDDDD13(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2634,6 +2732,7 @@ computeExchangeFockDDDD14(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2654,6 +2753,7 @@ computeExchangeFockDDDD15(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2674,6 +2774,7 @@ computeExchangeFockDDDD16(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2694,6 +2795,7 @@ computeExchangeFockDDDD17(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2714,6 +2816,7 @@ computeExchangeFockDDDD18(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2734,6 +2837,7 @@ computeExchangeFockDDDD19(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2754,6 +2858,7 @@ computeExchangeFockDDDD20(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2774,6 +2879,7 @@ computeExchangeFockDDDD21(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2794,6 +2900,7 @@ computeExchangeFockDDDD22(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2814,6 +2921,7 @@ computeExchangeFockDDDD23(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2834,6 +2942,7 @@ computeExchangeFockDDDD24(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2854,6 +2963,7 @@ computeExchangeFockDDDD25(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2874,6 +2984,7 @@ computeExchangeFockDDDD26(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2894,6 +3005,7 @@ computeExchangeFockDDDD27(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2914,6 +3026,7 @@ computeExchangeFockDDDD28(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2934,6 +3047,7 @@ computeExchangeFockDDDD29(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2954,6 +3068,7 @@ computeExchangeFockDDDD30(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2974,6 +3089,7 @@ computeExchangeFockDDDD31(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -2994,6 +3110,7 @@ computeExchangeFockDDDD32(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3014,6 +3131,7 @@ computeExchangeFockDDDD33(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3034,6 +3152,7 @@ computeExchangeFockDDDD34(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3054,6 +3173,7 @@ computeExchangeFockDDDD35(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3074,6 +3194,7 @@ computeExchangeFockDDDD36(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3094,6 +3215,7 @@ computeExchangeFockDDDD37(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3114,6 +3236,7 @@ computeExchangeFockDDDD38(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3134,6 +3257,7 @@ computeExchangeFockDDDD39(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3154,6 +3278,7 @@ computeExchangeFockDDDD40(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3174,6 +3299,7 @@ computeExchangeFockDDDD41(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3202,6 +3328,7 @@ computeExchangeFockDSDD0(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3230,6 +3357,7 @@ computeExchangeFockDSDD1(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3258,6 +3386,7 @@ computeExchangeFockDSDD2(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3286,6 +3415,7 @@ computeExchangeFockDSDD3(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3314,6 +3444,7 @@ computeExchangeFockDSDD4(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3342,6 +3473,7 @@ computeExchangeFockDSDD5(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDS0(double*         mat_K,
@@ -3369,6 +3501,7 @@ computeExchangeFockDDDS0(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3397,6 +3530,7 @@ computeExchangeFockDDDS1(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3425,6 +3559,7 @@ computeExchangeFockDDDS2(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3453,6 +3588,7 @@ computeExchangeFockDDDS3(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3481,6 +3617,7 @@ computeExchangeFockDDDS4(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3509,6 +3646,7 @@ computeExchangeFockDDDS5(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3540,6 +3678,7 @@ computeExchangeFockDSDP0(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3571,6 +3710,7 @@ computeExchangeFockDSDP1(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3602,6 +3742,7 @@ computeExchangeFockDSDP2(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDS0(double*         mat_K,
@@ -3632,6 +3773,7 @@ computeExchangeFockDPDS0(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3663,6 +3805,7 @@ computeExchangeFockDPDS1(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3694,6 +3837,7 @@ computeExchangeFockDPDS2(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3722,6 +3866,7 @@ computeExchangeFockPDDD0(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3750,6 +3895,7 @@ computeExchangeFockPDDD1(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3778,6 +3924,7 @@ computeExchangeFockPDDD2(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3806,6 +3953,7 @@ computeExchangeFockPDDD3(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3834,6 +3982,7 @@ computeExchangeFockPDDD4(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3862,6 +4011,7 @@ computeExchangeFockPDDD5(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3890,6 +4040,7 @@ computeExchangeFockPDDD6(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3918,6 +4069,7 @@ computeExchangeFockPDDD7(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3946,6 +4098,7 @@ computeExchangeFockPDDD8(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -3974,6 +4127,7 @@ computeExchangeFockPDDD9(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4002,6 +4156,7 @@ computeExchangeFockPDDD10(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4030,6 +4185,7 @@ computeExchangeFockPDDD11(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4058,6 +4214,7 @@ computeExchangeFockPDDD12(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4086,6 +4243,7 @@ computeExchangeFockPDDD13(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4114,6 +4272,7 @@ computeExchangeFockPDDD14(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4142,6 +4301,7 @@ computeExchangeFockPDDD15(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4170,6 +4330,7 @@ computeExchangeFockPDDD16(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4198,6 +4359,7 @@ computeExchangeFockPDDD17(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4226,6 +4388,7 @@ computeExchangeFockPPDD0(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4254,6 +4417,7 @@ computeExchangeFockPPDD1(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4282,6 +4446,7 @@ computeExchangeFockPPDD2(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4310,6 +4475,7 @@ computeExchangeFockPPDD3(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4338,6 +4504,7 @@ computeExchangeFockPPDD4(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4366,6 +4533,7 @@ computeExchangeFockPPDD5(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4394,6 +4562,7 @@ computeExchangeFockPDDP0(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4422,6 +4591,7 @@ computeExchangeFockPDDP1(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4450,6 +4620,7 @@ computeExchangeFockPDDP2(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4478,6 +4649,7 @@ computeExchangeFockPDDP3(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4506,6 +4678,7 @@ computeExchangeFockPDDP4(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4534,6 +4707,7 @@ computeExchangeFockPPDP0(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4562,6 +4736,7 @@ computeExchangeFockPPDP1(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4590,6 +4765,7 @@ computeExchangeFockPPDP2(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4621,6 +4797,7 @@ computeExchangeFockPSDD0(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4652,6 +4829,7 @@ computeExchangeFockPSDD1(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4683,6 +4861,7 @@ computeExchangeFockPSDD2(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDS0(double*         mat_K,
@@ -4713,6 +4892,7 @@ computeExchangeFockPDDS0(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4744,6 +4924,7 @@ computeExchangeFockPDDS1(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4775,6 +4956,7 @@ computeExchangeFockPDDS2(double*         mat_K,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4803,6 +4985,7 @@ computeExchangeFockSDDD0(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4831,6 +5014,7 @@ computeExchangeFockSDDD1(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4859,6 +5043,7 @@ computeExchangeFockSDDD2(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4887,6 +5072,7 @@ computeExchangeFockSDDD3(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4915,6 +5101,7 @@ computeExchangeFockSDDD4(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4943,6 +5130,7 @@ computeExchangeFockSDDD5(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -4974,6 +5162,7 @@ computeExchangeFockSPDD0(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -5005,6 +5194,7 @@ computeExchangeFockSPDD1(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -5036,6 +5226,7 @@ computeExchangeFockSPDD2(double*         mat_K,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDP0(double*         mat_K,
@@ -5066,6 +5257,7 @@ computeExchangeFockSDDP0(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -5097,6 +5289,7 @@ computeExchangeFockSDDP1(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -5128,6 +5321,7 @@ computeExchangeFockSDDP2(double*         mat_K,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -5156,6 +5350,7 @@ computeExchangeFockPPPD0(double*         mat_K,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -5184,6 +5379,7 @@ computeExchangeFockPPPD1(double*         mat_K,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -5212,6 +5408,7 @@ computeExchangeFockPPPD2(double*         mat_K,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPP0(double*         mat_K,
@@ -5239,6 +5436,7 @@ computeExchangeFockPDPP0(double*         mat_K,
                         const double*   pair_data_K_pp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -5267,6 +5465,7 @@ computeExchangeFockPDPP1(double*         mat_K,
                         const double*   pair_data_K_pp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
@@ -5295,6 +5494,7 @@ computeExchangeFockPDPP2(double*         mat_K,
                         const double*   pair_data_K_pp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
+                        const double    omega,
                         const double    eri_threshold);
 
 }  // namespace gpu

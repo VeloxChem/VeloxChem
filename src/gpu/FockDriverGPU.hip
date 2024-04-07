@@ -1367,6 +1367,7 @@ computeFockOnGPU(const CMolecule& molecule,
                  const CAODensityMatrix& densityMatrix,
                  const double prefac_coulomb,
                  const double frac_exact_exchange,
+                 const double omega,
                  const double eri_threshold,
                  const double prelink_threshold,
                  CScreeningData& screening) -> CDenseMatrix
@@ -6323,6 +6324,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ss,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -6356,6 +6358,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_sp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -6389,6 +6392,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ss,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -6417,6 +6421,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_sp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -6450,6 +6455,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_sd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -6483,6 +6489,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ss,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -6519,6 +6526,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_sd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -6555,6 +6563,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_sp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -6583,6 +6592,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_sd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), hipMemcpyDeviceToHost));
@@ -6654,6 +6664,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ps,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -6687,6 +6698,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -6720,6 +6732,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ps,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -6753,6 +6766,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -6789,6 +6803,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -6825,6 +6840,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ps,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -6861,6 +6877,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -6897,6 +6914,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -6933,6 +6951,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDPD1, num_blocks, threads_per_block, 0, 0,
@@ -6964,6 +6983,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp * sizeof(double), hipMemcpyDeviceToHost));
@@ -7040,6 +7060,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ps,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -7077,6 +7098,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -7114,6 +7136,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ps,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -7143,6 +7166,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -7183,6 +7207,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -7223,6 +7248,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ps,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -7260,6 +7286,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPPD1, num_blocks, threads_per_block, 0, 0,
@@ -7288,6 +7315,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPPD2, num_blocks, threads_per_block, 0, 0,
@@ -7316,6 +7344,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -7353,6 +7382,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPP1, num_blocks, threads_per_block, 0, 0,
@@ -7381,6 +7411,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPP2, num_blocks, threads_per_block, 0, 0,
@@ -7409,6 +7440,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -7441,6 +7473,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPD1, num_blocks, threads_per_block, 0, 0,
@@ -7464,6 +7497,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPD2, num_blocks, threads_per_block, 0, 0,
@@ -7487,6 +7521,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPD3, num_blocks, threads_per_block, 0, 0,
@@ -7510,6 +7545,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPD4, num_blocks, threads_per_block, 0, 0,
@@ -7533,6 +7569,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPD5, num_blocks, threads_per_block, 0, 0,
@@ -7556,6 +7593,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_pd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -7647,6 +7685,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -7683,6 +7722,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -7719,6 +7759,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -7757,6 +7798,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -7794,6 +7836,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -7831,6 +7874,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -7871,6 +7915,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSPDD1, num_blocks, threads_per_block, 0, 0,
@@ -7902,6 +7947,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSPDD2, num_blocks, threads_per_block, 0, 0,
@@ -7933,6 +7979,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -7973,6 +8020,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDP1, num_blocks, threads_per_block, 0, 0,
@@ -8004,6 +8052,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDP2, num_blocks, threads_per_block, 0, 0,
@@ -8035,6 +8084,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -8072,6 +8122,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDD1, num_blocks, threads_per_block, 0, 0,
@@ -8100,6 +8151,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDD2, num_blocks, threads_per_block, 0, 0,
@@ -8128,6 +8180,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDD3, num_blocks, threads_per_block, 0, 0,
@@ -8156,6 +8209,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDD4, num_blocks, threads_per_block, 0, 0,
@@ -8184,6 +8238,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDD5, num_blocks, threads_per_block, 0, 0,
@@ -8212,6 +8267,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -8300,6 +8356,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -8340,6 +8397,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -8380,6 +8438,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -8420,6 +8479,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPSDD1, num_blocks, threads_per_block, 0, 0,
@@ -8451,6 +8511,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPSDD2, num_blocks, threads_per_block, 0, 0,
@@ -8482,6 +8543,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -8522,6 +8584,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDS1, num_blocks, threads_per_block, 0, 0,
@@ -8553,6 +8616,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDS2, num_blocks, threads_per_block, 0, 0,
@@ -8584,6 +8648,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -8621,6 +8686,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDP1, num_blocks, threads_per_block, 0, 0,
@@ -8649,6 +8715,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDP2, num_blocks, threads_per_block, 0, 0,
@@ -8677,6 +8744,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -8714,6 +8782,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDD1, num_blocks, threads_per_block, 0, 0,
@@ -8742,6 +8811,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDD2, num_blocks, threads_per_block, 0, 0,
@@ -8770,6 +8840,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDD3, num_blocks, threads_per_block, 0, 0,
@@ -8798,6 +8869,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDD4, num_blocks, threads_per_block, 0, 0,
@@ -8826,6 +8898,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDD5, num_blocks, threads_per_block, 0, 0,
@@ -8854,6 +8927,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -8891,6 +8965,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDP1, num_blocks, threads_per_block, 0, 0,
@@ -8919,6 +8994,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDP2, num_blocks, threads_per_block, 0, 0,
@@ -8947,6 +9023,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDP3, num_blocks, threads_per_block, 0, 0,
@@ -8975,6 +9052,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDP4, num_blocks, threads_per_block, 0, 0,
@@ -9003,6 +9081,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -9040,6 +9119,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD1, num_blocks, threads_per_block, 0, 0,
@@ -9068,6 +9148,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD2, num_blocks, threads_per_block, 0, 0,
@@ -9096,6 +9177,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD3, num_blocks, threads_per_block, 0, 0,
@@ -9124,6 +9206,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD4, num_blocks, threads_per_block, 0, 0,
@@ -9152,6 +9235,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD5, num_blocks, threads_per_block, 0, 0,
@@ -9180,6 +9264,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD6, num_blocks, threads_per_block, 0, 0,
@@ -9208,6 +9293,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD7, num_blocks, threads_per_block, 0, 0,
@@ -9236,6 +9322,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD8, num_blocks, threads_per_block, 0, 0,
@@ -9264,6 +9351,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD9, num_blocks, threads_per_block, 0, 0,
@@ -9292,6 +9380,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD10, num_blocks, threads_per_block, 0, 0,
@@ -9320,6 +9409,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD11, num_blocks, threads_per_block, 0, 0,
@@ -9348,6 +9438,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD12, num_blocks, threads_per_block, 0, 0,
@@ -9376,6 +9467,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD13, num_blocks, threads_per_block, 0, 0,
@@ -9404,6 +9496,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD14, num_blocks, threads_per_block, 0, 0,
@@ -9432,6 +9525,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD15, num_blocks, threads_per_block, 0, 0,
@@ -9460,6 +9554,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD16, num_blocks, threads_per_block, 0, 0,
@@ -9488,6 +9583,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD17, num_blocks, threads_per_block, 0, 0,
@@ -9516,6 +9612,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -9601,6 +9698,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -9637,6 +9735,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDP1, num_blocks, threads_per_block, 0, 0,
@@ -9668,6 +9767,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDP2, num_blocks, threads_per_block, 0, 0,
@@ -9699,6 +9799,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -9735,6 +9836,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDS1, num_blocks, threads_per_block, 0, 0,
@@ -9766,6 +9868,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDS2, num_blocks, threads_per_block, 0, 0,
@@ -9797,6 +9900,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -9832,6 +9936,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDD1, num_blocks, threads_per_block, 0, 0,
@@ -9860,6 +9965,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDD2, num_blocks, threads_per_block, 0, 0,
@@ -9888,6 +9994,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDD3, num_blocks, threads_per_block, 0, 0,
@@ -9916,6 +10023,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDD4, num_blocks, threads_per_block, 0, 0,
@@ -9944,6 +10052,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDD5, num_blocks, threads_per_block, 0, 0,
@@ -9972,6 +10081,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -10009,6 +10119,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDS1, num_blocks, threads_per_block, 0, 0,
@@ -10037,6 +10148,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDS2, num_blocks, threads_per_block, 0, 0,
@@ -10065,6 +10177,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDS3, num_blocks, threads_per_block, 0, 0,
@@ -10093,6 +10206,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDS4, num_blocks, threads_per_block, 0, 0,
@@ -10121,6 +10235,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDS5, num_blocks, threads_per_block, 0, 0,
@@ -10149,6 +10264,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_ds,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -10181,6 +10297,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDP1, num_blocks, threads_per_block, 0, 0,
@@ -10204,6 +10321,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDP2, num_blocks, threads_per_block, 0, 0,
@@ -10227,6 +10345,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDP3, num_blocks, threads_per_block, 0, 0,
@@ -10250,6 +10369,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDP4, num_blocks, threads_per_block, 0, 0,
@@ -10273,6 +10393,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDP5, num_blocks, threads_per_block, 0, 0,
@@ -10296,6 +10417,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -10333,6 +10455,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD1, num_blocks, threads_per_block, 0, 0,
@@ -10361,6 +10484,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD2, num_blocks, threads_per_block, 0, 0,
@@ -10389,6 +10513,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD3, num_blocks, threads_per_block, 0, 0,
@@ -10417,6 +10542,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD4, num_blocks, threads_per_block, 0, 0,
@@ -10445,6 +10571,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD5, num_blocks, threads_per_block, 0, 0,
@@ -10473,6 +10600,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD6, num_blocks, threads_per_block, 0, 0,
@@ -10501,6 +10629,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD7, num_blocks, threads_per_block, 0, 0,
@@ -10529,6 +10658,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD8, num_blocks, threads_per_block, 0, 0,
@@ -10557,6 +10687,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD9, num_blocks, threads_per_block, 0, 0,
@@ -10585,6 +10716,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD10, num_blocks, threads_per_block, 0, 0,
@@ -10613,6 +10745,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD11, num_blocks, threads_per_block, 0, 0,
@@ -10641,6 +10774,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD12, num_blocks, threads_per_block, 0, 0,
@@ -10669,6 +10803,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD13, num_blocks, threads_per_block, 0, 0,
@@ -10697,6 +10832,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD14, num_blocks, threads_per_block, 0, 0,
@@ -10725,6 +10861,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD15, num_blocks, threads_per_block, 0, 0,
@@ -10753,6 +10890,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD16, num_blocks, threads_per_block, 0, 0,
@@ -10781,6 +10919,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -10818,6 +10957,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP1, num_blocks, threads_per_block, 0, 0,
@@ -10846,6 +10986,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP2, num_blocks, threads_per_block, 0, 0,
@@ -10874,6 +11015,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP3, num_blocks, threads_per_block, 0, 0,
@@ -10902,6 +11044,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP4, num_blocks, threads_per_block, 0, 0,
@@ -10930,6 +11073,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP5, num_blocks, threads_per_block, 0, 0,
@@ -10958,6 +11102,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP6, num_blocks, threads_per_block, 0, 0,
@@ -10986,6 +11131,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP7, num_blocks, threads_per_block, 0, 0,
@@ -11014,6 +11160,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP8, num_blocks, threads_per_block, 0, 0,
@@ -11042,6 +11189,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP9, num_blocks, threads_per_block, 0, 0,
@@ -11070,6 +11218,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP10, num_blocks, threads_per_block, 0, 0,
@@ -11098,6 +11247,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP11, num_blocks, threads_per_block, 0, 0,
@@ -11126,6 +11276,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP12, num_blocks, threads_per_block, 0, 0,
@@ -11154,6 +11305,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP13, num_blocks, threads_per_block, 0, 0,
@@ -11182,6 +11334,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP14, num_blocks, threads_per_block, 0, 0,
@@ -11210,6 +11363,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP15, num_blocks, threads_per_block, 0, 0,
@@ -11238,6 +11392,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP16, num_blocks, threads_per_block, 0, 0,
@@ -11266,6 +11421,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP17, num_blocks, threads_per_block, 0, 0,
@@ -11294,6 +11450,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP18, num_blocks, threads_per_block, 0, 0,
@@ -11322,6 +11479,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP19, num_blocks, threads_per_block, 0, 0,
@@ -11350,6 +11508,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dp,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
@@ -11379,6 +11538,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD1, num_blocks, threads_per_block, 0, 0,
@@ -11399,6 +11559,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD2, num_blocks, threads_per_block, 0, 0,
@@ -11419,6 +11580,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD3, num_blocks, threads_per_block, 0, 0,
@@ -11439,6 +11601,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD4, num_blocks, threads_per_block, 0, 0,
@@ -11459,6 +11622,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD5, num_blocks, threads_per_block, 0, 0,
@@ -11479,6 +11643,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD6, num_blocks, threads_per_block, 0, 0,
@@ -11499,6 +11664,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD7, num_blocks, threads_per_block, 0, 0,
@@ -11519,6 +11685,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD8, num_blocks, threads_per_block, 0, 0,
@@ -11539,6 +11706,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD9, num_blocks, threads_per_block, 0, 0,
@@ -11559,6 +11727,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD10, num_blocks, threads_per_block, 0, 0,
@@ -11579,6 +11748,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD11, num_blocks, threads_per_block, 0, 0,
@@ -11599,6 +11769,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD12, num_blocks, threads_per_block, 0, 0,
@@ -11619,6 +11790,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD13, num_blocks, threads_per_block, 0, 0,
@@ -11639,6 +11811,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD14, num_blocks, threads_per_block, 0, 0,
@@ -11659,6 +11832,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD15, num_blocks, threads_per_block, 0, 0,
@@ -11679,6 +11853,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD16, num_blocks, threads_per_block, 0, 0,
@@ -11699,6 +11874,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD17, num_blocks, threads_per_block, 0, 0,
@@ -11719,6 +11895,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD18, num_blocks, threads_per_block, 0, 0,
@@ -11739,6 +11916,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD19, num_blocks, threads_per_block, 0, 0,
@@ -11759,6 +11937,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD20, num_blocks, threads_per_block, 0, 0,
@@ -11779,6 +11958,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD21, num_blocks, threads_per_block, 0, 0,
@@ -11799,6 +11979,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD22, num_blocks, threads_per_block, 0, 0,
@@ -11819,6 +12000,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD23, num_blocks, threads_per_block, 0, 0,
@@ -11839,6 +12021,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD24, num_blocks, threads_per_block, 0, 0,
@@ -11859,6 +12042,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD25, num_blocks, threads_per_block, 0, 0,
@@ -11879,6 +12063,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD26, num_blocks, threads_per_block, 0, 0,
@@ -11899,6 +12084,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD27, num_blocks, threads_per_block, 0, 0,
@@ -11919,6 +12105,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD28, num_blocks, threads_per_block, 0, 0,
@@ -11939,6 +12126,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD29, num_blocks, threads_per_block, 0, 0,
@@ -11959,6 +12147,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD30, num_blocks, threads_per_block, 0, 0,
@@ -11979,6 +12168,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD31, num_blocks, threads_per_block, 0, 0,
@@ -11999,6 +12189,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD32, num_blocks, threads_per_block, 0, 0,
@@ -12019,6 +12210,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD33, num_blocks, threads_per_block, 0, 0,
@@ -12039,6 +12231,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD34, num_blocks, threads_per_block, 0, 0,
@@ -12059,6 +12252,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD35, num_blocks, threads_per_block, 0, 0,
@@ -12079,6 +12273,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD36, num_blocks, threads_per_block, 0, 0,
@@ -12099,6 +12294,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD37, num_blocks, threads_per_block, 0, 0,
@@ -12119,6 +12315,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD38, num_blocks, threads_per_block, 0, 0,
@@ -12139,6 +12336,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD39, num_blocks, threads_per_block, 0, 0,
@@ -12159,6 +12357,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD40, num_blocks, threads_per_block, 0, 0,
@@ -12179,6 +12378,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD41, num_blocks, threads_per_block, 0, 0,
@@ -12199,6 +12399,7 @@ computeFockOnGPU(const CMolecule& molecule,
                            d_pair_data_K_dd,
                            d_boys_func_table,
                            d_boys_func_ft,
+                           omega,
                            eri_threshold);
 
         hipSafe(hipDeviceSynchronize());
