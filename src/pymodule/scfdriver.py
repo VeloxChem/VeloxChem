@@ -1563,28 +1563,55 @@ class ScfDriver:
         eri_t0 = tm.time()
 
         if self._dft and not self._first_step:
+
             if self.xcfun.is_hybrid():
-                fock_mat = compute_fock_gpu(molecule, basis, den_mat,
-                                            2.0, self.xcfun.get_frac_exact_exchange(),
-                                            self.eri_thresh, self.prelink_thresh,
-                                            screener)
+
+                if self.xcfun.is_range_separated():
+                    # range-separated hybrid
+                    full_k_coef = self.xcfun.get_rs_alpha() + self.xcfun.get_rs_beta()
+                    erf_k_coef = -self.xcfun.get_rs_beta()
+                    omega = self.xcfun.get_rs_omega()
+
+                    fock_mat_full_k = compute_fock_gpu(molecule, basis, den_mat,
+                                                       2.0, full_k_coef, omega,
+                                                       self.eri_thresh, self.prelink_thresh,
+                                                       screener)
+
+                    fock_mat_erf_k = compute_fock_gpu(molecule, basis, den_mat,
+                                                      0.0, erf_k_coef, omega,
+                                                      self.eri_thresh, self.prelink_thresh,
+                                                      screener)
+
+                    fock_mat_local = (fock_mat_full_k.to_numpy() -
+                                      fock_mat_erf_k.to_numpy())
+
+                else:
+                    # global hybrid
+                    fock_mat = compute_fock_gpu(molecule, basis, den_mat,
+                                                2.0, self.xcfun.get_frac_exact_exchange(), 0.0,
+                                                self.eri_thresh, self.prelink_thresh,
+                                                screener)
+                    fock_mat_local = fock_mat.to_numpy()
+
             else:
+                # pure DFT
                 fock_mat = compute_fock_gpu(molecule, basis, den_mat,
-                                            2.0, 0.0,
+                                            2.0, 0.0, 0.0,
                                             self.eri_thresh, self.prelink_thresh,
                                             screener)
+                fock_mat_local = fock_mat.to_numpy()
+
         else:
+            # Hartree-Fock
             fock_mat = compute_fock_gpu(molecule, basis, den_mat,
-                                        2.0, 1.0,
+                                        2.0, 1.0, 0.0,
                                         self.eri_thresh, self.prelink_thresh,
                                         screener)
+            fock_mat_local = fock_mat.to_numpy()
 
-        naos = fock_mat.number_of_rows()
-        fock_mat_np = np.zeros((naos, naos))
+        fock_mat = np.zeros(fock_mat_local.shape)
 
-        self.comm.Reduce(fock_mat.to_numpy(), fock_mat_np, op=MPI.SUM, root=mpi_master())
-
-        fock_mat = fock_mat_np
+        self.comm.Reduce(fock_mat_local, fock_mat, op=MPI.SUM, root=mpi_master())
 
         # TODO: add beta density
         # TODO: add other fock_t/fockmat
