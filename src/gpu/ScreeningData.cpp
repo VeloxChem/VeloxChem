@@ -3183,6 +3183,10 @@ auto CScreeningData::form_Q_and_D_inds_for_K(const int64_t                s_prim
 auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count, const CDenseMatrix& Q_prime, const double Q_prime_thresh) -> void
 {
     // TODO think about sorting by Q_prime bound
+    // or perhaps just sort the diagonal elements
+
+    // TODO consider determining the maximum density associated
+    // with the ik pair (i.e. max_D_jl for ik)
 
     // TODO: use uint2 for pair indices
 
