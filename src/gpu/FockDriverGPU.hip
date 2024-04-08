@@ -1373,6 +1373,8 @@ computeFockOnGPU(const              CMolecule& molecule,
                  const double       prelink_threshold,
                  CScreeningData&    screening) -> CDenseMatrix
 {
+    // TODO sanity check for flag_K: SYMM or ANTISYMM
+
     CGpuDevices gpu_devices;
 
     const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();

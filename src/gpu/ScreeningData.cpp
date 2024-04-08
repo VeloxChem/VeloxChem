@@ -2366,6 +2366,10 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count,
                                         const int64_t naos,
                                         const double* dens_ptr) const -> CDenseMatrix
 {
+    // TODO: use only the upper triangluar part to generate D_abs_full,
+    // particularly the SS, PP and DD blocks. Otherwise the input density must
+    // be symmetric or antisymmetric.
+
     const auto cart_naos = s_prim_count + p_prim_count * 3 + d_prim_count * 6;
 
     CDenseMatrix mat_D_abs_full(cart_naos, cart_naos);
