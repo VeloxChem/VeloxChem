@@ -709,8 +709,6 @@ class LinearSolver:
 
             if self.rank == mpi_master():
                 den_mat_np = dks[0]
-                # TODO: use hipblas
-                den_mat_np_T = dks[0].T - np.diag(np.diag(den_mat_np))
                 naos = den_mat_np.shape[0]
             else:
                 naos = None
@@ -718,20 +716,23 @@ class LinearSolver:
 
             if self.rank != mpi_master():
                 den_mat_np = np.zeros((naos, naos))
-                den_mat_np_T = np.zeros((naos, naos))
 
             self.comm.Bcast(den_mat_np, root=mpi_master())
-            self.comm.Bcast(den_mat_np_T, root=mpi_master())
-            dens = AODensityMatrix([den_mat_np], denmat.rest)
-            dens_T = AODensityMatrix([den_mat_np_T], denmat.rest)
+
+            # TODO: use hipblas
+            den_mat_np_symm = 0.5 * (den_mat_np + den_mat_np.T)
+            den_mat_np_antisymm = 0.5 * (den_mat_np - den_mat_np.T)
+
+            dens_symm = AODensityMatrix([den_mat_np_symm], denmat.rest)
+            dens_antisymm = AODensityMatrix([den_mat_np_antisymm], denmat.rest)
 
             # form Fock matrices
 
             fock_mat_local = (
-                self._comp_lr_fock(dens, molecule, basis, eri_dict, dft_dict,
-                                   pe_dict, 2.0, profiler) +
-                self._comp_lr_fock(dens_T, molecule, basis, eri_dict, dft_dict,
-                                   pe_dict, 0.0, profiler))
+                self._comp_lr_fock(dens_symm, molecule, basis, eri_dict, dft_dict,
+                                   pe_dict, 2.0, 'symm', profiler) +
+                self._comp_lr_fock(dens_antisymm, molecule, basis, eri_dict, dft_dict,
+                                   pe_dict, 0.0, 'antisymm', profiler))
 
             fock_mat = np.zeros(fock_mat_local.shape)
 
@@ -825,7 +826,7 @@ class LinearSolver:
                       dft_dict,
                       pe_dict,
                       prefac_coulomb,
-                      prefac_exchange,
+                      flag_exchange,
                       profiler=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
@@ -869,13 +870,16 @@ class LinearSolver:
                     erf_k_coef = -self.xcfun.get_rs_beta()
                     omega = self.xcfun.get_rs_omega()
 
-                    fock_mat_full_k = compute_fock_gpu(
-                        molecule, basis, dens, prefac_coulomb, full_k_coef, 0.0,
-                        self.eri_thresh, self.prelink_thresh, screening)
+                    fock_mat_full_k = compute_fock_gpu(molecule, basis, dens,
+                                                       prefac_coulomb,
+                                                       full_k_coef, 0.0,
+                                                       flag_exchange, self.eri_thresh,
+                                                       self.prelink_thresh,
+                                                       screening)
 
                     fock_mat_erf_k = compute_fock_gpu(molecule, basis, dens,
                                                       0.0, erf_k_coef, omega,
-                                                      self.eri_thresh,
+                                                      flag_exchange, self.eri_thresh,
                                                       self.prelink_thresh,
                                                       screening)
 
@@ -886,14 +890,14 @@ class LinearSolver:
                     # global hybrid
                     fock_mat = compute_fock_gpu(
                         molecule, basis, dens, prefac_coulomb,
-                        self.xcfun.get_frac_exact_exchange(), 0.0,
+                        self.xcfun.get_frac_exact_exchange(), 0.0, flag_exchange,
                         self.eri_thresh, self.prelink_thresh, screening)
                     fock_mat_local = fock_mat.to_numpy()
 
             else:
                 # pure DFT
                 fock_mat = compute_fock_gpu(molecule, basis, dens,
-                                            prefac_coulomb, 0.0, 0.0,
+                                            prefac_coulomb, 0.0, 0.0, flag_exchange,
                                             self.eri_thresh,
                                             self.prelink_thresh, screening)
                 fock_mat_local = fock_mat.to_numpy()
@@ -901,7 +905,7 @@ class LinearSolver:
         else:
             # Hartree-Fock
             fock_mat = compute_fock_gpu(molecule, basis, dens, prefac_coulomb,
-                                        1.0, 0.0, self.eri_thresh,
+                                        1.0, 0.0, flag_exchange, self.eri_thresh,
                                         self.prelink_thresh, screening)
             fock_mat_local = fock_mat.to_numpy()
 

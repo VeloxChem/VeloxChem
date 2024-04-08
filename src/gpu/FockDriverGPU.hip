@@ -1362,15 +1362,16 @@ transformDensity(const CMolecule& molecule, const CMolecularBasis& basis, const 
 }
 
 auto
-computeFockOnGPU(const CMolecule& molecule,
-                 const CMolecularBasis& basis,
-                 const CAODensityMatrix& densityMatrix,
-                 const double prefac_coulomb,
-                 const double frac_exact_exchange,
-                 const double omega,
-                 const double eri_threshold,
-                 const double prelink_threshold,
-                 CScreeningData& screening) -> CDenseMatrix
+computeFockOnGPU(const              CMolecule& molecule,
+                 const              CMolecularBasis& basis,
+                 const              CAODensityMatrix& densityMatrix,
+                 const double       prefac_coulomb,
+                 const double       frac_exact_exchange,
+                 const double       omega,
+                 const std::string& flag_K,
+                 const double       eri_threshold,
+                 const double       prelink_threshold,
+                 CScreeningData&    screening) -> CDenseMatrix
 {
     CGpuDevices gpu_devices;
 
@@ -6607,7 +6608,9 @@ computeFockOnGPU(const CMolecule& molecule,
 
             mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0) * frac_exact_exchange;
 
-            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0) * frac_exact_exchange;
+            const auto symm_pref = (fstr::upcase(flag_K) == "SYMM") ? 1.0 : -1.0;
+
+            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0) * frac_exact_exchange * symm_pref;
         }
 
         timer.stop("  K block SS");
@@ -7005,7 +7008,10 @@ computeFockOnGPU(const CMolecule& molecule,
                 auto k_coef_sph = k_cgto_sph_ind_coef.second;
 
                 mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto_sph] += mat_K[ik] * k_coef_sph * (-1.0) * frac_exact_exchange;
-                mat_Fock_omp[gpu_id].row(k_cgto_sph)[i_cgto] += mat_K[ik] * k_coef_sph * (-1.0) * frac_exact_exchange;
+
+                const auto symm_pref = (fstr::upcase(flag_K) == "SYMM") ? 1.0 : -1.0;
+
+                mat_Fock_omp[gpu_id].row(k_cgto_sph)[i_cgto] += mat_K[ik] * k_coef_sph * (-1.0) * frac_exact_exchange * symm_pref;
             }
         }
 
@@ -7626,7 +7632,9 @@ computeFockOnGPU(const CMolecule& molecule,
 
                     mat_Fock_omp[gpu_id].row(i_cgto_sph)[k_cgto_sph] += mat_K[ik] * coef_sph * (-1.0) * frac_exact_exchange;
 
-                    if (i != k) mat_Fock_omp[gpu_id].row(k_cgto_sph)[i_cgto_sph] += mat_K[ik] * coef_sph * (-1.0) * frac_exact_exchange;
+                    const auto symm_pref = (fstr::upcase(flag_K) == "SYMM") ? 1.0 : -1.0;
+
+                    if (i != k) mat_Fock_omp[gpu_id].row(k_cgto_sph)[i_cgto_sph] += mat_K[ik] * coef_sph * (-1.0) * frac_exact_exchange * symm_pref;
                 }
             }
         }
@@ -8293,7 +8301,10 @@ computeFockOnGPU(const CMolecule& molecule,
                 auto k_coef_sph = k_cgto_sph_ind_coef.second;
 
                 mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto_sph] += mat_K[ik] * k_coef_sph * (-1.0) * frac_exact_exchange;
-                mat_Fock_omp[gpu_id].row(k_cgto_sph)[i_cgto] += mat_K[ik] * k_coef_sph * (-1.0) * frac_exact_exchange;
+
+                const auto symm_pref = (fstr::upcase(flag_K) == "SYMM") ? 1.0 : -1.0;
+
+                mat_Fock_omp[gpu_id].row(k_cgto_sph)[i_cgto] += mat_K[ik] * k_coef_sph * (-1.0) * frac_exact_exchange * symm_pref;
             }
         }
 
@@ -9644,7 +9655,10 @@ computeFockOnGPU(const CMolecule& molecule,
                     auto coef_sph = i_coef_sph * k_coef_sph;
 
                     mat_Fock_omp[gpu_id].row(i_cgto_sph)[k_cgto_sph] += mat_K[ik] * coef_sph * (-1.0) * frac_exact_exchange;
-                    mat_Fock_omp[gpu_id].row(k_cgto_sph)[i_cgto_sph] += mat_K[ik] * coef_sph * (-1.0) * frac_exact_exchange;
+
+                    const auto symm_pref = (fstr::upcase(flag_K) == "SYMM") ? 1.0 : -1.0;
+
+                    mat_Fock_omp[gpu_id].row(k_cgto_sph)[i_cgto_sph] += mat_K[ik] * coef_sph * (-1.0) * frac_exact_exchange * symm_pref;
                 }
             }
         }
@@ -12432,7 +12446,9 @@ computeFockOnGPU(const CMolecule& molecule,
 
                     mat_Fock_omp[gpu_id].row(i_cgto_sph)[k_cgto_sph] += mat_K[ik] * coef_sph * (-1.0) * frac_exact_exchange;
 
-                    if (i != k) mat_Fock_omp[gpu_id].row(k_cgto_sph)[i_cgto_sph] += mat_K[ik] * coef_sph * (-1.0) * frac_exact_exchange;
+                    const auto symm_pref = (fstr::upcase(flag_K) == "SYMM") ? 1.0 : -1.0;
+
+                    if (i != k) mat_Fock_omp[gpu_id].row(k_cgto_sph)[i_cgto_sph] += mat_K[ik] * coef_sph * (-1.0) * frac_exact_exchange * symm_pref;
                 }
             }
         }

@@ -1495,13 +1495,13 @@ class ScfDriver:
 
                     fock_mat_full_k = compute_fock_gpu(molecule, basis, den_mat,
                                                        2.0, full_k_coef, 0.0,
-                                                       self.eri_thresh,
+                                                       'symm', self.eri_thresh,
                                                        self.prelink_thresh,
                                                        screener)
 
                     fock_mat_erf_k = compute_fock_gpu(molecule, basis, den_mat,
                                                       0.0, erf_k_coef, omega,
-                                                      self.eri_thresh,
+                                                      'symm', self.eri_thresh,
                                                       self.prelink_thresh,
                                                       screener)
 
@@ -1512,22 +1512,22 @@ class ScfDriver:
                     # global hybrid
                     fock_mat = compute_fock_gpu(
                         molecule, basis, den_mat, 2.0,
-                        self.xcfun.get_frac_exact_exchange(), 0.0,
+                        self.xcfun.get_frac_exact_exchange(), 0.0, 'symm',
                         self.eri_thresh, self.prelink_thresh, screener)
                     fock_mat_local = fock_mat.to_numpy()
 
             else:
                 # pure DFT
                 fock_mat = compute_fock_gpu(molecule, basis, den_mat, 2.0, 0.0,
-                                            0.0, self.eri_thresh,
+                                            0.0, 'symm', self.eri_thresh,
                                             self.prelink_thresh, screener)
                 fock_mat_local = fock_mat.to_numpy()
 
         else:
             # Hartree-Fock
             fock_mat = compute_fock_gpu(molecule, basis, den_mat, 2.0, 1.0, 0.0,
-                                        self.eri_thresh, self.prelink_thresh,
-                                        screener)
+                                        'symm', self.eri_thresh,
+                                        self.prelink_thresh, screener)
             fock_mat_local = fock_mat.to_numpy()
 
         fock_mat = np.zeros(fock_mat_local.shape)

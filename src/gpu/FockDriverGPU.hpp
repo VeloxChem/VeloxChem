@@ -42,15 +42,16 @@ auto computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecula
 
 auto transformDensity(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> CDenseMatrix;
 
-auto computeFockOnGPU(const CMolecule& molecule,
-                      const CMolecularBasis& basis,
-                      const CAODensityMatrix& densityMatrix,
-                      const double prefac_coulomb,
-                      const double frac_exact_exchange,
-                      const double omega,
-                      const double eri_threshold,
-                      const double prelink_threshold,
-                      CScreeningData& screening) -> CDenseMatrix;
+auto computeFockOnGPU(const              CMolecule& molecule,
+                      const              CMolecularBasis& basis,
+                      const              CAODensityMatrix& densityMatrix,
+                      const double       prefac_coulomb,
+                      const double       frac_exact_exchange,
+                      const double       omega,
+                      const std::string& flag_K,
+                      const double       eri_threshold,
+                      const double       prelink_threshold,
+                      CScreeningData&    screening) -> CDenseMatrix;
 
 auto computeDotProduct(const double* A, const double* B, const int64_t size) -> double;
 
