@@ -114,6 +114,8 @@ export_orbdata(py::module &m)
         .def("reduce_to_valence_basis", &CMolecularBasis::reduceToValenceBasis, "Reduces molecular basis to it's valence only form.")
         .def("get_basis_sets", &CMolecularBasis::getBasisSets, "Gets unique atomic basis sets in molecular basis")
         .def("get_basis_sets_indexes", &CMolecularBasis::getBasisSetsIndexes, "Gets vector of basis sets indexes.")
+        .def("set_label", &CMolecularBasis::setLabel, "Sets name of molecular basis.", "label"_a)
+        .def("get_label", &CMolecularBasis::getLabel, "Gets name of molecular basis.")
         .def("max_angular_momentum",
              py::overload_cast<>(&CMolecularBasis::getMaxAngularMomentum, py::const_),
              "Gets maximum angular momentum of molecular basis.")

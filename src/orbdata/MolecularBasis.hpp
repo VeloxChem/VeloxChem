@@ -27,6 +27,11 @@ class CMolecularBasis
     std::vector<int64_t> _indexes;
 
     /**
+     The name of molecular basis.
+     */
+    std::string _label;
+
+    /**
      Gets  basis set labels frequency map.
 
      @return the basis set labels frequency map of molecular basis.
@@ -313,6 +318,20 @@ class CMolecularBasis
      @return the vector of indexes (n_t, index_0,...,index_k ).
      */
     auto getIndexMap(const std::vector<int64_t>& atoms, const int64_t angmom, const int64_t npgtos) const -> std::vector<int64_t>;
+
+    /**
+     Sets name of molecular basis.
+
+     @param label the name of molecular basis.
+     */
+    void setLabel(const std::string& label);
+
+    /**
+     Gets name of molecular basis.
+
+     @return the name of molecular basis.
+     */
+    std::string getLabel() const;
 
     /**
      Prints atomic orbitals basis information to output stream for selected molecule.

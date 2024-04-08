@@ -268,6 +268,8 @@ def _MolecularBasis_read(molecule,
                                       basis_name)
         mol_basis.add(atom_basis)
 
+    mol_basis.set_label(basis_name.upper())
+
     ostream.print_block(mol_basis.info_str('Atomic Basis'))
     ostream.flush()
 

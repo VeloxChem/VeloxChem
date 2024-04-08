@@ -507,7 +507,7 @@ class ScfDriver:
         if self.restart:
             self._den_guess = DensityGuess('RESTART', self.checkpoint_file)
             self.restart = self._den_guess.validate_checkpoint(
-                self.rank, self.comm, molecule.elem_ids_to_numpy(),
+                self.rank, self.comm, molecule.get_element_ids(),
                 ao_basis.get_label(), self.scf_type)
 
         if self.restart:
@@ -1152,11 +1152,8 @@ class ScfDriver:
         if not self._first_step:
             signal_handler.remove_sigterm_function()
 
-            # TODO: write checkpoint
-            """
             self.write_checkpoint(molecule.get_element_ids(),
                                   ao_basis.get_label())
-            """
 
         if (self.rank == mpi_master() and (not self._first_step) and
                 self.is_converged):
@@ -1267,7 +1264,7 @@ class ScfDriver:
         self.ostream.print_info('Preparing for a graceful termination...')
         self.ostream.flush()
 
-        self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
+        self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
 
         self.ostream.print_blank()
         self.ostream.print_info('...done.')
@@ -1325,7 +1322,7 @@ class ScfDriver:
         if self.electric_field is not None:
             if molecule.get_charge() != 0:
                 coords = molecule.get_coordinates_in_bohr()
-                nuclear_charges = molecule.elem_ids_to_numpy()
+                nuclear_charges = molecule.get_element_ids()
                 self._dipole_origin = np.sum(coords.T * nuclear_charges,
                                              axis=1) / np.sum(nuclear_charges)
             else:

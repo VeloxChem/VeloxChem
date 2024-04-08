@@ -705,6 +705,18 @@ CMolecularBasis::getIndexMap(const std::vector<int64_t>& atoms, const int64_t an
     }
 }
 
+void
+CMolecularBasis::setLabel(const std::string& label)
+{
+    _label = label;
+}
+
+std::string
+CMolecularBasis::getLabel() const
+{
+    return _label;
+}
+
 auto
 CMolecularBasis::printBasis(const std::string& title) const -> std::string
 {
