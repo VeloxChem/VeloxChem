@@ -598,6 +598,24 @@ class CXCFunctional
      * @omega the value of omega parameter.
      */
     auto setRangeSeparatedParameterOmega(const double omega) -> void;
+
+    /** Gets Libxc version.
+     *
+     * @return Libxc version.
+     */
+    auto getLibxcVersion() const -> std::string;
+
+    /** Gets Libxc reference.
+     *
+     * @return Libxc reference.
+     */
+    auto getLibxcReference() const -> std::string;
+
+    /** Gets functional reference(s).
+     *
+     * @return functional reference(s).
+     */
+    auto getFunctionalReference() const -> std::vector<std::string>;
 };
 
 #endif /* XCFunctional_hpp */

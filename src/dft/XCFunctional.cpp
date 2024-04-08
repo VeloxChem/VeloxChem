@@ -32,6 +32,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <sstream>
 //#include <iostream>
 
 #include "ErrorHandler.hpp"
@@ -116,13 +117,7 @@ CXCFunctional::CXCFunctional(const std::string&              nameOfFunctional,
 
         if (hyb_exx_coeff != 0.0) _fractionOfExactExchange += coeff * hyb_exx_coeff;
 
-        // TODO process range-separation parameters when range-separted functional is supported
-
-        double omega = 0.0, alpha = 0.0, beta = 0.0;
-
         xc_hyb_cam_coef(funcptr, &_rangeSeparationParameterOmega, &_rangeSeparationParameterAlpha, &_rangeSeparationParameterBeta);
-
-        errors::assertMsgCritical(std::fabs(beta) < 1.0e-13, std::string("XCFunctional: Range-separated functional is not yet supported"));
 
         if (isRangeSeparated())
         {
@@ -3171,4 +3166,50 @@ CXCFunctional::setRangeSeparatedParameterOmega(const double omega) -> void
     xc_func_set_ext_params_name(funcptr, param_name.c_str(), omega);
 
     xc_hyb_cam_coef(funcptr, &_rangeSeparationParameterOmega, &_rangeSeparationParameterAlpha, &_rangeSeparationParameterBeta);
+}
+
+auto
+CXCFunctional::getLibxcVersion() const -> std::string
+{
+    std::stringstream ss;
+
+    ss << xc_version_string();
+
+    return ss.str();
+}
+
+auto
+CXCFunctional::getLibxcReference() const -> std::string
+{
+    std::stringstream ss;
+
+    ss << xc_reference();
+
+    return ss.str();
+}
+
+auto
+CXCFunctional::getFunctionalReference() const -> std::vector<std::string>
+{
+    std::vector<std::string> func_ref;
+
+    for (const auto& xccomp : _components)
+    {
+        auto funcptr = xccomp.getFunctionalPointer();
+
+        for (int i = 0; i < XC_MAX_REFERENCES; i++)
+        {
+            auto ref_ptr = xc_func_info_get_references(funcptr->info, i);
+
+            if (ref_ptr == NULL) continue;
+
+            std::stringstream ss;
+
+            ss << xc_func_reference_get_ref(ref_ptr);
+
+            func_ref.push_back(ss.str());
+        }
+    }
+
+    return func_ref;
 }
