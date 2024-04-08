@@ -56,10 +56,12 @@ class MolecularOrbitals:
 
         if (orbs is not None and enes is not None and occs is not None and
                 orbs_type is not None):
+            # TODO: make sure that the numpy arrays (not just the lists) are deep-copied
             self._orbitals = list(orbs)
             self._energies = list(enes)
             self._occupations = list(occs)
             self._orbitals_type = orbs_type
+
         else:
             self._orbitals = None
             self._energies = None

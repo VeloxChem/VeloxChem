@@ -501,28 +501,16 @@ class ScfDriver:
         if self.print_level > 2:
             self.print_level = 3
 
-        # TODO: fix restart
-        """
-        # initial guess
         if self.restart:
-            self._den_guess = DensityGuess('RESTART', self.checkpoint_file)
-            self.restart = self._den_guess.validate_checkpoint(
-                self.rank, self.comm, molecule.get_element_ids(),
-                ao_basis.get_label(), self.scf_type)
+            self.restart = self.validate_checkpoint(molecule.get_element_ids(),
+                                                    ao_basis.get_label(),
+                                                    self.scf_type)
 
         if self.restart:
             self.acc_type = 'DIIS'
             if self.rank == mpi_master():
                 self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
                     self.checkpoint_file)
-                self._molecular_orbitals = MolecularOrbitals(self._ref_mol_orbs)
-        else:
-            self._den_guess = DensityGuess('SAD')
-            if self.guess_unpaired_electrons:
-                self._den_guess.set_unpaired_electrons(
-                    self.guess_unpaired_electrons)
-        """
-        self.restart = False
 
         # nuclear repulsion energy
         self._nuc_energy = molecule.nuclear_repulsion_energy()
@@ -575,8 +563,11 @@ class ScfDriver:
         if self.acc_type.upper() == 'DIIS':
 
             if self.rank == mpi_master():
-                den_mat = self.gen_initial_density_sad(molecule, ao_basis,
-                                                       min_basis)
+                if self.restart:
+                    den_mat = self.gen_initial_density_restart(molecule)
+                else:
+                    den_mat = self.gen_initial_density_sad(
+                        molecule, ao_basis, min_basis)
                 den_mat_np = den_mat.alpha_to_numpy(0)
                 naos = den_mat_np.shape[0]
             else:
@@ -606,8 +597,11 @@ class ScfDriver:
             val_basis = ao_basis.reduce_to_valence_basis()
 
             if self.rank == mpi_master():
-                den_mat = self.gen_initial_density_sad(molecule, val_basis,
-                                                       min_basis)
+                if self.restart:
+                    den_mat = self.gen_initial_density_restart(molecule)
+                else:
+                    den_mat = self.gen_initial_density_sad(
+                        molecule, val_basis, min_basis)
                 den_mat_np = den_mat.alpha_to_numpy(0)
                 naos = den_mat_np.shape[0]
             else:
@@ -673,6 +667,20 @@ class ScfDriver:
         return self.scf_tensors
 
     def gen_initial_density_sad(self, molecule, ao_basis, min_basis):
+        """
+        Computes initial AO density using superposition of atomic densities
+        scheme.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis.
+        :param min_basis:
+            The minimal AO basis for generation of atomic densities.
+
+        :return:
+            The AO density matrix.
+        """
 
         sad_drv = SadGuessDriver()
 
@@ -688,6 +696,23 @@ class ScfDriver:
 
     def gen_initial_density_proj(self, molecule, ao_basis, valence_basis,
                                  valence_mo):
+        """
+        Computes initial AO density from molecular orbitals obtained by
+        inserting molecular orbitals from valence basis into molecular
+        orbitals in full AO basis.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis.
+        :param valence_basis:
+            The valence AO basis for generation of molecular orbitals.
+        :param valence_mo:
+            The molecular orbitals in valence AO basis.
+
+        :return:
+            The AO density matrix.
+        """
 
         # nao_1 = valence_mo.number_of_aos()
         nmo_1 = valence_mo.number_of_mos()
@@ -720,6 +745,57 @@ class ScfDriver:
             valence_mo.get_orbitals_type())
 
         return proj_mo.get_density(molecule, self.scf_type)
+
+    def gen_initial_density_restart(self, molecule):
+        """
+        Reads initial molecular orbitals and AO density from checkpoint file.
+
+        :param molecule:
+            The molecule.
+
+        :return:
+            The AO density matrix.
+        """
+
+        self._molecular_orbitals = MolecularOrbitals.read_hdf5(
+            self.checkpoint_file)
+        den_mat = self._molecular_orbitals.get_density(molecule, self.scf_type)
+
+        restart_text = 'Restarting from checkpoint file: '
+        restart_text += self.checkpoint_file
+        self.ostream.print_info(restart_text)
+        self.ostream.print_blank()
+
+        return den_mat
+
+    def validate_checkpoint(self, nuclear_charges, basis_set, scf_type):
+        """
+        Validates the checkpoint file by checking nuclear charges and basis set.
+
+        :param nuclear_charges:
+            Numpy array of the nuclear charges.
+        :param basis_set:
+            Name of the AO basis.
+        :param scf_type:
+            The type of SCF calculation (restricted, unrestricted, or
+            restricted_openshell).
+
+        :return:
+            Validity of the checkpoint file.
+        """
+
+        valid = False
+
+        if self.rank == mpi_master():
+            if (isinstance(self.checkpoint_file, str) and
+                    Path(self.checkpoint_file).is_file()):
+                valid = MolecularOrbitals.match_hdf5(self.checkpoint_file,
+                                                     nuclear_charges, basis_set,
+                                                     scf_type)
+
+        valid = self.comm.bcast(valid, root=mpi_master())
+
+        return valid
 
     def maximum_overlap(self, molecule, basis, orbitals, alpha_list, beta_list):
         """

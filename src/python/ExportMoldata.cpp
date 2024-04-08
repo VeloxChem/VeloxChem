@@ -79,7 +79,14 @@ export_moldata(py::module& m)
         .def("get_identifiers", &CMolecule::getIdsElemental, "Gets a vector of elemental identidiers in molecule.")
         .def("get_coordinates", &CMolecule::getCoordinates, py::arg("units") = "au", "Gets coordinates of atoms in molecules")
         .def("get_charges", &CMolecule::getCharges, "Gets a vector of atomic charges in molecule.")
-        .def("get_element_ids", &CMolecule::getCharges, "Gets a vector of atomic charges in molecule.")
+        .def(
+            "get_element_ids",
+            [](const CMolecule& self) -> py::array_t<double> {
+                const auto elem_ids = self.getCharges();
+                const auto n_atoms = self.getNumberOfAtoms();
+                return vlx_general::pointer_to_numpy(elem_ids.data(), {n_atoms});
+            },
+            "Gets nuclear charges for molecule.")
         .def(
             "get_partial_charges",
             [](const CMolecule& self, const double net_charge) -> std::vector<double> { return parchg::getPartialCharges(self, net_charge); },
