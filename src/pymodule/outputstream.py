@@ -23,10 +23,10 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-import time as tm
-import sys
-import os
+from os import environ
 from pathlib import Path
+import sys
+import time as tm
 
 from .errorhandler import assert_msg_critical
 
@@ -70,13 +70,16 @@ class OutputStream:
                 self.state = True
             except OSError:
                 self.state = False
-            errio = 'OutputStream: cannot open output file {}'.format(fname)
+            errio = f'OutputStream: cannot open output file {fname}'
             assert_msg_critical(self.state, errio)
 
         else:
             self.state = False
-            errio = 'OutputStream: invalid argument {}'.format(stream)
+            errio = f'OutputStream: invalid argument {stream}'
             assert_msg_critical(self.state, errio)
+
+        self._state_backup = None
+        self._mute_level = 0
 
     def __del__(self):
         """
@@ -96,6 +99,39 @@ class OutputStream:
             if self.stream is not sys.stdout:
                 self.stream.close()
             self.state = False
+
+    @property
+    def is_muted(self):
+        """
+        Checks if the output stream is muted.
+        """
+
+        return (self._state_backup is not None and self._mute_level > 0)
+
+    def mute(self):
+        """
+        Mutes the output stream.
+        """
+
+        self._mute_level += 1
+
+        if self._state_backup is None:
+            self._state_backup = self.state
+
+        self.state = False
+
+    def unmute(self):
+        """
+        "Unmutes" the output stream. Note that this only restores the original
+        state of the output stream.
+        """
+
+        if self._mute_level > 0:
+            self._mute_level -= 1
+
+        if self._mute_level == 0 and self._state_backup is not None:
+            self.state = self._state_backup
+            self._state_backup = None
 
     def get_state(self):
         """
@@ -174,6 +210,25 @@ class OutputStream:
         return '* Info * ' + line + ' ' * right
 
     @staticmethod
+    def warning(line, width):
+        """
+        Gets the warning string.
+
+        :param line:
+            The line of text.
+        :param width:
+            Width of the output.
+
+        :return:
+            The warning string.
+        """
+
+        length = len(line)
+        left = 12
+        right = width - length - left
+        return '* Warning * ' + line + ' ' * right
+
+    @staticmethod
     def tsep(width):
         """
         Gets the separator string.
@@ -244,6 +299,20 @@ class OutputStream:
             return
         self.buffer_lines.append(self.info(line, self.width))
 
+    def print_warning(self, line):
+        """
+        Prints a warning line to stream.
+
+        :param line:
+            The line of text.
+        """
+
+        if not self.state:
+            return
+        self.buffer_lines.append('*' * 11 + ' ' * (self.width - 11))
+        self.buffer_lines.append(self.warning(line, self.width))
+        self.buffer_lines.append('*' * 11 + ' ' * (self.width - 11))
+
     def print_separator(self):
         """
         Prints a separator line to stream.
@@ -267,6 +336,27 @@ class OutputStream:
         lines = block_lines.splitlines()
         for line in lines:
             self.print_header(line)
+
+    def print_reference(self, line):
+        """
+        Prints reference to output stream.
+
+        :param lines:
+            The reference line.
+        """
+
+        if not self.state:
+            return
+
+        cur_line = line
+        spaces = ' ' * 9
+
+        while len(cur_line) > 100:
+            index = cur_line[:100].strip().rfind(' ')
+            self.buffer_lines.append(spaces + cur_line[:index].strip())
+            cur_line = cur_line[index:]
+
+        self.buffer_lines.append(spaces + cur_line.strip())
 
     def print_start_header(self, num_nodes):
         """
@@ -297,9 +387,9 @@ class OutputStream:
         self.print_separator()
         self.print_blank()
 
-        if 'OMP_NUM_THREADS' in os.environ:
+        if 'OMP_NUM_THREADS' in environ:
             self.print_info('Using {} OpenMP threads per compute node.'.format(
-                os.environ['OMP_NUM_THREADS']))
+                environ['OMP_NUM_THREADS']))
             self.print_blank()
 
         return start_time
