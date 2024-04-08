@@ -23,20 +23,20 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef Log3Quadrature_hpp
-#define Log3Quadrature_hpp
+#ifndef M4T2Quadrature_hpp
+#define M4T2Quadrature_hpp
 
 #include <cstdint>
 
 #include "DenseMatrix.hpp"
 
 /**
- Class CLog3Quadrature class generates M4T2 aka "Log3" quadrature.
+ Class CM4T2Quadrature class generates M4T2 quadrature.
  Reference: O. Treutler and R. Ahlrichs, J. Chem. Phys. 102, 346 (1995).
 
  @author Z. Rinkevicius
  */
-class CLog3Quadrature
+class CM4T2Quadrature
 {
     /**
      The number of radial points.
@@ -57,24 +57,24 @@ class CLog3Quadrature
 
    public:
     /**
-     Creates a Log3 quadrature object.
+     Creates a M4T2 quadrature object.
 
      @param nRadialPoints the number of radial points.
      @param idElemental the identifier of chemical element.
      */
-    CLog3Quadrature(const int64_t nRadialPoints, const int64_t idElemental);
+    CM4T2Quadrature(const int64_t nRadialPoints, const int64_t idElemental);
 
     /**
-     Destroys a Log3 quadrature object.
+     Destroys a M4T2 quadrature object.
      */
-    ~CLog3Quadrature();
+    ~CM4T2Quadrature();
 
     /**
-     Generates quadrature points for radial Log3 quadrature.
+     Generates quadrature points for radial M4T2 quadrature.
 
      @return the quadrature points (coordinates, weights).
      */
     auto generate() const -> CDenseMatrix;
 };
 
-#endif /* Log3Quadrature_hpp */
+#endif /* M4T2Quadrature_hpp */

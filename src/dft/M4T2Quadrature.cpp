@@ -23,14 +23,14 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "Log3Quadrature.hpp"
+#include "M4T2Quadrature.hpp"
 
 #include <cmath>
 
 #include "MathConst.hpp"
 #include "MathFunc.hpp"
 
-CLog3Quadrature::CLog3Quadrature(const int64_t nRadialPoints, const int64_t idElemental)
+CM4T2Quadrature::CM4T2Quadrature(const int64_t nRadialPoints, const int64_t idElemental)
 
     : _nRadialPoints(nRadialPoints)
 
@@ -38,12 +38,12 @@ CLog3Quadrature::CLog3Quadrature(const int64_t nRadialPoints, const int64_t idEl
 {
 }
 
-CLog3Quadrature::~CLog3Quadrature()
+CM4T2Quadrature::~CM4T2Quadrature()
 {
 }
 
 auto
-CLog3Quadrature::generate() const -> CDenseMatrix
+CM4T2Quadrature::generate() const -> CDenseMatrix
 {
     if (_nRadialPoints > 0)
     {
@@ -98,7 +98,7 @@ CLog3Quadrature::generate() const -> CDenseMatrix
 }
 
 auto
-CLog3Quadrature::_getXiFactor() const -> double
+CM4T2Quadrature::_getXiFactor() const -> double
 {
     // H atom
 

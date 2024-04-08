@@ -2,7 +2,7 @@ target_sources(vlxobjs
   PRIVATE
     AOKohnShamMatrix.cpp
     LebedevLaikovQuadrature.cpp
-    Log3Quadrature.cpp
+    M4T2Quadrature.cpp
     DensityGridGenerator.cpp
     DftSubMatrix.cpp
     FunctionalParser.cpp
