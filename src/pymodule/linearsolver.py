@@ -23,20 +23,23 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
 from pathlib import Path
 from datetime import datetime
 import numpy as np
 import time as tm
 import sys
+import os
 
-# TODO import compute_fock_gpu
 # TODO import electric dipole, linear momentum and angular momentum driver
 # TODO import rotatory_strength_in_cgs
 # TODO import VisualizationDriver
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
-from .veloxchemlib import mpi_master, hartree_in_ev
 from .veloxchemlib import AODensityMatrix, denmat
+from .veloxchemlib import ScreeningData, GpuDevices
+from .veloxchemlib import compute_fock_gpu
+from .veloxchemlib import mpi_master, hartree_in_ev
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -103,9 +106,10 @@ class LinearSolver:
         """
 
         # ERI settings
-        self.eri_thresh = 1.0e-15
-        self.qq_type = 'QQ_DEN'
-        self.batch_size = None
+        self.eri_thresh = 1.0e-12
+        self.pair_thresh = 1.0e-10
+        self.density_thresh = 1.0e-10
+        self.prelink_thresh = 5.0e-6
 
         # dft
         self.xcfun = None
@@ -355,9 +359,10 @@ class LinearSolver:
             The dictionary of ERI information.
         """
 
-        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                    self.eri_thresh, molecule, basis)
+        num_gpus_per_node = self._get_num_gpus_per_node()
+
+        screening = ScreeningData(molecule, basis, num_gpus_per_node,
+                                  self.pair_thresh, self.density_thresh)
 
         return {
             'screening': screening,
@@ -643,8 +648,9 @@ class LinearSolver:
 
         n_ao = mo.shape[0] if self.rank == mpi_master() else None
 
-        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
-        num_batches = get_number_of_batches(n_total, batch_size, self.comm)
+        # TODO double check batch size
+        batch_size = 1
+        num_batches = n_total
 
         # go through batches
 
@@ -702,17 +708,37 @@ class LinearSolver:
                     kns.append(kn)
 
             if self.rank == mpi_master():
-                dens = AODensityMatrix(dks, denmat.rest)
+                den_mat_np = dks[0]
+                # TODO: use hipblas
+                den_mat_np_T = dks[0].T - np.diag(np.diag(den_mat_np))
+                naos = den_mat_np.shape[0]
             else:
-                dens = AODensityMatrix()
-            dens.broadcast(self.rank, self.comm)
+                naos = None
+            naos = self.comm.bcast(naos, root=mpi_master())
+
+            if self.rank != mpi_master():
+                den_mat_np = np.zeros((naos, naos))
+                den_mat_np_T = np.zeros((naos, naos))
+
+            self.comm.Bcast(den_mat_np, root=mpi_master())
+            self.comm.Bcast(den_mat_np_T, root=mpi_master())
+            dens = AODensityMatrix([den_mat_np], denmat.rest)
+            dens_T = AODensityMatrix([den_mat_np_T], denmat.rest)
 
             # form Fock matrices
 
-            fock = AOFockMatrix(dens)
+            fock_mat_local = (
+                self._comp_lr_fock(dens, molecule, basis, eri_dict, dft_dict,
+                                   pe_dict, 2.0, profiler) +
+                self._comp_lr_fock(dens_T, molecule, basis, eri_dict, dft_dict,
+                                   pe_dict, 0.0, profiler))
 
-            self._comp_lr_fock(fock, dens, molecule, basis, eri_dict, dft_dict,
-                               pe_dict, profiler)
+            fock_mat = np.zeros(fock_mat_local.shape)
+
+            self.comm.Reduce(fock_mat_local,
+                             fock_mat,
+                             op=MPI.SUM,
+                             root=mpi_master())
 
             e2_ger = None
             e2_ung = None
@@ -737,7 +763,7 @@ class LinearSolver:
                     fock_ung = np.zeros((norb**2, batch_ung))
 
                 for ifock in range(batch_ger + batch_ung):
-                    fak = fock.alpha_to_numpy(ifock)
+                    fak = fock_mat
 
                     if getattr(self, 'core_excitation', False):
                         core_exc_orb_inds = list(range(
@@ -762,10 +788,12 @@ class LinearSolver:
                         gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
                                                           norb)[:half_size]
 
-                    # Note: fak_mo_vec uses full MO coefficients matrix since
-                    # it is only for fock_ger/fock_ung in nonlinear response
-                    fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
-                                                      mo]).reshape(norb**2)
+                    if self.nonlinear:
+                        # Note: fak_mo_vec uses full MO coefficients matrix
+                        # since it is only for fock_ger/fock_ung in nonlinear
+                        # response
+                        fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
+                                                          mo]).reshape(norb**2)
 
                     if ifock < batch_ger:
                         e2_ger[:, ifock] = -gmo_vec_halfsize
@@ -790,13 +818,14 @@ class LinearSolver:
         self.ostream.print_blank()
 
     def _comp_lr_fock(self,
-                      fock,
                       dens,
                       molecule,
                       basis,
                       eri_dict,
                       dft_dict,
                       pe_dict,
+                      prefac_coulomb,
+                      prefac_exchange,
                       profiler=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
@@ -827,36 +856,67 @@ class LinearSolver:
         V_es = pe_dict['V_es']
         pe_drv = pe_dict['pe_drv']
 
-        # set flags for Fock matrices
-
-        fock_flag = fockmat.rgenjk
-        if self._dft:
-            if self.xcfun.is_hybrid():
-                fock_flag = fockmat.rgenjkx
-                fact_xc = self.xcfun.get_frac_exact_exchange()
-                for i in range(fock.number_of_fock_matrices()):
-                    fock.set_scale_factor(fact_xc, i)
-            else:
-                fock_flag = fockmat.rgenj
-        for i in range(fock.number_of_fock_matrices()):
-            fock.set_fock_type(fock_flag, i)
-
         t0 = tm.time()
-        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        eri_drv.compute(fock, dens, molecule, basis, screening)
+
+        if self._dft:
+
+            if self.xcfun.is_hybrid():
+
+                if self.xcfun.is_range_separated():
+                    # range-separated hybrid
+                    full_k_coef = (self.xcfun.get_rs_alpha() +
+                                   self.xcfun.get_rs_beta())
+                    erf_k_coef = -self.xcfun.get_rs_beta()
+                    omega = self.xcfun.get_rs_omega()
+
+                    fock_mat_full_k = compute_fock_gpu(
+                        molecule, basis, dens, prefac_coulomb, full_k_coef, 0.0,
+                        self.eri_thresh, self.prelink_thresh, screening)
+
+                    fock_mat_erf_k = compute_fock_gpu(molecule, basis, dens,
+                                                      0.0, erf_k_coef, omega,
+                                                      self.eri_thresh,
+                                                      self.prelink_thresh,
+                                                      screening)
+
+                    fock_mat_local = (fock_mat_full_k.to_numpy() +
+                                      fock_mat_erf_k.to_numpy())
+
+                else:
+                    # global hybrid
+                    fock_mat = compute_fock_gpu(
+                        molecule, basis, dens, prefac_coulomb,
+                        self.xcfun.get_frac_exact_exchange(), 0.0,
+                        self.eri_thresh, self.prelink_thresh, screening)
+                    fock_mat_local = fock_mat.to_numpy()
+
+            else:
+                # pure DFT
+                fock_mat = compute_fock_gpu(molecule, basis, dens,
+                                            prefac_coulomb, 0.0, 0.0,
+                                            self.eri_thresh,
+                                            self.prelink_thresh, screening)
+                fock_mat_local = fock_mat.to_numpy()
+
+        else:
+            # Hartree-Fock
+            fock_mat = compute_fock_gpu(molecule, basis, dens, prefac_coulomb,
+                                        1.0, 0.0, self.eri_thresh,
+                                        self.prelink_thresh, screening)
+            fock_mat_local = fock_mat.to_numpy()
+
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)
 
         if self._dft:
             t0 = tm.time()
-            if not self.xcfun.is_hybrid():
-                for ifock in range(fock.number_of_fock_matrices()):
-                    fock.scale(2.0, ifock)
 
-            xc_drv = XCIntegrator(self.comm)
-            xc_drv.integrate_fxc_fock(fock, molecule, basis, dens,
-                                      gs_density, molgrid,
-                                      self.xcfun.get_func_label())
+            # TODO: add integrate_fxc_fock
+            # xc_drv.integrate_fxc_fock(fock, molecule, basis, dens,
+            #                           gs_density, molgrid,
+            #                           self.xcfun.get_func_label())
+
+            # TODO: add fxc_mat to fock_mat_local
 
             if profiler is not None:
                 profiler.add_timing_info('FockXC', tm.time() - t0)
@@ -872,7 +932,7 @@ class LinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('FockPE', tm.time() - t0)
 
-        fock.reduce_sum(self.rank, self.nodes, self.comm)
+        return fock_mat_local
 
     def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """
@@ -2107,3 +2167,25 @@ class LinearSolver:
 
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def _get_num_gpus_per_node(self):
+        """
+        Gets number of GPUs per MPI process.
+
+        :return:
+            The number of GPUs per MPI process.
+        """
+
+        if 'VLX_NUM_GPUS_PER_NODE' in os.environ:
+            num_gpus_per_node = int(os.environ['VLX_NUM_GPUS_PER_NODE'])
+        else:
+            devices = GpuDevices()
+            num_gpus_per_node = devices.get_number_devices()
+            if 'SLURM_NTASKS_PER_NODE' in os.environ:
+                num_gpus_per_node //= int(os.environ['SLURM_NTASKS_PER_NODE'])
+
+        assert_msg_critical(
+            num_gpus_per_node > 0,
+            'LinearSolver: Invalid number of GPUs per MPI process')
+
+        return num_gpus_per_node

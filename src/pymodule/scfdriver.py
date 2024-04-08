@@ -1488,8 +1488,8 @@ class ScfDriver:
 
                 if self.xcfun.is_range_separated():
                     # range-separated hybrid
-                    full_k_coef = self.xcfun.get_rs_alpha(
-                    ) + self.xcfun.get_rs_beta()
+                    full_k_coef = (self.xcfun.get_rs_alpha() +
+                                   self.xcfun.get_rs_beta())
                     erf_k_coef = -self.xcfun.get_rs_beta()
                     omega = self.xcfun.get_rs_omega()
 
