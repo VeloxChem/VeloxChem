@@ -66,8 +66,6 @@ class LinearSolver:
         - xcfun: The XC functional.
         - pe: The flag for running polarizable embedding calculation.
         - pe_options: The dictionary with options for polarizable embedding.
-        - use_split_comm: The flag for using split communicators.
-        - split_comm_ratio: The list of ratios for split communicators.
         - electric_field: The static electric field.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
@@ -118,10 +116,6 @@ class LinearSolver:
         self.potfile = None
         self.pe_options = {}
         self._pe = False
-
-        # split communicators
-        self.use_split_comm = False
-        self._split_comm_ratio = None
 
         # static electric field
         self.electric_field = None
@@ -201,7 +195,6 @@ class LinearSolver:
                 'grid_level': ('int', 'accuracy level of DFT grid'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
                 'electric_field': ('seq_fixed', 'static electric field'),
-                'use_split_comm': ('bool', 'use split communicators'),
             },
         }
 
@@ -362,23 +355,9 @@ class LinearSolver:
             The dictionary of ERI information.
         """
 
-        if self.use_split_comm:
-            self.use_split_comm = ((self._dft or self._pe) and self.nodes >= 8)
-
-        if self.use_split_comm:
-            screening = None
-            valstr = 'ERI'
-            if self._dft:
-                valstr += '/DFT'
-            if self._pe:
-                valstr += '/PE'
-            self.ostream.print_info(
-                'Using sub-communicators for {}.'.format(valstr))
-            self.ostream.print_blank()
-        else:
-            eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-            screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                        self.eri_thresh, molecule, basis)
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                    self.eri_thresh, molecule, basis)
 
         return {
             'screening': screening,
@@ -862,192 +841,38 @@ class LinearSolver:
         for i in range(fock.number_of_fock_matrices()):
             fock.set_fock_type(fock_flag, i)
 
-        # calculate Fock on subcommunicators
-
-        if self.use_split_comm:
-            self._comp_lr_fock_split_comm(fock, dens, molecule, basis, eri_dict,
-                                          dft_dict, pe_dict, profiler)
-
-        else:
-            t0 = tm.time()
-            eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-            eri_drv.compute(fock, dens, molecule, basis, screening)
-            if profiler is not None:
-                profiler.add_timing_info('FockERI', tm.time() - t0)
-
-            if self._dft:
-                t0 = tm.time()
-                if not self.xcfun.is_hybrid():
-                    for ifock in range(fock.number_of_fock_matrices()):
-                        fock.scale(2.0, ifock)
-
-                xc_drv = XCIntegrator(self.comm)
-                xc_drv.integrate_fxc_fock(fock, molecule, basis, dens,
-                                          gs_density, molgrid,
-                                          self.xcfun.get_func_label())
-
-                if profiler is not None:
-                    profiler.add_timing_info('FockXC', tm.time() - t0)
-
-            if self._pe:
-                t0 = tm.time()
-                pe_drv.V_es = V_es.copy()
-                for ifock in range(fock.number_of_fock_matrices()):
-                    dm = dens.alpha_to_numpy(ifock) + dens.beta_to_numpy(ifock)
-                    e_pe, V_pe = pe_drv.get_pe_contribution(dm, elec_only=True)
-                    if self.rank == mpi_master():
-                        fock.add_matrix(DenseMatrix(V_pe), ifock)
-                if profiler is not None:
-                    profiler.add_timing_info('FockPE', tm.time() - t0)
-
-            fock.reduce_sum(self.rank, self.nodes, self.comm)
-
-    def _comp_lr_fock_split_comm(self,
-                                 fock,
-                                 dens,
-                                 molecule,
-                                 basis,
-                                 eri_dict,
-                                 dft_dict,
-                                 pe_dict,
-                                 profiler=None):
-        """
-        Computes linear response Fock/Fxc matrix on split communicators.
-
-        :param fock:
-            The Fock matrix (2e part).
-        :param dens:
-            The density matrix.
-        :param molecule:
-            The molecule.
-        :param basis:
-            The basis set.
-        :param eri_dict:
-            The dictionary containing ERI information.
-        :param dft_dict:
-            The dictionary containing DFT information.
-        :param pe_dict:
-            The dictionary containing PE information.
-        :param profiler:
-            The profiler.
-        """
-
-        molgrid = dft_dict['molgrid']
-        gs_density = dft_dict['gs_density']
-
-        V_es = pe_dict['V_es']
-        pe_drv = pe_dict['pe_drv']
-
-        if self._split_comm_ratio is None:
-            if self._dft and self._pe:
-                self._split_comm_ratio = [0.34, 0.33, 0.33]
-            elif self._dft:
-                self._split_comm_ratio = [0.5, 0.5, 0.0]
-            elif self._pe:
-                self._split_comm_ratio = [0.5, 0.0, 0.5]
-            else:
-                self._split_comm_ratio = [1.0, 0.0, 0.0]
-
-        if self._dft:
-            dft_nodes = int(float(self.nodes) * self._split_comm_ratio[1] + 0.5)
-            dft_nodes = max(1, dft_nodes)
-        else:
-            dft_nodes = 0
-
-        if self._pe:
-            pe_nodes = int(float(self.nodes) * self._split_comm_ratio[2] + 0.5)
-            pe_nodes = max(1, pe_nodes)
-        else:
-            pe_nodes = 0
-
-        eri_nodes = max(1, self.nodes - dft_nodes - pe_nodes)
-
-        if eri_nodes == max(eri_nodes, dft_nodes, pe_nodes):
-            eri_nodes = self.nodes - dft_nodes - pe_nodes
-        elif dft_nodes == max(eri_nodes, dft_nodes, pe_nodes):
-            dft_nodes = self.nodes - eri_nodes - pe_nodes
-        else:
-            pe_nodes = self.nodes - eri_nodes - dft_nodes
-
-        node_grps = [0] * eri_nodes + [1] * dft_nodes + [2] * pe_nodes
-        eri_comm = (node_grps[self.rank] == 0)
-        dft_comm = (node_grps[self.rank] == 1)
-        pe_comm = (node_grps[self.rank] == 2)
-
-        subcomms = SubCommunicators(self.comm, node_grps)
-        local_comm = subcomms.local_comm
-        cross_comm = subcomms.cross_comm
-
-        # reset molecular grid for DFT and V_es for PE
-        if self.rank != mpi_master():
-            molgrid = MolecularGrid()
-            V_es = np.zeros(0)
-        if self._dft:
-            if local_comm.Get_rank() == mpi_master():
-                molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
-        if self._pe:
-            if local_comm.Get_rank() == mpi_master():
-                V_es = cross_comm.bcast(V_es, root=mpi_master())
-
         t0 = tm.time()
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        eri_drv.compute(fock, dens, molecule, basis, screening)
+        if profiler is not None:
+            profiler.add_timing_info('FockERI', tm.time() - t0)
 
-        # calculate Fock on ERI nodes
-        if eri_comm:
-            eri_drv = ElectronRepulsionIntegralsDriver(local_comm)
-            local_screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                              self.eri_thresh, molecule, basis)
-            eri_drv.compute(fock, dens, molecule, basis, local_screening)
-            if self._dft and not self.xcfun.is_hybrid():
+        if self._dft:
+            t0 = tm.time()
+            if not self.xcfun.is_hybrid():
                 for ifock in range(fock.number_of_fock_matrices()):
                     fock.scale(2.0, ifock)
 
-        # calculate Fxc on DFT nodes
-        if dft_comm:
-            xc_drv = XCIntegrator(local_comm)
-            molgrid.re_distribute_counts_and_displacements(
-                local_comm.Get_rank(), local_comm.Get_size(), local_comm)
-            xc_drv.integrate_fxc_fock(fock, molecule, basis, dens, gs_density,
-                                      molgrid, self.xcfun.get_func_label())
+            xc_drv = XCIntegrator(self.comm)
+            xc_drv.integrate_fxc_fock(fock, molecule, basis, dens,
+                                      gs_density, molgrid,
+                                      self.xcfun.get_func_label())
 
-        # calculate e_pe and V_pe on PE nodes
-        if pe_comm:
-            from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, self.pe_options, local_comm)
+            if profiler is not None:
+                profiler.add_timing_info('FockXC', tm.time() - t0)
+
+        if self._pe:
+            t0 = tm.time()
             pe_drv.V_es = V_es.copy()
             for ifock in range(fock.number_of_fock_matrices()):
                 dm = dens.alpha_to_numpy(ifock) + dens.beta_to_numpy(ifock)
                 e_pe, V_pe = pe_drv.get_pe_contribution(dm, elec_only=True)
-                if local_comm.Get_rank() == mpi_master():
+                if self.rank == mpi_master():
                     fock.add_matrix(DenseMatrix(V_pe), ifock)
+            if profiler is not None:
+                profiler.add_timing_info('FockPE', tm.time() - t0)
 
-        dt = tm.time() - t0
-
-        if profiler is not None:
-            profiler.add_timing_info('FockBuild', dt)
-
-        # collect Fock on master node
         fock.reduce_sum(self.rank, self.nodes, self.comm)
-
-        if local_comm.Get_rank() == mpi_master():
-            dt = cross_comm.gather(dt, root=mpi_master())
-
-        if self.rank == mpi_master():
-            time_eri = dt[0] * eri_nodes
-            time_dft = 0.0
-            if self._dft:
-                time_dft = dt[1] * dft_nodes
-            time_pe = 0.0
-            if self._pe:
-                pe_root = 2 if self._dft else 1
-                time_pe = dt[pe_root] * pe_nodes
-            time_sum = time_eri + time_dft + time_pe
-            self._split_comm_ratio = [
-                time_eri / time_sum,
-                time_dft / time_sum,
-                time_pe / time_sum,
-            ]
-        self._split_comm_ratio = self.comm.bcast(self._split_comm_ratio,
-                                                 root=mpi_master())
 
     def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """
