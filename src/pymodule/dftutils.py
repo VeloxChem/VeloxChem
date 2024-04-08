@@ -25,6 +25,7 @@
 
 from .veloxchemlib import xcfun
 from .veloxchemlib import parse_xc_func
+from .veloxchemlib import XCFunctional
 from .errorhandler import assert_msg_critical
 
 
@@ -100,3 +101,33 @@ def get_default_grid_level(xc_func):
     else:
         assert_msg_critical(
             False, 'get_default_grid_level: Invalid XC functional type')
+
+
+def print_libxc_reference(xcfun, ostream):
+    """
+    Prints libxc reference.
+
+    :param xcfun:
+        The XC functional.
+    :param ostream:
+        The output stream.
+    """
+
+    if isinstance(xcfun, XCFunctional):
+        valstr = 'Using the Libxc library '
+        valstr += f'(version {xcfun.get_libxc_version()}).'
+        ostream.print_info(valstr)
+        ostream.print_blank()
+        valstr = xcfun.get_libxc_reference()
+        ostream.print_reference(valstr)
+        ostream.print_blank()
+
+        valstr = f'Using the {xcfun.get_func_label()} functional.'
+        ostream.print_info(valstr)
+        ostream.print_blank()
+        printed_refs = []
+        for ref in xcfun.get_functional_reference():
+            if ref not in printed_refs:
+                ostream.print_reference(ref)
+                printed_refs.append(ref)
+        ostream.print_blank()

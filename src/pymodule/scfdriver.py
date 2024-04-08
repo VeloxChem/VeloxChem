@@ -49,7 +49,7 @@ from .signalhandler import SignalHandler
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .diis import Diis
-from .dftutils import get_default_grid_level
+from .dftutils import get_default_grid_level, print_libxc_reference
 from .sanitychecks import molecule_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_tensors
@@ -178,6 +178,7 @@ class ScfDriver:
         self._d4_energy = 0.0
 
         # for open-shell system: unpaired electrons for initial guess
+        # TODO: enable guess_unpaired_electrons input for open-shell
         self.guess_unpaired_electrons = ''
 
         # dft
@@ -526,6 +527,8 @@ class ScfDriver:
 
         # generate integration grid
         if self._dft:
+            print_libxc_reference(self.xcfun, self.ostream)
+
             grid_drv = GridDriver(self.comm)
             grid_level = (get_default_grid_level(self.xcfun)
                           if self.grid_level is None else self.grid_level)
