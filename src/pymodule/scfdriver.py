@@ -1389,9 +1389,15 @@ class ScfDriver:
             molecule, basis, screener)
 
         naos = ovl_mat.number_of_rows()
-        ovl_mat_np = np.zeros((naos, naos))
-        kin_mat_np = np.zeros((naos, naos))
-        npot_mat_np = np.zeros((naos, naos))
+
+        if self.rank == mpi_master():
+            ovl_mat_np = np.zeros((naos, naos))
+            kin_mat_np = np.zeros((naos, naos))
+            npot_mat_np = np.zeros((naos, naos))
+        else:
+            ovl_mat_np = None
+            kin_mat_np = None
+            npot_mat_np = None
 
         self.comm.Reduce(ovl_mat.to_numpy(),
                          ovl_mat_np,

@@ -513,19 +513,22 @@ class LinearResponseEigenSolver(LinearSolver):
         if self.is_converged:
 
             # TODO: enable property calculation
-            """
             edip_grad = self.get_prop_grad('electric dipole', 'xyz', molecule,
-                                           basis, scf_tensors)
+                                           basis, scf_tensors, eri_dict['screening'])
+            """
             lmom_grad = self.get_prop_grad('linear momentum', 'xyz', molecule,
                                            basis, scf_tensors)
             mdip_grad = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
                                            basis, scf_tensors)
+            """
 
             eigvals = np.array([exc_energies[s] for s in range(self.nstates)])
 
             elec_trans_dipoles = np.zeros((self.nstates, 3))
+            """
             velo_trans_dipoles = np.zeros((self.nstates, 3))
             magn_trans_dipoles = np.zeros((self.nstates, 3))
+            """
 
             if self.rank == mpi_master():
                 # create h5 file for response solutions
@@ -561,6 +564,7 @@ class LinearResponseEigenSolver(LinearSolver):
                         z_mat = eigvec[:eigvec.size // 2].reshape(nocc, -1)
                         y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
 
+                """
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
                     if self.cube_origin is None or self.cube_stepsize is None:
@@ -695,15 +699,18 @@ class LinearResponseEigenSolver(LinearSolver):
                                 'oscillator_strength': esa_osc_str,
                                 'transition_dipole': esa_trans_dipole,
                             })
+                """
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
                         elec_trans_dipoles[s, ind] = np.vdot(
                             edip_grad[ind], eigvec) * (-1.0)
+                        """
                         velo_trans_dipoles[s, ind] = np.vdot(
                             lmom_grad[ind], eigvec) / eigvals[s]
                         magn_trans_dipoles[s, ind] = np.vdot(
                             mdip_grad[ind], eigvec)
+                        """
 
                     # write to h5 file for response solutions
                     if (self.save_solutions and
@@ -719,60 +726,29 @@ class LinearResponseEigenSolver(LinearSolver):
             if self.nto or self.detach_attach:
                 self.ostream.print_blank()
                 self.ostream.flush()
-            """
-
-            eigvals = np.array([exc_energies[s] for s in range(self.nstates)])
-
-            if self.rank == mpi_master():
-                # create h5 file for response solutions
-                if (self.save_solutions and self.checkpoint_file is not None):
-                    final_h5_fname = str(
-                        Path(self.checkpoint_file).with_suffix('.solutions.h5'))
-                    create_hdf5(final_h5_fname, molecule, basis,
-                                dft_dict['dft_func_label'],
-                                pe_dict['potfile_text'])
-
-            excitation_details = []
-
-            for s in range(self.nstates):
-                eigvec = self.get_full_solution_vector(exc_solutions[s])
-
-                if self.rank == mpi_master():
-                    if self.core_excitation:
-                        mo_occ = scf_tensors['C_alpha'][:, :self.
-                                                        num_core_orbitals]
-                        mo_vir = scf_tensors['C_alpha'][:, nocc:]
-                    else:
-                        mo_occ = scf_tensors['C_alpha'][:, :nocc]
-                        mo_vir = scf_tensors['C_alpha'][:, nocc:]
-
-                    # save excitation details
-                    excitation_details.append(
-                        self.get_excitation_details(eigvec, mo_occ.shape[1],
-                                                    mo_vir.shape[1]))
 
             if not self.nonlinear:
 
                 if self.rank == mpi_master():
 
                     # TODO: enable property calculation
-                    """
                     osc = (2.0 / 3.0) * np.sum(elec_trans_dipoles**2,
                                                axis=1) * eigvals
+                    """
                     rot_vel = np.sum(velo_trans_dipoles * magn_trans_dipoles,
                                      axis=1) * rotatory_strength_in_cgs()
                     """
 
                     ret_dict = {
                         'eigenvalues': eigvals,
+                        'eigenvectors_distributed': exc_solutions,
+                        'electric_transition_dipoles': elec_trans_dipoles,
+                        'oscillator_strengths': osc,
                         'excitation_details': excitation_details,
                     }
                     """
-                        'eigenvectors_distributed': exc_solutions,
-                        'electric_transition_dipoles': elec_trans_dipoles,
                         'velocity_transition_dipoles': velo_trans_dipoles,
                         'magnetic_transition_dipoles': magn_trans_dipoles,
-                        'oscillator_strengths': osc,
                         'rotatory_strengths': rot_vel,
                     """
 
@@ -797,11 +773,7 @@ class LinearResponseEigenSolver(LinearSolver):
                         self.ostream.print_info(checkpoint_text)
                         self.ostream.print_blank()
 
-                    # TODO: print properties
-                    self._print_excitation_details('Character of excitations:', ret_dict)
-                    """
                     self._print_results(ret_dict)
-                    """
 
                     return ret_dict
                 else:
@@ -1166,6 +1138,8 @@ class LinearResponseEigenSolver(LinearSolver):
             'Electric Transition Dipole Moments (dipole length, a.u.)',
             results['electric_transition_dipoles'])
 
+        # TODO: print more results
+        """
         self._print_transition_dipoles(
             'Electric Transition Dipole Moments (dipole velocity, a.u.)',
             results['velocity_transition_dipoles'])
@@ -1173,14 +1147,19 @@ class LinearResponseEigenSolver(LinearSolver):
         self._print_transition_dipoles(
             'Magnetic Transition Dipole Moments (a.u.)',
             results['magnetic_transition_dipoles'])
+        """
 
         self._print_absorption('One-Photon Absorption', results)
+        """
         self._print_ecd('Electronic Circular Dichroism', results)
+        """
         self._print_excitation_details('Character of excitations:', results)
 
+        """
         if self.esa:
             self._print_excited_state_absorption('Excited state absorption:',
                                                  results)
+        """
 
     def __deepcopy__(self, memo):
         """
