@@ -738,9 +738,9 @@ computeNuclearPotentialSS(double*         mat_V,
             const auto z_c = points_info[c + npoints * 2];
             const auto q_c = points_info[c + npoints * 3];
 
-            const double PC[3] = {y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                  z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                  x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+            const double PC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                  y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                  z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
