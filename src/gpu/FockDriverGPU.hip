@@ -6067,6 +6067,8 @@ computeFockOnGPU(const              CMolecule& molecule,
     const auto dd_max_D = screening.get_dd_max_D(); 
 
     // Note: assuming symmetric D
+    // TODO: double check if this needs to be changed as it requires
+    // the density to be either symmetric or antisymmetric
     const auto ps_max_D = screening.get_sp_max_D(); 
     const auto ds_max_D = screening.get_sd_max_D(); 
     const auto dp_max_D = screening.get_pd_max_D(); 

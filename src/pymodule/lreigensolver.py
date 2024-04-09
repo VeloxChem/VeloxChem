@@ -511,6 +511,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # calculate properties
         if self.is_converged:
+
+            # TODO: enable property calculation
+            """
             edip_grad = self.get_prop_grad('electric dipole', 'xyz', molecule,
                                            basis, scf_tensors)
             lmom_grad = self.get_prop_grad('linear momentum', 'xyz', molecule,
@@ -716,26 +719,64 @@ class LinearResponseEigenSolver(LinearSolver):
             if self.nto or self.detach_attach:
                 self.ostream.print_blank()
                 self.ostream.flush()
+            """
+
+            eigvals = np.array([exc_energies[s] for s in range(self.nstates)])
+
+            if self.rank == mpi_master():
+                # create h5 file for response solutions
+                if (self.save_solutions and self.checkpoint_file is not None):
+                    final_h5_fname = str(
+                        Path(self.checkpoint_file).with_suffix('.solutions.h5'))
+                    create_hdf5(final_h5_fname, molecule, basis,
+                                dft_dict['dft_func_label'],
+                                pe_dict['potfile_text'])
+
+            excitation_details = []
+
+            for s in range(self.nstates):
+                eigvec = self.get_full_solution_vector(exc_solutions[s])
+
+                if self.rank == mpi_master():
+                    if self.core_excitation:
+                        mo_occ = scf_tensors['C_alpha'][:, :self.
+                                                        num_core_orbitals]
+                        mo_vir = scf_tensors['C_alpha'][:, nocc:]
+                    else:
+                        mo_occ = scf_tensors['C_alpha'][:, :nocc]
+                        mo_vir = scf_tensors['C_alpha'][:, nocc:]
+
+                    # save excitation details
+                    excitation_details.append(
+                        self.get_excitation_details(eigvec, mo_occ.shape[1],
+                                                    mo_vir.shape[1]))
 
             if not self.nonlinear:
 
                 if self.rank == mpi_master():
+
+                    # TODO: enable property calculation
+                    """
                     osc = (2.0 / 3.0) * np.sum(elec_trans_dipoles**2,
                                                axis=1) * eigvals
                     rot_vel = np.sum(velo_trans_dipoles * magn_trans_dipoles,
                                      axis=1) * rotatory_strength_in_cgs()
+                    """
 
                     ret_dict = {
                         'eigenvalues': eigvals,
+                        'excitation_details': excitation_details,
+                    }
+                    """
                         'eigenvectors_distributed': exc_solutions,
                         'electric_transition_dipoles': elec_trans_dipoles,
                         'velocity_transition_dipoles': velo_trans_dipoles,
                         'magnetic_transition_dipoles': magn_trans_dipoles,
                         'oscillator_strengths': osc,
                         'rotatory_strengths': rot_vel,
-                        'excitation_details': excitation_details,
-                    }
+                    """
 
+                    """
                     if self.nto:
                         ret_dict['nto_lambdas'] = nto_lambdas
                         ret_dict['nto_h5_files'] = nto_h5_files
@@ -747,6 +788,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
                     if self.esa:
                         ret_dict['esa_results'] = esa_results
+                    """
 
                     if (self.save_solutions and
                             self.checkpoint_file is not None):
@@ -755,7 +797,11 @@ class LinearResponseEigenSolver(LinearSolver):
                         self.ostream.print_info(checkpoint_text)
                         self.ostream.print_blank()
 
+                    # TODO: print properties
+                    self._print_excitation_details('Character of excitations:', ret_dict)
+                    """
                     self._print_results(ret_dict)
+                    """
 
                     return ret_dict
                 else:
