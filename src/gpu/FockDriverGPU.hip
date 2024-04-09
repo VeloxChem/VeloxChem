@@ -832,27 +832,29 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
         dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergySS, num_blocks, threads_per_block, 0, 0, d_mat_S,
-                                                     d_mat_T,
-                                                     d_s_prim_info,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_ss_first_inds_local,
-                                                     d_ss_second_inds_local,
-                                                     static_cast<uint32_t>(ss_prim_pair_count_local));
+        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergySS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_S,
+                           d_mat_T,
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_ss_first_inds_local,
+                           d_ss_second_inds_local,
+                           static_cast<uint32_t>(ss_prim_pair_count_local));
 
         hipSafe(hipMemcpy(mat_S.data(), d_mat_S, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
         hipSafe(hipMemcpy(mat_T.data(), d_mat_T, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
-        hipLaunchKernelGGL(gpu::computeNuclearPotentialSS, num_blocks, threads_per_block, 0, 0, d_mat_V,
-                                                     d_s_prim_info,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_ss_first_inds_local,
-                                                     d_ss_second_inds_local,
-                                                     static_cast<uint32_t>(ss_prim_pair_count_local),
-                                                     d_points_info,
-                                                     static_cast<uint32_t>(natoms),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+        hipLaunchKernelGGL(gpu::computeNuclearPotentialSS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_V,
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_ss_first_inds_local,
+                           d_ss_second_inds_local,
+                           static_cast<uint32_t>(ss_prim_pair_count_local),
+                           d_points_info,
+                           static_cast<uint32_t>(natoms),
+                           d_boys_func_table,
+                           d_boys_func_ft);
 
         hipSafe(hipMemcpy(mat_V.data(), d_mat_V, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -886,31 +888,33 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergySP, num_blocks, threads_per_block, 0, 0, d_mat_S,
-                                                     d_mat_T,
-                                                     d_s_prim_info,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_p_prim_info,
-                                                     static_cast<uint32_t>(p_prim_count),
-                                                     d_sp_first_inds_local,
-                                                     d_sp_second_inds_local,
-                                                     static_cast<uint32_t>(sp_prim_pair_count_local));
+        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergySP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_S,
+                           d_mat_T,
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_sp_first_inds_local,
+                           d_sp_second_inds_local,
+                           static_cast<uint32_t>(sp_prim_pair_count_local));
 
         hipSafe(hipMemcpy(mat_S.data(), d_mat_S, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
         hipSafe(hipMemcpy(mat_T.data(), d_mat_T, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
-        hipLaunchKernelGGL(gpu::computeNuclearPotentialSP, num_blocks, threads_per_block, 0, 0, d_mat_V,
-                                                     d_s_prim_info,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_p_prim_info,
-                                                     static_cast<uint32_t>(p_prim_count),
-                                                     d_sp_first_inds_local,
-                                                     d_sp_second_inds_local,
-                                                     static_cast<uint32_t>(sp_prim_pair_count_local),
-                                                     d_points_info,
-                                                     static_cast<uint32_t>(natoms),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+        hipLaunchKernelGGL(gpu::computeNuclearPotentialSP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_V,
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_sp_first_inds_local,
+                           d_sp_second_inds_local,
+                           static_cast<uint32_t>(sp_prim_pair_count_local),
+                           d_points_info,
+                           static_cast<uint32_t>(natoms),
+                           d_boys_func_table,
+                           d_boys_func_ft);
 
         hipSafe(hipMemcpy(mat_V.data(), d_mat_V, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -950,31 +954,33 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
         dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergySD, num_blocks, threads_per_block, 0, 0, d_mat_S,
-                                                     d_mat_T,
-                                                     d_s_prim_info,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_d_prim_info,
-                                                     static_cast<uint32_t>(d_prim_count),
-                                                     d_sd_first_inds_local,
-                                                     d_sd_second_inds_local,
-                                                     static_cast<uint32_t>(sd_prim_pair_count_local));
+        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergySD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_S,
+                           d_mat_T,
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_sd_first_inds_local,
+                           d_sd_second_inds_local,
+                           static_cast<uint32_t>(sd_prim_pair_count_local));
 
         hipSafe(hipMemcpy(mat_S.data(), d_mat_S, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
         hipSafe(hipMemcpy(mat_T.data(), d_mat_T, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
-        hipLaunchKernelGGL(gpu::computeNuclearPotentialSD, num_blocks, threads_per_block, 0, 0, d_mat_V,
-                                                     d_s_prim_info,
-                                                     static_cast<uint32_t>(s_prim_count),
-                                                     d_d_prim_info,
-                                                     static_cast<uint32_t>(d_prim_count),
-                                                     d_sd_first_inds_local,
-                                                     d_sd_second_inds_local,
-                                                     static_cast<uint32_t>(sd_prim_pair_count_local),
-                                                     d_points_info,
-                                                     static_cast<uint32_t>(natoms),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+        hipLaunchKernelGGL(gpu::computeNuclearPotentialSD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_V,
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_sd_first_inds_local,
+                           d_sd_second_inds_local,
+                           static_cast<uint32_t>(sd_prim_pair_count_local),
+                           d_points_info,
+                           static_cast<uint32_t>(natoms),
+                           d_boys_func_table,
+                           d_boys_func_ft);
 
         hipSafe(hipMemcpy(mat_V.data(), d_mat_V, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -1014,27 +1020,29 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergyPP, num_blocks, threads_per_block, 0, 0, d_mat_S,
-                                                     d_mat_T,
-                                                     d_p_prim_info,
-                                                     static_cast<uint32_t>(p_prim_count),
-                                                     d_pp_first_inds_local,
-                                                     d_pp_second_inds_local,
-                                                     static_cast<uint32_t>(pp_prim_pair_count_local));
+        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergyPP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_S,
+                           d_mat_T,
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_pp_first_inds_local,
+                           d_pp_second_inds_local,
+                           static_cast<uint32_t>(pp_prim_pair_count_local));
 
         hipSafe(hipMemcpy(mat_S.data(), d_mat_S, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
         hipSafe(hipMemcpy(mat_T.data(), d_mat_T, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
-        hipLaunchKernelGGL(gpu::computeNuclearPotentialPP, num_blocks, threads_per_block, 0, 0, d_mat_V,
-                                                     d_p_prim_info,
-                                                     static_cast<uint32_t>(p_prim_count),
-                                                     d_pp_first_inds_local,
-                                                     d_pp_second_inds_local,
-                                                     static_cast<uint32_t>(pp_prim_pair_count_local),
-                                                     d_points_info,
-                                                     static_cast<uint32_t>(natoms),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+        hipLaunchKernelGGL(gpu::computeNuclearPotentialPP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_V,
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_pp_first_inds_local,
+                           d_pp_second_inds_local,
+                           static_cast<uint32_t>(pp_prim_pair_count_local),
+                           d_points_info,
+                           static_cast<uint32_t>(natoms),
+                           d_boys_func_table,
+                           d_boys_func_ft);
 
         hipSafe(hipMemcpy(mat_V.data(), d_mat_V, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -1084,31 +1092,33 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
         dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergyPD, num_blocks, threads_per_block, 0, 0, d_mat_S,
-                                                     d_mat_T,
-                                                     d_p_prim_info,
-                                                     static_cast<uint32_t>(p_prim_count),
-                                                     d_d_prim_info,
-                                                     static_cast<uint32_t>(d_prim_count),
-                                                     d_pd_first_inds_local,
-                                                     d_pd_second_inds_local,
-                                                     static_cast<uint32_t>(pd_prim_pair_count_local));
+        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergyPD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_S,
+                           d_mat_T,
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_pd_first_inds_local,
+                           d_pd_second_inds_local,
+                           static_cast<uint32_t>(pd_prim_pair_count_local));
 
         hipSafe(hipMemcpy(mat_S.data(), d_mat_S, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
         hipSafe(hipMemcpy(mat_T.data(), d_mat_T, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
-        hipLaunchKernelGGL(gpu::computeNuclearPotentialPD, num_blocks, threads_per_block, 0, 0, d_mat_V,
-                                                     d_p_prim_info,
-                                                     static_cast<uint32_t>(p_prim_count),
-                                                     d_d_prim_info,
-                                                     static_cast<uint32_t>(d_prim_count),
-                                                     d_pd_first_inds_local,
-                                                     d_pd_second_inds_local,
-                                                     static_cast<uint32_t>(pd_prim_pair_count_local),
-                                                     d_points_info,
-                                                     static_cast<uint32_t>(natoms),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+        hipLaunchKernelGGL(gpu::computeNuclearPotentialPD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_V,
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_pd_first_inds_local,
+                           d_pd_second_inds_local,
+                           static_cast<uint32_t>(pd_prim_pair_count_local),
+                           d_points_info,
+                           static_cast<uint32_t>(natoms),
+                           d_boys_func_table,
+                           d_boys_func_ft);
 
         hipSafe(hipMemcpy(mat_V.data(), d_mat_V, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -1155,27 +1165,29 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
         dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergyDD, num_blocks, threads_per_block, 0, 0, d_mat_S,
-                                                     d_mat_T,
-                                                     d_d_prim_info,
-                                                     static_cast<uint32_t>(d_prim_count),
-                                                     d_dd_first_inds_local,
-                                                     d_dd_second_inds_local,
-                                                     static_cast<uint32_t>(dd_prim_pair_count_local));
+        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergyDD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_S,
+                           d_mat_T,
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_dd_first_inds_local,
+                           d_dd_second_inds_local,
+                           static_cast<uint32_t>(dd_prim_pair_count_local));
 
         hipSafe(hipMemcpy(mat_S.data(), d_mat_S, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
         hipSafe(hipMemcpy(mat_T.data(), d_mat_T, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
-        hipLaunchKernelGGL(gpu::computeNuclearPotentialDD, num_blocks, threads_per_block, 0, 0, d_mat_V,
-                                                     d_d_prim_info,
-                                                     static_cast<uint32_t>(d_prim_count),
-                                                     d_dd_first_inds_local,
-                                                     d_dd_second_inds_local,
-                                                     static_cast<uint32_t>(dd_prim_pair_count_local),
-                                                     d_points_info,
-                                                     static_cast<uint32_t>(natoms),
-                                                     d_boys_func_table,
-                                                     d_boys_func_ft);
+        hipLaunchKernelGGL(gpu::computeNuclearPotentialDD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_V,
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_dd_first_inds_local,
+                           d_dd_second_inds_local,
+                           static_cast<uint32_t>(dd_prim_pair_count_local),
+                           d_points_info,
+                           static_cast<uint32_t>(natoms),
+                           d_boys_func_table,
+                           d_boys_func_ft);
 
         hipSafe(hipMemcpy(mat_V.data(), d_mat_V, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 

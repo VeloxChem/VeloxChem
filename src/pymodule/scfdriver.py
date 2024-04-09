@@ -523,6 +523,20 @@ class ScfDriver:
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
 
+        # ERI references
+        valstr = 'Using the following algorithms for ERI evaluation.'
+        self.ostream.print_info(valstr)
+        self.ostream.print_blank()
+        valstr = 'S. Obara and A. Saika, J. Chem. Phys. 84, 3963-3974 (1986)'
+        self.ostream.print_reference(valstr)
+        valstr = 'I. S. Ufimtsev and T. J. Martinez, '
+        valstr += 'J. Chem. Theory Comput. 5, 1004-1015 (2009)'
+        self.ostream.print_reference(valstr)
+        valstr = 'J. Kussmann and C. Ochsenfeld, '
+        valstr += 'J. Chem. Phys. 138, 134114 (2013)'
+        self.ostream.print_reference(valstr)
+        self.ostream.print_blank()
+
         # TODO: add DFT-D4 dispersion correction
 
         # generate integration grid
@@ -561,20 +575,6 @@ class ScfDriver:
                 self.pe_options['potfile'])
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
-
-        # ERI references
-        valstr = 'Using the following algorithms for ERI evaluation.'
-        self.ostream.print_info(valstr)
-        self.ostream.print_blank()
-        valstr = 'S. Obara and A. Saika, J. Chem. Phys. 84, 3963-3974 (1986)'
-        self.ostream.print_reference(valstr)
-        valstr = 'I. S. Ufimtsev and T. J. Martinez, '
-        valstr += 'J. Chem. Theory Comput. 5, 1004-1015 (2009)'
-        self.ostream.print_reference(valstr)
-        valstr = 'J. Kussmann and C. Ochsenfeld, '
-        valstr += 'J. Chem. Phys. 138, 134114 (2013)'
-        self.ostream.print_reference(valstr)
-        self.ostream.print_blank()
 
         # DIIS method
         if self.acc_type.upper() == 'DIIS':
