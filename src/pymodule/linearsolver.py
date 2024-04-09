@@ -40,6 +40,7 @@ from .veloxchemlib import AODensityMatrix, denmat
 from .veloxchemlib import ScreeningData, GpuDevices
 from .veloxchemlib import compute_fock_gpu
 from .veloxchemlib import compute_electric_dipole_integrals_gpu
+from .veloxchemlib import compute_linear_momentum_integrals_gpu
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
@@ -1333,13 +1334,35 @@ class LinearSolver:
                 integrals = tuple()
 
         elif operator in ['linear_momentum', 'linear momentum']:
-            linmom_drv = LinearMomentumIntegralsDriver(self.comm)
-            linmom_mats = linmom_drv.compute(molecule, basis)
+            mu_x, mu_y, mu_z = compute_linear_momentum_integrals_gpu(
+                    molecule, basis, screening)
+
+            naos = mu_x.number_of_rows()
 
             if self.rank == mpi_master():
-                integrals = (-1.0 * linmom_mats.x_to_numpy(),
-                             -1.0 * linmom_mats.y_to_numpy(),
-                             -1.0 * linmom_mats.z_to_numpy())
+                mu_x_mat_np = np.zeros((naos, naos))
+                mu_y_mat_np = np.zeros((naos, naos))
+                mu_z_mat_np = np.zeros((naos, naos))
+            else:
+                mu_x_mat_np = None
+                mu_y_mat_np = None
+                mu_z_mat_np = None
+
+            self.comm.Reduce(mu_x.to_numpy(),
+                             mu_x_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+            self.comm.Reduce(mu_y.to_numpy(),
+                             mu_y_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+            self.comm.Reduce(mu_z.to_numpy(),
+                             mu_z_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+
+            if self.rank == mpi_master():
+                integrals = (mu_x_mat_np, mu_y_mat_np, mu_z_mat_np)
             else:
                 integrals = tuple()
 

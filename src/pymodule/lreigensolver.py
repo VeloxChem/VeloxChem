@@ -515,9 +515,9 @@ class LinearResponseEigenSolver(LinearSolver):
             # TODO: enable property calculation
             edip_grad = self.get_prop_grad('electric dipole', 'xyz', molecule,
                                            basis, scf_tensors, eri_dict['screening'])
-            """
             lmom_grad = self.get_prop_grad('linear momentum', 'xyz', molecule,
-                                           basis, scf_tensors)
+                                           basis, scf_tensors, eri_dict['screening'])
+            """
             mdip_grad = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
                                            basis, scf_tensors)
             """
@@ -525,8 +525,8 @@ class LinearResponseEigenSolver(LinearSolver):
             eigvals = np.array([exc_energies[s] for s in range(self.nstates)])
 
             elec_trans_dipoles = np.zeros((self.nstates, 3))
-            """
             velo_trans_dipoles = np.zeros((self.nstates, 3))
+            """
             magn_trans_dipoles = np.zeros((self.nstates, 3))
             """
 
@@ -705,9 +705,9 @@ class LinearResponseEigenSolver(LinearSolver):
                     for ind, comp in enumerate('xyz'):
                         elec_trans_dipoles[s, ind] = np.vdot(
                             edip_grad[ind], eigvec) * (-1.0)
-                        """
                         velo_trans_dipoles[s, ind] = np.vdot(
                             lmom_grad[ind], eigvec) / eigvals[s]
+                        """
                         magn_trans_dipoles[s, ind] = np.vdot(
                             mdip_grad[ind], eigvec)
                         """
@@ -743,11 +743,11 @@ class LinearResponseEigenSolver(LinearSolver):
                         'eigenvalues': eigvals,
                         'eigenvectors_distributed': exc_solutions,
                         'electric_transition_dipoles': elec_trans_dipoles,
+                        'velocity_transition_dipoles': velo_trans_dipoles,
                         'oscillator_strengths': osc,
                         'excitation_details': excitation_details,
                     }
                     """
-                        'velocity_transition_dipoles': velo_trans_dipoles,
                         'magnetic_transition_dipoles': magn_trans_dipoles,
                         'rotatory_strengths': rot_vel,
                     """
@@ -1138,12 +1138,12 @@ class LinearResponseEigenSolver(LinearSolver):
             'Electric Transition Dipole Moments (dipole length, a.u.)',
             results['electric_transition_dipoles'])
 
-        # TODO: print more results
-        """
         self._print_transition_dipoles(
             'Electric Transition Dipole Moments (dipole velocity, a.u.)',
             results['velocity_transition_dipoles'])
 
+        # TODO: print more results
+        """
         self._print_transition_dipoles(
             'Magnetic Transition Dipole Moments (a.u.)',
             results['magnetic_transition_dipoles'])

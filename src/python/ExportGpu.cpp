@@ -293,6 +293,8 @@ export_gpu(py::module& m)
 
     m.def("compute_electric_dipole_integrals_gpu", &gpu::computeElectricDipoleIntegralsOnGPU, "Computes electric dipole integral matrices using GPU.");
 
+    m.def("compute_linear_momentum_integrals_gpu", &gpu::computeLinearMomentumIntegralsOnGPU, "Computes linear momentum integral matrices using GPU.");
+
     m.def("compute_q_matrix_gpu", &gpu::computeQMatrixOnGPU, "Computes Q matrix using GPU.");
 }
 
