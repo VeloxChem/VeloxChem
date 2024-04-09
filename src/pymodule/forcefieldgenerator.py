@@ -443,7 +443,7 @@ class ForceFieldGenerator:
 
         return content.splitlines()
 
-    def create_topology(self, molecule, basis=None):
+    def create_topology(self, molecule, basis=None, scf_drv=None, no_resp=False):
         """
         Analizes the topology of the molecule and create dictionaries
         for the atoms, bonds, angles, dihedrals, impropers and pairs.
@@ -452,6 +452,10 @@ class ForceFieldGenerator:
             The molecule.
         :param basis:
             The AO basis set.
+        :param scf_drv:
+            The SCF driver. If None, the default driver is used.
+        :param no_resp:
+            If RESP charges should not be computed.
         """
 
         # Read the force field data lines.
@@ -491,31 +495,55 @@ class ForceFieldGenerator:
 
         self.connectivity_matrix = np.copy(
             atomtypeidentifier.connectivity_matrix)
+        
+        if no_resp:
+
+            self.partial_charges = np.zeros(self.molecule.number_of_atoms())
 
         if self.partial_charges is None:
-            if basis is None:
-                if self.rank == mpi_master():
-                    basis = MolecularBasis.read(self.molecule,
-                                                '6-31G*',
-                                                ostream=None)
-                else:
-                    basis = MolecularBasis()
-                basis.broadcast(self.rank, self.comm)
-                msg = 'Using 6-31G* basis set for RESP charges...'
-                self.ostream.print_info(msg)
-                self.ostream.flush()
+            if scf_drv is None:
+                if basis is None:
+                    if self.rank == mpi_master():
+                        basis = MolecularBasis.read(self.molecule,
+                                                    '6-31G*',
+                                                    ostream=None)
+                    else:
+                        basis = MolecularBasis()
+                    basis.broadcast(self.rank, self.comm)
+                    msg = 'Using 6-31G* basis set for RESP charges...'
+                    self.ostream.print_info(msg)
+                    self.ostream.flush()
 
-            resp_drv = RespChargesDriver(self.comm, self.ostream)
-            resp_drv.filename = self.molecule_name
-            if self.resp_dict is not None:
-                resp_drv.update_settings(self.resp_dict)
-            if resp_drv.equal_charges is None:
-                resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
+                resp_drv = RespChargesDriver(self.comm, self.ostream)
+                resp_drv.filename = self.molecule_name
+                if self.resp_dict is not None:
+                    resp_drv.update_settings(self.resp_dict)
+                if resp_drv.equal_charges is None:
+                    resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
 
-            self.partial_charges = resp_drv.compute(self.molecule, basis,
-                                                    'resp')
-            self.partial_charges = self.comm.bcast(self.partial_charges,
-                                                   root=mpi_master())
+                self.partial_charges = resp_drv.compute(self.molecule, basis,
+                                                        'resp')
+                self.partial_charges = self.comm.bcast(self.partial_charges,
+                                                    root=mpi_master())
+                
+            else:
+                if basis is None:
+                    error_msg = 'Basis set is required when a custom SCF driver is used.'
+                    self.ostream.print_error(error_msg)
+
+                scf_result = scf_drv.compute(molecule, basis)
+                resp_drv = RespChargesDriver(self.comm, self.ostream)
+                resp_drv.filename = self.molecule_name
+                if self.resp_dict is not None:
+                    resp_drv.update_settings(self.resp_dict)
+                if resp_drv.equal_charges is None:
+                    resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
+
+                self.partial_charges = resp_drv.compute(self.molecule, basis,
+                                                        'resp')
+                self.partial_charges = self.comm.bcast(self.partial_charges,
+                                                    root=mpi_master())
+
 
         # preparing atomtypes and atoms
 
