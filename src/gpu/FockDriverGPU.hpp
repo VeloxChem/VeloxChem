@@ -40,6 +40,8 @@ auto computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis
 
 auto computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> std::vector<CDenseMatrix>;
 
+auto computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const std::vector<double>& origin, const CScreeningData& screening) -> std::vector<CDenseMatrix>;
+
 auto transformDensity(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> CDenseMatrix;
 
 auto computeFockOnGPU(const              CMolecule& molecule,
