@@ -95,7 +95,7 @@ computeLinearMomentumSS(double*         mat_mu_X,
 
             mat_mu[m][ij] = S_ij_00 * (
 
-                    2.0 * a_j * (PB_m)
+                    -2.0 * a_j * (PB_m)
 
                     );
         }
@@ -166,21 +166,11 @@ computeLinearMomentumSP(double*         mat_mu_X,
 
             mat_mu[m][ij] = S_ij_00 * (
 
-                    (
+                    -a_j / (a_i + a_j) * (delta[b0][m])
 
-                        - (
-                            delta[m][b0]
-                        )
+                    -2.0 * a_j * (PB_0 * PB_m)
 
-                        + 0.5 / (a_i + a_j) * 2.0 * a_j * (
-                            delta[b0][m]
-                        )
-
-                        + 2.0 * a_j * (
-                            PB_0 * PB_m
-                        )
-
-                    )
+                    + (delta[m][b0])
 
                     );
         }
@@ -261,23 +251,19 @@ computeLinearMomentumSD(double*         mat_mu_X,
 
             mat_mu[m][ij] = S_ij_00 * (
 
-                    (
+                    -a_j / (a_i + a_j) * (
+                        delta[b1][m] * (PB_0)
+                        + delta[b0][m] * (PB_1)
+                        + delta[b0][b1] * (PB_m)
+                    )
 
-                        - (
-                            delta[m][b1] * (PB_0)
-                            + delta[m][b0] * (PB_1)
-                        )
+                    -2.0 * a_j * (
+                        PB_0 * PB_1 * PB_m
+                    )
 
-                        + 0.5 / (a_i + a_j) * 2.0 * a_j * (
-                            delta[b1][m] * (PB_0)
-                            + delta[b0][m] * (PB_1)
-                            + delta[b0][b1] * (PB_m)
-                        )
-
-                        + 2.0 * a_j * (
-                            PB_0 * PB_1 * PB_m
-                        )
-
+                    + (
+                        delta[m][b1] * (PB_0)
+                        + delta[m][b0] * (PB_1)
                     )
 
                     );
@@ -350,22 +336,18 @@ computeLinearMomentumPP(double*         mat_mu_X,
 
             mat_mu[m][ij] = S_ij_00 * (
 
-                    (
+                    -a_j / (a_i + a_j) * (
+                        delta[b0][m] * (PA_0)
+                        + delta[a0][m] * (PB_0)
+                        + delta[a0][b0] * (PB_m)
+                    )
 
-                        - (
-                            delta[m][b0] * (PA_0)
-                        )
+                    -2.0 * a_j * (
+                        PA_0 * PB_0 * PB_m
+                    )
 
-                        + 0.5 / (a_i + a_j) * 2.0 * a_j * (
-                            delta[b0][m] * (PA_0)
-                            + delta[a0][m] * (PB_0)
-                            + delta[a0][b0] * (PB_m)
-                        )
-
-                        + 2.0 * a_j * (
-                            PA_0 * PB_0 * PB_m
-                        )
-
+                    + (
+                        delta[m][b0] * (PA_0)
                     )
 
                     );
@@ -451,37 +433,33 @@ computeLinearMomentumPD(double*         mat_mu_X,
 
             mat_mu[m][ij] = S_ij_00 * (
 
-                    (
+                    -0.5 * a_j / ( (a_i + a_j) * (a_i + a_j) ) * (
+                        delta[a0][b0] * delta[b1][m]
+                        + delta[a0][b1] * delta[b0][m]
+                        + delta[a0][m] * delta[b0][b1]
+                    )
 
-                        -0.5 / (a_i + a_j) * (
-                            delta[a0][b0] * delta[m][b1]
-                            + delta[a0][b1] * delta[m][b0]
-                        )
+                    -a_j / (a_i + a_j) * (
+                        delta[b1][m] * (PA_0 * PB_0)
+                        + delta[b0][m] * (PA_0 * PB_1)
+                        + delta[b0][b1] * (PA_0 * PB_m)
+                        + delta[a0][m] * (PB_0 * PB_1)
+                        + delta[a0][b1] * (PB_0 * PB_m)
+                        + delta[a0][b0] * (PB_1 * PB_m)
+                    )
 
-                        - (
-                            delta[m][b1] * (PA_0 * PB_0)
-                            + delta[m][b0] * (PA_0 * PB_1)
-                        )
+                    -2.0 * a_j * (
+                        PA_0 * PB_0 * PB_1 * PB_m
+                    )
 
-                        + 0.25 / ( (a_i + a_j) * (a_i + a_j) ) * 2.0 * a_j * (
-                            delta[a0][b0] * delta[b1][m]
-                            + delta[a0][b1] * delta[b0][m]
-                            + delta[a0][m] * delta[b0][b1]
-                        )
+                    + 0.5 / (a_i + a_j) * (
+                        delta[a0][b0] * delta[m][b1]
+                        + delta[a0][b1] * delta[m][b0]
+                    )
 
-                        + 0.5 / (a_i + a_j) * 2.0 * a_j * (
-                            delta[b1][m] * (PA_0 * PB_0)
-                            + delta[b0][m] * (PA_0 * PB_1)
-                            + delta[b0][b1] * (PA_0 * PB_m)
-                            + delta[a0][m] * (PB_0 * PB_1)
-                            + delta[a0][b1] * (PB_0 * PB_m)
-                            + delta[a0][b0] * (PB_1 * PB_m)
-                        )
-
-                        + 2.0 * a_j * (
-                            PA_0 * PB_0 * PB_1 * PB_m
-                        )
-
+                    + (
+                        delta[m][b1] * (PA_0 * PB_0)
+                        + delta[m][b0] * (PA_0 * PB_1)
                     )
 
                     );
@@ -569,57 +547,53 @@ computeLinearMomentumDD(double*         mat_mu_X,
 
             mat_mu[m][ij] = S_ij_00 * (
 
-                    (
+                    -0.5 * a_j / ( (a_i + a_j) * (a_i + a_j) ) * (
+                        delta[a1][b0] * delta[b1][m] * (PA_0)
+                        + delta[a1][b1] * delta[b0][m] * (PA_0)
+                        + delta[a1][m] * delta[b0][b1] * (PA_0)
+                        + delta[a0][b0] * delta[b1][m] * (PA_1)
+                        + delta[a0][b1] * delta[b0][m] * (PA_1)
+                        + delta[a0][m] * delta[b0][b1] * (PA_1)
+                        + delta[a0][a1] * delta[b1][m] * (PB_0)
+                        + delta[a0][b1] * delta[a1][m] * (PB_0)
+                        + delta[a0][m] * delta[a1][b1] * (PB_0)
+                        + delta[a0][a1] * delta[b0][m] * (PB_1)
+                        + delta[a0][b0] * delta[a1][m] * (PB_1)
+                        + delta[a0][m] * delta[a1][b0] * (PB_1)
+                        + delta[a0][a1] * delta[b0][b1] * (PB_m)
+                        + delta[a0][b0] * delta[a1][b1] * (PB_m)
+                        + delta[a0][b1] * delta[a1][b0] * (PB_m)
+                    )
 
-                        -0.5 / (a_i + a_j) * (
-                            delta[a1][b0] * delta[m][b1] * (PA_0)
-                            + delta[a1][b1] * delta[m][b0] * (PA_0)
-                            + delta[a0][b0] * delta[m][b1] * (PA_1)
-                            + delta[a0][b1] * delta[m][b0] * (PA_1)
-                            + delta[a0][a1] * delta[m][b1] * (PB_0)
-                            + delta[a0][a1] * delta[m][b0] * (PB_1)
-                        )
+                    -a_j / (a_i + a_j) * (
+                        delta[b1][m] * (PA_0 * PA_1 * PB_0)
+                        + delta[b0][m] * (PA_0 * PA_1 * PB_1)
+                        + delta[b0][b1] * (PA_0 * PA_1 * PB_m)
+                        + delta[a1][m] * (PA_0 * PB_0 * PB_1)
+                        + delta[a1][b1] * (PA_0 * PB_0 * PB_m)
+                        + delta[a1][b0] * (PA_0 * PB_1 * PB_m)
+                        + delta[a0][m] * (PA_1 * PB_0 * PB_1)
+                        + delta[a0][b1] * (PA_1 * PB_0 * PB_m)
+                        + delta[a0][b0] * (PA_1 * PB_1 * PB_m)
+                        + delta[a0][a1] * (PB_0 * PB_1 * PB_m)
+                    )
 
-                        - (
-                            delta[m][b1] * (PA_0 * PA_1 * PB_0)
-                            + delta[m][b0] * (PA_0 * PA_1 * PB_1)
-                        )
+                    -2.0 * a_j * (
+                        PA_0 * PA_1 * PB_0 * PB_1 * PB_m
+                    )
 
-                        + 0.25 / ( (a_i + a_j) * (a_i + a_j) ) * 2.0 * a_j * (
-                            delta[a1][b0] * delta[b1][m] * (PA_0)
-                            + delta[a1][b1] * delta[b0][m] * (PA_0)
-                            + delta[a1][m] * delta[b0][b1] * (PA_0)
-                            + delta[a0][b0] * delta[b1][m] * (PA_1)
-                            + delta[a0][b1] * delta[b0][m] * (PA_1)
-                            + delta[a0][m] * delta[b0][b1] * (PA_1)
-                            + delta[a0][a1] * delta[b1][m] * (PB_0)
-                            + delta[a0][b1] * delta[a1][m] * (PB_0)
-                            + delta[a0][m] * delta[a1][b1] * (PB_0)
-                            + delta[a0][a1] * delta[b0][m] * (PB_1)
-                            + delta[a0][b0] * delta[a1][m] * (PB_1)
-                            + delta[a0][m] * delta[a1][b0] * (PB_1)
-                            + delta[a0][a1] * delta[b0][b1] * (PB_m)
-                            + delta[a0][b0] * delta[a1][b1] * (PB_m)
-                            + delta[a0][b1] * delta[a1][b0] * (PB_m)
-                        )
+                    + 0.5 / (a_i + a_j) * (
+                        delta[a1][b0] * delta[m][b1] * (PA_0)
+                        + delta[a1][b1] * delta[m][b0] * (PA_0)
+                        + delta[a0][b0] * delta[m][b1] * (PA_1)
+                        + delta[a0][b1] * delta[m][b0] * (PA_1)
+                        + delta[a0][a1] * delta[m][b1] * (PB_0)
+                        + delta[a0][a1] * delta[m][b0] * (PB_1)
+                    )
 
-                        + 0.5 / (a_i + a_j) * 2.0 * a_j * (
-                            delta[b1][m] * (PA_0 * PA_1 * PB_0)
-                            + delta[b0][m] * (PA_0 * PA_1 * PB_1)
-                            + delta[b0][b1] * (PA_0 * PA_1 * PB_m)
-                            + delta[a1][m] * (PA_0 * PB_0 * PB_1)
-                            + delta[a1][b1] * (PA_0 * PB_0 * PB_m)
-                            + delta[a1][b0] * (PA_0 * PB_1 * PB_m)
-                            + delta[a0][m] * (PA_1 * PB_0 * PB_1)
-                            + delta[a0][b1] * (PA_1 * PB_0 * PB_m)
-                            + delta[a0][b0] * (PA_1 * PB_1 * PB_m)
-                            + delta[a0][a1] * (PB_0 * PB_1 * PB_m)
-                        )
-
-                        + 2.0 * a_j * (
-                            PA_0 * PA_1 * PB_0 * PB_1 * PB_m
-                        )
-
+                    + (
+                        delta[m][b1] * (PA_0 * PA_1 * PB_0)
+                        + delta[m][b0] * (PA_0 * PA_1 * PB_1)
                     )
 
                     );
