@@ -61,7 +61,7 @@ computeElectricDipoleSS(double*         mat_mu_X,
                         const uint32_t* second_inds_local,
                         const uint32_t  ss_prim_pair_count_local)
 {
-    // each thread computes a primitive S/T matrix element
+    // each thread computes a primitive matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -118,7 +118,7 @@ computeElectricDipoleSP(double*         mat_mu_X,
 {
     __shared__ double   delta[3][3];
 
-    // each thread computes a primitive S/T matrix element
+    // each thread computes a primitive matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -197,7 +197,7 @@ computeElectricDipoleSD(double*         mat_mu_X,
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    // each thread computes a primitive S/T matrix element
+    // each thread computes a primitive matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -299,7 +299,7 @@ computeElectricDipolePP(double*         mat_mu_X,
 {
     __shared__ double   delta[3][3];
 
-    // each thread computes a primitive S/T matrix element
+    // each thread computes a primitive matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -398,7 +398,7 @@ computeElectricDipolePD(double*         mat_mu_X,
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    // each thread computes a primitive S/T matrix element
+    // each thread computes a primitive matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -514,7 +514,7 @@ computeElectricDipoleDD(double*         mat_mu_X,
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    // each thread computes a primitive S/T matrix element
+    // each thread computes a primitive matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 

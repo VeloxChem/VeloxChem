@@ -517,18 +517,14 @@ class LinearResponseEigenSolver(LinearSolver):
                                            basis, scf_tensors, eri_dict['screening'])
             lmom_grad = self.get_prop_grad('linear momentum', 'xyz', molecule,
                                            basis, scf_tensors, eri_dict['screening'])
-            """
             mdip_grad = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
-                                           basis, scf_tensors)
-            """
+                                           basis, scf_tensors, eri_dict['screening'])
 
             eigvals = np.array([exc_energies[s] for s in range(self.nstates)])
 
             elec_trans_dipoles = np.zeros((self.nstates, 3))
             velo_trans_dipoles = np.zeros((self.nstates, 3))
-            """
             magn_trans_dipoles = np.zeros((self.nstates, 3))
-            """
 
             if self.rank == mpi_master():
                 # create h5 file for response solutions
@@ -707,10 +703,8 @@ class LinearResponseEigenSolver(LinearSolver):
                             edip_grad[ind], eigvec) * (-1.0)
                         velo_trans_dipoles[s, ind] = np.vdot(
                             lmom_grad[ind], eigvec) / eigvals[s]
-                        """
                         magn_trans_dipoles[s, ind] = np.vdot(
                             mdip_grad[ind], eigvec)
-                        """
 
                     # write to h5 file for response solutions
                     if (self.save_solutions and
@@ -734,23 +728,21 @@ class LinearResponseEigenSolver(LinearSolver):
                     # TODO: enable property calculation
                     osc = (2.0 / 3.0) * np.sum(elec_trans_dipoles**2,
                                                axis=1) * eigvals
-                    """
+                    # TODO: fix rotatory_strength_in_cgs constant
+                    rotatory_strength_in_cgs = 471.443648175
                     rot_vel = np.sum(velo_trans_dipoles * magn_trans_dipoles,
-                                     axis=1) * rotatory_strength_in_cgs()
-                    """
+                                     axis=1) * rotatory_strength_in_cgs
 
                     ret_dict = {
                         'eigenvalues': eigvals,
                         'eigenvectors_distributed': exc_solutions,
                         'electric_transition_dipoles': elec_trans_dipoles,
                         'velocity_transition_dipoles': velo_trans_dipoles,
+                        'magnetic_transition_dipoles': magn_trans_dipoles,
                         'oscillator_strengths': osc,
+                        'rotatory_strengths': rot_vel,
                         'excitation_details': excitation_details,
                     }
-                    """
-                        'magnetic_transition_dipoles': magn_trans_dipoles,
-                        'rotatory_strengths': rot_vel,
-                    """
 
                     """
                     if self.nto:
@@ -1142,19 +1134,15 @@ class LinearResponseEigenSolver(LinearSolver):
             'Electric Transition Dipole Moments (dipole velocity, a.u.)',
             results['velocity_transition_dipoles'])
 
-        # TODO: print more results
-        """
         self._print_transition_dipoles(
             'Magnetic Transition Dipole Moments (a.u.)',
             results['magnetic_transition_dipoles'])
-        """
 
         self._print_absorption('One-Photon Absorption', results)
-        """
         self._print_ecd('Electronic Circular Dichroism', results)
-        """
         self._print_excitation_details('Character of excitations:', results)
 
+        # TODO: print more results
         """
         if self.esa:
             self._print_excited_state_absorption('Excited state absorption:',
@@ -1295,8 +1283,10 @@ class LinearResponseEigenSolver(LinearSolver):
         auxnm = 1.0 / hartree_in_inverse_nm()
 
         exc_ene_au = rsp_results['eigenvalues']
+        # TODO: fix rotatory_strength_in_cgs constant
+        rotatory_strength_in_cgs = 471.443648175
         rot_str_au = rsp_results[
-            'rotatory_strengths'] / rotatory_strength_in_cgs()
+            'rotatory_strengths'] / rotatory_strength_in_cgs
 
         spectrum = {}
 

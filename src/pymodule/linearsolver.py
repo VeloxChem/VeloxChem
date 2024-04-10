@@ -41,6 +41,7 @@ from .veloxchemlib import ScreeningData, GpuDevices
 from .veloxchemlib import compute_fock_gpu
 from .veloxchemlib import compute_electric_dipole_integrals_gpu
 from .veloxchemlib import compute_linear_momentum_integrals_gpu
+from .veloxchemlib import compute_angular_momentum_integrals_gpu
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
@@ -1361,30 +1362,80 @@ class LinearSolver:
                              op=MPI.SUM,
                              root=mpi_master())
 
+            # TODO: fix coefficient of -1
             if self.rank == mpi_master():
                 integrals = (mu_x_mat_np, mu_y_mat_np, mu_z_mat_np)
             else:
                 integrals = tuple()
 
         elif operator in ['angular_momentum', 'angular momentum']:
-            angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-            angmom_mats = angmom_drv.compute(molecule, basis)
+            mu_x, mu_y, mu_z = compute_angular_momentum_integrals_gpu(
+                    molecule, basis, [0.0, 0.0, 0.0], screening)
+
+            naos = mu_x.number_of_rows()
 
             if self.rank == mpi_master():
-                integrals = (-1.0 * angmom_mats.x_to_numpy(),
-                             -1.0 * angmom_mats.y_to_numpy(),
-                             -1.0 * angmom_mats.z_to_numpy())
+                mu_x_mat_np = np.zeros((naos, naos))
+                mu_y_mat_np = np.zeros((naos, naos))
+                mu_z_mat_np = np.zeros((naos, naos))
+            else:
+                mu_x_mat_np = None
+                mu_y_mat_np = None
+                mu_z_mat_np = None
+
+            self.comm.Reduce(mu_x.to_numpy(),
+                             mu_x_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+            self.comm.Reduce(mu_y.to_numpy(),
+                             mu_y_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+            self.comm.Reduce(mu_z.to_numpy(),
+                             mu_z_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+
+            if self.rank == mpi_master():
+                integrals = (-1.0 * mu_x_mat_np,
+                             -1.0 * mu_y_mat_np,
+                             -1.0 * mu_z_mat_np)
             else:
                 integrals = tuple()
 
         elif operator in ['magnetic_dipole', 'magnetic dipole']:
-            angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-            angmom_mats = angmom_drv.compute(molecule, basis)
+            mu_x, mu_y, mu_z = compute_angular_momentum_integrals_gpu(
+                    molecule, basis, [0.0, 0.0, 0.0], screening)
+
+            naos = mu_x.number_of_rows()
 
             if self.rank == mpi_master():
-                integrals = (0.5 * angmom_mats.x_to_numpy(),
-                             0.5 * angmom_mats.y_to_numpy(),
-                             0.5 * angmom_mats.z_to_numpy())
+                mu_x_mat_np = np.zeros((naos, naos))
+                mu_y_mat_np = np.zeros((naos, naos))
+                mu_z_mat_np = np.zeros((naos, naos))
+            else:
+                mu_x_mat_np = None
+                mu_y_mat_np = None
+                mu_z_mat_np = None
+
+            self.comm.Reduce(mu_x.to_numpy(),
+                             mu_x_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+            self.comm.Reduce(mu_y.to_numpy(),
+                             mu_y_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+            self.comm.Reduce(mu_z.to_numpy(),
+                             mu_z_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+
+            # TODO: fix coefficient of -1
+            if self.rank == mpi_master():
+                integrals = (-0.5 * mu_x_mat_np,
+                             -0.5 * mu_y_mat_np,
+                             -0.5 * mu_z_mat_np)
             else:
                 integrals = tuple()
 
@@ -2161,10 +2212,12 @@ class LinearSolver:
         valstr = title
         self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        # TODO: fix rotatory_strength_in_cgs constant
+        rotatory_strength_in_cgs = 471.443648175
         for s, R in enumerate(results['rotatory_strengths']):
             valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
             valstr += '    Rot.Str. '
-            valstr += f'{(R / rotatory_strength_in_cgs()):13.6f} a.u.'
+            valstr += f'{(R / rotatory_strength_in_cgs):13.6f} a.u.'
             valstr += f'{R:11.4f} [10**(-40) cgs]'
             self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_blank()

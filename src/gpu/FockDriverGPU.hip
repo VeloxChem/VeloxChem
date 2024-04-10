@@ -47,6 +47,7 @@
 #include "FockDriverGPU.hpp"
 #include "ElectricDipoleIntegrals.hpp"
 #include "LinearMomentumIntegrals.hpp"
+#include "AngularMomentumIntegrals.hpp"
 #include "EriCoulomb.hpp"
 #include "EriExchange.hpp"
 #include "ErrorHandler.hpp"
@@ -2529,6 +2530,635 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule, const CMolecularB
     }
 
     return lmom_matrices;
+}
+
+auto
+computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const std::vector<double>& origin, const CScreeningData& screening) -> std::vector<CDenseMatrix>
+{
+    CGpuDevices gpu_devices;
+
+    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    // TODO use communicator from arguments
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    auto nthreads = omp_get_max_threads();
+    auto num_gpus_per_node = screening.getNumGpusPerNode();
+    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+
+    std::vector<CDenseMatrix> MX_matrices(num_gpus_per_node);
+    std::vector<CDenseMatrix> MY_matrices(num_gpus_per_node);
+    std::vector<CDenseMatrix> MZ_matrices(num_gpus_per_node);
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        MX_matrices[gpu_id] = CDenseMatrix(naos, naos);
+        MY_matrices[gpu_id] = CDenseMatrix(naos, naos);
+        MZ_matrices[gpu_id] = CDenseMatrix(naos, naos);
+    }
+
+#pragma omp parallel
+    {
+    auto thread_id = omp_get_thread_num();
+
+    if (thread_id % num_threads_per_gpu == 0)
+    {
+    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
+    auto gpu_count = nnodes * num_gpus_per_node;
+
+    // std::stringstream ss;
+    // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
+    // std::cout << ss.str();
+
+    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+
+    // GTOs blocks and number of AOs
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    // gto blocks
+
+    int64_t s_prim_count = 0;
+    int64_t p_prim_count = 0;
+    int64_t d_prim_count = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+        const auto npgtos = gto_block.getNumberOfPrimitives();
+
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
+        if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
+        if (gto_ang == 2) d_prim_count += npgtos * ncgtos;
+    }
+
+    // Cartesian to spherical index mapping for P and D
+
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_p;
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_d;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 1)
+        {
+            auto p_map = gto_block.getCartesianToSphericalMappingForP();
+
+            for (const auto& [cart_ind, sph_ind_coef] : p_map)
+            {
+                cart_sph_p[cart_ind] = sph_ind_coef;
+            }
+        }
+        else if (gto_ang == 2)
+        {
+            auto d_map = gto_block.getCartesianToSphericalMappingForD();
+
+            for (const auto& [cart_ind, sph_ind_coef] : d_map)
+            {
+                cart_sph_d[cart_ind] = sph_ind_coef;
+            }
+        }
+    }
+
+    // S gto block
+
+    std::vector<double>   s_prim_info(5 * s_prim_count);
+    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
+
+    double*   d_s_prim_info;
+
+    hipSafe(hipMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // P gto block
+
+    std::vector<double>   p_prim_info(5 * p_prim_count);
+    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
+
+    double*   d_p_prim_info;
+
+    hipSafe(hipMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // D gto block
+
+    std::vector<double>   d_prim_info(5 * d_prim_count);
+    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
+
+    double*   d_d_prim_info;
+
+    hipSafe(hipMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // GTO block pairs
+
+    const auto& ss_first_inds_local = screening.get_ss_first_inds_local(gpu_id);
+    const auto& sp_first_inds_local = screening.get_sp_first_inds_local(gpu_id);
+    const auto& sd_first_inds_local = screening.get_sd_first_inds_local(gpu_id);
+    const auto& pp_first_inds_local = screening.get_pp_first_inds_local(gpu_id);
+    const auto& pd_first_inds_local = screening.get_pd_first_inds_local(gpu_id);
+    const auto& dd_first_inds_local = screening.get_dd_first_inds_local(gpu_id);
+
+    const auto& ss_second_inds_local = screening.get_ss_second_inds_local(gpu_id);
+    const auto& sp_second_inds_local = screening.get_sp_second_inds_local(gpu_id);
+    const auto& sd_second_inds_local = screening.get_sd_second_inds_local(gpu_id);
+    const auto& pp_second_inds_local = screening.get_pp_second_inds_local(gpu_id);
+    const auto& pd_second_inds_local = screening.get_pd_second_inds_local(gpu_id);
+    const auto& dd_second_inds_local = screening.get_dd_second_inds_local(gpu_id);
+
+    const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
+    const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
+    const auto sd_prim_pair_count_local = static_cast<int64_t>(sd_first_inds_local.size());
+    const auto pp_prim_pair_count_local = static_cast<int64_t>(pp_first_inds_local.size());
+    const auto pd_prim_pair_count_local = static_cast<int64_t>(pd_first_inds_local.size());
+    const auto dd_prim_pair_count_local = static_cast<int64_t>(dd_first_inds_local.size());
+
+    const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local, sd_prim_pair_count_local,
+                                                     pp_prim_pair_count_local, pd_prim_pair_count_local, dd_prim_pair_count_local});
+
+    std::vector<double> mat_MX(max_prim_pair_count_local);
+    std::vector<double> mat_MY(max_prim_pair_count_local);
+    std::vector<double> mat_MZ(max_prim_pair_count_local);
+
+    // S on device
+
+    double *d_mat_MX, *d_mat_MY, *d_mat_MZ;
+
+    uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
+    uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
+    uint32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
+    uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
+    uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
+    uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
+
+    hipSafe(hipMalloc(&d_mat_MX, max_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_MY, max_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_MZ, max_prim_pair_count_local * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    MX_matrices[gpu_id].zero();
+    MY_matrices[gpu_id].zero();
+    MZ_matrices[gpu_id].zero();
+
+    auto& mat_mu_x = MX_matrices[gpu_id];
+    auto& mat_mu_y = MY_matrices[gpu_id];
+    auto& mat_mu_z = MZ_matrices[gpu_id];
+
+    hipSafe(hipDeviceSynchronize());
+
+    // SS
+
+    if (ss_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::computeAngularMomentumSS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_MX,
+                           d_mat_MY,
+                           d_mat_MZ,
+                           origin[0],
+                           origin[1],
+                           origin[2],
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_ss_first_inds_local,
+                           d_ss_second_inds_local,
+                           static_cast<uint32_t>(ss_prim_pair_count_local));
+
+        hipSafe(hipMemcpy(mat_MX.data(), d_mat_MX, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_MY.data(), d_mat_MY, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_MZ.data(), d_mat_MZ, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
+        {
+            const auto i = ss_first_inds_local[ij];
+            const auto j = ss_second_inds_local[ij];
+
+            const auto i_cgto = s_prim_aoinds[i];
+            const auto j_cgto = s_prim_aoinds[j];
+
+            mat_mu_x.row(i_cgto)[j_cgto] += mat_MX[ij];
+
+            if (i != j) mat_mu_x.row(j_cgto)[i_cgto] -= mat_MX[ij];
+
+            mat_mu_y.row(i_cgto)[j_cgto] += mat_MY[ij];
+
+            if (i != j) mat_mu_y.row(j_cgto)[i_cgto] -= mat_MY[ij];
+
+            mat_mu_z.row(i_cgto)[j_cgto] += mat_MZ[ij];
+
+            if (i != j) mat_mu_z.row(j_cgto)[i_cgto] -= mat_MZ[ij];
+        }
+    }
+
+    // SP
+
+    if (sp_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::computeAngularMomentumSP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_MX,
+                           d_mat_MY,
+                           d_mat_MZ,
+                           origin[0],
+                           origin[1],
+                           origin[2],
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_sp_first_inds_local,
+                           d_sp_second_inds_local,
+                           static_cast<uint32_t>(sp_prim_pair_count_local));
+
+        hipSafe(hipMemcpy(mat_MX.data(), d_mat_MX, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_MY.data(), d_mat_MY, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_MZ.data(), d_mat_MZ, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
+        {
+            const auto i = sp_first_inds_local[ij];
+            const auto j = sp_second_inds_local[ij];
+
+            const auto i_cgto = s_prim_aoinds[i];
+
+            // TODO: think about the ordering of cartesian components
+            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+            // Cartesian to spherical
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                mat_mu_x.row(i_cgto)[j_cgto_sph] += mat_MX[ij] * j_coef_sph;
+                mat_mu_x.row(j_cgto_sph)[i_cgto] -= mat_MX[ij] * j_coef_sph;
+
+                mat_mu_y.row(i_cgto)[j_cgto_sph] += mat_MY[ij] * j_coef_sph;
+                mat_mu_y.row(j_cgto_sph)[i_cgto] -= mat_MY[ij] * j_coef_sph;
+
+                mat_mu_z.row(i_cgto)[j_cgto_sph] += mat_MZ[ij] * j_coef_sph;
+                mat_mu_z.row(j_cgto_sph)[i_cgto] -= mat_MZ[ij] * j_coef_sph;
+            }
+        }
+    }
+
+    // SD
+
+    if (sd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::computeAngularMomentumSD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_MX,
+                           d_mat_MY,
+                           d_mat_MZ,
+                           origin[0],
+                           origin[1],
+                           origin[2],
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_sd_first_inds_local,
+                           d_sd_second_inds_local,
+                           static_cast<uint32_t>(sd_prim_pair_count_local));
+
+        hipSafe(hipMemcpy(mat_MX.data(), d_mat_MX, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_MY.data(), d_mat_MY, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_MZ.data(), d_mat_MZ, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
+        {
+            const auto i = sd_first_inds_local[ij];
+            const auto j = sd_second_inds_local[ij];
+
+            const auto i_cgto = s_prim_aoinds[i];
+
+            // TODO: think about the ordering of cartesian components
+            const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+            // Cartesian to spherical
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                mat_mu_x.row(i_cgto)[j_cgto_sph] += mat_MX[ij] * j_coef_sph;
+                mat_mu_x.row(j_cgto_sph)[i_cgto] -= mat_MX[ij] * j_coef_sph;
+
+                mat_mu_y.row(i_cgto)[j_cgto_sph] += mat_MY[ij] * j_coef_sph;
+                mat_mu_y.row(j_cgto_sph)[i_cgto] -= mat_MY[ij] * j_coef_sph;
+
+                mat_mu_z.row(i_cgto)[j_cgto_sph] += mat_MZ[ij] * j_coef_sph;
+                mat_mu_z.row(j_cgto_sph)[i_cgto] -= mat_MZ[ij] * j_coef_sph;
+            }
+        }
+    }
+
+    // PP
+
+    if (pp_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::computeAngularMomentumPP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_MX,
+                           d_mat_MY,
+                           d_mat_MZ,
+                           origin[0],
+                           origin[1],
+                           origin[2],
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_pp_first_inds_local,
+                           d_pp_second_inds_local,
+                           static_cast<uint32_t>(pp_prim_pair_count_local));
+
+        hipSafe(hipMemcpy(mat_MX.data(), d_mat_MX, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_MY.data(), d_mat_MY, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_MZ.data(), d_mat_MZ, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
+        {
+            const auto i = pp_first_inds_local[ij];
+            const auto j = pp_second_inds_local[ij];
+
+            // TODO: think about the ordering of cartesian components
+            const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+            // Cartesian to spherical
+            for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
+            {
+                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+                auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+                for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
+                {
+                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                    auto coef_sph = i_coef_sph * j_coef_sph;
+
+                    mat_mu_x.row(i_cgto_sph)[j_cgto_sph] += mat_MX[ij] * coef_sph;
+
+                    if (i != j) mat_mu_x.row(j_cgto_sph)[i_cgto_sph] -= mat_MX[ij] * coef_sph;
+
+                    mat_mu_y.row(i_cgto_sph)[j_cgto_sph] += mat_MY[ij] * coef_sph;
+
+                    if (i != j) mat_mu_y.row(j_cgto_sph)[i_cgto_sph] -= mat_MY[ij] * coef_sph;
+
+                    mat_mu_z.row(i_cgto_sph)[j_cgto_sph] += mat_MZ[ij] * coef_sph;
+
+                    if (i != j) mat_mu_z.row(j_cgto_sph)[i_cgto_sph] -= mat_MZ[ij] * coef_sph;
+                }
+            }
+        }
+    }
+
+    // PD
+
+    if (pd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::computeAngularMomentumPD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_MX,
+                           d_mat_MY,
+                           d_mat_MZ,
+                           origin[0],
+                           origin[1],
+                           origin[2],
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_pd_first_inds_local,
+                           d_pd_second_inds_local,
+                           static_cast<uint32_t>(pd_prim_pair_count_local));
+
+        hipSafe(hipMemcpy(mat_MX.data(), d_mat_MX, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_MY.data(), d_mat_MY, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_MZ.data(), d_mat_MZ, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
+        {
+            const auto i = pd_first_inds_local[ij];
+            const auto j = pd_second_inds_local[ij];
+
+            // TODO: think about the ordering of cartesian components
+            const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+            const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+            // Cartesian to spherical
+            for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
+            {
+                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+                auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+                for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
+                {
+                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                    auto coef_sph = i_coef_sph * j_coef_sph;
+
+                    mat_mu_x.row(i_cgto_sph)[j_cgto_sph] += mat_MX[ij] * coef_sph;
+                    mat_mu_x.row(j_cgto_sph)[i_cgto_sph] -= mat_MX[ij] * coef_sph;
+
+                    mat_mu_y.row(i_cgto_sph)[j_cgto_sph] += mat_MY[ij] * coef_sph;
+                    mat_mu_y.row(j_cgto_sph)[i_cgto_sph] -= mat_MY[ij] * coef_sph;
+
+                    mat_mu_z.row(i_cgto_sph)[j_cgto_sph] += mat_MZ[ij] * coef_sph;
+                    mat_mu_z.row(j_cgto_sph)[i_cgto_sph] -= mat_MZ[ij] * coef_sph;
+                }
+            }
+        }
+    }
+
+    // DD
+
+    if (dd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::computeAngularMomentumDD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_MX,
+                           d_mat_MY,
+                           d_mat_MZ,
+                           origin[0],
+                           origin[1],
+                           origin[2],
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_dd_first_inds_local,
+                           d_dd_second_inds_local,
+                           static_cast<uint32_t>(dd_prim_pair_count_local));
+
+        hipSafe(hipMemcpy(mat_MX.data(), d_mat_MX, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_MY.data(), d_mat_MY, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_MZ.data(), d_mat_MZ, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
+        {
+            const auto i = dd_first_inds_local[ij];
+            const auto j = dd_second_inds_local[ij];
+
+            // TODO: think about the ordering of cartesian components
+            const auto i_cgto = d_prim_aoinds[(i / 6) + d_prim_count * (i % 6)];
+            const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+            // Cartesian to spherical
+            for (const auto& i_cgto_sph_ind_coef : cart_sph_d[i_cgto])
+            {
+                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+                auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+                for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
+                {
+                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                    auto coef_sph = i_coef_sph * j_coef_sph;
+
+                    mat_mu_x.row(i_cgto_sph)[j_cgto_sph] += mat_MX[ij] * coef_sph;
+
+                    if (i != j) mat_mu_x.row(j_cgto_sph)[i_cgto_sph] -= mat_MX[ij] * coef_sph;
+
+                    mat_mu_y.row(i_cgto_sph)[j_cgto_sph] += mat_MY[ij] * coef_sph;
+
+                    if (i != j) mat_mu_y.row(j_cgto_sph)[i_cgto_sph] -= mat_MY[ij] * coef_sph;
+
+                    mat_mu_z.row(i_cgto_sph)[j_cgto_sph] += mat_MZ[ij] * coef_sph;
+
+                    if (i != j) mat_mu_z.row(j_cgto_sph)[i_cgto_sph] -= mat_MZ[ij] * coef_sph;
+                }
+            }
+        }
+    }
+
+    hipSafe(hipDeviceSynchronize());
+
+    hipSafe(hipFree(d_s_prim_info));
+    hipSafe(hipFree(d_p_prim_info));
+    hipSafe(hipFree(d_d_prim_info));
+
+    hipSafe(hipFree(d_mat_MX));
+    hipSafe(hipFree(d_mat_MY));
+    hipSafe(hipFree(d_mat_MZ));
+
+    hipSafe(hipFree(d_ss_first_inds_local));
+    hipSafe(hipFree(d_ss_second_inds_local));
+    hipSafe(hipFree(d_sp_first_inds_local));
+    hipSafe(hipFree(d_sp_second_inds_local));
+    hipSafe(hipFree(d_sd_first_inds_local));
+    hipSafe(hipFree(d_sd_second_inds_local));
+    hipSafe(hipFree(d_pp_first_inds_local));
+    hipSafe(hipFree(d_pp_second_inds_local));
+    hipSafe(hipFree(d_pd_first_inds_local));
+    hipSafe(hipFree(d_pd_second_inds_local));
+    hipSafe(hipFree(d_dd_first_inds_local));
+    hipSafe(hipFree(d_dd_second_inds_local));
+
+    }}
+
+    std::vector<CDenseMatrix> amom_matrices(3);
+
+    amom_matrices[0] = CDenseMatrix(naos, naos);
+    amom_matrices[1] = CDenseMatrix(naos, naos);
+    amom_matrices[2] = CDenseMatrix(naos, naos);
+
+    amom_matrices[0].zero();
+    amom_matrices[1].zero();
+    amom_matrices[2].zero();
+
+    auto p_mat_MX = amom_matrices[0].values();
+    auto p_mat_MY = amom_matrices[1].values();
+    auto p_mat_MZ = amom_matrices[2].values();
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        auto p_mat_mu_x = MX_matrices[gpu_id].values();
+        auto p_mat_mu_y = MY_matrices[gpu_id].values();
+        auto p_mat_mu_z = MZ_matrices[gpu_id].values();
+
+        for (int64_t ind = 0; ind < naos * naos; ind++)
+        {
+            p_mat_MX[ind] += p_mat_mu_x[ind];
+            p_mat_MY[ind] += p_mat_mu_y[ind];
+            p_mat_MZ[ind] += p_mat_mu_z[ind];
+        }
+    }
+
+    return amom_matrices;
 }
 
 auto

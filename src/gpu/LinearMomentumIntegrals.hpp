@@ -23,8 +23,8 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef LinearMomentum_hpp
-#define LinearMomentum_hpp
+#ifndef LinearMomentumIntegrals_hpp
+#define LinearMomentumIntegrals_hpp
 
 #include <cstdint>
 

@@ -23,15 +23,15 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef ElectricDipoleIntegrals_hpp
-#define ElectricDipoleIntegrals_hpp
+#ifndef AngularMomentumIntegrals_hpp
+#define AngularMomentumIntegrals_hpp
 
 #include <cstdint>
 
 namespace gpu {  // gpu namespace
 
 __global__ void
-computeElectricDipoleSS(double*         mat_mu_X,
+computeAngularMomentumSS(double*         mat_mu_X,
                         double*         mat_mu_Y,
                         double*         mat_mu_Z,
                         const double    origin_X,
@@ -44,7 +44,7 @@ computeElectricDipoleSS(double*         mat_mu_X,
                         const uint32_t  ss_prim_pair_count_local);
 
 __global__ void
-computeElectricDipoleSP(double*         mat_mu_X,
+computeAngularMomentumSP(double*         mat_mu_X,
                         double*         mat_mu_Y,
                         double*         mat_mu_Z,
                         const double    origin_X,
@@ -59,7 +59,7 @@ computeElectricDipoleSP(double*         mat_mu_X,
                         const uint32_t  sp_prim_pair_count_local);
 
 __global__ void
-computeElectricDipoleSD(double*         mat_mu_X,
+computeAngularMomentumSD(double*         mat_mu_X,
                         double*         mat_mu_Y,
                         double*         mat_mu_Z,
                         const double    origin_X,
@@ -74,7 +74,7 @@ computeElectricDipoleSD(double*         mat_mu_X,
                         const uint32_t  sd_prim_pair_count_local);
 
 __global__ void
-computeElectricDipolePP(double*         mat_mu_X,
+computeAngularMomentumPP(double*         mat_mu_X,
                         double*         mat_mu_Y,
                         double*         mat_mu_Z,
                         const double    origin_X,
@@ -87,7 +87,7 @@ computeElectricDipolePP(double*         mat_mu_X,
                         const uint32_t  pp_prim_pair_count_local);
 
 __global__ void
-computeElectricDipolePD(double*         mat_mu_X,
+computeAngularMomentumPD(double*         mat_mu_X,
                         double*         mat_mu_Y,
                         double*         mat_mu_Z,
                         const double    origin_X,
@@ -102,7 +102,7 @@ computeElectricDipolePD(double*         mat_mu_X,
                         const uint32_t  pd_prim_pair_count_local);
 
 __global__ void
-computeElectricDipoleDD(double*         mat_mu_X,
+computeAngularMomentumDD(double*         mat_mu_X,
                         double*         mat_mu_Y,
                         double*         mat_mu_Z,
                         const double    origin_X,

@@ -58,7 +58,7 @@ computeLinearMomentumSS(double*         mat_mu_X,
                         const uint32_t* second_inds_local,
                         const uint32_t  ss_prim_pair_count_local)
 {
-    // each thread computes a primitive S/T matrix element
+    // each thread computes a primitive matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -116,7 +116,7 @@ computeLinearMomentumSP(double*         mat_mu_X,
 {
     __shared__ double   delta[3][3];
 
-    // each thread computes a primitive S/T matrix element
+    // each thread computes a primitive matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -202,7 +202,7 @@ computeLinearMomentumSD(double*         mat_mu_X,
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    // each thread computes a primitive S/T matrix element
+    // each thread computes a primitive matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -297,7 +297,7 @@ computeLinearMomentumPP(double*         mat_mu_X,
 {
     __shared__ double   delta[3][3];
 
-    // each thread computes a primitive S/T matrix element
+    // each thread computes a primitive matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -388,7 +388,7 @@ computeLinearMomentumPD(double*         mat_mu_X,
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    // each thread computes a primitive S/T matrix element
+    // each thread computes a primitive matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -502,7 +502,7 @@ computeLinearMomentumDD(double*         mat_mu_X,
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    // each thread computes a primitive S/T matrix element
+    // each thread computes a primitive matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
