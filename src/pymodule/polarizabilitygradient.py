@@ -1277,10 +1277,13 @@ class PolarizabilityGradient():
         # title for result output
         header = title + 'Polarizability Gradients'
         line = '=' * 40
+        info_on_threshold = 'Printing only components with absolute values > 1.0e-6'
 
         self.ostream.print_blank()
         self.ostream.print_header(header)
         self.ostream.print_header(line)
+        self.ostream.print_blank()
+        self.ostream.print_info(info_on_threshold)
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -1289,27 +1292,50 @@ class PolarizabilityGradient():
             self.ostream.print_header(atom_info)
             self.ostream.print_blank()
 
-            # column headers
-            column_headers = '{:<12}{:<16}{:>12}{:>12}{:>12} \n'.format(
-                "frequency", "alpha components", "coord. x", "coord. y",
-                "coord. z")
-            gradient_block = column_headers
+            if self.is_complex:
+                column_headers = '{:<14s} {:>14s} {:>15s} {:>18s}'.format(
+                    'Component', 'Frequency', 'Real', 'Imaginary')
+                column_headers += '\n' + '-' * len(column_headers) + '\n'
+                gradient_block = column_headers
+                for w in self.frequencies:
+                    current_gradient = self.polgradient[w].reshape(3, 3, natm, 3)
+                    for aop, acomp in enumerate('xyz'):
+                        for bop, bcomp in enumerate('xyz'):
+                            for cop, ccomp in enumerate('xyz'):
+                                row = ''
+                                grad_element = current_gradient[aop, bop, i, cop]
+                                if (abs(grad_element.real) < 1.0e-6) and (abs(grad_element.imag) < 1.0e-6):
+                                    continue
+                                grad_str = 'd<<{:>1s};{:<1s}>>/d{:<3s} {:>10.4f} + i{:<8} '.format(
+                                        acomp.lower(), bcomp.lower(), ccomp.lower(), w, self.damping)
+                                result = '{:>12.6f} {:>14.6f}'.format(round(grad_element.real,6), grad_element.imag)
+                                row += grad_str + result + '\n'
+                                gradient_block += row
+            else:
+                column_headers = '{:<14s} {:>12s} {:>15s}'.format(
+                    'Component', 'Frequency', 'Value')
+                column_headers += '\n' + '-' * len(column_headers) + '\n'
+                gradient_block = column_headers
+                for w in self.frequencies:
+                    current_gradient = self.polgradient[w].reshape(3, 3, natm, 3)
+                    for aop, acomp in enumerate('xyz'):
+                        for bop, bcomp in enumerate('xyz'):
+                            for cop, ccomp in enumerate('xyz'):
+                                row = ''
+                                grad_element = current_gradient[aop, bop, i, cop]
+                                if (abs(grad_element.real) < 1.0e-6) and (abs(grad_element.imag) < 1.0e-6):
+                                    continue
+                                grad_str = 'd<<{:>1s};{:<1s}>>/d{:<3s} {:>10.4f} '.format(
+                                        acomp.lower(), bcomp.lower(), ccomp.lower(), w)
+                                result = '{:>18.6f}'.format(round(grad_element,6))
+                                row += grad_str + result + '\n'
+                                gradient_block += row
 
-            for w in self.frequencies:
-                freq = '{:<12}'.format(round(w, 4))
-                current_gradient = self.polgradient[w].reshape(3, 3, natm, 3)
-                for aop, acomp in enumerate('xyz'):
-                    for bop, bcomp in enumerate('xyz'):
-                        row = freq + '{:<16}'.format(acomp + bcomp)
-                        for cop, ccomp in enumerate('xyz'):
-                            grad_element = current_gradient[aop, bop, i, cop]
-                            row += '{:>12}'.format(round(grad_element, 4))
-                        row += ' \n'
-                gradient_block += row
 
             self.ostream.print_block(gradient_block)
             self.ostream.print_blank()
             self.ostream.print_blank()
+            self.ostream.flush()
 
     def print_geometry(self, molecule):
         """
