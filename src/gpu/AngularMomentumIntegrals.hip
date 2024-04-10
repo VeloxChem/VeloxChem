@@ -103,64 +103,27 @@ computeAngularMomentumSS(double*         mat_mu_X,
                               origin_Y - (a_i * y_i + a_j * y_j) / (a_i + a_j),
                               origin_Z - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
-        const double CA[3] = {x_i - origin_X, y_i - origin_Y, z_i - origin_Z};
-        const double CB[3] = {x_j - origin_X, y_j - origin_Y, z_j - origin_Z};
-
-        const double CA_CB[3] = {
-            CA[1] * CB[2] - CA[2] * CB[1],
-            CA[2] * CB[0] - CA[0] * CB[2],
-            CA[0] * CB[1] - CA[1] * CB[0],
-        };
-
-        const auto ksi = a_i * a_j / (a_i + a_j);
-
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
         double* mat_mu[3] = {mat_mu_X, mat_mu_Y, mat_mu_Z};
 
         for (uint32_t m = 0; m < 3; m++)
         {
-            /*
-            const auto L_ij = 2.0 * ksi * CA_CB[m];
-
-            mat_mu[m][ij] = S_ij_00 * L_ij;
-            */
-
             const auto m1 = (m + 1) % 3;
             const auto m2 = (m + 2) % 3;
 
             const auto PB_m1 = (-a_i / (a_i + a_j)) * rij[m1];
             const auto PB_m2 = (-a_i / (a_i + a_j)) * rij[m2];
 
-            mat_mu[m][ij] = S_ij_00 * (
+            mat_mu[m][ij] = -1.0 * S_ij_00 * (
 
-                    (
+                    -a_j / (a_i + a_j) * (delta[m1][m2])
 
-                        -0.5 / (a_i + a_j) * 2.0 * a_j * (
-                            delta[m1][m2]
-                        )
+                    + a_j / (a_i + a_j) * (delta[m1][m2])
 
-                        + 0.5 / (a_i + a_j) * 2.0 * a_j * (
-                            delta[m1][m2]
-                        )
+                    - PC[m1] * (-2.0 * a_j * (PB_m2))
 
-                    )
-
-                    + (-1) * PC[m1] * (
-
-                        -1.0 * 2.0 * a_j * (
-                            PB_m2
-                        )
-
-                    )
-
-                    + (-1) * PC[m2] * (
-
-                        2.0 * a_j * (
-                            PB_m1
-                        )
-
-                    )
+                    - PC[m2] * (2.0 * a_j * (PB_m1))
 
                     );
         }
@@ -228,80 +191,51 @@ computeAngularMomentumSP(double*         mat_mu_X,
                               origin_Y - (a_i * y_i + a_j * y_j) / (a_i + a_j),
                               origin_Z - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
-        const double CA[3] = {x_i - origin_X, y_i - origin_Y, z_i - origin_Z};
-        const double CB[3] = {x_j - origin_X, y_j - origin_Y, z_j - origin_Z};
-
-        const double CA_CB[3] = {
-            CA[1] * CB[2] - CA[2] * CB[1],
-            CA[2] * CB[0] - CA[0] * CB[2],
-            CA[0] * CB[1] - CA[1] * CB[0],
-        };
-
-        const double one_CA[3][3] = {{0.0,   -CA[2], CA[1]},
-                                     {CA[2],  0.0,  -CA[0]},
-                                     {-CA[1], CA[0],  0.0}};
-
-        const auto ksi = a_i * a_j / (a_i + a_j);
-
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
         double* mat_mu[3] = {mat_mu_X, mat_mu_Y, mat_mu_Z};
 
         for (uint32_t m = 0; m < 3; m++)
         {
-            const auto L_ij = 2.0 * ksi * CA_CB[m];
-
             const auto m1 = (m + 1) % 3;
             const auto m2 = (m + 2) % 3;
 
             const auto PB_m1 = (-a_i / (a_i + a_j)) * rij[m1];
             const auto PB_m2 = (-a_i / (a_i + a_j)) * rij[m2];
 
-            mat_mu[m][ij] = S_ij_00 * (
+            mat_mu[m][ij] = -1.0 * S_ij_00 * (
 
                     (
 
-                        -0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        -a_j / (a_i + a_j) * (
                             delta[m1][m2] * (PB_0)
                             + delta[b0][m1] * (PB_m2)
                         )
 
-                        + 0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        + a_j / (a_i + a_j) * (
                             delta[m1][m2] * (PB_0)
                             + delta[b0][m2] * (PB_m1)
                         )
 
                     )
 
-                    + (-1) * PC[m1] * (
+                    - PC[m1] * (
 
-                        -0.5 / (a_i + a_j) * 2.0 * a_j * (
-                            delta[b0][m2]
-                        )
+                        -a_j / (a_i + a_j) * (delta[b0][m2])
 
-                        -1.0 * 2.0 * a_j * (
-                            PB_0 * PB_m2
-                        )
+                        -2.0 * a_j * (PB_0 * PB_m2)
 
-                        + (
-                            delta[b0][m2]
-                        )
+                        + (delta[b0][m2])
 
                     )
 
-                    + (-1) * PC[m2] * (
+                    - PC[m2] * (
 
-                        -1 * (
-                            delta[b0][m1]
-                        )
+                        - (delta[b0][m1])
 
-                        + 0.5 / (a_i + a_j) * 2.0 * a_j * (
-                            delta[b0][m1]
-                        )
+                        + a_j / (a_i + a_j) * (delta[b0][m1])
 
-                        + 2.0 * a_j * (
-                            PB_0 * PB_m1
-                        )
+                        + 2.0 * a_j * (PB_0 * PB_m1)
 
                     )
 
@@ -381,46 +315,29 @@ computeAngularMomentumSD(double*         mat_mu_X,
                               origin_Y - (a_i * y_i + a_j * y_j) / (a_i + a_j),
                               origin_Z - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
-        const double CA[3] = {x_i - origin_X, y_i - origin_Y, z_i - origin_Z};
-        const double CB[3] = {x_j - origin_X, y_j - origin_Y, z_j - origin_Z};
-
-        const double CA_CB[3] = {
-            CA[1] * CB[2] - CA[2] * CB[1],
-            CA[2] * CB[0] - CA[0] * CB[2],
-            CA[0] * CB[1] - CA[1] * CB[0],
-        };
-
-        const double one_CA[3][3] = {{0.0,   -CA[2], CA[1]},
-                                     {CA[2],  0.0,  -CA[0]},
-                                     {-CA[1], CA[0],  0.0}};
-
-        const auto ksi = a_i * a_j / (a_i + a_j);
-
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
         double* mat_mu[3] = {mat_mu_X, mat_mu_Y, mat_mu_Z};
 
         for (uint32_t m = 0; m < 3; m++)
         {
-            const auto L_ij = 2.0 * ksi * CA_CB[m];
-
             const auto m1 = (m + 1) % 3;
             const auto m2 = (m + 2) % 3;
 
             const auto PB_m1 = (-a_i / (a_i + a_j)) * rij[m1];
             const auto PB_m2 = (-a_i / (a_i + a_j)) * rij[m2];
 
-            mat_mu[m][ij] = S_ij_00 * (
+            mat_mu[m][ij] = -1.0 * S_ij_00 * (
 
                     (
 
-                        -0.25 / ( (a_i + a_j) * (a_i + a_j) ) * 2.0 * a_j * (
+                        -0.5 * a_j / ( (a_i + a_j) * (a_i + a_j) ) * (
                             delta[b0][b1] * delta[m1][m2]
                             + delta[b0][m1] * delta[b1][m2]
                             + delta[b0][m2] * delta[b1][m1]
                         )
 
-                        -0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        -a_j / (a_i + a_j) * (
                             delta[m1][m2] * (PB_0 * PB_1)
                             + delta[b1][m1] * (PB_0 * PB_m2)
                             + delta[b0][m1] * (PB_1 * PB_m2)
@@ -431,13 +348,13 @@ computeAngularMomentumSD(double*         mat_mu_X,
                             + delta[b0][m2] * delta[b1][m1]
                         )
 
-                        + 0.25 / ( (a_i + a_j) * (a_i + a_j) ) * 2.0 * a_j * (
+                        + 0.5 * a_j / ( (a_i + a_j) * (a_i + a_j) ) * (
                             delta[b0][b1] * delta[m1][m2]
                             + delta[b0][m1] * delta[b1][m2]
                             + delta[b0][m2] * delta[b1][m1]
                         )
 
-                        + 0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        + a_j / (a_i + a_j) * (
                             delta[m1][m2] * (PB_0 * PB_1)
                             + delta[b1][m2] * (PB_0 * PB_m1)
                             + delta[b0][m2] * (PB_1 * PB_m1)
@@ -450,15 +367,15 @@ computeAngularMomentumSD(double*         mat_mu_X,
 
                     )
 
-                    + (-1) * PC[m1] * (
+                    - PC[m1] * (
 
-                        -0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        -a_j / (a_i + a_j) * (
                             delta[b1][m2] * (PB_0)
                             + delta[b0][m2] * (PB_1)
                             + delta[b0][b1] * (PB_m2)
                         )
 
-                        -1.0 * 2.0 * a_j * (
+                        -2.0 * a_j * (
                             PB_0 * PB_1 * PB_m2
                         )
 
@@ -469,14 +386,14 @@ computeAngularMomentumSD(double*         mat_mu_X,
 
                     )
 
-                    + (-1) * PC[m2] * (
+                    - PC[m2] * (
 
-                        -1 * (
+                        - (
                             delta[b1][m1] * (PB_0)
                             + delta[b0][m1] * (PB_1)
                         )
 
-                        + 0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        + a_j / (a_i + a_j) * (
                             delta[b1][m1] * (PB_0)
                             + delta[b0][m1] * (PB_1)
                             + delta[b0][b1] * (PB_m1)
@@ -507,7 +424,6 @@ computeAngularMomentumPP(double*         mat_mu_X,
                         const uint32_t  pp_prim_pair_count_local)
 {
     __shared__ double   delta[3][3];
-    __shared__ double   one_one[3][3][3];
 
     // each thread computes a primitive matrix element
 
@@ -518,21 +434,6 @@ computeAngularMomentumPP(double*         mat_mu_X,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
-        // x cross x/y/z
-        one_one[0][0][0] =  0.0; one_one[0][0][1] =  0.0; one_one[0][0][2] =  0.0;
-        one_one[0][1][0] =  0.0; one_one[0][1][1] =  0.0; one_one[0][1][2] =  1.0;
-        one_one[0][2][0] =  0.0; one_one[0][2][1] = -1.0; one_one[0][2][2] =  0.0;
-
-        // y cross x/y/z
-        one_one[1][0][0] =  0.0; one_one[1][0][1] =  0.0; one_one[1][0][2] = -1.0;
-        one_one[1][1][0] =  0.0; one_one[1][1][1] =  0.0; one_one[1][1][2] =  0.0;
-        one_one[1][2][0] =  1.0; one_one[1][2][1] =  0.0; one_one[1][2][2] =  0.0;
-
-        // z cross x/y/z
-        one_one[1][0][0] =  0.0; one_one[1][0][1] =  1.0; one_one[1][0][2] =  0.0;
-        one_one[1][1][0] = -1.0; one_one[1][1][1] =  0.0; one_one[1][1][2] =  0.0;
-        one_one[1][2][0] =  0.0; one_one[1][2][1] =  0.0; one_one[1][2][2] =  0.0;
     }
 
     __syncthreads();
@@ -571,33 +472,12 @@ computeAngularMomentumPP(double*         mat_mu_X,
                               origin_Y - (a_i * y_i + a_j * y_j) / (a_i + a_j),
                               origin_Z - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
-        const double CA[3] = {x_i - origin_X, y_i - origin_Y, z_i - origin_Z};
-        const double CB[3] = {x_j - origin_X, y_j - origin_Y, z_j - origin_Z};
-
-        const double CA_CB[3] = {
-            CA[1] * CB[2] - CA[2] * CB[1],
-            CA[2] * CB[0] - CA[0] * CB[2],
-            CA[0] * CB[1] - CA[1] * CB[0],
-        };
-
-        const double one_CA[3][3] = {{0.0,   -CA[2], CA[1]},
-                                     {CA[2],  0.0,  -CA[0]},
-                                     {-CA[1], CA[0],  0.0}};
-
-        const double one_CB[3][3] = {{0.0,   -CB[2], CB[1]},
-                                     {CB[2],  0.0,  -CB[0]},
-                                     {-CB[1], CB[0],  0.0}};
-
-        const auto ksi = a_i * a_j / (a_i + a_j);
-
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
         double* mat_mu[3] = {mat_mu_X, mat_mu_Y, mat_mu_Z};
 
         for (uint32_t m = 0; m < 3; m++)
         {
-            const auto L_ij = 2.0 * ksi * CA_CB[m];
-
             const auto m1 = (m + 1) % 3;
             const auto m2 = (m + 2) % 3;
 
@@ -607,17 +487,17 @@ computeAngularMomentumPP(double*         mat_mu_X,
             const auto PB_m1 = (-a_i / (a_i + a_j)) * rij[m1];
             const auto PB_m2 = (-a_i / (a_i + a_j)) * rij[m2];
 
-            mat_mu[m][ij] = S_ij_00 * (
+            mat_mu[m][ij] = -1.0 * S_ij_00 * (
 
                     (
 
-                        -0.25 / ( (a_i + a_j) * (a_i + a_j) ) * 2.0 * a_j * (
+                        -0.5 * a_j / ( (a_i + a_j) * (a_i + a_j) ) * (
                             delta[a0][b0] * delta[m1][m2]
                             + delta[a0][m1] * delta[b0][m2]
                             + delta[a0][m2] * delta[b0][m1]
                         )
 
-                        -0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        -a_j / (a_i + a_j) * (
                             delta[m1][m2] * (PA_0 * PB_0)
                             + delta[b0][m1] * (PA_0 * PB_m2)
                             + delta[a0][m1] * (PB_0 * PB_m2)
@@ -627,13 +507,13 @@ computeAngularMomentumPP(double*         mat_mu_X,
                             delta[a0][m2] * delta[b0][m1]
                         )
 
-                        + 0.25 / ( (a_i + a_j) * (a_i + a_j) ) * 2.0 * a_j * (
+                        + 0.5 * a_j / ( (a_i + a_j) * (a_i + a_j) ) * (
                             delta[a0][b0] * delta[m1][m2]
                             + delta[a0][m1] * delta[b0][m2]
                             + delta[a0][m2] * delta[b0][m1]
                         )
 
-                        + 0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        + a_j / (a_i + a_j) * (
                             delta[m1][m2] * (PA_0 * PB_0)
                             + delta[b0][m2] * (PA_0 * PB_m1)
                             + delta[a0][m2] * (PB_0 * PB_m1)
@@ -645,15 +525,15 @@ computeAngularMomentumPP(double*         mat_mu_X,
 
                     )
 
-                    + (-1) * PC[m1] * (
+                    - PC[m1] * (
 
-                        -0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        -a_j / (a_i + a_j) * (
                             delta[b0][m2] * (PA_0)
                             + delta[a0][m2] * (PB_0)
                             + delta[a0][b0] * (PB_m2)
                         )
 
-                        -1.0 * 2.0 * a_j * (
+                        -2.0 * a_j * (
                             PA_0 * PB_0 * PB_m2
                         )
 
@@ -663,13 +543,13 @@ computeAngularMomentumPP(double*         mat_mu_X,
 
                     )
 
-                    + (-1) * PC[m2] * (
+                    - PC[m2] * (
 
-                        -1 * (
+                        - (
                             delta[b0][m1] * (PA_0)
                         )
 
-                        + 0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        + a_j / (a_i + a_j) * (
                             delta[b0][m1] * (PA_0)
                             + delta[a0][m1] * (PB_0)
                             + delta[a0][b0] * (PB_m1)
@@ -703,7 +583,6 @@ computeAngularMomentumPD(double*         mat_mu_X,
 {
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
-    __shared__ double   one_one[3][3][3];
 
     // each thread computes a primitive matrix element
 
@@ -721,21 +600,6 @@ computeAngularMomentumPD(double*         mat_mu_X,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
-        // x cross x/y/z
-        one_one[0][0][0] =  0.0; one_one[0][0][1] =  0.0; one_one[0][0][2] =  0.0;
-        one_one[0][1][0] =  0.0; one_one[0][1][1] =  0.0; one_one[0][1][2] =  1.0;
-        one_one[0][2][0] =  0.0; one_one[0][2][1] = -1.0; one_one[0][2][2] =  0.0;
-
-        // y cross x/y/z
-        one_one[1][0][0] =  0.0; one_one[1][0][1] =  0.0; one_one[1][0][2] = -1.0;
-        one_one[1][1][0] =  0.0; one_one[1][1][1] =  0.0; one_one[1][1][2] =  0.0;
-        one_one[1][2][0] =  1.0; one_one[1][2][1] =  0.0; one_one[1][2][2] =  0.0;
-
-        // z cross x/y/z
-        one_one[1][0][0] =  0.0; one_one[1][0][1] =  1.0; one_one[1][0][2] =  0.0;
-        one_one[1][1][0] = -1.0; one_one[1][1][1] =  0.0; one_one[1][1][2] =  0.0;
-        one_one[1][2][0] =  0.0; one_one[1][2][1] =  0.0; one_one[1][2][2] =  0.0;
     }
 
     __syncthreads();
@@ -777,33 +641,12 @@ computeAngularMomentumPD(double*         mat_mu_X,
                               origin_Y - (a_i * y_i + a_j * y_j) / (a_i + a_j),
                               origin_Z - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
-        const double CA[3] = {x_i - origin_X, y_i - origin_Y, z_i - origin_Z};
-        const double CB[3] = {x_j - origin_X, y_j - origin_Y, z_j - origin_Z};
-
-        const double CA_CB[3] = {
-            CA[1] * CB[2] - CA[2] * CB[1],
-            CA[2] * CB[0] - CA[0] * CB[2],
-            CA[0] * CB[1] - CA[1] * CB[0],
-        };
-
-        const double one_CA[3][3] = {{0.0,   -CA[2], CA[1]},
-                                     {CA[2],  0.0,  -CA[0]},
-                                     {-CA[1], CA[0],  0.0}};
-
-        const double one_CB[3][3] = {{0.0,   -CB[2], CB[1]},
-                                     {CB[2],  0.0,  -CB[0]},
-                                     {-CB[1], CB[0],  0.0}};
-
-        const auto ksi = a_i * a_j / (a_i + a_j);
-
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
         double* mat_mu[3] = {mat_mu_X, mat_mu_Y, mat_mu_Z};
 
         for (uint32_t m = 0; m < 3; m++)
         {
-            const auto L_ij = 2.0 * ksi * CA_CB[m];
-
             const auto m1 = (m + 1) % 3;
             const auto m2 = (m + 2) % 3;
 
@@ -813,11 +656,11 @@ computeAngularMomentumPD(double*         mat_mu_X,
             const auto PB_m1 = (-a_i / (a_i + a_j)) * rij[m1];
             const auto PB_m2 = (-a_i / (a_i + a_j)) * rij[m2];
 
-            mat_mu[m][ij] = S_ij_00 * (
+            mat_mu[m][ij] = -1.0 * S_ij_00 * (
 
                     (
 
-                        -0.25 / ( (a_i + a_j) * (a_i + a_j) ) * 2.0 * a_j * (
+                        -0.5 * a_j / ( (a_i + a_j) * (a_i + a_j) ) * (
                             delta[b0][b1] * delta[m1][m2] * (PA_0)
                             + delta[b0][m1] * delta[b1][m2] * (PA_0)
                             + delta[b0][m2] * delta[b1][m1] * (PA_0)
@@ -832,7 +675,7 @@ computeAngularMomentumPD(double*         mat_mu_X,
                             + delta[a0][m1] * delta[b0][b1] * (PB_m2)
                         )
 
-                        -0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        -a_j / (a_i + a_j) * (
                             delta[m1][m2] * (PA_0 * PB_0 * PB_1)
                             + delta[b1][m1] * (PA_0 * PB_0 * PB_m2)
                             + delta[b0][m1] * (PA_0 * PB_1 * PB_m2)
@@ -846,7 +689,7 @@ computeAngularMomentumPD(double*         mat_mu_X,
                             + delta[a0][m2] * delta[b0][m1] * (PB_1)
                         )
 
-                        + 0.25 / ( (a_i + a_j) * (a_i + a_j) ) * 2.0 * a_j * (
+                        + 0.5 * a_j / ( (a_i + a_j) * (a_i + a_j) ) * (
                             delta[b0][b1] * delta[m1][m2] * (PA_0)
                             + delta[b0][m1] * delta[b1][m2] * (PA_0)
                             + delta[b0][m2] * delta[b1][m1] * (PA_0)
@@ -861,7 +704,7 @@ computeAngularMomentumPD(double*         mat_mu_X,
                             + delta[a0][m2] * delta[b0][b1] * (PB_m1)
                         )
 
-                        + 0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        + a_j / (a_i + a_j) * (
                             delta[m1][m2] * (PA_0 * PB_0 * PB_1)
                             + delta[b1][m2] * (PA_0 * PB_0 * PB_m1)
                             + delta[b0][m2] * (PA_0 * PB_1 * PB_m1)
@@ -877,15 +720,15 @@ computeAngularMomentumPD(double*         mat_mu_X,
 
                     )
 
-                    + (-1) * PC[m1] * (
+                    - PC[m1] * (
 
-                        -0.25 / ( (a_i + a_j) * (a_i + a_j) ) * 2.0 * a_j * (
+                        -0.5 * a_j / ( (a_i + a_j) * (a_i + a_j) ) * (
                             delta[a0][b0] * delta[b1][m2]
                             + delta[a0][b1] * delta[b0][m2]
                             + delta[a0][m2] * delta[b0][b1]
                         )
 
-                        -0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        -a_j / (a_i + a_j) * (
                             delta[b1][m2] * (PA_0 * PB_0)
                             + delta[b0][m2] * (PA_0 * PB_1)
                             + delta[b0][b1] * (PA_0 * PB_m2)
@@ -894,7 +737,7 @@ computeAngularMomentumPD(double*         mat_mu_X,
                             + delta[a0][b0] * (PB_1 * PB_m2)
                         )
 
-                        -1.0 * 2.0 * a_j * (
+                        -2.0 * a_j * (
                             PA_0 * PB_0 * PB_1 * PB_m2
                         )
 
@@ -910,25 +753,25 @@ computeAngularMomentumPD(double*         mat_mu_X,
 
                     )
 
-                    + (-1) * PC[m2] * (
+                    - PC[m2] * (
 
                         -0.5 / (a_i + a_j) * (
                             delta[a0][b0] * delta[b1][m1]
                             + delta[a0][b1] * delta[b0][m1]
                         )
 
-                        -1 * (
+                        - (
                             delta[b1][m1] * (PA_0 * PB_0)
                             + delta[b0][m1] * (PA_0 * PB_1)
                         )
 
-                        + 0.25 / ( (a_i + a_j) * (a_i + a_j) ) * 2.0 * a_j * (
+                        + 0.5 * a_j / ( (a_i + a_j) * (a_i + a_j) ) * (
                             delta[a0][b0] * delta[b1][m1]
                             + delta[a0][b1] * delta[b0][m1]
                             + delta[a0][m1] * delta[b0][b1]
                         )
 
-                        + 0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        + a_j / (a_i + a_j) * (
                             delta[b1][m1] * (PA_0 * PB_0)
                             + delta[b0][m1] * (PA_0 * PB_1)
                             + delta[b0][b1] * (PA_0 * PB_m1)
@@ -963,7 +806,6 @@ computeAngularMomentumDD(double*         mat_mu_X,
 {
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
-    __shared__ double   one_one[3][3][3];
 
     // each thread computes a primitive matrix element
 
@@ -981,21 +823,6 @@ computeAngularMomentumDD(double*         mat_mu_X,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
-        // x cross x/y/z
-        one_one[0][0][0] =  0.0; one_one[0][0][1] =  0.0; one_one[0][0][2] =  0.0;
-        one_one[0][1][0] =  0.0; one_one[0][1][1] =  0.0; one_one[0][1][2] =  1.0;
-        one_one[0][2][0] =  0.0; one_one[0][2][1] = -1.0; one_one[0][2][2] =  0.0;
-
-        // y cross x/y/z
-        one_one[1][0][0] =  0.0; one_one[1][0][1] =  0.0; one_one[1][0][2] = -1.0;
-        one_one[1][1][0] =  0.0; one_one[1][1][1] =  0.0; one_one[1][1][2] =  0.0;
-        one_one[1][2][0] =  1.0; one_one[1][2][1] =  0.0; one_one[1][2][2] =  0.0;
-
-        // z cross x/y/z
-        one_one[1][0][0] =  0.0; one_one[1][0][1] =  1.0; one_one[1][0][2] =  0.0;
-        one_one[1][1][0] = -1.0; one_one[1][1][1] =  0.0; one_one[1][1][2] =  0.0;
-        one_one[1][2][0] =  0.0; one_one[1][2][1] =  0.0; one_one[1][2][2] =  0.0;
     }
 
     __syncthreads();
@@ -1041,33 +868,12 @@ computeAngularMomentumDD(double*         mat_mu_X,
                               origin_Y - (a_i * y_i + a_j * y_j) / (a_i + a_j),
                               origin_Z - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
-        const double CA[3] = {x_i - origin_X, y_i - origin_Y, z_i - origin_Z};
-        const double CB[3] = {x_j - origin_X, y_j - origin_Y, z_j - origin_Z};
-
-        const double CA_CB[3] = {
-            CA[1] * CB[2] - CA[2] * CB[1],
-            CA[2] * CB[0] - CA[0] * CB[2],
-            CA[0] * CB[1] - CA[1] * CB[0],
-        };
-
-        const double one_CA[3][3] = {{0.0,   -CA[2], CA[1]},
-                                     {CA[2],  0.0,  -CA[0]},
-                                     {-CA[1], CA[0],  0.0}};
-
-        const double one_CB[3][3] = {{0.0,   -CB[2], CB[1]},
-                                     {CB[2],  0.0,  -CB[0]},
-                                     {-CB[1], CB[0],  0.0}};
-
-        const auto ksi = a_i * a_j / (a_i + a_j);
-
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
         double* mat_mu[3] = {mat_mu_X, mat_mu_Y, mat_mu_Z};
 
         for (uint32_t m = 0; m < 3; m++)
         {
-            const auto L_ij = 2.0 * ksi * CA_CB[m];
-
             const auto m1 = (m + 1) % 3;
             const auto m2 = (m + 2) % 3;
 
@@ -1077,7 +883,7 @@ computeAngularMomentumDD(double*         mat_mu_X,
             const auto PB_m1 = (-a_i / (a_i + a_j)) * rij[m1];
             const auto PB_m2 = (-a_i / (a_i + a_j)) * rij[m2];
 
-            mat_mu[m][ij] = S_ij_00 * (
+            mat_mu[m][ij] = -1.0 * S_ij_00 * (
 
                     (
 
@@ -1099,7 +905,7 @@ computeAngularMomentumDD(double*         mat_mu_X,
                             + delta[a0][m2] * delta[a1][m1] * delta[b0][b1]
                         )
 
-                        -0.25 / ( (a_i + a_j) * (a_i + a_j) ) * 2.0 * a_j * (
+                        -0.5 * a_j / ( (a_i + a_j) * (a_i + a_j) ) * (
                             delta[b0][b1] * delta[m1][m2] * (PA_0 * PA_1)
                             + delta[b0][m1] * delta[b1][m2] * (PA_0 * PA_1)
                             + delta[b0][m2] * delta[b1][m1] * (PA_0 * PA_1)
@@ -1141,7 +947,7 @@ computeAngularMomentumDD(double*         mat_mu_X,
                             + delta[a0][m2] * delta[a1][b1] * delta[b0][m1]
                         )
 
-                        -0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        -a_j / (a_i + a_j) * (
                             delta[m1][m2] * (PA_0 * PA_1 * PB_0 * PB_1)
                             + delta[b1][m1] * (PA_0 * PA_1 * PB_0 * PB_m2)
                             + delta[b0][m1] * (PA_0 * PA_1 * PB_1 * PB_m2)
@@ -1158,7 +964,7 @@ computeAngularMomentumDD(double*         mat_mu_X,
                             + delta[a0][m2] * delta[b0][m1] * (PA_1 * PB_1)
                         )
 
-                        + 0.125 / ( (a_i + a_j) * (a_i + a_j) * (a_i + a_j) ) * 2.0 * a_j * (
+                        + 0.25 * a_j / ( (a_i + a_j) * (a_i + a_j) * (a_i + a_j) ) * (
                             delta[a0][a1] * delta[b0][b1] * delta[m1][m2]
                             + delta[a0][a1] * delta[b0][m1] * delta[b1][m2]
                             + delta[a0][a1] * delta[b0][m2] * delta[b1][m1]
@@ -1176,7 +982,7 @@ computeAngularMomentumDD(double*         mat_mu_X,
                             + delta[a0][m2] * delta[a1][m1] * delta[b0][b1]
                         )
 
-                        + 0.25 / ( (a_i + a_j) * (a_i + a_j) ) * 2.0 * a_j * (
+                        + 0.5 * a_j / ( (a_i + a_j) * (a_i + a_j) ) * (
                             delta[b0][b1] * delta[m1][m2] * (PA_0 * PA_1)
                             + delta[b0][m1] * delta[b1][m2] * (PA_0 * PA_1)
                             + delta[b0][m2] * delta[b1][m1] * (PA_0 * PA_1)
@@ -1218,7 +1024,7 @@ computeAngularMomentumDD(double*         mat_mu_X,
                             + delta[a0][m1] * delta[a1][b1] * delta[b0][m2]
                         )
 
-                        + 0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        + a_j / (a_i + a_j) * (
                             delta[m1][m2] * (PA_0 * PA_1 * PB_0 * PB_1)
                             + delta[b1][m2] * (PA_0 * PA_1 * PB_0 * PB_m1)
                             + delta[b0][m2] * (PA_0 * PA_1 * PB_1 * PB_m1)
@@ -1237,9 +1043,9 @@ computeAngularMomentumDD(double*         mat_mu_X,
 
                     )
 
-                    + (-1) * PC[m1] * (
+                    - PC[m1] * (
 
-                        -0.25 / ( (a_i + a_j) * (a_i + a_j) ) * 2.0 * a_j * (
+                        -0.5 * a_j / ( (a_i + a_j) * (a_i + a_j) ) * (
                             delta[a1][b0] * delta[b1][m2] * (PA_0)
                             + delta[a1][b1] * delta[b0][m2] * (PA_0)
                             + delta[a1][m2] * delta[b0][b1] * (PA_0)
@@ -1257,7 +1063,7 @@ computeAngularMomentumDD(double*         mat_mu_X,
                             + delta[a0][b1] * delta[a1][b0] * (PB_m2)
                         )
 
-                        -0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        -a_j / (a_i + a_j) * (
                             delta[b1][m2] * (PA_0 * PA_1 * PB_0)
                             + delta[b0][m2] * (PA_0 * PA_1 * PB_1)
                             + delta[b0][b1] * (PA_0 * PA_1 * PB_m2)
@@ -1270,7 +1076,7 @@ computeAngularMomentumDD(double*         mat_mu_X,
                             + delta[a0][a1] * (PB_0 * PB_1 * PB_m2)
                         )
 
-                        -1.0 * 2.0 * a_j * (
+                        -2.0 * a_j * (
                             PA_0 * PA_1 * PB_0 * PB_1 * PB_m2
                         )
 
@@ -1290,7 +1096,7 @@ computeAngularMomentumDD(double*         mat_mu_X,
 
                     )
 
-                    + (-1) * PC[m2] * (
+                    - PC[m2] * (
 
                         -0.5 / (a_i + a_j) * (
                             delta[a1][b0] * delta[b1][m1] * (PA_0)
@@ -1301,12 +1107,12 @@ computeAngularMomentumDD(double*         mat_mu_X,
                             + delta[a0][a1] * delta[b0][m1] * (PB_1)
                         )
 
-                        -1 * (
+                        - (
                             delta[b1][m1] * (PA_0 * PA_1 * PB_0)
                             + delta[b0][m1] * (PA_0 * PA_1 * PB_1)
                         )
 
-                        + 0.25 / ( (a_i + a_j) * (a_i + a_j) ) * 2.0 * a_j * (
+                        + 0.5 * a_j / ( (a_i + a_j) * (a_i + a_j) ) * (
                             delta[a1][b0] * delta[b1][m1] * (PA_0)
                             + delta[a1][b1] * delta[b0][m1] * (PA_0)
                             + delta[a1][m1] * delta[b0][b1] * (PA_0)
@@ -1324,7 +1130,7 @@ computeAngularMomentumDD(double*         mat_mu_X,
                             + delta[a0][b1] * delta[a1][b0] * (PB_m1)
                         )
 
-                        + 0.5 / (a_i + a_j) * 2.0 * a_j * (
+                        + a_j / (a_i + a_j) * (
                             delta[b1][m1] * (PA_0 * PA_1 * PB_0)
                             + delta[b0][m1] * (PA_0 * PA_1 * PB_1)
                             + delta[b0][b1] * (PA_0 * PA_1 * PB_m1)

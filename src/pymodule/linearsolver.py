@@ -1432,11 +1432,10 @@ class LinearSolver:
                              op=MPI.SUM,
                              root=mpi_master())
 
-            # TODO: fix coefficient of -1
             if self.rank == mpi_master():
-                integrals = (-0.5 * mu_x_mat_np,
-                             -0.5 * mu_y_mat_np,
-                             -0.5 * mu_z_mat_np)
+                integrals = (0.5 * mu_x_mat_np,
+                             0.5 * mu_y_mat_np,
+                             0.5 * mu_z_mat_np)
             else:
                 integrals = tuple()
 
