@@ -1642,4 +1642,62 @@ integrateVxcFock(const CMolecule&        molecule,
     return CAOKohnShamMatrix();
 }
 
+static auto
+integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
+                       const CMolecule&        molecule,
+                       const CMolecularBasis&  basis,
+                       const CAODensityMatrix& rwDensityMatrix,
+                       const CAODensityMatrix& gsDensityMatrix,
+                       const CMolecularGrid&   molecularGrid,
+                       const CXCFunctional&    xcFunctional,
+                       const int64_t           numGpusPerNode) -> void
+{
+}
+
+static auto
+integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
+                       const CMolecule&        molecule,
+                       const CMolecularBasis&  basis,
+                       const CAODensityMatrix& rwDensityMatrix,
+                       const CAODensityMatrix& gsDensityMatrix,
+                       const CMolecularGrid&   molecularGrid,
+                       const CXCFunctional&    xcFunctional,
+                       const int64_t           numGpusPerNode) -> void
+{
+}
+
+auto
+integrateFxcFock(CDenseMatrix&           aoFockMatrix,
+                 const CMolecule&        molecule,
+                 const CMolecularBasis&  basis,
+                 const CAODensityMatrix& rwDensityMatrix,
+                 const CAODensityMatrix& gsDensityMatrix,
+                 const CMolecularGrid&   molecularGrid,
+                 const std::string&      xcFuncLabel,
+                 const int64_t           numGpusPerNode) -> void
+{
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    std::string erropenshell("gpu::integrateFxcFock: Only implemented for closed-shell");
+
+    const auto rw_closed_shell = rwDensityMatrix.isClosedShell();
+    const auto gs_closed_shell = gsDensityMatrix.isClosedShell();
+
+    errors::assertMsgCritical((rw_closed_shell && gs_closed_shell), erropenshell);
+
+    if (xcfuntype == xcfun::lda) return integrateFxcFockForLDA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode);
+
+    if (xcfuntype == xcfun::gga) return integrateFxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode);
+
+    /*
+    if (xcfuntype == xcfun::mgga) return integrateFxcFockForMGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode);
+
+    std::string errxcfuntype("XCIntegrator.integrateFxcFock: Only implemented for LDA/GGA/meta-GGA");
+
+    errors::assertMsgCritical(false, errxcfuntype);
+    */
+}
+
 }  // namespace gpu

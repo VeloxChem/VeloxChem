@@ -50,6 +50,15 @@ auto integrateVxcFock(const CMolecule&        molecule,
                       const std::string&      xcFuncLabel,
                       const int64_t           numGpusPerNode) -> CAOKohnShamMatrix;
 
+auto integrateFxcFock(CDenseMatrix&           aoFockMatrix,
+                      const CMolecule&        molecule,
+                      const CMolecularBasis&  basis,
+                      const CAODensityMatrix& rwDensityMatrix,
+                      const CAODensityMatrix& gsDensityMatrix,
+                      const CMolecularGrid&   molecularGrid,
+                      const std::string&      xcFuncLabel,
+                      const int64_t           numGpusPerNode) -> void;
+
 }  // namespace gpu
 
 #endif
