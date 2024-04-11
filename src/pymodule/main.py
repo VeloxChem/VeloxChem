@@ -501,12 +501,13 @@ def main():
         rsp_dict = (dict(task.input_dict['response'])
                     if 'response' in task.input_dict else {})
 
-        hessian_drv = ScfHessianDriver(task.mpi_comm, task.ostream)
+#        hessian_drv = ScfHessianDriver(task.mpi_comm, task.ostream)
+        hessian_drv = ScfHessianDriver(scf_drv)
         #hessian_drv.update_settings(method_dict, freq_dict)
         hessian_drv.update_settings(method_dict, hess_dict = vib_dict, 
                                     cphf_dict = orbrsp_dict, rsp_dict = rsp_dict,
                                     polgrad_dict = polgrad_dict)
-        hessian_drv.compute(task.molecule, task.ao_basis, scf_drv)
+        hessian_drv.compute(task.molecule, task.ao_basis)
         # TODO: add output file name for geomeTRIC vibrational analysis
         if task.mpi_rank == mpi_master():
             hessian_drv.vibrational_analysis(task.molecule)

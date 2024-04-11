@@ -606,7 +606,7 @@ class ScfHessianDriver(HessianDriver):
             self.compute_dipole_gradient(molecule, ao_basis,
                                     perturbed_density)
 
-        # Calculate the polarizability gradient, needed for Raman intensities
+        # Calculate the analytical polarizability gradient, needed for Raman intensities
         if self.do_raman:
             # Perform a linear response calculation
             lr_drv = LinearResponseSolver()
@@ -616,15 +616,12 @@ class ScfHessianDriver(HessianDriver):
 
             # Set up the polarizability gradient driver
             polgrad_drv = PolarizabilityGradient(self.comm, self.ostream)
-            #self.cphf_dict['frequencies'] = [ 0.0 ]
-            #polgrad_drv.update_settings(self.rsp_dict,
             polgrad_drv.update_settings(self.polgrad_dict,
                                         orbrsp_dict = self.cphf_dict,
                                         method_dict = self.method_dict,
                                         scf_drv = self.scf_driver)
             polgrad_drv.compute(molecule, ao_basis,
                                 self.scf_driver.scf_tensors, lr_results)
-            #self.polarizability_gradient = polgrad_drv.polgradient[0]
             self.polarizability_gradient = polgrad_drv.polgradient
 
     def compute_pople(self, molecule, ao_basis, cphf_oo, cphf_ov, fock_uij,
@@ -808,6 +805,7 @@ class ScfHessianDriver(HessianDriver):
         else:
             density = None
             gs_density = AODensityMatrix()
+            scf_tensors = None
 
         if self.scf_driver._dft:
             grid_drv = GridDriver()
@@ -819,6 +817,7 @@ class ScfHessianDriver(HessianDriver):
         gs_density.broadcast(self.rank, self.comm)
 
         density = self.comm.bcast(density, root=mpi_master())
+        scf_tensors = self.comm.bcast(scf_tensors, root=mpi_master())
 
         # We use comp_lr_fock from CphfSolver to compute the eri
         # and xc contributions
