@@ -258,6 +258,8 @@ def _MolecularBasis_read(molecule,
     if ostream is None:
         ostream = OutputStream(None)
 
+    # TODO: enable MPI bcast of MolecularBasis through basis_dict
+
     basis_dict = _read_basis_file(basis_name, basis_path, ostream)
 
     mol_basis = MolecularBasis()

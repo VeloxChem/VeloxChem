@@ -170,6 +170,8 @@ def _Molecule_read_xyz_string(xyz):
         The molecule.
     """
 
+    # TODO: enable MPI bcast of Molecule through xyz_string
+
     lines = xyz.strip().splitlines()
 
     try:
