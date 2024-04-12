@@ -890,7 +890,7 @@ class CphfSolver(LinearSolver):
                                                 b=b,
                                                 x0=x0,
                                                 M=PrecondOp,
-                                                tol=self.conv_thresh,
+                                                rtol=self.conv_thresh,
                                                 atol=0,
                                                 maxiter=self.max_iter)
 
