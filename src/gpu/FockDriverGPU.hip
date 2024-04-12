@@ -14585,6 +14585,8 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
 
     beta = 0.0;
 
+    // TODO: double check basis set with linear dependency
+
     // let E == (FDS - SDF)
     // X^T E^T (=> EX)
     hipblasSafe(hipblasDgemm(handle, op_X, HIPBLAS_OP_N, nmo, nao, nao, &alpha, d_X, lda_X, d_C, nao, &beta, d_Y, nmo));
