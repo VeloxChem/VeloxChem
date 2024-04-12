@@ -25,6 +25,7 @@
 
 from .veloxchemlib import xcfun
 from .veloxchemlib import parse_xc_func
+from .veloxchemlib import XCFunctional
 from .errorhandler import assert_msg_critical
 
 
@@ -102,31 +103,31 @@ def get_default_grid_level(xc_func):
             False, 'get_default_grid_level: Invalid XC functional type')
 
 
-def print_libxc_reference(xcfun_label, ostream):
+def print_libxc_reference(xcfun, ostream):
     """
     Prints libxc reference.
 
+    :param xcfun:
+        The XC functional.
     :param ostream:
         The output stream.
     """
 
-    if isinstance(xcfun_label, str) and xcfun_label.lower() != 'hf':
-        xcfun = parse_xc_func(xcfun_label)
+    if isinstance(xcfun, XCFunctional):
+        valstr = 'Using the Libxc library '
+        valstr += f'(version {xcfun.get_libxc_version()}).'
+        ostream.print_info(valstr)
         ostream.print_blank()
-
-        valstr = f'The Libxc library (version {xcfun.get_libxc_version()})'
-        valstr += ' was used in DFT calculation. Reference:'
-        ostream.print_header(valstr.ljust(100))
         valstr = xcfun.get_libxc_reference()
-        ostream.print_header(valstr.ljust(100))
+        ostream.print_reference(valstr)
         ostream.print_blank()
 
-        valstr = f'The {xcfun.get_func_label()} functional was used in DFT'
-        valstr += ' calculation. Reference(s):'
-        ostream.print_header(valstr.ljust(100))
+        valstr = f'Using the {xcfun.get_func_label()} functional.'
+        ostream.print_info(valstr)
+        ostream.print_blank()
         printed_refs = []
         for ref in xcfun.get_functional_reference():
             if ref not in printed_refs:
-                ostream.print_header(ref.ljust(100))
+                ostream.print_reference(ref)
                 printed_refs.append(ref)
         ostream.print_blank()

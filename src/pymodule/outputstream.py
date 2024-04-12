@@ -79,6 +79,7 @@ class OutputStream:
             assert_msg_critical(self.state, errio)
 
         self._state_backup = None
+        self._mute_level = 0
 
     def __del__(self):
         """
@@ -99,15 +100,25 @@ class OutputStream:
                 self.stream.close()
             self.state = False
 
+    @property
+    def is_muted(self):
+        """
+        Checks if the output stream is muted.
+        """
+
+        return (self._state_backup is not None and self._mute_level > 0)
+
     def mute(self):
         """
         Mutes the output stream.
         """
 
-        # only mute from an unmuted state (i.e. when _state_backup is None)
+        self._mute_level += 1
+
         if self._state_backup is None:
             self._state_backup = self.state
-            self.state = False
+
+        self.state = False
 
     def unmute(self):
         """
@@ -115,8 +126,10 @@ class OutputStream:
         state of the output stream.
         """
 
-        # only unmute from an muted state (i.e. when _state_backup is not None)
-        if self._state_backup is not None:
+        if self._mute_level > 0:
+            self._mute_level -= 1
+
+        if self._mute_level == 0 and self._state_backup is not None:
             self.state = self._state_backup
             self._state_backup = None
 
@@ -323,6 +336,27 @@ class OutputStream:
         lines = block_lines.splitlines()
         for line in lines:
             self.print_header(line)
+
+    def print_reference(self, line):
+        """
+        Prints reference to output stream.
+
+        :param lines:
+            The reference line.
+        """
+
+        if not self.state:
+            return
+
+        cur_line = line
+        spaces = ' ' * 9
+
+        while len(cur_line) > 100:
+            index = cur_line[:100].strip().rfind(' ')
+            self.buffer_lines.append(spaces + cur_line[:index].strip())
+            cur_line = cur_line[index:]
+
+        self.buffer_lines.append(spaces + cur_line.strip())
 
     def print_start_header(self, num_nodes):
         """

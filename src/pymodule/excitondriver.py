@@ -48,7 +48,7 @@ from .aofockmatrix import AOFockMatrix
 from .scfrestdriver import ScfRestrictedDriver
 from .rspabsorption import Absorption
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input, print_keywords, get_random_string_parallel
+from .inputparser import parse_input, print_keywords
 from .qqscheme import get_qq_scheme
 from .dftutils import get_default_grid_level
 from .checkpoint import read_rsp_hdf5
@@ -161,8 +161,7 @@ class ExcitonModelDriver:
         self.checkpoint_file = None
 
         # filename
-        self.filename = 'veloxchem_exciton_' + get_random_string_parallel(
-            self.comm)
+        self.filename = None
 
         # input keywords
         self.input_keywords = {
@@ -302,6 +301,9 @@ class ExcitonModelDriver:
         :param min_basis:
             The minimal AO basis set.
         """
+
+        if self.checkpoint_file is None and self.filename is not None:
+            self.checkpoint_file = f'{self.filename}.exciton.h5'
 
         # sanity check
         assert_msg_critical(
@@ -1142,14 +1144,7 @@ class ExcitonModelDriver:
                           if self.grid_level is None else self.grid_level)
             grid_drv.set_level(grid_level)
 
-            grid_t0 = tm.time()
             dimer_molgrid = grid_drv.generate(dimer)
-            n_grid_points = dimer_molgrid.number_of_points()
-            self.ostream.print_info(
-                'Molecular grid with {} points generated in {:.2f} sec.'.format(
-                    n_grid_points,
-                    tm.time() - grid_t0))
-            self.ostream.print_blank()
         else:
             dimer_molgrid = None
 

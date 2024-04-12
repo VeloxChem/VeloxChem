@@ -27,30 +27,30 @@ from .veloxchemlib import mpi_master
 from .gradientdriver import GradientDriver
 
 
-class OpenMMGradientDriver(GradientDriver):
+class MMGradientDriver(GradientDriver):
     """
-    Implements OpenMM gradient driver.
+    Implements MM gradient driver.
 
-    :param openmm_drv:
-        The OpenMM driver.
+    :param mm_drv:
+        The MM driver.
 
     Instance variables
         - flag: The driver flag.
     """
 
-    def __init__(self, openmm_drv):
+    def __init__(self, mm_drv):
         """
-        Initializes OpenMM gradient driver.
+        Initializes MM gradient driver.
         """
 
-        super().__init__(openmm_drv.comm, openmm_drv.ostream)
+        super().__init__(mm_drv.comm, mm_drv.ostream)
 
-        self.openmm_driver = openmm_drv
-        self.flag = 'OpenMM Gradient Driver'
+        self.mm_driver = mm_drv
+        self.flag = 'MM Gradient Driver'
 
     def compute(self, molecule):
         """
-        Performs calculation of OpenMM analytical gradient.
+        Performs calculation of MM analytical gradient.
 
         :param molecule:
             The molecule.
@@ -58,9 +58,9 @@ class OpenMMGradientDriver(GradientDriver):
 
         self.print_header()
 
-        self.openmm_driver.compute(molecule)
+        self.mm_driver.compute(molecule)
 
-        self.gradient = self.openmm_driver.get_gradient()
+        self.gradient = self.mm_driver.get_gradient()
         self.gradient = self.comm.bcast(self.gradient, root=mpi_master())
 
         self.print_geometry(molecule)
@@ -71,12 +71,12 @@ class OpenMMGradientDriver(GradientDriver):
 
     def compute_energy(self, molecule):
         """
-        Performs calculation of OpenMM energy.
+        Performs calculation of MM energy.
 
         :param molecule:
             The molecule.
         """
 
-        self.openmm_driver.compute(molecule)
+        self.mm_driver.compute(molecule)
 
-        return self.openmm_driver.get_energy()
+        return self.mm_driver.get_energy()

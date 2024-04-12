@@ -65,10 +65,8 @@ class ScfHessianDriver(HessianDriver):
     """
     Implements SCF Hessian driver.
 
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
+    :param scf_drv:
+        The Scf driver.
 
     Instance variables
         - do_raman: Additionally calculate Raman intensities
@@ -77,14 +75,16 @@ class ScfHessianDriver(HessianDriver):
                 the Ahlrichs/Furche way.
     """
 
-    def __init__(self, comm=None, ostream=None):
+    def __init__(self, scf_drv):
         """
         Initializes SCF Hessian driver.
         """
 
-        super().__init__(comm, ostream)
+        super().__init__(scf_drv.comm, scf_drv.ostream)
 
+        self.scf_driver = scf_drv
         self.flag = 'SCF Hessian Driver'
+
         self.do_raman = False
         self.pople_hessian = False
 
@@ -152,7 +152,7 @@ class ScfHessianDriver(HessianDriver):
             rsp_dict = {}
         self.rsp_dict = dict(rsp_dict)
 
-    def compute(self, molecule, ao_basis, scf_drv):
+    def compute(self, molecule, ao_basis):
         """
         Computes the analytical or numerical nuclear Hessian.
 
@@ -160,8 +160,6 @@ class ScfHessianDriver(HessianDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param scf_drv:
-            The SCF driver.
         """
 
         if self.rank == mpi_master():
@@ -178,12 +176,12 @@ class ScfHessianDriver(HessianDriver):
         })
 
         # Save the electronic energy
-        self.elec_energy = scf_drv.get_scf_energy()
+        self.elec_energy = self.scf_driver.get_scf_energy()
 
         if self.numerical:
-            self.compute_numerical(molecule, ao_basis, scf_drv)
+            self.compute_numerical(molecule, ao_basis)
         else:
-            self.compute_analytical(molecule, ao_basis, scf_drv, profiler)
+            self.compute_analytical(molecule, ao_basis, profiler)
 
         if self.rank == mpi_master():
             # print Hessian
@@ -200,7 +198,7 @@ class ScfHessianDriver(HessianDriver):
             self.ostream.flush()
 
     # TODO: check if compute numerical works with MPI
-    def compute_numerical(self, molecule, ao_basis, scf_drv):
+    def compute_numerical(self, molecule, ao_basis):
         """
         Performs the calculation of a numerical Hessian based only
         on the energy.
@@ -209,11 +207,9 @@ class ScfHessianDriver(HessianDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param scf_drv:
-            The SCF driver.
         """
 
-        scf_drv.ostream.mute()
+        self.ostream.mute()
 
         # atom labels
         labels = molecule.get_labels()
@@ -241,8 +237,9 @@ class ScfHessianDriver(HessianDriver):
         # set up LR solver and member variable
         if self.do_raman:
             # linear response driver for polarizability calculation
-            lr_drv = LinearResponseSolver(self.comm, scf_drv.ostream)
+            lr_drv = LinearResponseSolver(self.comm, self.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
+
             # polarizability: 3 coordinates x 3 coordinates
             # (ignoring frequencies)
             # polarizability gradient: dictionary goes through
@@ -252,11 +249,11 @@ class ScfHessianDriver(HessianDriver):
                 self.polarizability_gradient = {}
                 self.polarizability_gradient[self.frequency] = np.zeros((3, 3, 3 * natm))
 
-        scf_drv.restart = False
-        scf_results = scf_drv.compute(molecule, ao_basis)
-        assert_msg_critical(scf_drv.is_converged,
+        self.scf_driver.restart = False
+        scf_results = self.scf_driver.compute(molecule, ao_basis)
+        assert_msg_critical(self.scf_driver.is_converged,
                             'ScfHessianDriver: SCF did not converge')
-        energy_0 = scf_drv.get_scf_energy()
+        energy_0 = self.scf_driver.get_scf_energy()
 
         for i in range(natm):
             for x in range(3):
@@ -265,10 +262,10 @@ class ScfHessianDriver(HessianDriver):
                 new_mol = Molecule(labels, coords, units='au')
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
-                scf_results = scf_drv.compute(new_mol, ao_basis)
-                assert_msg_critical(scf_drv.is_converged,
+                scf_results = self.scf_driver.compute(new_mol, ao_basis)
+                assert_msg_critical(self.scf_driver.is_converged,
                                     'ScfHessianDriver: SCF did not converge')
-                energy_ixp = scf_drv.get_scf_energy()
+                energy_ixp = self.scf_driver.get_scf_energy()
 
                 prop.compute_scf_prop(new_mol, ao_basis, scf_results)
                 if self.rank == mpi_master():
@@ -283,10 +280,10 @@ class ScfHessianDriver(HessianDriver):
                 new_mol = Molecule(labels, coords, units='au')
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
-                scf_results = scf_drv.compute(new_mol, ao_basis)
-                assert_msg_critical(scf_drv.is_converged,
+                scf_results = self.scf_driver.compute(new_mol, ao_basis)
+                assert_msg_critical(self.scf_driver.is_converged,
                                     'ScfHessianDriver: SCF did not converge')
-                energy_ixm = scf_drv.get_scf_energy()
+                energy_ixm = self.scf_driver.get_scf_energy()
 
                 prop.compute_scf_prop(new_mol, ao_basis, scf_results)
                 if self.rank == mpi_master():
@@ -328,22 +325,24 @@ class ScfHessianDriver(HessianDriver):
                             new_mol = Molecule(labels, coords, units='au')
                             new_mol.set_charge(charge)
                             new_mol.set_multiplicity(multiplicity)
-                            scf_results = scf_drv.compute(new_mol, ao_basis)
+                            scf_results = self.scf_driver.compute(
+                                new_mol, ao_basis)
                             assert_msg_critical(
-                                scf_drv.is_converged,
+                                self.scf_driver.is_converged,
                                 'ScfHessianDriver: SCF did not converge')
-                            energy_jyp = scf_drv.get_scf_energy()
+                            energy_jyp = self.scf_driver.get_scf_energy()
 
                             # Plus x, plus y
                             coords[i, x] += self.delta_h
                             new_mol = Molecule(labels, coords, units='au')
                             new_mol.set_charge(charge)
                             new_mol.set_multiplicity(multiplicity)
-                            scf_results = scf_drv.compute(new_mol, ao_basis)
+                            scf_results = self.scf_driver.compute(
+                                new_mol, ao_basis)
                             assert_msg_critical(
-                                scf_drv.is_converged,
+                                self.scf_driver.is_converged,
                                 'ScfHessianDriver: SCF did not converge')
-                            energy_ixp_jyp = scf_drv.get_scf_energy()
+                            energy_ixp_jyp = self.scf_driver.get_scf_energy()
                             coords[i, x] -= self.delta_h
 
                             # Minus y
@@ -351,22 +350,24 @@ class ScfHessianDriver(HessianDriver):
                             new_mol = Molecule(labels, coords, units='au')
                             new_mol.set_charge(charge)
                             new_mol.set_multiplicity(multiplicity)
-                            scf_results = scf_drv.compute(new_mol, ao_basis)
+                            scf_results = self.scf_driver.compute(
+                                new_mol, ao_basis)
                             assert_msg_critical(
-                                scf_drv.is_converged,
+                                self.scf_driver.is_converged,
                                 'ScfHessianDriver: SCF did not converge')
-                            energy_jym = scf_drv.get_scf_energy()
+                            energy_jym = self.scf_driver.get_scf_energy()
 
                             # Minus x, minus y:
                             coords[i, x] -= self.delta_h
                             new_mol = Molecule(labels, coords, units='au')
                             new_mol.set_charge(charge)
                             new_mol.set_multiplicity(multiplicity)
-                            scf_results = scf_drv.compute(new_mol, ao_basis)
+                            scf_results = self.scf_driver.compute(
+                                new_mol, ao_basis)
                             assert_msg_critical(
-                                scf_drv.is_converged,
+                                self.scf_driver.is_converged,
                                 'ScfHessianDriver: SCF did not converge')
-                            energy_ixm_jym = scf_drv.get_scf_energy()
+                            energy_ixm_jym = self.scf_driver.get_scf_energy()
 
                             coords[i, x] += self.delta_h
                             coords[j, y] += self.delta_h
@@ -380,13 +381,13 @@ class ScfHessianDriver(HessianDriver):
         self.hessian = hessian.reshape(3 * natm, 3 * natm)
 
         # restore scf_drv to initial state
-        scf_results = scf_drv.compute(molecule, ao_basis)
-        assert_msg_critical(scf_drv.is_converged,
+        scf_results = self.scf_driver.compute(molecule, ao_basis)
+        assert_msg_critical(self.scf_driver.is_converged,
                             'ScfHessianDriver: SCF did not converge')
-        scf_drv.ostream.unmute()
+        self.ostream.unmute()
 
     # TODO: replace all einsum with multidot!
-    def compute_analytical(self, molecule, ao_basis, scf_drv, profiler):
+    def compute_analytical(self, molecule, ao_basis, profiler):
         """
         Computes the analytical nuclear Hessian.
         So far only for restricted Hartree-Fock with PySCF integral derivatives...
@@ -395,14 +396,12 @@ class ScfHessianDriver(HessianDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param scf_drv:
-            The SCF driver.
         :param profiler:
             The profiler.
         """
 
         natm = molecule.number_of_atoms()
-        scf_tensors = scf_drv.scf_tensors
+        scf_tensors = self.scf_driver.scf_tensors
 
         if self.rank == mpi_master(): 
             density = scf_tensors['D_alpha']
@@ -429,7 +428,7 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
         # Solve the CPHF equations
-        cphf_solver.compute(molecule, ao_basis, scf_tensors, scf_drv)
+        cphf_solver.compute(molecule, ao_basis, scf_tensors, self.scf_driver)
         
         if self.rank == mpi_master():
             hessian_first_order_derivatives = np.zeros((natm, natm, 3, 3))
@@ -488,25 +487,25 @@ class ScfHessianDriver(HessianDriver):
                                     ao_basis, -0.5 * ovlp_deriv_oo, cphf_ov,
                                     fock_uij, fock_deriv_oo,
                                     orben_ovlp_deriv_oo,
-                                    perturbed_density, scf_drv, profiler)
+                                    perturbed_density, profiler)
         else:
             cphf_rhs = self.comm.bcast(cphf_rhs, root=mpi_master())
             hessian_first_order_derivatives = self.compute_furche(molecule,
                                     ao_basis, cphf_rhs, -0.5 * ovlp_deriv_oo,
-                                    cphf_ov, scf_drv, profiler)
+                                    cphf_ov, profiler)
         # amount of exact exchange
         frac_K = 1.0
 
         # DFT:
         if self.dft:
-            if scf_drv.xcfun.is_hybrid():
-                frac_K = scf_drv.xcfun.get_frac_exact_exchange()
+            if self.scf_driver.xcfun.is_hybrid():
+                frac_K = self.scf_driver.xcfun.get_frac_exact_exchange()
             else:
                 frac_K = 0.0
 
             grid_drv = GridDriver()
             grid_level = (get_default_grid_level(self.xcfun)
-                          if scf_drv.grid_level is None else scf_drv.grid_level)
+                          if self.scf_driver.grid_level is None else self.scf_driver.grid_level)
             grid_drv.set_level(grid_level)
 
             xc_mol_hess = XCMolecularHessian()
@@ -515,7 +514,7 @@ class ScfHessianDriver(HessianDriver):
             hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(molecule,
                                                 ao_basis,
                                                 gs_density, mol_grid,
-                                                scf_drv.xcfun.get_func_label())
+                                                self.scf_driver.xcfun.get_func_label())
             hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
 
         if self.rank == mpi_master():
@@ -604,33 +603,30 @@ class ScfHessianDriver(HessianDriver):
 
             # Calculate the gradient of the dipole moment,
             # needed for IR intensities
-            self.compute_dipole_gradient(molecule, ao_basis, scf_drv,
+            self.compute_dipole_gradient(molecule, ao_basis,
                                     perturbed_density)
 
-        # Calculate the polarizability gradient, needed for Raman intensities
+        # Calculate the analytical polarizability gradient, needed for Raman intensities
         if self.do_raman:
             # Perform a linear response calculation
             lr_drv = LinearResponseSolver()
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
             lr_drv.ostream.state = False
-            lr_results = lr_drv.compute(molecule, ao_basis, scf_drv.scf_tensors)
+            lr_results = lr_drv.compute(molecule, ao_basis, self.scf_driver.scf_tensors)
 
             # Set up the polarizability gradient driver
             polgrad_drv = PolarizabilityGradient(self.comm, self.ostream)
-            #self.cphf_dict['frequencies'] = [ 0.0 ]
-            #polgrad_drv.update_settings(self.rsp_dict,
             polgrad_drv.update_settings(self.polgrad_dict,
                                         orbrsp_dict = self.cphf_dict,
                                         method_dict = self.method_dict,
-                                        scf_drv = scf_drv)
+                                        scf_drv = self.scf_driver)
             polgrad_drv.compute(molecule, ao_basis,
-                                scf_drv.scf_tensors, lr_results)
-            #self.polarizability_gradient = polgrad_drv.polgradient[0]
+                                self.scf_driver.scf_tensors, lr_results)
             self.polarizability_gradient = polgrad_drv.polgradient
 
     def compute_pople(self, molecule, ao_basis, cphf_oo, cphf_ov, fock_uij,
                       fock_deriv_oo, orben_ovlp_deriv_oo, perturbed_density,
-                      scf_drv, profiler):
+                      profiler):
         """
         Computes the analytical nuclear Hessian the Pople way.
         Int. J. Quantum Chem. Quantum Chem. Symp. 13, 225-241 (1979).
@@ -657,8 +653,6 @@ class ScfHessianDriver(HessianDriver):
             orbital energies (ei+ej)S^\chi_ij
         :param perturbed_density:
             The perturbed density matrix.
-        :param scf_drv:
-            The SCF driver.
         :param profiler:
             The profiler.
         """
@@ -667,12 +661,13 @@ class ScfHessianDriver(HessianDriver):
         nocc = molecule.number_of_alpha_electrons()
 
         if self.rank == mpi_master():
-            mo = scf_drv.scf_tensors['C']
+            scf_tensors = self.scf_driver.scf_tensors
+            mo = scf_tensors['C']
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
             nao = mo.shape[0]
-            density = scf_drv.scf_tensors['D_alpha']
-            mo_energies = scf_drv.scf_tensors['E']
+            density = scf_tensors['D_alpha']
+            mo_energies = scf_tensors['E']
             eocc = mo_energies[:nocc]
             eo_diag = np.diag(eocc)
             epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
@@ -697,7 +692,7 @@ class ScfHessianDriver(HessianDriver):
 
         grid_drv = GridDriver()
         grid_level = (get_default_grid_level(self.xcfun)
-                      if scf_drv.grid_level is None else scf_drv.grid_level)
+                      if self.scf_driver.grid_level is None else self.scf_driver.grid_level)
         grid_drv.set_level(grid_level)
 
         mol_grid = grid_drv.generate(molecule)
@@ -706,7 +701,7 @@ class ScfHessianDriver(HessianDriver):
         density = self.comm.bcast(density, root=mpi_master())
 
         fock_uia_numpy = self.construct_fock_matrix_cphf(molecule, ao_basis,
-                                                         cphf_ov, scf_drv)
+                                                         cphf_ov)
 
         if self.rank == mpi_master():
             fock_cphf_oo = np.einsum('mi,xymn,nj->xyij', mo_occ, fock_uij,
@@ -733,23 +728,23 @@ class ScfHessianDriver(HessianDriver):
             # derivatives
             hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
 
-        if scf_drv._dft: 
+        if self.scf_driver._dft: 
             xc_mol_hess = XCMolecularHessian()
         for i in range(natm):
             # upper triangular part
             for j in range(i, natm):
-                if scf_drv._dft:
+                if self.scf_driver._dft:
                     # First derivative of the Vxc matrix elements
                     vxc_deriv_j = xc_mol_hess.integrate_vxc_fock_gradient(
                                     molecule, ao_basis, gs_density, mol_grid,
-                                    scf_drv.xcfun.get_func_label(), j)
+                                    self.scf_driver.xcfun.get_func_label(), j)
                     vxc_deriv_j = self.comm.reduce(vxc_deriv_j,
                                                    root=mpi_master())
                 if self.rank == mpi_master():
                     # First derivative of the Fock matrix
                     fock_deriv_j =  fock_deriv(molecule, ao_basis, density, j,
-                                                scf_drv)
-                    if scf_drv._dft:
+                                               self.scf_driver)
+                    if self.scf_driver._dft:
                         fock_deriv_j += vxc_deriv_j
 
                     # First derivative of overlap matrix
@@ -775,7 +770,7 @@ class ScfHessianDriver(HessianDriver):
 
 
     def compute_furche(self, molecule, ao_basis, cphf_rhs, cphf_oo, cphf_ov,
-                       scf_drv, profiler):
+                       profiler):
         """
         Computes the analytical nuclear Hessian the Furche/Ahlrichs way.
         Chem. Phys. Lett. 362, 511–518 (2002).
@@ -791,8 +786,6 @@ class ScfHessianDriver(HessianDriver):
             The oo block of the CPHF coefficients.
         :param cphf_ov:
             The ov block of the CPHF coefficients.
-        :param scf_drv:
-            The SCF driver.
         :param profiler:
             The profiler.
         """
@@ -800,28 +793,31 @@ class ScfHessianDriver(HessianDriver):
         natm = molecule.number_of_atoms()
         nocc = molecule.number_of_alpha_electrons()
         if self.rank == mpi_master():
-            mo = scf_drv.scf_tensors['C']
+            scf_tensors = self.scf_driver.scf_tensors
+            mo = scf_tensors['C']
             mo_occ = mo[:, :nocc].copy()
             nao = mo.shape[0]
-            density = scf_drv.scf_tensors['D_alpha']
-            mo_energies = scf_drv.scf_tensors['E']
+            density = scf_tensors['D_alpha']
+            mo_energies = scf_tensors['E']
             eocc = mo_energies[:nocc]
             omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
             gs_density = AODensityMatrix([density], denmat.rest)
         else:
             density = None
             gs_density = AODensityMatrix()
+            scf_tensors = None
 
-        if scf_drv._dft:
+        if self.scf_driver._dft:
             grid_drv = GridDriver()
             grid_level = (get_default_grid_level(self.xcfun)
-                          if scf_drv.grid_level is None else scf_drv.grid_level)
+                          if self.scf_driver.grid_level is None else self.scf_driver.grid_level)
             grid_drv.set_level(grid_level)
 
             mol_grid = grid_drv.generate(molecule)
         gs_density.broadcast(self.rank, self.comm)
 
         density = self.comm.bcast(density, root=mpi_master())
+        scf_tensors = self.comm.bcast(scf_tensors, root=mpi_master())
 
         # We use comp_lr_fock from CphfSolver to compute the eri
         # and xc contributions
@@ -830,7 +826,7 @@ class ScfHessianDriver(HessianDriver):
         # ERI information
         eri_dict = cphf_solver._init_eri(molecule, ao_basis)
         # DFT information
-        dft_dict = cphf_solver._init_dft(molecule, scf_drv.scf_tensors)
+        dft_dict = cphf_solver._init_dft(molecule, scf_tensors)
         # PE information
         pe_dict = cphf_solver._init_pe(molecule, ao_basis)
 
@@ -845,35 +841,35 @@ class ScfHessianDriver(HessianDriver):
             # matrix derivatives
             hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
 
-        if scf_drv._dft: 
+        if self.scf_driver._dft: 
             xc_mol_hess = XCMolecularHessian()
         for i in range(natm):
             # First derivative of the Vxc matrix elements
-            if scf_drv._dft:
+            if self.scf_driver._dft:
                 vxc_deriv_i = xc_mol_hess.integrate_vxc_fock_gradient(
                                 molecule, ao_basis, gs_density, mol_grid,
-                                scf_drv.xcfun.get_func_label(), i)
+                                self.scf_driver.xcfun.get_func_label(), i)
                 vxc_deriv_i = self.comm.reduce(vxc_deriv_i, root=mpi_master())
             if self.rank == mpi_master():
                 fock_deriv_i =  fock_deriv(molecule, ao_basis, density, i,
-                                      scf_drv)
-                if scf_drv._dft:
+                                           self.scf_driver)
+                if self.scf_driver._dft:
                     fock_deriv_i += vxc_deriv_i
                 ovlp_deriv_i = overlap_deriv(molecule, ao_basis, i)
 
             # upper triangular part
             for j in range(i, natm):
                 # First derivative of the Vxc matrix elements
-                if scf_drv._dft:
+                if self.scf_driver._dft:
                     vxc_deriv_j = xc_mol_hess.integrate_vxc_fock_gradient(
                                     molecule, ao_basis, gs_density, mol_grid,
-                                    scf_drv.xcfun.get_func_label(), j)
+                                    self.scf_driver.xcfun.get_func_label(), j)
                     vxc_deriv_j = self.comm.reduce(vxc_deriv_j,
                                                     root=mpi_master())
                 if self.rank == mpi_master():
                     fock_deriv_j =  fock_deriv(molecule, ao_basis, density, j,
-                                          scf_drv)
-                    if scf_drv._dft:
+                                               self.scf_driver)
+                    if self.scf_driver._dft:
                         fock_deriv_j += vxc_deriv_j
                     ovlp_deriv_j = overlap_deriv(molecule, ao_basis, j)
         
@@ -959,7 +955,7 @@ class ScfHessianDriver(HessianDriver):
             return None
 
 
-    def construct_fock_matrix_cphf(self, molecule, ao_basis, cphf_ov, scf_drv):
+    def construct_fock_matrix_cphf(self, molecule, ao_basis, cphf_ov):
         """
         Contracts the CPHF coefficients with the two-electron
         integrals and returns an auxiliary fock matrix as a
@@ -971,19 +967,18 @@ class ScfHessianDriver(HessianDriver):
             The AO Basis.
         :param chpf_ov:
             The occupied-virtual block of the CPHF coefficients.
-        :param scf_drv:
-            The SCF driver.
         """
         natm = molecule.number_of_atoms()
         nocc = molecule.number_of_alpha_electrons()
 
         if self.rank == mpi_master():
-            mo = scf_drv.scf_tensors['C']
+            scf_tensors = self.scf_driver.scf_tensors
+            mo = scf_tensors['C']
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
             nao = mo.shape[0]
-            density = scf_drv.scf_tensors['D_alpha']
-            mo_energies = scf_drv.scf_tensors['E']
+            density = scf_tensors['D_alpha']
+            mo_energies = scf_tensors['E']
             eocc = mo_energies[:nocc]
             eo_diag = np.diag(eocc)
             epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
@@ -1012,7 +1007,7 @@ class ScfHessianDriver(HessianDriver):
         # ERI information
         eri_dict = cphf_solver._init_eri(molecule, ao_basis)
         # DFT information
-        dft_dict = cphf_solver._init_dft(molecule, scf_drv.scf_tensors)
+        dft_dict = cphf_solver._init_dft(molecule, scf_tensors)
         # PE information
         pe_dict = cphf_solver._init_pe(molecule, ao_basis)
 
@@ -1038,7 +1033,7 @@ class ScfHessianDriver(HessianDriver):
             return None
 
     def compute_perturbed_energy_weighted_density_matrix(self, molecule,
-                                                         ao_basis, scf_drv):
+                                                         ao_basis):
         """
         Calculates the perturbed energy weighted density matrix
         and returns it as a numpy array.
@@ -1047,27 +1042,25 @@ class ScfHessianDriver(HessianDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param scf_drv:
-            The SCF driver.
         """
         natm = molecule.number_of_atoms()
         nocc = molecule.number_of_alpha_electrons()
-        mo = scf_drv.scf_tensors['C']
+        scf_tensors = self.scf_driver.scf_tensors
+        mo = scf_tensors['C']
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
         nao = mo.shape[0]
         nmo = mo.shape[1]
         nvir = nmo - nocc
-        mo_energies = scf_drv.scf_tensors['E']
+        mo_energies = scf_tensors['E']
         eocc = mo_energies[:nocc]
         eoo = eocc.reshape(-1, 1) + eocc #ei+ej
-        scf_tensors = scf_drv.scf_tensors
         # Set up a CPHF solver
         cphf_solver = CphfSolver(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
         # Solve the CPHF equations
-        cphf_solver.compute(molecule, ao_basis, scf_tensors, scf_drv)
+        cphf_solver.compute(molecule, ao_basis, scf_tensors, self.scf_driver)
 
         # Extract the relevant results
         cphf_solution_dict = cphf_solver.cphf_results
@@ -1080,7 +1073,7 @@ class ScfHessianDriver(HessianDriver):
         fock_deriv_oo = np.einsum('mi,xymn,nj->xyij', mo_occ,
                                    fock_deriv_ao, mo_occ)
         fock_uia_numpy = self.construct_fock_matrix_cphf(molecule, ao_basis,
-                                                         cphf_ov, scf_drv)
+                                                         cphf_ov)
 
         # (ei+ej)S^\chi_ij
         orben_ovlp_deriv_oo = np.einsum('ij,xyij->xyij', eoo, ovlp_deriv_oo)
@@ -1118,7 +1111,7 @@ class ScfHessianDriver(HessianDriver):
 
     # TODO: make this option available
     def compute_numerical_with_analytical_gradient(self, molecule, ao_basis,
-                                                   scf_drv, profiler=None):
+                                                   profiler=None):
 
         """
         Performs calculation of numerical Hessian.
@@ -1127,8 +1120,6 @@ class ScfHessianDriver(HessianDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param scf_drv:
-            The SCF driver.
         :param profiler:
             The profiler.
         """
@@ -1156,7 +1147,7 @@ class ScfHessianDriver(HessianDriver):
         else:
             grad_dict['numerical'] = 'no'
 
-        scf_drv.ostream.mute()
+        self.ostream.mute()
 
         # atom labels
         labels = molecule.get_labels()
@@ -1168,12 +1159,12 @@ class ScfHessianDriver(HessianDriver):
         coords = molecule.get_coordinates()
 
         # gradient driver
-        grad_drv = ScfGradientDriver(scf_drv.comm,
-                                     scf_drv.ostream)
+        grad_drv = ScfGradientDriver(self.scf_driver)
         grad_drv.update_settings(grad_dict, self.method_dict)
 
         # number of atomic orbitals
-        nao = scf_drv.scf_tensors['D_alpha'].shape[0]
+        scf_tensors = self.scf_driver.scf_tensors
+        nao = scf_tensors['D_alpha'].shape[0]
 
         # Hessian
         hessian = np.zeros((natm, 3, natm, 3))
@@ -1188,7 +1179,7 @@ class ScfHessianDriver(HessianDriver):
         # member variable
         if self.do_raman:
             # linear response driver for polarizability calculation
-            lr_drv = LinearResponseSolver(self.comm, scf_drv.ostream)
+            lr_drv = LinearResponseSolver(self.comm, self.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
             # include rsp_settings dict for frequencies etc.
             # polarizability: 3 coordinates x 3 coordinates
@@ -1205,34 +1196,34 @@ class ScfHessianDriver(HessianDriver):
                 for d in range(3):
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    scf_drv.compute(new_mol, ao_basis)
-                    grad_drv.compute(new_mol, ao_basis, scf_drv)
+                    self.scf_driver.compute(new_mol, ao_basis)
+                    grad_drv.compute(new_mol, ao_basis)
                     grad_plus = grad_drv.get_gradient()
 
                     prop.compute_scf_prop(new_mol, ao_basis,
-                                          scf_drv.scf_tensors)
+                                          self.scf_driver.scf_tensors)
                     mu_plus = prop.get_property('dipole moment')
 
                     if self.do_raman:
                         lr_drv._is_converged = False
                         lr_results_p = lr_drv.compute(new_mol, ao_basis,
-                                                      scf_drv.scf_tensors)
+                                                      self.scf_driver.scf_tensors)
 
 
                     coords[i, d] -= 2.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    scf_drv.compute(new_mol, ao_basis)
-                    grad_drv.compute(new_mol, ao_basis, scf_drv)
+                    self.scf_driver.compute(new_mol, ao_basis)
+                    grad_drv.compute(new_mol, ao_basis)
                     grad_minus = grad_drv.get_gradient()
 
                     prop.compute_scf_prop(new_mol, ao_basis,
-                                          scf_drv.scf_tensors)
+                                          self.scf_driver.scf_tensors)
                     mu_minus = prop.get_property('dipole moment')
 
                     if self.do_raman:
                         lr_drv._is_converged = False
                         lr_results_m = lr_drv.compute(new_mol, ao_basis,
-                                                      scf_drv.scf_tensors)
+                                                      self.scf_driver.scf_tensors)
                         for aop in range(3):
                             #for bop in lr_drv.b_components:
                             for bop in range(3):
@@ -1260,63 +1251,63 @@ class ScfHessianDriver(HessianDriver):
                 for d in range(3):
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    scf_drv.compute(new_mol, ao_basis)
-                    grad_drv.compute(new_mol, ao_basis, scf_drv)
+                    self.scf_driver.compute(new_mol, ao_basis)
+                    grad_drv.compute(new_mol, ao_basis)
                     grad_plus1 = grad_drv.get_gradient()
 
                     prop.compute_scf_prop(new_mol, ao_basis,
-                                          scf_drv.scf_tensors)
+                                          self.scf_driver.scf_tensors)
                     mu_plus1 = prop.get_property('dipole moment')
 
                     if self.do_raman:
                         lr_drv._is_converged = False
                         lr_results_p1 = lr_drv.compute(new_mol, ao_basis,
-                                                      scf_drv.scf_tensors)
+                                                      self.scf_driver.scf_tensors)
 
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    scf_drv.compute(new_mol, ao_basis)
-                    grad_drv.compute(new_mol, ao_basis, scf_drv)
+                    self.scf_driver.compute(new_mol, ao_basis)
+                    grad_drv.compute(new_mol, ao_basis)
                     grad_plus2 = grad_drv.get_gradient()
 
                     prop.compute_scf_prop(new_mol, ao_basis,
-                                          scf_drv.scf_tensors)
+                                          self.scf_driver.scf_tensors)
                     mu_plus2 = prop.get_property('dipole moment')
 
                     if self.do_raman:
                         lr_drv._is_converged = False
                         lr_results_p2 = lr_drv.compute(new_mol, ao_basis,
-                                                      scf_drv.scf_tensors)
+                                                      self.scf_driver.scf_tensors)
 
                     coords[i, d] -= 3.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    scf_drv.compute(new_mol, ao_basis, scf_drv)
-                    grad_drv.compute(new_mol, ao_basis, scf_drv)
+                    self.scf_driver.compute(new_mol, ao_basis)
+                    grad_drv.compute(new_mol, ao_basis)
                     grad_minus1 = grad_drv.get_gradient()
 
                     prop.compute_scf_prop(new_mol, ao_basis,
-                                          scf_drv.scf_tensors)
+                                          self.scf_driver.scf_tensors)
                     mu_minus1 = prop.get_property('dipole moment')
 
                     if self.do_raman:
                         lr_drv._is_converged = False
                         lr_results_m1 = lr_drv.compute(new_mol, ao_basis,
-                                                      scf_drv.scf_tensors)
+                                                      self.scf_driver.scf_tensors)
 
                     coords[i, d] -= self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    scf_drv.compute(new_mol, ao_basis)
-                    grad_drv.compute(new_mol, ao_basis, scf_drv)
+                    self.scf_driver.compute(new_mol, ao_basis)
+                    grad_drv.compute(new_mol, ao_basis)
                     grad_minus2 = grad_drv.get_gradient()
 
                     prop.compute_scf_prop(new_mol, ao_basis,
-                                          scf_drv.scf_tensors)
+                                          self.scf_driver.scf_tensors)
                     mu_minus2 = prop.get_property('dipole moment')
 
                     if self.do_raman:
                         lr_drv._is_converged = False
                         lr_results_m2 = lr_drv.compute(new_mol, ao_basis,
-                                                      scf_drv.scf_tensors)
+                                                      self.scf_driver.scf_tensors)
 
                         for aop in range(3):
                             for bop in range(3):
@@ -1351,10 +1342,10 @@ class ScfHessianDriver(HessianDriver):
 
         #self.ostream.print_blank()
 
-        scf_drv.compute(molecule, ao_basis)
-        scf_drv.ostream.unmute()
+        self.scf_driver.compute(molecule, ao_basis)
+        self.ostream.unmute()
 
-    def compute_dipole_gradient(self, molecule, ao_basis, scf_drv,
+    def compute_dipole_gradient(self, molecule, ao_basis,
                                 perturbed_density):
         """
         Computes the analytical gradient of the dipole moment.
@@ -1373,7 +1364,9 @@ class ScfHessianDriver(HessianDriver):
         natm = molecule.number_of_atoms()
         nuclear_charges = molecule.elem_ids_to_numpy()
 
-        density = scf_drv.scf_tensors['D_alpha']
+        scf_tensors = self.scf_driver.scf_tensors 
+
+        density = scf_tensors['D_alpha']
 
         # Dipole integrals
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
@@ -1400,8 +1393,7 @@ class ScfHessianDriver(HessianDriver):
         # the derivative with respect to each atom and contract with 
         # the densities in the same way as done for the energy gradient.
         dipole_integrals_deriv = self.compute_dipole_integral_derivatives(
-                                                        molecule, ao_basis,
-                                                        scf_drv)
+                                                        molecule, ao_basis)
 
         # Add the electronic contributions
         dipole_gradient += -2 * (np.einsum('mn,caxmn->cax', density,
@@ -1413,8 +1405,7 @@ class ScfHessianDriver(HessianDriver):
         self.dipole_gradient = dipole_gradient.reshape(3, 3 * natm)
 
 
-    def compute_dipole_integral_derivatives(self, molecule, ao_basis,
-                                            scf_drv):
+    def compute_dipole_integral_derivatives(self, molecule, ao_basis):
         """
         Imports the analytical derivatives of dipole integrals.
 
@@ -1422,8 +1413,6 @@ class ScfHessianDriver(HessianDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param scf_drv:
-            The SCF driver.
 
         :return:
             The dipole integral derivatives.
@@ -1432,8 +1421,9 @@ class ScfHessianDriver(HessianDriver):
         # number of atoms
         natm = molecule.number_of_atoms()
 
+        scf_tensors = self.scf_driver.scf_tensors
         # number of atomic orbitals
-        nao = scf_drv.scf_tensors['D_alpha'].shape[0]
+        nao = scf_tensors['D_alpha'].shape[0]
 
         # 3 dipole components x No. atoms x 3 atomic coordinates
         # x No. basis x No. basis

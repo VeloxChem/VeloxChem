@@ -24,13 +24,15 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+from collections import defaultdict
 import numpy as np
 import networkx as nx
 import sys
 import re
 
-from .veloxchemlib import mpi_master, bohr_in_angstrom
+from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
+from .errorhandler import safe_arccos
 
 
 class AtomTypeIdentifier:
@@ -95,34 +97,8 @@ class AtomTypeIdentifier:
         # output stream
         self.ostream = ostream
 
-    def create_connectivity_matrix(self, factor=1.3):
-        """
-        Creates a connectivity matrix for the molecule based on the atomic
-        coordinates and covalent radii, determining which atoms are bonded.
-
-        :param factor:
-            A scaling factor for the covalent radii to account for the bond
-            threshold.  Default value is 1.3.
-        """
-
-        num_atoms = self.coordinates.shape[0]
-
-        self.connectivity_matrix = np.zeros((num_atoms, num_atoms),
-                                            dtype='int32')
-        self.distance_matrix = np.zeros((num_atoms, num_atoms))
-
-        for i in range(num_atoms):
-            for j in range(i + 1, num_atoms):
-                distance = self.measure_length(self.coordinates[i],
-                                               self.coordinates[j])
-                adjusted_threshold = (self.covalent_radii[i] +
-                                      self.covalent_radii[j]) * factor
-
-                if distance <= adjusted_threshold:
-                    self.connectivity_matrix[i][j] = 1
-                    self.connectivity_matrix[j][i] = 1
-                    self.distance_matrix[i][j] = distance
-                    self.distance_matrix[j][i] = distance
+        # GAFF version
+        self.gaff_version = None
 
     def plot_connectivity_map_3D(self):
         """
@@ -151,7 +127,7 @@ class AtomTypeIdentifier:
             ax.text(self.coordinates[i, 0],
                     self.coordinates[i, 1],
                     self.coordinates[i, 2],
-                    symbol,
+                    f'{symbol} ({i + 1})',
                     fontsize=12,
                     ha='center',
                     va='center')
@@ -435,6 +411,17 @@ class AtomTypeIdentifier:
 
         self.bad_hydrogen = False
 
+        using_gaff_220 = False
+        if self.gaff_version is not None:
+            gaff_version_major = self.gaff_version.split('.')[0]
+            gaff_version_minor = self.gaff_version.split('.')[1]
+            # here we only compare the first digit of gaff_version_minor...
+            if gaff_version_minor:
+                gaff_version_minor = gaff_version_minor[0]
+            if gaff_version_major.isdigit() and gaff_version_minor.isdigit():
+                using_gaff_220 = (int(gaff_version_major) >= 2 and
+                                  int(gaff_version_minor) >= 2)
+
         for atom_number, info in self.atom_info_dict.items():
 
             # Chemical environment information
@@ -460,15 +447,29 @@ class AtomTypeIdentifier:
                             connected_atom_info = self.atom_info_dict[
                                 connected_atom_number]
 
-                            if (connected_atom_info.get('AtomicSymbol') == 'C'
-                                    and
-                                    connected_atom_info.get('CycleNumber') and
-                                    not set(
-                                        connected_atom_info.get('CycleNumber'))
-                                    & set(info.get('CycleNumber')) and
-                                    'pure_aromatic'
-                                    in connected_atom_info.get('Aromaticity')):
+                            if connected_atom_info.get('AtomicSymbol') != 'C':
+                                continue
 
+                            if not connected_atom_info.get('CycleNumber'):
+                                continue
+
+                            if 'pure_aromatic' not in connected_atom_info.get(
+                                    'Aromaticity'):
+                                continue
+
+                            common_cycle_numbers = (
+                                set(connected_atom_info.get('CycleNumber')) &
+                                set(info.get('CycleNumber')))
+
+                            # Note: Here we count both pure_aromatic and
+                            # non_pure_aromatic rings
+                            common_aromatic_cycles = [
+                                cycle_num for cycle_num in common_cycle_numbers
+                                if self.aromaticity[cycle_num] in
+                                ['pure_aromatic', 'non_pure_aromatic']
+                            ]
+
+                            if not common_aromatic_cycles:
                                 connected_carbon_atom = connected_atom_number
                                 break
 
@@ -480,28 +481,6 @@ class AtomTypeIdentifier:
 
                         elif connected_carbon_atom is not None:
                             carbon_type = {'opls': 'opls_521', 'gaff': 'cp'}
-
-                            index_in_distances = info[
-                                'ConnectedAtomsNumbers'].index(
-                                    connected_carbon_atom)
-                            d = info['ConnectedAtomsDistances'][
-                                index_in_distances]
-
-                            if d > 1.4685:
-                                biphenyl_carbon = {
-                                    'opls': 'opls_521',
-                                    'gaff': 'cp'
-                                }
-                            else:
-                                biphenyl_carbon = {
-                                    'opls': 'opls_CQ',
-                                    'gaff': 'cq'
-                                }
-
-                            # Store the atomtype in the dictionary for the
-                            # biphenyl carbon
-                            self.atom_types_dict[
-                                f'C{connected_carbon_atom}'] = biphenyl_carbon
 
                         else:
                             carbon_type = {'opls': 'opls_145', 'gaff': 'ca'}
@@ -560,10 +539,10 @@ class AtomTypeIdentifier:
                         elif 4 in info['CycleSize']:
                             carbon_type = {'opls': 'opls_CY', 'gaff': 'cy'}
 
-                        elif 5 in info['CycleSize']:
+                        elif 5 in info['CycleSize'] and using_gaff_220:
                             carbon_type = {'opls': 'opls_c5', 'gaff': 'c5'}
 
-                        elif 6 in info['CycleSize']:
+                        elif 6 in info['CycleSize'] and using_gaff_220:
                             carbon_type = {'opls': 'opls_c6', 'gaff': 'c6'}
 
                         else:
@@ -921,7 +900,7 @@ class AtomTypeIdentifier:
                     if (info['NumConnectedAtoms'] == 2 and
                             connected_symbols == {'H'}):
 
-                        oxygen_type = {'opls': 'opls_154', 'gaff': 'ow'}
+                        oxygen_type = {'opls': 'opls_111', 'gaff': 'ow'}
 
                     elif (info['NumConnectedAtoms'] == 2 and
                           'H' in connected_symbols):
@@ -1001,7 +980,11 @@ class AtomTypeIdentifier:
                     if (connected_atom_info['AtomicSymbol'] == 'H' and
                             connected_atom_info['NumConnectedAtoms'] == 1):
 
-                        if oxygen_type == {'opls': 'opls_154', 'gaff': 'oh'}:
+                        if oxygen_type == {'opls': 'opls_111', 'gaff': 'ow'}:
+
+                            hydrogen_type = {'opls': 'opls_112', 'gaff': 'hw'}
+
+                        elif oxygen_type == {'opls': 'opls_154', 'gaff': 'oh'}:
 
                             hydrogen_type = {'opls': 'opls_155', 'gaff': 'ho'}
 
@@ -1220,7 +1203,7 @@ class AtomTypeIdentifier:
                             vec_jk = (
                                 self.coordinates[connected_atoms_numbers[1] - 1]
                                 - self.coordinates[info['AtomNumber'] - 1])
-                            theta_ijk = np.arccos(
+                            theta_ijk = safe_arccos(
                                 np.dot(vec_ji, vec_jk) /
                                 (np.linalg.norm(vec_ji) *
                                  np.linalg.norm(vec_jk)))
@@ -1813,7 +1796,7 @@ class AtomTypeIdentifier:
 
         atom_types = list(self.gaff_atom_types)
 
-        # Look for bonds formed between cc, ce, cg, nc
+        # Look for bonds formed between cc, ce, cg, nc, ne
 
         assigned_bonds = []
         counted_atom_ids = []
@@ -1896,7 +1879,45 @@ class AtomTypeIdentifier:
                 else:
                     atom_types[j] = conjugated_atom_type_pairs[atom_types[j]][1]
 
+        # Look for bonds formed between cp
+
+        for i, at_i in enumerate(atom_types):
+            for j, at_j in enumerate(atom_types):
+                if (j > i and self.connectivity_matrix[i][j] == 1 and
+                        at_i in ['cp', 'cq'] and at_j in ['cp', 'cq']):
+                    if self.get_common_cycles(i, j, 'pure_aromatic'):
+                        atom_types[j] = 'cq' if atom_types[i] == 'cp' else 'cp'
+                    else:
+                        atom_types[j] = atom_types[i]
+
         self.gaff_atom_types = atom_types
+
+    def get_common_cycles(self, i, j, cycle_type='any'):
+        """
+        Gets number of common cycles shared by a pair of atoms.
+
+        :param i:
+            The index of the first atom.
+        :param j:
+            The index of the second atom.
+        :param cycle_type:
+            The type of cycles.
+
+        :return:
+            The number of common cycles.
+        """
+
+        common_cycle_numbers = (
+            set(self.atom_info_dict[i + 1].get('CycleNumber')) &
+            set(self.atom_info_dict[j + 1].get('CycleNumber')))
+
+        if cycle_type in ['pure_aromatic', 'non_pure_aromatic', 'non_aromatic']:
+            return [
+                cycle_num for cycle_num in common_cycle_numbers
+                if self.aromaticity[cycle_num] == cycle_type
+            ]
+        else:
+            return list(common_cycle_numbers)
 
     def generate_gaff_atomtypes(self, molecule):
         """
@@ -1912,9 +1933,10 @@ class AtomTypeIdentifier:
         # Workflow of the method
         self.coordinates = molecule.get_coordinates_in_angstrom()
         self.atomic_symbols = molecule.get_labels()
-        self.covalent_radii = (molecule.covalent_radii_to_numpy() *
-                               bohr_in_angstrom())
-        self.create_connectivity_matrix()
+
+        self.connectivity_matrix = molecule.get_connectivity_matrix()
+        self.distance_matrix = molecule.get_distance_matrix_in_angstrom()
+
         self.detect_closed_cyclic_structures()
         self.create_atom_info_dict()
         self.decide_atom_type()
@@ -1995,3 +2017,117 @@ class AtomTypeIdentifier:
         """
 
         return np.linalg.norm(np.array(v1) - np.array(v2))
+
+    def identify_equivalences(self, depth=20):
+        """
+        Identifies equivalent atoms in the molecule.
+        The depth parameter specifies how many bonds are considered for the equivalence.
+        The default value is 4.
+
+        :param depth:
+            Depth of the equivalence search
+        """
+
+        def gather_neighbors(atom_index, current_depth=0, path=()):
+            """
+            Gather the paths to neighbors of an atom up to a certain depth.
+            """
+
+            if current_depth == depth:
+                return []
+
+            if current_depth == 0 and not path:
+                path = (atom_index,)
+
+            neighbors = []
+
+            for i, connected in enumerate(connectivity_matrix[atom_index]):
+                if connected and i not in path:
+                    new_path = path + (i,)
+                    neighbors.append(new_path)
+                    if current_depth < depth - 1:
+                        neighbors.extend(
+                            gather_neighbors(i, current_depth + 1, new_path))
+
+            return neighbors
+
+        # Main logic for identifying equivalences
+
+        conjugated_atomtype_mapping = {
+            'cc': 'cd',
+            'cd': 'cc',
+            'ce': 'cf',
+            'cf': 'ce',
+            'cg': 'ch',
+            'ch': 'cg',
+            'nc': 'nd',
+            'nd': 'nc',
+            'ne': 'nf',
+            'nf': 'ne',
+            'cp': 'cq',
+            'cq': 'cp',
+        }
+
+        self.equivalent_atoms = [f'{at}_00' for at in self.gaff_atom_types]
+
+        connectivity_matrix = self.connectivity_matrix
+
+        for atom_type in list(set(self.gaff_atom_types)):
+
+            # skip cd/cf/ch/nd/nf/cq since they will be counted by
+            # cc/ce/cg/nc/ne/cp
+            if atom_type in ['cd', 'cf', 'ch', 'nd', 'nf', 'cq']:
+                continue
+
+            swapped_atom_type = conjugated_atomtype_mapping.get(
+                atom_type, atom_type)
+
+            atom_type_count = self.gaff_atom_types.count(atom_type)
+            if swapped_atom_type != atom_type:
+                atom_type_count += self.gaff_atom_types.count(swapped_atom_type)
+
+            if atom_type_count == 1:
+                continue
+
+            atom_paths = defaultdict(set)
+
+            for idx, at in enumerate(self.gaff_atom_types):
+                if at in [atom_type, swapped_atom_type]:
+                    paths = gather_neighbors(idx)
+                    path_types = [
+                        tuple(self.gaff_atom_types[step]
+                              for step in path)
+                        for path in paths
+                    ]
+                    path_types = tuple(sorted(path_types))
+
+                    swapped_path_types = [
+                        tuple(
+                            conjugated_atomtype_mapping.get(at, at)
+                            for at in path)
+                        for path in path_types
+                    ]
+                    swapped_path_types = tuple(sorted(swapped_path_types))
+
+                    if swapped_path_types in atom_paths:
+                        atom_paths[swapped_path_types].add(idx)
+                    else:
+                        atom_paths[path_types].add(idx)
+
+            for eq_id, (path_set, indices) in enumerate(atom_paths.items()):
+                for idx in indices:
+                    self.equivalent_atoms[idx] = f'{atom_type}_{eq_id:02d}'
+
+        equal_charges_str_list = []
+
+        for eq_at in list(set(self.equivalent_atoms)):
+            if self.equivalent_atoms.count(eq_at) > 1:
+                eq_str_list = [
+                    str(i + 1)
+                    for i, a in enumerate(self.equivalent_atoms)
+                    if a == eq_at
+                ]
+                eq_str = ' = '.join(eq_str_list)
+                equal_charges_str_list.append(eq_str)
+
+        self.equivalent_charges = ', '.join(equal_charges_str_list)

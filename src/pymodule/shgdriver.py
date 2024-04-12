@@ -129,7 +129,7 @@ class ShgDriver(NonlinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def compute(self, molecule, ao_basis, scf_tensors):
+    def compute(self, molecule, ao_basis, scf_results):
         """
         Computes the isotropic quadratic response function for second-harmonic
         generation.
@@ -138,7 +138,7 @@ class ShgDriver(NonlinearSolver):
             The molecule.
         :param basis:
             The AO basis.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -154,7 +154,7 @@ class ShgDriver(NonlinearSolver):
         molecule_sanity_check(molecule)
 
         # check SCF results
-        scf_results_sanity_check(self, scf_tensors)
+        scf_results_sanity_check(self, scf_results)
 
         # check dft setup
         dft_sanity_check(self, 'compute', 'nonlinear')
@@ -183,9 +183,9 @@ class ShgDriver(NonlinearSolver):
             'SHG Driver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            S = scf_tensors['S']
-            da = scf_tensors['D_alpha']
-            mo = scf_tensors['C_alpha']
+            S = scf_results['S']
+            da = scf_results['D_alpha']
+            mo = scf_results['C_alpha']
             d_a_mo = np.linalg.multi_dot([mo.T, S, da, S, mo])
             norb = mo.shape[1]
         else:
@@ -202,11 +202,11 @@ class ShgDriver(NonlinearSolver):
         a_grad = linear_solver.get_complex_prop_grad(self.a_operator,
                                                      self.a_components,
                                                      molecule, ao_basis,
-                                                     scf_tensors)
+                                                     scf_results)
         b_grad = linear_solver.get_complex_prop_grad(self.b_operator,
                                                      self.b_components,
                                                      molecule, ao_basis,
-                                                     scf_tensors)
+                                                     scf_results)
 
         if self.rank == mpi_master():
             inv_sqrt_2 = 1.0 / np.sqrt(2.0)
@@ -264,7 +264,7 @@ class ShgDriver(NonlinearSolver):
             N_drv.checkpoint_file = str(
                 Path(self.checkpoint_file).with_suffix('.shg.h5'))
 
-        N_results = N_drv.compute(molecule, ao_basis, scf_tensors, AB)
+        N_results = N_drv.compute(molecule, ao_basis, scf_results, AB)
 
         self._is_converged = N_drv.is_converged
 
@@ -276,14 +276,14 @@ class ShgDriver(NonlinearSolver):
         # Compute the isotropic parallel beta vector
 
         beta = self.compute_quad_components(Focks, freqpairs, X, d_a_mo, Nx,
-                                            self.comp, scf_tensors, molecule,
+                                            self.comp, scf_results, molecule,
                                             ao_basis, profiler)
 
         profiler.end(self.ostream)
 
         # Compute dipole vector
         scf_prop = FirstOrderProperties(self.comm, self.ostream)
-        scf_prop.compute_scf_prop(molecule, ao_basis, scf_tensors)
+        scf_prop.compute_scf_prop(molecule, ao_basis, scf_results)
 
         if self.rank == mpi_master():
 
@@ -368,7 +368,7 @@ class ShgDriver(NonlinearSolver):
             return None
 
     def compute_quad_components(self, Focks, freqpairs, X, d_a_mo, Nx, track,
-                                scf_tensors, molecule, ao_basis, profiler):
+                                scf_results, molecule, ao_basis, profiler):
         """
         Computes all the relevent terms to compute the isotropic quadratic
         response function used for SHG.
@@ -382,7 +382,7 @@ class ShgDriver(NonlinearSolver):
         :param Nx:
             A dictonary containing all the response vectors in distributed
             form.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
             The molecule.
@@ -396,8 +396,8 @@ class ShgDriver(NonlinearSolver):
         """
 
         if self.rank == mpi_master():
-            mo = scf_tensors['C_alpha']
-            F0 = np.linalg.multi_dot([mo.T, scf_tensors['F_alpha'], mo])
+            mo = scf_results['C_alpha']
+            F0 = np.linalg.multi_dot([mo.T, scf_results['F_alpha'], mo])
             norb = mo.shape[1]
         else:
             mo = None
@@ -408,7 +408,7 @@ class ShgDriver(NonlinearSolver):
 
         nocc = molecule.number_of_alpha_electrons()
 
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_results)
 
         # computing all compounded first-order densities
         first_order_dens, second_order_dens = self.get_densities(

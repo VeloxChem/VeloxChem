@@ -1,5 +1,6 @@
 from pathlib import Path
 import numpy as np
+import math
 import pytest
 
 from veloxchem.veloxchemlib import ChemicalElement, DispersionModel
@@ -392,3 +393,28 @@ class TestMolData:
 
             if fpath.is_file():
                 fpath.unlink()
+
+    def test_dihedral(self):
+
+        xyz_string = """
+            9
+            xyz
+            O    1.086900000000    0.113880000000   -0.060730000000
+            C    2.455250000000    0.132120000000   -0.071390000000
+            C    3.171673900000   -0.838788100000    0.496389800000
+            C    2.491492369403   -1.966504408464    1.155862765438
+            O    1.664691816845   -2.650313648401    0.565927537003
+            H    0.786520000000   -0.686240000000    0.407170000000
+            H    2.871553600000    0.995167700000   -0.576074500000
+            H    4.254316047964   -0.842628605717    0.498660431748
+            H    2.767678583706   -2.159148582998    2.205812810612
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        assert abs(mol.get_dihedral_in_degrees((2, 3, 4, 5)) - 55.0) < 1e-4
+
+        mol.set_dihedral_in_degrees((2, 3, 4, 5), 270.0)
+        assert abs(mol.get_dihedral((2, 3, 4, 5), 'radian') +
+                   math.pi / 2.0) < 1e-4
+
+        mol.set_dihedral((2, 3, 4, 5), math.pi / 2.0, 'radian')
+        assert abs(mol.get_dihedral_in_degrees((2, 3, 4, 5)) - 90.0) < 1e-4

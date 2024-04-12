@@ -49,6 +49,7 @@ from .cubicgrid import CubicGrid
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check)
 from .errorhandler import assert_msg_critical
+from .inputparser import get_random_string_parallel
 from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, create_hdf5,
                          write_rsp_solution)
 
@@ -404,6 +405,12 @@ class TdaEigenSolver(LinearSolver):
                     'Running NTO analysis for S{:d}...'.format(s + 1))
                 self.ostream.flush()
 
+                if self.filename is not None:
+                    base_fname = self.filename
+                else:
+                    name_string = get_random_string_parallel(self.comm)
+                    base_fname = 'vlx_' + name_string
+
                 if self.rank == mpi_master():
                     nto_mo = self.get_nto(t_mat, mo_occ, mo_vir)
 
@@ -412,7 +419,7 @@ class TdaEigenSolver(LinearSolver):
                     lam_end = lam_start + min(mo_occ.shape[1], mo_vir.shape[1])
                     nto_lambdas.append(nto_lam[lam_start:lam_end])
 
-                    nto_h5_fname = f'{self._filename}_S{s+1}_NTO.h5'
+                    nto_h5_fname = f'{base_fname}_S{s+1}_NTO.h5'
                     nto_mo.write_hdf5(nto_h5_fname)
                     nto_h5_files.append(nto_h5_fname)
                 else:

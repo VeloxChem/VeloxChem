@@ -723,6 +723,10 @@ class ComplexResponse(LinearSolver):
                     self._graceful_exit(molecule, basis, dft_dict, pe_dict,
                                         rsp_vector_labels)
 
+            if self.force_checkpoint:
+                self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
+                                       rsp_vector_labels)
+
             # creating new sigma and rho linear transformations
 
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
@@ -1031,7 +1035,7 @@ class ComplexResponse(LinearSolver):
 
     def _print_results(self, rsp_results, ostream=None):
         """
-        Prints response resutls to output stream.
+        Prints response results to output stream.
 
         :param rsp_results:
             The dictionary containing response results.

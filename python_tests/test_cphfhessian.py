@@ -32,18 +32,22 @@ class TestCphfSolver(unittest.TestCase):
         cphf_solver = CphfSolver()
         cphf_settings = {'conv_thresh':2e-7}
         cphf_solver.update_settings(cphf_settings, method_settings)
-        cph_results = cphf_solver.compute(molecule, basis, scf_tensors, scf_drv)
+        cphf_solver.ostream.mute()
+        cphf_solver.compute(molecule, basis, scf_tensors, scf_drv)
 
         if scf_drv.rank == mpi_master():
-            cphf_coefficients = cphf_solver.cphf_results['cphf_ov']
-            #print(cphf_coefficients.shape) 
+            cphf_results = cphf_solver.cphf_results
+            cphf_coefficients = cphf_results['cphf_ov']
+            np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
             hf_file_name = str(here /'inputs'/'cphf_coefficients.h5')
             hf = h5py.File(hf_file_name, 'r')
             cphf_reference = np.array(hf.get(label))
             hf.close()
-            print(xcfun, np.max(np.abs(cphf_coefficients - cphf_reference)))
-            self.assertTrue(np.max(np.abs(cphf_coefficients - cphf_reference))
+
+            # Here we are comparing the CPHF coefficients in MO basis, so
+            # there might be sign differences; we compare absolute values instead.
+            self.assertTrue(np.max(np.abs(cphf_coefficients) - np.abs(cphf_reference))
                              < 1.0e-6)
         
     @pytest.mark.skipif('pyscf' not in sys.modules,

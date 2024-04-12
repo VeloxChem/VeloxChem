@@ -409,6 +409,16 @@ CMolecule::getAtomCoordinates(const int32_t iAtom) const
 }
 
 void
+CMolecule::setAtomCoordinates(const int32_t iAtom, const std::vector<double>& xyz)
+{
+    _atomCoordinates.data(0)[iAtom] = xyz[0];
+
+    _atomCoordinates.data(1)[iAtom] = xyz[1];
+
+    _atomCoordinates.data(2)[iAtom] = xyz[2];
+}
+
+void
 CMolecule::setCharge(const double charge)
 {
     _charge = charge;

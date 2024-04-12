@@ -380,6 +380,14 @@ class CMolecule
     std::vector<double> getAtomCoordinates(const int32_t iAtom) const;
 
     /**
+     Sets atom coordinates of specific atom.
+
+     @param iAtom the index of atom.
+     @param xyz the Cartesian coordinates.
+     */
+    void setAtomCoordinates(const int32_t iAtom, const std::vector<double>& xyz);
+
+    /**
      Gets index of nearest atom with given atom label to specific atom.
 
      @param iAtom the index of requested atom.

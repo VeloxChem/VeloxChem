@@ -25,7 +25,6 @@
 
 from os import environ, cpu_count
 from pathlib import Path
-from sys import stdout
 
 from .mklconf import configure_mkl_rt
 
@@ -66,8 +65,3 @@ def set_omp_num_threads(ncores=None):
             if ncores is None:
                 ncores = 1
             environ['OMP_NUM_THREADS'] = str(ncores)
-            print('* Warning * Environment variable OMP_NUM_THREADS not set.',
-                  file=stdout)
-            print('* Warning * Setting OMP_NUM_THREADS to {:d}.'.format(ncores),
-                  file=stdout)
-            stdout.flush()

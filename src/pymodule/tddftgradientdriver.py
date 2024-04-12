@@ -33,7 +33,6 @@ from .veloxchemlib import fockmat
 from .veloxchemlib import XCIntegrator
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .molecule import Molecule
-from .firstorderprop import FirstOrderProperties
 from .lrsolver import LinearResponseSolver
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
@@ -123,7 +122,10 @@ class TddftGradientDriver(GradientDriver):
 
         if 'tamm_dancoff' in rsp_dict.keys():
             grad_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
-            orbrsp_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff'] 
+            orbrsp_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
+
+        if 'do_first_order_prop' in grad_dict.keys():
+            orbrsp_dict['do_first_order_prop'] = grad_dict['do_first_order_prop']
 
         parse_input(self, grad_keywords, grad_dict)
 
@@ -255,11 +257,11 @@ class TddftGradientDriver(GradientDriver):
 
         # ground state gradient
         t1 = tm.time()
-        gs_grad_drv = ScfGradientDriver()
+        gs_grad_drv = ScfGradientDriver(scf_drv)
         gs_grad_drv.update_settings(self.grad_dict, self.method_dict)
 
         gs_grad_drv.ostream.mute()
-        gs_grad_drv.compute(molecule, basis, scf_drv)
+        gs_grad_drv.compute(molecule, basis)
         gs_grad_drv.ostream.unmute()
         t2 = tm.time()
 

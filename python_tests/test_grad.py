@@ -19,10 +19,10 @@ class TestGrad:
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream)
+        grad_drv = ScfGradientDriver(scf_drv)
         # So far testing with numerical gradient
         grad_drv.numerical = True
-        grad_drv.compute(task.molecule, task.ao_basis, scf_drv)
+        grad_drv.compute(task.molecule, task.ao_basis)
 
         if is_mpi_master(task.mpi_comm):
             grad = grad_drv.get_gradient()
