@@ -42,6 +42,7 @@ from .veloxchemlib import compute_fock_gpu
 from .veloxchemlib import compute_electric_dipole_integrals_gpu
 from .veloxchemlib import compute_linear_momentum_integrals_gpu
 from .veloxchemlib import compute_angular_momentum_integrals_gpu
+from .veloxchemlib import integrate_fxc_fock_gpu
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
@@ -406,8 +407,10 @@ class LinearSolver:
                           if self.grid_level is None else self.grid_level)
             grid_drv.set_level(grid_level)
 
+            num_gpus_per_node = self._get_num_gpus_per_node()
+
             grid_t0 = tm.time()
-            molgrid = grid_drv.generate(molecule)
+            molgrid = grid_drv.generate(molecule, num_gpus_per_node)
             n_grid_points = molgrid.number_of_points()
             self.ostream.print_info(
                 'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
@@ -415,12 +418,20 @@ class LinearSolver:
                        tm.time() - grid_t0))
             self.ostream.print_blank()
 
+            # TODO: create method for broadcasting large numpy array
+
             if self.rank == mpi_master():
-                gs_density = AODensityMatrix([scf_tensors['D_alpha']],
-                                             denmat.rest)
+                gs_density_np = scf_tensors['D_alpha']
+                naos = gs_density_np.shape[0]
             else:
-                gs_density = AODensityMatrix()
-            gs_density.broadcast(self.rank, self.comm)
+                naos = None
+            naos = self.comm.bcast(naos, root=mpi_master())
+
+            if self.rank != mpi_master():
+                gs_density_np = np.zeros((naos, naos))
+
+            self.comm.Bcast(gs_density_np, root=mpi_master())
+            gs_density = AODensityMatrix([gs_density_np], denmat.rest)
 
             dft_func_label = self.xcfun.get_func_label().upper()
         else:
@@ -871,6 +882,8 @@ class LinearSolver:
 
         t0 = tm.time()
 
+        fock_mat, fock_mat_erf_k = None, None
+
         if self._dft:
 
             if self.xcfun.is_hybrid():
@@ -882,12 +895,12 @@ class LinearSolver:
                     erf_k_coef = -self.xcfun.get_rs_beta()
                     omega = self.xcfun.get_rs_omega()
 
-                    fock_mat_full_k = compute_fock_gpu(molecule, basis, dens,
-                                                       prefac_coulomb,
-                                                       full_k_coef, 0.0,
-                                                       flag_exchange, self.eri_thresh,
-                                                       self.prelink_thresh,
-                                                       screening)
+                    fock_mat = compute_fock_gpu(molecule, basis, dens,
+                                                prefac_coulomb,
+                                                full_k_coef, 0.0,
+                                                flag_exchange, self.eri_thresh,
+                                                self.prelink_thresh,
+                                                screening)
 
                     fock_mat_erf_k = compute_fock_gpu(molecule, basis, dens,
                                                       0.0, erf_k_coef, omega,
@@ -895,16 +908,12 @@ class LinearSolver:
                                                       self.prelink_thresh,
                                                       screening)
 
-                    fock_mat_local = (fock_mat_full_k.to_numpy() +
-                                      fock_mat_erf_k.to_numpy())
-
                 else:
                     # global hybrid
                     fock_mat = compute_fock_gpu(
                         molecule, basis, dens, prefac_coulomb,
                         self.xcfun.get_frac_exact_exchange(), 0.0, flag_exchange,
                         self.eri_thresh, self.prelink_thresh, screening)
-                    fock_mat_local = fock_mat.to_numpy()
 
             else:
                 # pure DFT
@@ -912,14 +921,12 @@ class LinearSolver:
                                             prefac_coulomb, 0.0, 0.0, flag_exchange,
                                             self.eri_thresh,
                                             self.prelink_thresh, screening)
-                fock_mat_local = fock_mat.to_numpy()
 
         else:
             # Hartree-Fock
             fock_mat = compute_fock_gpu(molecule, basis, dens, prefac_coulomb,
                                         1.0, 0.0, flag_exchange, self.eri_thresh,
                                         self.prelink_thresh, screening)
-            fock_mat_local = fock_mat.to_numpy()
 
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)
@@ -927,12 +934,11 @@ class LinearSolver:
         if self._dft:
             t0 = tm.time()
 
-            # TODO: add integrate_fxc_fock
-            # xc_drv.integrate_fxc_fock(fock, molecule, basis, dens,
-            #                           gs_density, molgrid,
-            #                           self.xcfun.get_func_label())
-
-            # TODO: add fxc_mat to fock_mat_local
+            # TODO: enable GGA
+            integrate_fxc_fock_gpu(fock_mat, molecule, basis, dens,
+                                   gs_density, molgrid,
+                                   self.xcfun.get_func_label(),
+                                   screening.get_num_gpus_per_node())
 
             if profiler is not None:
                 profiler.add_timing_info('FockXC', tm.time() - t0)
@@ -947,6 +953,11 @@ class LinearSolver:
                     fock.add_matrix(DenseMatrix(V_pe), ifock)
             if profiler is not None:
                 profiler.add_timing_info('FockPE', tm.time() - t0)
+
+        fock_mat_local = fock_mat.to_numpy()
+        if fock_mat_erf_k is not None:
+            # add contribution from range-separation
+            fock_mat_local += fock_mat_erf_k.to_numpy()
 
         return fock_mat_local
 

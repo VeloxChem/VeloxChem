@@ -1298,6 +1298,7 @@ class ScfDriver:
                 'D': (D_alpha, D_beta),
                 'F': (F_alpha, F_beta),
             }
+            """
 
             if self._dft:
                 # dft info
@@ -1309,6 +1310,7 @@ class ScfDriver:
                 # pe info
                 self._scf_tensors['potfile'] = self.potfile
 
+            """
             self._write_final_hdf5(molecule, ao_basis)
             """
 

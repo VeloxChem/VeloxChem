@@ -285,6 +285,8 @@ export_gpu(py::module& m)
 
     m.def("integrate_vxc_fock_gpu", &gpu::integrateVxcFock, "Integrates Vxc matrix using GPU.");
 
+    m.def("integrate_fxc_fock_gpu", &gpu::integrateFxcFock, "Integrates Fxc matrix using GPU.");
+
     m.def("compute_fock_gpu", &gpu::computeFockOnGPU, "Computes Fock matrix using GPU.");
 
     m.def("transform_density", &gpu::transformDensity, "Transforms density matrix (spherical to Cartesian).");
