@@ -199,9 +199,12 @@ getDensitySigmaOnGrids(double*        d_rho,
         d_rhograd[6 * g + 4] = rho_a_y;
         d_rhograd[6 * g + 5] = rho_a_z;
 
-        d_sigma[3 * g + 0] = rho_a_x * rho_a_x + rho_a_y * rho_a_y + rho_a_z * rho_a_z;
-        d_sigma[3 * g + 1] = rho_a_x * rho_a_x + rho_a_y * rho_a_y + rho_a_z * rho_a_z;
-        d_sigma[3 * g + 2] = rho_a_x * rho_a_x + rho_a_y * rho_a_y + rho_a_z * rho_a_z;
+        if (d_sigma != nullptr)
+        {
+            d_sigma[3 * g + 0] = rho_a_x * rho_a_x + rho_a_y * rho_a_y + rho_a_z * rho_a_z;
+            d_sigma[3 * g + 1] = rho_a_x * rho_a_x + rho_a_y * rho_a_y + rho_a_z * rho_a_z;
+            d_sigma[3 * g + 2] = rho_a_x * rho_a_x + rho_a_y * rho_a_y + rho_a_z * rho_a_z;
+        }
     }
 }
 
@@ -255,18 +258,18 @@ getLdaFxcMatrixG(double*        d_mat_G,
 }
 
 __global__ void
-getGgaMatrixG(double*        d_mat_G,
-              const double*  d_grid_w,
-              const uint32_t grid_offset,
-              const uint32_t npoints,
-              const double*  d_gto_values,
-              const double*  d_gto_values_x,
-              const double*  d_gto_values_y,
-              const double*  d_gto_values_z,
-              const uint32_t aocount,
-              const double*  d_rhograd,
-              const double*  d_vrho,
-              const double*  d_vsigma)
+getGgaVxcMatrixG(double*        d_mat_G,
+                 const double*  d_grid_w,
+                 const uint32_t grid_offset,
+                 const uint32_t npoints,
+                 const double*  d_gto_values,
+                 const double*  d_gto_values_x,
+                 const double*  d_gto_values_y,
+                 const double*  d_gto_values_z,
+                 const uint32_t aocount,
+                 const double*  d_rhograd,
+                 const double*  d_vrho,
+                 const double*  d_vsigma)
 {
     const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
     const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
@@ -282,6 +285,110 @@ getGgaMatrixG(double*        d_mat_G,
         d_mat_G[g + i * npoints] = d_grid_w[g + grid_offset] * d_vrho[2 * g + 0] * d_gto_values[g + i * npoints] +
                                    2.0 * (d_grid_w[g + grid_offset] * (vx * d_gto_values_x[g + i * npoints] + vy * d_gto_values_y[g + i * npoints] +
                                                                        vz * d_gto_values_z[g + i * npoints]));
+    }
+}
+
+__global__ void
+getGgaFxcMatrixG(double*        d_mat_G,
+                 double*        d_mat_G_gga,
+                 const double*  d_grid_w,
+                 const uint32_t grid_offset,
+                 const uint32_t npoints,
+                 const double*  d_gto_values,
+                 const double*  d_gto_values_x,
+                 const double*  d_gto_values_y,
+                 const double*  d_gto_values_z,
+                 const uint32_t aocount,
+                 const double*  d_rhow,
+                 const double*  d_rhograd,
+                 const double*  d_rhowgrad,
+                 const uint32_t dim_rho,
+                 const double*  d_vsigma,
+                 const uint32_t dim_vsigma,
+                 const double*  d_v2rho2,
+                 const uint32_t dim_v2rho2,
+                 const double*  d_v2rhosigma,
+                 const uint32_t dim_v2rhosigma,
+                 const double*  d_v2sigma2,
+                 const uint32_t dim_v2sigma2)
+{
+    const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
+    const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if ((i < aocount) && (g < npoints))
+    {
+        const auto w = d_grid_w[g + grid_offset];
+
+        const auto rhow_a = d_rhow[2 * g + 0];
+        const auto rhow_b = d_rhow[2 * g + 1];
+
+        const auto rhowgrad_ax = d_rhowgrad[6 * g + 0];
+        const auto rhowgrad_ay = d_rhowgrad[6 * g + 1];
+        const auto rhowgrad_az = d_rhowgrad[6 * g + 2];
+        const auto rhowgrad_bx = d_rhowgrad[6 * g + 3];
+        const auto rhowgrad_by = d_rhowgrad[6 * g + 4];
+        const auto rhowgrad_bz = d_rhowgrad[6 * g + 5];
+
+        const auto rhograd_ax = d_rhograd[6 * g + 0];
+        const auto rhograd_ay = d_rhograd[6 * g + 1];
+        const auto rhograd_az = d_rhograd[6 * g + 2];
+        const auto rhograd_bx = d_rhograd[6 * g + 3];
+        const auto rhograd_by = d_rhograd[6 * g + 4];
+        const auto rhograd_bz = d_rhograd[6 * g + 5];
+
+        const auto grhow_grho_aa = 2.0 * (rhowgrad_ax * rhograd_ax + rhowgrad_ay * rhograd_ay + rhowgrad_az * rhograd_az);
+
+        const auto grhow_grho_bb = 2.0 * (rhowgrad_bx * rhograd_bx + rhowgrad_by * rhograd_by + rhowgrad_bz * rhograd_bz);
+
+        const auto grhow_grho_ab = (rhowgrad_ax * rhograd_bx + rhowgrad_ay * rhograd_by + rhowgrad_az * rhograd_bz +
+                                    rhowgrad_bx * rhograd_ax + rhowgrad_by * rhograd_ay + rhowgrad_bz * rhograd_az);
+
+        // functional derivatives
+
+        // first-order
+
+        const auto vsigma_a = d_vsigma[3 * g + 0];
+        const auto vsigma_c = d_vsigma[3 * g + 1];
+
+        // second-order
+
+        const auto v2rho2_aa = d_v2rho2[3 * g + 0];
+        const auto v2rho2_ab = d_v2rho2[3 * g + 1];
+
+        const auto v2rhosigma_aa = d_v2rhosigma[6 * g + 0];
+        const auto v2rhosigma_ac = d_v2rhosigma[6 * g + 1];
+        const auto v2rhosigma_ab = d_v2rhosigma[6 * g + 2];
+        const auto v2rhosigma_ba = d_v2rhosigma[6 * g + 3];
+        const auto v2rhosigma_bc = d_v2rhosigma[6 * g + 4];
+
+        const auto v2sigma2_aa = d_v2sigma2[6 * g + 0];
+        const auto v2sigma2_ac = d_v2sigma2[6 * g + 1];
+        const auto v2sigma2_ab = d_v2sigma2[6 * g + 2];
+        const auto v2sigma2_cc = d_v2sigma2[6 * g + 3];
+        const auto v2sigma2_cb = d_v2sigma2[6 * g + 4];
+
+        // scalar contribution
+
+        const auto f_0 = v2rho2_aa * rhow_a + v2rho2_ab * rhow_b + v2rhosigma_aa * grhow_grho_aa + v2rhosigma_ac * grhow_grho_ab + v2rhosigma_ab * grhow_grho_bb;
+
+        d_mat_G[g + i * npoints] = w * f_0 * d_gto_values[g + i * npoints];
+
+        // vector contribution
+
+        const auto f_aa = v2rhosigma_aa * rhow_a + v2rhosigma_ba * rhow_b + v2sigma2_aa * grhow_grho_aa + v2sigma2_ac * grhow_grho_ab + v2sigma2_ab * grhow_grho_bb;
+        const auto f_ab = v2rhosigma_ac * rhow_a + v2rhosigma_bc * rhow_b + v2sigma2_ac * grhow_grho_aa + v2sigma2_cc * grhow_grho_ab + v2sigma2_cb * grhow_grho_bb;
+
+        double xcomp = 2.0 * f_aa * rhograd_ax + f_ab * rhograd_bx;
+        double ycomp = 2.0 * f_aa * rhograd_ay + f_ab * rhograd_by;
+        double zcomp = 2.0 * f_aa * rhograd_az + f_ab * rhograd_bz;
+
+        xcomp += 2.0 * vsigma_a * rhowgrad_ax + vsigma_c * rhowgrad_bx;
+        ycomp += 2.0 * vsigma_a * rhowgrad_ay + vsigma_c * rhowgrad_by;
+        zcomp += 2.0 * vsigma_a * rhowgrad_az + vsigma_c * rhowgrad_bz;
+
+        d_mat_G_gga[g + i * npoints] = w * (xcomp * d_gto_values_x[g + i * npoints] +
+                                            ycomp * d_gto_values_y[g + i * npoints] +
+                                            zcomp * d_gto_values_z[g + i * npoints]);
     }
 }
 
@@ -321,55 +428,6 @@ matmulAB(double* C, double* A, double* B, uint32_t aocount, uint32_t npoints)
         for (uint32_t m = 0; m < TILE_DIM; m++)
         {
             val += As[threadIdx.y][m] * Bs[m][threadIdx.x];
-        }
-
-        __syncthreads();
-    }
-
-    if ((i < aocount) && (g < npoints))
-    {
-        C[i * npoints + g] = val;
-    }
-}
-
-__global__ void
-matmulAtB(double* C, double* A, double* B, uint32_t aocount, uint32_t npoints)
-{
-    __shared__ double As[TILE_DIM][TILE_DIM + 1];
-    __shared__ double Bs[TILE_DIM][TILE_DIM + 1];
-
-    const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
-    const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
-
-    double val = 0.0;
-
-    for (uint32_t k = 0; k < (aocount + TILE_DIM - 1) / TILE_DIM; k++)
-    {
-        if ((i < aocount) && (k * TILE_DIM + threadIdx.x < aocount))
-        {
-            // note: transpose of A
-            As[threadIdx.x][threadIdx.y] = A[(k * TILE_DIM + threadIdx.x) * aocount + i];
-        }
-        else
-        {
-            As[threadIdx.x][threadIdx.y] = 0.0;
-        }
-
-        if ((k * TILE_DIM + threadIdx.y < aocount) && (g < npoints))
-        {
-            Bs[threadIdx.y][threadIdx.x] = B[(k * TILE_DIM + threadIdx.y) * npoints + g];
-        }
-        else
-        {
-            Bs[threadIdx.y][threadIdx.x] = 0.0;
-        }
-
-        __syncthreads();
-
-        for (uint32_t m = 0; m < TILE_DIM; m++)
-        {
-            // note: transpose of A
-            val += As[m][threadIdx.y] * Bs[m][threadIdx.x];
         }
 
         __syncthreads();
@@ -433,6 +491,90 @@ matmulABtKohnShamMatrix(double*         d_mat_Vxc_full,
     if ((i < aocount) && (j < aocount))
     {
         d_mat_Vxc_full[d_ao_inds[i] * naos + d_ao_inds[j]] += val;
+    }
+}
+
+__global__ void
+matmulABt(double* C, double* A, double* B, uint32_t aocount, uint32_t npoints)
+{
+    __shared__ double As[TILE_DIM][TILE_DIM + 1];
+    __shared__ double Bs[TILE_DIM][TILE_DIM + 1];
+
+    const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
+    const uint32_t j = blockIdx.x * blockDim.x + threadIdx.x;
+
+    double val = 0.0;
+
+    for (uint32_t k = 0; k < (npoints + TILE_DIM - 1) / TILE_DIM; k++)
+    {
+        if ((i < aocount) && (k * TILE_DIM + threadIdx.x < npoints))
+        {
+            As[threadIdx.y][threadIdx.x] = A[i * npoints + (k * TILE_DIM + threadIdx.x)];
+        }
+        else
+        {
+            As[threadIdx.y][threadIdx.x] = 0.0;
+        }
+
+        if ((k * TILE_DIM + threadIdx.y < npoints) && (j < aocount))
+        {
+            // note: transpose of B
+            Bs[threadIdx.x][threadIdx.y] = B[j * npoints + (k * TILE_DIM + threadIdx.y)];
+        }
+        else
+        {
+            Bs[threadIdx.x][threadIdx.y] = 0.0;
+        }
+
+        __syncthreads();
+
+        for (uint32_t m = 0; m < TILE_DIM; m++)
+        {
+            // note: transpose of B
+            val += As[threadIdx.y][m] * Bs[threadIdx.x][m];
+        }
+
+        __syncthreads();
+    }
+
+    if ((i < aocount) && (j < aocount))
+    {
+        C[i * aocount + j] = val;
+    }
+}
+
+__global__ void
+distributeLdaSubmMatrix(double*         d_mat_full,
+                        const uint32_t  naos,
+                        const double*   d_mat_Vxc,
+                        const uint32_t* d_ao_inds,
+                        const uint32_t  aocount)
+{
+    const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
+    const uint32_t j = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if ((i < aocount) && (j < aocount))
+    {
+        d_mat_full[d_ao_inds[i] * naos + d_ao_inds[j]] += d_mat_Vxc[i * aocount + j];
+    }
+}
+
+__global__ void
+distributeGgaSubmMatrix(double*         d_mat_full,
+                        const uint32_t  naos,
+                        const double*   d_mat_Fxc,
+                        const double*   d_mat_Fxc_gga,
+                        const uint32_t* d_ao_inds,
+                        const uint32_t  aocount)
+{
+    const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
+    const uint32_t j = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if ((i < aocount) && (j < aocount))
+    {
+        d_mat_full[d_ao_inds[i] * naos + d_ao_inds[j]] += (d_mat_Fxc[i * aocount + j] +
+                                                           d_mat_Fxc_gga[i * aocount + j] +
+                                                           d_mat_Fxc_gga[j * aocount + i]);
     }
 }
 
@@ -1372,7 +1514,7 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
     // GTOs on grid points
 
-    double *d_mat_Vxc_full, *d_den_mat_full, *d_den_mat, *d_gto_values, *d_gto_values_x, *d_gto_values_y, *d_gto_values_z, *d_mat_F;
+    double *d_mat_Vxc_full, *d_mat_Vxc, *d_den_mat_full, *d_den_mat, *d_gto_values, *d_gto_values_x, *d_gto_values_y, *d_gto_values_z, *d_mat_F;
 
     hipSafe(hipMalloc(&d_den_mat, naos * naos * sizeof(double)));
     hipSafe(hipMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
@@ -1382,6 +1524,7 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
     hipSafe(hipMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
     hipSafe(hipMalloc(&d_den_mat_full, naos * naos * sizeof(double)));
     hipSafe(hipMalloc(&d_mat_Vxc_full, naos * naos * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_Vxc, naos * naos * sizeof(double)));
 
     hipSafe(hipMemcpy(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), hipMemcpyHostToDevice));
 
@@ -1589,7 +1732,7 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        hipLaunchKernelGGL(gpu::getGgaMatrixG, num_blocks, threads_per_block, 0, 0, d_mat_G,
+        hipLaunchKernelGGL(gpu::getGgaVxcMatrixG, num_blocks, threads_per_block, 0, 0, d_mat_G,
                                                                   d_grid_w,
                                                                   static_cast<uint32_t>(gridblockpos),
                                                                   static_cast<uint32_t>(npoints),
@@ -1606,6 +1749,7 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
         num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
+        /*
         hipLaunchKernelGGL(gpu::matmulABtKohnShamMatrix, num_blocks, threads_per_block, 0, 0, d_mat_Vxc_full,
                                                                         static_cast<uint32_t>(naos),
                                                                         d_gto_values,
@@ -1613,6 +1757,21 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
                                                                         d_ao_inds,
                                                                         static_cast<uint32_t>(aocount),
                                                                         static_cast<uint32_t>(npoints));
+        */
+
+        hipLaunchKernelGGL(gpu::matmulABt, num_blocks, threads_per_block, 0, 0,
+                           d_mat_Vxc,
+                           d_gto_values,
+                           d_mat_G,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        hipLaunchKernelGGL(gpu::distributeLdaSubmMatrix, num_blocks, threads_per_block, 0, 0,
+                           d_mat_Vxc_full,
+                           static_cast<uint32_t>(naos),
+                           d_mat_Vxc,
+                           d_ao_inds,
+                           static_cast<uint32_t>(aocount));
 
         // compute partial contribution to XC energy
 
@@ -1645,6 +1804,7 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
     hipSafe(hipFree(d_mat_F));
     hipSafe(hipFree(d_den_mat_full));
     hipSafe(hipFree(d_mat_Vxc_full));
+    hipSafe(hipFree(d_mat_Vxc));
 
     hipSafe(hipFree(d_rho));
     hipSafe(hipFree(d_rhograd));
@@ -1991,7 +2151,6 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
         hipSafe(hipMemcpy(d_v2rho2, v2rho2, dim->v2rho2 * npoints * sizeof(double), hipMemcpyHostToDevice));
 
         // compute partial contribution to Fxc matrix and distribute partial
-        // Fxc to full Kohn-Sham matrix
 
         // sub density matrix for rho_w
         // reusing d_den_mat
@@ -2131,7 +2290,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    std::string errnaos("gpu::integrateFxcFockForLDA: Inconsistent number of AOs");
+    std::string errnaos("gpu::integrateFxcFockForGGA: Inconsistent number of AOs");
 
     errors::assertMsgCritical((naos == gsDensityMatrix.getNumberOfRows(0)) && (naos == gsDensityMatrix.getNumberOfColumns(0)), errnaos);
     errors::assertMsgCritical((naos == rwDensityMatrix.getNumberOfRows(0)) && (naos == rwDensityMatrix.getNumberOfColumns(0)), errnaos);
@@ -2186,7 +2345,10 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
     // GTOs on grid points
 
-    double *d_mat_Fxc_full, *d_gs_den_mat_full, *d_rw_den_mat_full, *d_den_mat, *d_gto_values, *d_gto_values_x, *d_gto_values_y, *d_gto_values_z, *d_mat_F;
+    double *d_mat_Fxc_full, *d_gs_den_mat_full, *d_rw_den_mat_full;
+    double *d_den_mat, *d_gto_values, *d_gto_values_x, *d_gto_values_y, *d_gto_values_z;
+    double *d_mat_F, *d_mat_G_gga;
+    double *d_mat_Fxc, *d_mat_Fxc_gga;
 
     hipSafe(hipMalloc(&d_den_mat, naos * naos * sizeof(double)));
     hipSafe(hipMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
@@ -2194,6 +2356,9 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
     hipSafe(hipMalloc(&d_gto_values_y, naos * max_npoints_per_box * sizeof(double)));
     hipSafe(hipMalloc(&d_gto_values_z, naos * max_npoints_per_box * sizeof(double)));
     hipSafe(hipMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_G_gga, naos * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_Fxc, naos * naos * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_Fxc_gga, naos * naos * sizeof(double)));
     hipSafe(hipMalloc(&d_gs_den_mat_full, naos * naos * sizeof(double)));
     hipSafe(hipMalloc(&d_rw_den_mat_full, naos * naos * sizeof(double)));
     hipSafe(hipMalloc(&d_mat_Fxc_full, naos * naos * sizeof(double)));
@@ -2218,27 +2383,48 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
     std::vector<double> rhograd_data(dim->rho * 3 * max_npoints_per_box);
     std::vector<double> sigma_data(dim->sigma * max_npoints_per_box);
 
-    std::vector<double> exc_data(dim->zk * max_npoints_per_box);
+    std::vector<double> rhow_data(dim->rho * max_npoints_per_box);
+    std::vector<double> rhowgrad_data(dim->rho * 3 * max_npoints_per_box);
+
     std::vector<double> vrho_data(dim->vrho * max_npoints_per_box);
     std::vector<double> vsigma_data(dim->vsigma * max_npoints_per_box);
+
+    std::vector<double> v2rho2_data(dim->v2rho2 * max_npoints_per_box);
+    std::vector<double> v2rhosigma_data(dim->v2rhosigma * max_npoints_per_box);
+    std::vector<double> v2sigma2_data(dim->v2sigma2 * max_npoints_per_box);
 
     auto rho     = rho_data.data();
     auto rhograd = rhograd_data.data();
     auto sigma   = sigma_data.data();
 
-    auto exc    = exc_data.data();
+    auto rhow     = rhow_data.data();
+    auto rhowgrad = rhowgrad_data.data();
+
     auto vrho   = vrho_data.data();
     auto vsigma = vsigma_data.data();
 
-    double *d_rho, *d_rhograd, *d_sigma, *d_exc, *d_vrho, *d_vsigma;
+    auto v2rho2     = v2rho2_data.data();
+    auto v2rhosigma = v2rhosigma_data.data();
+    auto v2sigma2   = v2sigma2_data.data();
+
+    double *d_rho, *d_rhograd, *d_sigma;
+    double *d_rhow, *d_rhowgrad;
+    double *d_vrho, *d_vsigma;
+    double *d_v2rho2, *d_v2rhosigma, *d_v2sigma2;
 
     hipSafe(hipMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
     hipSafe(hipMalloc(&d_rhograd, dim->rho * 3 * max_npoints_per_box * sizeof(double)));
     hipSafe(hipMalloc(&d_sigma, dim->sigma * max_npoints_per_box * sizeof(double)));
 
-    hipSafe(hipMalloc(&d_exc, dim->zk * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_rhow, dim->rho * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_rhowgrad, dim->rho * 3 * max_npoints_per_box * sizeof(double)));
+
     hipSafe(hipMalloc(&d_vrho, dim->vrho * max_npoints_per_box * sizeof(double)));
     hipSafe(hipMalloc(&d_vsigma, dim->vsigma * max_npoints_per_box * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_v2rho2, dim->v2rho2 * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_v2rhosigma, dim->v2rhosigma * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_v2sigma2, dim->v2sigma2 * max_npoints_per_box * sizeof(double)));
 
     // coordinates and weights of grid points
 
@@ -2350,12 +2536,28 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
         hipSafe(hipMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), hipMemcpyHostToDevice));
 
+        // sub density matrix for ground-state rho
+
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
         num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
         hipLaunchKernelGGL(gpu::getSubDensityMatrix, num_blocks, threads_per_block, 0, 0, 
-            d_den_mat, d_gs_den_mat_full, static_cast<uint32_t>(naos), d_ao_inds, static_cast<uint32_t>(aocount));
+                           d_den_mat,
+                           d_gs_den_mat_full,
+                           static_cast<uint32_t>(naos),
+                           d_ao_inds,
+                           static_cast<uint32_t>(aocount));
+
+        /*
+        // TODO use hipblas
+        CDenseMatrix symm_den_mat(aocount, aocount);
+        hipSafe(hipMemcpy(symm_den_mat.values(), d_den_mat, aocount * aocount * sizeof(double), hipMemcpyDeviceToHost));
+        symm_den_mat.symmetrizeAndScale(0.5);
+        hipSafe(hipMemcpy(d_den_mat, symm_den_mat.values(), aocount * aocount * sizeof(double), hipMemcpyHostToDevice));
+        */
+
+        // GGA density for ground-state rho
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
@@ -2363,77 +2565,172 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
         // TODO: use hipblas
         hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, 
-            d_mat_F, d_den_mat, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
+                           d_mat_F,
+                           d_den_mat,
+                           d_gto_values,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
         // Note: one block in y dimension
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, 1);
 
-        hipLaunchKernelGGL(gpu::getDensitySigmaOnGrids, num_blocks, threads_per_block, 0, 0, d_rho,
-                                                                        d_rhograd,
-                                                                        d_sigma,
-                                                                        d_mat_F,
-                                                                        d_gto_values,
-                                                                        d_gto_values_x,
-                                                                        d_gto_values_y,
-                                                                        d_gto_values_z,
-                                                                        static_cast<uint32_t>(aocount),
-                                                                        static_cast<uint32_t>(npoints));
+        hipLaunchKernelGGL(gpu::getDensitySigmaOnGrids, num_blocks, threads_per_block, 0, 0,
+                           d_rho,
+                           d_rhograd,
+                           d_sigma,
+                           d_mat_F,
+                           d_gto_values,
+                           d_gto_values_x,
+                           d_gto_values_y,
+                           d_gto_values_z,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        // functional evaluation for ground-state rho
 
         hipSafe(hipMemcpy(rho, d_rho, dim->rho * npoints * sizeof(double), hipMemcpyDeviceToHost));
         hipSafe(hipMemcpy(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), hipMemcpyDeviceToHost));
         hipSafe(hipMemcpy(sigma, d_sigma, dim->sigma * npoints * sizeof(double), hipMemcpyDeviceToHost));
 
-        xcfun_copy.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
+        xcfun_copy.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
-        hipSafe(hipMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), hipMemcpyHostToDevice));
+        xcfun_copy.compute_fxc_for_gga(npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
+
         hipSafe(hipMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), hipMemcpyHostToDevice));
         hipSafe(hipMemcpy(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), hipMemcpyHostToDevice));
 
-        // compute partial contribution to Fxc matrix and distribute partial
-        // Fxc to full Kohn-Sham matrix
+        hipSafe(hipMemcpy(d_v2rho2, v2rho2, dim->v2rho2 * npoints * sizeof(double), hipMemcpyHostToDevice));
+        hipSafe(hipMemcpy(d_v2rhosigma, v2rhosigma, dim->v2rhosigma * npoints * sizeof(double), hipMemcpyHostToDevice));
+        hipSafe(hipMemcpy(d_v2sigma2, v2sigma2, dim->v2sigma2 * npoints * sizeof(double), hipMemcpyHostToDevice));
 
-        // reuse d_den_mat and d_mat_F as working space
+        // compute partial contribution to Fxc matrix and distribute partial
+
+        // sub density matrix for rho_w
+        // reusing d_den_mat
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+        hipLaunchKernelGGL(gpu::getSubDensityMatrix, num_blocks, threads_per_block, 0, 0, 
+                           d_den_mat,
+                           d_rw_den_mat_full,
+                           static_cast<uint32_t>(naos),
+                           d_ao_inds,
+                           static_cast<uint32_t>(aocount));
+
+        // TODO use hipblas
+        CDenseMatrix symm_den_mat(aocount, aocount);
+        hipSafe(hipMemcpy(symm_den_mat.values(), d_den_mat, aocount * aocount * sizeof(double), hipMemcpyDeviceToHost));
+        symm_den_mat.symmetrizeAndScale(0.5);
+        hipSafe(hipMemcpy(d_den_mat, symm_den_mat.values(), aocount * aocount * sizeof(double), hipMemcpyHostToDevice));
+
+        // GGA density for rho_w
+        // reusing d_mat_F
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+        // TODO: use hipblas
+        hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, 
+                           d_mat_F,
+                           d_den_mat,
+                           d_gto_values,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        // Note: one block in y dimension
+        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+        hipLaunchKernelGGL(gpu::getDensitySigmaOnGrids, num_blocks, threads_per_block, 0, 0,
+                           d_rhow,
+                           d_rhowgrad,
+                           nullptr,
+                           d_mat_F,
+                           d_gto_values,
+                           d_gto_values_x,
+                           d_gto_values_y,
+                           d_gto_values_z,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        // integrate partial Fxc Fock for GGA
+
+        // forming matrix G
+        // reusing d_mat_F as d_mat_G
+
         auto d_mat_G = d_mat_F;
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        hipLaunchKernelGGL(gpu::getGgaMatrixG, num_blocks, threads_per_block, 0, 0, d_mat_G,
-                                                                  d_grid_w,
-                                                                  static_cast<uint32_t>(gridblockpos),
-                                                                  static_cast<uint32_t>(npoints),
-                                                                  d_gto_values,
-                                                                  d_gto_values_x,
-                                                                  d_gto_values_y,
-                                                                  d_gto_values_z,
-                                                                  static_cast<uint32_t>(aocount),
-                                                                  d_rhograd,
-                                                                  d_vrho,
-                                                                  d_vsigma);
+        hipLaunchKernelGGL(gpu::getGgaFxcMatrixG, num_blocks, threads_per_block, 0, 0,
+                           d_mat_G,
+                           d_mat_G_gga,
+                           d_grid_w,
+                           static_cast<uint32_t>(gridblockpos),
+                           static_cast<uint32_t>(npoints),
+                           d_gto_values,
+                           d_gto_values_x,
+                           d_gto_values_y,
+                           d_gto_values_z,
+                           static_cast<uint32_t>(aocount),
+                           d_rhow,
+                           d_rhograd,
+                           d_rhowgrad,
+                           static_cast<uint32_t>(dim->rho),
+                           d_vsigma,
+                           static_cast<uint32_t>(dim->vsigma),
+                           d_v2rho2,
+                           static_cast<uint32_t>(dim->v2rho2),
+                           d_v2rhosigma,
+                           static_cast<uint32_t>(dim->v2rhosigma),
+                           d_v2sigma2,
+                           static_cast<uint32_t>(dim->v2sigma2));
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
         num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        hipLaunchKernelGGL(gpu::matmulABtKohnShamMatrix, num_blocks, threads_per_block, 0, 0, d_mat_Fxc_full,
-                                                                        static_cast<uint32_t>(naos),
-                                                                        d_gto_values,
-                                                                        d_mat_G,
-                                                                        d_ao_inds,
-                                                                        static_cast<uint32_t>(aocount),
-                                                                        static_cast<uint32_t>(npoints));
+        // TODO: mat_F + (mat_F_gga + mat_F_gga.T)
+        hipLaunchKernelGGL(gpu::matmulABt, num_blocks, threads_per_block, 0, 0,
+                           d_mat_Fxc,
+                           d_gto_values,
+                           d_mat_G,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipLaunchKernelGGL(gpu::matmulABt, num_blocks, threads_per_block, 0, 0,
+                           d_mat_Fxc_gga,
+                           d_gto_values,
+                           d_mat_G_gga,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        hipSafe(hipDeviceSynchronize());
+
+        // TODO: use hipblas for (mat_Fxc_gga + mat_Fxc_gga.T)
+
+        hipLaunchKernelGGL(gpu::distributeGgaSubmMatrix, num_blocks, threads_per_block, 0, 0,
+                           d_mat_Fxc_full,
+                           static_cast<uint32_t>(naos),
+                           d_mat_Fxc,
+                           d_mat_Fxc_gga,
+                           d_ao_inds,
+                           static_cast<uint32_t>(aocount));
     }
 
     hipSafe(hipDeviceSynchronize());
 
     hipSafe(hipMemcpy(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos * sizeof(double), hipMemcpyDeviceToHost));
-
-    // Note: symmetrize mat_Fxc
-
-    mat_Fxc_omp[gpu_id].symmetrizeAndScale(0.5);
 
     hipSafe(hipFree(d_gto_info));
     hipSafe(hipFree(d_ao_inds));
@@ -2444,16 +2741,23 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
     hipSafe(hipFree(d_gto_values_y));
     hipSafe(hipFree(d_gto_values_z));
     hipSafe(hipFree(d_mat_F));
+    hipSafe(hipFree(d_mat_G_gga));
+    hipSafe(hipFree(d_mat_Fxc));
+    hipSafe(hipFree(d_mat_Fxc_gga));
     hipSafe(hipFree(d_gs_den_mat_full));
     hipSafe(hipFree(d_rw_den_mat_full));
     hipSafe(hipFree(d_mat_Fxc_full));
 
     hipSafe(hipFree(d_rho));
     hipSafe(hipFree(d_rhograd));
+    hipSafe(hipFree(d_rhow));
+    hipSafe(hipFree(d_rhowgrad));
     hipSafe(hipFree(d_sigma));
-    hipSafe(hipFree(d_exc));
     hipSafe(hipFree(d_vrho));
     hipSafe(hipFree(d_vsigma));
+    hipSafe(hipFree(d_v2rho2));
+    hipSafe(hipFree(d_v2rhosigma));
+    hipSafe(hipFree(d_v2sigma2));
 
     hipSafe(hipFree(d_grid_x));
     hipSafe(hipFree(d_grid_y));
