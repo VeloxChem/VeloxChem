@@ -1169,8 +1169,8 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        // Note: we should use A * B here but since A is symmetric we can also use A^T * B
-        hipLaunchKernelGGL(gpu::matmulAtB, num_blocks, threads_per_block, 0, 0, 
+        // TODO: use hipblas
+        hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, 
             d_mat_F, d_den_mat, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
@@ -1549,8 +1549,8 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        // Note: we should use A * B here but since A is symmetric we can also use A^T * B
-        hipLaunchKernelGGL(gpu::matmulAtB, num_blocks, threads_per_block, 0, 0, 
+        // TODO: use hipblas
+        hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, 
             d_mat_F, d_den_mat, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
@@ -1963,8 +1963,7 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
         // TODO: use hipblas
-        // Note: we should use A * B here but since A is symmetric we can also use A^T * B
-        hipLaunchKernelGGL(gpu::matmulAtB, num_blocks, threads_per_block, 0, 0, 
+        hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, 
                            d_mat_F,
                            d_den_mat,
                            d_gto_values,
