@@ -443,9 +443,9 @@ class ForceFieldGenerator:
 
         return content.splitlines()
 
-    def create_topology(self, molecule, basis=None, scf_drv=None, no_resp=False):
+    def create_topology(self, molecule, basis=None, scf_result=None, no_resp=False):
         """
-        Analizes the topology of the molecule and create dictionaries
+        Analyzes the topology of the molecule and create dictionaries
         for the atoms, bonds, angles, dihedrals, impropers and pairs.
 
         :param molecule:
@@ -453,9 +453,10 @@ class ForceFieldGenerator:
         :param basis:
             The AO basis set.
         :param scf_drv:
-            The SCF driver. If None, the default driver is used.
+            A converged SCF result.
         :param no_resp:
             If RESP charges should not be computed.
+            Partial charges will be set to zero.
         """
 
         # Read the force field data lines.
@@ -497,11 +498,15 @@ class ForceFieldGenerator:
             atomtypeidentifier.connectivity_matrix)
         
         if no_resp:
-
+            # Skip calculations
             self.partial_charges = np.zeros(self.molecule.number_of_atoms())
+            msg = 'RESP calculation disabled: All partial charges are set to zero.'
+            self.ostream.print_info(msg)
+            self.ostream.flush()
 
+        # Default behavior: compute RESP charges
         if self.partial_charges is None:
-            if scf_drv is None:
+            if scf_result is None:
                 if basis is None:
                     if self.rank == mpi_master():
                         basis = MolecularBasis.read(self.molecule,
@@ -525,25 +530,27 @@ class ForceFieldGenerator:
                                                         'resp')
                 self.partial_charges = self.comm.bcast(self.partial_charges,
                                                     root=mpi_master())
-                
+
+            # Else use the provided SCF result   
             else:
                 if basis is None:
-                    error_msg = 'Basis set is required when a custom SCF driver is used.'
-                    self.ostream.print_error(error_msg)
-
-                scf_result = scf_drv.compute(molecule, basis)
+                    error_msg = 'Basis is required for RESP charges.'
+                    assert_msg_critical(False, error_msg)
+                    
                 resp_drv = RespChargesDriver(self.comm, self.ostream)
                 resp_drv.filename = self.molecule_name
+                msg = 'Using provided SCF result for RESP charges'
+                self.ostream.print_info(msg)
+                self.ostream.flush()
                 if self.resp_dict is not None:
                     resp_drv.update_settings(self.resp_dict)
                 if resp_drv.equal_charges is None:
                     resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
 
                 self.partial_charges = resp_drv.compute(self.molecule, basis,
-                                                        'resp')
+                                                        scf_result, 'resp')
                 self.partial_charges = self.comm.bcast(self.partial_charges,
                                                     root=mpi_master())
-
 
         # preparing atomtypes and atoms
 
