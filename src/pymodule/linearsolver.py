@@ -934,11 +934,13 @@ class LinearSolver:
         if self._dft:
             t0 = tm.time()
 
-            # TODO: enable GGA
-            integrate_fxc_fock_gpu(fock_mat, molecule, basis, dens,
-                                   gs_density, molgrid,
-                                   self.xcfun.get_func_label(),
-                                   screening.get_num_gpus_per_node())
+            # TODO: enable meta-GGA
+            # TODO: double check flag_exchange for Fxc
+            if flag_exchange != 'antisymm':
+                integrate_fxc_fock_gpu(fock_mat, molecule, basis, dens,
+                                       gs_density, molgrid,
+                                       self.xcfun.get_func_label(),
+                                       screening.get_num_gpus_per_node())
 
             if profiler is not None:
                 profiler.add_timing_info('FockXC', tm.time() - t0)
