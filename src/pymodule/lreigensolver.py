@@ -94,9 +94,9 @@ class LinearResponseEigenSolver(LinearSolver):
         self.core_excitation = False
         self.num_core_orbitals = 0
 
-        self.nto = False
+        self.nto = True
         self.nto_pairs = None
-        self.nto_cubes = True
+        self.nto_cubes = False
         self.detach_attach = False
         self.cube_origin = None
         self.cube_stepsize = None
@@ -570,6 +570,7 @@ class LinearResponseEigenSolver(LinearSolver):
                         cubic_grid = CubicGrid(self.cube_origin,
                                                self.cube_stepsize,
                                                self.cube_points)
+                """
 
                 if self.nto:
                     self.ostream.print_info(
@@ -594,6 +595,7 @@ class LinearResponseEigenSolver(LinearSolver):
                         nto_h5_fname = f'{base_fname}_S{s+1}_NTO.h5'
                         nto_mo.write_hdf5(nto_h5_fname)
                         nto_h5_files.append(nto_h5_fname)
+                    """
                     else:
                         nto_mo = MolecularOrbitals()
                     nto_mo.broadcast(self.rank, self.comm)
@@ -605,7 +607,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
                         if self.rank == mpi_master():
                             nto_cube_files.append(nto_cube_fnames)
+                    """
 
+                """
                 if self.detach_attach:
                     self.ostream.print_info(
                         'Running detachment/attachment analysis for S{:d}...'.
@@ -744,13 +748,15 @@ class LinearResponseEigenSolver(LinearSolver):
                         'excitation_details': excitation_details,
                     }
 
-                    """
                     if self.nto:
                         ret_dict['nto_lambdas'] = nto_lambdas
                         ret_dict['nto_h5_files'] = nto_h5_files
+                        """
                         if self.nto_cubes:
                             ret_dict['nto_cubes'] = nto_cube_files
+                        """
 
+                    """
                     if self.detach_attach:
                         ret_dict['density_cubes'] = dens_cube_files
 

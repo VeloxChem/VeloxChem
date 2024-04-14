@@ -947,8 +947,6 @@ class ScfDriver:
         # write checkpoint file and sychronize MPI processes
 
         self.restart = True
-        if self.checkpoint_file is None:
-            self.checkpoint_file = f'{self._filename}.scf.h5'
         self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
         self.comm.barrier()
 
@@ -962,8 +960,14 @@ class ScfDriver:
             Name of the basis set.
         """
 
-        if self.rank == mpi_master():
-            if self.checkpoint_file and isinstance(self.checkpoint_file, str):
+        if self.checkpoint_file is None and self._filename is None:
+            return
+
+        if self.checkpoint_file is None and self._filename is not None:
+            self.checkpoint_file = f'{self._filename}.scf.h5'
+
+        if self.checkpoint_file and isinstance(self.checkpoint_file, str):
+            if self.rank == mpi_master():
                 self.molecular_orbitals.write_hdf5(self.checkpoint_file,
                                                    nuclear_charges, basis_set)
                 self.ostream.print_blank()
