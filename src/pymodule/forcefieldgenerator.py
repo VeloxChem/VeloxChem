@@ -1659,20 +1659,24 @@ class ForceFieldGenerator:
         filename = str(xml_file)
 
         atoms = self.atoms
+        bonds = self.bonds
 
         # Create the root element of the XML file
         ForceField = ET.Element("ForceField")
         
         # AtomTypes section
         AtomTypes = ET.SubElement(ForceField, "AtomTypes")
-        for atom_id, atom_data in atoms.items():
-            element = ''.join([i for i in atom_data['name'] if not i.isdigit()])  # Extract element symbol
-            attributes = {
-                "name": str(atom_id),
-                "class": atom_data['type'],
-                "element": element,
-                "mass": str(atom_data['mass'])  # Ensure mass is a string
-            }
+        for at in self.unique_atom_types:
+            for i, atom in self.atoms.items():
+                    if atom['type'] == at:
+                        element = ''.join([i for i in atom['name'] if not i.isdigit()])  
+                        attributes = {
+                            "name": atom['type'],
+                            "class": atom['name'],
+                            "element": element,
+                            "mass": str(atom['mass']) 
+                        }
+                        break
             ET.SubElement(AtomTypes, "Type", **attributes)
 
         # Residues section
@@ -1680,7 +1684,90 @@ class ForceFieldGenerator:
         Residue = ET.SubElement(Residues, "Residue", name=mol_name)
         for atom_id, atom_data in atoms.items():
             ET.SubElement(Residue, "Atom", name=str(atom_id), type=atom_data['type'], charge=str(atom_data['charge']))
-            
+        for bond_id, bond_data in bonds.items():
+            ET.SubElement(Residue, "Bond", atomName1=str(bond_id[0]), atomName2=str(bond_id[1]))
+
+        # Bonds section
+        Bonds = ET.SubElement(ForceField, "HarmonicBondForce")
+        for bond_id, bond_data in bonds.items():
+            attributes = {
+                "class1": str(bond_id[0]),
+                "class2": str(bond_id[1]),
+                "length": str(bond_data['equilibrium']),
+                "k": str(bond_data['force_constant'])
+            }
+            ET.SubElement(Bonds, "Bond", **attributes)
+
+        # Angles section
+        Angles = ET.SubElement(ForceField, "HarmonicAngleForce")
+        for angle_id, angle_data in self.angles.items():
+            attributes = {
+                "class1": str(angle_id[0]),
+                "class2": str(angle_id[1]),
+                "class3": str(angle_id[2]),
+                "angle": str(angle_data['equilibrium'] * np.pi / 180),
+                "k": str(angle_data['force_constant'])
+            }
+        # Periodic Dihedrals section
+        Dihedrals = ET.SubElement(ForceField, "PeriodicTorsionForce")
+        for dihedral_id, dihedral_data in self.dihedrals.items():
+            if dihedral_data['type'] == 'RB':
+                continue
+            attributes = {
+                "class1": str(dihedral_id[0]),
+                "class2": str(dihedral_id[1]),
+                "class3": str(dihedral_id[2]),
+                "class4": str(dihedral_id[3]),
+                "periodicity": str(dihedral_data['periodicity']),
+                "phase": str(dihedral_data['phase'] * np.pi / 180),
+                "k": str(dihedral_data['barrier'])
+            }
+            ET.SubElement(Dihedrals, "Proper", **attributes)
+
+        # RB Dihedrals section
+        RB_Dihedrals = ET.SubElement(ForceField, "RBTorsionForce")
+        for dihedral_id, dihedral_data in self.dihedrals.items():
+            if dihedral_data['type'] == 'Fourier':
+                continue
+            attributes = {
+                "class1": str(dihedral_id[0]),
+                "class2": str(dihedral_id[1]),
+                "class3": str(dihedral_id[2]),
+                "class4": str(dihedral_id[3]),
+                "c0": str(dihedral_data['RB_coefficients'][0]),
+                "c1": str(dihedral_data['RB_coefficients'][1]),
+                "c2": str(dihedral_data['RB_coefficients'][2]),
+                "c3": str(dihedral_data['RB_coefficients'][3]),
+                "c4": str(dihedral_data['RB_coefficients'][4]),
+                "c5": str(dihedral_data['RB_coefficients'][5])
+            }
+            ET.SubElement(RB_Dihedrals, "Proper", **attributes)
+
+        # Improper Dihedrals section
+        Impropers = ET.SubElement(ForceField, "PeriodicTorsionForce")
+        for improper_id, improper_data in self.impropers.items():
+            attributes = {
+                "class1": str(improper_id[0]),
+                "class2": str(improper_id[1]),
+                "class3": str(improper_id[2]),
+                "class4": str(improper_id[3]),
+                "periodicity": str(improper_data['periodicity']),
+                "phase": str(improper_data['phase'] * np.pi / 180),
+                "k": str(improper_data['barrier'])
+            }
+            ET.SubElement(Impropers, "Improper", **attributes)
+
+        # NonbondedForce section
+        NonbondedForce = ET.SubElement(ForceField, "NonbondedForce", coulomb14scale=str(self.fudgeQQ), lj14scale=str(self.fudgeLJ))
+        for atom_id, atom_data in atoms.items():
+            attributes = {
+                "type": atom_data['type'],
+                "charge": str(atom_data['charge']),
+                "sigma": str(atom_data['sigma']),
+                "epsilon": str(atom_data['epsilon'])
+            }
+            ET.SubElement(NonbondedForce, "Atom", **attributes)
+
         # Generate the tree and write to file
         tree = ET.ElementTree(ForceField)
         rough_string = ET.tostring(ForceField, 'utf-8')
@@ -1758,6 +1845,11 @@ class ForceFieldGenerator:
                 line_str = f'ATOM  {i+1:>5}  {atom_name:<3} {mol_name:<3}    1' \
                         f'{coords_in_angstrom[i][0]:>12.3f}{coords_in_angstrom[i][1]:>8.3f}{coords_in_angstrom[i][2]:>8.3f}  1.00  0.00\n'
                 f_pdb.write(line_str)
+
+            # Add a CONECT section to the PDB file stating the bonds
+            # This is required by OpenMM to correctly assign topology.bonds
+            for (i, j) in self.bonds:
+                f_pdb.write(f'CONECT{i+1:>5}{j+1:>5}\n')
 
             f_pdb.write('TER\n')
             f_pdb.write('ENDMDL\n')
