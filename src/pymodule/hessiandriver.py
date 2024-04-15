@@ -77,6 +77,7 @@ class HessianDriver:
         - temperature: The temperature (in K) used for thermodynamic analysis.
         - pressure: The pressure (in bar) used for thermodynamic analysis.
         - numerical_grad: Perform numerical gradient calculation.
+        - do_raman: Calculate Raman activity
         - print_vib_analysis: Print vibrational analysis
           (frequencies and normal modes)
     """
@@ -157,7 +158,8 @@ class HessianDriver:
                 'timing': ('bool', 'whether timing is needed'),
                 'profiling': ('bool', 'whether profiling is needed'),
                 'memory_profiling': ('bool', 'whether to profile memory'),
-                'memory_tracing': ('bool', 'whether to trace memory')
+                'memory_tracing': ('bool', 'whether to trace memory'),
+                'do_raman': ('bool', 'whether to calculate Raman activity')
                 },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
