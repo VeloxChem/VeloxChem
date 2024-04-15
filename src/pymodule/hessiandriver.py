@@ -123,6 +123,8 @@ class HessianDriver:
         # flag for two-point or four-point approximation
         self.do_four_point = False
 
+        self.do_raman = False
+
         self.numerical_grad = False
         self.print_vib_analysis = True
 
@@ -150,6 +152,7 @@ class HessianDriver:
                 'numerical': ('bool', 'do numerical hessian'),
                 'do_four_point': ('bool', 'do four-point numerical integration'),
                 'numerical_grad': ('bool', 'whether the gradient is numerical'),
+                'do_raman': ('bool', 'whether to calculate Raman activity'),
                 'print_vib_analysis': ('bool', 'whether to print vibrational analysis'),
                 'do_print_hessian': ('bool', 'whether to print the Hessian'),
                 'print_depolarization_ratio': ('bool', 'whether to print Raman depolarization ratio'),
@@ -159,11 +162,10 @@ class HessianDriver:
                 'profiling': ('bool', 'whether profiling is needed'),
                 'memory_profiling': ('bool', 'whether to profile memory'),
                 'memory_tracing': ('bool', 'whether to trace memory'),
-                'do_raman': ('bool', 'whether to calculate Raman activity')
                 },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
-                'grid_level': ('int', 'accuracy level of DFT grid')
+                'grid_level': ('int', 'accuracy level of DFT grid'),
                 }
             }
 
