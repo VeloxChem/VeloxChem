@@ -3,26 +3,17 @@ import time as tm
 import sys
 from mpi4py import MPI
 
-# from .veloxchemlib import ElectronRepulsionIntegralsDriver
-# from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import AODensityMatrix
-# from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
-# from .veloxchemlib import fockmat
-# from .veloxchemlib import XCIntegrator
 from .veloxchemlib import MolecularGrid
-# from .veloxchemlib import parse_xc_func
 from .veloxchemlib import GridDriver, XCMolecularGradient
 from .veloxchemlib import hartree_in_wavenumber
-# from .cphfsolver import CphfSolver
 from .polorbitalresponse import PolOrbitalResponse
 from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
 from .molecule import Molecule
 from .outputstream import OutputStream
-# from .qqscheme import get_qq_scheme
-# from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .sanitychecks import dft_sanity_check, polgrad_sanity_check
 
@@ -97,10 +88,7 @@ class PolarizabilityGradient():
             }
         }
 
-    def update_settings(self,
-                        grad_dict,
-                        orbrsp_dict=None,
-                        method_dict=None,
+    def update_settings(self, grad_dict, orbrsp_dict=None, method_dict=None,
                         scf_drv=None):
         """
         Updates response and method settings in polarizability gradient
