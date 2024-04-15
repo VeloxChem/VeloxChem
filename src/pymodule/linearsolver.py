@@ -697,17 +697,21 @@ class LinearSolver:
                 dks = []
                 kns = []
 
+            symm_flags = []
+
             for col in range(batch_start, batch_end):
                 if col < n_ger:
                     v_ger = vecs_ger.get_full_vector(col)
                     if self.rank == mpi_master():
                         # full-size gerade trial vector
                         vec = np.hstack((v_ger, v_ger))
+                    symm_flags.append('antisymm')
                 else:
                     v_ung = vecs_ung.get_full_vector(col - n_ger)
                     if self.rank == mpi_master():
                         # full-size ungerade trial vector
                         vec = np.hstack((v_ung, -v_ung))
+                    symm_flags.append('symm')
 
                 if self.rank == mpi_master():
                     half_size = vec.shape[0] // 2
@@ -730,6 +734,7 @@ class LinearSolver:
                     dks.append(dak)
                     kns.append(kn)
 
+            symm_flag = symm_flags[0]
             if self.rank == mpi_master():
                 den_mat_np = dks[0]
                 naos = den_mat_np.shape[0]
@@ -742,20 +747,15 @@ class LinearSolver:
 
             self.comm.Bcast(den_mat_np, root=mpi_master())
 
-            # TODO: use hipblas
-            den_mat_np_symm = 0.5 * (den_mat_np + den_mat_np.T)
-            den_mat_np_antisymm = 0.5 * (den_mat_np - den_mat_np.T)
-
-            dens_symm = AODensityMatrix([den_mat_np_symm], denmat.rest)
-            dens_antisymm = AODensityMatrix([den_mat_np_antisymm], denmat.rest)
+            dens = AODensityMatrix([den_mat_np], denmat.rest)
 
             # form Fock matrices
 
-            fock_mat_local = (
-                self._comp_lr_fock(dens_symm, molecule, basis, eri_dict, dft_dict,
-                                   pe_dict, 2.0, 'symm', profiler) +
-                self._comp_lr_fock(dens_antisymm, molecule, basis, eri_dict, dft_dict,
-                                   pe_dict, 0.0, 'antisymm', profiler))
+            coulomb_coef = 0.0 if symm_flag == 'antisymm' else 2.0
+            fock_mat_local = self._comp_lr_fock(dens, molecule, basis,
+                                                eri_dict, dft_dict, pe_dict,
+                                                coulomb_coef, symm_flag,
+                                                profiler)
 
             fock_mat = np.zeros(fock_mat_local.shape)
 
