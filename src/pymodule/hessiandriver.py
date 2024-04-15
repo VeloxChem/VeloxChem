@@ -241,18 +241,6 @@ class HessianDriver:
         elem = molecule.get_labels()
         coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
 
-        # Constants and conversion factors
-        #c = speed_of_light_in_vacuum_in_SI()
-        #alpha = fine_structure_constant()
-        #bohr_in_km = bohr_in_angstrom() * 1e-13
-        #cm_to_m = 1e-2  # centimeters in meters
-        #N_to_mdyne = 1e+8  # Newton in milli dyne
-        #m_to_A = 1e+10  # meters in Angstroms
-
-        # Conversion factor of IR intensity to km/mol
-        #conv_ir_ea0amu2kmmol = (electron_mass_in_amu() * avogadro_constant() *
-        #                        alpha**2 * bohr_in_km * np.pi / 3.0)
-
         self.frequencies, self.normal_modes, gibbs_energy = (
             geometric.normal_modes.frequency_analysis(
                 coords,
@@ -272,67 +260,15 @@ class HessianDriver:
 
         # Calculate force constants
         self.force_constants = self.calculate_force_constant()
-        #self.force_constants = (4.0 * np.pi**2 *
-        #                        (c * (self.frequencies / cm_to_m))**2 *
-        #                        self.reduced_masses *
-        #                        amu_in_kg()) * (N_to_mdyne / m_to_A)
 
         # Calculate IR intensities (for ground state only)
         if self.dipole_gradient is not None:
-            #ir_trans_dipole = self.dipole_gradient.dot(self.normal_modes.T)
-            #ir_intensity_au_amu = np.array([
-            #    np.linalg.norm(ir_trans_dipole[:, x])**2
-            #    for x in range(ir_trans_dipole.shape[1])
-            #])
-            #self.ir_intensities = ir_intensity_au_amu * conv_ir_ea0amu2kmmol
             self.ir_intensities = self.calculate_ir_intensity(self.normal_modes)
 
         # Calculate Raman intensities, if applicable
-        #if self.polarizability_gradient is not None:
         if self.do_raman:
             self.raman_intensities, depol_ratio = self.calculate_raman_activity(
                     self.normal_modes)
-            # Get information from polarizability gradient dictionary
-            #raman_conversion_factor = 0.078424
-            #raman_conversion_factor = self.get_conversion_factor('raman')
-            #nfreq = len(self.polarizability_gradient)
-            freqs = list(self.polarizability_gradient.keys())
-            #self.ostream.print_blank()
-            #self.ostream.print_info('Polarizability gradient calculated for ' + 
-            #                        '{0} frequencies: {1}'.format(nfreq, freqs))
-            #self.ostream.print_blank()
-
-            ## dictionary for Raman intensities
-            #self.raman_intensities = {}
-            #for freq in freqs:
-            #    # get gradient for current frequency
-            #    current_polarizability_gradient = self.polarizability_gradient[freq]
-            #    size_x = current_polarizability_gradient.shape[0]
-            #    size_y = current_polarizability_gradient.shape[1]
-            #    size_k = self.normal_modes.shape[0]
-
-            #    # einsum 'xyi,ik->xyk'
-            #    raman_transmom = np.matmul(
-            #        current_polarizability_gradient.reshape(size_x * size_y, -1),
-            #        self.normal_modes.T).reshape(size_x, size_y, size_k)
-
-            #    # Calculate rotational invariants
-            #    alpha_bar = np.zeros((number_of_modes))
-            #    gamma_bar_sq = np.zeros((number_of_modes))
-            #    for i in range(3):
-            #        alpha_bar += raman_transmom[i, i] / 3
-            #        for j in range(i + 1, 3):
-            #            gamma_bar_sq += 0.5 * (
-            #                raman_transmom[i, i] -
-            #                raman_transmom[j, j])**2 + 3 * raman_transmom[i, j]**2
-            #    alpha_bar_sq = alpha_bar**2
-            #    self.raman_intensities[freq] = (
-            #        45 * alpha_bar_sq + 7 * gamma_bar_sq) * raman_conversion_factor
-
-            #    if self.print_depolarization_ratio and (freq == 0.0): # TODO dynamic also?
-            #        int_pol = 45 * alpha_bar_sq + 4 * gamma_bar_sq
-            #        int_depol = 3 * gamma_bar_sq
-            #        depol_ratio = int_depol / int_pol
 
         # Now we can normalize the normal modes -- as done in geomeTRIC
         self.normal_modes /= np.linalg.norm(self.normal_modes,
@@ -370,6 +306,7 @@ class HessianDriver:
 
             if self.raman_intensities is not None:
                 freq_unit = ' a.u.'
+                freqs = list(self.raman_intensities.keys())
                 for freq in freqs:
                     if freq == 0.0:
                         this_freq = 'static'
