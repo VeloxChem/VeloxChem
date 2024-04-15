@@ -59,7 +59,7 @@ class HessianDriver:
           in Hartree / (amu * Bohr**2).
         - reduced_masses: The reduced masses of the normal modes in amu.
         - force_constants: The force constants in mdyn/Angstrom.
-        - frequencies: The vibrational frequencies in cm**-1.
+        - vib_frequencies: The vibrational frequencies in cm**-1.
         - normal_modes: The normalized vibrational normal modes in
                         (non-mass-weighted) Cartesian coordinates.
         - cart_normal_modes: The non-normalized vibrational modes in
@@ -79,7 +79,7 @@ class HessianDriver:
         - numerical_grad: Perform numerical gradient calculation.
         - do_raman: Calculate Raman activity
         - print_vib_analysis: Print vibrational analysis
-          (frequencies and normal modes)
+          (vibrational frequencies and normal modes)
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -107,7 +107,7 @@ class HessianDriver:
         self.mass_weighted_hessian = None
         self.reduced_masses = None
         self.force_constants = None
-        self.frequencies = None
+        self.vib_frequencies = None
 
         self.normal_modes = None  # normalized, not mass-weighted
         self.cart_normal_modes = None  # neither normalized nor mass-weighted
@@ -241,7 +241,7 @@ class HessianDriver:
         elem = molecule.get_labels()
         coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
 
-        self.frequencies, self.normal_modes, gibbs_energy = (
+        self.vib_frequencies, self.normal_modes, gibbs_energy = (
             geometric.normal_modes.frequency_analysis(
                 coords,
                 self.hessian,
@@ -256,7 +256,7 @@ class HessianDriver:
         # einsum 'ki->i'
         self.reduced_masses = 1.0 / np.sum(self.normal_modes.T**2, axis=0)
 
-        number_of_modes = len(self.frequencies)
+        number_of_modes = len(self.vib_frequencies)
 
         # Calculate force constants
         self.force_constants = self.calculate_force_constant()
@@ -282,13 +282,13 @@ class HessianDriver:
         width = 52
         for k in range(number_of_modes):
 
-            # Print indices and frequencies:
+            # Print indices and vibrational frequencies:
             index_string = '{:22s}{:d}'.format('Vibrational Mode', k + 1)
             self.ostream.print_header(index_string.ljust(width))
             self.ostream.print_header('-' * width)
 
             freq_string = '{:22s}{:20.2f}  {:8s}'.format(
-                'Harmonic frequency:', self.frequencies[k], 'cm**-1')
+                'Harmonic frequency:', self.vib_frequencies[k], 'cm**-1')
             self.ostream.print_header(freq_string.ljust(width))
 
             mass_string = '{:22s}{:20.4f}  {:8s}'.format(
@@ -375,7 +375,7 @@ class HessianDriver:
         freqs = list(self.polarizability_gradient.keys())
         nfreq = len(freqs)
 
-        number_of_modes = len(self.frequencies)
+        number_of_modes = len(self.vib_frequencies)
 
         # dictionary for Raman intensities
         raman_intensities = {}
@@ -450,7 +450,7 @@ class HessianDriver:
         m_to_A = 1e+10  # meters in Angstroms
 
         force_constants = (4.0 * np.pi**2 *
-                                (c * (self.frequencies / cm_to_m))**2 *
+                                (c * (self.vib_frequencies / cm_to_m))**2 *
                                 self.reduced_masses *
                                 amu_in_kg()) * (N_to_mdyne / m_to_A)
         return force_constants
