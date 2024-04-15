@@ -37,6 +37,8 @@ from .veloxchemlib import parse_xc_func
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .dftutils import get_default_grid_level
+from .inputparser import parse_input
+from .sanitychecks import dft_sanity_check
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -132,7 +134,7 @@ class HessianDriver:
         self.temperature = 298.15
         self.pressure = 1.0
 
-        self.dft = False
+        self._dft = False
         self.grid_level = None
         self.xcfun = None
 
@@ -142,7 +144,28 @@ class HessianDriver:
         self.memory_profiling = False
         self.memory_tracing = False
 
-    def update_settings(self, method_dict, hess_dict=None):
+        self._input_keywords = {
+            'hessian': {
+                'numerical': ('bool', 'do numerical hessian'),
+                'do_four_point': ('bool', 'do four-point numerical integration'),
+                'numerical_grad': ('bool', 'whether the gradient is numerical'),
+                'print_vib_analysis': ('bool', 'whether to print vibrational analysis'),
+                'do_print_hessian': ('bool', 'whether to print the Hessian'),
+                'print_depolarization_ratio': ('bool', 'whether to print Raman depolarization ratio'),
+                'temperature': ('float', 'the temperature'),
+                'pressure': ('float', 'the pressure'),
+                'timing': ('bool', 'whether timing is needed'),
+                'profiling': ('bool', 'whether profiling is needed'),
+                'memory_profiling': ('bool', 'whether to profile memory'),
+                'memory_tracing': ('bool', 'whether to trace memory')
+                },
+            'method_settings': {
+                'xcfun': ('str_upper', 'exchange-correlation functional'),
+                'grid_level': ('int', 'accuracy level of DFT grid')
+                }
+            }
+
+    def update_settings(self, method_dict=None, hess_dict=None):
         """
         Updates settings in HessianDriver.
 
@@ -152,94 +175,29 @@ class HessianDriver:
             The input dictionary of Hessian settings group.
         """
 
+        if method_dict is None:
+            method_dict = {}
         if hess_dict is None:
             hess_dict = {}
 
-        # check if Hessian is to be calculated numerically
-        if 'numerical' in hess_dict:
-            key = hess_dict['numerical'].lower()
-            self.numerical = (key in ['yes', 'y'])
+        hess_keywords = {
+            key: val[0] for key, val in
+            self._input_keywords['hessian'].items()
+        }
 
-        if 'do_four_point' in hess_dict:
-            key = hess_dict['do_four_point'].lower()
-            self.do_four_point = (key in ['yes', 'y'])
+        parse_input(self, hess_keywords, hess_dict)
 
-        # TODO: use parse_input and _dft_sanity_check
+        method_keywords = {
+            key: val[0]
+            for key, val in self._input_keywords['method_settings'].items()
+        }
 
-        if 'dft' in method_dict:
-            key = method_dict['dft'].lower()
-            self.dft = (key in ['yes', 'y'])
-        if 'grid_level' in method_dict:
-            self.grid_level = int(method_dict['grid_level'])
-        if 'xcfun' in method_dict:
-            if 'dft' not in method_dict:
-                self.dft = True
-            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Hessian driver: Undefined XC functional')
+        parse_input(self, method_keywords, method_dict)
 
-        if self.do_four_point:
-            self.numerical = True
-
-        # TODO: check if analytical gradient is available; 
-        # if not, calculate numerical hessian using energy differences
-        # check if gradient is to be calculated numerically
-        if 'numerical_grad' in hess_dict:
-            key = hess_dict['numerical_grad'].lower()
-            self.numerical_grad = True if key in ['yes', 'y'] else False
-
-        # if gradient is calculated numerically, so is the Hessian
-        if self.numerical_grad:
-            self.numerical = True
-
-        # Analytical DFT Hessian is not implemented yet
-        if 'xcfun' in method_dict:
-            if method_dict['xcfun'] is not None:
-                #self.numerical = True
-                self.dft = True
-        if 'dft' in method_dict:
-            key = method_dict['dft'].lower()
-            self.dft = True if key in ['yes', 'y'] else False
-
-        # print vibrational analysis (frequencies and normal modes)
-        if 'print_vib_analysis' in hess_dict:
-            key = hess_dict['print_vib_analysis'].lower()
-            self.print_vib_analysis = True if key in ['yes', 'y'] else False
-
-        # print the Hessian (not mass-weighted)
-        if 'do_print_hessian' in hess_dict:
-            key = hess_dict['do_print_hessian'].lower()
-            self.do_print_hessian = True if key in ['yes', 'y'] else False
-
-        # print the depolarization ratio, parallel, and perpendicular
-        # Raman activities
-        if 'print_depolarization_ratio' in hess_dict:
-            key = hess_dict['print_depolarization_ratio'].lower()
-            self.print_depolarization_ratio = (key in ['yes', 'y'])
-
-        if 'temperature' in hess_dict:
-            self.temperature = float(hess_dict['temperature'])
-        if 'pressure' in hess_dict:
-            self.pressure = float(hess_dict['pressure'])
-
-        # TODO: check if timing and profiling are needed
-        # Timing and profiling
-        if 'timing' in hess_dict:
-            key = hess_dict['timing'].lower()
-            self.timing = True if key in ['yes', 'y'] else False
-        if 'profiling' in hess_dict:
-            key = hess_dict['profiling'].lower()
-            self.profiling = True if key in ['yes', 'y'] else False
-        if 'memory_profiling' in hess_dict:
-            key = hess_dict['memory_profiling'].lower()
-            self.memory_profiling = True if key in ['yes', 'y'] else False
-        if 'memory_tracing' in hess_dict:
-            key = hess_dict['memory_tracing'].lower()
-            self.memory_tracing = True if key in ['yes', 'y'] else False
+        dft_sanity_check(self, 'update_settings')
 
         self.method_dict = dict(method_dict)
         self.hess_dict = dict(hess_dict)
-
 
     def compute(self, molecule, ao_basis=None, min_basis=None):
         """
@@ -254,7 +212,6 @@ class HessianDriver:
         """
 
         return
-
 
     def vibrational_analysis(self, molecule, filename=None, rsp_drv=None):
         """
@@ -280,6 +237,19 @@ class HessianDriver:
         elem = molecule.get_labels()
         coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
 
+        # Constants and conversion factors
+        c = speed_of_light_in_vacuum_in_SI()
+        alpha = fine_structure_constant()
+        bohr_in_km = bohr_in_angstrom() * 1e-13
+        cm_to_m = 1e-2  # centimeters in meters
+        N_to_mdyne = 1e+8  # Newton in milli dyne
+        m_to_A = 1e+10  # meters in Angstroms
+        raman_conversion_factor = 0.078424
+
+        # Conversion factor of IR intensity to km/mol
+        conv_ir_ea0amu2kmmol = (electron_mass_in_amu() * avogadro_constant() *
+                                alpha**2 * bohr_in_km * np.pi / 3.0)
+
         self.frequencies, self.normal_modes, gibbs_energy = (
             geometric.normal_modes.frequency_analysis(
                 coords,
@@ -295,29 +265,13 @@ class HessianDriver:
         # einsum 'ki->i'
         self.reduced_masses = 1.0 / np.sum(self.normal_modes.T**2, axis=0)
 
-        # Constants and conversion factors
-        c = speed_of_light_in_vacuum_in_SI()
-        alpha = fine_structure_constant()
-        bohr_in_km = bohr_in_angstrom() * 1e-13
-        cm_to_m = 1e-2  # centimeters in meters
-        N_to_mdyne = 1e+8  # Newton in milli dyne
-        m_to_A = 1e+10  # meters in Angstroms
-        raman_conversion_factor = 0.078424
-
-        # Conversion factor of IR intensity to km/mol
-        conv_ir_ea0amu2kmmol = (electron_mass_in_amu() * avogadro_constant() *
-                                alpha**2 * bohr_in_km * np.pi / 3.0)
+        number_of_modes = len(self.frequencies)
 
         # Calculate force constants
         self.force_constants = (4.0 * np.pi**2 *
                                 (c * (self.frequencies / cm_to_m))**2 *
                                 self.reduced_masses *
                                 amu_in_kg()) * (N_to_mdyne / m_to_A)
-
-        # TODO: remove and replace natoms with natm; atom_symbol with elem
-        natoms = molecule.number_of_atoms()
-        atom_symbol = molecule.get_labels()
-        number_of_modes = len(self.frequencies)
 
         # Calculate IR intensities (for ground state only)
         if self.dipole_gradient is not None:
@@ -326,7 +280,6 @@ class HessianDriver:
                 np.linalg.norm(ir_trans_dipole[:, x])**2
                 for x in range(ir_trans_dipole.shape[1])
             ])
-
             self.ir_intensities = ir_intensity_au_amu * conv_ir_ea0amu2kmmol
 
         # Calculate Raman intensities, if applicable
@@ -335,8 +288,8 @@ class HessianDriver:
             nfreq = len(self.polarizability_gradient)
             freqs = list(self.polarizability_gradient.keys())
             self.ostream.print_blank()
-            self.ostream.print_info('Polarizability gradient calculated for {0} frequencies: {1}'.format(
-                nfreq, freqs))
+            self.ostream.print_info('Polarizability gradient calculated for ' + 
+                                    '{0} frequencies: {1}'.format(nfreq, freqs))
             self.ostream.print_blank()
 
             # dictionary for Raman intensities
@@ -365,12 +318,6 @@ class HessianDriver:
                 alpha_bar_sq = alpha_bar**2
                 self.raman_intensities[freq] = (
                     45 * alpha_bar_sq + 7 * gamma_bar_sq) * raman_conversion_factor
-                # DEBUG
-                self.ostream.print_blank()
-                print('alpha_YY for freq = {0}: {1}'.format(
-                    round(freq, 4), alpha_bar_sq + 4.0/45.0 * gamma_bar_sq))
-                print('alpha_ZY for freq = {0}: {1}'.format(
-                    round(freq, 4), 1.0/15.0 * gamma_bar_sq))
 
                 if self.print_depolarization_ratio and (freq == 0.0): # TODO dynamic also?
                     int_pol = 45 * alpha_bar_sq + 4 * gamma_bar_sq
@@ -418,9 +365,6 @@ class HessianDriver:
                         this_freq = 'static'
                     else:
                         this_freq = str(round(freq,4)) + freq_unit # TODO convert to other unit?
-                    #raman_intens_string = '{:24s}{:18.4f}  {:8s}'.format(
-                    #        'Raman activity: ' + this_freq, self.raman_intensities[freq][k],
-                    #        'A**4/amu')
                     raman_intens_string = '{:16s} {:12s} {:12.4f}  {:8s}'.format(
                             'Raman activity:', this_freq, self.raman_intensities[freq][k],
                             'A**4/amu')
@@ -450,9 +394,9 @@ class HessianDriver:
             self.ostream.print_header(normal_mode_string.ljust(width))
 
             # Print normal modes:
-            for atom_index in range(natoms):
+            for atom_index in range(natm):
                 valstr = '{:<8d}'.format(atom_index + 1)
-                valstr += '{:<8s}'.format(atom_symbol[atom_index])
+                valstr += '{:<8s}'.format(elem[atom_index])
                 valstr += '{:12.4f}'.format(
                     self.normal_modes[k][atom_index * 3 + 0])
                 valstr += '{:12.4f}'.format(
@@ -465,7 +409,6 @@ class HessianDriver:
             self.ostream.print_blank()
 
         self.ostream.flush()
-
 
     def hess_nuc_contrib(self, molecule):
         """
@@ -636,7 +579,6 @@ class HessianDriver:
 
             valstr = '{:15s}'.format('  Coord. ')
 
-
             coord_dict = {0: '(x)', 1: '(y)', 2: '(z)'}
             end = k + 2
             if k + 2 > natm:
@@ -648,7 +590,6 @@ class HessianDriver:
 
             self.ostream.print_line(valstr)
             self.ostream.print_blank()
-
 
             for i in range(natm):
                 for di in range(3):
@@ -676,7 +617,6 @@ class HessianDriver:
         self.ostream.flush()
 
         cur_str = 'Hessian Type                    : '
-
         if self.numerical:
             cur_str += 'Numerical'
             cur_str2 = 'Numerical Method                : '
@@ -691,11 +631,12 @@ class HessianDriver:
 
         self.ostream.print_blank()
         self.ostream.print_header(cur_str.ljust(str_width))
+
         if self.numerical:
             self.ostream.print_header(cur_str2.ljust(str_width))
             self.ostream.print_header(cur_str3.ljust(str_width))
 
-        if self.dft:
+        if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
