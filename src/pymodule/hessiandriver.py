@@ -78,6 +78,7 @@ class HessianDriver:
         - pressure: The pressure (in bar) used for thermodynamic analysis.
         - numerical_grad: Perform numerical gradient calculation.
         - do_raman: Calculate Raman activity
+        - do_ir: Calculate IR intensities
         - print_vib_analysis: Print vibrational analysis
           (vibrational frequencies and normal modes)
     """
@@ -124,6 +125,7 @@ class HessianDriver:
         self.do_four_point = False
 
         self.do_raman = False
+        self.do_ir = True
 
         self.numerical_grad = False
         self.print_vib_analysis = True
@@ -153,6 +155,7 @@ class HessianDriver:
                 'do_four_point': ('bool', 'do four-point numerical integration'),
                 'numerical_grad': ('bool', 'whether the gradient is numerical'),
                 'do_raman': ('bool', 'whether to calculate Raman activity'),
+                'do_ir': ('bool', 'whether to calculate IR intensities'),
                 'print_vib_analysis': ('bool', 'whether to print vibrational analysis'),
                 'do_print_hessian': ('bool', 'whether to print the Hessian'),
                 'print_depolarization_ratio': ('bool', 'whether to print Raman depolarization ratio'),
@@ -262,7 +265,8 @@ class HessianDriver:
         self.force_constants = self.calculate_force_constant()
 
         # Calculate IR intensities (for ground state only)
-        if self.dipole_gradient is not None:
+        #if self.dipole_gradient is not None:
+        if self.do_ir:
             self.ir_intensities = self.calculate_ir_intensity(self.normal_modes)
 
         # Calculate Raman intensities, if applicable
@@ -432,7 +436,6 @@ class HessianDriver:
             for x in range(ir_trans_dipole.shape[1])
         ])
 
-        #self.ir_intensities = ir_intensity_au_amu * conv_ir_ea0amu2kmmol
         return ir_intensity_au_amu * conv_ir_ea0amu2kmmol
 
     def calculate_force_constant(self):
@@ -457,7 +460,7 @@ class HessianDriver:
 
     def get_conversion_factor(self, prop):
         """
-        Calculates conversion factor for IR.
+        Calculates conversion factor for IR or Raman.
 
         :param prop:
             Which property conversion factor.
@@ -468,17 +471,11 @@ class HessianDriver:
         """
 
         # Constants and conversion factors
-        #c = speed_of_light_in_vacuum_in_SI()
         alpha = fine_structure_constant()
         bohr_in_km = bohr_in_angstrom() * 1e-13
-        #cm_to_m = 1e-2  # centimeters in meters
-        #N_to_mdyne = 1e+8  # Newton in milli dyne
-        #m_to_A = 1e+10  # meters in Angstroms
 
         # Conversion factor of IR intensity to km/mol
         if (prop == 'ir'):
-            #conv_ir_ea0amu2kmmol = (electron_mass_in_amu() * avogadro_constant()
-            #                        * alpha**2 * bohr_in_km * np.pi / 3.0)
             conv_factor = conv_ir_ea0amu2kmmol = (electron_mass_in_amu() * avogadro_constant()
                                     * alpha**2 * bohr_in_km * np.pi / 3.0)
         elif (prop == 'raman'):

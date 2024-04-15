@@ -580,7 +580,9 @@ class ScfHessianDriver(HessianDriver):
 
             # Calculate the gradient of the dipole moment,
             # needed for IR intensities
-            self.compute_dipole_gradient(molecule, ao_basis,
+            # TODO move to general compute() function
+            if self.do_ir:
+                self.compute_dipole_gradient(molecule, ao_basis,
                                     perturbed_density)
 
 
