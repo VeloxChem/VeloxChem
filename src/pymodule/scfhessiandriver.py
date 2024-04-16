@@ -87,6 +87,7 @@ class ScfHessianDriver(HessianDriver):
 
         #self.do_raman = False
         self.pople_hessian = False
+        self.perturbed_density = None
 
         # Solver setup
         #self.conv_thresh = 1.0e-4
@@ -194,8 +195,11 @@ class ScfHessianDriver(HessianDriver):
         else:
             self.compute_analytical(molecule, ao_basis, profiler)
 
-        # if requested, calculate the analytical polarizability gradient
-        # for Raman intensities
+        # Calculate the gradient of the dipole moment,
+        # needed for IR intensities
+        if self.do_ir and (self.perturbed_density is not None):
+            self.compute_dipole_gradient(molecule, ao_basis)
+        # Calculate the analytical polarizability gradient for Raman intensities
         if self.do_raman:
             self.compute_polarizability_gradient(molecule, ao_basis)
 
@@ -571,6 +575,10 @@ class ScfHessianDriver(HessianDriver):
             if self._dft:
                 self.hessian += hessian_dft_xc
 
+            # save perturbed density as instance variable: needed for dipole
+            # gradient
+            self.perturbed_density = perturbed_density
+
             t3 = tm.time()
             self.ostream.print_info('Second order derivative contributions'
                                     + ' to the Hessian computed in' +
@@ -581,9 +589,9 @@ class ScfHessianDriver(HessianDriver):
             # Calculate the gradient of the dipole moment,
             # needed for IR intensities
             # TODO move to general compute() function
-            if self.do_ir:
-                self.compute_dipole_gradient(molecule, ao_basis,
-                                    perturbed_density)
+            #if self.do_ir:
+            #    self.compute_dipole_gradient(molecule, ao_basis,
+            #                        perturbed_density)
 
 
     def compute_pople(self, molecule, ao_basis, cphf_oo, cphf_ov, fock_uij,
@@ -1229,8 +1237,7 @@ class ScfHessianDriver(HessianDriver):
         self.scf_driver.compute(molecule, ao_basis)
         self.ostream.unmute()
 
-    def compute_dipole_gradient(self, molecule, ao_basis,
-                                perturbed_density):
+    def compute_dipole_gradient(self, molecule, ao_basis):
         """
         Computes the analytical gradient of the dipole moment.
 
@@ -1240,7 +1247,7 @@ class ScfHessianDriver(HessianDriver):
             The AO basis set.
         :param scf_drv:
             The SCF driver.
-        :param perturbed_density:
+        :param perturbed_density: #TODO remove this if setup approved
             The perturbed density matrix.
         """
 
@@ -1249,6 +1256,7 @@ class ScfHessianDriver(HessianDriver):
         nuclear_charges = molecule.elem_ids_to_numpy()
 
         scf_tensors = self.scf_driver.scf_tensors 
+        perturbed_density = self.perturbed_density
 
         density = scf_tensors['D_alpha']
 
@@ -1342,7 +1350,8 @@ class ScfHessianDriver(HessianDriver):
         polgrad_drv = PolarizabilityGradient(self.comm, self.ostream)
         polgrad_drv.update_settings(self.polgrad_dict,
                                     orbrsp_dict = self.cphf_dict,
-                                    method_dict = self.method_dict)
+                                    method_dict = self.method_dict, 
+                                    scf_drv = self.scf_driver)
         polgrad_drv.compute(molecule, ao_basis, scf_tensors, lr_results)
 
         self.polarizability_gradient = polgrad_drv.polgradient
