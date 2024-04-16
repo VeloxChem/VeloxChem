@@ -180,7 +180,7 @@ class AtomTypeIdentifier:
                 if self.connectivity_matrix[i][j] == 1:
                     self.graph.add_edge(i, j)
 
-        all_cycles = list(nx.simple_cycles(self.graph))
+        all_cycles = list(nx.simple_cycles(self.graph, length_bound=6))
 
         # Sort by cycle length
         all_cycles = sorted(all_cycles, key=len)
