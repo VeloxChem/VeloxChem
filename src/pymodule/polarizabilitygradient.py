@@ -66,7 +66,7 @@ class PolarizabilityGradient():
         self.grid_level = 4
         self.xcfun = None
 
-        self.flag = 'Polarizability Gradient'
+        self.flag = 'Polarizability Gradient Driver'
         self.frequencies = (0,)
         self.vector_components = 'xyz'
 
@@ -151,17 +151,15 @@ class PolarizabilityGradient():
             The results of the linear response calculation.
         """
 
+        if self.rank == mpi_master():
+            self.print_header()
+
         # sanity check
         dft_sanity_check(self, 'compute')
 
         start_time = tm.time()
 
         if self.numerical:
-            if self.rank == mpi_master():
-                valstr = '*** Calculating numerical polarizability gradient ***'
-                self.ostream.print_header(valstr)
-                self.ostream.print_blank()
-                self.ostream.flush()
             if self.scf_drv is None:
                 error_message = 'PolarizabilityGradient: missing input SCF driver '
                 error_message += 'for numerical calculations'
@@ -178,11 +176,6 @@ class PolarizabilityGradient():
             # sanity checks linear response input
             polgrad_sanity_check(self, self.flag, lr_results)
             self.check_real_or_complex_input(lr_results)
-            if self.rank == mpi_master():
-                valstr = '*** Calculating analytical polarizability gradient ***'
-                self.ostream.print_header(valstr)
-                self.ostream.print_blank()
-                self.ostream.flush()
             if self.is_complex:
                 self.compute_analytical_complex(molecule, basis, scf_tensors,
                                                 lr_results)
@@ -1244,6 +1237,54 @@ class PolarizabilityGradient():
             'gs_density': gs_density,
             'dft_func_label': dft_func_label,
         }
+
+    def print_header(self):
+        """
+        Prints polarizability gradient calculation setup details to output stream.
+        """
+
+        str_width = 70
+
+        self.ostream.print_blank()
+        self.ostream.print_header(self.flag)
+        self.ostream.print_header((len(self.flag) + 2) * '=')
+        self.ostream.flush()
+
+        cur_str = 'Polarizability gradient type    : '
+        if self.is_complex:
+            cur_str += 'Complex '
+        else:
+            cur_str += 'Real '
+        if self.numerical:
+            cur_str += 'Numerical'
+            cur_str2 = 'Numerical Method                : '
+            if self.do_four_point:
+                cur_str2 += 'Five-Point Stencil'
+            else:
+                cur_str2 += 'Symmetric Difference Quotient'
+            cur_str3 = 'Finite Difference Step Size     : '
+            cur_str3 += str(self.delta_h) + ' a.u.'
+        else:
+            cur_str += 'Analytical'
+
+        self.ostream.print_blank()
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self.numerical:
+            self.ostream.print_header(cur_str2.ljust(str_width))
+            self.ostream.print_header(cur_str3.ljust(str_width))
+
+        if self._dft:
+            cur_str = 'Exchange-Correlation Functional : '
+            cur_str += self.xcfun.get_func_label().upper()
+            self.ostream.print_header(cur_str.ljust(str_width))
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            cur_str = 'Molecular Grid Level            : ' + str(grid_level)
+            self.ostream.print_header(cur_str.ljust(str_width))
+
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def print_polarizability_gradient(self, molecule):
         """
