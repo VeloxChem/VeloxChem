@@ -1092,26 +1092,9 @@ class CphfSolver(LinearSolver):
         self.ostream.flush()
 
     def print_cphf_header(self, title):
-        self.ostream.print_blank()
-        self.ostream.print_header('{:s} Setup'.format(title))
-        self.ostream.print_header('=' * (len(title) + 8))
-        self.ostream.print_blank()
+        """
+        Prints information on the solver setup
+        """
 
-        str_width = 70
+        return None
 
-        # print general info
-        cur_str = 'Solver Type                     : '
-        if self.use_subspace_solver:
-            cur_str += 'Iterative Subspace Algorithm'
-        else:
-            cur_str += 'Conjugate Gradient'
-        self.ostream.print_header(cur_str.ljust(str_width))
-
-        cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
-        self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Convergence Threshold           : {:.1e}'.format(
-            self.conv_thresh)
-        self.ostream.print_header(cur_str.ljust(str_width))
-
-        self.ostream.print_blank()
-        self.ostream.flush()
