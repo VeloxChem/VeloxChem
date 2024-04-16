@@ -1495,7 +1495,7 @@ class LinearSolver:
             return tuple()
 
     def get_complex_prop_grad(self, operator, components, molecule, basis,
-                              scf_tensors):
+                              scf_tensors, screening):
         """
         Computes complex property gradients for linear response equations.
 
@@ -1526,46 +1526,142 @@ class LinearSolver:
         )
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
-            dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-            dipole_mats = dipole_drv.compute(molecule, basis)
+            mu_x, mu_y, mu_z = compute_electric_dipole_integrals_gpu(
+                    molecule, basis, [0.0, 0.0, 0.0], screening)
+
+            naos = mu_x.number_of_rows()
 
             if self.rank == mpi_master():
-                integrals = (dipole_mats.x_to_numpy() + 0j,
-                             dipole_mats.y_to_numpy() + 0j,
-                             dipole_mats.z_to_numpy() + 0j)
+                mu_x_mat_np = np.zeros((naos, naos))
+                mu_y_mat_np = np.zeros((naos, naos))
+                mu_z_mat_np = np.zeros((naos, naos))
+            else:
+                mu_x_mat_np = None
+                mu_y_mat_np = None
+                mu_z_mat_np = None
+
+            self.comm.Reduce(mu_x.to_numpy(),
+                             mu_x_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+            self.comm.Reduce(mu_y.to_numpy(),
+                             mu_y_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+            self.comm.Reduce(mu_z.to_numpy(),
+                             mu_z_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+
+            if self.rank == mpi_master():
+                integrals = (mu_x_mat_np + 0j,
+                             mu_y_mat_np + 0j,
+                             mu_z_mat_np + 0j)
             else:
                 integrals = tuple()
 
         elif operator in ['linear_momentum', 'linear momentum']:
-            linmom_drv = LinearMomentumIntegralsDriver(self.comm)
-            linmom_mats = linmom_drv.compute(molecule, basis)
+            mu_x, mu_y, mu_z = compute_linear_momentum_integrals_gpu(
+                    molecule, basis, screening)
+
+            naos = mu_x.number_of_rows()
 
             if self.rank == mpi_master():
-                integrals = (-1j * linmom_mats.x_to_numpy(),
-                             -1j * linmom_mats.y_to_numpy(),
-                             -1j * linmom_mats.z_to_numpy())
+                mu_x_mat_np = np.zeros((naos, naos))
+                mu_y_mat_np = np.zeros((naos, naos))
+                mu_z_mat_np = np.zeros((naos, naos))
+            else:
+                mu_x_mat_np = None
+                mu_y_mat_np = None
+                mu_z_mat_np = None
+
+            self.comm.Reduce(mu_x.to_numpy(),
+                             mu_x_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+            self.comm.Reduce(mu_y.to_numpy(),
+                             mu_y_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+            self.comm.Reduce(mu_z.to_numpy(),
+                             mu_z_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+
+            if self.rank == mpi_master():
+                integrals = (-1j * mu_x_mat_np,
+                             -1j * mu_y_mat_np,
+                             -1j * mu_z_mat_np)
             else:
                 integrals = tuple()
 
         elif operator in ['angular_momentum', 'angular momentum']:
-            angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-            angmom_mats = angmom_drv.compute(molecule, basis)
+            mu_x, mu_y, mu_z = compute_angular_momentum_integrals_gpu(
+                    molecule, basis, [0.0, 0.0, 0.0], screening)
+
+            naos = mu_x.number_of_rows()
 
             if self.rank == mpi_master():
-                integrals = (-1j * angmom_mats.x_to_numpy(),
-                             -1j * angmom_mats.y_to_numpy(),
-                             -1j * angmom_mats.z_to_numpy())
+                mu_x_mat_np = np.zeros((naos, naos))
+                mu_y_mat_np = np.zeros((naos, naos))
+                mu_z_mat_np = np.zeros((naos, naos))
+            else:
+                mu_x_mat_np = None
+                mu_y_mat_np = None
+                mu_z_mat_np = None
+
+            self.comm.Reduce(mu_x.to_numpy(),
+                             mu_x_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+            self.comm.Reduce(mu_y.to_numpy(),
+                             mu_y_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+            self.comm.Reduce(mu_z.to_numpy(),
+                             mu_z_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+
+            if self.rank == mpi_master():
+                integrals = (-1j * mu_x_mat_np,
+                             -1j * mu_y_mat_np,
+                             -1j * mu_z_mat_np)
             else:
                 integrals = tuple()
 
         elif operator in ['magnetic_dipole', 'magnetic dipole']:
-            angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-            angmom_mats = angmom_drv.compute(molecule, basis)
+            mu_x, mu_y, mu_z = compute_angular_momentum_integrals_gpu(
+                    molecule, basis, [0.0, 0.0, 0.0], screening)
+
+            naos = mu_x.number_of_rows()
 
             if self.rank == mpi_master():
-                integrals = (0.5j * angmom_mats.x_to_numpy(),
-                             0.5j * angmom_mats.y_to_numpy(),
-                             0.5j * angmom_mats.z_to_numpy())
+                mu_x_mat_np = np.zeros((naos, naos))
+                mu_y_mat_np = np.zeros((naos, naos))
+                mu_z_mat_np = np.zeros((naos, naos))
+            else:
+                mu_x_mat_np = None
+                mu_y_mat_np = None
+                mu_z_mat_np = None
+
+            self.comm.Reduce(mu_x.to_numpy(),
+                             mu_x_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+            self.comm.Reduce(mu_y.to_numpy(),
+                             mu_y_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+            self.comm.Reduce(mu_z.to_numpy(),
+                             mu_z_mat_np,
+                             op=MPI.SUM,
+                             root=mpi_master())
+
+            if self.rank == mpi_master():
+                integrals = (0.5j * mu_x_mat_np,
+                             0.5j * mu_y_mat_np,
+                             0.5j * mu_z_mat_np)
             else:
                 integrals = tuple()
 

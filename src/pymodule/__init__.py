@@ -43,5 +43,6 @@ from .matrix import Matrix
 from .sadguessdriver import SadGuessDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .lreigensolver import LinearResponseEigenSolver
+from .cppsolver import ComplexResponse
 
 __version__ = "1.0rc0"
