@@ -151,13 +151,12 @@ class PolarizabilityGradient():
             The results of the linear response calculation.
         """
 
-        # sanity checks
+        # sanity check
         dft_sanity_check(self, 'compute')
 
         start_time = tm.time()
 
         if self.numerical:
-            # print only on the master node
             if self.rank == mpi_master():
                 valstr = '*** Calculating numerical polarizability gradient ***'
                 self.ostream.print_header(valstr)
@@ -176,8 +175,9 @@ class PolarizabilityGradient():
                 error_message = 'PolarizabilityGradient: missing input LR results'
                 error_message += 'for analytical calculations'
                 raise ValueError(error_message)
+            # sanity checks linear response input
             polgrad_sanity_check(self, self.flag, lr_results)
-            # print only on the master node
+            self.check_real_or_complex_input(lr_results)
             if self.rank == mpi_master():
                 valstr = '*** Calculating analytical polarizability gradient ***'
                 self.ostream.print_header(valstr)
@@ -1334,3 +1334,22 @@ class PolarizabilityGradient():
         """
 
         self.ostream.print_block(molecule.get_string())
+
+    def check_real_or_complex_input(self, lr_results):
+        """
+        Checks if the input LR results and polgrad settings are
+        both real or both complex.
+
+        :param lr_results:
+            Results from linear response calculation.
+        """
+
+        response_functions = lr_results.get('response_functions', None)
+        keys = list(response_functions.keys())
+        is_complex_response = (type(response_functions[keys[0]]) is np.complex_)
+
+        if (is_complex_response != self.is_complex):
+            error_text = 'Mismatch between LR results and polgrad settings!'
+            error_text += 'One is complex, the other is not.'
+            raise ValueError(error_text)
+
