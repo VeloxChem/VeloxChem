@@ -1743,11 +1743,11 @@ class AtomTypeIdentifier:
                 # Assign atom types based on AtomicSymbol and AtomNumber
                 atom_type = {
                     'opls': f'opls_{info["AtomicSymbol"]}{info["AtomNumber"]}',
-                    'gaff': f'{info["AtomicSymbol"]}{info["AtomNumber"]}'
+                    'gaff': f'{info["AtomicSymbol"]}'
                 }
 
                 self.atom_types_dict[
-                    f"{info['AtomicSymbol']}"] = atom_type
+                    f"{info['AtomicSymbol']}{info['AtomNumber']}"] = atom_type
 
                 if 'H' in info['ConnectedAtoms']:
                     hydrogen_type = {'opls': 'opls_h_x', 'gaff': 'h_x'}

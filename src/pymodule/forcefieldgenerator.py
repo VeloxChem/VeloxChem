@@ -454,7 +454,7 @@ class ForceFieldGenerator:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_drv:
+        :param scf_result:
             A converged SCF result.
         :param no_resp:
             If RESP charges should not be computed.
