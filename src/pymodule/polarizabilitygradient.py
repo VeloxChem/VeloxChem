@@ -16,6 +16,7 @@ from .molecule import Molecule
 from .outputstream import OutputStream
 from .inputparser import parse_input
 from .sanitychecks import dft_sanity_check, polgrad_sanity_check
+from .dftutils import get_default_grid_level
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
@@ -63,7 +64,8 @@ class PolarizabilityGradient():
         self.do_four_point = False
 
         self._dft = False
-        self.grid_level = 4
+        #self.grid_level = 4
+        self.grid_level = None
         self.xcfun = None
 
         self.flag = 'Polarizability Gradient Driver'
@@ -127,6 +129,9 @@ class PolarizabilityGradient():
 
         if 'frequencies' not in orbrsp_dict:
             orbrsp_dict['frequencies'] = self.frequencies
+
+        if self._dft and (self.grid_level is None):
+            self.grid_level = get_default_grid_level(self.xcfun) 
 
         # must be set without an if-statement in case the orbital response
         # dictionary has previously been set
