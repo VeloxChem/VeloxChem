@@ -1747,7 +1747,7 @@ class AtomTypeIdentifier:
                 }
 
                 self.atom_types_dict[
-                    f"{info['AtomicSymbol']}{info['AtomNumber']}"] = atom_type
+                    f"{info['AtomicSymbol']}"] = atom_type
 
                 if 'H' in info['ConnectedAtoms']:
                     hydrogen_type = {'opls': 'opls_h_x', 'gaff': 'h_x'}

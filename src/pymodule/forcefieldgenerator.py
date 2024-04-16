@@ -1672,7 +1672,7 @@ class ForceFieldGenerator:
                         element = ''.join([i for i in atom['name'] if not i.isdigit()])  
                         attributes = {
                             "name": atom['type'],
-                            "class": atom['name'],
+                            "class": atom['type'],
                             "element": element,
                             "mass": str(atom['mass']) 
                         }
@@ -1683,16 +1683,16 @@ class ForceFieldGenerator:
         Residues = ET.SubElement(ForceField, "Residues")
         Residue = ET.SubElement(Residues, "Residue", name=mol_name)
         for atom_id, atom_data in atoms.items():
-            ET.SubElement(Residue, "Atom", name=str(atom_id), type=atom_data['type'], charge=str(atom_data['charge']))
+            ET.SubElement(Residue, "Atom", name=str(atom_id + 1), type=atom_data['type'], charge=str(atom_data['charge']))
         for bond_id, bond_data in bonds.items():
-            ET.SubElement(Residue, "Bond", atomName1=str(bond_id[0]), atomName2=str(bond_id[1]))
+            ET.SubElement(Residue, "Bond", atomName1=str(bond_id[0] + 1), atomName2=str(bond_id[1] + 1))
 
         # Bonds section
         Bonds = ET.SubElement(ForceField, "HarmonicBondForce")
         for bond_id, bond_data in bonds.items():
             attributes = {
-                "class1": str(bond_id[0]),
-                "class2": str(bond_id[1]),
+                "class1": atoms[bond_id[0]]['type'],
+                "class2": atoms[bond_id[1]]['type'],
                 "length": str(bond_data['equilibrium']),
                 "k": str(bond_data['force_constant'])
             }
@@ -1702,22 +1702,24 @@ class ForceFieldGenerator:
         Angles = ET.SubElement(ForceField, "HarmonicAngleForce")
         for angle_id, angle_data in self.angles.items():
             attributes = {
-                "class1": str(angle_id[0]),
-                "class2": str(angle_id[1]),
-                "class3": str(angle_id[2]),
+                "class1": atoms[angle_id[0]]['type'],
+                "class2": atoms[angle_id[1]]['type'],
+                "class3": atoms[angle_id[2]]['type'],
                 "angle": str(angle_data['equilibrium'] * np.pi / 180),
                 "k": str(angle_data['force_constant'])
             }
+            ET.SubElement(Angles, "Angle", **attributes)
+
         # Periodic Dihedrals section
         Dihedrals = ET.SubElement(ForceField, "PeriodicTorsionForce")
         for dihedral_id, dihedral_data in self.dihedrals.items():
             if dihedral_data['type'] == 'RB':
                 continue
             attributes = {
-                "class1": str(dihedral_id[0]),
-                "class2": str(dihedral_id[1]),
-                "class3": str(dihedral_id[2]),
-                "class4": str(dihedral_id[3]),
+                "class1": atoms[dihedral_id[0]]['type'],
+                "class2": atoms[dihedral_id[1]]['type'],
+                "class3": atoms[dihedral_id[2]]['type'],
+                "class4": atoms[dihedral_id[3]]['type'],
                 "periodicity": str(dihedral_data['periodicity']),
                 "phase": str(dihedral_data['phase'] * np.pi / 180),
                 "k": str(dihedral_data['barrier'])
@@ -1730,10 +1732,10 @@ class ForceFieldGenerator:
             if dihedral_data['type'] == 'Fourier':
                 continue
             attributes = {
-                "class1": str(dihedral_id[0]),
-                "class2": str(dihedral_id[1]),
-                "class3": str(dihedral_id[2]),
-                "class4": str(dihedral_id[3]),
+                "class1": atoms[dihedral_id[0]]['type'],
+                "class2": atoms[dihedral_id[1]]['type'],
+                "class3": atoms[dihedral_id[2]]['type'],
+                "class4": atoms[dihedral_id[3]]['type'],
                 "c0": str(dihedral_data['RB_coefficients'][0]),
                 "c1": str(dihedral_data['RB_coefficients'][1]),
                 "c2": str(dihedral_data['RB_coefficients'][2]),
@@ -1747,10 +1749,10 @@ class ForceFieldGenerator:
         Impropers = ET.SubElement(ForceField, "PeriodicTorsionForce")
         for improper_id, improper_data in self.impropers.items():
             attributes = {
-                "class1": str(improper_id[0]),
-                "class2": str(improper_id[1]),
-                "class3": str(improper_id[2]),
-                "class4": str(improper_id[3]),
+                "class1": atoms[improper_id[0]]['type'],
+                "class2": atoms[improper_id[1]]['type'],
+                "class3": atoms[improper_id[2]]['type'],
+                "class4": atoms[improper_id[3]]['type'],
                 "periodicity": str(improper_data['periodicity']),
                 "phase": str(improper_data['phase'] * np.pi / 180),
                 "k": str(improper_data['barrier'])
@@ -1831,19 +1833,19 @@ class ForceFieldGenerator:
         if mol_name is None:
             mol_name = Path(self.molecule_name).stem
 
-        coords_in_angstrom = self.molecule.get_coordinates_in_angstrom()
+        coord_in_angstrom = self.molecule.get_coordinates_in_angstrom() 
 
         with open(pdb_filename, 'w') as f_pdb:
             # Header
-            f_pdb.write(f'TITLE     GRO file of {mol_name}, generated by VeloxChem\n')
+            f_pdb.write(f'TITLE     PDB file of {mol_name}, generated by VeloxChem\n')
             f_pdb.write('MODEL        1\n')
 
             # Atoms
             for i, atom in self.atoms.items():
                 atom_name = atom['name'].strip()
                 # Formatting to ensure all components are in the correct column positions
-                line_str = f'ATOM  {i+1:>5}  {atom_name:<3} {mol_name:<3}    1' \
-                        f'{coords_in_angstrom[i][0]:>12.3f}{coords_in_angstrom[i][1]:>8.3f}{coords_in_angstrom[i][2]:>8.3f}  1.00  0.00\n'
+                line_str = f'HETATM  {i+1:>3}  {atom_name:<3} {mol_name:<3}    1' \
+                        f'{coord_in_angstrom[i][0]:>12.3f}{coord_in_angstrom[i][1]:>8.3f}{coord_in_angstrom[i][2]:>8.3f}  1.00  0.00\n'
                 f_pdb.write(line_str)
 
             # Add a CONECT section to the PDB file stating the bonds
