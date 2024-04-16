@@ -35,6 +35,7 @@ from .scfgradientdriver import ScfGradientDriver
 from .outputstream import OutputStream
 from .firstorderprop import FirstOrderProperties
 from .cphfsolver import CphfSolver
+from .hessianorbitalresponse import HessianOrbitalResponse
 from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
 from .polarizabilitygradient import PolarizabilityGradient
@@ -364,7 +365,8 @@ class ScfHessianDriver(HessianDriver):
         gs_density.broadcast(self.rank, self.comm)
 
         # Set up a CPHF solver
-        cphf_solver = CphfSolver(self.comm, self.ostream)
+        #cphf_solver = CphfSolver(self.comm, self.ostream)
+        cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
         # Solve the CPHF equations
@@ -733,7 +735,8 @@ class ScfHessianDriver(HessianDriver):
 
         # We use comp_lr_fock from CphfSolver to compute the eri
         # and xc contributions
-        cphf_solver = CphfSolver(self.comm, self.ostream)
+        #cphf_solver = CphfSolver(self.comm, self.ostream)
+        cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
         # ERI information
         eri_dict = cphf_solver._init_eri(molecule, ao_basis)
@@ -914,7 +917,8 @@ class ScfHessianDriver(HessianDriver):
 
         # We use comp_lr_fock from CphfSolver to compute the eri
         # and xc contributions
-        cphf_solver = CphfSolver(self.comm, self.ostream)
+        #cphf_solver = CphfSolver(self.comm, self.ostream)
+        cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
         # ERI information
         eri_dict = cphf_solver._init_eri(molecule, ao_basis)
@@ -968,7 +972,8 @@ class ScfHessianDriver(HessianDriver):
         eocc = mo_energies[:nocc]
         eoo = eocc.reshape(-1, 1) + eocc #ei+ej
         # Set up a CPHF solver
-        cphf_solver = CphfSolver(self.comm, self.ostream)
+        #cphf_solver = CphfSolver(self.comm, self.ostream)
+        cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
         # Solve the CPHF equations
