@@ -265,7 +265,6 @@ class HessianDriver:
         self.force_constants = self.calculate_force_constant()
 
         # Calculate IR intensities (for ground state only)
-        #if self.dipole_gradient is not None:
         if self.do_ir:
             self.ir_intensities = self.calculate_ir_intensity(self.normal_modes)
 
