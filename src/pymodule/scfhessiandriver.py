@@ -88,11 +88,8 @@ class ScfHessianDriver(HessianDriver):
         self.pople_hessian = False
         self.perturbed_density = None
 
-        self.frequency = 0.0 # used for numerical only
-
         self._input_keywords['hessian'].update({
             'pople_hessian': ('bool', 'whether to compute Pople Hessian'),
-            'frequency': ('float', 'TO BE OUTPHASED')
             })
 
 
@@ -124,8 +121,8 @@ class ScfHessianDriver(HessianDriver):
                 polgrad_dict = {}
             if rsp_dict is None:
                 rsp_dict = {}
-        self.polgrad_dict = dict(polgrad_dict)
-        self.rsp_dict = dict(rsp_dict)
+            self.polgrad_dict = dict(polgrad_dict)
+            self.rsp_dict = dict(rsp_dict)
 
     def compute(self, molecule, ao_basis):
         """
@@ -158,10 +155,10 @@ class ScfHessianDriver(HessianDriver):
         else:
             self.compute_analytical(molecule, ao_basis, profiler)
 
-        # Calculate the gradient of the dipole moment,
-        # needed for IR intensities
+        # Calculate the gradient of the dipole moment for IR intensities
         if self.do_ir and (self.perturbed_density is not None):
             self.compute_dipole_gradient(molecule, ao_basis)
+
         # Calculate the analytical polarizability gradient for Raman intensities
         if self.do_raman:
             self.compute_polarizability_gradient(molecule, ao_basis)
@@ -254,12 +251,10 @@ class ScfHessianDriver(HessianDriver):
 
                 if self.rank == mpi_master():
                     for c in range(3):
-                        self.dipole_gradient[c, 3 * i +
-                                             x] = ((mu_plus[c] - mu_minus[c]) /
-                                                   (2.0 * self.delta_h))
+                        self.dipole_gradient[c, 3 * i + x] = (
+                                (mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h))
 
-                hessian[i, x, i,
-                        x] = ((energy_ixp - 2 * energy_0 + energy_ixm) /
+                hessian[i, x, i, x] = ((energy_ixp - 2 * energy_0 + energy_ixm) /
                               self.delta_h**2)
                 coords[i, x] += self.delta_h
 
@@ -1298,6 +1293,10 @@ class ScfHessianDriver(HessianDriver):
                                     orbrsp_dict = self.cphf_dict,
                                     method_dict = self.method_dict, 
                                     scf_drv = self.scf_driver)
+        # set to numerical if Hessian calc is numerical
+        if self.numerical:
+            polgrad_drv.numerical = True
+
         polgrad_drv.compute(molecule, ao_basis, scf_tensors, lr_results)
 
         self.polarizability_gradient = polgrad_drv.polgradient
