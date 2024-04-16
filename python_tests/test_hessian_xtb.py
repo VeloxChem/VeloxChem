@@ -44,7 +44,7 @@ class TestXtbHessianDriver:
 
             diff_hessian = np.max(np.abs(xtb_hessian_drv.hessian - ref_hessian))
             rel_diff_freq = np.max(
-                np.abs(xtb_hessian_drv.frequencies / ref_frequencies - 1.0))
+                np.abs(xtb_hessian_drv.vib_frequencies / ref_frequencies - 1.0))
             rel_diff_ir = np.max(
                 np.abs(xtb_hessian_drv.ir_intensities / ref_ir_intensities -
                        1.0))
