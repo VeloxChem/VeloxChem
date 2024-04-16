@@ -30,12 +30,13 @@ import numpy as np
 import time as tm
 import sys
 
-# TODO import rotatory_strength_in_cgs, hartree_in_inverse_nm, fine_structure_constant, extinction_coefficient_from_beta
 # TODO import VisualizationDriver and CubicGrid
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import denmat
-from .veloxchemlib import mpi_master, hartree_in_ev
+from .veloxchemlib import (mpi_master, hartree_in_ev, rotatory_strength_in_cgs,
+                           hartree_in_inverse_nm, fine_structure_constant,
+                           extinction_coefficient_from_beta)
 from .veloxchemlib import compute_electric_dipole_integrals_gpu
 from .outputstream import OutputStream
 from .profiler import Profiler
@@ -752,10 +753,8 @@ class LinearResponseEigenSolver(LinearSolver):
 
                     osc = (2.0 / 3.0) * np.sum(elec_trans_dipoles**2,
                                                axis=1) * eigvals
-                    # TODO: fix rotatory_strength_in_cgs constant
-                    rotatory_strength_in_cgs = 471.443648175
                     rot_vel = np.sum(velo_trans_dipoles * magn_trans_dipoles,
-                                     axis=1) * rotatory_strength_in_cgs
+                                     axis=1) * rotatory_strength_in_cgs()
 
                     ret_dict = {
                         'eigenvalues': eigvals,
@@ -1306,10 +1305,8 @@ class LinearResponseEigenSolver(LinearSolver):
         auxnm = 1.0 / hartree_in_inverse_nm()
 
         exc_ene_au = rsp_results['eigenvalues']
-        # TODO: fix rotatory_strength_in_cgs constant
-        rotatory_strength_in_cgs = 471.443648175
         rot_str_au = rsp_results[
-            'rotatory_strengths'] / rotatory_strength_in_cgs
+            'rotatory_strengths'] / rotatory_strength_in_cgs()
 
         spectrum = {}
 
