@@ -24,7 +24,6 @@
 
 # TODO: remove commented out code;
 from mpi4py import MPI
-#from pathlib import Path
 import numpy as np
 import time as tm
 import sys
@@ -39,7 +38,6 @@ from .veloxchemlib import XCMolecularHessian
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
-#from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
@@ -47,7 +45,6 @@ from .qqscheme import get_qq_scheme
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .dftutils import get_default_grid_level
-#from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
 from scipy.sparse import linalg
 
 # For PySCF integral derivatives
@@ -111,15 +108,6 @@ class CphfSolver(LinearSolver):
         }
 
         parse_input(self, cphf_keywords, cphf_dict)
-
-        #if 'use_subspace_solver' in cphf_dict:
-        #    key = cphf_dict['use_subspace_solver'].lower()
-        #    self.use_subspace_solver = True if key in ['yes', 'y'] else False
-
-        #if 'print_residuals' in cphf_dict:
-        #    key = cphf_dict['print_residuals'].lower()
-        #    self.print_residuals = True if key in ['yes', 'y'] else False
-
 
     def compute(self, molecule, basis, scf_tensors, *args):
         """
@@ -190,12 +178,6 @@ class CphfSolver(LinearSolver):
 
         self.start_time = tm.time()
 
-        #self.profiler.set_timing_key('TotalSubspace')
-        #self.profiler.start_timer('TotalSubspace')
-
-        #self.profiler.set_timing_key('CPHF RHS')
-        #self.profiler.start_timer('CPHF RHS')
-
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
         # DFT information
@@ -236,16 +218,11 @@ class CphfSolver(LinearSolver):
             cphf_rhs = cphf_rhs_dict['cphf_rhs'] #.reshape(3*natm, nocc*nvir)
             dof = cphf_rhs.shape[0]
             cphf_rhs = cphf_rhs.reshape(dof, nocc * nvir)
-            #ovlp_deriv_oo = cphf_rhs_dict['ovlp_deriv_oo']
-            #fock_deriv_ao = cphf_rhs_dict['fock_deriv_ao']
-            #fock_uij_numpy = cphf_rhs_dict['fock_uij']
         else:
             cphf_rhs = None
             dof = None
 
         dof = self.comm.bcast(dof, root=mpi_master())
-
-        #self.profiler.stop_timer('CPHF RHS')
 
         # Initialize trial and sigma vectors
         self.dist_trials = None
@@ -331,7 +308,6 @@ class CphfSolver(LinearSolver):
                 else:
                     residuals[x] = dist_residual
 
-
             # write to output
             if self.rank == mpi_master():
                 self.ostream.print_info(
@@ -352,7 +328,6 @@ class CphfSolver(LinearSolver):
 
                 self.profiler.print_memory_tracing(self.ostream)
 
-                # TODO: Create a print_iteration routine
                 if self.print_residuals:
                     self.print_iteration(relative_residual_norm, molecule)
 
@@ -364,7 +339,6 @@ class CphfSolver(LinearSolver):
             if self.is_converged:
                 break
 
-            #self.profiler.set_timing_key('Iter '+str(iteration)+' Orthonorm.')
             self.profiler.start_timer('Orthonorm.')
 
             # update trial vectors
@@ -373,7 +347,6 @@ class CphfSolver(LinearSolver):
 
             self.profiler.stop_timer('Orthonorm.')
 
-            #self.profiler.set_timing_key('Iter ' + str(iteration) + ' FockBuild')
             self.profiler.start_timer('FockBuild')
 
             # update sigma vectors
@@ -384,7 +357,6 @@ class CphfSolver(LinearSolver):
             self.profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
 
-        #self.profiler.stop_timer('TotalSubspace')
         self.profiler.print_timing(self.ostream)
         self.profiler.print_profiling_summary(self.ostream)
 
@@ -413,10 +385,6 @@ class CphfSolver(LinearSolver):
         if self.rank == mpi_master():
             return {**cphf_rhs_dict,
                 'cphf_ov': cphf_ov,
-                #'cphf_rhs': cphf_rhs.reshape(natm,3,nocc,nvir),
-                #'ovlp_deriv_oo': ovlp_deriv_oo,
-                #'fock_deriv_ao': fock_deriv_ao,
-                #'fock_uij': fock_uij_numpy,
             }
         return None
 
@@ -681,17 +649,12 @@ class CphfSolver(LinearSolver):
         if self.rank == mpi_master():
             cphf_rhs = cphf_rhs_dict['cphf_rhs'] #.reshape(3*natm, nocc*nvir)
             dof = cphf_rhs.shape[0]
-            #ovlp_deriv_oo = cphf_rhs_dict['ovlp_deriv_oo']
-            #fock_deriv_ao = cphf_rhs_dict['fock_deriv_ao']
-            #fock_uij_numpy = cphf_rhs_dict['fock_uij']
         else:
             cphf_rhs = None
 
         self.profiler.stop_timer('CPHF RHS')
 
         cphf_rhs = self.comm.bcast(cphf_rhs, root=mpi_master())
-
-        #cphf_ov = np.zeros((dof, nocc, nvir))
 
         # Solve the CPHF equations using conjugate gradient (cg)
         cphf_ov = self.solve_cphf_cg(molecule, basis, scf_tensors,
@@ -715,14 +678,8 @@ class CphfSolver(LinearSolver):
             cphf_ov_dict = {**cphf_rhs_dict, 'cphf_ov': cphf_ov}
 
             return cphf_ov_dict
-                #'cphf_ov': cphf_ov,
-                #'cphf_rhs': cphf_rhs.reshape(natm,3,nocc,nvir),
-                #'ovlp_deriv_oo': ovlp_deriv_oo,
-                #'fock_deriv_ao': fock_deriv_ao,
-                #'fock_uij': fock_uij_numpy,
 
         return None
-
 
     def solve_cphf_cg(self, molecule, basis, scf_tensors, cphf_rhs):
         """
@@ -898,8 +855,6 @@ class CphfSolver(LinearSolver):
 
         return cphf_coefficients_ov.reshape(dof, nocc, nvir)
 
-
-
     def compute_rhs(self, molecule, basis, scf_tensors, scf_drv):
         """
         Computes the right hand side for the CPHF equations for
@@ -1040,12 +995,6 @@ class CphfSolver(LinearSolver):
         ao_density_uij.broadcast(self.rank, self.comm)
 
         fock_uij = AOFockMatrix(ao_density_uij)
-
-        # TODO: remove commented out code below once
-        # it's confirmed that the correct Hessian is calculated
-        # without this flag.
-        #fock_flag = fockmat.rgenjk
-        #fock_uij.set_fock_type(fock_flag, 1)
 
         self._comp_lr_fock(fock_uij, ao_density_uij, molecule, basis,
                            eri_dict, dft_dict, pe_dict, self.profiler)

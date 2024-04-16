@@ -204,8 +204,6 @@ class PolOrbitalResponse(CphfSolver):
                 # Check if response vectors exist for desired frequency of gradient
                 polgrad_sanity_check(self, self.flag, lr_results)
 
-            # TODO: make get_full_solution_vector directly available from the
-            # parent class (i.e. lrsolver)?
             full_vec = ([
                 self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
@@ -732,8 +730,6 @@ class PolOrbitalResponse(CphfSolver):
                 # Check if response vectors exist for desired frequency of gradient
                 polgrad_sanity_check(self, self.flag, lr_results)
 
-            # TODO: make get_full_solution_vector directly available from the
-            # parent class (i.e. lrsolver)?
             full_vec = ([
                 self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
@@ -1155,8 +1151,6 @@ class PolOrbitalResponse(CphfSolver):
                 # TODO: do we keep this factor like that?
                 sqrt2 = np.sqrt(2.0)
 
-            # TODO: make get_full_solution_vector directly available from the
-            # parent class (i.e. lrsolver)?
             full_vec = ([
                 self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
@@ -1270,12 +1264,8 @@ class PolOrbitalResponse(CphfSolver):
             # the contraction of x_minus_y.
 
             if self.rank == mpi_master():
-                # TODO: what shape should we use: (dof**2, nao, nao)
-                #       or (dof, dof, nao, nao)?
                 omega = np.zeros((dof * dof, nao, nao))
 
-                # Calculate omega (without for-loops, only the diagonal parts
-                # possible for now)
                 # Construct epsilon_dm_ao
                 epsilon_dm_ao = np.zeros((dof, dof, nao, nao))
                 epsilon_cphf_ao = np.zeros((dof, dof, nao, nao))
@@ -1365,7 +1355,6 @@ class PolOrbitalResponse(CphfSolver):
                                 fock_ao_rhs.alpha_to_numpy(m * dof + n))
                         # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2),
                         #        (2,0), (2,1), (2,2) * dof
-                        # gamma_{zx} =
 
                         omega_1pdm_2pdm_contribs = -(np.linalg.multi_dot([
                             D_vir, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir
@@ -1468,8 +1457,6 @@ class PolOrbitalResponse(CphfSolver):
                 # TODO: do we keep this factor like that?
                 sqrt2 = np.sqrt(2.0)
 
-            # TODO: make get_full_solution_vector directly available from the
-            # parent class (i.e. lrsolver)?
             full_vec = ([
                 self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
@@ -1600,12 +1587,8 @@ class PolOrbitalResponse(CphfSolver):
             # the contraction of x_minus_y.
 
             if self.rank == mpi_master():
-                # TODO: what shape should we use: (dof**2, nao, nao)
-                #       or (dof, dof, nao, nao)?
                 omega = np.zeros((dof * dof, nao, nao), dtype=np.complex_)
 
-                # Calculate omega (without for-loops, only the diagonal parts
-                # possible for now)
                 # Construct epsilon_dm_ao
                 epsilon_dm_ao = np.zeros((dof, dof, nao, nao),
                                          dtype=np.complex_)
@@ -1713,7 +1696,6 @@ class PolOrbitalResponse(CphfSolver):
 
                         # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2),
                         #        (2,0), (2,1), (2,2) * dof
-                        # gamma_{zx} =
 
                         omega_1pdm_2pdm_contribs = -(np.linalg.multi_dot([
                             D_vir, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir
