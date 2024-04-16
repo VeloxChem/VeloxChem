@@ -483,14 +483,8 @@ def main():
 
     # Ground state Hessian / Vibrational analysis
 
-    #if task_type in ['freq', 'frequencies']:
     # TODO: shouldn't this go together with hessian?
     if task_type in ['vib', 'vibrational']:
-
-        #if 'frequencies' in task.input_dict:
-        #    freq_dict = task.input_dict['frequencies']
-        #else:
-        #    freq_dict = {}
 
         vib_dict = (task.input_dict['vibrational']
                     if 'vibrational' in task.input_dict else {})
@@ -501,9 +495,7 @@ def main():
         rsp_dict = (dict(task.input_dict['response'])
                     if 'response' in task.input_dict else {})
 
-#        hessian_drv = ScfHessianDriver(task.mpi_comm, task.ostream)
         hessian_drv = ScfHessianDriver(scf_drv)
-        #hessian_drv.update_settings(method_dict, freq_dict)
         hessian_drv.update_settings(method_dict, hess_dict = vib_dict, 
                                     cphf_dict = orbrsp_dict, rsp_dict = rsp_dict,
                                     polgrad_dict = polgrad_dict)
@@ -513,16 +505,18 @@ def main():
             hessian_drv.vibrational_analysis(task.molecule)
 
     # TODO: maybe remove (this was included for testing the MPI-parallelization)
-    if task_type in ['cphf']:
-        if 'cphf_settings' in task.input_dict:
-            cphf_dict = task.input_dict['cphf_settings']
-        else:
-            cphf_dict = {}
+    # FIXME: this will no longer work after compute_rhs has been moved to
+    # hessianorbitalresponse class
+    #if task_type in ['cphf']:
+    #    if 'cphf_settings' in task.input_dict:
+    #        cphf_dict = task.input_dict['cphf_settings']
+    #    else:
+    #        cphf_dict = {}
 
-        cphf_drv = CphfSolver(task.mpi_comm, task.ostream)
-        cphf_drv.update_settings(cphf_dict, method_dict)
-        cphf_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors,
-                         scf_drv) 
+    #    cphf_drv = CphfSolver(task.mpi_comm, task.ostream)
+    #    cphf_drv.update_settings(cphf_dict, method_dict)
+    #    cphf_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors,
+    #                     scf_drv) 
 
 
     # Polarizability gradient

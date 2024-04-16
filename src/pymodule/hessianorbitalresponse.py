@@ -38,7 +38,6 @@ from .veloxchemlib import XCMolecularHessian
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
-#from .linearsolver import LinearSolver
 from .cphfsolver import CphfSolver
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
@@ -268,6 +267,10 @@ class HessianOrbitalResponse(CphfSolver):
             return {}
 
     def print_cphf_header(self, title):
+        """
+        Prints information on the solver setup
+        """
+
         self.ostream.print_blank()
         self.ostream.print_header('{:s} Setup'.format(title))
         self.ostream.print_header('=' * (len(title) + 8))
