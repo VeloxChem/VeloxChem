@@ -30,13 +30,13 @@ import numpy as np
 import time as tm
 import sys
 
-# TODO import electric dipole driver
 # TODO import rotatory_strength_in_cgs, hartree_in_inverse_nm, fine_structure_constant, extinction_coefficient_from_beta
 # TODO import VisualizationDriver and CubicGrid
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import denmat
 from .veloxchemlib import mpi_master, hartree_in_ev
+from .veloxchemlib import compute_electric_dipole_integrals_gpu
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
@@ -512,7 +512,6 @@ class LinearResponseEigenSolver(LinearSolver):
         # calculate properties
         if self.is_converged:
 
-            # TODO: enable property calculation
             edip_grad = self.get_prop_grad('electric dipole', 'xyz', molecule,
                                            basis, scf_tensors, eri_dict['screening'])
             lmom_grad = self.get_prop_grad('linear momentum', 'xyz', molecule,
@@ -629,15 +628,38 @@ class LinearResponseEigenSolver(LinearSolver):
 
                     if self.rank == mpi_master():
                         dens_cube_files.append(dens_cube_fnames)
+                """
 
                 if self.esa:
-                    dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-                    dipole_matrices = dipole_drv.compute(molecule, basis)
+                    mu_x, mu_y, mu_z = compute_electric_dipole_integrals_gpu(
+                            molecule, basis, [0.0, 0.0, 0.0], eri_dict['screening'])
+
+                    naos = mu_x.number_of_rows()
 
                     if self.rank == mpi_master():
-                        dipole_integrals = (dipole_matrices.x_to_numpy(),
-                                            dipole_matrices.y_to_numpy(),
-                                            dipole_matrices.z_to_numpy())
+                        mu_x_mat_np = np.zeros((naos, naos))
+                        mu_y_mat_np = np.zeros((naos, naos))
+                        mu_z_mat_np = np.zeros((naos, naos))
+                    else:
+                        mu_x_mat_np = None
+                        mu_y_mat_np = None
+                        mu_z_mat_np = None
+
+                    self.comm.Reduce(mu_x.to_numpy(),
+                                     mu_x_mat_np,
+                                     op=MPI.SUM,
+                                     root=mpi_master())
+                    self.comm.Reduce(mu_y.to_numpy(),
+                                     mu_y_mat_np,
+                                     op=MPI.SUM,
+                                     root=mpi_master())
+                    self.comm.Reduce(mu_z.to_numpy(),
+                                     mu_z_mat_np,
+                                     op=MPI.SUM,
+                                     root=mpi_master())
+
+                    if self.rank == mpi_master():
+                        dipole_integrals = (mu_x_mat_np, mu_y_mat_np, mu_z_mat_np)
                     else:
                         dipole_integrals = None
 
@@ -699,7 +721,6 @@ class LinearResponseEigenSolver(LinearSolver):
                                 'oscillator_strength': esa_osc_str,
                                 'transition_dipole': esa_trans_dipole,
                             })
-                """
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
@@ -729,7 +750,6 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 if self.rank == mpi_master():
 
-                    # TODO: enable property calculation
                     osc = (2.0 / 3.0) * np.sum(elec_trans_dipoles**2,
                                                axis=1) * eigvals
                     # TODO: fix rotatory_strength_in_cgs constant
@@ -759,10 +779,10 @@ class LinearResponseEigenSolver(LinearSolver):
                     """
                     if self.detach_attach:
                         ret_dict['density_cubes'] = dens_cube_files
+                    """
 
                     if self.esa:
                         ret_dict['esa_results'] = esa_results
-                    """
 
                     if (self.save_solutions and
                             self.checkpoint_file is not None):
@@ -1148,12 +1168,9 @@ class LinearResponseEigenSolver(LinearSolver):
         self._print_ecd('Electronic Circular Dichroism', results)
         self._print_excitation_details('Character of excitations:', results)
 
-        # TODO: print more results
-        """
         if self.esa:
             self._print_excited_state_absorption('Excited state absorption:',
                                                  results)
-        """
 
     def __deepcopy__(self, memo):
         """

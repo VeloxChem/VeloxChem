@@ -31,7 +31,6 @@ import time as tm
 import sys
 import os
 
-# TODO import electric dipole, linear momentum and angular momentum driver
 # TODO import rotatory_strength_in_cgs
 # TODO import VisualizationDriver
 from .veloxchemlib import DenseMatrix
@@ -705,12 +704,16 @@ class LinearSolver:
                     if self.rank == mpi_master():
                         # full-size gerade trial vector
                         vec = np.hstack((v_ger, v_ger))
+                    # Note: antisymmetric density matrix from gerade vector
+                    # due to commut_mo_density
                     symm_flags.append('antisymm')
                 else:
                     v_ung = vecs_ung.get_full_vector(col - n_ger)
                     if self.rank == mpi_master():
                         # full-size ungerade trial vector
                         vec = np.hstack((v_ung, -v_ung))
+                    # Note: symmetric density matrix from ungerade vector
+                    # due to commut_mo_density
                     symm_flags.append('symm')
 
                 if self.rank == mpi_master():
@@ -751,6 +754,7 @@ class LinearSolver:
 
             # form Fock matrices
 
+            # Note: skipping Coulomb for antisymmetric density matrix
             coulomb_coef = 0.0 if symm_flag == 'antisymm' else 2.0
             fock_mat_local = self._comp_lr_fock(dens, molecule, basis,
                                                 eri_dict, dft_dict, pe_dict,
@@ -935,7 +939,7 @@ class LinearSolver:
             t0 = tm.time()
 
             # TODO: enable meta-GGA
-            # TODO: double check flag_exchange for Fxc
+            # Note: skipping Fxc for antisymmetric density matrix
             if flag_exchange != 'antisymm':
                 integrate_fxc_fock_gpu(fock_mat, molecule, basis, dens,
                                        gs_density, molgrid,
