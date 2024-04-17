@@ -1535,8 +1535,8 @@ class ForceFieldGenerator:
             total_charge = 0.0
             for i, atom in self.atoms.items():
                 total_charge += atom['charge']
-                line_str = '{:6}{:>5}{:6}{:>6}{:>6}'.format(
-                    i + 1, atom['type'], 1, res_name, atom['name'])
+                line_str = '{:6}{:1}{:>5}{:6}{:>6}{:>6}'.format(
+                    i + 1,'', atom['type'], 1, res_name, atom['name'])
                 line_str += '{:5}{:13.6f}{:13.5f}'.format(
                     i + 1, atom['charge'], atom['mass'])
                 line_str += ' ; qtot{:7.3f}  equiv. {}\n'.format(
@@ -1843,7 +1843,7 @@ class ForceFieldGenerator:
             # Atoms
             for i, atom in self.atoms.items():
                 atom_name = atom['name'].strip()
-                # Formatting to ensure all components are in the correct column positions
+
                 line_str = f'HETATM  {i+1:>3}  {atom_name:<3} {mol_name:<3}    1' \
                         f'{coord_in_angstrom[i][0]:>12.3f}{coord_in_angstrom[i][1]:>8.3f}{coord_in_angstrom[i][2]:>8.3f}  1.00  0.00\n'
                 f_pdb.write(line_str)

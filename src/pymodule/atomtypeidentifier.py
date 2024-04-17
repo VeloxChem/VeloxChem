@@ -1743,7 +1743,7 @@ class AtomTypeIdentifier:
                 # Assign atom types based on AtomicSymbol and AtomNumber
                 atom_type = {
                     'opls': f'opls_{info["AtomicSymbol"]}{info["AtomNumber"]}',
-                    'gaff': f'{info["AtomicSymbol"]}'
+                    'gaff': f'{info["AtomicSymbol"]}{info["AtomNumber"]}'
                 }
 
                 self.atom_types_dict[
