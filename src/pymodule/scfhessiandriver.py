@@ -379,24 +379,60 @@ class ScfHessianDriver(HessianDriver):
             ovlp_deriv_oo = cphf_solution_dict['ovlp_deriv_oo']
 
             # Calculate the perturbed density matrix
-            perturbed_density = ( - np.einsum('mj,xyij,ni->xymn',
-                                        mo_occ, ovlp_deriv_oo, mo_occ)
-                              + np.einsum('ma,xyia,ni->xymn',
-                                        mo_vir, cphf_ov, mo_occ)
-                              + np.einsum('mi,xyia,na->xymn',
-                                        mo_occ, cphf_ov, mo_vir)
+            #perturbed_density = ( - np.einsum('mj,xyij,ni->xymn',
+            #                            mo_occ, ovlp_deriv_oo, mo_occ)
+            #                  + np.einsum('ma,xyia,ni->xymn',
+            #                            mo_vir, cphf_ov, mo_occ)
+            #                  + np.einsum('mi,xyia,na->xymn',
+            #                            mo_occ, cphf_ov, mo_vir)
+            #                )
+            # MULTIDOT
+            dof = cphf_ov.shape[0]
+            #tmp_perturbed_density = np.zeros((dof, dof, nao, nao))
+            perturbed_density = np.zeros((dof, dof, nao, nao))
+            for x in range(dof):
+                for y in range(dof):
+                    #tmp_perturbed_density[x, y] = (
+                    perturbed_density[x, y] = (
+                            # mj,xyij,ni->xymn
+                            - np.linalg.multi_dot([mo_occ, ovlp_deriv_oo[x, y].T, mo_occ.T])
+                            # ma,xyia,ni->xymn
+                            + np.linalg.multi_dot([mo_vir, cphf_ov[x, y].T, mo_occ.T]) 
+                            # mi,xyia,na->xymn
+                            + np.linalg.multi_dot([mo_occ, cphf_ov[x, y], mo_vir.T]) 
                             )
+            #print('\n pert_den:\n', perturbed_density)
+            #print('\n tmp_pert_den:\n', tmp_perturbed_density)
+
             t1 = tm.time()
         
             # Parts related to first-order integral derivatives
             if self.pople_hessian:
                 fock_uij = cphf_solution_dict['fock_uij']
                 fock_deriv_ao = cphf_solution_dict['fock_deriv_ao']
-                fock_deriv_oo = np.einsum('mi,xymn,nj->xyij', mo_occ,
-                                           fock_deriv_ao, mo_occ)
+                #fock_deriv_oo = np.einsum('mi,xymn,nj->xyij', mo_occ,
+                #                           fock_deriv_ao, mo_occ)
                 # (ei+ej)S^\chi_ij
-                orben_ovlp_deriv_oo = np.einsum('ij,xyij->xyij', eoo,
-                                               ovlp_deriv_oo)
+                #orben_ovlp_deriv_oo = np.einsum('ij,xyij->xyij', eoo,
+                #                               ovlp_deriv_oo)
+                # MULTIDOT
+                #tmp_fock_deriv_oo = np.zeros((dof, dof, nocc, nocc))
+                #tmp_orben_ovlp_deriv_oo = np.zeros((dof, dof, nocc, nocc))
+                fock_deriv_oo = np.zeros((dof, dof, nocc, nocc))
+                orben_ovlp_deriv_oo = np.zeros((dof, dof, nocc, nocc))
+                for x in range(dof):
+                    for y in range(dof):
+                        # mi,xymn,nj->xyij
+                        #tmp_fock_deriv_oo[x, y] = np.linalg.multi_dot([
+                        fock_deriv_oo[x, y] = np.linalg.multi_dot([
+                            mo_occ.T, fock_deriv_ao[x, y], mo_occ])
+                        # ij,xyij->xyij (element-wise multiplication)
+                        #tmp_orben_ovlp_deriv_oo[x, y] = np.multiply(eoo, ovlp_deriv_oo[x,y])
+                        orben_ovlp_deriv_oo[x, y] = np.multiply(eoo, ovlp_deriv_oo[x,y])
+                #print('\n fock_deriv_oo\n', fock_deriv_oo)
+                #print('\n tmp_fock_deriv_oo\n', tmp_fock_deriv_oo)
+                #print('\n orben_ovlp_deriv_oo\n', orben_ovlp_deriv_oo)
+                #print('\n tmp_orben_ovlp_deriv_oo\n', tmp_orben_ovlp_deriv_oo)
             else:
                 cphf_rhs = cphf_solution_dict['cphf_rhs'].reshape(natm, 3,
                                                                   nocc, nvir)
