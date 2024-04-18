@@ -449,6 +449,9 @@ class ScfHessianDriver(HessianDriver):
             else:
                 cphf_rhs = None
 
+        #JOSE
+        dof = self.comm.bcast(dof, root=mpi_master())
+
         ovlp_deriv_oo = self.comm.bcast(ovlp_deriv_oo, root=mpi_master())
         cphf_ov = self.comm.bcast(cphf_ov, root=mpi_master())
         perturbed_density = self.comm.bcast(perturbed_density,
@@ -504,6 +507,7 @@ class ScfHessianDriver(HessianDriver):
 
             # Parts related to second-order integral derivatives
             hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
+            tmp_hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
             for i in range(natm):
                 # do only upper triangular matrix
                 for j in range(i, natm):
@@ -529,8 +533,51 @@ class ScfHessianDriver(HessianDriver):
 
                         hessian_2nd_order_derivatives[i, i] += 2 * np.einsum(
                         'mn,xymn->xy', density, aux_ii_Fock_2nd_deriv_j)
+
                         hessian_2nd_order_derivatives[i, i] -= frac_K * np.einsum(
                         'mn,xymn->xy', density, aux_ii_Fock_2nd_deriv_k)
+
+                        # MULTIDOT
+                        tmp_aux_ii_Fock_2nd_deriv_j = np.zeros((3, 3, nao, nao))
+                        tmp_aux_ii_Fock_2nd_deriv_k = np.zeros((3, 3, nao, nao))
+                        for x in range(dof):
+                            for y in range(dof):
+                                # mn,xymn->xy
+                                tmp_hessian_2nd_order_derivatives[i, i, x, y] += 2.0 * (
+                                        np.linalg.multi_dot([
+                                            omega_ao.reshape(nao**2), 
+                                            ovlp_2nd_deriv_ii[x, y].reshape(nao**2)])
+                                        )
+                                # kl,xymnkl->xymn
+                                tmp_aux_ii_Fock_2nd_deriv_j[x, y] = np.linalg.multi_dot([
+                                    density.reshape(nao**2), 
+                                    (eri_2nd_deriv_ii[x, y].transpose(2,3,0,1)).reshape(nao**2,nao**2)
+                                    ]).reshape(nao, nao)
+                                # kl,xymknl->xymn
+                                tmp_aux_ii_Fock_2nd_deriv_k[x, y] = np.linalg.multi_dot([
+                                    density.reshape(nao**2), 
+                                    (eri_2nd_deriv_ii[x, y].transpose(1,3,0,2)).reshape(nao**2,nao**2)
+                                    ]).reshape(nao, nao)
+                                # mn,xymn->xy
+                                tmp_hessian_2nd_order_derivatives[i, i, x, y] += 2.0 * (
+                                        np.linalg.multi_dot([
+                                            density.reshape(nao**2), 
+                                            tmp_aux_ii_Fock_2nd_deriv_j[x, y].reshape(nao**2)
+                                        ]))
+                                # mn,xymn->xy
+                                tmp_hessian_2nd_order_derivatives[i, i, x, y] -= frac_K * (
+                                        np.linalg.multi_dot([
+                                            density.reshape(nao**2), 
+                                            tmp_aux_ii_Fock_2nd_deriv_k[x, y].reshape(nao**2)
+                                        ]))
+                        # DEBUG
+                        #print('\nhessian_2nd_order_derivatives:\n', hessian_2nd_order_derivatives)
+                        #print('\ntmp_hessian_2nd_order_derivatives:\n', tmp_hessian_2nd_order_derivatives)
+                        #print('\naux_ii_Fock_2nd_deriv_j\n', aux_ii_Fock_2nd_deriv_j)
+                        #print('\ntmp_aux_ii_Fock_2nd_deriv_j\n', tmp_aux_ii_Fock_2nd_deriv_j)
+                        #print('\naux_ii_Fock_2nd_deriv_k\n', aux_ii_Fock_2nd_deriv_k)
+                        #print('\ntmp_aux_ii_Fock_2nd_deriv_k\n', tmp_aux_ii_Fock_2nd_deriv_k)
+                               
 
                     # Add non-diagonal contributions, 2S + 2J - K + 2h
                     aux_ij_Fock_2nd_deriv_j = np.einsum(
@@ -546,10 +593,57 @@ class ScfHessianDriver(HessianDriver):
                     hessian_2nd_order_derivatives[i,j] += 2*np.einsum(
                             'mn,xymn->xy', density, hcore_2nd_deriv_ij)
 
+                    # MULTIDOT
+                    tmp_aux_ij_Fock_2nd_deriv_j = np.zeros((3, 3, nao, nao))
+                    tmp_aux_ij_Fock_2nd_deriv_k = np.zeros((3, 3, nao, nao))
+                    for x in range(dof):
+                        for y in range(dof):
+                            # kl,xymnkl->xymn
+                            tmp_aux_ij_Fock_2nd_deriv_j[x, y] = np.linalg.multi_dot([
+                                density.reshape(nao**2), 
+                                (eri_2nd_deriv_ij[x, y].transpose(2, 3, 0, 1)).reshape(nao**2, nao**2)
+                                ]).reshape(nao, nao)
+                            # kl,xymknl->xymn
+                            tmp_aux_ij_Fock_2nd_deriv_k[x, y] = np.linalg.multi_dot([
+                                density.reshape(nao**2), 
+                                (eri_2nd_deriv_ij[x, y].transpose(1, 3, 0, 2)).reshape(nao**2, nao**2)
+                                ]).reshape(nao, nao)
+                            # mn, xymn->xy
+                            tmp_hessian_2nd_order_derivatives[i, j, x, y] += 2.0 * (
+                                    np.linalg.multi_dot([
+                                        density.reshape(nao**2),
+                                        tmp_aux_ij_Fock_2nd_deriv_j[x, y].reshape(nao**2)]))
+                            # mn,xymn->xy
+                            tmp_hessian_2nd_order_derivatives[i, j, x, y] -= frac_K * (
+                                    np.linalg.multi_dot([
+                                        density.reshape(nao**2),
+                                        tmp_aux_ij_Fock_2nd_deriv_k[x, y].reshape(nao**2)]))
+                            # mn,xymn->xy
+                            tmp_hessian_2nd_order_derivatives[i, j, x, y] += 2.0 * (
+                                    np.linalg.multi_dot([
+                                        omega_ao.reshape(nao**2),
+                                        ovlp_2nd_deriv_ij[x, y].reshape(nao**2)]))
+                            # mn,xymn->xy
+                            tmp_hessian_2nd_order_derivatives[i, j, x, y] += 2.0 * (
+                                    np.linalg.multi_dot([
+                                        density.reshape(nao**2),
+                                        hcore_2nd_deriv_ij[x, y].reshape(nao**2)]))
+                    #print('\naux_ij_Fock_2nd_deriv_j\n', aux_ij_Fock_2nd_deriv_j)
+                    #print('\ntmp_aux_ij_Fock_2nd_deriv_j\n', tmp_aux_ij_Fock_2nd_deriv_j)
+                    #print('\naux_ij_Fock_2nd_deriv_k\n', aux_ij_Fock_2nd_deriv_k)
+                    #print('\ntmp_aux_ij_Fock_2nd_deriv_k\n', tmp_aux_ij_Fock_2nd_deriv_k)
+
                 # lower triangle is transpose of the upper part
                 for j in range(i):
                     hessian_2nd_order_derivatives[i,j] += (
                                 hessian_2nd_order_derivatives[j,i].T )
+                    # MULTIDOT
+                    tmp_hessian_2nd_order_derivatives[i,j] += (
+                                tmp_hessian_2nd_order_derivatives[j,i].T )
+
+            # DEBUG
+            #print('\nhessian_2nd_order_derivatives:\n', hessian_2nd_order_derivatives)
+            #print('\ntmp_hessian_2nd_order_derivatives:\n', tmp_hessian_2nd_order_derivatives)
 
             ## Nuclear-nuclear repulsion contribution
             hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule)
