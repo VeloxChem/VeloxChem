@@ -599,7 +599,7 @@ class PolarizabilityGradient():
                                             nao**2, nao**2),
                                         (x_plus_y[y] - x_plus_y[y].T).reshape(
                                             nao**2)
-                                    ]) + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atnmp->xya
+                                    ]) + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->xya
                                         x_minus_y[x].reshape(nao**2),
                                         d_eri[a].transpose(2, 3, 1, 0).reshape(
                                             nao**2, nao**2),
