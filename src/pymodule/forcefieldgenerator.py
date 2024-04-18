@@ -553,6 +553,12 @@ class ForceFieldGenerator:
                                                         scf_result, 'resp')
                 self.partial_charges = self.comm.bcast(self.partial_charges,
                                                     root=mpi_master())
+                
+        # self.partial charges should be summing to a natural number
+        # it should be rounded to double precision
+
+        self.partial_charges = np.round(self.partial_charges, 16)
+
 
         # preparing atomtypes and atoms
 
@@ -1825,13 +1831,35 @@ class ForceFieldGenerator:
             The PDB file path.
         :param mol_name:
             The name of the molecule.
+
+        PDB format from http://deposit.rcsb.org/adit/docs/pdb_atom_format.html:
+
+        COLUMNS        DATA TYPE       CONTENTS
+        --------------------------------------------------------------------------------
+         1 -  6        Record name     "HETATM" *No standard residues are used*
+         7 - 11        Integer         Atom serial number.
+        13 - 16        Atom            Atom name.
+        17             Character       Alternate location indicator.
+        18 - 20        Residue name    Residue name.
+        22             Character       Chain identifier.
+        23 - 26        Integer         Residue sequence number.
+        27             AChar           Code for insertion of residues.
+        31 - 38        Real(8.3)       Orthogonal coordinates for X in Angstroms.
+        39 - 46        Real(8.3)       Orthogonal coordinates for Y in Angstroms.
+        47 - 54        Real(8.3)       Orthogonal coordinates for Z in Angstroms.
+        55 - 60        Real(6.2)       Occupancy (Default = 1.0).
+        61 - 66        Real(6.2)       Temperature factor (Default = 0.0).
+        73 - 76        LString(4)      Segment identifier, left-justified.
+        77 - 78        LString(2)      Element symbol, right-justified.
+        79 - 80        LString(2)      Charge on the atom.
         """
 
         pdb_filename = str(pdb_file)
         if mol_name is None:
             mol_name = Path(self.molecule_name).stem
 
-        coord_in_angstrom = self.molecule.get_coordinates_in_angstrom() 
+        coords_in_angstrom = self.molecule.get_coordinates_in_angstrom()
+        molecule_elements = self.molecule.get_labels()
 
         with open(pdb_filename, 'w') as f_pdb:
             # Header
@@ -1839,12 +1867,43 @@ class ForceFieldGenerator:
             f_pdb.write('MODEL        1\n')
 
             # Atoms
-            for i, atom in self.atoms.items():
-                atom_name = atom['name'].strip()
+            # Format each atom according to the PDB format
+            # 1-6: Record name "HETATM"
+            # 7-11: Atom serial number
+            # 13-16: Atom name
+            # 17: Alternate location indicator
+            # 18-20: Residue name
+            # 22: Chain identifier
+            # 23-26: Residue sequence number
+            # 27: Code for insertion of residues
+            # 31-38: Orthogonal coordinates for X in Angstroms in 8.3f format
+            # 39-46: Orthogonal coordinates for Y in Angstroms in 8.3f format
+            # 47-54: Orthogonal coordinates for Z in Angstroms in 8.3f format
+            # 55-60: Occupancy in 6.2f format
+            # 61-66: Temperature factor in 6.2f format
+            # 73-76: Segment identifier, left-justified. Limit to 4 characters
+            # 77-78: Element symbol, right-justified. Limit to 2 characters
+            # 79-80: Charge on the atom. Limit to 2 characters
 
-                line_str = f'HETATM  {i+1:>3}  {atom_name:<3} {mol_name:<3}    1' \
-                        f'{coord_in_angstrom[i][0]:>12.3f}{coord_in_angstrom[i][1]:>8.3f}{coord_in_angstrom[i][2]:>8.3f}  1.00  0.00\n'
-                f_pdb.write(line_str)
+            for i, (atom, element) in enumerate(zip(self.atoms.values(), molecule_elements), 1):
+                atom_name = atom['name']
+                charge = atom['charge']  # Ensure this exists and is properly formatted
+                charge = f"+{charge}" if charge > 0 else f"{charge}"
+                charge = charge.rjust(2)  # Right justify in the field 79-80
+                occupancy = 1.00
+                temp_factor = 0.00
+                segment_id = mol_name[:4]  # Limit to 4 characters
+                element_symbol = element[:2].rjust(2)  # Ensure element symbols are right-justified in their field
+
+                # Format string ensuring each element fits exactly in the specified columns
+                line_str = "{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {:>2s}{:2s}".format(
+                    'HETATM', i, atom_name[:4],'',mol_name[:3],'A', 1,'', 
+                    coords_in_angstrom[i-1][0], coords_in_angstrom[i-1][1], coords_in_angstrom[i-1][2], 
+                    occupancy, temp_factor, 
+                    element_symbol, charge)
+
+                f_pdb.write(line_str + '\n')
+                
 
             # Add a CONECT section to the PDB file stating the bonds
             # This is required by OpenMM to correctly assign topology.bonds
