@@ -716,6 +716,8 @@ class ScfHessianDriver(HessianDriver):
             eo_diag = np.diag(eocc)
             epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
 
+            dof = cphf_ov.shape[0]
+
             # Construct the perturbed density matrix, and perturbed omega
             # TODO: consider if using the transpose makes the
             # computation faster; consider using cphf coefficients in AO
@@ -730,6 +732,29 @@ class ScfHessianDriver(HessianDriver):
                                                 eocc, mo_occ, cphf_ov, mo_vir)
                                      )
             gs_density = AODensityMatrix([density], denmat.rest)
+
+            #print('\norben_perturbed_density\n', orben_perturbed_density)
+            # MULTIDOT
+            #print('\ntmp einsum\n', np.einsum('i,mj,xyij,ni->xymn', eocc, mo_occ, cphf_oo, mo_occ))
+            tmp_orben_perturbed_density = np.zeros((dof, dof, nao, nao))
+            mo_e_occ = np.multiply(mo_occ, eocc)
+            for x in range(dof):
+                for y in range(dof):
+                    tmp_orben_perturbed_density[x, y] = (
+                            # i,mj,xyij,ni->xymn
+                            np.linalg.multi_dot([
+                                mo_occ, cphf_oo[x, y].T, mo_e_occ.T])
+                            # i,mi,xyij,nj->xymn
+                            + np.linalg.multi_dot([
+                                mo_e_occ, cphf_oo[x, y], mo_occ.T])
+                            # i,ma,xyia,ni->xymn
+                            + np.linalg.multi_dot([
+                                mo_vir, cphf_ov[x, y].T, mo_e_occ.T])
+                            # i,mi,xyia,na->xymn
+                            + np.linalg.multi_dot([
+                                mo_e_occ, cphf_ov[x, y], mo_vir.T])
+                            )
+            #print('\ntmp_orben_perturbed_density\n', tmp_orben_perturbed_density)
         else:
             density = None
             gs_density = AODensityMatrix()
@@ -756,6 +781,40 @@ class ScfHessianDriver(HessianDriver):
                             +np.einsum('mj,xymn,ni->xyij', mo_occ,
                                        fock_uia_numpy, mo_occ)
                             )
+            #MULTIDOT
+            tmp_fock_cphf_oo = np.zeros((dof, dof, nocc, nocc))
+            tmp_fock_cphf_ov = np.zeros((dof, dof, nocc, nocc))
+            tmp_perturbed_omega_ao = np.zeros((dof, dof, nao, nao))
+            for x in range(dof):
+                for y in range(dof):
+                    tmp_fock_cphf_oo[x, y] = (
+                            # mi,xymn,nj->xyij
+                            np.linalg.multi_dot([
+                                mo_occ.T, fock_uij[x, y], mo_occ])
+                            )
+                    tmp_fock_cphf_ov[x, y] = (
+                            # mi,xymn,nj->xyij
+                            np.linalg.multi_dot([
+                                mo_occ.T, fock_uia_numpy[x, y], mo_occ])
+                            # mj,xymn,ni->xyij
+                            + np.linalg.multi_dot([
+                                mo_occ.T, fock_uia_numpy[x, y], mo_occ]).T
+                            )
+
+                    tmp_perturbed_omega_ao[x, y] = -1.0 * (
+                            tmp_orben_perturbed_density[x,y]
+                            + np.linalg.multi_dot([
+                                mo_occ, fock_deriv_oo[x, y], mo_occ.T])
+                            - 0.5 * np.linalg.multi_dot([
+                                mo_occ, orben_ovlp_deriv_oo[x,y], mo_occ.T])
+                            + 2.0 * np.linalg.multi_dot([
+                                mo_occ, tmp_fock_cphf_oo[x, y], mo_occ.T])
+                            + np.linalg.multi_dot([
+                                mo_occ, tmp_fock_cphf_ov[x, y], mo_occ.T])
+                            )
+            #print('\nfock_cphf_ov\n', fock_cphf_ov)
+            #print('\ntmp_fock_cphf_ov\n', tmp_fock_cphf_ov)
+
             # Construct the derivative of the omega multipliers:
             perturbed_omega_ao = - ( orben_perturbed_density
                                     + np.einsum('mi,xyij,nj->xymn', mo_occ,
@@ -767,10 +826,13 @@ class ScfHessianDriver(HessianDriver):
                                     + np.einsum('mi,xyij,nj->xymn', mo_occ,
                                                 fock_cphf_ov, mo_occ)
                                     )
+            #print('\nperturbed_omega_ao\n', perturbed_omega_ao)
+            #print('\ntmp_perturbed_omega_ao\n', tmp_perturbed_omega_ao)
 
             # First integral derivatives: partial Fock and overlap matrix
             # derivatives
             hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
+            tmp_hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
 
         if self.scf_driver._dft: 
             xc_mol_hess = XCMolecularHessian()
@@ -800,6 +862,12 @@ class ScfHessianDriver(HessianDriver):
                     hessian_first_integral_derivatives[i,j] += ( 
                         np.einsum('xmn, ymn->xy',
                                   2*perturbed_omega_ao[i], ovlp_deriv_j) )
+                    # MULTIDOT
+                    # WIP
+                    #for x in range(dof):
+                    #    for y in range(dof):
+                    #        tmp_hessian_first_integral_derivatives[i, j, x, y] =(
+                    #                2.0 * perturbed_density[i])
 
             if self.rank == mpi_master():
                 # lower triangular part
