@@ -643,8 +643,8 @@ class ScfHessianDriver(HessianDriver):
                                 tmp_hessian_2nd_order_derivatives[j,i].T )
 
             # DEBUG
-            print('\nhessian_2nd_order_derivatives:\n', hessian_2nd_order_derivatives)
-            print('\ntmp_hessian_2nd_order_derivatives:\n', tmp_hessian_2nd_order_derivatives)
+            #print('\nhessian_2nd_order_derivatives:\n', hessian_2nd_order_derivatives)
+            #print('\ntmp_hessian_2nd_order_derivatives:\n', tmp_hessian_2nd_order_derivatives)
 
             ## Nuclear-nuclear repulsion contribution
             hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule)
@@ -817,9 +817,6 @@ class ScfHessianDriver(HessianDriver):
             #print('\ntmp_fock_cphf_ov\n', tmp_fock_cphf_ov)
 
             # Construct the derivative of the omega multipliers:
-            #DEBUG
-            print('\n',orben_perturbed_density.shape)
-            print(fock_deriv_oo.shape)
 
             perturbed_omega_ao = - ( orben_perturbed_density
                                     + np.einsum('mi,xyij,nj->xymn', mo_occ,
@@ -868,17 +865,28 @@ class ScfHessianDriver(HessianDriver):
                         np.einsum('xmn, ymn->xy',
                                   2*perturbed_omega_ao[i], ovlp_deriv_j) )
                     # MULTIDOT
-                    # WIP
-                    #for x in range(dof):
-                    #    for y in range(dof):
-                    #        tmp_hessian_first_integral_derivatives[i, j, x, y] =(
-                    #                2.0 * perturbed_density[i])
+                    for x in range(dof):
+                        for y in range(dof):
+                            tmp_hessian_first_integral_derivatives[i, j, x, y] += (
+                                    # xmn,ymn->xy
+                                    np.linalg.multi_dot([2.0 * perturbed_density[i, x].reshape(nao**2),
+                                                         fock_deriv_j[y].reshape(nao**2)])
+                                    # xmn,ymn->xy
+                                    + np.linalg.multi_dot([2.0 * perturbed_omega_ao[i, x].reshape(nao**2),
+                                                           ovlp_deriv_j[y].reshape(nao**2)])
+                                    )
 
             if self.rank == mpi_master():
                 # lower triangular part
                 for j in range(i):
                     hessian_first_integral_derivatives[i,j] += (
                                      hessian_first_integral_derivatives[j,i].T )
+                    # MULTIDOT
+                    tmp_hessian_first_integral_derivatives[i,j] += (
+                                     tmp_hessian_first_integral_derivatives[j,i].T )
+                #DEBUG
+                #print('\nhessian_first_integral_derivatives\n', hessian_first_integral_derivatives)
+                #print('\ntmp_hessian_first_integral_derivatives\n', tmp_hessian_first_integral_derivatives)
 
         if self.rank == mpi_master():
             return hessian_first_integral_derivatives
@@ -913,6 +921,8 @@ class ScfHessianDriver(HessianDriver):
             scf_tensors = self.scf_driver.scf_tensors
             mo = scf_tensors['C']
             mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+            nvir = mo_vir.shape[1]
             nao = mo.shape[0]
             density = scf_tensors['D_alpha']
             mo_energies = scf_tensors['E']
@@ -955,8 +965,22 @@ class ScfHessianDriver(HessianDriver):
             hessian_cphf_coeff_rhs = 4 * np.einsum('ixka,jyka->ijxy',
                                                     cphf_ov, cphf_rhs)
 
+            # MULTIDOT
+            tmp_hessian_cphf_coeff_rhs = np.zeros((natm, natm, 3, 3))
+            for i in range(natm):
+                for j in range(natm):
+                    for x in range(3):
+                        for y in range(3):
+                            tmp_hessian_cphf_coeff_rhs[i,j,x,y] = 4.0 * (
+                            np.linalg.multi_dot([cphf_ov[i,x].reshape(nocc*nvir),
+                                                 cphf_rhs[j,y].reshape(nocc*nvir)])
+                            )
+            #print('\nhessian_cphf_coeff_rhs\n', hessian_cphf_coeff_rhs)
+            #print('\ntmp_hessian_cphf_coeff_rhs\n', tmp_hessian_cphf_coeff_rhs)
+
             # First integral derivatives: partial Fock and overlap
             # matrix derivatives
+            # TODO why is this initiated here?
             hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
 
         if self.scf_driver._dft: 
@@ -1031,6 +1055,22 @@ class ScfHessianDriver(HessianDriver):
                     P_P_Sjy = np.einsum('mn,xnk,kl->xml', density,
                                          ovlp_deriv_j, density)
 
+                    # MULTIDOT
+                    tmp_P_P_Six = np.zeros((3, nao, nao))
+                    tmp_P_P_Sjy = np.zeros((3, nao, nao))
+                    for x in range(3):
+                        # mn,xnk,kl->xml
+                        tmp_P_P_Six[x] = np.linalg.multi_dot([
+                        density, ovlp_deriv_i[x], density])
+                        # mn,xnk,kl->xml
+                        tmp_P_P_Sjy[x] = np.linalg.multi_dot([
+                            density, ovlp_deriv_j[x], density])
+                    # DEBUG
+                    #print('\nP_P_Sjy\n', P_P_Sjy)
+                    #print('\ntmp_P_P_Sjy\n', tmp_P_P_Sjy)
+                    #print('\nP_P_Six\n', P_P_Six)
+                    #print('\ntmp_P_P_Six\n', tmp_P_P_Six)
+
                     # Create a list of 2D numpy arrays to create
                     # AODensityMatrix objects
                     # and calculate auxiliary Fock matrix with ERI driver
@@ -1043,12 +1083,13 @@ class ScfHessianDriver(HessianDriver):
                 P_P_Six_dm_ao.broadcast(self.rank, self.comm)
 
                 P_P_Six_fock_ao = AOFockMatrix(P_P_Six_dm_ao)
-                # TODO: use _comp_lr_fock
                 # MPI issue
                 cphf_solver._comp_lr_fock(P_P_Six_fock_ao, P_P_Six_dm_ao,
                                           molecule, ao_basis, eri_dict,
                                           dft_dict, pe_dict, profiler)
 
+                # MULTIDOT
+                tmp_hessian_eri_overlap = hessian_eri_overlap
                 if self.rank == mpi_master():
                     # Convert the auxiliary Fock matrices to numpy arrays 
                     # for further use
@@ -1058,6 +1099,18 @@ class ScfHessianDriver(HessianDriver):
 
                     hessian_eri_overlap[i,j] += 2.0 * np.einsum('xmn,ymn->xy',
                                                       np_P_P_Six_fock, P_P_Sjy)
+
+                    # MULTIDOT
+                    for x in range(3):
+                        for y in range(3):
+                            # xmn,ymn->xy
+                            tmp_hessian_eri_overlap[i,j] += 2.0 * (np.linalg.multi_dot([
+                                np_P_P_Six_fock[x].reshape(nao**2), 
+                                P_P_Sjy[y].reshape(nao**2)]))
+                    # DEBUG
+                    #print('\nhessian_eri_overlap\n', hessian_eri_overlap)
+                    #print('\ntmp_hessian_eri_overlap\n', tmp_hessian_eri_overlap)
+
 
             # lower triangular part
             for j in range(i):
@@ -1103,6 +1156,16 @@ class ScfHessianDriver(HessianDriver):
             # Transform the CPHF coefficients to AO:
             uia_ao = np.einsum('mk,xykb,nb->xymn', mo_occ, 
                                 cphf_ov, mo_vir).reshape((3*natm, nao, nao))
+            # MULTIDOT
+            tmp_uia_ao = np.zeros((natm, 3, nao, nao))
+            for x in range(natm):
+                for y in range(3):
+                    tmp_uia_ao[x,y] = np.linalg.multi_dot([
+                        mo_occ, cphf_ov[x,y], mo_vir.T])
+            tmp_uia_ao = tmp_uia_ao.reshape(3*natm, nao, nao)
+            # DEBUG
+            #print('\nuia_ao\n', uia_ao)
+            #print('\ntmp_uia_ao\n', tmp_uia_ao)
             
             # create AODensity and Fock matrix objects, contract with ERI
             uia_ao_list = list([uia_ao[x] for x in range(natm * 3)])
@@ -1151,6 +1214,7 @@ class ScfHessianDriver(HessianDriver):
         else:
             return None
 
+    # FIXME the function below is unused
     def compute_perturbed_energy_weighted_density_matrix(self, molecule,
                                                          ao_basis):
         """
@@ -1194,6 +1258,16 @@ class ScfHessianDriver(HessianDriver):
                                    fock_deriv_ao, mo_occ)
         fock_uia_numpy = self.construct_fock_matrix_cphf(molecule, ao_basis,
                                                          cphf_ov)
+        # MULTIDOT
+        tmp_fock_deriv_oo = np.zeros((natm, 3, nocc, nocc))
+        for x in range(natm):
+            for y in range(3):
+                # mi,xymn,nj->xyij
+                tmp_fock_deriv_oo[x,y] = np.linalg.multi_dot([
+                    mo_occ.T, fock_deriv_ao[x,y], mo_occ])
+        # DEBUG
+        print('\nfock_deriv_oo\n', fock_deriv_oo)
+        print('\ntmp_fock_deriv_oo\n', tmp_fock_deriv_oo)
 
         # (ei+ej)S^\chi_ij
         orben_ovlp_deriv_oo = np.einsum('ij,xyij->xyij', eoo, ovlp_deriv_oo)
@@ -1408,6 +1482,7 @@ class ScfHessianDriver(HessianDriver):
         perturbed_density = self.perturbed_density
 
         density = scf_tensors['D_alpha']
+        nao = perturbed_density.shape[-1] # need for reshaping
 
         # Dipole integrals
         dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
@@ -1418,6 +1493,8 @@ class ScfHessianDriver(HessianDriver):
 
         # Initialize a local dipole gradient to zero
         dipole_gradient = np.zeros((3, natm, 3))
+        # MULTIDOT
+        tmp_dipole_gradient = np.zeros((3, natm, 3))
 
         # Put the nuclear contributions to the right place
         natm_zeros = np.zeros((natm))
@@ -1442,6 +1519,20 @@ class ScfHessianDriver(HessianDriver):
                            + np.einsum('axmn,cmn->cax', perturbed_density,
                                        dipole_ints)
                            )
+        # MULTIDOT
+        tmp_dipole_gradient = dipole_gradient
+        for a in range(natm):
+            for c in range(3):
+                for x in range(3):
+                    dipole_gradient[c,a,x] += -2.0 * (
+                            np.linalg.multi_dot([
+                                density.reshape(nao**2),
+                                dipole_integrals_deriv[c,a,x].reshape(nao**2)])
+                            + np.linalg.multi_dot([
+                                perturbed_density[a,x].reshape(nao**2),
+                                dipole_ints[c].reshape(nao**2)]))
+        print('\ndipole_gradient\n', dipole_gradient)
+        print('\ntmp_dipole_gradient\n', tmp_dipole_gradient)
 
         self.dipole_gradient = dipole_gradient.reshape(3, 3 * natm)
 
