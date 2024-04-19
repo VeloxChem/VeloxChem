@@ -379,21 +379,21 @@ class ScfHessianDriver(HessianDriver):
             ovlp_deriv_oo = cphf_solution_dict['ovlp_deriv_oo']
 
             # Calculate the perturbed density matrix
-            #perturbed_density = ( - np.einsum('mj,xyij,ni->xymn',
-            #                            mo_occ, ovlp_deriv_oo, mo_occ)
-            #                  + np.einsum('ma,xyia,ni->xymn',
-            #                            mo_vir, cphf_ov, mo_occ)
-            #                  + np.einsum('mi,xyia,na->xymn',
-            #                            mo_occ, cphf_ov, mo_vir)
-            #                )
+            perturbed_density = ( - np.einsum('mj,xyij,ni->xymn',
+                                        mo_occ, ovlp_deriv_oo, mo_occ)
+                              + np.einsum('ma,xyia,ni->xymn',
+                                        mo_vir, cphf_ov, mo_occ)
+                              + np.einsum('mi,xyia,na->xymn',
+                                        mo_occ, cphf_ov, mo_vir)
+                            )
             # MULTIDOT
-            dof = cphf_ov.shape[0]
-            #tmp_perturbed_density = np.zeros((dof, dof, nao, nao))
-            perturbed_density = np.zeros((dof, dof, nao, nao))
-            for x in range(dof):
+            dof = 3
+            tmp_perturbed_density = np.zeros((natm, dof, nao, nao))
+            #perturbed_density = np.zeros((natm, dof, nao, nao))
+            for x in range(natm):
                 for y in range(dof):
-                    #tmp_perturbed_density[x, y] = (
-                    perturbed_density[x, y] = (
+                    tmp_perturbed_density[x, y] = (
+                    #perturbed_density[x, y] = (
                             # mj,xyij,ni->xymn
                             - np.linalg.multi_dot([mo_occ, ovlp_deriv_oo[x, y].T, mo_occ.T])
                             # ma,xyia,ni->xymn
@@ -410,25 +410,26 @@ class ScfHessianDriver(HessianDriver):
             if self.pople_hessian:
                 fock_uij = cphf_solution_dict['fock_uij']
                 fock_deriv_ao = cphf_solution_dict['fock_deriv_ao']
-                #fock_deriv_oo = np.einsum('mi,xymn,nj->xyij', mo_occ,
-                #                           fock_deriv_ao, mo_occ)
+                fock_deriv_oo = np.einsum('mi,xymn,nj->xyij', mo_occ,
+                                           fock_deriv_ao, mo_occ)
                 # (ei+ej)S^\chi_ij
-                #orben_ovlp_deriv_oo = np.einsum('ij,xyij->xyij', eoo,
-                #                               ovlp_deriv_oo)
+                orben_ovlp_deriv_oo = np.einsum('ij,xyij->xyij', eoo,
+                                               ovlp_deriv_oo)
+
                 # MULTIDOT
-                #tmp_fock_deriv_oo = np.zeros((dof, dof, nocc, nocc))
-                #tmp_orben_ovlp_deriv_oo = np.zeros((dof, dof, nocc, nocc))
-                fock_deriv_oo = np.zeros((dof, dof, nocc, nocc))
-                orben_ovlp_deriv_oo = np.zeros((dof, dof, nocc, nocc))
-                for x in range(dof):
+                tmp_fock_deriv_oo = np.zeros((natm, dof, nocc, nocc))
+                tmp_orben_ovlp_deriv_oo = np.zeros((natm, dof, nocc, nocc))
+                #fock_deriv_oo = np.zeros((dof, dof, nocc, nocc))
+                #orben_ovlp_deriv_oo = np.zeros((dof, dof, nocc, nocc))
+                for x in range(natm):
                     for y in range(dof):
                         # mi,xymn,nj->xyij
-                        #tmp_fock_deriv_oo[x, y] = np.linalg.multi_dot([
-                        fock_deriv_oo[x, y] = np.linalg.multi_dot([
+                        tmp_fock_deriv_oo[x, y] = np.linalg.multi_dot([
+                        #fock_deriv_oo[x, y] = np.linalg.multi_dot([
                             mo_occ.T, fock_deriv_ao[x, y], mo_occ])
                         # ij,xyij->xyij (element-wise multiplication)
-                        #tmp_orben_ovlp_deriv_oo[x, y] = np.multiply(eoo, ovlp_deriv_oo[x,y])
-                        orben_ovlp_deriv_oo[x, y] = np.multiply(eoo, ovlp_deriv_oo[x,y])
+                        tmp_orben_ovlp_deriv_oo[x, y] = np.multiply(eoo, ovlp_deriv_oo[x,y])
+                        #orben_ovlp_deriv_oo[x, y] = np.multiply(eoo, ovlp_deriv_oo[x,y])
                 #print('\n fock_deriv_oo\n', fock_deriv_oo)
                 #print('\n tmp_fock_deriv_oo\n', tmp_fock_deriv_oo)
                 #print('\n orben_ovlp_deriv_oo\n', orben_ovlp_deriv_oo)
@@ -642,8 +643,8 @@ class ScfHessianDriver(HessianDriver):
                                 tmp_hessian_2nd_order_derivatives[j,i].T )
 
             # DEBUG
-            #print('\nhessian_2nd_order_derivatives:\n', hessian_2nd_order_derivatives)
-            #print('\ntmp_hessian_2nd_order_derivatives:\n', tmp_hessian_2nd_order_derivatives)
+            print('\nhessian_2nd_order_derivatives:\n', hessian_2nd_order_derivatives)
+            print('\ntmp_hessian_2nd_order_derivatives:\n', tmp_hessian_2nd_order_derivatives)
 
             ## Nuclear-nuclear repulsion contribution
             hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule)
@@ -716,7 +717,7 @@ class ScfHessianDriver(HessianDriver):
             eo_diag = np.diag(eocc)
             epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
 
-            dof = cphf_ov.shape[0]
+            dof = 3
 
             # Construct the perturbed density matrix, and perturbed omega
             # TODO: consider if using the transpose makes the
@@ -736,9 +737,9 @@ class ScfHessianDriver(HessianDriver):
             #print('\norben_perturbed_density\n', orben_perturbed_density)
             # MULTIDOT
             #print('\ntmp einsum\n', np.einsum('i,mj,xyij,ni->xymn', eocc, mo_occ, cphf_oo, mo_occ))
-            tmp_orben_perturbed_density = np.zeros((dof, dof, nao, nao))
+            tmp_orben_perturbed_density = np.zeros((natm, dof, nao, nao))
             mo_e_occ = np.multiply(mo_occ, eocc)
-            for x in range(dof):
+            for x in range(natm):
                 for y in range(dof):
                     tmp_orben_perturbed_density[x, y] = (
                             # i,mj,xyij,ni->xymn
@@ -782,10 +783,10 @@ class ScfHessianDriver(HessianDriver):
                                        fock_uia_numpy, mo_occ)
                             )
             #MULTIDOT
-            tmp_fock_cphf_oo = np.zeros((dof, dof, nocc, nocc))
-            tmp_fock_cphf_ov = np.zeros((dof, dof, nocc, nocc))
-            tmp_perturbed_omega_ao = np.zeros((dof, dof, nao, nao))
-            for x in range(dof):
+            tmp_fock_cphf_oo = np.zeros((natm, dof, nocc, nocc))
+            tmp_fock_cphf_ov = np.zeros((natm, dof, nocc, nocc))
+            tmp_perturbed_omega_ao = np.zeros((natm, dof, nao, nao))
+            for x in range(natm):
                 for y in range(dof):
                     tmp_fock_cphf_oo[x, y] = (
                             # mi,xymn,nj->xyij
@@ -816,6 +817,10 @@ class ScfHessianDriver(HessianDriver):
             #print('\ntmp_fock_cphf_ov\n', tmp_fock_cphf_ov)
 
             # Construct the derivative of the omega multipliers:
+            #DEBUG
+            print('\n',orben_perturbed_density.shape)
+            print(fock_deriv_oo.shape)
+
             perturbed_omega_ao = - ( orben_perturbed_density
                                     + np.einsum('mi,xyij,nj->xymn', mo_occ,
                                                 fock_deriv_oo, mo_occ)
