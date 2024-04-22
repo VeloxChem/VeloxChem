@@ -57,6 +57,7 @@ from .rsptpatransition import TpaTransition
 from .rsptpa import TPA
 from .tdhfhessiandriver import TdhfHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
+from .vibrationalanalysis import VibrationalAnalysis
 from .cphfsolver import CphfSolver
 from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
@@ -483,7 +484,7 @@ def main():
 
     # Ground state Hessian / Vibrational analysis
 
-    # TODO: shouldn't this go together with hessian?
+    # TODO: fix to use new vibrationalanalysis class!!
     if task_type in ['vib', 'vibrational']:
 
         vib_dict = (task.input_dict['vibrational']

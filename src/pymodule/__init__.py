@@ -126,8 +126,9 @@ from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
 from .cphfsolver import CphfSolver
 from .tdhfhessiandriver import TdhfHessianDriver
-from .polarizabilitygradient import PolOrbitalResponse
+from .polorbitalresponse import PolOrbitalResponse
 from .polarizabilitygradient import PolarizabilityGradient
+from .vibrationalanalysis import VibrationalAnalysis
 from .forcefieldgenerator import ForceFieldGenerator
 from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
