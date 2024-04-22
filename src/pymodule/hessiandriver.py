@@ -52,6 +52,8 @@ class HessianDriver:
         The MPI communicator.
     :param ostream:
         The output stream.
+    :param scf_drv:
+        The SCF driver.
 
     Instance variables
         - hessian: The Hessian in Hartree per Bohr**2.
@@ -69,23 +71,28 @@ class HessianDriver:
         - polarizability_gradient: The gradient of the polarizability.
         - raman_intensities: The Raman intensities (in A**4/amu).
         - flag: The type of Hessian driver.
-        - numerical: Perform numerical Hessian calculation.
-        - delta_h: Nuclear displacement for finite differences.
-        - do_four_point: Perform four-point numerical approximation.
-        - do_print_hessian: Flag for printing the Hessian.
+#        - numerical: Perform numerical Hessian calculation.
+        - numerical_hessian: Perform numerical Hessian calculation.
+        - numerical_raman: Perform numerical polarizability gradient calculation.
+#        - delta_h: Nuclear displacement for finite differences.
+#        - do_four_point: Perform four-point numerical approximation.
+        - do_four_point_hessian: Perform four-point numerical approximation.
+        - do_four_point_raman: Perform four-point numerical approximation.
+#        - do_print_hessian: Flag for printing the Hessian.
         - elec_energy: The (total) electronic energy.
         - temperature: The temperature (in K) used for thermodynamic analysis.
         - pressure: The pressure (in bar) used for thermodynamic analysis.
-        - numerical_grad: Perform numerical gradient calculation.
+#        - numerical_grad: Perform numerical gradient calculation.
         - do_raman: Calculate Raman activity
         - do_ir: Calculate IR intensities
         - print_vib_analysis: Print vibrational analysis
           (vibrational frequencies and normal modes)
     """
 
-    def __init__(self, comm=None, ostream=None):
+    # TODO cleanup instance variables: move some to scfhessiandriver.py
+    def __init__(self, scf_drv, comm=None, ostream=None):
         """
-        Initializes Hessian driver.
+        Initializes vibrational analysis driver.
         """
 
         if comm is None:
@@ -105,7 +112,7 @@ class HessianDriver:
         self.ostream = ostream
 
         self.hessian = None
-        self.mass_weighted_hessian = None
+        self.mass_weighted_hessian = None # FIXME unused variable
         self.reduced_masses = None
         self.force_constants = None
         self.vib_frequencies = None
@@ -121,13 +128,18 @@ class HessianDriver:
         self.numerical = False
         self.delta_h = 0.001
 
+        self.numerical_hessian = False
+        self.numerical_raman = False
+
         # flag for two-point or four-point approximation
         self.do_four_point = False
+        self.do_four_point_hessian = False
+        self.do_four_point_raman = False
 
         self.do_raman = False
         self.do_ir = True
 
-        self.numerical_grad = False
+        #self.numerical_grad = False
         self.print_vib_analysis = True
 
         # flag for printing the Hessian
@@ -139,21 +151,21 @@ class HessianDriver:
         self.temperature = 298.15
         self.pressure = 1.0
 
-        self._dft = False
-        self.grid_level = None
-        self.xcfun = None
+        #self._dft = False
+        #self.grid_level = None
+        #self.xcfun = None
 
         # Timing and profiling
-        self.timing = False
-        self.profiling = False
-        self.memory_profiling = False
-        self.memory_tracing = False
+#        self.timing = False
+#        self.profiling = False
+#        self.memory_profiling = False
+#        self.memory_tracing = False
 
         self._input_keywords = {
             'hessian': {
                 'numerical': ('bool', 'do numerical hessian'),
                 'do_four_point': ('bool', 'do four-point numerical integration'),
-                'numerical_grad': ('bool', 'whether the gradient is numerical'),
+#                'numerical_grad': ('bool', 'whether the gradient is numerical'),
                 'do_raman': ('bool', 'whether to calculate Raman activity'),
                 'do_ir': ('bool', 'whether to calculate IR intensities'),
                 'print_vib_analysis': ('bool', 'whether to print vibrational analysis'),
@@ -161,18 +173,20 @@ class HessianDriver:
                 'print_depolarization_ratio': ('bool', 'whether to print Raman depolarization ratio'),
                 'temperature': ('float', 'the temperature'),
                 'pressure': ('float', 'the pressure'),
-                'timing': ('bool', 'whether timing is needed'),
-                'profiling': ('bool', 'whether profiling is needed'),
-                'memory_profiling': ('bool', 'whether to profile memory'),
-                'memory_tracing': ('bool', 'whether to trace memory'),
+#                'timing': ('bool', 'whether timing is needed'),
+#                'profiling': ('bool', 'whether profiling is needed'),
+#                'memory_profiling': ('bool', 'whether to profile memory'),
+#                'memory_tracing': ('bool', 'whether to trace memory'),
                 },
-            'method_settings': {
-                'xcfun': ('str_upper', 'exchange-correlation functional'),
-                'grid_level': ('int', 'accuracy level of DFT grid'),
-                }
+            #'method_settings': {
+            #    'xcfun': ('str_upper', 'exchange-correlation functional'),
+            #    'grid_level': ('int', 'accuracy level of DFT grid'),
+            #    }
             }
 
-    def update_settings(self, method_dict=None, hess_dict=None):
+    # TODO take hess, polgrad, orbrsp dicts as input
+    def update_settings(self, method_dict=None, vib_dict=None, hess_dict=None, cphf_dict=None,
+                        rsp_dict=None, polgrad_dict=None):
         """
         Updates settings in HessianDriver.
 
@@ -180,12 +194,20 @@ class HessianDriver:
             The input dictionary of method settings group.
         :param hess_dict:
             The input dictionary of Hessian settings group.
+        :param cphf_dict:
+            The input dictionary of CPHF (orbital response) settings.
+        :param rsp_dict:
+            The input dictionary for linear response settings
+            (needed to compute the polarizability gradient).
+        :param polgrad_dict:
+            The input dictionary for the polarizability gradient
+            (needed to compute Raman activity).
         """
 
         if method_dict is None:
             method_dict = {}
-        if hess_dict is None:
-            hess_dict = {}
+        if vib_dict is None:
+            vib_dict = {}
 
         hess_keywords = {
             key: val[0] for key, val in
@@ -201,10 +223,24 @@ class HessianDriver:
 
         parse_input(self, method_keywords, method_dict)
 
+        # Settings for property modules
+        if hess_dict is None:
+            hess_dict = {}
+        if cphf_dict is None:
+            cphf_dict = {}
+        if rsp_dict is None:
+            rsp_dict = {}
+        if polgrad_dict is None:
+            polgrad_dict = {}
+
         dft_sanity_check(self, 'update_settings')
 
         self.method_dict = dict(method_dict)
+        self.vib_dict = dict(vib_dict)
         self.hess_dict = dict(hess_dict)
+        self.cphf_dict = dict(cphf_dict)
+        self.rsp_dict = dict(rsp_dict)
+        self.polgrad_dict = dict(polgrad_dict)
 
     def compute(self, molecule, ao_basis=None, min_basis=None):
         """
@@ -218,8 +254,27 @@ class HessianDriver:
             The minimal AO basis set.
         """
 
+        # TODO run gradient drivers
+
+        ## hessian driver as default
+
+        # Save the electronic energy
+        self.elec_energy = self.scf_driver.get_scf_energy()
+
+        # TODO call dipgrad function from hessiandriver
+        # Calculate the gradient of the dipole moment for IR intensities
+        if self.do_ir and (self.perturbed_density is not None):
+            self.compute_dipole_gradient(molecule, ao_basis)
+            # TODO call compute ir intensities
+
+        # Calculate the analytical polarizability gradient for Raman intensities
+        if self.do_raman:
+            self.compute_polarizability_gradient(molecule, ao_basis)
+            # TODO call compute raman
+
         return
 
+    # TODO make into print-only function
     def vibrational_analysis(self, molecule, filename=None, rsp_drv=None):
         """
         Performs vibrational analysis (frequencies and normal modes)
@@ -244,6 +299,7 @@ class HessianDriver:
         elem = molecule.get_labels()
         coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
 
+        # TODO move to own function
         self.vib_frequencies, self.normal_modes, gibbs_energy = (
             geometric.normal_modes.frequency_analysis(
                 coords,
@@ -264,10 +320,12 @@ class HessianDriver:
         # Calculate force constants
         self.force_constants = self.calculate_force_constant()
 
+        # TODO move to compute
         # Calculate IR intensities (for ground state only)
         if self.do_ir:
             self.ir_intensities = self.calculate_ir_intensity(self.normal_modes)
 
+        # TODO move to compute
         # Calculate Raman intensities, if applicable
         if self.do_raman:
             self.raman_intensities, depol_ratio = self.calculate_raman_activity(
@@ -481,6 +539,38 @@ class HessianDriver:
             conv_factor = 0.078424
             
         return conv_factor
+
+    def compute_polarizability_gradient(self, molecule, ao_basis):
+        """
+        Directs the calculation of the polarizability gradient
+        needed for Raman activity.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        """
+
+        scf_tensors = self.scf_driver.scf_tensors
+
+        # Perform a linear response calculation
+        lr_drv = LinearResponseSolver()
+        lr_drv.update_settings(self.rsp_dict, self.method_dict)
+        lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
+
+        # Set up the polarizability gradient driver and run
+        polgrad_drv = PolarizabilityGradient(self.comm, self.ostream)
+        polgrad_drv.update_settings(self.polgrad_dict,
+                                    orbrsp_dict = self.cphf_dict,
+                                    method_dict = self.method_dict, 
+                                    scf_drv = self.scf_driver)
+        # set to numerical if Hessian calc is numerical
+        if self.numerical:
+            polgrad_drv.numerical = True
+
+        polgrad_drv.compute(molecule, ao_basis, scf_tensors, lr_results)
+
+        self.polarizability_gradient = polgrad_drv.polgradient
 
 #    def hess_nuc_contrib(self, molecule):
 #        """
