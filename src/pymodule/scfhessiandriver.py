@@ -148,6 +148,10 @@ class ScfHessianDriver(HessianDriver):
             'memory_tracing': self.memory_tracing,
         })
 
+        # Sanity check
+        if (self.pople_hessian) and (not self._dft):
+            raise ValueError('Pople Hessian only valid for DFT')
+
         # Save the electronic energy
         self.elec_energy = self.scf_driver.get_scf_energy()
 
