@@ -45,6 +45,8 @@ class PolOrbitalResponse(CphfSolver):
         self.vector_components = 'xyz'
         self.cphf_results = None
 
+        self.sqrt2 = np.sqrt(2.0)
+
         self._input_keywords['orbitalresponse'].update({
             'vector_components':
                 ('str_lower', 'Cartesian components of operator'),
@@ -198,9 +200,6 @@ class PolOrbitalResponse(CphfSolver):
                 mo_vir = mo[:, nocc:].copy()
                 nvir = mo_vir.shape[1]
 
-                # TODO: do we keep this factor like that?
-                sqrt2 = np.sqrt(2.0)
-
                 # Check if response vectors exist for desired frequency of gradient
                 polgrad_sanity_check(self, self.flag, lr_results)
 
@@ -216,10 +215,10 @@ class PolOrbitalResponse(CphfSolver):
 
                 # Extract the excitation and de-excitation components
                 # from the full solution vector.
-                exc_vec = (1 / sqrt2 *
+                exc_vec = (1.0 / self.sqrt2 *
                            np.array(full_vec)[:, :nocc * nvir].reshape(
                                dof, nocc, nvir))
-                deexc_vec = (1 / sqrt2 *
+                deexc_vec = (1.0 / self.sqrt2 *
                              np.array(full_vec)[:, nocc * nvir:].reshape(
                                  dof, nocc, nvir))
 
@@ -763,9 +762,6 @@ class PolOrbitalResponse(CphfSolver):
                 mo_vir = mo[:, nocc:].copy()
                 nvir = mo_vir.shape[1]
 
-                # TODO: do we keep this factor like that?
-                sqrt2 = np.sqrt(2.0)
-
                 # Check if response vectors exist for desired frequency of gradient
                 polgrad_sanity_check(self, self.flag, lr_results)
 
@@ -780,10 +776,10 @@ class PolOrbitalResponse(CphfSolver):
 
                 # Extract the excitation and de-excitation components
                 # from the full solution vector.
-                exc_vec = (1 / sqrt2 *
+                exc_vec = (1.0 / self.sqrt2 *
                            np.array(full_vec)[:, :nocc * nvir].reshape(
                                dof, nocc, nvir))
-                deexc_vec = (1 / sqrt2 *
+                deexc_vec = (1.0 / self.sqrt2 *
                              np.array(full_vec)[:, nocc * nvir:].reshape(
                                  dof, nocc, nvir))
 
@@ -1227,9 +1223,6 @@ class PolOrbitalResponse(CphfSolver):
                 dof = int(all_cphf_ov.shape[0] / n_freqs)
                 cphf_ov = all_cphf_ov.reshape(n_freqs, dof, nocc, nvir)[f]
 
-                # TODO: do we keep this factor like that?
-                sqrt2 = np.sqrt(2.0)
-
             full_vec = ([
                 self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
@@ -1241,10 +1234,10 @@ class PolOrbitalResponse(CphfSolver):
 
                 # Extract the excitation and de-excitation components
                 # from the full solution vector.
-                exc_vec = (1 / sqrt2 *
+                exc_vec = (1.0 / self.sqrt2 *
                            np.array(full_vec)[:, :nocc * nvir].reshape(
                                dof, nocc, nvir))
-                deexc_vec = (1 / sqrt2 *
+                deexc_vec = (1.0 / self.sqrt2 *
                              np.array(full_vec)[:, nocc * nvir:].reshape(
                                  dof, nocc, nvir))
 
@@ -1542,9 +1535,6 @@ class PolOrbitalResponse(CphfSolver):
                 n_lambdas = int(all_cphf_ov.shape[0] / n_freqs)
                 cphf_ov = all_cphf_ov.reshape(n_freqs, n_lambdas, nocc, nvir)[f]
 
-                # TODO: do we keep this factor like that?
-                sqrt2 = np.sqrt(2.0)
-
             full_vec = ([
                 self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
@@ -1559,10 +1549,10 @@ class PolOrbitalResponse(CphfSolver):
 
                 # Extract the excitation and de-excitation components
                 # from the full solution vector.
-                exc_vec = (1 / sqrt2 *
+                exc_vec = (1.0 / self.sqrt2 *
                            np.array(full_vec)[:, :nocc * nvir].reshape(
                                dof, nocc, nvir))
-                deexc_vec = (1 / sqrt2 *
+                deexc_vec = (1.0 / self.sqrt2 *
                              np.array(full_vec)[:, nocc * nvir:].reshape(
                                  dof, nocc, nvir))
 
