@@ -30,6 +30,7 @@ import numpy as np
 import sys
 
 from .scfgradientdriver import ScfGradientDriver
+from .scfhessiandriver import ScfHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
 from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
@@ -115,6 +116,8 @@ class VibrationalAnalysis:
 
         self.ostream = ostream
 
+        self.scf_driver = scf_drv
+
         self.hessian = None
         self.mass_weighted_hessian = None # FIXME unused variable
         self.reduced_masses = None
@@ -127,18 +130,19 @@ class VibrationalAnalysis:
         self.ir_intensities = None
         self.polarizability_gradient = None
         self.raman_intensities = None
-        self.flag = None
+
+        self.flag = 'Vibrational Analysis Driver'
 
         #self.numerical = False
         #self.delta_h = 0.001
 
         self.numerical_hessian = False
-        self.numerical_raman = False
+        self.numerical_polgrad = False
 
         # flag for two-point or four-point approximation
         #self.do_four_point = False
         self.do_four_point_hessian = False
-        self.do_four_point_raman = False
+        self.do_four_point_polgrad = False
 
         self.do_ir = True
         self.do_raman = False
@@ -192,7 +196,6 @@ class VibrationalAnalysis:
             #    }
             }
 
-    # TODO take hess, polgrad, orbrsp dicts as input
     def update_settings(self, method_dict=None, vib_dict=None, hess_dict=None, cphf_dict=None,
                         rsp_dict=None, polgrad_dict=None):
         """
@@ -222,14 +225,14 @@ class VibrationalAnalysis:
             self._input_keywords['vibrational'].items()
         }
 
-        parse_input(self, hess_keywords, hess_dict)
+        parse_input(self, vib_keywords, vib_dict)
 
-        method_keywords = {
-            key: val[0]
-            for key, val in self._input_keywords['method_settings'].items()
-        }
+        #method_keywords = {
+        #    key: val[0]
+        #    for key, val in self._input_keywords['method_settings'].items()
+        #}
 
-        parse_input(self, method_keywords, method_dict)
+        #parse_input(self, method_keywords, method_dict)
 
         # Settings for property modules
         if hess_dict is None:
@@ -241,7 +244,7 @@ class VibrationalAnalysis:
         if polgrad_dict is None:
             polgrad_dict = {}
 
-        dft_sanity_check(self, 'update_settings')
+        #dft_sanity_check(self, 'update_settings')
 
         self.method_dict = dict(method_dict)
         self.vib_dict = dict(vib_dict)
@@ -268,7 +271,12 @@ class VibrationalAnalysis:
         self.compute_hessian(molecule, ao_basis)
 
         # Get vibrational frequencies and normal modes
-        self.frequency_analysis(molecule)
+        # TODO what to do about that filename input
+        self.frequency_analysis(molecule, filename=None)
+
+        # Diagonalizes Hessian and calculates the reduced masses
+        # einsum 'ki->i'
+        self.reduced_masses = 1.0 / np.sum(self.normal_modes.T**2, axis=0)
 
         # Calculate force constants
         self.force_constants = self.calculate_force_constant()
@@ -430,7 +438,7 @@ class VibrationalAnalysis:
 
         self.ostream.flush()
 
-    def frequency_analysis(self, molecule):
+    def frequency_analysis(self, molecule, filename=None):
         """
         Runs the frequency analysis from geomeTRIC to obtain vibrational
         frequencies and normal modes.
@@ -585,7 +593,7 @@ class VibrationalAnalysis:
             
         return conv_factor
 
-    def compute_hessian(self, molecule, basis):
+    def compute_hessian(self, molecule, ao_basis):
         """
         Directs the calculation of the nuclear Hessian
 
