@@ -42,6 +42,7 @@ class SymmetryAnalyzer:
         self._schoenflies_symbol = ''
         self._max_order = 1
         self._list_of_elements = ["E"]
+        self._inequivalent_atoms = {} # Temporary
         
     def identify_pointgroup(self,
                             molecule,
@@ -60,7 +61,7 @@ class SymmetryAnalyzer:
                 - The pointgroup symbol.
                 - (The list of detected elements in spectific cases.)
                 - The list of all expected elements.
-                - The list of subgroups available for symmetrization.
+                - The list of available Abelian groups for symmetrization.
                 - An array with the reoriented geometry in bohr.
         """
 
@@ -93,7 +94,6 @@ class SymmetryAnalyzer:
         # Initializes ensembles of results
         symmetry_analysis = {}
         symmetry_elements_list = []
-        subgroups_list = []
         self._reoriented_coordinates = np.zeros((self._natoms,3))
 
         # Handle case of isolated atom
@@ -126,7 +126,7 @@ class SymmetryAnalyzer:
                 symmetry_analysis["degeneracy"] = "Principal moments of inertia are triply degenerated."
 
         # Collect the results
-        if self._max_order <= 2 and self._schoenflies_symbol != "O(3)":
+        if self._max_order <= 2 and self._schoenflies_symbol not in ["O(3)", "D2d"]:
             symmetry_analysis["Elements_found"] = self._list_of_elements
 
         symmetry_analysis["Point_group"] = self._schoenflies_symbol
@@ -135,11 +135,14 @@ class SymmetryAnalyzer:
             symmetry_elements_list = all_symmetry_elements[self._schoenflies_symbol]
             symmetry_analysis["Expected_elements"] = symmetry_elements_list
 
-        if self._schoenflies_symbol in subgroups:
-            subgroups_list = subgroups[self._schoenflies_symbol]
-            symmetry_analysis["Subgroups"] = subgroups_list
+        if self._schoenflies_symbol in groups_for_symmetrization:
+            Groups_for_symm_list = groups_for_symmetrization[self._schoenflies_symbol]
+            symmetry_analysis["Groups_for_symm"] = Groups_for_symm_list
 
         symmetry_analysis["reoriented_geom"] = self._reoriented_coordinates
+
+        #Temporary test of inequivalent atoms search
+        symmetry_analysis["inequiv_atoms_by_op"] = self._inequivalent_atoms
 
         return symmetry_analysis
     
@@ -164,8 +167,8 @@ class SymmetryAnalyzer:
         if "Expected_elements" in results_dict:
             print("All expected symmetry elements: {}".format(results_dict["Expected_elements"]))
 
-        if "Subgroups" in results_dict:
-            print("Available Abelian subgroups for symmetrization: {}".format(results_dict["Subgroups"]))
+        if "Groups_for_symm" in results_dict:
+            print("Available Abelian groups for symmetrization: {}".format(results_dict["Groups_for_symm"]))
         else:
             print("No available subgroups for symmetrization.")
 
@@ -199,8 +202,10 @@ class SymmetryAnalyzer:
 
         symmetrized_data["new_pointgroup"] = pointgoup_to_symmetrize
 
-        # if self._natoms <= 50:
-            
+        # if self._natoms <= 60:
+
+        # Temporary
+        symmetrized_data["inequiv_atoms_by_op"] = results_dict["inequiv_atoms_by_op"]
 
         return symmetrized_data
 
@@ -230,6 +235,9 @@ class SymmetryAnalyzer:
             write_xyz_file(self._symbols,coord,pointgroup,xyz_filename)
         else:
             print(coord)
+
+        # Temporary
+        print(results_dict["inequiv_atoms_by_op"])
 
     def _linear(self):
         """
@@ -274,12 +282,9 @@ class SymmetryAnalyzer:
             if self._check_op(c2):
                 n_axis_c2 += 1
                 main_axis = axis
+                self._list_of_elements.append("C2")
         
         self._max_order = 2
-
-        # Check and save in list the rotation axis of order 2 along the main axis
-        if self._check_op(Rotation(main_axis, self._max_order)):
-            self._list_of_elements.append("C{}".format(self._max_order))
 
         if n_axis_c2 == 0:
             self._max_order = 0
@@ -302,9 +307,10 @@ class SymmetryAnalyzer:
             # Determine the highest possible rotation axis order along the main axis
             self._max_order = self._get_axis_rot_order(main_axis, n_max=9)
 
-            # Check for rotation of maximum order
-            if self._check_op(Rotation(main_axis, order=self._max_order)):
-                self._list_of_elements.append("C{}".format(self._max_order))
+            # Check for C2 axis along main axis
+            # Imperative for symmetrization in abelian with real characters subgroups
+            if self._check_op(Rotation(main_axis, order=2)):
+                self._list_of_elements.append("C2")
 
             # Get the perpendicualar axis to main axis and check for C2 rotation axis 
             # along p_axis by rotating p_axis along the main axis
@@ -390,20 +396,32 @@ class SymmetryAnalyzer:
                         t_axis = np.dot(main_axis, rotation_matrix(p_axis_base, np.pi/2).T)
                         return np.dot(t_axis, rot_matrix.T)
 
-            p_axis = _determine_orientation_I(main_axis)
             # Set orientation
+            p_axis = _determine_orientation_I(main_axis)
             self._set_orientation(main_axis, p_axis)
 
             # Check for inverison center at center of mass
             if self._check_op(Inversion()):
                 self._schoenflies_symbol += 'h'
 
+                # Check for one reflexion plane containing a C5 axis as it is a generator for some subgroups
+                for angle in np.arange(0, np.pi, 0.1*np.pi / self._max_order + self._tolerance_ang):
+                    axis = np.dot(p_axis, rotation_matrix(main_axis, angle))
+                    if self._check_op(Reflection(axis)):
+                        break
+
+            # Check for C2 axes perpendicular to main axis
+            # Useful for reorienting and symmetrizing in D subgroups
+            for angle in np.arange(0, np.pi/2 + self._tolerance_ang, self._tolerance_ang):
+                axis = np.dot(p_axis, rotation_matrix(main_axis, angle))
+                self._check_op(Rotation(axis, order=2))
+
         # O or Oh
         if self._schoenflies_symbol == 'O':
             
             def _determine_orientation_O(main_axis):
                 """
-                Determine the orientation of the molecule within the Octahedron symmetry group. 
+                Determine the orientation of the molecule within the octahedron symmetry group. 
 
                 :param main_axis:
                     The main axis obtained with _set_orientation. 
@@ -424,20 +442,33 @@ class SymmetryAnalyzer:
                     if self._check_op(c4):
                         return axis
 
-            p_axis = _determine_orientation_O(main_axis)
             # Set orientation
+            p_axis = _determine_orientation_O(main_axis)
             self._set_orientation(main_axis, p_axis)
 
             # Check for inverison center at center of mass
             if self._check_op(Inversion()):
                 self._schoenflies_symbol += 'h'
 
+                # Check for one reflexion plane containing a C4 axis as it is a generator for some subgroups
+                for angle in np.arange(0, np.pi, 0.1*np.pi / self._max_order + self._tolerance_ang):
+                    axis = np.dot(p_axis, rotation_matrix(main_axis, angle))
+                    if self._check_op(Reflection(axis)):
+                        break
+
+            # Check for C2 axis perpendicular to main axis
+            # Useful for reorienting and symmetrizing in D subgroups
+            for angle in np.arange(0, np.pi/2 + self._tolerance_ang, 0.2*np.pi / self._max_order + self._tolerance_ang):
+                axis = np.dot(p_axis, rotation_matrix(main_axis, angle))
+                self._check_op(Rotation(axis, order=2))
+
+
         # T or Td, Th
         if self._schoenflies_symbol == 'T':
 
             def _determine_orientation_T(main_axis):
                 """
-                Determine the orientation of the molecule within the Tetrahedron symmetry group. 
+                Determine the orientation of the molecule within the tetrahedron symmetry group. 
 
                 :param main_axis:
                     The main axis obtained with _set_orientation. 
@@ -462,6 +493,23 @@ class SymmetryAnalyzer:
             p_axis = _determine_orientation_T(main_axis)
             # Set orientation
             self._set_orientation(main_axis, p_axis)
+
+            # Check for C2 axis perpendicular to main axis
+            # Useful for reorienting and symmetrizing in D subgroups
+            for angle in np.arange(0, np.pi + self._tolerance_ang, 0.05*np.pi / self._max_order + self._tolerance_ang):
+                axis = np.dot(main_axis, rotation_matrix(p_axis, angle))
+                if self._check_op(Rotation(axis, order=2)):
+                    temporary_main_axis = axis
+                    
+                    # Check for another C2 axis perpendicular to the first one
+                    # (Collect the generators of D2x subgroups)
+                    temporary_p_axis = get_perpendicular(temporary_main_axis)
+                    for angle in np.arange(0, np.pi/2 + self._tolerance_ang, 0.1*np.pi / self._max_order + self._tolerance_ang):
+                        axis = np.dot(temporary_p_axis, rotation_matrix(temporary_main_axis, angle))
+                        if self._check_op(Rotation(axis, order=2)):
+                            break
+                    # Check for one reflexion plane containing a C2 axis as it is a generator for some subgroups
+                    self._check_op(Reflection(temporary_main_axis))
 
             # Check for inverison center at center of mass
             if self._check_op(Inversion()):
@@ -538,7 +586,7 @@ class SymmetryAnalyzer:
             self._schoenflies_symbol = "S{}".format(2 * self._max_order)
 
         # Save reoriented center of mass frame coordinates for symmetrization
-        # Main axis is z by convention
+        # Main cartesian axis is z by convention
         orientation = np.array([p_axis, np.cross(main_axis, p_axis), main_axis])
         self._cent_coord = np.dot(self._cent_coord, orientation.T)
         self._reoriented_coordinates = self._cent_coord
@@ -562,13 +610,6 @@ class SymmetryAnalyzer:
             self._schoenflies_symbol = "C2"
         else:
             self._schoenflies_symbol = "D{}".format(self._max_order)
-
-        # Check for C2 axis perpendicular to the main axis 
-        if self._max_order == 2:
-            for angle in np.arange(0, np.pi + self._tolerance_ang, np.pi / self._max_order + self._tolerance_ang):
-                axis = np.dot(p_axis, rotation_matrix(main_axis, angle))
-                if self._check_op(Rotation(axis, order=self._max_order)):
-                    self._list_of_elements.append("C{}".format(self._max_order))
 
         # Check for inversion center at center of mass
         if self._check_op(Inversion()):
@@ -598,7 +639,7 @@ class SymmetryAnalyzer:
             self._list_of_elements.append("S{}".format(2*self._max_order))
 
         # Save reoriented center of mass frame coordinates for symmetrization
-        # Main axis is z by convention
+        # Main axis cartesian is z by convention
         orientation = np.array([p_axis, np.cross(main_axis, p_axis), main_axis])
         self._cent_coord = np.dot(self._cent_coord, orientation.T)
         self._reoriented_coordinates = self._cent_coord
@@ -651,12 +692,22 @@ class SymmetryAnalyzer:
             True if the symmetry operation exists in the point group, False otherwise.
         """
 
+        # Get representative of the operation
         sym_matrix = operation.get_matrix()
+
+        # Define absolte tolerance from the eigenvalue tolerance
         error_abs_rad = abs_to_rad(self._tolerance_eig, coord=self._cent_coord)
 
+        # Get COM frame coordinates after the operation
         op_coordinates = np.matmul(self._cent_coord, sym_matrix)
-        for idx, op_coord in enumerate(op_coordinates):
 
+        # Initialize objects to obtain inequivalent atoms
+        mapping = []
+        inequivalent_atoms_by_operation = set()
+
+        # Check if operation exists
+        for idx, op_coord in enumerate(op_coordinates):
+            # Calculate the differences in radii and angles
             difference_rad = radius_diff_in_radiants(op_coord, self._cent_coord, self._tolerance_eig)
             difference_ang = angle_between_vector_matrix(op_coord, self._cent_coord, self._tolerance_eig)
 
@@ -671,6 +722,20 @@ class SymmetryAnalyzer:
 
             if not check_diff(difference_ang, difference_rad):
                 return False
+            
+            # Save the original atom index, the manipulated atom index, and their associated original coordinates
+            manipulated_atom_idx = np.argmin(np.linalg.norm(self._cent_coord - op_coord, axis=1))
+            mapping.append((idx, manipulated_atom_idx))
+
+            # Check if the original atom is already in the list of inequivalent atoms
+            if idx == manipulated_atom_idx:
+                inequivalent_atoms_by_operation.add(idx)
+            elif idx != manipulated_atom_idx:
+                for mapping_tuple in mapping:
+                    if mapping_tuple[0] not in [indice_tuple[1] for indice_tuple in mapping]:
+                        inequivalent_atoms_by_operation.add(mapping_tuple[0])
+
+        self._inequivalent_atoms[operation] = inequivalent_atoms_by_operation
 
         return True
 
@@ -1034,25 +1099,25 @@ all_symmetry_elements = {
     "Dinfh": ["E", "Cinf", "i"]
 }
 
-subgroups = {
+groups_for_symmetrization = {
     "C1": ["C1"],
     "Cs": ["Cs", "C1"],
-    "Ci": ["C1"],
-    "C2": ["C1"],
+    "Ci": ["Ci", "C1"],
+    "C2": ["C2", "C1"],
     "C3": ["C1"],
     "C4": ["C2", "C1"],
     "C5": ["C1"],
     "C6": ["C2", "C1"],
     "C7": ["C1"],
-    "C8": ["C4", "C2", "C1"],
-    "D2": ["C2", "C1"],
+    "C8": ["C2", "C1"],
+    "D2": ["D2", "C2", "C1"],
     "D3": ["C2", "C1"],
     "D4": ["D2", "C2", "C1"],
     "D5": ["C2", "C1"],
     "D6": ["D2", "C2", "C1"],
     "D7": ["C2", "C1"],
-    "D8": ["C2", "C1"],
-    "C2v": ["C2", "Cs", "C1"],
+    "D8": ["D2", "C2", "C1"],
+    "C2v": ["C2v", "C2", "Cs", "C1"],
     "C3v": ["Cs", "C1"],
     "C4v": ["C2v", "C2", "Cs", "C1"],
     "C5v": ["Cs", "C1"],
@@ -1066,14 +1131,14 @@ subgroups = {
     "D6d": ["C2v", "D2", "C2", "Cs", "C1"],
     "D7d": ["C2h", "C2", "Cs", "Ci", "C1"],
     "D8d": ["C2v", "D2", "C2", "Cs", "C1"],
-    "C2h": ["C2", "Cs", "Ci", "C1"],
+    "C2h": ["C2h", "C2", "Cs", "Ci", "C1"],
     "C3h": ["Cs", "C1"],
     "C4h": ["C2h", "C2", "Cs", "Ci", "C1"],
     "C5h": ["Cs", "C1"],
     "C6h": ["C2h", "C2", "Cs", "Ci", "C1"], 
     "C7h": ["Cs", "C1"],
     "C8h": ["C2h", "C2", "Cs", "Ci", "C1"],
-    "D2h": ["D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
+    "D2h": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
     "D3h": ["C2v", "C2", "Cs", "C1"],
     "D4h": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
     "D5h": ["C2v", "C2", "Cs", "C1"],
@@ -1081,10 +1146,10 @@ subgroups = {
     "D7h": ["C2v", "C2", "Cs", "C1"],
     "D8h": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
     "S4": ["C2", "C1"],
-    "S6": ["C3", "Ci", "C1"],
+    "S6": ["Ci", "C1"],
     "S8": ["C2", "C1"],
     "S10": ["Ci", "C1"],
-    "T": ["D2", "C3", "C2", "C1"],
+    "T": ["D2", "C2", "C1"],
     "Th": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
     "Td": ["D2", "C2v", "C2", "Cs", "C1"],
     "O": ["D2", "C2", "C1"],

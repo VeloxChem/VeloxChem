@@ -150,7 +150,7 @@ from .environment import (set_vlxbasispath, set_omp_num_threads, get_basis_path,
                           configure_mkl_rt)
 
 set_vlxbasispath()
-set_omp_num_threads(10)
+set_omp_num_threads()
 configure_mkl_rt()
 
 __version__ = "1.0rc3"
