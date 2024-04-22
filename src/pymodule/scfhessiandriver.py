@@ -67,7 +67,7 @@ from .import_from_pyscf import eri_second_deriv
 from .import_from_pyscf import dipole_deriv
 
 # TODO remove parent class
-class ScfHessianDriver(HessianDriver):
+class ScfHessianDriver():
     """
     Implements SCF Hessian driver.
 
@@ -89,7 +89,7 @@ class ScfHessianDriver(HessianDriver):
         - perturbed_density: The perturbed density
     """
 
-    def __init__(self, scf_drv):
+    def __init__(self, scf_drv, comm=None, ostream=None):
         """
         Initializes SCF Hessian driver.
         """
@@ -111,7 +111,7 @@ class ScfHessianDriver(HessianDriver):
         self.ostream = ostream
 
         # TODO remove
-        super().__init__(scf_drv.comm, scf_drv.ostream)
+        #super().__init__(scf_drv.comm, scf_drv.ostream)
 
         self.flag = 'SCF Hessian Driver'
         self.scf_driver = scf_drv
@@ -148,7 +148,8 @@ class ScfHessianDriver(HessianDriver):
         self._input_keywords = {
             'hessian': {
                 'do_pople_hessian': ('bool', 'whether to compute Pople Hessian'),
-                'do_dipole_gradient': ('bool', 'whether to compute the dipole gradient')
+                'do_dipole_gradient': ('bool', 'whether to compute the dipole gradient'),
+                'do_print_hessian': ('bool', 'whether to print the Hessian'),
                 'timing': ('bool', 'whether timing is needed'),
                 'profiling': ('bool', 'whether profiling is needed'),
                 'memory_profiling': ('bool', 'whether to profile memory'),
@@ -160,7 +161,7 @@ class ScfHessianDriver(HessianDriver):
                 }
             }
 
-    def update_settings(self, method_dict, hess_dict=None, cphf_dict=None)#,
+    def update_settings(self, method_dict, hess_dict=None, cphf_dict=None):#,
                         #rsp_dict=None, polgrad_dict=None):
         """
         Updates settings in ScfHessianDriver.
@@ -176,7 +177,7 @@ class ScfHessianDriver(HessianDriver):
             (needed to compute the polarizability gradient).
         """
 
-        super().update_settings(method_dict, hess_dict)
+        #super().update_settings(method_dict, hess_dict)
 
         if method_dict is None:
             method_dict = {}
