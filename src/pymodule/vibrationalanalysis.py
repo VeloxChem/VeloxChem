@@ -49,7 +49,6 @@ with redirect_stderr(StringIO()) as fg_err:
     import geometric
 
 
-#class HessianDriver:
 class VibrationalAnalysis:
     """
     Implements the vibrational analysis driver.
@@ -78,18 +77,14 @@ class VibrationalAnalysis:
         - raman_intensities: The Raman intensities (in A**4/amu).
         - frequencies: the frequency/ies of external electric field (for resonance Raman)
         - flag: The type of Hessian driver.
-#        - numerical: Perform numerical Hessian calculation.
         - numerical_hessian: Perform numerical Hessian calculation.
         - numerical_raman: Perform numerical polarizability gradient calculation.
-#        - delta_h: Nuclear displacement for finite differences.
-#        - do_four_point: Perform four-point numerical approximation.
         - do_four_point_hessian: Perform four-point numerical approximation.
         - do_four_point_raman: Perform four-point numerical approximation.
-#        - do_print_hessian: Flag for printing the Hessian.
+        - do_print_hessian: Flag for printing the Hessian.
         - elec_energy: The (total) electronic energy.
         - temperature: The temperature (in K) used for thermodynamic analysis.
         - pressure: The pressure (in bar) used for thermodynamic analysis.
-#        - numerical_grad: Perform numerical gradient calculation.
         - do_raman: Calculate Raman activity
         - do_ir: Calculate IR intensities
     """
@@ -134,14 +129,11 @@ class VibrationalAnalysis:
 
         self.flag = 'Vibrational Analysis Driver'
 
-        #self.numerical = False
-        #self.delta_h = 0.001
-
+        # flag for numerical Hessian and pol. gradient
         self.numerical_hessian = False
         self.numerical_polgrad = False
 
         # flag for two-point or four-point approximation
-        #self.do_four_point = False
         self.do_four_point_hessian = False
         self.do_four_point_polgrad = False
 
@@ -149,11 +141,9 @@ class VibrationalAnalysis:
         self.do_raman = False
         self.frequencies = (0,)
 
-        #self.numerical_grad = False
-        #self.print_vib_analysis = True
-
-        # flag for printing the Hessian
+        # flag for printing
         self.do_print_hessian = False
+        self.do_print_polgrad = False
         self.print_depolarization_ratio = False
 
         # Thermodynamics
@@ -161,40 +151,21 @@ class VibrationalAnalysis:
         self.temperature = 298.15
         self.pressure = 1.0
 
-        #self._dft = False
-        #self.grid_level = None
-        #self.xcfun = None
-
-        # Timing and profiling
-#        self.timing = False
-#        self.profiling = False
-#        self.memory_profiling = False
-#        self.memory_tracing = False
-
         self._input_keywords = {
             'vibrational': {
                 'numerical_hessian': ('bool', 'do numerical hessian'),
                 'numerical_polgrad': ('bool', 'do numerical polarizability gradient'),
                 'do_four_point_hessian': ('bool', 'do four-point numerical integration'),
                 'do_four_point_polgrad': ('bool', 'do four-point numerical integration'),
-#                'numerical_grad': ('bool', 'whether the gradient is numerical'),
                 'do_raman': ('bool', 'whether to calculate Raman activity'),
                 'do_ir': ('bool', 'whether to calculate IR intensities'),
-#                'print_vib_analysis': ('bool', 'whether to print vibrational analysis'),
                 'do_print_hessian': ('bool', 'whether to print the Hessian'),
+                'do_print_polgrad': ('bool', 'whether to print the pol. gradient'),
                 'print_depolarization_ratio': ('bool', 'whether to print Raman depolarization ratio'),
                 'temperature': ('float', 'the temperature'),
                 'pressure': ('float', 'the pressure'),
                 'frequencies': ('seq_range', 'frequencies of external electric field'),
-#                'timing': ('bool', 'whether timing is needed'),
-#                'profiling': ('bool', 'whether profiling is needed'),
-#                'memory_profiling': ('bool', 'whether to profile memory'),
-#                'memory_tracing': ('bool', 'whether to trace memory'),
                 },
-            #'method_settings': {
-            #    'xcfun': ('str_upper', 'exchange-correlation functional'),
-            #    'grid_level': ('int', 'accuracy level of DFT grid'),
-            #    }
             }
 
     def update_settings(self, method_dict=None, vib_dict=None, hess_dict=None, cphf_dict=None,
@@ -228,13 +199,6 @@ class VibrationalAnalysis:
 
         parse_input(self, vib_keywords, vib_dict)
 
-        #method_keywords = {
-        #    key: val[0]
-        #    for key, val in self._input_keywords['method_settings'].items()
-        #}
-
-        #parse_input(self, method_keywords, method_dict)
-
         # Settings for property modules
         if hess_dict is None:
             hess_dict = {}
@@ -244,8 +208,6 @@ class VibrationalAnalysis:
             rsp_dict = {}
         if polgrad_dict is None:
             polgrad_dict = {}
-
-        #dft_sanity_check(self, 'update_settings')
 
         self.method_dict = dict(method_dict)
         self.vib_dict = dict(vib_dict)
@@ -268,7 +230,7 @@ class VibrationalAnalysis:
             The minimal AO basis set.
         """
 
-        # Run Hessian driver
+        # Compute Hessian driver
         self.compute_hessian(molecule, ao_basis)
 
         # Get vibrational frequencies and normal modes
@@ -277,6 +239,7 @@ class VibrationalAnalysis:
 
         # Diagonalizes Hessian and calculates the reduced masses
         # einsum 'ki->i'
+        # TODO find a better place for this
         self.reduced_masses = 1.0 / np.sum(self.normal_modes.T**2, axis=0)
 
         # Calculate force constants
@@ -297,7 +260,6 @@ class VibrationalAnalysis:
 
         return
 
-    # TODO make into print-only function
     def print_vibrational_analysis(self, molecule, filename=None, rsp_drv=None):
         """
         Prints the results from the vibrational analysis.
@@ -310,47 +272,10 @@ class VibrationalAnalysis:
             The response driver (for excited state vibrational analysis).
         """
 
-        #err_msg = ('The installed geometric package does not support\n' +
-        #           '  vibrational analysis. Please install the latest\n' +
-        #           '  geometric via pip or conda.\n')
-        #assert_msg_critical(hasattr(geometric, 'normal_modes'), err_msg)
-
         # number of atoms, elements, and coordinates
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
-        #coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
-
-        # TODO move to own function
-        #self.vib_frequencies, self.normal_modes, gibbs_energy = (
-        #    geometric.normal_modes.frequency_analysis(
-        #        coords,
-        #        self.hessian,
-        #        elem,
-        #        energy=self.elec_energy,
-        #        temperature=self.temperature,
-        #        pressure=self.pressure,
-        #        outfnm=filename,
-        #        normalized=False))
-
-        # Diagonalizes Hessian and calculates the reduced masses
-        # einsum 'ki->i'
-        self.reduced_masses = 1.0 / np.sum(self.normal_modes.T**2, axis=0)
-
         number_of_modes = len(self.vib_frequencies)
-
-        # Calculate force constants
-        #self.force_constants = self.calculate_force_constant()
-
-        # TODO move to compute
-        # Calculate IR intensities (for ground state only)
-        #if self.do_ir:
-        #    self.ir_intensities = self.calculate_ir_intensity(self.normal_modes)
-
-        # TODO move to compute
-        # Calculate Raman intensities, if applicable
-        #if self.do_raman:
-        #    self.raman_intensities, depol_ratio = self.calculate_raman_activity(
-        #            self.normal_modes)
 
         # Normalize the normal modes -- as done in geomeTRIC
         self.normal_modes /= np.linalg.norm(self.normal_modes,
@@ -393,7 +318,7 @@ class VibrationalAnalysis:
                     if freq == 0.0:
                         this_freq = 'static'
                     else:
-                        this_freq = str(round(freq,4)) + freq_unit # TODO convert to other unit?
+                        this_freq = str(round(freq,4)) + freq_unit
                     raman_intens_string = '{:16s} {:12s} {:12.4f}  {:8s}'.format(
                             'Raman activity:', this_freq, self.raman_intensities[freq][k],
                             'A**4/amu')
@@ -604,7 +529,6 @@ class VibrationalAnalysis:
             The AO basis set.
         """
 
-        #hessian_drv = ScfHessianDriver(self.scf_driver)
         hessian_drv = self.hessian_driver
         hessian_drv.update_settings(self.method_dict, self.hess_dict, cphf_dict=self.cphf_dict)
 
@@ -612,6 +536,7 @@ class VibrationalAnalysis:
         hessian_drv.numerical = self.numerical_hessian
         hessian_drv.do_four_point = self.do_four_point_hessian
         hessian_drv.do_dipole_gradient = self.do_ir
+        hessian_drv.do_print_hessian = self.do_print_hessian
 
         hessian_drv.compute(molecule, ao_basis)
 
@@ -634,6 +559,8 @@ class VibrationalAnalysis:
         # Perform a linear response calculation
         lr_drv = LinearResponseSolver()
         lr_drv.update_settings(self.rsp_dict, self.method_dict)
+        if 'frequencies' not in self.rsp_dict:
+            lr_drv.frequencies = self.frequencies
         lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
 
         # Set up the polarizability gradient driver and run
@@ -646,6 +573,7 @@ class VibrationalAnalysis:
         # Transfer settings for vibrational task to polgrad driver
         polgrad_drv.numerical = self.numerical_polgrad
         polgrad_drv.do_four_point = self.do_four_point_polgrad
+        polgrad_drv.do_print_polgrad = self.do_print_polgrad
         # TODO will we do it this way around?
         if 'frequencies' not in self.polgrad_dict:
             polgrad_drv.frequencies = self.frequencies
