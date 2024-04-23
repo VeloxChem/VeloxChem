@@ -61,6 +61,7 @@ class PolarizabilityGradient():
 
         self.numerical = False
         self.do_four_point = False
+        self.do_print_polgrad = False
 
         self._dft = False
         self.grid_level = None
