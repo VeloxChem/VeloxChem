@@ -66,8 +66,7 @@ from .import_from_pyscf import hcore_second_deriv
 from .import_from_pyscf import eri_second_deriv
 from .import_from_pyscf import dipole_deriv
 
-# TODO remove parent class
-class ScfHessianDriver():
+class ScfHessianDriver(HessianDriver):
     """
     Implements SCF Hessian driver.
 
@@ -79,13 +78,13 @@ class ScfHessianDriver():
         - flag: The type of Hessian driver.
         - do_pople_hessian: Evaluate the Hessian the Pople or
                 the Ahlrichs/Furche way.
-        - numerical: Perform numerical Hessian calculation.
+#        - numerical: Perform numerical Hessian calculation.
         - numerical_grad: Perform numerical gradient calculation.
-        - do_four_point: Perform four-point numerical approximation.
-        - delta_h: Nuclear displacement for finite differences.
-        - do_print_hessian: Flag for printing the Hessian.
-        - do_dipole_gradient: The gradient of the dipole moment.
-        - dipole_gradient: The gradient of the dipole moment.
+#        - do_four_point: Perform four-point numerical approximation.
+#        - delta_h: Nuclear displacement for finite differences.
+#        - do_print_hessian: Flag for printing the Hessian.
+#        - do_dipole_gradient: The gradient of the dipole moment.
+#        - dipole_gradient: The gradient of the dipole moment.
         - perturbed_density: The perturbed density
     """
 
@@ -94,33 +93,32 @@ class ScfHessianDriver():
         Initializes SCF Hessian driver.
         """
 
-        if comm is None:
-            comm = MPI.COMM_WORLD
+        super().__init__(scf_drv.comm, scf_drv.ostream)
 
-        if ostream is None:
-            if comm.Get_rank() == mpi_master():
-                ostream = OutputStream(sys.stdout)
-            else:
-                ostream = OutputStream(None)
+        #if comm is None:
+        #    comm = MPI.COMM_WORLD
 
-        # MPI information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
+        #if ostream is None:
+        #    if comm.Get_rank() == mpi_master():
+        #        ostream = OutputStream(sys.stdout)
+        #    else:
+        #        ostream = OutputStream(None)
 
-        self.ostream = ostream
+        ## MPI information
+        #self.comm = comm
+        #self.rank = self.comm.Get_rank()
+        #self.nodes = self.comm.Get_size()
 
-        # TODO remove
-        #super().__init__(scf_drv.comm, scf_drv.ostream)
+        #self.ostream = ostream
 
         self.flag = 'SCF Hessian Driver'
         self.scf_driver = scf_drv
 
-        self.hessian = None
+#        self.hessian = None
 
-        self.numerical = False
-        self.do_four_point = False
-        self.delta_h = 0.001
+#        self.numerical = False
+#        self.do_four_point = False
+#        self.delta_h = 0.001
 
         self.numerical_grad = False
 
@@ -128,38 +126,39 @@ class ScfHessianDriver():
 
         self.perturbed_density = None
 
-        self.do_dipole_gradient = False
-        self.dipole_gradient = None
+#        self.do_dipole_gradient = False
+#        self.dipole_gradient = None
 
         # flag for printing the Hessian
         self.do_print_hessian = False
 
-        self._dft = False
-        self.grid_level = None
-        self.xcfun = None
+#        self._dft = False
+#        self.grid_level = None
+#        self.xcfun = None
 
         # Timing and profiling
-        self.timing = False
-        self.profiling = False
-        self.memory_profiling = False
-        self.memory_tracing = False
+#        self.timing = False
+#        self.profiling = False
+#        self.memory_profiling = False
+#        self.memory_tracing = False
 
-        #self._input_keywords['hessian'].update({
-        self._input_keywords = {
-            'hessian': {
+        self._input_keywords['hessian'].update({
+        #self._input_keywords = {
+            #'hessian': {
                 'do_pople_hessian': ('bool', 'whether to compute Pople Hessian'),
-                'do_dipole_gradient': ('bool', 'whether to compute the dipole gradient'),
-                'do_print_hessian': ('bool', 'whether to print the Hessian'),
-                'timing': ('bool', 'whether timing is needed'),
-                'profiling': ('bool', 'whether profiling is needed'),
-                'memory_profiling': ('bool', 'whether to profile memory'),
-                'memory_tracing': ('bool', 'whether to trace memory'),
-                },
-             'method_settings': {
-                'xcfun': ('str_upper', 'exchange-correlation functional'),
-                'grid_level': ('int', 'accuracy level of DFT grid'),
-                }
-            }
+                'numerical_grad': ('bool', 'whether the gradient is numerical'),
+#                'do_dipole_gradient': ('bool', 'whether to compute the dipole gradient'),
+#                'do_print_hessian': ('bool', 'whether to print the Hessian'),
+#                'timing': ('bool', 'whether timing is needed'),
+#                'profiling': ('bool', 'whether profiling is needed'),
+#                'memory_profiling': ('bool', 'whether to profile memory'),
+#                'memory_tracing': ('bool', 'whether to trace memory'),
+            #    },
+#             'method_settings': {
+#                'xcfun': ('str_upper', 'exchange-correlation functional'),
+#                'grid_level': ('int', 'accuracy level of DFT grid'),
+            #    }
+            })
 
     def update_settings(self, method_dict, hess_dict=None, cphf_dict=None):#,
                         #rsp_dict=None, polgrad_dict=None):
@@ -177,42 +176,34 @@ class ScfHessianDriver():
             (needed to compute the polarizability gradient).
         """
 
-        #super().update_settings(method_dict, hess_dict)
+        super().update_settings(method_dict, hess_dict)
 
-        if method_dict is None:
-            method_dict = {}
-        if hess_dict is None:
-            hess_dict = {}
+        #if method_dict is None:
+        #    method_dict = {}
+        #if hess_dict is None:
+        #    hess_dict = {}
         if cphf_dict is None:
             cphf_dict = {}
 
-        hess_keywords = {
-            key: val[0] for key, val in
-            self._input_keywords['hessian'].items()
-        }
+        #hess_keywords = {
+        #    key: val[0] for key, val in
+        #    self._input_keywords['hessian'].items()
+        #}
 
-        parse_input(self, hess_keywords, hess_dict)
+        #parse_input(self, hess_keywords, hess_dict)
 
-        method_keywords = {
-            key: val[0]
-            for key, val in self._input_keywords['method_settings'].items()
-        }
+        #method_keywords = {
+        #    key: val[0]
+        #    for key, val in self._input_keywords['method_settings'].items()
+        #}
 
-        parse_input(self, method_keywords, method_dict)
+        #parse_input(self, method_keywords, method_dict)
 
-        dft_sanity_check(self, 'update_settings')
+        #dft_sanity_check(self, 'update_settings')
 
-        self.method_dict = dict(method_dict)
-        self.hess_dict = dict(hess_dict)
+        #self.method_dict = dict(method_dict)
+        #self.hess_dict = dict(hess_dict)
         self.cphf_dict = dict(cphf_dict)
-
-        #if self.do_raman:
-        #    if polgrad_dict is None:
-        #        polgrad_dict = {}
-        #    if rsp_dict is None:
-        #        rsp_dict = {}
-        #    self.polgrad_dict = dict(polgrad_dict)
-        #    self.rsp_dict = dict(rsp_dict)
 
     def compute(self, molecule, ao_basis):
         """
@@ -1439,6 +1430,7 @@ class ScfHessianDriver():
 
         return nuc_contrib
 
+    # TODO move to parent class
     def hess_xc_contrib(self, molecule, basis, gs_density, xcfun_label):
         """
         Calculates the exchange-correlation contribution to the analytical
@@ -1474,6 +1466,7 @@ class ScfHessianDriver():
 
         return exc_hessian
 
+    # TODO move to parent class
     def vxc_fock_grad_xc_contrib(self, molecule, basis, gs_density, xcfun_label,
                                  atom_idx):
         """
@@ -1576,6 +1569,7 @@ class ScfHessianDriver():
         self.dipole_gradient = dipole_gradient.reshape(3, 3 * natm)
 
 
+    # TODO can stay here
     def compute_dipole_integral_derivatives(self, molecule, ao_basis):
         """
         Imports the analytical derivatives of dipole integrals.
@@ -1607,151 +1601,119 @@ class ScfHessianDriver():
 
         return dipole_integrals_gradient
 
-#    def compute_polarizability_gradient(self, molecule, ao_basis):
+    #def print_header(self):
+    #    """
+    #    Prints Hessian calculation setup details to output stream.
+    #    """
+
+    #    str_width = 70
+
+    #    self.ostream.print_blank()
+    #    self.ostream.print_header(self.flag)
+    #    self.ostream.print_header((len(self.flag) + 2) * '=')
+    #    self.ostream.flush()
+
+    #    cur_str = 'Hessian Type                    : '
+    #    if self.numerical:
+    #        cur_str += 'Numerical'
+    #        cur_str2 = 'Numerical Method                : '
+    #        if self.do_four_point:
+    #            cur_str2 += 'Five-Point Stencil'
+    #        else:
+    #            cur_str2 += 'Symmetric Difference Quotient'
+    #        cur_str3 = 'Finite Difference Step Size     : '
+    #        cur_str3 += str(self.delta_h) + ' a.u.'
+    #    else:
+    #        cur_str += 'Analytical'
+
+    #    self.ostream.print_blank()
+    #    self.ostream.print_header(cur_str.ljust(str_width))
+
+    #    if self.numerical:
+    #        self.ostream.print_header(cur_str2.ljust(str_width))
+    #        self.ostream.print_header(cur_str3.ljust(str_width))
+
+    #    if self._dft:
+    #        cur_str = 'Exchange-Correlation Functional : '
+    #        cur_str += self.xcfun.get_func_label().upper()
+    #        self.ostream.print_header(cur_str.ljust(str_width))
+    #        grid_level = (get_default_grid_level(self.xcfun)
+    #                      if self.grid_level is None else self.grid_level)
+    #        cur_str = 'Molecular Grid Level            : ' + str(grid_level)
+    #        self.ostream.print_header(cur_str.ljust(str_width))
+
+    #    self.ostream.print_blank()
+    #    self.ostream.flush()
+
+    #def print_hessian(self, molecule):
+    #    """
+    #    Prints the Hessian.
+
+    #    :param molecule:
+    #        The molecule.
+    #    """
+
+    #    # atom labels
+    #    labels = molecule.get_labels()
+
+    #    if self.numerical:
+    #        title = 'Numerical '
+    #    else:
+    #        title = 'Analytical '
+
+    #    title += 'Hessian (Hartree/Bohr**2)'
+    #    self.ostream.print_header(title)
+    #    self.ostream.print_header('-' * (len(title) + 2))
+    #    self.ostream.print_blank()
+
+    #    natm = molecule.number_of_atoms()
+
+    #    for k in range(0, natm, 2):
+
+    #        valstr = '{:15s}'.format('  Coord. ')
+
+    #        coord_dict = {0: '(x)', 1: '(y)', 2: '(z)'}
+    #        end = k + 2
+    #        if k + 2 > natm:
+    #            end = natm
+    #        for i in range(k, end):
+    #            for di in range(3):
+    #                valstr += '{:16s}'.format('' + str(i + 1) + ' ' +
+    #                                          labels[i] + coord_dict[di] + '')
+
+    #        self.ostream.print_line(valstr)
+    #        self.ostream.print_blank()
+
+    #        for i in range(natm):
+    #            for di in range(3):
+    #                valstr = '  {:7s}'.format(
+    #                    str(i + 1) + ' ' + labels[i] + coord_dict[di])
+    #                for j in range(k, end):
+    #                    for dj in range(3):
+    #                        valstr += '{:16.8f}'.format(
+    #                            self.hessian[i * 3 + di, j * 3 + dj])
+    #                self.ostream.print_line(valstr)
+    #        self.ostream.print_blank()
+    #        self.ostream.print_blank()
+    #    self.ostream.flush()
+
+#    def print_geometry(self, molecule):
 #        """
-#        Directs the calculation of the polarizability gradient
-#        needed for Raman activity.
+#        Prints the geometry.
 #
 #        :param molecule:
 #            The molecule.
-#        :param ao_basis:
-#            The AO basis set.
 #        """
 #
-#        scf_tensors = self.scf_driver.scf_tensors
+#        self.ostream.print_block(molecule.get_string())
 #
-#        # Perform a linear response calculation
-#        lr_drv = LinearResponseSolver()
-#        lr_drv.update_settings(self.rsp_dict, self.method_dict)
-#        lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
+#    def get_hessian(self):
+#        """
+#        Gets the Hessian.
 #
-#        # Set up the polarizability gradient driver and run
-#        polgrad_drv = PolarizabilityGradient(self.comm, self.ostream)
-#        polgrad_drv.update_settings(self.polgrad_dict,
-#                                    orbrsp_dict = self.cphf_dict,
-#                                    method_dict = self.method_dict, 
-#                                    scf_drv = self.scf_driver)
-#        # set to numerical if Hessian calc is numerical
-#        if self.numerical:
-#            polgrad_drv.numerical = True
+#        :return:
+#            The Hessian.
+#        """
 #
-#        polgrad_drv.compute(molecule, ao_basis, scf_tensors, lr_results)
-#
-#        self.polarizability_gradient = polgrad_drv.polgradient
- 
-    def print_header(self):
-        """
-        Prints Hessian calculation setup details to output stream.
-        """
-
-        str_width = 70
-
-        self.ostream.print_blank()
-        self.ostream.print_header(self.flag)
-        self.ostream.print_header((len(self.flag) + 2) * '=')
-        self.ostream.flush()
-
-        cur_str = 'Hessian Type                    : '
-        if self.numerical:
-            cur_str += 'Numerical'
-            cur_str2 = 'Numerical Method                : '
-            if self.do_four_point:
-                cur_str2 += 'Five-Point Stencil'
-            else:
-                cur_str2 += 'Symmetric Difference Quotient'
-            cur_str3 = 'Finite Difference Step Size     : '
-            cur_str3 += str(self.delta_h) + ' a.u.'
-        else:
-            cur_str += 'Analytical'
-
-        self.ostream.print_blank()
-        self.ostream.print_header(cur_str.ljust(str_width))
-
-        if self.numerical:
-            self.ostream.print_header(cur_str2.ljust(str_width))
-            self.ostream.print_header(cur_str3.ljust(str_width))
-
-        if self._dft:
-            cur_str = 'Exchange-Correlation Functional : '
-            cur_str += self.xcfun.get_func_label().upper()
-            self.ostream.print_header(cur_str.ljust(str_width))
-            grid_level = (get_default_grid_level(self.xcfun)
-                          if self.grid_level is None else self.grid_level)
-            cur_str = 'Molecular Grid Level            : ' + str(grid_level)
-            self.ostream.print_header(cur_str.ljust(str_width))
-
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-    def print_hessian(self, molecule):
-        """
-        Prints the Hessian.
-
-        :param molecule:
-            The molecule.
-        """
-
-        # atom labels
-        labels = molecule.get_labels()
-
-        if self.numerical:
-            title = 'Numerical '
-        else:
-            title = 'Analytical '
-
-        title += 'Hessian (Hartree/Bohr**2)'
-        self.ostream.print_header(title)
-        self.ostream.print_header('-' * (len(title) + 2))
-        self.ostream.print_blank()
-
-        natm = molecule.number_of_atoms()
-
-        for k in range(0, natm, 2):
-
-            valstr = '{:15s}'.format('  Coord. ')
-
-            coord_dict = {0: '(x)', 1: '(y)', 2: '(z)'}
-            end = k + 2
-            if k + 2 > natm:
-                end = natm
-            for i in range(k, end):
-                for di in range(3):
-                    valstr += '{:16s}'.format('' + str(i + 1) + ' ' +
-                                              labels[i] + coord_dict[di] + '')
-
-            self.ostream.print_line(valstr)
-            self.ostream.print_blank()
-
-            for i in range(natm):
-                for di in range(3):
-                    valstr = '  {:7s}'.format(
-                        str(i + 1) + ' ' + labels[i] + coord_dict[di])
-                    for j in range(k, end):
-                        for dj in range(3):
-                            valstr += '{:16.8f}'.format(
-                                self.hessian[i * 3 + di, j * 3 + dj])
-                    self.ostream.print_line(valstr)
-            self.ostream.print_blank()
-            self.ostream.print_blank()
-        self.ostream.flush()
-
-    def print_geometry(self, molecule):
-        """
-        Prints the geometry.
-
-        :param molecule:
-            The molecule.
-        """
-
-        self.ostream.print_block(molecule.get_string())
-
-    def get_hessian(self):
-        """
-        Gets the Hessian.
-
-        :return:
-            The Hessian.
-        """
-
-        return self.hessian
+#        return self.hessian
 
