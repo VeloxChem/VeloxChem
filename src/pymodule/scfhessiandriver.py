@@ -233,7 +233,7 @@ class ScfHessianDriver(HessianDriver):
             raise ValueError('Pople Hessian only valid for DFT')
 
         # Save the electronic energy
-        #self.elec_energy = self.scf_driver.get_scf_energy()
+        self.elec_energy = self.scf_driver.get_scf_energy()
 
         if self.numerical:
             self.compute_numerical(molecule, ao_basis)
