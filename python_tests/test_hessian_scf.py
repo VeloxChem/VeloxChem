@@ -22,7 +22,8 @@ class TestScfHessianDriver:
 
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        vib_settings = {'do_ir': 'yes', 'do_raman': 'yes', 'numerical_hessian':'yes'}
+        vib_settings = {'do_ir': 'yes', 'do_raman': 'yes', 'numerical_hessian':'yes',
+                        'numerical_polgrad': 'yes'}
         method_settings = {}
         scf_hessian_drv = ScfHessianDriver(scf_drv)
         vibanalysis_drv = VibrationalAnalysis(scf_hessian_drv)
