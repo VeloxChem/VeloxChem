@@ -1852,13 +1852,6 @@ CScreeningData::sortQD(const int64_t s_prim_count,
     const auto pd_prim_pair_count = static_cast<int64_t>(sorted_pd_mat_Q_D.size());
     const auto dd_prim_pair_count = static_cast<int64_t>(sorted_dd_mat_Q_D.size());
 
-    _ss_max_D = 0.0;
-    _sp_max_D = 0.0;
-    _sd_max_D = 0.0;
-    _pp_max_D = 0.0;
-    _pd_max_D = 0.0;
-    _dd_max_D = 0.0;
-
     // TODO: use uint2 for pair indices
 
     _ss_mat_Q       = std::vector<double>  (ss_prim_pair_count);
@@ -1882,8 +1875,6 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
         _ss_first_inds[ij]  = static_cast<uint32_t>(i);
         _ss_second_inds[ij] = static_cast<uint32_t>(j);
-
-        if (std::fabs(D_ij) > _ss_max_D) _ss_max_D = std::fabs(D_ij);
 
         // ij pair data:
 
@@ -1930,8 +1921,6 @@ CScreeningData::sortQD(const int64_t s_prim_count,
         _sp_first_inds[ij]  = static_cast<uint32_t>(i);
         _sp_second_inds[ij] = static_cast<uint32_t>(j);
 
-        if (std::fabs(D_ij) > _sp_max_D) _sp_max_D = std::fabs(D_ij);
-
         // ij pair data:
 
         const auto a_i = s_prim_info[i + s_prim_count * 0];
@@ -1974,8 +1963,6 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
         _sd_first_inds[ij]  = static_cast<uint32_t>(i);
         _sd_second_inds[ij] = static_cast<uint32_t>(j);
-
-        if (std::fabs(D_ij) > _sd_max_D) _sd_max_D = std::fabs(D_ij);
 
         // ij pair data:
 
@@ -2020,8 +2007,6 @@ CScreeningData::sortQD(const int64_t s_prim_count,
         _pp_first_inds[ij]  = static_cast<uint32_t>(i);
         _pp_second_inds[ij] = static_cast<uint32_t>(j);
 
-        if (std::fabs(D_ij) > _pp_max_D) _pp_max_D = std::fabs(D_ij);
-
         // ij pair data:
 
         const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
@@ -2065,8 +2050,6 @@ CScreeningData::sortQD(const int64_t s_prim_count,
         _pd_first_inds[ij]  = static_cast<uint32_t>(i);
         _pd_second_inds[ij] = static_cast<uint32_t>(j);
 
-        if (std::fabs(D_ij) > _pd_max_D) _pd_max_D = std::fabs(D_ij);
-
         // ij pair data:
 
         const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
@@ -2109,8 +2092,6 @@ CScreeningData::sortQD(const int64_t s_prim_count,
 
         _dd_first_inds[ij]  = static_cast<uint32_t>(i);
         _dd_second_inds[ij] = static_cast<uint32_t>(j);
-
-        if (std::fabs(D_ij) > _dd_max_D) _dd_max_D = std::fabs(D_ij);
 
         // ij pair data:
 
