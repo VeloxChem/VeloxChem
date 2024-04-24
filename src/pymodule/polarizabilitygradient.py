@@ -168,6 +168,7 @@ class PolarizabilityGradient():
                 error_message = 'PolarizabilityGradient: missing input SCF driver '
                 error_message += 'for numerical calculations'
                 raise ValueError(error_message)
+            # Compute
             if self.is_complex:
                 self.compute_numerical_complex(molecule, basis, self.scf_drv)
             else:
@@ -178,8 +179,10 @@ class PolarizabilityGradient():
                 error_message = 'PolarizabilityGradient missing input: LR results'
                 error_message += 'for analytical gradient'
                 raise ValueError(error_message)
-            polgrad_sanity_check(self, self.flag, lr_results)
-            self.check_real_or_complex_input(lr_results)
+            if self.rank == mpi_master():
+                polgrad_sanity_check(self, self.flag, lr_results)
+                self.check_real_or_complex_input(lr_results)
+            # Compute
             if self.is_complex:
                 self.compute_analytical_complex(molecule, basis, scf_tensors,
                                                 lr_results)
