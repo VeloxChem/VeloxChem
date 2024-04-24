@@ -3477,6 +3477,11 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     mat_full = CDenseMatrix();
 
+    // max densities are needed by exchange Fock
+    screening.findMaxDensities(s_prim_count, p_prim_count, d_prim_count,
+                               s_prim_aoinds, p_prim_aoinds, d_prim_aoinds,
+                               cart_naos, cart_dens_ptr);
+
     timer.stop("Prep. preLinK");
 
     std::string errnaos("gpu::computeFockGPU: Inconsistent number of AOs");

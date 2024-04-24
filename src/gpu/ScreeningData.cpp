@@ -2134,6 +2134,137 @@ CScreeningData::sortQD(const int64_t s_prim_count,
     }
 }
 
+auto
+CScreeningData::findMaxDensities(const int64_t s_prim_count,
+                                 const int64_t p_prim_count,
+                                 const int64_t d_prim_count,
+                                 const std::vector<uint32_t>& s_prim_aoinds,
+                                 const std::vector<uint32_t>& p_prim_aoinds,
+                                 const std::vector<uint32_t>& d_prim_aoinds,
+                                 const int64_t naos,
+                                 const double* dens_ptr) -> void
+{
+    _ss_max_D = 0.0;
+    _sp_max_D = 0.0;
+    _sd_max_D = 0.0;
+    _pp_max_D = 0.0;
+    _pd_max_D = 0.0;
+    _dd_max_D = 0.0;
+
+    // S-S gto block pair and S-P gto block pair
+
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
+        // S-S gto block pair
+
+        const auto i_cgto = s_prim_aoinds[i];
+
+        for (int64_t j = i; j < s_prim_count; j++)
+        {
+            const auto j_cgto = s_prim_aoinds[j];
+
+            const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+
+            if (std::fabs(D_ij) > _ss_max_D) _ss_max_D = std::fabs(D_ij);
+        }
+
+        // S-P gto block pair
+
+        for (int64_t j = 0; j < p_prim_count; j++)
+        {
+            for (int64_t j_cart = 0; j_cart < 3; j_cart++)
+            {
+                const auto j_cgto = p_prim_aoinds[j + p_prim_count * j_cart];
+
+                const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+
+                if (std::fabs(D_ij) > _sp_max_D) _sp_max_D = std::fabs(D_ij);
+            }
+        }
+
+        // S-D gto block pair
+
+        for (int64_t j = 0; j < d_prim_count; j++)
+        {
+            for (int64_t j_cart = 0; j_cart < 6; j_cart++)
+            {
+                const auto j_cgto = d_prim_aoinds[j + d_prim_count * j_cart];
+
+                const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+
+                if (std::fabs(D_ij) > _sd_max_D) _sd_max_D = std::fabs(D_ij);
+            }
+        }
+    }
+
+    for (int64_t i = 0; i < p_prim_count; i++)
+    {
+        // P-P gto block pair
+
+        for (int64_t j = i; j < p_prim_count; j++)
+        {
+            for (int64_t i_cart = 0; i_cart < 3; i_cart++)
+            {
+                const auto i_cgto = p_prim_aoinds[i + p_prim_count * i_cart];
+
+                const auto j_cart_start = (j == i ? i_cart : 0);
+
+                for (int64_t j_cart = j_cart_start; j_cart < 3; j_cart++)
+                {
+                    const auto j_cgto = p_prim_aoinds[j + p_prim_count * j_cart];
+
+                    const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+
+                    if (std::fabs(D_ij) > _pp_max_D) _pp_max_D = std::fabs(D_ij);
+                }
+            }
+        }
+    
+        // P-D gto block pair
+
+        for (int64_t j = 0; j < d_prim_count; j++)
+        {
+            for (int64_t i_cart = 0; i_cart < 3; i_cart++)
+            {
+                const auto i_cgto = p_prim_aoinds[i + p_prim_count * i_cart];
+
+                for (int64_t j_cart = 0; j_cart < 6; j_cart++)
+                {
+                    const auto j_cgto = d_prim_aoinds[j + d_prim_count * j_cart];
+
+                    const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+
+                    if (std::fabs(D_ij) > _pd_max_D) _pd_max_D = std::fabs(D_ij);
+                }
+            }
+        }    
+    }
+
+    for (int64_t i = 0; i < d_prim_count; i++)
+    {
+        // D-D gto block pair
+
+        for (int64_t j = i; j < d_prim_count; j++)
+        {
+            for (int64_t i_cart = 0; i_cart < 6; i_cart++)
+            {
+                const auto i_cgto = d_prim_aoinds[i + d_prim_count * i_cart];
+
+                const auto j_cart_start = (j == i ? i_cart : 0);
+
+                for (int64_t j_cart = j_cart_start; j_cart < 6; j_cart++)
+                {
+                    const auto j_cgto = d_prim_aoinds[j + d_prim_count * j_cart];
+
+                    const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+
+                    if (std::fabs(D_ij) > _dd_max_D) _dd_max_D = std::fabs(D_ij);
+                }
+            }
+        }
+    }
+}
+
 auto CScreeningData::get_ss_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _ss_first_inds_local[gpu_id]; }
 auto CScreeningData::get_sp_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _sp_first_inds_local[gpu_id]; }
 auto CScreeningData::get_sd_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _sd_first_inds_local[gpu_id]; }
