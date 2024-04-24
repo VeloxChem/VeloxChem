@@ -87,6 +87,8 @@ class VibrationalAnalysis:
         - pressure: The pressure (in bar) used for thermodynamic analysis.
         - do_raman: Calculate Raman activity
         - do_ir: Calculate IR intensities
+        - is_scf: Whether the reference state is SCF
+        - is_xtb: Whether the reference state is XTB
     """
 
     def __init__(self, hess_drv, comm=None, ostream=None):
@@ -110,8 +112,17 @@ class VibrationalAnalysis:
 
         self.ostream = ostream
 
+        # Hessian driver etc
         self.hessian_driver = hess_drv
-        self.scf_driver = hess_drv.scf_driver
+        self.is_scf = False
+        self.is_xtb = False
+        hess_drv_class_name = self.hess_drv.__class__.__name__
+        if 'Scf' in hess_drv_class_name:
+            self.scf_driver = hess_drv.scf_driver
+            self.is_scf = True
+        else:
+            self.scf_driver = None
+            self.is_xtb = True
 
         self.hessian = None
         self.mass_weighted_hessian = None # FIXME unused variable
@@ -249,10 +260,11 @@ class VibrationalAnalysis:
                 self.ir_intensities = self.calculate_ir_intensity(self.normal_modes)
 
             # Calculate the analytical polarizability gradient for Raman intensities
-            if self.do_raman:
-                #self.compute_polarizability_gradient(molecule, ao_basis)
+            if self.do_raman and self.is_scf:
                 self.raman_intensities, depol_ratio = self.calculate_raman_activity(
                         self.normal_modes)
+            elif self.do_raman and self.is_xtb:
+                self.ostream.print_info('Raman not available for XTB.')
 
             # Print the vibrational properties
             self.print_vibrational_analysis(molecule)
@@ -381,9 +393,6 @@ class VibrationalAnalysis:
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
         coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
-
-        # Save the electronic energy
-        self.elec_energy = self.scf_driver.get_scf_energy()
 
         self.vib_frequencies, self.normal_modes, gibbs_energy = (
             geometric.normal_modes.frequency_analysis(
@@ -544,13 +553,17 @@ class VibrationalAnalysis:
 
         hessian_drv.compute(molecule, ao_basis)
 
+        # Save gradients
         self.hessian = hessian_drv.hessian
         self.dipole_gradient = hessian_drv.dipole_gradient
+        # Save the electronic energy
+        self.elec_energy = hessian_driver.elec_energy
 
     def compute_polarizability_gradient(self, molecule, ao_basis):
         """
         Directs the calculation of the polarizability gradient
         needed for Raman activity.
+        OBS!!! Only for SCF/DFT (not XTB)
 
         :param molecule:
             The molecule.
