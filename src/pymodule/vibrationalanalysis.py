@@ -86,6 +86,7 @@ class VibrationalAnalysis:
         - temperature: The temperature (in K) used for thermodynamic analysis.
         - pressure: The pressure (in bar) used for thermodynamic analysis.
         - do_raman: Calculate Raman activity
+        - do_resonance_raman: Calculate resonance Raman activity
         - do_ir: Calculate IR intensities
         - is_scf: Whether the reference state is SCF
         - is_xtb: Whether the reference state is XTB
@@ -116,7 +117,7 @@ class VibrationalAnalysis:
         self.hessian_driver = hess_drv
         self.is_scf = False
         self.is_xtb = False
-        hess_drv_class_name = self.hess_drv.__class__.__name__
+        hess_drv_class_name = self.hessian_driver.__class__.__name__
         if 'Scf' in hess_drv_class_name:
             self.scf_driver = hess_drv.scf_driver
             self.is_scf = True
@@ -149,6 +150,7 @@ class VibrationalAnalysis:
 
         self.do_ir = True
         self.do_raman = False
+        self.do_resonance_raman = False
         self.frequencies = (0,)
 
         # flag for printing
@@ -167,8 +169,9 @@ class VibrationalAnalysis:
                 'numerical_polgrad': ('bool', 'do numerical polarizability gradient'),
                 'do_four_point_hessian': ('bool', 'do four-point numerical integration'),
                 'do_four_point_polgrad': ('bool', 'do four-point numerical integration'),
-                'do_raman': ('bool', 'whether to calculate Raman activity'),
                 'do_ir': ('bool', 'whether to calculate IR intensities'),
+                'do_raman': ('bool', 'whether to calculate Raman activity'),
+                'do_resonance_raman': ('bool', 'whether to calculate resonance Raman activity'),
                 'do_print_hessian': ('bool', 'whether to print the Hessian'),
                 'do_print_polgrad': ('bool', 'whether to print the pol. gradient'),
                 'print_depolarization_ratio': ('bool', 'whether to print Raman depolarization ratio'),
@@ -557,7 +560,7 @@ class VibrationalAnalysis:
         self.hessian = hessian_drv.hessian
         self.dipole_gradient = hessian_drv.dipole_gradient
         # Save the electronic energy
-        self.elec_energy = hessian_driver.elec_energy
+        self.elec_energy = hessian_drv.elec_energy
 
     def compute_polarizability_gradient(self, molecule, ao_basis):
         """
@@ -572,13 +575,6 @@ class VibrationalAnalysis:
         """
 
         scf_tensors = self.scf_driver.scf_tensors
-
-        # Perform a linear response calculation
-        lr_drv = LinearResponseSolver()
-        lr_drv.update_settings(self.rsp_dict, self.method_dict)
-        if 'frequencies' not in self.rsp_dict:
-            lr_drv.frequencies = self.frequencies
-        lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
 
         # Set up the polarizability gradient driver and run
         polgrad_drv = PolarizabilityGradient(self.comm, self.ostream)
@@ -595,7 +591,25 @@ class VibrationalAnalysis:
         if 'frequencies' not in self.polgrad_dict:
             polgrad_drv.frequencies = self.frequencies
 
+        # Perform a linear response calculation
+        if self.do_resonance_raman:
+            polgrad_drv.is_complex = True
+            lr_drv = ComplexResponse()
+            lr_drv.update_settings(self.rsp_dict, self.method_dict)
+            lr_drv.damping = polgrad_drv.damping
+            if 'frequencies' not in self.rsp_dict:
+                lr_drv.frequencies = polgrad_drv.frequencies
+            lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
+        else:
+            lr_drv = LinearResponseSolver()
+            lr_drv.update_settings(self.rsp_dict, self.method_dict)
+            if 'frequencies' not in self.rsp_dict:
+                lr_drv.frequencies = self.frequencies
+            lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
+
+        # Compute polarizability gradient
         polgrad_drv.compute(molecule, ao_basis, scf_tensors, lr_results)
 
+        # Save the gradient
         self.polarizability_gradient = polgrad_drv.polgradient
 
