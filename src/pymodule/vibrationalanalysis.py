@@ -89,7 +89,6 @@ class VibrationalAnalysis:
         - do_ir: Calculate IR intensities
     """
 
-    # TODO cleanup instance variables: move some to scfhessiandriver.py
     def __init__(self, hess_drv, comm=None, ostream=None):
         """
         Initializes vibrational analysis driver.
@@ -230,33 +229,33 @@ class VibrationalAnalysis:
             The minimal AO basis set.
         """
 
-        # Compute Hessian driver
+        # Compute the Hessian
         self.compute_hessian(molecule, ao_basis)
 
-        # Get vibrational frequencies and normal modes
-        # TODO what to do about that filename input
-        self.frequency_analysis(molecule, filename=None)
-
-        # Diagonalizes Hessian and calculates the reduced masses
-        # einsum 'ki->i'
-        # TODO find a better place for this
-        self.reduced_masses = 1.0 / np.sum(self.normal_modes.T**2, axis=0)
-
-        # Calculate force constants
-        self.force_constants = self.calculate_force_constant()
-
-        # Calculate the gradient of the dipole moment for IR intensities
-        if self.do_ir:
-            self.ir_intensities = self.calculate_ir_intensity(self.normal_modes)
-
-        # Calculate the analytical polarizability gradient for Raman intensities
+        # Compute the polarizability gradient for Raman intensities
         if self.do_raman:
             self.compute_polarizability_gradient(molecule, ao_basis)
-            self.raman_intensities, depol_ratio = self.calculate_raman_activity(
-                    self.normal_modes)
 
-        # Print the vibrational properties
-        self.print_vibrational_analysis(molecule)
+        if self.rank == mpi_master():
+            # Get vibrational frequencies and normal modes
+            # TODO what to do about that filename input
+            self.frequency_analysis(molecule, filename=None)
+
+            # Calculate force constants
+            self.force_constants = self.calculate_force_constant()
+
+            # Calculate the gradient of the dipole moment for IR intensities
+            if self.do_ir:
+                self.ir_intensities = self.calculate_ir_intensity(self.normal_modes)
+
+            # Calculate the analytical polarizability gradient for Raman intensities
+            if self.do_raman:
+                #self.compute_polarizability_gradient(molecule, ao_basis)
+                self.raman_intensities, depol_ratio = self.calculate_raman_activity(
+                        self.normal_modes)
+
+            # Print the vibrational properties
+            self.print_vibrational_analysis(molecule)
 
         return
 
@@ -487,6 +486,11 @@ class VibrationalAnalysis:
         cm_to_m = 1e-2  # centimeters in meters
         N_to_mdyne = 1e+8  # Newton in milli dyne
         m_to_A = 1e+10  # meters in Angstroms
+
+        # Diagonalizes Hessian and calculates the reduced masses
+        # einsum 'ki->i'
+        # TODO is this a good place for reduced masses?
+        self.reduced_masses = 1.0 / np.sum(self.normal_modes.T**2, axis=0)
 
         force_constants = (4.0 * np.pi**2 *
                                 (c * (self.vib_frequencies / cm_to_m))**2 *

@@ -460,7 +460,6 @@ class ScfHessianDriver(HessianDriver):
             cphf_ov = cphf_solution_dict['cphf_ov'].reshape(natm, 3, nocc, nvir)
             ovlp_deriv_oo = cphf_solution_dict['ovlp_deriv_oo']
 
-            # TODO replace dof with just "3"
             dof = 3
             perturbed_density = np.zeros((natm, dof, nao, nao))
             for x in range(natm):
@@ -506,9 +505,6 @@ class ScfHessianDriver(HessianDriver):
                 orben_ovlp_deriv_oo = None
             else:
                 cphf_rhs = None
-
-        # TODO remove
-        dof = self.comm.bcast(dof, root=mpi_master())
 
         ovlp_deriv_oo = self.comm.bcast(ovlp_deriv_oo, root=mpi_master())
         cphf_ov = self.comm.bcast(cphf_ov, root=mpi_master())
