@@ -220,7 +220,7 @@ def _Molecule_read_PDB_file(pdbfile):
         for line in lines:
             if line.startswith('ATOM') or line.startswith('HETATM'):
 
-                if line[76:78] == []:
+                if line[76:78].strip() == '':
                     error_msg = "No atom label found in PDB file. Please provide atom labels in columns 77-78."
                     error_msg += "For more information, see: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html#ATOM"
                     raise ValueError(error_msg)
