@@ -1222,6 +1222,69 @@ class ForceFieldGenerator:
                     'comment': comment
                 }
 
+    def add_bond(self, bond, force_constant=250000.00, equilibrium=None):
+        """
+        Adds a bond to the topology.
+
+        :param bond:
+            The bond to be added. As a tuple of atom indices.
+        :param force_constant:
+            The force constant of the bond. Default is 250000.00 kJ/mol/nm^2.
+        :param equilibrium:
+            The equilibrium distance of the bond. If none it will be calculated.
+        """
+
+        i, j = bond
+
+        # Convert to zero-based indices
+        i = i - 1
+        j = j - 1
+
+        if equilibrium is None:
+            coords = self.molecule.get_coordinates_in_angstrom()
+            equilibrium = np.linalg.norm(coords[i] - coords[j]) * 0.1
+
+        self.bonds[bond] = {
+            'type': 'harmonic',
+            'force_constant': force_constant,
+            'equilibrium': equilibrium,
+            'comment': 'User-defined'
+        }
+
+    def add_angle(self, angle, force_constant=1000.00, equilibrium=None):
+        """
+        Adds an angle to the topology.
+
+        :param angle:
+            The angle to be added. As a tuple of atom indices.
+        :param force_constant:
+            The force constant of the angle. Default is 1000.00 kJ/mol/rad^2.
+        :param equilibrium:
+            The equilibrium angle of the angle. If none it will be calculated.
+        """
+
+        i, j, k = angle
+
+        # Convert to zero-based indices
+        i = i - 1
+        j = j - 1
+        k = k - 1
+
+        if equilibrium is None:
+            coords = self.molecule.get_coordinates_in_angstrom()
+            a = coords[i] - coords[j]
+            b = coords[k] - coords[j]
+            equilibrium = safe_arccos(
+                np.dot(a, b) / np.linalg.norm(a) /
+                np.linalg.norm(b)) * 180 / np.pi
+
+        self.angles[angle] = {
+            'type': 'harmonic',
+            'force_constant': force_constant,
+            'equilibrium': equilibrium,
+            'comment': 'User-defined'
+        }
+
     def get_dihedral_guess_patterns(self, at_2, at_3):
         """
         Gets guesses for dihedral parameters.
