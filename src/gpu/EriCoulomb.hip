@@ -43259,8 +43259,9 @@ computeCoulombFockPPDD8(double*         mat_J,
     }
 }
 
+
 __global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockPPPD0(double*         mat_J,
+computeCoulombFockPPPD(double*         mat_J,
                        const double*   p_prim_info,
                        const uint32_t  p_prim_count,
                        const double*   d_prim_info,
@@ -43279,638 +43280,7 @@ computeCoulombFockPPPD0(double*         mat_J,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
-{
-    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t skip_thread_block;
-    __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
-
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double J_ij = 0.0;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < pp_prim_pair_count_local)
-    {
-        i = pp_first_inds_local[ij];
-        j = pp_second_inds_local[ij];
-
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
-
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
-
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
-
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
-
-        S_ij_00 = pp_pair_data_local[ij];
-    }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
-
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
-
-        if ((kl < pd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
-        {
-            const auto k = pd_first_inds[kl];
-            const auto l = pd_second_inds[kl];
-
-            const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
-
-            const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                                   p_prim_info[k / 3 + p_prim_count * 3],
-                                   p_prim_info[k / 3 + p_prim_count * 4]};
-
-            const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
-
-            const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                                   d_prim_info[l / 6 + d_prim_count * 3],
-                                   d_prim_info[l / 6 + d_prim_count * 4]};
-
-            const auto S_kl_00 = pd_pair_data[kl];
-
-            const auto a0 = i % 3;
-            const auto b0 = j % 3;
-            const auto c0 = k % 3;
-            const auto d0 = d_cart_inds[l % 6][0];
-            const auto d1 = d_cart_inds[l % 6][1];
-
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
-            // J. Chem. Phys. 84, 3963-3974 (1986)
-
-            const auto S1 = a_i + a_j;
-            const auto S2 = a_k + a_l;
-            const auto S4 = S1 + S2;
-
-            const auto Lambda = sqrt(4.0 * S1 * S2 / (MATH_CONST_PI * S4));
-
-            double F5_t[3];
-
-            gpu::computeBoysFunction(F5_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j / S1) * rij[a0];
-            const auto PB_0 = (-a_i / S1) * rij[b0];
-            const auto QC_0 = (a_l / S2) * rkl[c0];
-            const auto QD_0 = (-a_k / S2) * rkl[d0];
-            const auto QD_1 = (-a_k / S2) * rkl[d1];
-
-            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
-                    F5_t[0] * (
-
-                        0.25 / ( S1 * S2 ) * (
-                            delta[a0][b0] * delta[d0][d1] * QC_0
-                            + delta[a0][b0] * delta[c0][d1] * QD_0
-                            + delta[a0][b0] * delta[c0][d0] * QD_1
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[0] * (
-
-                        0.5 / S1 * (
-                            delta[a0][b0] * (QD_0 * QD_1 * QC_0)
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[0] * (
-
-                        0.5 / S2 * (
-                            delta[d0][d1] * (PB_0 * PA_0 * QC_0)
-                            + delta[c0][d1] * (PB_0 * PA_0 * QD_0)
-                            + delta[c0][d0] * (PB_0 * PA_0 * QD_1)
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[0] * (
-
-                        (
-                            
-                            + PB_0 * PA_0 * QD_0 * QD_1 * QC_0
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[1] * (
-
-                        0.25 / ( S1 * S4 ) * (
-                            delta[a0][b0] * delta[d0][d1] * (QC_0 * (-1.0))
-                            + delta[a0][b0] * delta[c0][d1] * (QD_0 * (-1.0))
-                            + delta[a0][b0] * delta[c0][d0] * (QD_1 * (-1.0))
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[1] * (
-
-                        0.25 / ( S2 * S4 ) * (
-                            delta[b0][c0] * delta[d0][d1] * PA_0
-                            + delta[b0][d0] * delta[c0][d1] * PA_0
-                            + delta[b0][d1] * delta[c0][d0] * PA_0
-                            + delta[a0][b0] * delta[d0][d1] * (PQ[c0] * (-1.0) + QC_0 * (-1.0))
-                            + delta[a0][b0] * delta[c0][d1] * (PQ[d0] * (-1.0) + QD_0 * (-1.0))
-                            + delta[a0][b0] * delta[c0][d0] * (PQ[d1] * (-1.0) + QD_1 * (-1.0))
-                            + delta[a0][c0] * delta[d0][d1] * PB_0
-                            + delta[a0][d0] * delta[c0][d1] * PB_0
-                            + delta[a0][d1] * delta[c0][d0] * PB_0
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[1] * (
-
-                        0.5 * S1 / ( S2 * S4 ) * (
-                            delta[d0][d1] * (PB_0 * PA_0 * PQ[c0] * (-1.0) + PB_0 * PA_0 * QC_0 * (-1.0))
-                            + delta[c0][d1] * (PB_0 * PA_0 * PQ[d0] * (-1.0) + PB_0 * PA_0 * QD_0 * (-1.0))
-                            + delta[c0][d0] * (PB_0 * PA_0 * PQ[d1] * (-1.0) + PB_0 * PA_0 * QD_1 * (-1.0))
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[1] * (
-
-                        0.5 * S2 / ( S1 * S4 ) * (
-                            delta[a0][b0] * (QD_0 * QD_1 * QC_0 * (-1.0))
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[1] * (
-
-                        0.5 / S4 * (
-                            delta[d0][d1] * (PB_0 * PQ[a0] * QC_0 + PA_0 * PQ[b0] * QC_0)
-                            + delta[c0][d1] * (PB_0 * PQ[a0] * QD_0 + PA_0 * PQ[b0] * QD_0)
-                            + delta[c0][d0] * (PB_0 * PQ[a0] * QD_1 + PA_0 * PQ[b0] * QD_1)
-                            + delta[b0][d1] * (PA_0 * QD_0 * QC_0)
-                            + delta[b0][d0] * (PA_0 * QD_1 * QC_0)
-                            + delta[b0][c0] * (PA_0 * QD_0 * QD_1)
-                            + delta[a0][d1] * (PB_0 * QD_0 * QC_0)
-                            + delta[a0][d0] * (PB_0 * QD_1 * QC_0)
-                            + delta[a0][b0] * (PQ[c0] * QD_0 * QD_1 * (-1.0) + PQ[d0] * QD_1 * QC_0 * (-1.0) + PQ[d1] * QD_0 * QC_0 * (-1.0))
-                            + delta[a0][c0] * (PB_0 * QD_0 * QD_1)
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[1] * (
-
-                        S1 / S4 * (
-                            
-                            + PB_0 * PA_0 * PQ[c0] * QD_0 * QD_1 * (-1.0)
-                            + PB_0 * PA_0 * PQ[d0] * QD_1 * QC_0 * (-1.0)
-                            + PB_0 * PA_0 * PQ[d1] * QD_0 * QC_0 * (-1.0)
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[1] * (
-
-                        S2 / S4 * (
-                            
-                            + PB_0 * PQ[a0] * QD_0 * QD_1 * QC_0
-                            + PA_0 * PQ[b0] * QD_0 * QD_1 * QC_0
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[2] * (
-
-                        ( S1 * S1 ) / ( S4 * S4 ) * (
-                            
-                            + PB_0 * PA_0 * PQ[c0] * PQ[d0] * QD_1
-                            + PB_0 * PA_0 * PQ[c0] * PQ[d1] * QD_0
-                            + PB_0 * PA_0 * PQ[d0] * PQ[d1] * QC_0
-                        )
-
-                    )
-
-                    );
-
-            // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-            ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * pd_mat_D[kl] * 2.0;
-        }
-        else
-        {
-            ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-            // indicator for early exit for thread block (ERIs[0][0] has the largest upper bound)
-            if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 1;
-        }
-
-        __syncthreads();
-
-        // early exit for thread block
-        if (skip_thread_block == 1) break;
-
-        if (threadIdx.y == 0)
-        {
-            for (uint32_t n = 0; n < TILE_DIM; n++)
-            {
-                J_ij += ERIs[n][threadIdx.x];
-            }
-        }
-
-        __syncthreads();
-    }
-
-    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
-    {
-        mat_J[ij] += J_ij;
-    }
-}
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockPPPD1(double*         mat_J,
-                       const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   pd_mat_D,
-                       const double*   pp_mat_Q_local,
-                       const double*   pd_mat_Q,
-                       const uint32_t* pp_first_inds_local,
-                       const uint32_t* pp_second_inds_local,
-                       const double*   pp_pair_data_local,
-                       const uint32_t  pp_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
-                       const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold)
-{
-    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
-
-    __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t skip_thread_block;
-    __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
-
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double J_ij = 0.0;
-
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < pp_prim_pair_count_local)
-    {
-        i = pp_first_inds_local[ij];
-        j = pp_second_inds_local[ij];
-
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
-
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
-
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
-
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
-
-        S_ij_00 = pp_pair_data_local[ij];
-    }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
-
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
-
-        if ((kl < pd_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) > eri_threshold))
-        {
-            const auto k = pd_first_inds[kl];
-            const auto l = pd_second_inds[kl];
-
-            const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
-
-            const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                                   p_prim_info[k / 3 + p_prim_count * 3],
-                                   p_prim_info[k / 3 + p_prim_count * 4]};
-
-            const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
-
-            const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                                   d_prim_info[l / 6 + d_prim_count * 3],
-                                   d_prim_info[l / 6 + d_prim_count * 4]};
-
-            const auto S_kl_00 = pd_pair_data[kl];
-
-            const auto a0 = i % 3;
-            const auto b0 = j % 3;
-            const auto c0 = k % 3;
-            const auto d0 = d_cart_inds[l % 6][0];
-            const auto d1 = d_cart_inds[l % 6][1];
-
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
-            // J. Chem. Phys. 84, 3963-3974 (1986)
-
-            const auto S1 = a_i + a_j;
-            const auto S2 = a_k + a_l;
-            const auto S4 = S1 + S2;
-
-            const auto Lambda = sqrt(4.0 * S1 * S2 / (MATH_CONST_PI * S4));
-
-            double F5_t[4];
-
-            gpu::computeBoysFunction(F5_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j / S1) * rij[a0];
-            const auto PB_0 = (-a_i / S1) * rij[b0];
-            const auto QC_0 = (a_l / S2) * rkl[c0];
-            const auto QD_0 = (-a_k / S2) * rkl[d0];
-            const auto QD_1 = (-a_k / S2) * rkl[d1];
-
-            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
-                    F5_t[2] * (
-
-                        ( S1 * S2 ) / ( S4 * S4 ) * (
-                            
-                            + PB_0 * PQ[a0] * PQ[c0] * QD_0 * QD_1 * (-1.0)
-                            + PB_0 * PQ[a0] * PQ[d0] * QD_1 * QC_0 * (-1.0)
-                            + PB_0 * PQ[a0] * PQ[d1] * QD_0 * QC_0 * (-1.0)
-                            + PA_0 * PQ[b0] * PQ[c0] * QD_0 * QD_1 * (-1.0)
-                            + PA_0 * PQ[b0] * PQ[d0] * QD_1 * QC_0 * (-1.0)
-                            + PA_0 * PQ[b0] * PQ[d1] * QD_0 * QC_0 * (-1.0)
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[2] * (
-
-                        ( S2 * S2 ) / ( S4 * S4 ) * (
-                            
-                            + PQ[a0] * PQ[b0] * QD_0 * QD_1 * QC_0
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[2] * (
-
-                        0.25 * S1 / ( S2 * S4 * S4 ) * (
-                            delta[b0][c0] * delta[d0][d1] * (PA_0 * (-1.0))
-                            + delta[b0][d0] * delta[c0][d1] * (PA_0 * (-1.0))
-                            + delta[b0][d1] * delta[c0][d0] * (PA_0 * (-1.0))
-                            + delta[a0][c0] * delta[d0][d1] * (PB_0 * (-1.0))
-                            + delta[a0][d0] * delta[c0][d1] * (PB_0 * (-1.0))
-                            + delta[a0][d1] * delta[c0][d0] * (PB_0 * (-1.0))
-                            + delta[a0][b0] * delta[d0][d1] * (PQ[c0])
-                            + delta[a0][b0] * delta[c0][d1] * (PQ[d0])
-                            + delta[a0][b0] * delta[c0][d0] * (PQ[d1])
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[2] * (
-
-                        0.25 / ( S4 * S4 ) * (
-                            delta[a0][d0] * delta[b0][d1] * QC_0
-                            + delta[a0][d1] * delta[b0][d0] * QC_0
-                            + delta[a0][b0] * delta[d0][d1] * (PQ[c0] + QC_0)
-                            + delta[b0][c0] * delta[d0][d1] * (PQ[a0])
-                            + delta[b0][d0] * delta[c0][d1] * (PQ[a0])
-                            + delta[b0][d1] * delta[c0][d0] * (PQ[a0])
-                            + delta[a0][c0] * delta[d0][d1] * (PQ[b0])
-                            + delta[a0][d0] * delta[c0][d1] * (PQ[b0])
-                            + delta[a0][d1] * delta[c0][d0] * (PQ[b0])
-                            + delta[a0][b0] * delta[c0][d1] * (PQ[d0] + QD_0)
-                            + delta[a0][b0] * delta[c0][d0] * (PQ[d1] + QD_1)
-                            + delta[a0][c0] * delta[b0][d1] * QD_0
-                            + delta[a0][d1] * delta[b0][c0] * QD_0
-                            + delta[a0][c0] * delta[b0][d0] * QD_1
-                            + delta[a0][d0] * delta[b0][c0] * QD_1
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[2] * (
-
-                        0.5 * ( S1 * S1 ) / ( S2 * S4 * S4 ) * (
-                            delta[d0][d1] * (PB_0 * PA_0 * PQ[c0])
-                            + delta[c0][d1] * (PB_0 * PA_0 * PQ[d0])
-                            + delta[c0][d0] * (PB_0 * PA_0 * PQ[d1])
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[2] * (
-
-                        0.5 * S1 / ( S4 * S4 ) * (
-                            delta[d0][d1] * (PB_0 * PQ[a0] * PQ[c0] * (-1.0) + PB_0 * PQ[a0] * QC_0 * (-1.0) + PA_0 * PQ[b0] * PQ[c0] * (-1.0) + PA_0 * PQ[b0] * QC_0 * (-1.0))
-                            + delta[c0][d1] * (PB_0 * PQ[a0] * PQ[d0] * (-1.0) + PB_0 * PQ[a0] * QD_0 * (-1.0) + PA_0 * PQ[b0] * PQ[d0] * (-1.0) + PA_0 * PQ[b0] * QD_0 * (-1.0))
-                            + delta[c0][d0] * (PB_0 * PQ[a0] * PQ[d1] * (-1.0) + PB_0 * PQ[a0] * QD_1 * (-1.0) + PA_0 * PQ[b0] * PQ[d1] * (-1.0) + PA_0 * PQ[b0] * QD_1 * (-1.0))
-                            + delta[b0][d1] * (PA_0 * PQ[c0] * QD_0 * (-1.0) + PA_0 * PQ[d0] * QC_0 * (-1.0))
-                            + delta[b0][d0] * (PA_0 * PQ[c0] * QD_1 * (-1.0) + PA_0 * PQ[d1] * QC_0 * (-1.0))
-                            + delta[b0][c0] * (PA_0 * PQ[d0] * QD_1 * (-1.0) + PA_0 * PQ[d1] * QD_0 * (-1.0))
-                            + delta[a0][d1] * (PB_0 * PQ[c0] * QD_0 * (-1.0) + PB_0 * PQ[d0] * QC_0 * (-1.0))
-                            + delta[a0][d0] * (PB_0 * PQ[c0] * QD_1 * (-1.0) + PB_0 * PQ[d1] * QC_0 * (-1.0))
-                            + delta[a0][c0] * (PB_0 * PQ[d0] * QD_1 * (-1.0) + PB_0 * PQ[d1] * QD_0 * (-1.0))
-                            + delta[a0][b0] * (PQ[c0] * PQ[d0] * QD_1 + PQ[c0] * PQ[d1] * QD_0 + PQ[d0] * PQ[d1] * QC_0)
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[2] * (
-
-                        0.5 * S2 / ( S4 * S4 ) * (
-                            delta[d0][d1] * (PQ[a0] * PQ[b0] * QC_0)
-                            + delta[b0][d1] * (PQ[a0] * QD_0 * QC_0)
-                            + delta[b0][d0] * (PQ[a0] * QD_1 * QC_0)
-                            + delta[a0][d1] * (PQ[b0] * QD_0 * QC_0)
-                            + delta[a0][d0] * (PQ[b0] * QD_1 * QC_0)
-                            + delta[a0][b0] * (PQ[c0] * QD_0 * QD_1 + PQ[d0] * QD_1 * QC_0 + PQ[d1] * QD_0 * QC_0)
-                            + delta[c0][d1] * (PQ[a0] * PQ[b0] * QD_0)
-                            + delta[c0][d0] * (PQ[a0] * PQ[b0] * QD_1)
-                            + delta[b0][c0] * (PQ[a0] * QD_0 * QD_1)
-                            + delta[a0][c0] * (PQ[b0] * QD_0 * QD_1)
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[3] * (
-
-                        ( S1 * S1 * S1 ) / ( S4 * S4 * S4 ) * (
-                            
-                            + PB_0 * PA_0 * PQ[c0] * PQ[d0] * PQ[d1] * (-1.0)
-                        )
-
-                    )
-
-                    +
-
-                    F5_t[3] * (
-
-                        ( S1 * S1 * S2 ) / ( S4 * S4 * S4 ) * (
-                            
-                            + PB_0 * PQ[a0] * PQ[c0] * PQ[d0] * QD_1
-                            + PB_0 * PQ[a0] * PQ[c0] * PQ[d1] * QD_0
-                            + PB_0 * PQ[a0] * PQ[d0] * PQ[d1] * QC_0
-                            + PA_0 * PQ[b0] * PQ[c0] * PQ[d0] * QD_1
-                            + PA_0 * PQ[b0] * PQ[c0] * PQ[d1] * QD_0
-                            + PA_0 * PQ[b0] * PQ[d0] * PQ[d1] * QC_0
-                        )
-
-                    )
-
-                    );
-
-            // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-            ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * pd_mat_D[kl] * 2.0;
-        }
-        else
-        {
-            ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-            // indicator for early exit for thread block (ERIs[0][0] has the largest upper bound)
-            if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 1;
-        }
-
-        __syncthreads();
-
-        // early exit for thread block
-        if (skip_thread_block == 1) break;
-
-        if (threadIdx.y == 0)
-        {
-            for (uint32_t n = 0; n < TILE_DIM; n++)
-            {
-                J_ij += ERIs[n][threadIdx.x];
-            }
-        }
-
-        __syncthreads();
-    }
-
-    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
-    {
-        mat_J[ij] += J_ij;
-    }
-}
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockPPPD2(double*         mat_J,
-                       const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   pd_mat_D,
-                       const double*   pp_mat_Q_local,
-                       const double*   pd_mat_Q,
-                       const uint32_t* pp_first_inds_local,
-                       const uint32_t* pp_second_inds_local,
-                       const double*   pp_pair_data_local,
-                       const uint32_t  pp_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
-                       const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
@@ -44023,6 +43393,306 @@ computeCoulombFockPPPD2(double*         mat_J,
             const auto QD_1 = (-a_k / S2) * rkl[d1];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    F5_t[0] * (
+
+                        0.25 / ( S1 * S2 ) * (
+                            delta[a0][b0] * delta[d0][d1] * (QC_0)
+                            + delta[a0][b0] * delta[c0][d1] * (QD_0)
+                            + delta[a0][b0] * delta[c0][d0] * (QD_1)
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[0] * (
+
+                        0.5 / S1 * (
+                            delta[a0][b0] * (QD_0 * QD_1 * QC_0)
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[0] * (
+
+                        0.5 / S2 * (
+                            delta[d0][d1] * (PB_0 * PA_0 * QC_0)
+                            + delta[c0][d1] * (PB_0 * PA_0 * QD_0)
+                            + delta[c0][d0] * (PB_0 * PA_0 * QD_1)
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[0] * (
+
+                        (
+                            
+                            + PB_0 * PA_0 * QD_0 * QD_1 * QC_0
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[1] * (
+
+                        0.25 / ( S1 * S4 ) * (
+                            delta[a0][b0] * delta[d0][d1] * (QC_0 * (-1.0))
+                            + delta[a0][b0] * delta[c0][d1] * (QD_0 * (-1.0))
+                            + delta[a0][b0] * delta[c0][d0] * (QD_1 * (-1.0))
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[1] * (
+
+                        0.25 / ( S2 * S4 ) * (
+                            delta[b0][c0] * delta[d0][d1] * (PA_0)
+                            + delta[b0][d0] * delta[c0][d1] * (PA_0)
+                            + delta[b0][d1] * delta[c0][d0] * (PA_0)
+                            + delta[a0][b0] * delta[d0][d1] * (PQ[c0] * (-1.0) + QC_0 * (-1.0))
+                            + delta[a0][b0] * delta[c0][d1] * (PQ[d0] * (-1.0) + QD_0 * (-1.0))
+                            + delta[a0][b0] * delta[c0][d0] * (PQ[d1] * (-1.0) + QD_1 * (-1.0))
+                            + delta[a0][c0] * delta[d0][d1] * (PB_0)
+                            + delta[a0][d0] * delta[c0][d1] * (PB_0)
+                            + delta[a0][d1] * delta[c0][d0] * (PB_0)
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[1] * (
+
+                        0.5 * S1 / ( S2 * S4 ) * (
+                            delta[d0][d1] * (PB_0 * PA_0 * PQ[c0] * (-1.0) + PB_0 * PA_0 * QC_0 * (-1.0))
+                            + delta[c0][d1] * (PB_0 * PA_0 * PQ[d0] * (-1.0) + PB_0 * PA_0 * QD_0 * (-1.0))
+                            + delta[c0][d0] * (PB_0 * PA_0 * PQ[d1] * (-1.0) + PB_0 * PA_0 * QD_1 * (-1.0))
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[1] * (
+
+                        0.5 * S2 / ( S1 * S4 ) * (
+                            delta[a0][b0] * (QD_0 * QD_1 * QC_0 * (-1.0))
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[1] * (
+
+                        0.5 / S4 * (
+                            delta[d0][d1] * (PB_0 * PQ[a0] * QC_0 + PA_0 * PQ[b0] * QC_0)
+                            + delta[c0][d1] * (PB_0 * PQ[a0] * QD_0 + PA_0 * PQ[b0] * QD_0)
+                            + delta[c0][d0] * (PB_0 * PQ[a0] * QD_1 + PA_0 * PQ[b0] * QD_1)
+                            + delta[b0][d1] * (PA_0 * QD_0 * QC_0)
+                            + delta[b0][d0] * (PA_0 * QD_1 * QC_0)
+                            + delta[b0][c0] * (PA_0 * QD_0 * QD_1)
+                            + delta[a0][d1] * (PB_0 * QD_0 * QC_0)
+                            + delta[a0][d0] * (PB_0 * QD_1 * QC_0)
+                            + delta[a0][b0] * (PQ[c0] * QD_0 * QD_1 * (-1.0) + PQ[d0] * QD_1 * QC_0 * (-1.0) + PQ[d1] * QD_0 * QC_0 * (-1.0))
+                            + delta[a0][c0] * (PB_0 * QD_0 * QD_1)
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[1] * (
+
+                        S1 / S4 * (
+                            
+                            + PB_0 * PA_0 * PQ[c0] * QD_0 * QD_1 * (-1.0)
+                            + PB_0 * PA_0 * PQ[d0] * QD_1 * QC_0 * (-1.0)
+                            + PB_0 * PA_0 * PQ[d1] * QD_0 * QC_0 * (-1.0)
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[1] * (
+
+                        S2 / S4 * (
+                            
+                            + PB_0 * PQ[a0] * QD_0 * QD_1 * QC_0
+                            + PA_0 * PQ[b0] * QD_0 * QD_1 * QC_0
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[2] * (
+
+                        ( S1 * S1 ) / ( S4 * S4 ) * (
+                            
+                            + PB_0 * PA_0 * PQ[c0] * PQ[d0] * QD_1
+                            + PB_0 * PA_0 * PQ[c0] * PQ[d1] * QD_0
+                            + PB_0 * PA_0 * PQ[d0] * PQ[d1] * QC_0
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[2] * (
+
+                        ( S1 * S2 ) / ( S4 * S4 ) * (
+                            
+                            + PB_0 * PQ[a0] * PQ[c0] * QD_0 * QD_1 * (-1.0)
+                            + PB_0 * PQ[a0] * PQ[d0] * QD_1 * QC_0 * (-1.0)
+                            + PB_0 * PQ[a0] * PQ[d1] * QD_0 * QC_0 * (-1.0)
+                            + PA_0 * PQ[b0] * PQ[c0] * QD_0 * QD_1 * (-1.0)
+                            + PA_0 * PQ[b0] * PQ[d0] * QD_1 * QC_0 * (-1.0)
+                            + PA_0 * PQ[b0] * PQ[d1] * QD_0 * QC_0 * (-1.0)
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[2] * (
+
+                        ( S2 * S2 ) / ( S4 * S4 ) * (
+                            
+                            + PQ[a0] * PQ[b0] * QD_0 * QD_1 * QC_0
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[2] * (
+
+                        0.25 * S1 / ( S2 * S4 * S4 ) * (
+                            delta[b0][c0] * delta[d0][d1] * (PA_0 * (-1.0))
+                            + delta[b0][d0] * delta[c0][d1] * (PA_0 * (-1.0))
+                            + delta[b0][d1] * delta[c0][d0] * (PA_0 * (-1.0))
+                            + delta[a0][c0] * delta[d0][d1] * (PB_0 * (-1.0))
+                            + delta[a0][d0] * delta[c0][d1] * (PB_0 * (-1.0))
+                            + delta[a0][d1] * delta[c0][d0] * (PB_0 * (-1.0))
+                            + delta[a0][b0] * delta[d0][d1] * (PQ[c0])
+                            + delta[a0][b0] * delta[c0][d1] * (PQ[d0])
+                            + delta[a0][b0] * delta[c0][d0] * (PQ[d1])
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[2] * (
+
+                        0.25 / ( S4 * S4 ) * (
+                            delta[a0][d0] * delta[b0][d1] * (QC_0)
+                            + delta[a0][d1] * delta[b0][d0] * (QC_0)
+                            + delta[a0][b0] * delta[d0][d1] * (PQ[c0] + QC_0)
+                            + delta[b0][c0] * delta[d0][d1] * (PQ[a0])
+                            + delta[b0][d0] * delta[c0][d1] * (PQ[a0])
+                            + delta[b0][d1] * delta[c0][d0] * (PQ[a0])
+                            + delta[a0][c0] * delta[d0][d1] * (PQ[b0])
+                            + delta[a0][d0] * delta[c0][d1] * (PQ[b0])
+                            + delta[a0][d1] * delta[c0][d0] * (PQ[b0])
+                            + delta[a0][b0] * delta[c0][d1] * (PQ[d0] + QD_0)
+                            + delta[a0][b0] * delta[c0][d0] * (PQ[d1] + QD_1)
+                            + delta[a0][c0] * delta[b0][d1] * (QD_0)
+                            + delta[a0][d1] * delta[b0][c0] * (QD_0)
+                            + delta[a0][c0] * delta[b0][d0] * (QD_1)
+                            + delta[a0][d0] * delta[b0][c0] * (QD_1)
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[2] * (
+
+                        0.5 * ( S1 * S1 ) / ( S2 * S4 * S4 ) * (
+                            delta[d0][d1] * (PB_0 * PA_0 * PQ[c0])
+                            + delta[c0][d1] * (PB_0 * PA_0 * PQ[d0])
+                            + delta[c0][d0] * (PB_0 * PA_0 * PQ[d1])
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[2] * (
+
+                        0.5 * S1 / ( S4 * S4 ) * (
+                            delta[d0][d1] * (PB_0 * PQ[a0] * PQ[c0] * (-1.0) + PB_0 * PQ[a0] * QC_0 * (-1.0) + PA_0 * PQ[b0] * PQ[c0] * (-1.0) + PA_0 * PQ[b0] * QC_0 * (-1.0))
+                            + delta[c0][d1] * (PB_0 * PQ[a0] * PQ[d0] * (-1.0) + PB_0 * PQ[a0] * QD_0 * (-1.0) + PA_0 * PQ[b0] * PQ[d0] * (-1.0) + PA_0 * PQ[b0] * QD_0 * (-1.0))
+                            + delta[c0][d0] * (PB_0 * PQ[a0] * PQ[d1] * (-1.0) + PB_0 * PQ[a0] * QD_1 * (-1.0) + PA_0 * PQ[b0] * PQ[d1] * (-1.0) + PA_0 * PQ[b0] * QD_1 * (-1.0))
+                            + delta[b0][d1] * (PA_0 * PQ[c0] * QD_0 * (-1.0) + PA_0 * PQ[d0] * QC_0 * (-1.0))
+                            + delta[b0][d0] * (PA_0 * PQ[c0] * QD_1 * (-1.0) + PA_0 * PQ[d1] * QC_0 * (-1.0))
+                            + delta[b0][c0] * (PA_0 * PQ[d0] * QD_1 * (-1.0) + PA_0 * PQ[d1] * QD_0 * (-1.0))
+                            + delta[a0][d1] * (PB_0 * PQ[c0] * QD_0 * (-1.0) + PB_0 * PQ[d0] * QC_0 * (-1.0))
+                            + delta[a0][d0] * (PB_0 * PQ[c0] * QD_1 * (-1.0) + PB_0 * PQ[d1] * QC_0 * (-1.0))
+                            + delta[a0][c0] * (PB_0 * PQ[d0] * QD_1 * (-1.0) + PB_0 * PQ[d1] * QD_0 * (-1.0))
+                            + delta[a0][b0] * (PQ[c0] * PQ[d0] * QD_1 + PQ[c0] * PQ[d1] * QD_0 + PQ[d0] * PQ[d1] * QC_0)
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[2] * (
+
+                        0.5 * S2 / ( S4 * S4 ) * (
+                            delta[d0][d1] * (PQ[a0] * PQ[b0] * QC_0)
+                            + delta[b0][d1] * (PQ[a0] * QD_0 * QC_0)
+                            + delta[b0][d0] * (PQ[a0] * QD_1 * QC_0)
+                            + delta[a0][d1] * (PQ[b0] * QD_0 * QC_0)
+                            + delta[a0][d0] * (PQ[b0] * QD_1 * QC_0)
+                            + delta[a0][b0] * (PQ[c0] * QD_0 * QD_1 + PQ[d0] * QD_1 * QC_0 + PQ[d1] * QD_0 * QC_0)
+                            + delta[c0][d1] * (PQ[a0] * PQ[b0] * QD_0)
+                            + delta[c0][d0] * (PQ[a0] * PQ[b0] * QD_1)
+                            + delta[b0][c0] * (PQ[a0] * QD_0 * QD_1)
+                            + delta[a0][c0] * (PQ[b0] * QD_0 * QD_1)
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[3] * (
+
+                        ( S1 * S1 * S1 ) / ( S4 * S4 * S4 ) * (
+                            
+                            + PB_0 * PA_0 * PQ[c0] * PQ[d0] * PQ[d1] * (-1.0)
+                        )
+
+                    )
+
+                    +
+
+                    F5_t[3] * (
+
+                        ( S1 * S1 * S2 ) / ( S4 * S4 * S4 ) * (
+                            
+                            + PB_0 * PQ[a0] * PQ[c0] * PQ[d0] * QD_1
+                            + PB_0 * PQ[a0] * PQ[c0] * PQ[d1] * QD_0
+                            + PB_0 * PQ[a0] * PQ[d0] * PQ[d1] * QC_0
+                            + PA_0 * PQ[b0] * PQ[c0] * PQ[d0] * QD_1
+                            + PA_0 * PQ[b0] * PQ[c0] * PQ[d1] * QD_0
+                            + PA_0 * PQ[b0] * PQ[d0] * PQ[d1] * QC_0
+                        )
+
+                    )
+
+                    +
 
                     F5_t[3] * (
 
@@ -44184,6 +43854,7 @@ computeCoulombFockPPPD2(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
+
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPPPP(double*         mat_J,
