@@ -6,7 +6,6 @@ from .veloxchemlib import AtomBasis
 from .veloxchemlib import GtoBlock
 from .veloxchemlib import Matrices
 from .veloxchemlib import OverlapDriver
-from .veloxchemlib import KineticEnergyDriver
 
 # C++ functions
 from .veloxchemlib import bohr_in_angstroms

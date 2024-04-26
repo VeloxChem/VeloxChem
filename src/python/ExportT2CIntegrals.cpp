@@ -3,7 +3,6 @@
 #include <pybind11/operators.h>
 #include <pybind11/stl.h>
 
-#include "KineticEnergyDriver.hpp"
 #include "OverlapDriver.hpp"
 #include "Point.hpp"
 
@@ -30,17 +29,6 @@ export_t2cintegrals(py::module& m)
                 return std::make_shared<CMatrix>(ovl_drv.compute(bra_basis, ket_basis, molecule));
             },
             "Computes overlap matrix for given molecule and pair of bases.");
-
-    // CKineticEnergyDriver class
-
-    PyClass<CKineticEnergyDriver>(m, "KineticEnergyDriver")
-        .def(py::init<>())
-        .def(
-            "compute",
-            [](const CKineticEnergyDriver& kin_drv, const CMolecule& molecule, const CMolecularBasis& basis) -> std::shared_ptr<CMatrix> {
-                return std::make_shared<CMatrix>(kin_drv.compute(basis, molecule));
-            },
-            "Computes kinetic energy matrix for given molecule and basis.");
 }
 
 }  // namespace vlx_t2cintegrals
