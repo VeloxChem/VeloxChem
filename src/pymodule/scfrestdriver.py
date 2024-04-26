@@ -30,7 +30,6 @@ import sys
 import os
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import fock_t as fockmat
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import matmul_gpu, eigh_gpu, dot_product_gpu
 from .veloxchemlib import compute_error_vector_gpu
@@ -231,23 +230,6 @@ class ScfRestrictedDriver(ScfDriver):
             return "Spin-Restricted Kohn-Sham" + pe_type
 
         return "Spin-Restricted Hartree-Fock" + pe_type
-
-    def _update_fock_type(self, fock_mat):
-        """
-        Updates Fock matrix to fit selected functional in Kohn-Sham
-        calculations.
-
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
-        """
-
-        if self.xcfun.is_hybrid():
-            fock_mat.set_fock_type(fockmat.restjkx, 0)
-            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0)
-        else:
-            fock_mat.set_fock_type(fockmat.restj, 0)
-
-        return
 
     def __deepcopy__(self, memo):
         """

@@ -2148,17 +2148,6 @@ class ScfDriver:
 
         return 'Undefined'
 
-    def _update_fock_type(self, fock_mat):
-        """
-        Updates Fock matrix to fit selected functional in Kohn-Sham
-        calculations.
-
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
-        """
-
-        return
-
     def _delete_mos(self, mol_orbs, mol_eigs):
         """
         Generates trimmed molecular orbital by deleting MOs with coeficients

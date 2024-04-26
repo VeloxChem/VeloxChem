@@ -159,35 +159,3 @@ class Tester:
 
         # check matrix type
         assert lhs.get_type() == rhs.get_type()
-
-    @staticmethod
-    def compare_fockmatrices(lhs, rhs):
-
-        tol = 1.0e-12
-
-        # check exchange contribution scaling factors
-        fact_a = lhs.get_exchange_scale()
-        fact_b = rhs.get_exchange_scale()
-        assert mt.isclose(fact_a, fact_b, rel_tol=tol, abs_tol=tol)
-
-        # check Fock matrix types
-        ftype_a = lhs.get_fock_type()
-        ftype_b = rhs.get_fock_type()
-        assert ftype_a == ftype_b
-
-        # check matrices
-        fmat_a = lhs.get_matrix()
-        fmat_b = rhs.get_matrix()
-        Tester.compare_matrices(fmat_a, fmat_b)
-
-    @staticmethod
-    def compare_list_of_fockmatrices(lhs, rhs):
-
-        # check number of Fock matrices
-        nmat_a = lhs.number_of_matrices()
-        nmat_b = rhs.number_of_matrices()
-        assert nmat_a == nmat_b
-
-        # check Fock matrices
-        for i in range(nmat_a):
-            Tester.compare_fockmatrices(lhs.get_matrix(i), rhs.get_matrix(i))
