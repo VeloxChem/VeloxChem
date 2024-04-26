@@ -3,7 +3,6 @@
 #include <pybind11/operators.h>
 #include <pybind11/stl.h>
 
-#include "DipoleDriver.hpp"
 #include "KineticEnergyDriver.hpp"
 #include "NuclearPotentialDriver.hpp"
 #include "OverlapDriver.hpp"
@@ -58,18 +57,6 @@ export_t2cintegrals(py::module& m)
                 return std::make_shared<CMatrices>(npot_drv.compute(basis, molecule, charges, points));
             },
             "Computes nuclear potential matrix for given molecule, basis and vector of external charges.");
-
-    // CDipoleDriver class
-
-    PyClass<CDipoleDriver>(m, "DipoleDriver")
-        .def(py::init<>())
-        .def(
-            "compute",
-            [](const CDipoleDriver& dip_drv, const CMolecule& molecule, const CMolecularBasis& basis, const TPoint3D& point)
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(dip_drv.compute(basis, molecule, point)); },
-            "Computes dipole matrix for given molecule, basis and origin.");
-
-    // ...
 }
 
 }  // namespace vlx_t2cintegrals

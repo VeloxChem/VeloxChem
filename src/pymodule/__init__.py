@@ -8,7 +8,6 @@ from .veloxchemlib import Matrices
 from .veloxchemlib import OverlapDriver
 from .veloxchemlib import KineticEnergyDriver
 from .veloxchemlib import NuclearPotentialDriver
-from .veloxchemlib import DipoleDriver
 
 # C++ functions
 from .veloxchemlib import bohr_in_angstroms
