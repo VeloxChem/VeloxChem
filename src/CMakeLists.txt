@@ -51,7 +51,6 @@ target_link_libraries(vlxobjs
 
 add_subdirectory(pymodule)
 add_subdirectory(t2c_func)
-add_subdirectory(t4c_func)
 add_subdirectory(python)
 add_subdirectory(moldata)
 add_subdirectory(general)

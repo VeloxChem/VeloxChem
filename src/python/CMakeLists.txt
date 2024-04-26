@@ -49,7 +49,6 @@ pybind11_add_module(veloxchemlib
     ExportMoldata.cpp
     ExportDFT.cpp
     ExportT2CIntegrals.cpp
-    ExportT4CIntegrals.cpp
   )
 
 target_include_directories(veloxchemlib
