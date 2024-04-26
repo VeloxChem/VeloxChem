@@ -53,20 +53,24 @@ class XtbHessianDriver(HessianDriver):
         self.xtb_driver = xtb_drv
         self.flag = 'XTB Hessian Driver'
 
-    def update_settings(self, method_dict, freq_dict=None):
+    def update_settings(self, method_dict, hess_dict=None, cphf_dict=None):
         """
         Updates settings in XtbHessianDriver.
 
         :param method_dict:
             The input dictionary of method settings group.
-        :param freq_dict:
-            The input dictionary of Hessian/frequency settings group.
+        :param hess_dict:
+            The input dictionary of Hessian settings group.
+        :param cphf_dict:
+            Dummy input to avoid crash in vibrationalanalysis driver
         """
 
-        super().update_settings(method_dict, freq_dict)
+        super().update_settings(method_dict, hess_dict)
 
-        if freq_dict is None:
-            freq_dict = {}
+        if hess_dict is None:
+            hess_dict = {}
+        if cphf_dict is None:
+            cphf_dict = {}
 
     def compute(self, molecule):
         """
