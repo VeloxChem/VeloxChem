@@ -3298,9 +3298,6 @@ auto CScreeningData::form_Q_and_D_inds_for_K(const int64_t                s_prim
 
 auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count, const CDenseMatrix& Q_prime, const double Q_prime_thresh) -> void
 {
-    // TODO think about sorting by Q_prime bound
-    // or perhaps just sort the diagonal elements
-
     // TODO consider determining the maximum density associated
     // with the ik pair (i.e. max_D_jl for ik)
 
@@ -3308,42 +3305,34 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int6
 
     // ss, sp, sd blocks
 
-    std::vector<uint32_t> pair_inds_i_for_K_ss;
-    std::vector<uint32_t> pair_inds_k_for_K_ss;
-
-    std::vector<uint32_t> pair_inds_i_for_K_sp;
-    std::vector<uint32_t> pair_inds_k_for_K_sp;
-
-    std::vector<uint32_t> pair_inds_i_for_K_sd;
-    std::vector<uint32_t> pair_inds_k_for_K_sd;
+    std::vector<std::tuple<double, int64_t, int64_t>> sorted_ss_Qp_ik;
+    std::vector<std::tuple<double, int64_t, int64_t>> sorted_sp_Qp_ik;
+    std::vector<std::tuple<double, int64_t, int64_t>> sorted_sd_Qp_ik;
+    std::vector<std::tuple<double, int64_t, int64_t>> sorted_pp_Qp_ik;
+    std::vector<std::tuple<double, int64_t, int64_t>> sorted_pd_Qp_ik;
+    std::vector<std::tuple<double, int64_t, int64_t>> sorted_dd_Qp_ik;
 
     for (int64_t i = 0; i < s_prim_count; i++)
     {
         for (int64_t k = i; k < s_prim_count; k++)
         {
-            if (std::fabs(Q_prime.row(i)[k]) > Q_prime_thresh)
-            {
-                pair_inds_i_for_K_ss.push_back(i);
-                pair_inds_k_for_K_ss.push_back(k);
-            }
+            const auto Qp_ik = std::fabs(Q_prime.row(i)[k]);
+
+            if (Qp_ik > Q_prime_thresh) sorted_ss_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
         }
 
         for (int64_t k = 0; k < p_prim_count * 3; k++)
         {
-            if (std::fabs(Q_prime.row(i)[s_prim_count + k]) > Q_prime_thresh)
-            {
-                pair_inds_i_for_K_sp.push_back(i);
-                pair_inds_k_for_K_sp.push_back(k);
-            }
+            const auto Qp_ik = std::fabs(Q_prime.row(i)[s_prim_count + k]);
+
+            if (Qp_ik > Q_prime_thresh) sorted_sp_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
         }
 
         for (int64_t k = 0; k < d_prim_count * 6; k++)
         {
-            if (std::fabs(Q_prime.row(i)[s_prim_count + p_prim_count * 3 + k]) > Q_prime_thresh)
-            {
-                pair_inds_i_for_K_sd.push_back(i);
-                pair_inds_k_for_K_sd.push_back(k);
-            }
+            const auto Qp_ik = std::fabs(Q_prime.row(i)[s_prim_count + p_prim_count * 3 + k]);
+
+            if (Qp_ik > Q_prime_thresh) sorted_sd_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
         }
     }
 
@@ -3359,20 +3348,16 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int6
     {
         for (int64_t k = i; k < p_prim_count * 3; k++)
         {
-            if (std::fabs(Q_prime.row(s_prim_count + i)[s_prim_count + k]) > Q_prime_thresh)
-            {
-                pair_inds_i_for_K_pp.push_back(i);
-                pair_inds_k_for_K_pp.push_back(k);
-            }
+            const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + i)[s_prim_count + k]);
+
+            if (Qp_ik > Q_prime_thresh) sorted_pp_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
         }
 
         for (int64_t k = 0; k < d_prim_count * 6; k++)
         {
-            if (std::fabs(Q_prime.row(s_prim_count + i)[s_prim_count + p_prim_count * 3 + k]) > Q_prime_thresh)
-            {
-                pair_inds_i_for_K_pd.push_back(i);
-                pair_inds_k_for_K_pd.push_back(k);
-            }
+            const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + i)[s_prim_count + p_prim_count * 3 + k]);
+
+            if (Qp_ik > Q_prime_thresh) sorted_pd_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
         }
     }
 
@@ -3385,20 +3370,25 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int6
     {
         for (int64_t k = i; k < d_prim_count * 6; k++)
         {
-            if (std::fabs(Q_prime.row(s_prim_count + p_prim_count * 3 + i)[s_prim_count + p_prim_count * 3 + k]) > Q_prime_thresh)
-            {
-                pair_inds_i_for_K_dd.push_back(i);
-                pair_inds_k_for_K_dd.push_back(k);
-            }
+            const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + p_prim_count * 3 + i)[s_prim_count + p_prim_count * 3 + k]);
+
+            if (Qp_ik > Q_prime_thresh) sorted_dd_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
         }
     }
 
-    const auto ss_pair_count_for_K = static_cast<int64_t>(pair_inds_i_for_K_ss.size());
-    const auto sp_pair_count_for_K = static_cast<int64_t>(pair_inds_i_for_K_sp.size());
-    const auto sd_pair_count_for_K = static_cast<int64_t>(pair_inds_i_for_K_sd.size());
-    const auto pp_pair_count_for_K = static_cast<int64_t>(pair_inds_i_for_K_pp.size());
-    const auto pd_pair_count_for_K = static_cast<int64_t>(pair_inds_i_for_K_pd.size());
-    const auto dd_pair_count_for_K = static_cast<int64_t>(pair_inds_i_for_K_dd.size());
+    std::sort(sorted_ss_Qp_ik.begin(), sorted_ss_Qp_ik.end());
+    std::sort(sorted_sp_Qp_ik.begin(), sorted_sp_Qp_ik.end());
+    std::sort(sorted_sd_Qp_ik.begin(), sorted_sd_Qp_ik.end());
+    std::sort(sorted_pp_Qp_ik.begin(), sorted_pp_Qp_ik.end());
+    std::sort(sorted_pd_Qp_ik.begin(), sorted_pd_Qp_ik.end());
+    std::sort(sorted_dd_Qp_ik.begin(), sorted_dd_Qp_ik.end());
+
+    const auto ss_pair_count_for_K = static_cast<int64_t>(sorted_ss_Qp_ik.size());
+    const auto sp_pair_count_for_K = static_cast<int64_t>(sorted_sp_Qp_ik.size());
+    const auto sd_pair_count_for_K = static_cast<int64_t>(sorted_sd_Qp_ik.size());
+    const auto pp_pair_count_for_K = static_cast<int64_t>(sorted_pp_Qp_ik.size());
+    const auto pd_pair_count_for_K = static_cast<int64_t>(sorted_pd_Qp_ik.size());
+    const auto dd_pair_count_for_K = static_cast<int64_t>(sorted_dd_Qp_ik.size());
 
     // std::stringstream ss;
     // ss << "preLinK screening\n";
@@ -3485,38 +3475,74 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int6
 
             for (int64_t ik = gpu_rank, idx = 0; ik < ss_pair_count_for_K; ik+=gpu_count, idx++)
             {
-                _local_pair_inds_i_for_K_ss[gpu_id][idx] = pair_inds_i_for_K_ss[ik];
-                _local_pair_inds_k_for_K_ss[gpu_id][idx] = pair_inds_k_for_K_ss[ik];
+                const auto& vals = sorted_ss_Qp_ik[ss_pair_count_for_K - 1 - ik];
+
+                // auto Qp_ik = std::get<0>(vals);
+                auto i = std::get<1>(vals);
+                auto k = std::get<2>(vals);
+
+                _local_pair_inds_i_for_K_ss[gpu_id][idx] = i;
+                _local_pair_inds_k_for_K_ss[gpu_id][idx] = k;
             }
 
             for (int64_t ik = gpu_rank, idx = 0; ik < sp_pair_count_for_K; ik+=gpu_count, idx++)
             {
-                _local_pair_inds_i_for_K_sp[gpu_id][idx] = pair_inds_i_for_K_sp[ik];
-                _local_pair_inds_k_for_K_sp[gpu_id][idx] = pair_inds_k_for_K_sp[ik];
+                const auto& vals = sorted_sp_Qp_ik[sp_pair_count_for_K - 1 - ik];
+
+                // auto Qp_ik = std::get<0>(vals);
+                auto i = std::get<1>(vals);
+                auto k = std::get<2>(vals);
+
+                _local_pair_inds_i_for_K_sp[gpu_id][idx] = i;
+                _local_pair_inds_k_for_K_sp[gpu_id][idx] = k;
             }
 
             for (int64_t ik = gpu_rank, idx = 0; ik < sd_pair_count_for_K; ik+=gpu_count, idx++)
             {
-                _local_pair_inds_i_for_K_sd[gpu_id][idx] = pair_inds_i_for_K_sd[ik];
-                _local_pair_inds_k_for_K_sd[gpu_id][idx] = pair_inds_k_for_K_sd[ik];
+                const auto& vals = sorted_sd_Qp_ik[sd_pair_count_for_K - 1 - ik];
+
+                // auto Qp_ik = std::get<0>(vals);
+                auto i = std::get<1>(vals);
+                auto k = std::get<2>(vals);
+
+                _local_pair_inds_i_for_K_sd[gpu_id][idx] = i;
+                _local_pair_inds_k_for_K_sd[gpu_id][idx] = k;
             }
 
             for (int64_t ik = gpu_rank, idx = 0; ik < pp_pair_count_for_K; ik+=gpu_count, idx++)
             {
-                _local_pair_inds_i_for_K_pp[gpu_id][idx] = pair_inds_i_for_K_pp[ik];
-                _local_pair_inds_k_for_K_pp[gpu_id][idx] = pair_inds_k_for_K_pp[ik];
+                const auto& vals = sorted_pp_Qp_ik[pp_pair_count_for_K - 1 - ik];
+
+                // auto Qp_ik = std::get<0>(vals);
+                auto i = std::get<1>(vals);
+                auto k = std::get<2>(vals);
+
+                _local_pair_inds_i_for_K_pp[gpu_id][idx] = i;
+                _local_pair_inds_k_for_K_pp[gpu_id][idx] = k;
             }
 
             for (int64_t ik = gpu_rank, idx = 0; ik < pd_pair_count_for_K; ik+=gpu_count, idx++)
             {
-                _local_pair_inds_i_for_K_pd[gpu_id][idx] = pair_inds_i_for_K_pd[ik];
-                _local_pair_inds_k_for_K_pd[gpu_id][idx] = pair_inds_k_for_K_pd[ik];
+                const auto& vals = sorted_pd_Qp_ik[pd_pair_count_for_K - 1 - ik];
+
+                // auto Qp_ik = std::get<0>(vals);
+                auto i = std::get<1>(vals);
+                auto k = std::get<2>(vals);
+
+                _local_pair_inds_i_for_K_pd[gpu_id][idx] = i;
+                _local_pair_inds_k_for_K_pd[gpu_id][idx] = k;
             }
 
             for (int64_t ik = gpu_rank, idx = 0; ik < dd_pair_count_for_K; ik+=gpu_count, idx++)
             {
-                _local_pair_inds_i_for_K_dd[gpu_id][idx] = pair_inds_i_for_K_dd[ik];
-                _local_pair_inds_k_for_K_dd[gpu_id][idx] = pair_inds_k_for_K_dd[ik];
+                const auto& vals = sorted_dd_Qp_ik[dd_pair_count_for_K - 1 - ik];
+
+                // auto Qp_ik = std::get<0>(vals);
+                auto i = std::get<1>(vals);
+                auto k = std::get<2>(vals);
+
+                _local_pair_inds_i_for_K_dd[gpu_id][idx] = i;
+                _local_pair_inds_k_for_K_dd[gpu_id][idx] = k;
             }
         }
     }
