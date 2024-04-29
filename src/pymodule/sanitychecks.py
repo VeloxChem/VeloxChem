@@ -57,9 +57,6 @@ def scf_results_sanity_check(obj, scf_results):
         if scf_results.get('eri_thresh', None) is not None:
             updated_scf_info['eri_thresh'] = scf_results['eri_thresh']
 
-        if scf_results.get('qq_type', None) is not None:
-            updated_scf_info['qq_type'] = scf_results['qq_type']
-
         if scf_results.get('restart', None) is not None:
             # do not restart if scf is not restarted from checkpoint
             if not scf_results['restart']:

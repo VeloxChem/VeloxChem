@@ -366,7 +366,7 @@ def parse_input(obj, keyword_types, input_dictionary):
     """
     Parses input keywords for object.
         - 'str' for string input, such as 'checkpoint_file: mycheckpoint.h5'
-        - 'str_upper' for uppercase string input, such as 'qq_type: QQ_DEN'
+        - 'str_upper' for uppercase string input, such as 'acc_type: DIIS'
         - 'str_lower' for lowercase string input, such as 'coordsys: tric'
         - 'int' for integer input, such as 'max_iter: 300'
         - 'float' for floating-point input, such as 'eri_thresh: 1.0e-12'

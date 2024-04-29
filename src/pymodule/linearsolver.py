@@ -65,7 +65,6 @@ class LinearSolver:
 
     Instance variables
         - eri_thresh: The electron repulsion integrals screening threshold.
-        - qq_type: The electron repulsion integrals screening scheme.
         - batch_size: The batch size for computation of Fock matrices.
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
@@ -179,7 +178,6 @@ class LinearSolver:
         self._input_keywords = {
             'response': {
                 'eri_thresh': ('float', 'ERI screening threshold'),
-                'qq_type': ('str_upper', 'ERI screening scheme'),
                 'batch_size': ('int', 'batch size for Fock build'),
                 'conv_thresh': ('float', 'convergence threshold'),
                 'max_iter': ('int', 'maximum number of iterations'),
