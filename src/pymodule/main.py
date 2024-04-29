@@ -25,7 +25,6 @@
 
 from mpi4py import MPI
 from datetime import datetime, timedelta
-import time as tm
 
 from .veloxchemlib import mpi_initialized, mpi_master
 from .mpitask import MpiTask
@@ -244,7 +243,6 @@ def main():
                                       task.min_basis)
 
         mol_orbs = scf_drv.molecular_orbitals
-        density = scf_drv.density
 
         if not scf_drv.is_converged:
             return

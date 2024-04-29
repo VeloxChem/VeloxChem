@@ -753,7 +753,10 @@ class LinearSolver:
                                                 dft_dict, pe_dict, coulomb_coef,
                                                 symm_flag, profiler)
 
-            fock_mat = np.zeros(fock_mat_local.shape)
+            if self.rank == mpi_master():
+                fock_mat = np.zeros(fock_mat_local.shape)
+            else:
+                fock_mat = None
 
             self.comm.Reduce(fock_mat_local,
                              fock_mat,

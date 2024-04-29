@@ -169,8 +169,7 @@ class MpiTask:
         if 'xtb' not in self.input_dict['method_settings']:
             basis_path = '.'
             if 'basis_path' in self.input_dict['method_settings']:
-                basis_path = self.input_dict['method_settings'][
-                    'basis_path']
+                basis_path = self.input_dict['method_settings']['basis_path']
 
             basis_name = self.input_dict['method_settings']['basis'].upper()
 
@@ -179,9 +178,8 @@ class MpiTask:
                  'xyzfile' in self.input_dict['molecule'])):
 
                 # TODO: read basis on master node and then broadcast basis_dict
-                self.ao_basis = MolecularBasis.read(self.molecule,
-                                                    basis_name, basis_path,
-                                                    self.ostream)
+                self.ao_basis = MolecularBasis.read(self.molecule, basis_name,
+                                                    basis_path, self.ostream)
 
                 self.min_basis = MolecularBasis.read(self.molecule,
                                                      'AO-START-GUESS',

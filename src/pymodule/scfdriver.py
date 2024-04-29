@@ -1561,7 +1561,10 @@ class ScfDriver:
                                         self.prelink_thresh, screener)
             fock_mat_local = fock_mat.to_numpy()
 
-        fock_mat = np.zeros(fock_mat_local.shape)
+        if self.rank == mpi_master():
+            fock_mat = np.zeros(fock_mat_local.shape)
+        else:
+            fock_mat = None
 
         self.comm.Reduce(fock_mat_local,
                          fock_mat,
@@ -1669,7 +1672,12 @@ class ScfDriver:
         if self._dft and not self._first_step:
             # TODO: take care of unrestricted/restricted-open-shell case
             vxc_mat_np_local = vxc_mat.alpha_to_numpy()
-            vxc_mat_np_sum = np.zeros(vxc_mat_np_local.shape)
+
+            if self.rank == mpi_master():
+                vxc_mat_np_sum = np.zeros(vxc_mat_np_local.shape)
+            else:
+                vxc_mat_np_sum = None
+
             self.comm.Reduce(vxc_mat_np_local,
                              vxc_mat_np_sum,
                              op=MPI.SUM,

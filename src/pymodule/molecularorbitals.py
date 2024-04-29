@@ -25,7 +25,6 @@
 
 from enum import Enum
 import numpy as np
-import time as tm
 import h5py
 import math
 import sys

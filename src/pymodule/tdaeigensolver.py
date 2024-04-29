@@ -340,7 +340,10 @@ class TdaEigenSolver(LinearSolver):
                         tdens_antisymm, molecule, basis, eri_dict, dft_dict,
                         pe_dict, 0.0, 'antisymm', profiler)
 
-                    fock_mat = np.zeros(fock_mat_local.shape)
+                    if self.rank == mpi_master():
+                        fock_mat = np.zeros(fock_mat_local.shape)
+                    else:
+                        fock_mat = None
 
                     self.comm.Reduce(fock_mat_local,
                                      fock_mat,
