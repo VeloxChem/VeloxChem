@@ -78,6 +78,7 @@ class FirstOrderProperties:
         :param scf_results:
             The dictionary containing SCF results.
         """
+
         if self.rank == mpi_master():
             total_density = scf_results['D_alpha'] + scf_results['D_beta']
         else:
@@ -107,7 +108,7 @@ class FirstOrderProperties:
 
         # dipole integrals
         mu_x, mu_y, mu_z = compute_electric_dipole_integrals_gpu(
-                molecule, basis, origin, screening)
+            molecule, basis, origin, screening)
 
         naos = mu_x.number_of_rows()
 

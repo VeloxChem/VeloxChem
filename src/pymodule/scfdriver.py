@@ -1268,19 +1268,19 @@ class ScfDriver:
             if self.rank == mpi_master():
                 S = ovl_mat
 
-                # TODO: assemble scf_tensors
+                # TODO: add C_beta, E_beta and F_beta
 
                 C_alpha = self.molecular_orbitals.alpha_to_numpy()
-                #C_beta = self.molecular_orbitals.beta_to_numpy()
+                # C_beta = self.molecular_orbitals.beta_to_numpy()
 
                 E_alpha = self.molecular_orbitals.ea_to_numpy()
-                #E_beta = self.molecular_orbitals.eb_to_numpy()
+                # E_beta = self.molecular_orbitals.eb_to_numpy()
 
                 D_alpha = self.density.alpha_to_numpy(0)
                 D_beta = self.density.beta_to_numpy(0)
 
                 F_alpha = fock_mat
-                #F_beta = fock_mat.beta_to_numpy(0)
+                # F_beta = fock_mat.beta_to_numpy(0)
 
                 self._scf_tensors = {
                     'S': S,
@@ -1336,7 +1336,6 @@ class ScfDriver:
             if self.rank == mpi_master():
                 self._scf_tensors['dipole_moment'] = np.array(
                     self._scf_prop.get_property('dipole_moment'))
-
                 """
                 self._write_final_hdf5(molecule, ao_basis)
                 """

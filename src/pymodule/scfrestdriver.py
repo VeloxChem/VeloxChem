@@ -27,7 +27,6 @@ from mpi4py import MPI
 from copy import deepcopy
 import numpy as np
 import sys
-import os
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import XCFunctional, MolecularGrid
@@ -89,7 +88,8 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            e_mat = compute_error_vector_gpu(oao_mat, fock_mat, den_mat.alpha_to_numpy(0), ovl_mat)
+            e_mat = compute_error_vector_gpu(oao_mat, fock_mat,
+                                             den_mat.alpha_to_numpy(0), ovl_mat)
             e_mat_shape = e_mat.shape
             # e_grad = 2.0 * np.linalg.norm(e_mat)
             e_grad = 2.0 * np.sqrt(dot_product_gpu(e_mat, e_mat))
@@ -128,7 +128,7 @@ class ScfRestrictedDriver(ScfDriver):
             old_dmat = old_den_mat.alpha_to_numpy(0)
             ddmat = dmat - old_dmat
 
-            #diff_den = np.linalg.norm(ddmat)
+            # diff_den = np.linalg.norm(ddmat)
             diff_den = np.sqrt(dot_product_gpu(ddmat, ddmat))
         else:
             diff_den = 0.0
