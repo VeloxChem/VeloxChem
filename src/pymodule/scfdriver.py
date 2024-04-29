@@ -45,10 +45,11 @@ from .profiler import Profiler
 from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
 from .sadguessdriver import SadGuessDriver
+from .diis import Diis
 from .signalhandler import SignalHandler
+from .firstorderprop import FirstOrderProperties
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
-from .diis import Diis
 from .dftutils import get_default_grid_level, print_libxc_reference
 from .sanitychecks import molecule_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
@@ -201,6 +202,9 @@ class ScfDriver:
 
         # scf tensors
         self._scf_tensors = None
+
+        # scf property
+        self._scf_prop = None
 
         # timing and profiling
         self.timing = False
@@ -679,6 +683,9 @@ class ScfDriver:
                 self.molecular_orbitals.print_orbitals(molecule, ao_basis, True,
                                                        self.ostream)
             """
+
+            self._scf_prop.print_properties(molecule)
+
             self.ostream.flush()
 
         return self.scf_tensors
@@ -1009,6 +1016,10 @@ class ScfDriver:
             The profiler.
         """
 
+        self._scf_tensors = None
+
+        self._scf_prop = FirstOrderProperties(self.comm, self.ostream)
+
         if not self._first_step:
             profiler.begin({
                 'timing': self.timing,
@@ -1252,74 +1263,83 @@ class ScfDriver:
             self.write_checkpoint(molecule.get_element_ids(),
                                   ao_basis.get_label())
 
-        if (self.rank == mpi_master() and (not self._first_step) and
-                self.is_converged):
-            S = ovl_mat
+        if (not self._first_step) and self.is_converged:
 
-            # TODO: assemble scf_tensors
+            if self.rank == mpi_master():
+                S = ovl_mat
 
-            C_alpha = self.molecular_orbitals.alpha_to_numpy()
-            #C_beta = self.molecular_orbitals.beta_to_numpy()
+                # TODO: assemble scf_tensors
 
-            E_alpha = self.molecular_orbitals.ea_to_numpy()
-            #E_beta = self.molecular_orbitals.eb_to_numpy()
+                C_alpha = self.molecular_orbitals.alpha_to_numpy()
+                #C_beta = self.molecular_orbitals.beta_to_numpy()
 
-            D_alpha = self.density.alpha_to_numpy(0)
-            #D_beta = self.density.beta_to_numpy(0)
+                E_alpha = self.molecular_orbitals.ea_to_numpy()
+                #E_beta = self.molecular_orbitals.eb_to_numpy()
 
-            F_alpha = fock_mat
-            #F_beta = fock_mat.beta_to_numpy(0)
+                D_alpha = self.density.alpha_to_numpy(0)
+                D_beta = self.density.beta_to_numpy(0)
 
-            self._scf_tensors = {
-                'S': S,
-                'C_alpha': C_alpha,
-                'E_alpha': E_alpha,
-                'D_alpha': D_alpha,
-                'F_alpha': F_alpha,
-                'scf_energy': self.scf_energy,
-            }
-            """
-            self._scf_tensors = {
-                # eri info
-                'eri_thresh': self.eri_thresh,
-                # scf info
-                'scf_type': self.scf_type,
-                'scf_energy': self.scf_energy,
-                'restart': self.restart,
-                # scf tensors
-                'S': S,
-                'C_alpha': C_alpha,
-                'C_beta': C_beta,
-                'E_alpha': E_alpha,
-                'E_beta': E_beta,
-                'D_alpha': D_alpha,
-                'D_beta': D_beta,
-                'F_alpha': F_alpha,
-                'F_beta': F_beta,
-                # for backward compatibility
-                'C': C_alpha,
-                'E': E_alpha,
-                'D': (D_alpha, D_beta),
-                'F': (F_alpha, F_beta),
-            }
-            """
+                F_alpha = fock_mat
+                #F_beta = fock_mat.beta_to_numpy(0)
 
-            if self._dft:
-                # dft info
-                self._scf_tensors['xcfun'] = self.xcfun.get_func_label()
-                if self.grid_level is not None:
-                    self._scf_tensors['grid_level'] = self.grid_level
+                self._scf_tensors = {
+                    'S': S,
+                    'C_alpha': C_alpha,
+                    'E_alpha': E_alpha,
+                    'D_alpha': D_alpha,
+                    'D_beta': D_beta,
+                    'F_alpha': F_alpha,
+                    'scf_energy': self.scf_energy,
+                }
+                """
+                self._scf_tensors = {
+                    # eri info
+                    'eri_thresh': self.eri_thresh,
+                    # scf info
+                    'scf_type': self.scf_type,
+                    'scf_energy': self.scf_energy,
+                    'restart': self.restart,
+                    # scf tensors
+                    'S': S,
+                    'C_alpha': C_alpha,
+                    'C_beta': C_beta,
+                    'E_alpha': E_alpha,
+                    'E_beta': E_beta,
+                    'D_alpha': D_alpha,
+                    'D_beta': D_beta,
+                    'F_alpha': F_alpha,
+                    'F_beta': F_beta,
+                    # for backward compatibility
+                    'C': C_alpha,
+                    'E': E_alpha,
+                    'D': (D_alpha, D_beta),
+                    'F': (F_alpha, F_beta),
+                }
+                """
 
-            if self._pe:
-                # pe info
-                self._scf_tensors['potfile'] = self.potfile
+                if self._dft:
+                    # dft info
+                    self._scf_tensors['xcfun'] = self.xcfun.get_func_label()
+                    if self.grid_level is not None:
+                        self._scf_tensors['grid_level'] = self.grid_level
 
-            """
-            self._write_final_hdf5(molecule, ao_basis)
-            """
+                if self._pe:
+                    # pe info
+                    self._scf_tensors['potfile'] = self.potfile
 
-        else:
-            self._scf_tensors = None
+            else:
+                self._scf_tensors = None
+
+            self._scf_prop.compute_scf_prop(molecule, ao_basis,
+                                            self.scf_tensors, screener)
+
+            if self.rank == mpi_master():
+                self._scf_tensors['dipole_moment'] = np.array(
+                    self._scf_prop.get_property('dipole_moment'))
+
+                """
+                self._write_final_hdf5(molecule, ao_basis)
+                """
 
         if self.rank == mpi_master():
             self._print_scf_finish(diis_start_time)
