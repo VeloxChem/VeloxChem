@@ -34,7 +34,7 @@ import os
 # TODO import rotatory_strength_in_cgs
 # TODO import VisualizationDriver
 from .veloxchemlib import DenseMatrix
-from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
+from .veloxchemlib import GridDriver, MolecularGrid
 from .veloxchemlib import AODensityMatrix, denmat
 from .veloxchemlib import ScreeningData, GpuDevices
 from .veloxchemlib import compute_fock_gpu
@@ -44,7 +44,6 @@ from .veloxchemlib import compute_angular_momentum_integrals_gpu
 from .veloxchemlib import integrate_fxc_fock_gpu
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .distributedarray import DistributedArray
-from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals, molorb
 from .sanitychecks import dft_sanity_check
 from .errorhandler import assert_msg_critical
@@ -669,10 +668,6 @@ class LinearSolver:
             else:
                 fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
 
-        # determine number of batches
-
-        n_ao = mo.shape[0] if self.rank == mpi_master() else None
-
         # TODO double check batch size
         batch_size = 1
         num_batches = n_total
@@ -754,10 +749,9 @@ class LinearSolver:
 
             # Note: skipping Coulomb for antisymmetric density matrix
             coulomb_coef = 0.0 if symm_flag == 'antisymm' else 2.0
-            fock_mat_local = self._comp_lr_fock(dens, molecule, basis,
-                                                eri_dict, dft_dict, pe_dict,
-                                                coulomb_coef, symm_flag,
-                                                profiler)
+            fock_mat_local = self._comp_lr_fock(dens, molecule, basis, eri_dict,
+                                                dft_dict, pe_dict, coulomb_coef,
+                                                symm_flag, profiler)
 
             fock_mat = np.zeros(fock_mat_local.shape)
 
@@ -898,15 +892,15 @@ class LinearSolver:
                     omega = self.xcfun.get_rs_omega()
 
                     fock_mat = compute_fock_gpu(molecule, basis, dens,
-                                                prefac_coulomb,
-                                                full_k_coef, 0.0,
-                                                flag_exchange, self.eri_thresh,
-                                                self.prelink_thresh,
-                                                screening)
+                                                prefac_coulomb, full_k_coef,
+                                                0.0, flag_exchange,
+                                                self.eri_thresh,
+                                                self.prelink_thresh, screening)
 
                     fock_mat_erf_k = compute_fock_gpu(molecule, basis, dens,
                                                       0.0, erf_k_coef, omega,
-                                                      flag_exchange, self.eri_thresh,
+                                                      flag_exchange,
+                                                      self.eri_thresh,
                                                       self.prelink_thresh,
                                                       screening)
 
@@ -914,21 +908,23 @@ class LinearSolver:
                     # global hybrid
                     fock_mat = compute_fock_gpu(
                         molecule, basis, dens, prefac_coulomb,
-                        self.xcfun.get_frac_exact_exchange(), 0.0, flag_exchange,
-                        self.eri_thresh, self.prelink_thresh, screening)
+                        self.xcfun.get_frac_exact_exchange(), 0.0,
+                        flag_exchange, self.eri_thresh, self.prelink_thresh,
+                        screening)
 
             else:
                 # pure DFT
                 fock_mat = compute_fock_gpu(molecule, basis, dens,
-                                            prefac_coulomb, 0.0, 0.0, flag_exchange,
-                                            self.eri_thresh,
+                                            prefac_coulomb, 0.0, 0.0,
+                                            flag_exchange, self.eri_thresh,
                                             self.prelink_thresh, screening)
 
         else:
             # Hartree-Fock
             fock_mat = compute_fock_gpu(molecule, basis, dens, prefac_coulomb,
-                                        1.0, 0.0, flag_exchange, self.eri_thresh,
-                                        self.prelink_thresh, screening)
+                                        1.0, 0.0, flag_exchange,
+                                        self.eri_thresh, self.prelink_thresh,
+                                        screening)
 
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)
@@ -1288,7 +1284,8 @@ class LinearSolver:
 
         return dist_new_ger, dist_new_ung
 
-    def get_prop_grad(self, operator, components, molecule, basis, scf_tensors, screening):
+    def get_prop_grad(self, operator, components, molecule, basis, scf_tensors,
+                      screening):
         """
         Computes property gradients for linear response equations.
 
@@ -1318,7 +1315,7 @@ class LinearSolver:
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             mu_x, mu_y, mu_z = compute_electric_dipole_integrals_gpu(
-                    molecule, basis, [0.0, 0.0, 0.0], screening)
+                molecule, basis, [0.0, 0.0, 0.0], screening)
 
             naos = mu_x.number_of_rows()
 
@@ -1345,13 +1342,17 @@ class LinearSolver:
                              root=mpi_master())
 
             if self.rank == mpi_master():
-                integrals = (mu_x_mat_np, mu_y_mat_np, mu_z_mat_np)
+                integrals = (
+                    mu_x_mat_np,
+                    mu_y_mat_np,
+                    mu_z_mat_np,
+                )
             else:
                 integrals = tuple()
 
         elif operator in ['linear_momentum', 'linear momentum']:
             mu_x, mu_y, mu_z = compute_linear_momentum_integrals_gpu(
-                    molecule, basis, screening)
+                molecule, basis, screening)
 
             naos = mu_x.number_of_rows()
 
@@ -1378,15 +1379,17 @@ class LinearSolver:
                              root=mpi_master())
 
             if self.rank == mpi_master():
-                integrals = (-1.0 * mu_x_mat_np,
-                             -1.0 * mu_y_mat_np,
-                             -1.0 * mu_z_mat_np)
+                integrals = (
+                    -1.0 * mu_x_mat_np,
+                    -1.0 * mu_y_mat_np,
+                    -1.0 * mu_z_mat_np,
+                )
             else:
                 integrals = tuple()
 
         elif operator in ['angular_momentum', 'angular momentum']:
             mu_x, mu_y, mu_z = compute_angular_momentum_integrals_gpu(
-                    molecule, basis, [0.0, 0.0, 0.0], screening)
+                molecule, basis, [0.0, 0.0, 0.0], screening)
 
             naos = mu_x.number_of_rows()
 
@@ -1413,15 +1416,17 @@ class LinearSolver:
                              root=mpi_master())
 
             if self.rank == mpi_master():
-                integrals = (-1.0 * mu_x_mat_np,
-                             -1.0 * mu_y_mat_np,
-                             -1.0 * mu_z_mat_np)
+                integrals = (
+                    -1.0 * mu_x_mat_np,
+                    -1.0 * mu_y_mat_np,
+                    -1.0 * mu_z_mat_np,
+                )
             else:
                 integrals = tuple()
 
         elif operator in ['magnetic_dipole', 'magnetic dipole']:
             mu_x, mu_y, mu_z = compute_angular_momentum_integrals_gpu(
-                    molecule, basis, [0.0, 0.0, 0.0], screening)
+                molecule, basis, [0.0, 0.0, 0.0], screening)
 
             naos = mu_x.number_of_rows()
 
@@ -1448,9 +1453,11 @@ class LinearSolver:
                              root=mpi_master())
 
             if self.rank == mpi_master():
-                integrals = (0.5 * mu_x_mat_np,
-                             0.5 * mu_y_mat_np,
-                             0.5 * mu_z_mat_np)
+                integrals = (
+                    0.5 * mu_x_mat_np,
+                    0.5 * mu_y_mat_np,
+                    0.5 * mu_z_mat_np,
+                )
             else:
                 integrals = tuple()
 
@@ -1525,7 +1532,7 @@ class LinearSolver:
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             mu_x, mu_y, mu_z = compute_electric_dipole_integrals_gpu(
-                    molecule, basis, [0.0, 0.0, 0.0], screening)
+                molecule, basis, [0.0, 0.0, 0.0], screening)
 
             naos = mu_x.number_of_rows()
 
@@ -1552,15 +1559,17 @@ class LinearSolver:
                              root=mpi_master())
 
             if self.rank == mpi_master():
-                integrals = (mu_x_mat_np + 0j,
-                             mu_y_mat_np + 0j,
-                             mu_z_mat_np + 0j)
+                integrals = (
+                    mu_x_mat_np + 0j,
+                    mu_y_mat_np + 0j,
+                    mu_z_mat_np + 0j,
+                )
             else:
                 integrals = tuple()
 
         elif operator in ['linear_momentum', 'linear momentum']:
             mu_x, mu_y, mu_z = compute_linear_momentum_integrals_gpu(
-                    molecule, basis, screening)
+                molecule, basis, screening)
 
             naos = mu_x.number_of_rows()
 
@@ -1587,15 +1596,17 @@ class LinearSolver:
                              root=mpi_master())
 
             if self.rank == mpi_master():
-                integrals = (-1j * mu_x_mat_np,
-                             -1j * mu_y_mat_np,
-                             -1j * mu_z_mat_np)
+                integrals = (
+                    -1j * mu_x_mat_np,
+                    -1j * mu_y_mat_np,
+                    -1j * mu_z_mat_np,
+                )
             else:
                 integrals = tuple()
 
         elif operator in ['angular_momentum', 'angular momentum']:
             mu_x, mu_y, mu_z = compute_angular_momentum_integrals_gpu(
-                    molecule, basis, [0.0, 0.0, 0.0], screening)
+                molecule, basis, [0.0, 0.0, 0.0], screening)
 
             naos = mu_x.number_of_rows()
 
@@ -1622,15 +1633,17 @@ class LinearSolver:
                              root=mpi_master())
 
             if self.rank == mpi_master():
-                integrals = (-1j * mu_x_mat_np,
-                             -1j * mu_y_mat_np,
-                             -1j * mu_z_mat_np)
+                integrals = (
+                    -1j * mu_x_mat_np,
+                    -1j * mu_y_mat_np,
+                    -1j * mu_z_mat_np,
+                )
             else:
                 integrals = tuple()
 
         elif operator in ['magnetic_dipole', 'magnetic dipole']:
             mu_x, mu_y, mu_z = compute_angular_momentum_integrals_gpu(
-                    molecule, basis, [0.0, 0.0, 0.0], screening)
+                molecule, basis, [0.0, 0.0, 0.0], screening)
 
             naos = mu_x.number_of_rows()
 
@@ -1657,9 +1670,11 @@ class LinearSolver:
                              root=mpi_master())
 
             if self.rank == mpi_master():
-                integrals = (0.5j * mu_x_mat_np,
-                             0.5j * mu_y_mat_np,
-                             0.5j * mu_z_mat_np)
+                integrals = (
+                    0.5j * mu_x_mat_np,
+                    0.5j * mu_y_mat_np,
+                    0.5j * mu_z_mat_np,
+                )
             else:
                 integrals = tuple()
 

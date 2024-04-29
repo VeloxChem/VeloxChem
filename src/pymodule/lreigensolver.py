@@ -514,11 +514,14 @@ class LinearResponseEigenSolver(LinearSolver):
         if self.is_converged:
 
             edip_grad = self.get_prop_grad('electric dipole', 'xyz', molecule,
-                                           basis, scf_tensors, eri_dict['screening'])
+                                           basis, scf_tensors,
+                                           eri_dict['screening'])
             lmom_grad = self.get_prop_grad('linear momentum', 'xyz', molecule,
-                                           basis, scf_tensors, eri_dict['screening'])
+                                           basis, scf_tensors,
+                                           eri_dict['screening'])
             mdip_grad = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
-                                           basis, scf_tensors, eri_dict['screening'])
+                                           basis, scf_tensors,
+                                           eri_dict['screening'])
 
             eigvals = np.array([exc_energies[s] for s in range(self.nstates)])
 
@@ -559,7 +562,6 @@ class LinearResponseEigenSolver(LinearSolver):
                         mo_vir = scf_tensors['C_alpha'][:, nocc:]
                         z_mat = eigvec[:eigvec.size // 2].reshape(nocc, -1)
                         y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
-
                 """
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
@@ -608,7 +610,6 @@ class LinearResponseEigenSolver(LinearSolver):
                         if self.rank == mpi_master():
                             nto_cube_files.append(nto_cube_fnames)
                     """
-
                 """
                 if self.detach_attach:
                     self.ostream.print_info(
@@ -633,7 +634,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 if self.esa:
                     mu_x, mu_y, mu_z = compute_electric_dipole_integrals_gpu(
-                            molecule, basis, [0.0, 0.0, 0.0], eri_dict['screening'])
+                        molecule, basis, [0.0, 0.0, 0.0], eri_dict['screening'])
 
                     naos = mu_x.number_of_rows()
 
@@ -660,7 +661,11 @@ class LinearResponseEigenSolver(LinearSolver):
                                      root=mpi_master())
 
                     if self.rank == mpi_master():
-                        dipole_integrals = (mu_x_mat_np, mu_y_mat_np, mu_z_mat_np)
+                        dipole_integrals = (
+                            mu_x_mat_np,
+                            mu_y_mat_np,
+                            mu_z_mat_np,
+                        )
                     else:
                         dipole_integrals = None
 
@@ -774,7 +779,6 @@ class LinearResponseEigenSolver(LinearSolver):
                         if self.nto_cubes:
                             ret_dict['nto_cubes'] = nto_cube_files
                         """
-
                     """
                     if self.detach_attach:
                         ret_dict['density_cubes'] = dens_cube_files

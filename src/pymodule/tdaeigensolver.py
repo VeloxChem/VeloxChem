@@ -277,7 +277,8 @@ class TdaEigenSolver(LinearSolver):
             nvir = norb - nocc
 
             if self.core_excitation:
-                mo_occ = scf_tensors['C_alpha'][:, :self.num_core_orbitals].copy()
+                mo_occ = scf_tensors['C_alpha'][:, :self.
+                                                num_core_orbitals].copy()
             else:
                 mo_occ = scf_tensors['C_alpha'][:, :nocc].copy()
             mo_vir = scf_tensors['C_alpha'][:, nocc:].copy()
@@ -306,7 +307,9 @@ class TdaEigenSolver(LinearSolver):
                 for k in range(n_trials):
                     if self.rank == mpi_master():
                         if self.core_excitation:
-                            tmat = trial_mat[:, k].reshape(self.num_core_orbitals, nvir)
+                            tmat = trial_mat[:,
+                                             k].reshape(self.num_core_orbitals,
+                                                        nvir)
                         else:
                             tmat = trial_mat[:, k].reshape(nocc, nvir)
                         tmat = np.matmul(mo_occ, np.matmul(tmat, mo_vir.T))
@@ -326,17 +329,16 @@ class TdaEigenSolver(LinearSolver):
                     tmat_antisymm = 0.5 * (tmat - tmat.T)
 
                     tdens_symm = AODensityMatrix([tmat_symm], denmat.rest)
-                    tdens_antisymm = AODensityMatrix([tmat_antisymm], denmat.rest)
+                    tdens_antisymm = AODensityMatrix([tmat_antisymm],
+                                                     denmat.rest)
 
-                    fock_mat_local = (
-                            self._comp_lr_fock(tdens_symm, molecule, basis,
-                                               eri_dict, dft_dict, pe_dict,
-                                               2.0, 'symm',
-                                               profiler) +
-                            self._comp_lr_fock(tdens_antisymm, molecule, basis,
-                                               eri_dict, dft_dict, pe_dict,
-                                               0.0, 'antisymm',
-                                               profiler))
+                    fock_mat_local = self._comp_lr_fock(tdens_symm, molecule,
+                                                        basis, eri_dict,
+                                                        dft_dict, pe_dict, 2.0,
+                                                        'symm', profiler)
+                    fock_mat_local += self._comp_lr_fock(
+                        tdens_antisymm, molecule, basis, eri_dict, dft_dict,
+                        pe_dict, 0.0, 'antisymm', profiler)
 
                     fock_mat = np.zeros(fock_mat_local.shape)
 
@@ -409,7 +411,8 @@ class TdaEigenSolver(LinearSolver):
 
         # compute 1e dipole integrals
 
-        integrals = self._comp_onee_integrals(molecule, basis, eri_dict['screening'])
+        integrals = self._comp_onee_integrals(molecule, basis,
+                                              eri_dict['screening'])
 
         # print converged excited states
 
@@ -444,7 +447,6 @@ class TdaEigenSolver(LinearSolver):
                 excitation_details.append(
                     self.get_excitation_details(eigvecs[:, s], mo_occ.shape[1],
                                                 mo_vir.shape[1]))
-
             """
             if self.nto or self.detach_attach:
                 vis_drv = VisualizationDriver(self.comm)
@@ -490,7 +492,6 @@ class TdaEigenSolver(LinearSolver):
                     if self.rank == mpi_master():
                         nto_cube_files.append(nto_cube_fnames)
                 """
-
             """
             if self.detach_attach and self._is_converged:
                 self.ostream.print_info(
@@ -679,13 +680,13 @@ class TdaEigenSolver(LinearSolver):
         """
 
         mx, my, mz = compute_electric_dipole_integrals_gpu(
-                molecule, basis, [0.0, 0.0, 0.0], screening)
+            molecule, basis, [0.0, 0.0, 0.0], screening)
 
         lx, ly, lz = compute_linear_momentum_integrals_gpu(
-                molecule, basis, screening)
+            molecule, basis, screening)
 
         ax, ay, az = compute_angular_momentum_integrals_gpu(
-                molecule, basis, [0.0, 0.0, 0.0], screening)
+            molecule, basis, [0.0, 0.0, 0.0], screening)
 
         naos = mx.number_of_rows()
 
@@ -730,19 +731,29 @@ class TdaEigenSolver(LinearSolver):
         integrals = {}
 
         if self.rank == mpi_master():
-            integrals['electric_dipole'] = (mx_np, my_np, mz_np)
+            integrals['electric_dipole'] = (
+                mx_np,
+                my_np,
+                mz_np,
+            )
 
-            integrals['linear_momentum'] = (-1.0 * lx_np,
-                                            -1.0 * ly_np,
-                                            -1.0 * lz_np)
+            integrals['linear_momentum'] = (
+                -1.0 * lx_np,
+                -1.0 * ly_np,
+                -1.0 * lz_np,
+            )
 
-            integrals['angular_momentum'] = (-1.0 * ax_np,
-                                             -1.0 * ay_np,
-                                             -1.0 * az_np)
+            integrals['angular_momentum'] = (
+                -1.0 * ax_np,
+                -1.0 * ay_np,
+                -1.0 * az_np,
+            )
 
-            integrals['magnetic_dipole'] = (0.5 * ax_np,
-                                            0.5 * ay_np,
-                                            0.5 * az_np)
+            integrals['magnetic_dipole'] = (
+                0.5 * ax_np,
+                0.5 * ay_np,
+                0.5 * az_np,
+            )
 
         return integrals
 
