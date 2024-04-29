@@ -72,12 +72,14 @@ class XtbHessianDriver(HessianDriver):
         if cphf_dict is None:
             cphf_dict = {}
 
-    def compute(self, molecule):
+    def compute(self, molecule, *args):
         """
         Computes the numerical nuclear Hessian.
 
         :param molecule:
             The molecule.
+        :param args:
+            Redundant args from call in vibrationalanalysis
         """
 
         self.print_header()
