@@ -10,6 +10,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.cphfsolver import CphfSolver
+from veloxchem.hessianorbitalresponse import HessianOrbitalResponse
 
 try:
     import pyscf
@@ -29,7 +30,7 @@ class TestCphfSolver(unittest.TestCase):
         scf_drv.ostream.mute()
         scf_tensors = scf_drv.compute(molecule, basis)
 
-        cphf_solver = CphfSolver()
+        cphf_solver = HessianOrbitalResponse()
         cphf_settings = {'conv_thresh':2e-7}
         cphf_solver.update_settings(cphf_settings, method_settings)
         cphf_solver.ostream.mute()
