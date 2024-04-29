@@ -129,9 +129,15 @@ def _read_atom_basis(basis_data, elem_id, basis_name):
     while basis_data:
         shell_title = basis_data.pop(0).split()
         assert_msg_critical(
-            len(shell_title) == 2,
+            len(shell_title) == 2 or len(shell_title) == 3,
             'Basis set parser: {}'.format(' '.join(shell_title)),
         )
+
+        if len(shell_title) == 3:
+            ncgto = int(shell_title[2])
+            err_gc = 'MolcularBasis.read: '
+            err_gc += 'General contraction format is currently not supported'
+            assert_msg_critical(ncgto == 1, err_gc)
 
         if shell_title[0] == 'ECP':
             atom_basis.set_ecp_label(shell_title)
