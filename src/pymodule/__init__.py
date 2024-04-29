@@ -23,8 +23,6 @@ from .veloxchemlib import set_number_of_threads
 from .veloxchemlib import get_number_of_threads
 from .veloxchemlib import make_workgroup
 
-# C++ enums
-
 # Python functions
 from .errorhandler import assert_msg_critical
 
@@ -39,5 +37,10 @@ from .sadguessdriver import SadGuessDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .lreigensolver import LinearResponseEigenSolver
 from .cppsolver import ComplexResponse
+
+# Environment variable: basis set path
+from .environment import set_vlxbasispath
+
+set_vlxbasispath()
 
 __version__ = "1.0rc0"
