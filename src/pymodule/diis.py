@@ -30,8 +30,7 @@ from .veloxchemlib import weighted_sum_gpu, dot_product_gpu
 
 class Diis:
     """
-    Implements direct inversion of the iterative subspace in C2 form proposed
-    by H. Seller.
+    Implements direct inversion of the iterative subspace.
 
     Instance variables
         - error_vectors: The list of error vectors.
@@ -177,11 +176,10 @@ class Diis:
 
     def compute_weights(self):
         """
-        Computes C2-DIIS weights from error vectors using H. Sellers method
-        (Int. J. Quantum Chem., vol. 45, pp. 31-41, 1993).
+        Computes DIIS weights from error vectors.
 
         :return:
-            The array of C2-DIIS weights with smallest residual error.
+            The DIIS weights.
         """
 
         n_vecs = len(self.error_vectors)

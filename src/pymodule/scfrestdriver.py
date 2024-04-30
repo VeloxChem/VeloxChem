@@ -40,8 +40,8 @@ from .scfdriver import ScfDriver
 
 class ScfRestrictedDriver(ScfDriver):
     """
-    Implements spin restricted closed shell SCF method with C2-DIIS and
-    two-level C2-DIIS convergence accelerators.
+    Implements spin restricted closed shell SCF method with DIIS and
+    two-level DIIS convergence accelerators.
 
     :param comm:
         The MPI communicator.

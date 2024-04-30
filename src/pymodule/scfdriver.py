@@ -681,10 +681,12 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self._print_scf_energy()
-            # TODO: compute S2
-            """
+
             s2 = self.compute_s2(molecule, self.scf_tensors)
             self._print_ground_state(molecule, s2)
+
+            # TODO: print orbitals
+            """
             if self.print_level == 2:
                 self.molecular_orbitals.print_orbitals(molecule, ao_basis,
                                                        False, self.ostream)
@@ -1282,13 +1284,13 @@ class ScfDriver:
                 S = ovl_mat
 
                 C_alpha = self.molecular_orbitals.alpha_to_numpy()
-                # C_beta = self.molecular_orbitals.beta_to_numpy()
+                C_beta = self.molecular_orbitals.beta_to_numpy()
 
                 E_alpha = self.molecular_orbitals.ea_to_numpy()
-                # E_beta = self.molecular_orbitals.eb_to_numpy()
+                E_beta = self.molecular_orbitals.eb_to_numpy()
 
                 occ_alpha = self.molecular_orbitals.occa_to_numpy()
-                # occ_beta = self.molecular_orbitals.occb_to_numpy()
+                occ_beta = self.molecular_orbitals.occb_to_numpy()
 
                 D_alpha = self.density.alpha_to_numpy(0)
                 D_beta = self.density.beta_to_numpy(0)
@@ -1296,7 +1298,7 @@ class ScfDriver:
                 F_alpha = fock_mat
                 # F_beta = fock_mat.beta_to_numpy(0)
 
-                # TODO: add C_beta, E_beta, occ_beta and F_beta
+                # TODO: add F_beta
 
                 self._scf_tensors = {
                     # eri info
@@ -1308,8 +1310,11 @@ class ScfDriver:
                     # scf tensors
                     'S': S,
                     'C_alpha': C_alpha,
+                    'C_beta': C_beta,
                     'E_alpha': E_alpha,
+                    'E_beta': E_beta,
                     'occ_alpha': occ_alpha,
+                    'occ_beta': occ_beta,
                     'D_alpha': D_alpha,
                     'D_beta': D_beta,
                     'F_alpha': F_alpha,
@@ -2214,13 +2219,13 @@ class ScfDriver:
         nbeta = molecule.number_of_beta_electrons()
 
         smat = scf_tensors['S']
-        Cocc_a = scf_tensors['C_alpha'][:, :nalpha]
-        Cocc_b = scf_tensors['C_beta'][:, :nbeta]
+        Cocc_a = scf_tensors['C_alpha'][:, :nalpha].copy()
+        Cocc_b = scf_tensors['C_beta'][:, :nbeta].copy()
 
         a_b = float(nalpha - nbeta) / 2.0
         s2_exact = a_b * (a_b + 1.0)
 
-        ovl_a_b = np.matmul(Cocc_a.T, np.matmul(smat, Cocc_b))
+        ovl_a_b = matmul_gpu(Cocc_a.T, matmul_gpu(smat, Cocc_b))
         s2 = s2_exact + nbeta - np.sum(ovl_a_b**2)
 
         return s2
