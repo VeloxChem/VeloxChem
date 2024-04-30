@@ -53,7 +53,7 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
 from .dftutils import get_default_grid_level, print_libxc_reference
 from .sanitychecks import molecule_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
-from .checkpoint import create_hdf5, write_scf_tensors
+from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
 
 class ScfDriver:
@@ -143,6 +143,7 @@ class ScfDriver:
         self.prelink_thresh = 5.0e-6
 
         # iterations data
+        self._history = None
         self._iter_data = None
         self._is_converged = False
         self._scf_energy = 0.0
@@ -355,6 +356,14 @@ class ScfDriver:
         """
 
         return self._scf_tensors
+
+    @property
+    def history(self):
+        """
+        Returns the SCF history.
+        """
+
+        return self._history
 
     @property
     def filename(self):
@@ -1020,6 +1029,8 @@ class ScfDriver:
 
         self._scf_prop = FirstOrderProperties(self.comm, self.ostream)
 
+        self._history = []
+
         if not self._first_step:
             profiler.begin({
                 'timing': self.timing,
@@ -1186,6 +1197,8 @@ class ScfDriver:
                 'diff_energy': diff_e_scf,
             }
 
+            self._history.append(self._iter_data)
+
             # update density and energy
 
             self._density = AODensityMatrix(den_mat)
@@ -1268,13 +1281,14 @@ class ScfDriver:
             if self.rank == mpi_master():
                 S = ovl_mat
 
-                # TODO: add C_beta, E_beta and F_beta
-
                 C_alpha = self.molecular_orbitals.alpha_to_numpy()
                 # C_beta = self.molecular_orbitals.beta_to_numpy()
 
                 E_alpha = self.molecular_orbitals.ea_to_numpy()
                 # E_beta = self.molecular_orbitals.eb_to_numpy()
+
+                occ_alpha = self.molecular_orbitals.occa_to_numpy()
+                # occ_beta = self.molecular_orbitals.occb_to_numpy()
 
                 D_alpha = self.density.alpha_to_numpy(0)
                 D_beta = self.density.beta_to_numpy(0)
@@ -1282,16 +1296,8 @@ class ScfDriver:
                 F_alpha = fock_mat
                 # F_beta = fock_mat.beta_to_numpy(0)
 
-                self._scf_tensors = {
-                    'S': S,
-                    'C_alpha': C_alpha,
-                    'E_alpha': E_alpha,
-                    'D_alpha': D_alpha,
-                    'D_beta': D_beta,
-                    'F_alpha': F_alpha,
-                    'scf_energy': self.scf_energy,
-                }
-                """
+                # TODO: add C_beta, E_beta, occ_beta and F_beta
+
                 self._scf_tensors = {
                     # eri info
                     'eri_thresh': self.eri_thresh,
@@ -1302,20 +1308,12 @@ class ScfDriver:
                     # scf tensors
                     'S': S,
                     'C_alpha': C_alpha,
-                    'C_beta': C_beta,
                     'E_alpha': E_alpha,
-                    'E_beta': E_beta,
+                    'occ_alpha': occ_alpha,
                     'D_alpha': D_alpha,
                     'D_beta': D_beta,
                     'F_alpha': F_alpha,
-                    'F_beta': F_beta,
-                    # for backward compatibility
-                    'C': C_alpha,
-                    'E': E_alpha,
-                    'D': (D_alpha, D_beta),
-                    'F': (F_alpha, F_beta),
                 }
-                """
 
                 if self._dft:
                     # dft info
@@ -1336,9 +1334,8 @@ class ScfDriver:
             if self.rank == mpi_master():
                 self._scf_tensors['dipole_moment'] = np.array(
                     self._scf_prop.get_property('dipole_moment'))
-                """
+
                 self._write_final_hdf5(molecule, ao_basis)
-                """
 
         if self.rank == mpi_master():
             self._print_scf_finish(diis_start_time)
@@ -2327,7 +2324,7 @@ class ScfDriver:
             return
 
         final_h5_fname = str(
-            Path(self.checkpoint_file).with_suffix('.tensors.h5'))
+            Path(self.checkpoint_file).with_suffix('.results.h5'))
 
         if self._dft:
             xc_label = self.xcfun.get_func_label()
@@ -2341,7 +2338,8 @@ class ScfDriver:
             potfile_text = ''
 
         create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
-        write_scf_tensors(final_h5_fname, self.scf_tensors)
+        write_scf_results_to_hdf5(final_h5_fname, self.scf_tensors,
+                                  self.history)
 
         self.ostream.print_blank()
         checkpoint_text = 'SCF tensors written to file: '
