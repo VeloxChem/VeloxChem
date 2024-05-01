@@ -359,20 +359,6 @@ class LinearSolver:
             The dictionary of ERI information.
         """
 
-        # ERI references
-        valstr = 'Using the following algorithms for ERI evaluation.'
-        self.ostream.print_info(valstr)
-        self.ostream.print_blank()
-        valstr = 'S. Obara and A. Saika, J. Chem. Phys. 84, 3963-3974 (1986)'
-        self.ostream.print_reference(valstr)
-        valstr = 'I. S. Ufimtsev and T. J. Martinez, '
-        valstr += 'J. Chem. Theory Comput. 5, 1004-1015 (2009)'
-        self.ostream.print_reference(valstr)
-        valstr = 'J. Kussmann and C. Ochsenfeld, '
-        valstr += 'J. Chem. Phys. 138, 134114 (2013)'
-        self.ostream.print_reference(valstr)
-        self.ostream.print_blank()
-
         num_gpus_per_node = self._get_num_gpus_per_node()
 
         screening = ScreeningData(molecule, basis, num_gpus_per_node,
@@ -396,8 +382,6 @@ class LinearSolver:
         """
 
         if self._dft:
-            print_libxc_reference(self.xcfun, self.ostream)
-
             grid_drv = GridDriver(self.comm)
             grid_level = (get_default_grid_level(self.xcfun)
                           if self.grid_level is None else self.grid_level)

@@ -542,9 +542,11 @@ class ScfDriver:
         self.ostream.print_blank()
         valstr = 'S. Obara and A. Saika, J. Chem. Phys. 84, 3963-3974 (1986)'
         self.ostream.print_reference(valstr)
+        self.ostream.print_blank()
         valstr = 'I. S. Ufimtsev and T. J. Martinez, '
         valstr += 'J. Chem. Theory Comput. 5, 1004-1015 (2009)'
         self.ostream.print_reference(valstr)
+        self.ostream.print_blank()
         valstr = 'J. Kussmann and C. Ochsenfeld, '
         valstr += 'J. Chem. Phys. 138, 134114 (2013)'
         self.ostream.print_reference(valstr)

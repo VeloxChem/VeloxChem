@@ -114,6 +114,14 @@ def print_libxc_reference(xcfun, ostream):
     """
 
     if isinstance(xcfun, XCFunctional):
+        valstr = 'Using the following algorithm for XC numerical integration.'
+        ostream.print_info(valstr)
+        ostream.print_blank()
+        valstr = 'J. Kussmann, H. Laqua and C. Ochsenfeld, '
+        valstr += 'J. Chem. Theory Comput. 2021, 17, 1512-1521'
+        ostream.print_reference(valstr)
+        ostream.print_blank()
+
         valstr = 'Using the Libxc library '
         valstr += f'(version {xcfun.get_libxc_version()}).'
         ostream.print_info(valstr)
