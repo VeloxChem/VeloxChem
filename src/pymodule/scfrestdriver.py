@@ -88,10 +88,9 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            e_mat = compute_error_vector_gpu(oao_mat, fock_mat,
-                                             den_mat.alpha_to_numpy(0), ovl_mat)
+            e_mat = compute_error_vector_gpu(oao_mat, fock_mat, den_mat,
+                                             ovl_mat)
             e_mat_shape = e_mat.shape
-            # e_grad = 2.0 * np.linalg.norm(e_mat)
             e_grad = 2.0 * np.sqrt(dot_product_gpu(e_mat, e_mat))
             max_grad = np.max(np.abs(e_mat))
         else:
@@ -124,9 +123,7 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            dmat = den_mat.alpha_to_numpy(0)
-            old_dmat = old_den_mat.alpha_to_numpy(0)
-            ddmat = dmat - old_dmat
+            ddmat = den_mat - old_den_mat
 
             # diff_den = np.linalg.norm(ddmat)
             diff_den = np.sqrt(dot_product_gpu(ddmat, ddmat))
@@ -158,8 +155,8 @@ class ScfRestrictedDriver(ScfDriver):
                 self._fock_matrices_alpha.popleft()
                 self._density_matrices_alpha.popleft()
 
-            self._fock_matrices_alpha.append(fock_mat)
-            self._density_matrices_alpha.append(den_mat.alpha_to_numpy(0))
+            self._fock_matrices_alpha.append(fock_mat.copy())
+            self._density_matrices_alpha.append(den_mat.copy())
 
     def _get_scaled_fock(self, weights):
         """

@@ -30,8 +30,6 @@ import math
 import sys
 
 from .veloxchemlib import to_angular_momentum
-from .veloxchemlib import denmat
-from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import matmul_gpu
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
@@ -333,7 +331,7 @@ class MolecularOrbitals:
             occ_mo = occ * mo
             dens = matmul_gpu(occ_mo, occ_mo.T)
 
-            return AODensityMatrix([dens], denmat.rest)
+            return dens
 
         elif self._orbitals_type == molorb.unrest and (
                 scf_type is None or scf_type == 'unrestricted'):
@@ -350,7 +348,7 @@ class MolecularOrbitals:
             dens_a = np.matmul(occ_mo_a, occ_mo_a.T)
             dens_b = np.matmul(occ_mo_b, occ_mo_b.T)
 
-            return AODensityMatrix([dens_a, dens_b], denmat.unrest)
+            return (dens_a, dens_b)
 
         elif self._orbitals_type == molorb.restopen and (
                 scf_type is None or scf_type == 'restricted_openshell'):
@@ -366,7 +364,7 @@ class MolecularOrbitals:
             dens_a = np.matmul(occ_mo_a, occ_mo_a.T)
             dens_b = np.matmul(occ_mo_b, occ_mo_b.T)
 
-            return AODensityMatrix([dens_a, dens_b], denmat.unrest)
+            return (dens_a, dens_b)
 
         else:
 

@@ -150,7 +150,7 @@ class ScfDriver:
         self._num_iter = 0
 
         # density matrix and molecular orbitals
-        self._density = AODensityMatrix()
+        self._density = None
         self._molecular_orbitals = MolecularOrbitals()
 
         # nuclear repulsion energy
@@ -598,17 +598,15 @@ class ScfDriver:
                 else:
                     den_mat = self.gen_initial_density_sad(
                         molecule, ao_basis, min_basis)
-                den_mat_np = den_mat.alpha_to_numpy(0)
-                naos = den_mat_np.shape[0]
+                naos = den_mat.shape[0]
             else:
                 naos = None
             naos = self.comm.bcast(naos, root=mpi_master())
 
             if self.rank != mpi_master():
-                den_mat_np = np.zeros((naos, naos))
+                den_mat = np.zeros((naos, naos))
 
-            self.comm.Bcast(den_mat_np, root=mpi_master())
-            den_mat = AODensityMatrix([den_mat_np], denmat.rest)
+            self.comm.Bcast(den_mat, root=mpi_master())
 
             self._comp_diis(molecule, ao_basis, den_mat, profiler)
 
@@ -632,17 +630,15 @@ class ScfDriver:
                 else:
                     den_mat = self.gen_initial_density_sad(
                         molecule, val_basis, min_basis)
-                den_mat_np = den_mat.alpha_to_numpy(0)
-                naos = den_mat_np.shape[0]
+                naos = den_mat.shape[0]
             else:
                 naos = None
             naos = self.comm.bcast(naos, root=mpi_master())
 
             if self.rank != mpi_master():
-                den_mat_np = np.zeros((naos, naos))
+                den_mat = np.zeros((naos, naos))
 
-            self.comm.Bcast(den_mat_np, root=mpi_master())
-            den_mat = AODensityMatrix([den_mat_np], denmat.rest)
+            self.comm.Bcast(den_mat, root=mpi_master())
 
             self._comp_diis(molecule, val_basis, den_mat, profiler)
 
@@ -656,17 +652,15 @@ class ScfDriver:
             if self.rank == mpi_master():
                 den_mat = self.gen_initial_density_proj(
                     molecule, ao_basis, val_basis, self._molecular_orbitals)
-                den_mat_np = den_mat.alpha_to_numpy(0)
-                naos = den_mat_np.shape[0]
+                naos = den_mat.shape[0]
             else:
                 naos = None
             naos = self.comm.bcast(naos, root=mpi_master())
 
             if self.rank != mpi_master():
-                den_mat_np = np.zeros((naos, naos))
+                den_mat = np.zeros((naos, naos))
 
-            self.comm.Bcast(den_mat_np, root=mpi_master())
-            den_mat = AODensityMatrix([den_mat_np], denmat.rest)
+            self.comm.Bcast(den_mat, root=mpi_master())
 
             self._comp_diis(molecule, ao_basis, den_mat, profiler)
 
@@ -719,15 +713,7 @@ class ScfDriver:
 
         sad_drv = SadGuessDriver()
 
-        if self.scf_type == 'restricted':
-            D = sad_drv.compute(molecule, min_basis, ao_basis, self.scf_type)
-            den_mat = AODensityMatrix([D], denmat.rest)
-        else:
-            Da, Db = sad_drv.compute(molecule, min_basis, ao_basis,
-                                     self.scf_type)
-            den_mat = AODensityMatrix([Da, Db], denmat.unrest)
-
-        return den_mat
+        return sad_drv.compute(molecule, min_basis, ao_basis, self.scf_type)
 
     def gen_initial_density_proj(self, molecule, ao_basis, valence_basis,
                                  valence_mo):
@@ -1116,7 +1102,7 @@ class ScfDriver:
                                         ' {:.1e}.'.format(self.eri_thresh))
                 self.ostream.print_blank()
 
-        self._density = AODensityMatrix(den_mat)
+        self._density = den_mat.copy()
 
         profiler.check_memory_usage('Initial guess')
 
@@ -1143,8 +1129,10 @@ class ScfDriver:
 
             iter_start_time = tm.time()
 
+            dmat = AODensityMatrix([den_mat], denmat.rest)
+
             fock_mat, vxc_mat, e_pe, V_pe = self._comp_2e_fock(
-                den_mat, molecule, ao_basis, screener, e_grad, profiler)
+                dmat, molecule, ao_basis, screener, e_grad, profiler)
 
             profiler.start_timer('CompEnergy')
 
@@ -1161,13 +1149,11 @@ class ScfDriver:
                 ])
 
                 if self.scf_type == 'restricted':
-                    e_el += 2.0 * np.trace(
-                        np.matmul(efpot, den_mat.alpha_to_numpy(0)))
+                    e_el += 2.0 * np.trace(np.matmul(efpot, den_mat))
                     fock_mat.add_matrix(DenseMatrix(efpot), 0)
                 else:
-                    e_el += np.trace(
-                        np.matmul(efpot, (den_mat.alpha_to_numpy(0) +
-                                          den_mat.beta_to_numpy(0))))
+                    e_el += np.trace(np.matmul(efpot,
+                                               (den_mat[0] + den_mat[1])))
                     fock_mat.add_matrix(DenseMatrix(efpot), 0, 'alpha')
                     fock_mat.add_matrix(DenseMatrix(efpot), 0, 'beta')
 
@@ -1184,7 +1170,7 @@ class ScfDriver:
 
             # compute density change and energy change
 
-            diff_den = self._comp_density_change(den_mat, self.density)
+            diff_den = self._comp_density_change(den_mat, self._density)
 
             e_scf = (e_el + self._nuc_energy + self._d4_energy +
                      self._ef_nuc_energy)
@@ -1203,7 +1189,7 @@ class ScfDriver:
 
             # update density and energy
 
-            self._density = AODensityMatrix(den_mat)
+            self._density = den_mat.copy()
 
             self._scf_energy = e_scf
 
@@ -1247,17 +1233,16 @@ class ScfDriver:
                 mo = self.molecular_orbitals.alpha_to_numpy()
                 occ = self.molecular_orbitals.occa_to_numpy()
                 occ_mo = occ * mo
-                den_mat_np = matmul_gpu(occ_mo, occ_mo.T)
-                naos = den_mat_np.shape[0]
+                den_mat = matmul_gpu(occ_mo, occ_mo.T)
+                naos = den_mat.shape[0]
             else:
                 naos = None
             naos = self.comm.bcast(naos, root=mpi_master())
 
             if self.rank != mpi_master():
-                den_mat_np = np.zeros((naos, naos))
+                den_mat = np.zeros((naos, naos))
 
-            self.comm.Bcast(den_mat_np, root=mpi_master())
-            den_mat = AODensityMatrix([den_mat_np], denmat.rest)
+            self.comm.Bcast(den_mat, root=mpi_master())
 
             profiler.stop_timer('FockDiag')
 
@@ -1292,8 +1277,12 @@ class ScfDriver:
                 occ_alpha = self.molecular_orbitals.occa_to_numpy()
                 occ_beta = self.molecular_orbitals.occb_to_numpy()
 
-                D_alpha = self.density.alpha_to_numpy(0)
-                D_beta = self.density.beta_to_numpy(0)
+                if self.scf_type == 'restricted':
+                    D_alpha = self._density
+                    D_beta = self._density
+                else:
+                    D_alpha = self._density[0]
+                    D_beta = self._density[1]
 
                 F_alpha = fock_mat
                 # F_beta = fock_mat.beta_to_numpy(0)
@@ -1480,7 +1469,7 @@ class ScfDriver:
         return ovl_mat, kin_mat, npot_mat, dipole_mats
 
     def _comp_2e_fock(self,
-                      den_mat,
+                      dmat,
                       molecule,
                       basis,
                       screener,
@@ -1489,7 +1478,7 @@ class ScfDriver:
         """
         Computes Fock/Kohn-Sham matrix (only 2e part).
 
-        :param den_mat:
+        :param dmat:
             The AO density matrix.
         :param molecule:
             The molecule.
@@ -1526,13 +1515,13 @@ class ScfDriver:
                     erf_k_coef = -self.xcfun.get_rs_beta()
                     omega = self.xcfun.get_rs_omega()
 
-                    fock_mat_full_k = compute_fock_gpu(molecule, basis, den_mat,
+                    fock_mat_full_k = compute_fock_gpu(molecule, basis, dmat,
                                                        2.0, full_k_coef, 0.0,
                                                        'symm', self.eri_thresh,
                                                        self.prelink_thresh,
                                                        screener)
 
-                    fock_mat_erf_k = compute_fock_gpu(molecule, basis, den_mat,
+                    fock_mat_erf_k = compute_fock_gpu(molecule, basis, dmat,
                                                       0.0, erf_k_coef, omega,
                                                       'symm', self.eri_thresh,
                                                       self.prelink_thresh,
@@ -1544,21 +1533,21 @@ class ScfDriver:
                 else:
                     # global hybrid
                     fock_mat = compute_fock_gpu(
-                        molecule, basis, den_mat, 2.0,
+                        molecule, basis, dmat, 2.0,
                         self.xcfun.get_frac_exact_exchange(), 0.0, 'symm',
                         self.eri_thresh, self.prelink_thresh, screener)
                     fock_mat_local = fock_mat.to_numpy()
 
             else:
                 # pure DFT
-                fock_mat = compute_fock_gpu(molecule, basis, den_mat, 2.0, 0.0,
+                fock_mat = compute_fock_gpu(molecule, basis, dmat, 2.0, 0.0,
                                             0.0, 'symm', self.eri_thresh,
                                             self.prelink_thresh, screener)
                 fock_mat_local = fock_mat.to_numpy()
 
         else:
             # Hartree-Fock
-            fock_mat = compute_fock_gpu(molecule, basis, den_mat, 2.0, 1.0, 0.0,
+            fock_mat = compute_fock_gpu(molecule, basis, dmat, 2.0, 1.0, 0.0,
                                         'symm', self.eri_thresh,
                                         self.prelink_thresh, screener)
             fock_mat_local = fock_mat.to_numpy()
@@ -1583,7 +1572,7 @@ class ScfDriver:
             # TODO: support xcfun.mgga
             if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga]:
                 vxc_mat = integrate_vxc_fock_gpu(
-                    molecule, basis, den_mat, self._mol_grid,
+                    molecule, basis, dmat, self._mol_grid,
                     self.xcfun.get_func_label(),
                     screener.get_num_gpus_per_node())
             else:
@@ -1598,7 +1587,7 @@ class ScfDriver:
 
         if self._pe and not self._first_step:
             self._pe_drv.V_es = self._V_es.copy()
-            dm = den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0)
+            dm = dmat.alpha_to_numpy(0) + dmat.beta_to_numpy(0)
             e_pe, V_pe = self._pe_drv.get_pe_contribution(dm)
             self._pe_summary = self._pe_drv.cppe_state.summary_string
         else:
@@ -1634,11 +1623,9 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             # electronic, kinetic, nuclear energy
-            D = den_mat.alpha_to_numpy(0)
-            T = kin_mat
-            V = npot_mat
-            Hcore_plus_full_Fock = 2.0 * (T - V) + fock_mat
-            e_sum = dot_product_gpu(D, Hcore_plus_full_Fock)
+            hcore_mat = kin_mat - npot_mat
+            hcore_plus_full_Fock = 2.0 * hcore_mat + fock_mat
+            e_sum = dot_product_gpu(den_mat, hcore_plus_full_Fock)
             if self._dft and not self._first_step:
                 e_sum += vxc_mat.get_energy()
             if self._pe and not self._first_step:
@@ -1948,8 +1935,12 @@ class ScfDriver:
         """
 
         if self.rank == mpi_master():
-            D_alpha = self.density.alpha_to_numpy(0)
-            D_beta = self.density.beta_to_numpy(0)
+            if self.scf_type == 'restricted':
+                D_alpha = self._density
+                D_beta = self._density
+            else:
+                D_alpha = self._density[0]
+                D_beta = self._density[1]
             S = ovl_mat
             calc_nelec = (np.sum(D_alpha * S), np.sum(D_beta * S))
         else:
