@@ -33,18 +33,11 @@ from .veloxchemlib import OverlapDriver
 # C++ functions
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import hartree_in_ev
-from .veloxchemlib import get_pi
 from .veloxchemlib import cantor_index
 from .veloxchemlib import cantor_pair
 from .veloxchemlib import to_spherical_components
 from .veloxchemlib import to_cartesian_components
 from .veloxchemlib import angular_component_to_str
-from .veloxchemlib import get_batch_index
-from .veloxchemlib import number_of_batches
-from .veloxchemlib import get_batch_range
-from .veloxchemlib import set_number_of_threads
-from .veloxchemlib import get_number_of_threads
-from .veloxchemlib import make_workgroup
 
 # Python functions
 from .errorhandler import assert_msg_critical

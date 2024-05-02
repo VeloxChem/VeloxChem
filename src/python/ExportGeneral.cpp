@@ -150,28 +150,6 @@ export_general(py::module& m) -> void
           "Gets factor needed for the calculation of the extinction coefficent from the electric-dipole magnetic-dipole polarizability beta.");
     m.def("fine_structure_constant", &units::getFineStructureConstant, "Gets fine-structure constant.");
 
-    // exposing functions from BatchFunc.hpp
-
-    m.def("get_batch_index", &batch::getBatchIndex, "Gets starting index of batch.");
-
-    m.def("number_of_batches", &batch::getNumberOfBatches, "Gets number of batches for given vector size.");
-
-    m.def("get_batch_range", &batch::getBatchRange, "Gets range of specific batch.");
-
-    // exposing functions from OpenMPFunc.hpp
-
-    m.def("set_number_of_threads", &omp::setNumberOfThreads, "Sets number of OMP threads to requested value.");
-
-    m.def("get_number_of_threads", &omp::getNumberOfThreads, "Gets number of OMP threads available.");
-
-    m.def("make_workgroup",
-          py::overload_cast<const std::vector<CGtoBlock>&>(&omp::makeWorkGroup),
-          "Gets work group for given vector of basis function blocks.");
-
-    m.def("make_workgroup",
-          py::overload_cast<const std::vector<CGtoBlock>&, const std::vector<CGtoBlock>&>(&omp::makeWorkGroup),
-          "Gets work group for given two vectors of basis function blocks.");
-
     // exposing functions from StringFormat.hpp
 
     m.def("upcase", &fstr::upcase, "Convers string to upper case string.");
@@ -195,8 +173,7 @@ export_general(py::module& m) -> void
         [](const int64_t source, const size_t width, const fmt_t aligment) -> std::string { return fstr::to_string(source, width, aligment); },
         "Formats integer number to string with specified alignment.");
 
-    m.def(
-        "to_string", [](const bool source) -> std::string { return fstr::to_string(source); }, "Formats bool to string.");
+    m.def("to_string", [](const bool source) -> std::string { return fstr::to_string(source); }, "Formats bool to string.");
 
     m.def(
         "to_angular_momentum",

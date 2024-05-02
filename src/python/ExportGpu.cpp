@@ -31,10 +31,10 @@
 
 #include <vector>
 
-#include "GpuDevices.hpp"
 #include "ErrorHandler.hpp"
-#include "FockDriverGPU.hpp"
 #include "ExportGeneral.hpp"
+#include "FockDriverGPU.hpp"
+#include "GpuDevices.hpp"
 #include "ScreeningData.hpp"
 #include "XCIntegratorGPU.hpp"
 
@@ -60,13 +60,13 @@ export_gpu(py::module& m)
     py::class_<CScreeningData, std::shared_ptr<CScreeningData>>(m, "ScreeningData")
         .def(py::init<const CMolecule&, const CMolecularBasis&, const int64_t, const double, const double>())
         .def("get_num_gpus_per_node", &CScreeningData::getNumGpusPerNode)
-        .def("get_q_matrix",
-        [](CScreeningData& self, const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) -> py::array_t<double> {
-            const auto q_mat = self.get_mat_Q_full(s_prim_count, p_prim_count, d_prim_count);
-            return vlx_general::pointer_to_numpy(q_mat.values(), {q_mat.getNumberOfRows(), q_mat.getNumberOfColumns()});
-        },
-        "Gets Q matrix.")
-        ;
+        .def(
+            "get_q_matrix",
+            [](CScreeningData& self, const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) -> py::array_t<double> {
+                const auto q_mat = self.get_mat_Q_full(s_prim_count, p_prim_count, d_prim_count);
+                return vlx_general::pointer_to_numpy(q_mat.values(), {q_mat.getNumberOfRows(), q_mat.getNumberOfColumns()});
+            },
+            "Gets Q matrix.");
 
     m.def(
         "compute_gto_values",
@@ -97,8 +97,8 @@ export_gpu(py::module& m)
             errors::assertMsgCritical(A.size() == B.size(), errsize);
 
             std::string errstyle("dot_product_gpu: Expecting contiguous numpy array");
-            auto c_style_A = py::detail::check_flags(A.ptr(), py::array::c_style);
-            auto c_style_B = py::detail::check_flags(B.ptr(), py::array::c_style);
+            auto        c_style_A = py::detail::check_flags(A.ptr(), py::array::c_style);
+            auto        c_style_B = py::detail::check_flags(B.ptr(), py::array::c_style);
             errors::assertMsgCritical(c_style_A && c_style_B, errstyle);
 
             const auto n = static_cast<int64_t>(A.size());
@@ -126,7 +126,7 @@ export_gpu(py::module& m)
             for (size_t i = 0; i < arrays.size(); i++)
             {
                 std::string errstyle("weighted_sum_gpu: Expecting contiguous numpy array");
-                auto c_style = py::detail::check_flags(arrays[i].ptr(), py::array::c_style);
+                auto        c_style = py::detail::check_flags(arrays[i].ptr(), py::array::c_style);
                 errors::assertMsgCritical(c_style, errstyle);
 
                 data_pointers.push_back(arrays[i].data());
@@ -140,7 +140,8 @@ export_gpu(py::module& m)
 
     m.def(
         "compute_error_vector_gpu",
-        [](const py::array_t<double>& X, const py::array_t<double>& F, const py::array_t<double>& D, const py::array_t<double>& S) -> py::array_t<double> {
+        [](const py::array_t<double>& X, const py::array_t<double>& F, const py::array_t<double>& D, const py::array_t<double>& S)
+            -> py::array_t<double> {
             std::string errshape("compute_error_vector_gpu: Mismatch in matrix shape");
             std::string errstyle("compute_error_vector_gpu: Expecting contiguous numpy array");
 
@@ -278,8 +279,7 @@ export_gpu(py::module& m)
             result.append(eigenVectors);
 
             return result;
-
-            },
+        },
         "Diagonalizes matrix using GPU.");
 
     m.def("integrate_vxc_fock_gpu", &gpu::integrateVxcFock, "Integrates Vxc matrix using GPU.");
@@ -292,11 +292,15 @@ export_gpu(py::module& m)
 
     m.def("compute_one_electron_integrals_gpu", &gpu::computeOneElectronIntegralsOnGPU, "Computes one-electron integral matrices using GPU.");
 
-    m.def("compute_electric_dipole_integrals_gpu", &gpu::computeElectricDipoleIntegralsOnGPU, "Computes electric dipole integral matrices using GPU.");
+    m.def(
+        "compute_electric_dipole_integrals_gpu", &gpu::computeElectricDipoleIntegralsOnGPU, "Computes electric dipole integral matrices using GPU.");
 
-    m.def("compute_linear_momentum_integrals_gpu", &gpu::computeLinearMomentumIntegralsOnGPU, "Computes linear momentum integral matrices using GPU.");
+    m.def(
+        "compute_linear_momentum_integrals_gpu", &gpu::computeLinearMomentumIntegralsOnGPU, "Computes linear momentum integral matrices using GPU.");
 
-    m.def("compute_angular_momentum_integrals_gpu", &gpu::computeAngularMomentumIntegralsOnGPU, "Computes angular momentum integral matrices using GPU.");
+    m.def("compute_angular_momentum_integrals_gpu",
+          &gpu::computeAngularMomentumIntegralsOnGPU,
+          "Computes angular momentum integral matrices using GPU.");
 
     m.def("compute_q_matrix_gpu", &gpu::computeQMatrixOnGPU, "Computes Q matrix using GPU.");
 }

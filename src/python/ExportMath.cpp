@@ -119,10 +119,6 @@ export_math(py::module& m) -> void
         .value("gen", mat_t::gen);
     // clang-format on
 
-    // exposing functions from MathConst.hpp
-
-    m.def("get_pi", &mathconst::getPiValue, "Gets PI value.");
-
     // exposing functions from MathIndex.hpp
 
     m.def("uplo_index", &mathfunc::uplo_index, "Gets index of upper triangular matrix.");

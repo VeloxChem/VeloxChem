@@ -48,7 +48,7 @@ from .sanitychecks import dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
-from .dftutils import get_default_grid_level, print_libxc_reference
+from .dftutils import get_default_grid_level
 from .checkpoint import write_rsp_hdf5
 
 
