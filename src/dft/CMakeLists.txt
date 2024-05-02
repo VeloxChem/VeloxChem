@@ -14,7 +14,6 @@ target_sources(vlxobjs
     PartitionFunc.cpp
     XCComponent.cpp
     XCFunctional.cpp
-    XCIntegrator.cpp
   )
 
 target_include_directories(vlxobjs

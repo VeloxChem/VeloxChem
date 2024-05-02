@@ -34,11 +34,10 @@ namespace vxcfuncs {  // vxcfuncs namespace
 std::vector<std::string>
 getAvailableFunctionals()
 {
-    return std::vector<std::string>({"SLATER", "SLDA",   "B88X",    "BLYP",  "B3LYP",   "BHANDH", "BHANDHLYP", "PBE",   "PBE0",   "REVPBE",
-                                     "BP86",   "PW91",   "MPW1K",   "OLYP",  "O3LYP",   "X3LYP",  "B97",       "B97-1", "B97-2",  "B97-3",
-                                     "LRC-WPBEH", "CAM-B3LYP",
-                                     "TPSS",   "TPSSH",  "REVTPSS", "PKZB",  "SCAN",    "RSCAN",  "R2SCAN",    "M05",   "M05-2X", "M06",
-                                     "M06-2X", "M06-HF", "M06-L",   "M11-L", "MPW1B95", "MPWB1K", "PW6B95",    "PWB6K"});
+    return std::vector<std::string>({"SLATER",    "SLDA",      "B88X",   "BLYP",   "B3LYP",   "BHANDH", "BHANDHLYP", "PBE",    "PBE0",   "REVPBE",
+                                     "BP86",      "PW91",      "MPW1K",  "OLYP",   "O3LYP",   "X3LYP",  "B97",       "B97-1",  "B97-2",  "B97-3",
+                                     "LRC-WPBEH", "CAM-B3LYP", "TPSS",   "TPSSH",  "REVTPSS", "PKZB",   "SCAN",      "RSCAN",  "R2SCAN", "M05",
+                                     "M05-2X",    "M06",       "M06-2X", "M06-HF", "M06-L",   "M11-L",  "MPW1B95",   "MPWB1K", "PW6B95", "PWB6K"});
 }
 
 CXCFunctional

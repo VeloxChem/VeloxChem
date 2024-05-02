@@ -34,9 +34,6 @@
 #include <vector>
 
 #include "DenseLinearAlgebra.hpp"
-#include "DensityGridGenerator.hpp"
-#include "DftFunc.hpp"
-#include "DftSubMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "FunctionalParser.hpp"
 #include "GpuConstants.hpp"
@@ -2799,7 +2796,7 @@ integrateFxcFock(CDenseMatrix&           aoFockMatrix,
     /*
     if (xcfuntype == xcfun::mgga) integrateFxcFockForMGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode);
 
-    std::string errxcfuntype("XCIntegrator.integrateFxcFock: Only implemented for LDA/GGA/meta-GGA");
+    std::string errxcfuntype("gpu::integrateFxcFock: Only implemented for LDA/GGA/meta-GGA");
 
     errors::assertMsgCritical(false, errxcfuntype);
     */

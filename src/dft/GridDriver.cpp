@@ -168,8 +168,7 @@ CGridDriver::_startHeader(const CMolecule& molecule) const -> std::string
 {
     std::stringstream ss;
 
-    ss << "Numerical Grid For DFT Integration"
-       << "\n";
+    ss << "Numerical Grid For DFT Integration" << "\n";
 
     ss << std::string(36, '=') << "\n\n";
 
@@ -304,7 +303,7 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
     }
 
     std::vector<uint32_t> atom_ids_of_points(bpoints);
-    std::vector<double> atom_min_distances(bpoints);
+    std::vector<double>   atom_min_distances(bpoints);
 
     // if (rank == mpi::master()) std::cout << "* Info * Generating grid points for atoms ..." << std::endl;
     // timer.reset();

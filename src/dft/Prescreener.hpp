@@ -59,8 +59,10 @@ auto getGridBoxDimension(const int64_t gridBlockPosition,
  @param boxDimension the dimension of the grid box.
  @return the mask indices for CGTOs and the pre-screened indices for AOs.
  */
-auto preScreenGtoBlock(const CGtoBlock& gtoBlock, const int64_t gtoDeriv, const double gtoThreshold, const std::array<double, 6>& boxDimension)
-    -> std::tuple<std::vector<int64_t>, std::vector<int64_t>>;
+auto preScreenGtoBlock(const CGtoBlock&             gtoBlock,
+                       const int64_t                gtoDeriv,
+                       const double                 gtoThreshold,
+                       const std::array<double, 6>& boxDimension) -> std::tuple<std::vector<int64_t>, std::vector<int64_t>>;
 
 }  // namespace prescr
 

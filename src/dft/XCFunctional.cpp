@@ -30,9 +30,8 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
-#include <string>
 #include <sstream>
-//#include <iostream>
+#include <string>
 
 #include "ErrorHandler.hpp"
 #include "GridScreener.hpp"
@@ -3156,7 +3155,8 @@ CXCFunctional::setRangeSeparatedParameterOmega(const double omega) -> void
 {
     errors::assertMsgCritical(isRangeSeparated(), "XCFunctional.setRangeSeparatedParameterOmega: Only applicable to range-separated functional");
 
-    errors::assertMsgCritical(_components.size() == 1, "XCFunctional.setRangeSeparatedParameterOmega: Only applicable to single-component functional");
+    errors::assertMsgCritical(_components.size() == 1,
+                              "XCFunctional.setRangeSeparatedParameterOmega: Only applicable to single-component functional");
 
     std::string param_name("_omega");
 

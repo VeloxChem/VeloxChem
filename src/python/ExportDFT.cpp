@@ -39,14 +39,13 @@
 #include "MolecularGrid.hpp"
 #include "XCComponent.hpp"
 #include "XCFunctional.hpp"
-#include "XCIntegrator.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
 
 namespace vlx_dft {  // vlx_dft namespace
 
-// constructors for CGridDriver, CXCIntegrator
+// constructors for CGridDriver
 
 static auto
 CGridDriver_create(py::object py_comm) -> std::shared_ptr<CGridDriver>
@@ -54,14 +53,6 @@ CGridDriver_create(py::object py_comm) -> std::shared_ptr<CGridDriver>
     if (py_comm.is_none()) return std::make_shared<CGridDriver>(MPI_COMM_WORLD);
 
     return std::make_shared<CGridDriver>(*vlx_general::get_mpi_comm(py_comm));
-}
-
-static auto
-CXCIntegrator_create(py::object py_comm) -> std::shared_ptr<CXCIntegrator>
-{
-    if (py_comm.is_none()) return std::make_shared<CXCIntegrator>(MPI_COMM_WORLD);
-
-    return std::make_shared<CXCIntegrator>(*vlx_general::get_mpi_comm(py_comm));
 }
 
 // Exports classes/functions in src/dft to python
@@ -148,31 +139,6 @@ export_dft(py::module& m)
         .def(py::init(&CGridDriver_create), "comm"_a = py::none())
         .def("generate", &CGridDriver::generate, "Generates molecular grid for molecule.", "molecule"_a, "num_gpus_per_node"_a)
         .def("set_level", &CGridDriver::setLevel, "Sets accuracy level for grid generation.", "grid_level"_a);
-
-    // CXCIntegrator class
-
-    PyClass<CXCIntegrator>(m, "XCIntegrator")
-        .def(py::init(&CXCIntegrator_create), "comm"_a = py::none())
-        .def("integrate_vxc_fock",
-             &CXCIntegrator::integrateVxcFock,
-             "Integrates 1st-order exchange-correlation contribution to Kohn-Sham matrix.",
-             "molecule"_a,
-             "basis"_a,
-             "density_matrix"_a,
-             "molecular_grid"_a,
-             "flag"_a)
-        .def(
-            "compute_gto_values",
-            [](CXCIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid)
-                -> py::array_t<double> {
-                auto gtovalues = self.computeGtoValuesOnGridPoints(molecule, basis, molecularGrid);
-                return vlx_general::pointer_to_numpy(gtovalues.values(), {gtovalues.getNumberOfRows(), gtovalues.getNumberOfColumns()});
-            },
-            "Computes GTO values on grid points.",
-            "molecule"_a,
-            "basis"_a,
-            "molecular_grid"_a)
-        .def("get_timing_summary", &CXCIntegrator::getTimingSummary, "Gets timing summary.");
 
     // XCComponent class
 

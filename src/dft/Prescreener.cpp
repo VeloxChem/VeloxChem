@@ -28,10 +28,6 @@
 #include <cmath>
 
 #include "GtoFunc.hpp"
-#include "GtoValuesRecD.hpp"
-#include "GtoValuesRecF.hpp"
-#include "GtoValuesRecP.hpp"
-#include "GtoValuesRecS.hpp"
 
 namespace prescr {  // prescr namespace
 
