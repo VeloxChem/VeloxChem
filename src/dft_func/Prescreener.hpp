@@ -3,8 +3,7 @@
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2023 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -22,9 +21,6 @@
 //
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
-//
-//  This file contains derivative work of dftd4 (v2.4.0):
-//  Copyright © 2017-2019 Stefan Grimme, Sebastian Ehlert, Eike Caldeweyher
 
 #ifndef Prescreener_hpp
 #define Prescreener_hpp
