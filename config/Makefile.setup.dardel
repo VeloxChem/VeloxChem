@@ -1,0 +1,139 @@
+#
+#                           VELOXCHEM 1.0-RC3
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
+# Automatically generated settings
+
+USE_MPI := true
+USE_GPU := true
+USE_MKL := false
+USE_XTB := false
+
+BUILD_LIB := /cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/build/lib/veloxchem
+VLX_TARGET := $(BUILD_LIB)/veloxchemlib.cpython-39-x86_64-linux-gnu.so
+
+#CXX := CC
+CXX := /opt/rocm-5.0.2/llvm/bin/clang++ ${shell CC --cray-print-opts=cflags} ${shell CC --cray-print-opts=libs}
+
+CXX_REL_FLG := -fopenmp -std=c++17
+CXX_DEB_FLG := -fopenmp -std=c++17
+
+MATH_INC := -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/openblas/include
+MATH_INC += -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/magma/include
+#MATH_LIB := -lomp -lpthread -lm -ldl
+MATH_LIB := -L/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/openblas/lib -lopenblas
+MATH_LIB += -L/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/magma/lib -lmagma
+
+XC_INC := -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/libxc/include
+XC_LIB := -L/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/libxc/lib
+XC_LIB += -Wl,-rpath,/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/libxc/lib -lxc
+
+PYTHON := python3.9
+
+PYTHON_INC := -I/opt/cray/pe/python/3.9.12.1/include/python3.9
+PYTHON_INC += -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/vlxenv/lib/python3.9/site-packages/mpi4py/include
+PYTHON_INC += -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/vlxenv/lib/python3.9/site-packages/numpy/core/include
+PYTHON_INC += -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/vlxenv/lib/python3.9/site-packages/pybind11/include
+
+DEVCC := hipcc --offload-arch=gfx90a -fopenmp -std=c++17
+DEVCC_REL_FLG := $(XC_INC) -fPIC
+DEVCC_DEB_FLG := $(XC_INC) -fPIC
+DEVICE_LIB := -lhipblas
+#DEVICE_LIB := -lhipblas -lhipsolver
+
+MACLIBS :=
+
+LTOFLAG :=
+
+# Generic settings
+
+# Compiler flags
+
+CXX_REL_FLG += -std=c++17 -O3 -Wall
+CXX_DEB_FLG += -std=c++17 -O3 -Wall -g
+
+# Preprocessor flags
+
+CPP_REL_FLG := -DVLX_ALIGN=64
+CPP_DEB_FLG := -DVLX_ALIGN=64 -DVAR_DEBUG=1
+
+ifeq ($(USE_MPI),true)
+  CPP_REL_FLG += -DENABLE_MPI=1
+  CPP_DEB_FLG += -DENABLE_MPI=1
+else
+  CPP_REL_FLG += -DENABLE_MPI=0
+  CPP_DEB_FLG += -DENABLE_MPI=0
+endif
+
+ifeq ($(USE_GPU),true)
+  CPP_REL_FLG += -DENABLE_GPU
+  CPP_DEB_FLG += -DENABLE_GPU
+endif
+
+ifeq ($(USE_MKL),true)
+  CPP_REL_FLG += -DENABLE_MKL
+  CPP_DEB_FLG += -DENABLE_MKL
+endif
+
+# Math library
+
+LIB_LIST := $(MATH_LIB)
+
+# LibXC
+
+CXX_REL_FLG += $(XC_INC)
+CXX_DEB_FLG += $(XC_INC)
+LIB_LIST += $(XC_LIB)
+
+# Extra flag for MacOS
+
+LIB_LIST += $(MACLIBS)
+
+CXX_REL_FLG += -fPIC $(PYTHON_INC)
+CXX_DEB_FLG += -fPIC $(PYTHON_INC)
+
+# flag for GPU devices
+
+LIB_LIST += $(DEVICE_LIB)
+
+# XTB interface (optional)
+
+ifeq ($(USE_XTB),true)
+  CPP_REL_FLG += -DENABLE_XTB -DXTB_PARAMS="$(XTB_PATH)"
+  CPP_DEB_FLG += -DENABLE_XTB -DXTB_PARAMS="$(XTB_PATH)"
+  CXX_REL_FLG += $(XTB_INC)
+  CXX_DEB_FLG += $(XTB_INC)
+  LIB_LIST += $(XTB_LIB)
+endif
+
+# Native shell commands
+
+CP := cp -f
+MV := mv -f
+RM := rm -f
+
+# Native libraries generation tools
+
+AR      := ar
+ARFLAGS := rc
