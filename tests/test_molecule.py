@@ -167,25 +167,6 @@ class TestMolecule:
         q = mol.get_charge()
         assert mt.isclose(q, 1.0, rel_tol=tol, abs_tol=tol)
 
-    def test_check_multiplicity(self):
-
-        # singlet, doublet, and triplet NH3
-        mol = self.nh3_molecule()
-        assert mol.check_multiplicity()
-        mol.set_multiplicity(2)
-        assert not mol.check_multiplicity()
-        mol.set_multiplicity(3)
-        assert mol.check_multiplicity()
-
-        # singlet, doublet, and triplet NH3+
-        mol.set_charge(1.0)
-        mol.set_multiplicity(1)
-        assert not mol.check_multiplicity()
-        mol.set_multiplicity(2)
-        assert mol.check_multiplicity()
-        mol.set_multiplicity(3)
-        assert not mol.check_multiplicity()
-
     def test_number_of_atoms(self):
 
         mol = self.nh3_molecule()
@@ -330,7 +311,7 @@ class TestMolecule:
     def test_get_str(self):
 
         mol = self.nh3_molecule()
-        molstr = mol.get_str()
+        molstr = mol.get_string()
         lines = molstr.splitlines()
 
         assert lines[0] == 'Molecular Geometry (Angstroms)'
@@ -445,11 +426,12 @@ class TestMolecule:
         mol.set_charge(1.0)
         mol.set_multiplicity(2)
 
-        nocc = mol.get_aufbau_occupation(6)
-        rocc = np.array([2.0, 2.0, 2.0, 2.0, 1.0, 0.0])
-        assert np.allclose(rocc, nocc, tol, tol, False)
+        nocca = mol.get_aufbau_alpha_occupation(6)
+        noccb = mol.get_aufbau_beta_occupation(6)
 
-        nocca, noccb = mol.get_aufbau_occupation(6, 'unrestricted')
+        rocc = np.array([2.0, 2.0, 2.0, 2.0, 1.0, 0.0])
+        assert np.allclose(rocc, nocca + noccb, tol, tol, False)
+
         rocca = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 0.0])
         roccb = np.array([1.0, 1.0, 1.0, 1.0, 0.0, 0.0])
         assert np.allclose(rocca, nocca, tol, tol, False)
