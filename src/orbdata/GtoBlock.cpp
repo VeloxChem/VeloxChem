@@ -22,10 +22,11 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+#include "GtoBlock.hpp"
+
 #include <cmath>
 
 #include "ErrorHandler.hpp"
-#include "GtoBlock.hpp"
 
 CGtoBlock::CGtoBlock(const std::vector<TPoint3D>& coordinates,
                      const std::vector<double>&   exponents,
@@ -132,7 +133,7 @@ CGtoBlock::CGtoBlock(const CMolecularBasis&      basis,
             for (int64_t j = 0; j < npgtos; j++)
             {
                 const auto joff = j * ncgtos + i;
-                
+
                 _exponents[joff] = fexps[j];
 
                 _norms[joff] = fnorms[j];
@@ -222,7 +223,8 @@ CGtoBlock::getAtomicOrbitalsIndexesForCartesian() const -> std::vector<int64_t>
 auto
 CGtoBlock::getSphericalToCartesianMapping() const -> std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>>
 {
-    errors::assertMsgCritical((0 <= _angmom) && (_angmom <= 2), std::string("GtoBlock: getSphericalToCartesianMapping only works for s/p/d orbitals"));
+    errors::assertMsgCritical((0 <= _angmom) && (_angmom <= 2),
+                              std::string("GtoBlock: getSphericalToCartesianMapping only works for s/p/d orbitals"));
 
     std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> sph_cart_p;
 
