@@ -40,7 +40,7 @@ class SymmetryAnalyzer:
         # Initializes variables
         self._schoenflies_symbol = ''
         self._max_order = 1
-        self._inequivalent_atoms = {'operations': [], 'ineq_atoms': []}
+        self._inequivalent_atoms = {}
         self._primary_axis = [1., 0., 0.]
         self._secondary_axis = [0., 1., 0.]
         self._molecule_type = ''
@@ -190,6 +190,7 @@ class SymmetryAnalyzer:
         !!!Under construction!!!
         """
         # Initializes
+        self._symbols_atom_sym = []
         symmetrized_data = {}
 
         if pointgoup_to_symmetrize is None:
@@ -221,7 +222,7 @@ class SymmetryAnalyzer:
             if self._natoms <= 60:
                 symmetrized_coords = self._symmetrize_molecule(pointgoup_to_symmetrize)
                 reoriented_coords = self._conventional_orientation(symmetrized_coords)
-                symmetrized_data["symmetrized_coord"] = reoriented_coords
+                symmetrized_data["symmetrized_coord"] = reoriented_coords * bohr_in_angstrom()
                 symmetrized_data["new_pointgroup"] = pointgoup_to_symmetrize
             else:
                 reoriented_coords = self._conventional_orientation(self._cent_coord)
@@ -256,7 +257,7 @@ class SymmetryAnalyzer:
         pointgroup = results_symmetrization["new_pointgroup"]
 
         if xyz_filename:
-            write_xyz_file(self._symbols,coords,pointgroup,xyz_filename)
+            write_xyz_file(self._symbols_atom_sym, coords, pointgroup, xyz_filename)
         else:
             for arr in coords:
                 formatted_string = np.array2string(arr, formatter={'float_kind': lambda x: "%12.8f" % x})
@@ -319,7 +320,13 @@ class SymmetryAnalyzer:
             if self._check_op(c2, "C2"):
                 n_axis_c2 += 1
                 principal_axis = axis
-        
+                break
+
+        p_axis = get_perpendicular(principal_axis)
+        if self._check_op(Rotation(p_axis, order=2), "C2_p"):
+            n_axis_c2 += 1
+            self._secondary_axis = p_axis
+
         self._max_order = 2
 
         if n_axis_c2 == 0:
@@ -353,7 +360,7 @@ class SymmetryAnalyzer:
             for angle in np.arange(0, np.pi, 0.1* np.pi / self._max_order):
                 axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
                 c2 = Rotation(axis, order=2)
-                if self._check_op(c2, "C2"):
+                if self._check_op(c2, "C2_p"):
                     self._dihedral(principal_axis)
                     return
                         
@@ -595,15 +602,19 @@ class SymmetryAnalyzer:
         self._schoenflies_symbol = "C{}".format(self._max_order)
         
         # Check for reflexion planes perpenducular to the principal axis
+        h_symbols = False
         if self._check_op(Reflection(principal_axis), "sigma_h"):
             self._schoenflies_symbol += 'h'
+            h_symbols = True
+
+        p_axis = get_perpendicular(principal_axis)
+        self._secondary_axis = p_axis
 
         # Check for reflexion planes containing the principal axis
         v_symbol = set()
-        self._secondary_axis = get_perpendicular(principal_axis)
-        for angle in np.arange(0, np.pi + self._tolerance_ang, 0.5*np.pi / self._max_order + self._tolerance_ang):
-            axis = np.dot(self._secondary_axis, rotation_matrix(principal_axis, angle))
-            if self._check_op(Reflection(axis), "sigma_v"):
+        for angle in np.arange(0, np.pi, 0.1*np.pi / self._max_order + self._tolerance_ang):
+            axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
+            if self._check_op(Reflection(axis), "sigma_v") and not h_symbols:
                 v_symbol.add('v')
 
         self._schoenflies_symbol += ''.join(v_symbol)
@@ -631,7 +642,7 @@ class SymmetryAnalyzer:
         self._primary_axis = principal_axis
 
         # Determine perpendicular axis to principal axis
-        self._secondary_axis = get_perpendicular(principal_axis)
+        p_axis = get_perpendicular(principal_axis)
 
         if self._max_order == 1:
             # D1 is equivalent to C2
@@ -651,8 +662,8 @@ class SymmetryAnalyzer:
         # Check for reflexion planes containing the principal axis
         d_symbol = False
         for angle in np.arange(0, np.pi, 0.5*np.pi / self._max_order):
-            axis = np.dot(self._secondary_axis, rotation_matrix(principal_axis, angle))
-            if self._check_op(Reflection(axis), "sigma") and not h_symbols and not d_symbol:
+            axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
+            if self._check_op(Reflection(axis), "sigma_v") and not h_symbols and not d_symbol:
                 self._schoenflies_symbol += 'd'
                 d_symbol = True
     
@@ -748,9 +759,8 @@ class SymmetryAnalyzer:
                         inequivalent_atoms_by_operation.add(mapping_tuple[0])
 
         # Save string and inequivalent atom indices for detected operations used in symmetrization
-        if element_string in ["C2", "sigma", "sigma_h", "sigma_v", "sigma", "i"]:
-            self._inequivalent_atoms["operations"].append(element_string)
-            self._inequivalent_atoms["ineq_atoms"].append(inequivalent_atoms_by_operation)
+        if element_string in ["C2", "C2_p", "sigma", "sigma_h", "sigma_v", "sigma", "i"]:
+            self._inequivalent_atoms[element_string] = inequivalent_atoms_by_operation
 
         return True
 
@@ -764,59 +774,64 @@ class SymmetryAnalyzer:
             The chosen point group for symmetrization.
 
         :return:
-            A list of arrays containing the coordinates of the molecule after symmetrization.
+            A array with the coordinates of the symmetrized molecule.
 
         !!!Under construction!!!
         """
 
         # Initialize the list of coordinates for the inequivalent atoms after symmetrization
         full_symmetrized_coord = []
-
+        full_symmetrized_symbols = []
+        
         # Define the possible symmetry operation to apply on the inequivalent coordinates
         symmetry_operation = {
             "i" : Inversion(),
-            "C2" : Rotation([1.,0.,0.], order=2),
+            "C2" : Rotation(self._primary_axis, order=2),
             "C2_p" : Rotation(self._secondary_axis, order=2),
-            "sigma_h" : Reflection([1.,0.,0.]),
+            "sigma_h" : Reflection(self._primary_axis),
             "sigma_v" : Reflection(self._secondary_axis)
         }
 
-        if pointgroup in generators:
-            for operation in generators[pointgroup]:
-                # Retrieve the set of inequivalent atoms for the given operation
-                ineq_atoms = self._inequivalent_atoms["ineq_atoms"]
-                if operation in symmetry_operation:
-                    representative = symmetry_operation[operation]
-                    sym_matrix = representative.get_matrix()
+        # Loop over the operations to apply and generate the representatives
+        # In reverse order to apply rotation in last as it is the main operator 
+        for operation in reversed(generators[pointgroup]):
+            if operation in self._inequivalent_atoms:
+                representative = symmetry_operation[operation]
+                sym_matrix = representative.get_matrix()
 
-        # Loop over each set of inequivalent atoms
-        for a_set in ineq_atoms:
-            # Retrieve the coordinates for the current set of inequivalent atoms
-            ineq_coords = [self._cent_coord[index] for index in a_set]
+                # Retrieve the coordinates for the current set of inequivalent atoms
+                ineq_coords = [self._cent_coord[index] for index in self._inequivalent_atoms[operation]]
+                ineq_symbols = [self._symbols[index] for index in self._inequivalent_atoms[operation]]
 
-            # Apply the symmetry operation to the coordinates of the inequivalent atoms
-            op_coordinates = np.dot(ineq_coords, sym_matrix.T)
+                # Apply the symmetry operation to the coordinates of the inequivalent atoms
+                op_coordinates = np.dot(ineq_coords, sym_matrix.T)
 
-            # Loop over each array of inequivalent atoms coordinates
-            for i, array1 in enumerate(ineq_coords):
-                # Calculate the absolute difference between the original and generated coordinates
-                abs_diff = np.abs(array1 - op_coordinates[i])
+        # Loop over each pair of arrays of coordinates and
+        # calculate the absolute difference between the original and generated coordinates
+        for i, (coord, symbol) in enumerate(zip(ineq_coords, ineq_symbols)):
+                abs_diff = np.abs(coord - op_coordinates[i])
 
                 # If the absolute difference is greater than a small tolerance value, 
-                # append both coordinates to the full_symmetrized_coord list
+                # append both coordinates and symbols to the respective lists
                 if np.any(abs_diff > 0.5):
-                    full_symmetrized_coord.append(array1 * bohr_in_angstrom())
-                    full_symmetrized_coord.append(op_coordinates[i] * bohr_in_angstrom())
+                    full_symmetrized_coord.append(coord)
+                    full_symmetrized_coord.append(op_coordinates[i])
+                    full_symmetrized_symbols.append(symbol)
+                    full_symmetrized_symbols.append(symbol)  # Symbol is the same for both coordinates
                 # If the absolute difference is within the tolerance value, 
-                # append the symmetrized coordinate to the full_symmetrized_coord list
+                # append the symmetrized coordinate and symbol to the respective lists
                 else:
-                    average_pos = (array1 + op_coordinates[i])/2
-                    full_symmetrized_coord.append(average_pos * bohr_in_angstrom())
+                    average_pos = (coord + op_coordinates[i])/2
+                    full_symmetrized_coord.append(average_pos)
+                    full_symmetrized_symbols.append(symbol)
 
-            # Check that number of generated atoms is the same as the original molecule
-            assert self._natoms == len(full_symmetrized_coord), "Number of generated atoms does not match initial molecule."
+        # Check that the number of generated atoms is the same as the original molecule
+        assert self._natoms == len(full_symmetrized_coord), "Number of generated atoms does not match initial molecule."
 
-        return full_symmetrized_coord
+        # Store the symbols of the inequivalent atoms in the instance variable
+        self._symbols_atom_sym = full_symmetrized_symbols
+
+        return np.array(full_symmetrized_coord)
 
     def _set_orientation(self, principal_axis, p_axis):
         """
@@ -1278,5 +1293,5 @@ generators = {
     "D2": ["C2", "C2_p"],
     "C2v": ["C2", "sigma_v"],
     "C2h": ["C2", "sigma_h"],
-    "D2h": ["C2", "C2_p", "sigma_h"]
+    "D2h": ["C2", "C2_p", "sigma_h", "sigma_v"]
 }
