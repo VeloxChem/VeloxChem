@@ -156,6 +156,7 @@ class ScfDriver:
 
         # nuclear repulsion energy
         self._nuc_energy = 0.0
+        self._nuc_mm_energy = 0.0
 
         # mpi information
         self._comm = comm
@@ -547,6 +548,22 @@ class ScfDriver:
 
         # nuclear repulsion energy
         self._nuc_energy = molecule.nuclear_repulsion_energy()
+
+        # nuclei - point charges interaction
+        self._nuc_mm_energy = 0.0
+        if self._pe:
+            natoms = molecule.number_of_atoms()
+            coords = molecule.get_coordinates_in_bohr()
+            nuclear_charges = molecule.get_element_ids()
+            npoints = self._point_charges.shape[1]
+            for a in range(natoms):
+                xyz_a = coords[a]
+                chg_a = nuclear_charges[a]
+                for p in range(npoints):
+                    xyz_p = self._point_charges[:3, p]
+                    chg_p = self._point_charges[3, p]
+                    r_ap = np.linalg.norm(xyz_a - xyz_p)
+                    self._nuc_mm_energy += chg_a * chg_p / r_ap
 
         if self.rank == mpi_master():
             self._print_header()
@@ -1197,23 +1214,8 @@ class ScfDriver:
 
             diff_den = self._comp_density_change(den_mat, self._density)
 
-            e_scf = (e_el + self._nuc_energy + self._d4_energy +
-                     self._ef_nuc_energy)
-
-            if self._pe and not self._first_step:
-                # nuclei - point charges interaction
-                natoms = molecule.number_of_atoms()
-                coords = molecule.get_coordinates_in_bohr()
-                nuclear_charges = molecule.get_element_ids()
-                npoints = self._point_charges.shape[1]
-                for a in range(natoms):
-                    xyz_a = coords[a]
-                    chg_a = nuclear_charges[a]
-                    for p in range(npoints):
-                        xyz_p = self._point_charges[:3, p]
-                        chg_p = self._point_charges[3, p]
-                        r_ap = np.linalg.norm(xyz_a - xyz_p)
-                        e_scf += chg_a * chg_p / r_ap
+            e_scf = (e_el + self._nuc_energy + self._nuc_mm_energy +
+                     self._d4_energy + self._ef_nuc_energy)
 
             diff_e_scf = e_scf - self.scf_energy
 
@@ -2281,13 +2283,15 @@ class ScfDriver:
 
         enuc = self._nuc_energy
 
+        enuc_mm = self._nuc_mm_energy
+
         e_d4 = self._d4_energy
 
         e_ef_nuc = self._ef_nuc_energy
 
         etot = self._iter_data['energy']
 
-        e_el = etot - enuc - e_d4 - e_ef_nuc
+        e_el = etot - enuc - enuc_mm - e_d4 - e_ef_nuc
 
         valstr = f'Total Energy                       :{etot:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
@@ -2296,6 +2300,9 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'
+        self.ostream.print_header(valstr.ljust(92))
+
+        valstr = f'Nuclei-Point Charges Energy        :{enuc_mm:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
         if self.dispersion:
