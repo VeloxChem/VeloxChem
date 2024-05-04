@@ -1674,10 +1674,7 @@ class ScfDriver:
                              root=mpi_master())
 
         if self.rank == mpi_master():
-            # TODO: double check
-            T = kin_mat
-            V = npot_mat
-            fock_mat += (T - V)
+            fock_mat += (kin_mat - npot_mat)
 
             if self._dft and not self._first_step:
                 fock_mat += vxc_mat_np_sum

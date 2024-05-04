@@ -30,7 +30,6 @@ import time as tm
 import sys
 import os
 
-# TODO import rotatory_strength_in_cgs
 # TODO import VisualizationDriver
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver, MolecularGrid
@@ -41,7 +40,7 @@ from .veloxchemlib import compute_electric_dipole_integrals_gpu
 from .veloxchemlib import compute_linear_momentum_integrals_gpu
 from .veloxchemlib import compute_angular_momentum_integrals_gpu
 from .veloxchemlib import integrate_fxc_fock_gpu
-from .veloxchemlib import mpi_master, hartree_in_ev
+from .veloxchemlib import mpi_master, hartree_in_ev, rotatory_strength_in_cgs
 from .distributedarray import DistributedArray
 from .molecularorbitals import MolecularOrbitals, molorb
 from .sanitychecks import dft_sanity_check
@@ -651,7 +650,6 @@ class LinearSolver:
             else:
                 fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
 
-        # TODO double check batch size
         batch_size = 1
         num_batches = n_total
 
@@ -2324,12 +2322,10 @@ class LinearSolver:
         valstr = title
         self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_header(('-' * len(valstr)).ljust(92))
-        # TODO: fix rotatory_strength_in_cgs constant
-        rotatory_strength_in_cgs = 471.443648175
         for s, R in enumerate(results['rotatory_strengths']):
             valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
             valstr += '    Rot.Str. '
-            valstr += f'{(R / rotatory_strength_in_cgs):13.6f} a.u.'
+            valstr += f'{(R / rotatory_strength_in_cgs()):13.6f} a.u.'
             valstr += f'{R:11.4f} [10**(-40) cgs]'
             self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_blank()

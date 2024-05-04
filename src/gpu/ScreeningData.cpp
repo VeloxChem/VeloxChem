@@ -2477,7 +2477,7 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count,
                                         const int64_t naos,
                                         const double* dens_ptr) const -> CDenseMatrix
 {
-    // TODO: use only the upper triangluar part to generate D_abs_full,
+    // TODO: consider using only upper triangluar part to generate D_abs_full,
     // particularly the SS, PP and DD blocks. Otherwise the input density must
     // be symmetric or antisymmetric.
 

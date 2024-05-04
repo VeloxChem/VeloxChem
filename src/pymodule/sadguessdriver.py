@@ -784,9 +784,6 @@ class SadGuessDriver:
         return alpha_occ_for_atoms, beta_occ_for_atoms
 
     def get_ao_indices_of_atoms(self, molecule, basis):
-        """
-        TODO
-        """
 
         natoms = molecule.number_of_atoms()
         aoinds_atoms = [[] for atomidx in range(natoms)]
@@ -805,9 +802,6 @@ class SadGuessDriver:
         return aoinds_atoms
 
     def compute(self, molecule, basis_1, basis_2, density_type):
-        """
-        TODO
-        """
 
         ovl_drv = OverlapDriver()
 
@@ -822,9 +816,6 @@ class SadGuessDriver:
 
     def _comp_sad_guess(self, molecule, basis_1, basis_2, S12, S22,
                         density_type):
-        """
-        TODO
-        """
 
         natoms = molecule.number_of_atoms()
 
