@@ -37,7 +37,11 @@ namespace gpu {
 
 auto computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> CDenseMatrix;
 
-auto computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> std::vector<CDenseMatrix>;
+auto computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> std::vector<CDenseMatrix>;
+
+auto computeNuclearPotentialIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> CDenseMatrix;
+
+auto computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening, const double* points_info_ptr, const int64_t npoints) -> CDenseMatrix;
 
 auto computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const std::vector<double>& origin, const CScreeningData& screening) -> std::vector<CDenseMatrix>;
 

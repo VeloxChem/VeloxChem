@@ -560,7 +560,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 }
 
 auto
-computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> std::vector<CDenseMatrix>
+computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> std::vector<CDenseMatrix>
 {
     CGpuDevices gpu_devices;
 
@@ -579,12 +579,594 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
     std::vector<CDenseMatrix> S_matrices(num_gpus_per_node);
     std::vector<CDenseMatrix> T_matrices(num_gpus_per_node);
-    std::vector<CDenseMatrix> V_matrices(num_gpus_per_node);
 
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
         S_matrices[gpu_id] = CDenseMatrix(naos, naos);
         T_matrices[gpu_id] = CDenseMatrix(naos, naos);
+    }
+
+#pragma omp parallel
+    {
+    auto thread_id = omp_get_thread_num();
+
+    if (thread_id % num_threads_per_gpu == 0)
+    {
+    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
+    auto gpu_count = nnodes * num_gpus_per_node;
+
+    // std::stringstream ss;
+    // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
+    // std::cout << ss.str();
+
+    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+
+    // GTOs blocks and number of AOs
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    // gto blocks
+
+    int64_t s_prim_count = 0;
+    int64_t p_prim_count = 0;
+    int64_t d_prim_count = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+        const auto npgtos = gto_block.getNumberOfPrimitives();
+
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
+        if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
+        if (gto_ang == 2) d_prim_count += npgtos * ncgtos;
+    }
+
+    // Cartesian to spherical index mapping for P and D
+
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_p;
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_d;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 1)
+        {
+            auto p_map = gto_block.getCartesianToSphericalMappingForP();
+
+            for (const auto& [cart_ind, sph_ind_coef] : p_map)
+            {
+                cart_sph_p[cart_ind] = sph_ind_coef;
+            }
+        }
+        else if (gto_ang == 2)
+        {
+            auto d_map = gto_block.getCartesianToSphericalMappingForD();
+
+            for (const auto& [cart_ind, sph_ind_coef] : d_map)
+            {
+                cart_sph_d[cart_ind] = sph_ind_coef;
+            }
+        }
+    }
+
+    // S gto block
+
+    std::vector<double>   s_prim_info(5 * s_prim_count);
+    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
+
+    double*   d_s_prim_info;
+
+    hipSafe(hipMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // P gto block
+
+    std::vector<double>   p_prim_info(5 * p_prim_count);
+    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
+
+    double*   d_p_prim_info;
+
+    hipSafe(hipMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // D gto block
+
+    std::vector<double>   d_prim_info(5 * d_prim_count);
+    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
+
+    double*   d_d_prim_info;
+
+    hipSafe(hipMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // GTO block pairs
+
+    const auto& ss_first_inds_local = screening.get_ss_first_inds_local(gpu_id);
+    const auto& sp_first_inds_local = screening.get_sp_first_inds_local(gpu_id);
+    const auto& sd_first_inds_local = screening.get_sd_first_inds_local(gpu_id);
+    const auto& pp_first_inds_local = screening.get_pp_first_inds_local(gpu_id);
+    const auto& pd_first_inds_local = screening.get_pd_first_inds_local(gpu_id);
+    const auto& dd_first_inds_local = screening.get_dd_first_inds_local(gpu_id);
+
+    const auto& ss_second_inds_local = screening.get_ss_second_inds_local(gpu_id);
+    const auto& sp_second_inds_local = screening.get_sp_second_inds_local(gpu_id);
+    const auto& sd_second_inds_local = screening.get_sd_second_inds_local(gpu_id);
+    const auto& pp_second_inds_local = screening.get_pp_second_inds_local(gpu_id);
+    const auto& pd_second_inds_local = screening.get_pd_second_inds_local(gpu_id);
+    const auto& dd_second_inds_local = screening.get_dd_second_inds_local(gpu_id);
+
+    const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
+    const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
+    const auto sd_prim_pair_count_local = static_cast<int64_t>(sd_first_inds_local.size());
+    const auto pp_prim_pair_count_local = static_cast<int64_t>(pp_first_inds_local.size());
+    const auto pd_prim_pair_count_local = static_cast<int64_t>(pd_first_inds_local.size());
+    const auto dd_prim_pair_count_local = static_cast<int64_t>(dd_first_inds_local.size());
+
+    const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local, sd_prim_pair_count_local,
+                                                     pp_prim_pair_count_local, pd_prim_pair_count_local, dd_prim_pair_count_local});
+
+    std::vector<double> mat_S(max_prim_pair_count_local);
+    std::vector<double> mat_T(max_prim_pair_count_local);
+
+    // S and T on device
+
+    double *d_mat_S, *d_mat_T;
+
+    uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
+    uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
+    uint32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
+    uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
+    uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
+    uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
+
+    hipSafe(hipMalloc(&d_mat_S, max_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_T, max_prim_pair_count_local * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    S_matrices[gpu_id].zero();
+    T_matrices[gpu_id].zero();
+
+    auto& mat_overlap = S_matrices[gpu_id];
+    auto& mat_kinetic_energy = T_matrices[gpu_id];
+
+    hipSafe(hipDeviceSynchronize());
+
+    // SS
+
+    if (ss_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergySS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_S,
+                           d_mat_T,
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_ss_first_inds_local,
+                           d_ss_second_inds_local,
+                           static_cast<uint32_t>(ss_prim_pair_count_local));
+
+        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
+        {
+            const auto i = ss_first_inds_local[ij];
+            const auto j = ss_second_inds_local[ij];
+
+            const auto i_cgto = s_prim_aoinds[i];
+            const auto j_cgto = s_prim_aoinds[j];
+
+            mat_overlap.row(i_cgto)[j_cgto] += mat_S[ij];
+
+            if (i != j) mat_overlap.row(j_cgto)[i_cgto] += mat_S[ij];
+
+            mat_kinetic_energy.row(i_cgto)[j_cgto] += mat_T[ij];
+
+            if (i != j) mat_kinetic_energy.row(j_cgto)[i_cgto] += mat_T[ij];
+        }
+    }
+
+    // SP
+
+    if (sp_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergySP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_S,
+                           d_mat_T,
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_sp_first_inds_local,
+                           d_sp_second_inds_local,
+                           static_cast<uint32_t>(sp_prim_pair_count_local));
+
+        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
+        {
+            const auto i = sp_first_inds_local[ij];
+            const auto j = sp_second_inds_local[ij];
+
+            const auto i_cgto = s_prim_aoinds[i];
+
+            // TODO: think about the ordering of cartesian components
+            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+            // Cartesian to spherical
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                mat_overlap.row(i_cgto)[j_cgto_sph] += mat_S[ij] * j_coef_sph;
+                mat_overlap.row(j_cgto_sph)[i_cgto] += mat_S[ij] * j_coef_sph;
+
+                mat_kinetic_energy.row(i_cgto)[j_cgto_sph] += mat_T[ij] * j_coef_sph;
+                mat_kinetic_energy.row(j_cgto_sph)[i_cgto] += mat_T[ij] * j_coef_sph;
+            }
+        }
+    }
+
+    // SD
+
+    if (sd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergySD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_S,
+                           d_mat_T,
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_sd_first_inds_local,
+                           d_sd_second_inds_local,
+                           static_cast<uint32_t>(sd_prim_pair_count_local));
+
+        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
+        {
+            const auto i = sd_first_inds_local[ij];
+            const auto j = sd_second_inds_local[ij];
+
+            const auto i_cgto = s_prim_aoinds[i];
+
+            // TODO: think about the ordering of cartesian components
+            const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+            // Cartesian to spherical
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                mat_overlap.row(i_cgto)[j_cgto_sph] += mat_S[ij] * j_coef_sph;
+                mat_overlap.row(j_cgto_sph)[i_cgto] += mat_S[ij] * j_coef_sph;
+
+                mat_kinetic_energy.row(i_cgto)[j_cgto_sph] += mat_T[ij] * j_coef_sph;
+                mat_kinetic_energy.row(j_cgto_sph)[i_cgto] += mat_T[ij] * j_coef_sph;
+            }
+        }
+    }
+
+    // PP
+
+    if (pp_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergyPP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_S,
+                           d_mat_T,
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_pp_first_inds_local,
+                           d_pp_second_inds_local,
+                           static_cast<uint32_t>(pp_prim_pair_count_local));
+
+        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
+        {
+            const auto i = pp_first_inds_local[ij];
+            const auto j = pp_second_inds_local[ij];
+
+            // TODO: think about the ordering of cartesian components
+            const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+            // Cartesian to spherical
+            for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
+            {
+                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+                auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+                for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
+                {
+                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                    auto coef_sph = i_coef_sph * j_coef_sph;
+
+                    mat_overlap.row(i_cgto_sph)[j_cgto_sph] += mat_S[ij] * coef_sph;
+
+                    if (i != j) mat_overlap.row(j_cgto_sph)[i_cgto_sph] += mat_S[ij] * coef_sph;
+
+                    mat_kinetic_energy.row(i_cgto_sph)[j_cgto_sph] += mat_T[ij] * coef_sph;
+
+                    if (i != j) mat_kinetic_energy.row(j_cgto_sph)[i_cgto_sph] += mat_T[ij] * coef_sph;
+                }
+            }
+        }
+    }
+
+    // PD
+
+    if (pd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergyPD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_S,
+                           d_mat_T,
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_pd_first_inds_local,
+                           d_pd_second_inds_local,
+                           static_cast<uint32_t>(pd_prim_pair_count_local));
+
+        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
+        {
+            const auto i = pd_first_inds_local[ij];
+            const auto j = pd_second_inds_local[ij];
+
+            // TODO: think about the ordering of cartesian components
+            const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+            const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+            // Cartesian to spherical
+            for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
+            {
+                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+                auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+                for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
+                {
+                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                    auto coef_sph = i_coef_sph * j_coef_sph;
+
+                    mat_overlap.row(i_cgto_sph)[j_cgto_sph] += mat_S[ij] * coef_sph;
+                    mat_overlap.row(j_cgto_sph)[i_cgto_sph] += mat_S[ij] * coef_sph;
+
+                    mat_kinetic_energy.row(i_cgto_sph)[j_cgto_sph] += mat_T[ij] * coef_sph;
+                    mat_kinetic_energy.row(j_cgto_sph)[i_cgto_sph] += mat_T[ij] * coef_sph;
+                }
+            }
+        }
+    }
+
+    // DD
+
+    if (dd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergyDD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_S,
+                           d_mat_T,
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_dd_first_inds_local,
+                           d_dd_second_inds_local,
+                           static_cast<uint32_t>(dd_prim_pair_count_local));
+
+        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
+        {
+            const auto i = dd_first_inds_local[ij];
+            const auto j = dd_second_inds_local[ij];
+
+            // TODO: think about the ordering of cartesian components
+            const auto i_cgto = d_prim_aoinds[(i / 6) + d_prim_count * (i % 6)];
+            const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+            // Cartesian to spherical
+            for (const auto& i_cgto_sph_ind_coef : cart_sph_d[i_cgto])
+            {
+                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+                auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+                for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
+                {
+                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                    auto coef_sph = i_coef_sph * j_coef_sph;
+
+                    mat_overlap.row(i_cgto_sph)[j_cgto_sph] += mat_S[ij] * coef_sph;
+
+                    if (i != j) mat_overlap.row(j_cgto_sph)[i_cgto_sph] += mat_S[ij] * coef_sph;
+
+                    mat_kinetic_energy.row(i_cgto_sph)[j_cgto_sph] += mat_T[ij] * coef_sph;
+
+                    if (i != j) mat_kinetic_energy.row(j_cgto_sph)[i_cgto_sph] += mat_T[ij] * coef_sph;
+                }
+            }
+        }
+    }
+
+    hipSafe(hipDeviceSynchronize());
+
+    hipSafe(hipFree(d_s_prim_info));
+    hipSafe(hipFree(d_p_prim_info));
+    hipSafe(hipFree(d_d_prim_info));
+
+    hipSafe(hipFree(d_mat_S));
+    hipSafe(hipFree(d_mat_T));
+
+    hipSafe(hipFree(d_ss_first_inds_local));
+    hipSafe(hipFree(d_ss_second_inds_local));
+    hipSafe(hipFree(d_sp_first_inds_local));
+    hipSafe(hipFree(d_sp_second_inds_local));
+    hipSafe(hipFree(d_sd_first_inds_local));
+    hipSafe(hipFree(d_sd_second_inds_local));
+    hipSafe(hipFree(d_pp_first_inds_local));
+    hipSafe(hipFree(d_pp_second_inds_local));
+    hipSafe(hipFree(d_pd_first_inds_local));
+    hipSafe(hipFree(d_pd_second_inds_local));
+    hipSafe(hipFree(d_dd_first_inds_local));
+    hipSafe(hipFree(d_dd_second_inds_local));
+
+    }}
+
+    std::vector<CDenseMatrix> ST_matrices(2);
+
+    ST_matrices[0] = CDenseMatrix(naos, naos);
+    ST_matrices[1] = CDenseMatrix(naos, naos);
+
+    ST_matrices[0].zero();
+    ST_matrices[1].zero();
+
+    auto p_mat_S = ST_matrices[0].values();
+    auto p_mat_T = ST_matrices[1].values();
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        auto p_mat_overlap = S_matrices[gpu_id].values();
+        auto p_mat_kinetic_energy = T_matrices[gpu_id].values();
+
+        for (int64_t ind = 0; ind < naos * naos; ind++)
+        {
+            p_mat_S[ind] += p_mat_overlap[ind];
+            p_mat_T[ind] += p_mat_kinetic_energy[ind];
+        }
+    }
+
+    return ST_matrices;
+}
+
+auto
+computeNuclearPotentialIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> CDenseMatrix
+{
+    const auto mol_charges = molecule.getCharges();
+    const auto mol_coords = molecule.getCoordinates(std::string("BOHR"));
+    const auto natoms = molecule.getNumberOfAtoms();
+
+    std::vector<double> points_info(natoms * 4);
+
+    for (int64_t a = 0; a < natoms; a++)
+    {
+        points_info[a + natoms * 0] = mol_coords[a][0];
+        points_info[a + natoms * 1] = mol_coords[a][1];
+        points_info[a + natoms * 2] = mol_coords[a][2];
+        points_info[a + natoms * 3] = mol_charges[a];
+    }
+
+    return gpu::computePointChargesIntegralsOnGPU(molecule, basis, screening, points_info.data(), natoms);
+}
+
+auto
+computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening, const double* points_info_ptr, const int64_t npoints) -> CDenseMatrix
+{
+    CGpuDevices gpu_devices;
+
+    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    // TODO use communicator from arguments
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    auto nthreads = omp_get_max_threads();
+    auto num_gpus_per_node = screening.getNumGpusPerNode();
+    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+
+    std::vector<CDenseMatrix> V_matrices(num_gpus_per_node);
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
         V_matrices[gpu_id] = CDenseMatrix(naos, naos);
     }
 
@@ -740,13 +1322,11 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local, sd_prim_pair_count_local,
                                                      pp_prim_pair_count_local, pd_prim_pair_count_local, dd_prim_pair_count_local});
 
-    std::vector<double> mat_S(max_prim_pair_count_local);
-    std::vector<double> mat_T(max_prim_pair_count_local);
     std::vector<double> mat_V(max_prim_pair_count_local);
 
-    // S on device
+    // V on device
 
-    double *d_mat_S, *d_mat_T, *d_mat_V;
+    double *d_mat_V;
 
     uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
     uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
@@ -755,8 +1335,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
     uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
 
-    hipSafe(hipMalloc(&d_mat_S, max_prim_pair_count_local * sizeof(double)));
-    hipSafe(hipMalloc(&d_mat_T, max_prim_pair_count_local * sizeof(double)));
     hipSafe(hipMalloc(&d_mat_V, max_prim_pair_count_local * sizeof(double)));
 
     hipSafe(hipMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
@@ -795,33 +1373,15 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     hipSafe(hipMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
 
-    S_matrices[gpu_id].zero();
-    T_matrices[gpu_id].zero();
     V_matrices[gpu_id].zero();
 
-    auto& mat_overlap = S_matrices[gpu_id];
-    auto& mat_kinetic_energy = T_matrices[gpu_id];
     auto& mat_nuclear_potential = V_matrices[gpu_id];
-
-    const auto mol_charges = molecule.getCharges();
-    const auto mol_coords = molecule.getCoordinates(std::string("BOHR"));
-    const auto natoms = molecule.getNumberOfAtoms();
-
-    std::vector<double> points_info(natoms * 4);
-
-    for (int64_t a = 0; a < natoms; a++)
-    {
-        points_info[a + natoms * 0] = mol_coords[a][0];
-        points_info[a + natoms * 1] = mol_coords[a][1];
-        points_info[a + natoms * 2] = mol_coords[a][2];
-        points_info[a + natoms * 3] = mol_charges[a];
-    }
 
     double *d_points_info;
 
-    hipSafe(hipMalloc(&d_points_info, natoms * 4 * sizeof(double)));
+    hipSafe(hipMalloc(&d_points_info, npoints * 4 * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_points_info, points_info.data(), natoms * 4 * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_points_info, points_info_ptr, npoints * 4 * sizeof(double), hipMemcpyHostToDevice));
 
     hipSafe(hipDeviceSynchronize());
 
@@ -833,18 +1393,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
         dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergySS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_S,
-                           d_mat_T,
-                           d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_ss_first_inds_local,
-                           d_ss_second_inds_local,
-                           static_cast<uint32_t>(ss_prim_pair_count_local));
-
-        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-
         hipLaunchKernelGGL(gpu::computeNuclearPotentialSS, num_blocks, threads_per_block, 0, 0,
                            d_mat_V,
                            d_s_prim_info,
@@ -853,7 +1401,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                            d_ss_second_inds_local,
                            static_cast<uint32_t>(ss_prim_pair_count_local),
                            d_points_info,
-                           static_cast<uint32_t>(natoms),
+                           static_cast<uint32_t>(npoints),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -866,14 +1414,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
             const auto i_cgto = s_prim_aoinds[i];
             const auto j_cgto = s_prim_aoinds[j];
-
-            mat_overlap.row(i_cgto)[j_cgto] += mat_S[ij];
-
-            if (i != j) mat_overlap.row(j_cgto)[i_cgto] += mat_S[ij];
-
-            mat_kinetic_energy.row(i_cgto)[j_cgto] += mat_T[ij];
-
-            if (i != j) mat_kinetic_energy.row(j_cgto)[i_cgto] += mat_T[ij];
 
             mat_nuclear_potential.row(i_cgto)[j_cgto] += mat_V[ij];
 
@@ -889,20 +1429,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergySP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_S,
-                           d_mat_T,
-                           d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_sp_first_inds_local,
-                           d_sp_second_inds_local,
-                           static_cast<uint32_t>(sp_prim_pair_count_local));
-
-        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-
         hipLaunchKernelGGL(gpu::computeNuclearPotentialSP, num_blocks, threads_per_block, 0, 0,
                            d_mat_V,
                            d_s_prim_info,
@@ -913,7 +1439,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                            d_sp_second_inds_local,
                            static_cast<uint32_t>(sp_prim_pair_count_local),
                            d_points_info,
-                           static_cast<uint32_t>(natoms),
+                           static_cast<uint32_t>(npoints),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -935,12 +1461,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                 auto j_cgto_sph = j_cgto_sph_ind_coef.first;
                 auto j_coef_sph = j_cgto_sph_ind_coef.second;
 
-                mat_overlap.row(i_cgto)[j_cgto_sph] += mat_S[ij] * j_coef_sph;
-                mat_overlap.row(j_cgto_sph)[i_cgto] += mat_S[ij] * j_coef_sph;
-
-                mat_kinetic_energy.row(i_cgto)[j_cgto_sph] += mat_T[ij] * j_coef_sph;
-                mat_kinetic_energy.row(j_cgto_sph)[i_cgto] += mat_T[ij] * j_coef_sph;
-
                 mat_nuclear_potential.row(i_cgto)[j_cgto_sph] += mat_V[ij] * j_coef_sph;
                 mat_nuclear_potential.row(j_cgto_sph)[i_cgto] += mat_V[ij] * j_coef_sph;
             }
@@ -955,20 +1475,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
         dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergySD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_S,
-                           d_mat_T,
-                           d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
-                           d_sd_first_inds_local,
-                           d_sd_second_inds_local,
-                           static_cast<uint32_t>(sd_prim_pair_count_local));
-
-        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-
         hipLaunchKernelGGL(gpu::computeNuclearPotentialSD, num_blocks, threads_per_block, 0, 0,
                            d_mat_V,
                            d_s_prim_info,
@@ -979,7 +1485,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                            d_sd_second_inds_local,
                            static_cast<uint32_t>(sd_prim_pair_count_local),
                            d_points_info,
-                           static_cast<uint32_t>(natoms),
+                           static_cast<uint32_t>(npoints),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -1001,12 +1507,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                 auto j_cgto_sph = j_cgto_sph_ind_coef.first;
                 auto j_coef_sph = j_cgto_sph_ind_coef.second;
 
-                mat_overlap.row(i_cgto)[j_cgto_sph] += mat_S[ij] * j_coef_sph;
-                mat_overlap.row(j_cgto_sph)[i_cgto] += mat_S[ij] * j_coef_sph;
-
-                mat_kinetic_energy.row(i_cgto)[j_cgto_sph] += mat_T[ij] * j_coef_sph;
-                mat_kinetic_energy.row(j_cgto_sph)[i_cgto] += mat_T[ij] * j_coef_sph;
-
                 mat_nuclear_potential.row(i_cgto)[j_cgto_sph] += mat_V[ij] * j_coef_sph;
                 mat_nuclear_potential.row(j_cgto_sph)[i_cgto] += mat_V[ij] * j_coef_sph;
             }
@@ -1021,18 +1521,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergyPP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_S,
-                           d_mat_T,
-                           d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_pp_first_inds_local,
-                           d_pp_second_inds_local,
-                           static_cast<uint32_t>(pp_prim_pair_count_local));
-
-        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-
         hipLaunchKernelGGL(gpu::computeNuclearPotentialPP, num_blocks, threads_per_block, 0, 0,
                            d_mat_V,
                            d_p_prim_info,
@@ -1041,7 +1529,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                            d_pp_second_inds_local,
                            static_cast<uint32_t>(pp_prim_pair_count_local),
                            d_points_info,
-                           static_cast<uint32_t>(natoms),
+                           static_cast<uint32_t>(npoints),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -1069,14 +1557,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
                     auto coef_sph = i_coef_sph * j_coef_sph;
 
-                    mat_overlap.row(i_cgto_sph)[j_cgto_sph] += mat_S[ij] * coef_sph;
-
-                    if (i != j) mat_overlap.row(j_cgto_sph)[i_cgto_sph] += mat_S[ij] * coef_sph;
-
-                    mat_kinetic_energy.row(i_cgto_sph)[j_cgto_sph] += mat_T[ij] * coef_sph;
-
-                    if (i != j) mat_kinetic_energy.row(j_cgto_sph)[i_cgto_sph] += mat_T[ij] * coef_sph;
-
                     mat_nuclear_potential.row(i_cgto_sph)[j_cgto_sph] += mat_V[ij] * coef_sph;
 
                     if (i != j) mat_nuclear_potential.row(j_cgto_sph)[i_cgto_sph] += mat_V[ij] * coef_sph;
@@ -1093,20 +1573,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
         dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergyPD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_S,
-                           d_mat_T,
-                           d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
-                           d_pd_first_inds_local,
-                           d_pd_second_inds_local,
-                           static_cast<uint32_t>(pd_prim_pair_count_local));
-
-        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-
         hipLaunchKernelGGL(gpu::computeNuclearPotentialPD, num_blocks, threads_per_block, 0, 0,
                            d_mat_V,
                            d_p_prim_info,
@@ -1117,7 +1583,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                            d_pd_second_inds_local,
                            static_cast<uint32_t>(pd_prim_pair_count_local),
                            d_points_info,
-                           static_cast<uint32_t>(natoms),
+                           static_cast<uint32_t>(npoints),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -1145,12 +1611,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
                     auto coef_sph = i_coef_sph * j_coef_sph;
 
-                    mat_overlap.row(i_cgto_sph)[j_cgto_sph] += mat_S[ij] * coef_sph;
-                    mat_overlap.row(j_cgto_sph)[i_cgto_sph] += mat_S[ij] * coef_sph;
-
-                    mat_kinetic_energy.row(i_cgto_sph)[j_cgto_sph] += mat_T[ij] * coef_sph;
-                    mat_kinetic_energy.row(j_cgto_sph)[i_cgto_sph] += mat_T[ij] * coef_sph;
-
                     mat_nuclear_potential.row(i_cgto_sph)[j_cgto_sph] += mat_V[ij] * coef_sph;
                     mat_nuclear_potential.row(j_cgto_sph)[i_cgto_sph] += mat_V[ij] * coef_sph;
                 }
@@ -1166,18 +1626,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
         dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergyDD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_S,
-                           d_mat_T,
-                           d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
-                           d_dd_first_inds_local,
-                           d_dd_second_inds_local,
-                           static_cast<uint32_t>(dd_prim_pair_count_local));
-
-        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-
         hipLaunchKernelGGL(gpu::computeNuclearPotentialDD, num_blocks, threads_per_block, 0, 0,
                            d_mat_V,
                            d_d_prim_info,
@@ -1186,7 +1634,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                            d_dd_second_inds_local,
                            static_cast<uint32_t>(dd_prim_pair_count_local),
                            d_points_info,
-                           static_cast<uint32_t>(natoms),
+                           static_cast<uint32_t>(npoints),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -1214,14 +1662,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
                     auto coef_sph = i_coef_sph * j_coef_sph;
 
-                    mat_overlap.row(i_cgto_sph)[j_cgto_sph] += mat_S[ij] * coef_sph;
-
-                    if (i != j) mat_overlap.row(j_cgto_sph)[i_cgto_sph] += mat_S[ij] * coef_sph;
-
-                    mat_kinetic_energy.row(i_cgto_sph)[j_cgto_sph] += mat_T[ij] * coef_sph;
-
-                    if (i != j) mat_kinetic_energy.row(j_cgto_sph)[i_cgto_sph] += mat_T[ij] * coef_sph;
-
                     mat_nuclear_potential.row(i_cgto_sph)[j_cgto_sph] += mat_V[ij] * coef_sph;
 
                     if (i != j) mat_nuclear_potential.row(j_cgto_sph)[i_cgto_sph] += mat_V[ij] * coef_sph;
@@ -1239,8 +1679,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     hipSafe(hipFree(d_p_prim_info));
     hipSafe(hipFree(d_d_prim_info));
 
-    hipSafe(hipFree(d_mat_S));
-    hipSafe(hipFree(d_mat_T));
     hipSafe(hipFree(d_mat_V));
 
     hipSafe(hipFree(d_ss_first_inds_local));
@@ -1260,35 +1698,23 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
     }}
 
-    std::vector<CDenseMatrix> STV_matrices(3);
+    CDenseMatrix V_matrix(naos, naos);
 
-    STV_matrices[0] = CDenseMatrix(naos, naos);
-    STV_matrices[1] = CDenseMatrix(naos, naos);
-    STV_matrices[2] = CDenseMatrix(naos, naos);
+    V_matrix.zero();
 
-    STV_matrices[0].zero();
-    STV_matrices[1].zero();
-    STV_matrices[2].zero();
-
-    auto p_mat_S = STV_matrices[0].values();
-    auto p_mat_T = STV_matrices[1].values();
-    auto p_mat_V = STV_matrices[2].values();
+    auto p_mat_V = V_matrix.values();
 
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
-        auto p_mat_overlap = S_matrices[gpu_id].values();
-        auto p_mat_kinetic_energy = T_matrices[gpu_id].values();
         auto p_mat_nuclear_potential = V_matrices[gpu_id].values();
 
         for (int64_t ind = 0; ind < naos * naos; ind++)
         {
-            p_mat_S[ind] += p_mat_overlap[ind];
-            p_mat_T[ind] += p_mat_kinetic_energy[ind];
             p_mat_V[ind] += p_mat_nuclear_potential[ind];
         }
     }
 
-    return STV_matrices;
+    return V_matrix;
 }
 
 auto
@@ -1458,7 +1884,7 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule, const CMolecularB
     std::vector<double> mat_MY(max_prim_pair_count_local);
     std::vector<double> mat_MZ(max_prim_pair_count_local);
 
-    // S on device
+    // MX/MY/MZ on device
 
     double *d_mat_MX, *d_mat_MY, *d_mat_MZ;
 
@@ -2087,7 +2513,7 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule, const CMolecularB
     std::vector<double> mat_MY(max_prim_pair_count_local);
     std::vector<double> mat_MZ(max_prim_pair_count_local);
 
-    // S on device
+    // MX/MY/MZ on device
 
     double *d_mat_MX, *d_mat_MY, *d_mat_MZ;
 
@@ -2698,7 +3124,7 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule, const CMolecular
     std::vector<double> mat_MY(max_prim_pair_count_local);
     std::vector<double> mat_MZ(max_prim_pair_count_local);
 
-    // S on device
+    // MX/MY/MZ on device
 
     double *d_mat_MX, *d_mat_MY, *d_mat_MZ;
 

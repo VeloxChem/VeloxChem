@@ -39,7 +39,8 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import xcfun
 from .veloxchemlib import (compute_fock_gpu, matmul_gpu, eigh_gpu,
                            dot_product_gpu, integrate_vxc_fock_gpu,
-                           compute_one_electron_integrals_gpu)
+                           compute_overlap_and_kinetic_energy_integrals_gpu,
+                           compute_nuclear_potential_integrals_gpu)
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -1401,8 +1402,10 @@ class ScfDriver:
 
         t0 = tm.time()
 
-        # TODO merge kin_mat and npot_mat
-        ovl_mat, kin_mat, npot_mat = compute_one_electron_integrals_gpu(
+        ovl_mat, kin_mat = compute_overlap_and_kinetic_energy_integrals_gpu(
+            molecule, basis, screener)
+
+        npot_mat = compute_nuclear_potential_integrals_gpu(
             molecule, basis, screener)
 
         naos = ovl_mat.number_of_rows()
