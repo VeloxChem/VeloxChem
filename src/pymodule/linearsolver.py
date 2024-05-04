@@ -31,7 +31,6 @@ import sys
 import os
 
 # TODO import VisualizationDriver
-from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver, MolecularGrid
 from .veloxchemlib import AODensityMatrix, denmat
 from .veloxchemlib import ScreeningData, GpuDevices
@@ -331,19 +330,6 @@ class LinearSolver:
 
         self._pe = ('potfile' in self.pe_options)
 
-        if self._pe:
-            from .polembed import PolEmbed
-
-            cppe_potfile = None
-            if self.rank == mpi_master():
-                potfile = self.pe_options['potfile']
-                if not Path(potfile).is_file() and self.filename is not None:
-                    potfile = str(
-                        Path(self.filename).parent / Path(potfile).name)
-                cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
-            cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
-            self.pe_options['potfile'] = cppe_potfile
-
     def _init_eri(self, molecule, basis):
         """
         Initializes ERI.
@@ -437,30 +423,20 @@ class LinearSolver:
         """
 
         if self._pe:
-            from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, self.pe_options, self.comm)
-            V_es = pe_drv.compute_multipole_potential_integrals()
-
-            cppe_info = 'Using CPPE {} for polarizable embedding.'.format(
-                pe_drv.get_cppe_version())
-            self.ostream.print_info(cppe_info)
-            self.ostream.print_blank()
-
-            pot_info = "Reading polarizable embedding potential: {}".format(
-                self.pe_options['potfile'])
-            self.ostream.print_info(pot_info)
-            self.ostream.print_blank()
-
-            with open(str(self.pe_options['potfile']), 'r') as f_pot:
-                potfile_text = '\n'.join(f_pot.readlines())
+            if self.rank == mpi_master():
+                potfile = self.pe_options['potfile']
+                if not Path(potfile).is_file():
+                    potfile = str(
+                        Path(self._filename).parent / Path(potfile).name)
+                with Path(potfile).open('r') as fh:
+                    potfile_text = '\n'.join(fh.readlines())
+            else:
+                potfile_text = None
+            potfile_text = self.comm.bcast(potfile_text, root=mpi_master())
         else:
-            pe_drv = None
-            V_es = None
             potfile_text = ''
 
         return {
-            'pe_drv': pe_drv,
-            'V_es': V_es,
             'potfile_text': potfile_text,
         }
 
@@ -857,9 +833,6 @@ class LinearSolver:
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
 
-        V_es = pe_dict['V_es']
-        pe_drv = pe_dict['pe_drv']
-
         t0 = tm.time()
 
         fock_mat, fock_mat_erf_k = None, None
@@ -926,17 +899,6 @@ class LinearSolver:
 
             if profiler is not None:
                 profiler.add_timing_info('FockXC', tm.time() - t0)
-
-        if self._pe:
-            t0 = tm.time()
-            pe_drv.V_es = V_es.copy()
-            for ifock in range(fock.number_of_fock_matrices()):
-                dm = dens.alpha_to_numpy(ifock) + dens.beta_to_numpy(ifock)
-                e_pe, V_pe = pe_drv.get_pe_contribution(dm, elec_only=True)
-                if self.rank == mpi_master():
-                    fock.add_matrix(DenseMatrix(V_pe), ifock)
-            if profiler is not None:
-                profiler.add_timing_info('FockPE', tm.time() - t0)
 
         fock_mat_local = fock_mat.to_numpy()
         if fock_mat_erf_k is not None:
