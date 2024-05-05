@@ -1083,6 +1083,7 @@ class ScfDriver:
                            dipole_mats.z_to_numpy())
 
         if self._pe and not self._first_step:
+            t0_point_charges = tm.time()
             V_es = compute_point_charges_integrals_gpu(molecule, ao_basis,
                                                        screener,
                                                        self._point_charges)
@@ -1095,6 +1096,10 @@ class ScfDriver:
                              self._V_es,
                              op=MPI.SUM,
                              root=mpi_master())
+            self.ostream.print_info(
+                'Point charges one-electron integral computed in' +
+                ' {:.2f} sec.'.format(tm.time() - t0_point_charges))
+            self.ostream.print_blank()
 
         linear_dependency = False
 
