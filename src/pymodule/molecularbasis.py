@@ -125,8 +125,10 @@ def _read_atom_basis(basis_data, elem_id, basis_name):
 
     atom_basis = AtomBasis()
 
-    while basis_data:
-        shell_title = basis_data.pop(0).split()
+    basis_data_copy = list(basis_data)
+
+    while basis_data_copy:
+        shell_title = basis_data_copy.pop(0).split()
         assert_msg_critical(
             len(shell_title) == 2 or len(shell_title) == 3,
             'Basis set parser: {}'.format(' '.join(shell_title)),
@@ -148,7 +150,7 @@ def _read_atom_basis(basis_data, elem_id, basis_name):
             coeffs = [0.0] * npgto
 
             for i in range(npgto):
-                prims = basis_data.pop(0).split()
+                prims = basis_data_copy.pop(0).split()
                 assert_msg_critical(
                     len(prims) == 2,
                     'Basis set parser: {}'.format(' '.join(prims)))
@@ -265,14 +267,36 @@ def _MolecularBasis_read(molecule,
 
     # TODO: enable MPI bcast of MolecularBasis through basis_dict
 
-    basis_dict = _read_basis_file(basis_name, basis_path, ostream)
+    basis_dict = {}
+
+    basis_set_labels = molecule.get_basis_set_labels()
+
+    # read atom basis sets defined in molecule
+    for basis_set_label in set(basis_set_labels):
+        if basis_set_label != '':
+            basis_dict[basis_set_label.upper()] = _read_basis_file(
+                basis_set_label, basis_path, ostream)
+
+    # read default basis set
+    if basis_name.upper() not in basis_dict:
+        basis_dict[basis_name.upper()] = _read_basis_file(
+            basis_name, basis_path, ostream)
 
     mol_basis = MolecularBasis()
 
-    for elem_id in molecule.get_identifiers():
-        basis_key = _gen_basis_key(elem_id, basis_dict)
-        atom_basis = _read_atom_basis(basis_dict[basis_key], elem_id,
-                                      basis_name)
+    for idx, elem_id in enumerate(molecule.get_identifiers()):
+        if basis_name.upper() == 'AO-START-GUESS':
+            basis_set_label = basis_name.upper()
+        else:
+            basis_set_label = basis_set_labels[idx].upper()
+            if basis_set_label == '':
+                basis_set_label = basis_name.upper()
+
+        basis_key = _gen_basis_key(elem_id, basis_dict[basis_set_label])
+
+        atom_basis = _read_atom_basis(basis_dict[basis_set_label][basis_key],
+                                      elem_id, basis_set_label)
+
         mol_basis.add(atom_basis)
 
     mol_basis.set_label(basis_name.upper())
