@@ -16,7 +16,7 @@ class TestOverlapDriver:
             C   0.100  -0.400  -1.000
             O   0.300   1.400  -2.100
         """
-        mol = Molecule.read_str(costr, 'au')
+        mol = Molecule.read_molecule_string(costr, 'au')
 
         here = Path(__file__).parent
         basis_path = str(here.parent / 'basis')
@@ -30,7 +30,7 @@ class TestOverlapDriver:
             C   0.100  -0.400  -1.000
             O   0.300   1.400  -2.100
         """
-        mol = Molecule.read_str(costr, 'au')
+        mol = Molecule.read_molecule_string(costr, 'au')
 
         here = Path(__file__).parent
         basis_path = str(here.parent / 'basis')

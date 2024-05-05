@@ -36,24 +36,24 @@
 #include "MathFunc.hpp"
 #include "StringFormat.hpp"
 
-CMolecule::CMolecule(const std::vector<int64_t>& identifiers, const std::vector<TPoint3D>& coordinates, const std::string& units)
+CMolecule::CMolecule(const std::vector<int64_t>& identifiers, const std::vector<TPoint3D>& coordinates, const std::string& units, const std::vector<std::string>& basis_set_labels)
 {
     if (const auto natoms = identifiers.size(); coordinates.size() == natoms)
     {
         for (size_t i = 0; i < natoms; i++)
         {
-            addAtom(identifiers[i], coordinates[i], units);
+            addAtom(identifiers[i], coordinates[i], units, basis_set_labels[i]);
         }
     }
 }
 
-CMolecule::CMolecule(const std::vector<std::string>& labels, const std::vector<TPoint3D>& coordinates, const std::string& units)
+CMolecule::CMolecule(const std::vector<std::string>& labels, const std::vector<TPoint3D>& coordinates, const std::string& units, const std::vector<std::string>& basis_set_labels)
 {
     if (const auto natoms = labels.size(); coordinates.size() == natoms)
     {
         for (size_t i = 0; i < natoms; i++)
         {
-            addAtom(labels[i], coordinates[i], units);
+            addAtom(labels[i], coordinates[i], units, basis_set_labels[i]);
         }
     }
 }
@@ -66,6 +66,8 @@ CMolecule::CMolecule(const CMolecule& molfrag_one, const CMolecule& molfrag_two)
 
     _coordinates = molfrag_one._coordinates;
 
+    _basis_set_labels = molfrag_one._basis_set_labels;
+
     // append geometrical data from molecule B
 
     if (const auto natoms = molfrag_two.getNumberOfAtoms(); natoms > 0)
@@ -75,6 +77,8 @@ CMolecule::CMolecule(const CMolecule& molfrag_one, const CMolecule& molfrag_two)
             _identifiers.push_back(molfrag_two._identifiers[i]);
 
             _coordinates.push_back(molfrag_two._coordinates[i]);
+
+            _basis_set_labels.push_back(molfrag_two._basis_set_labels[i]);
         }
     }
 
@@ -90,20 +94,22 @@ CMolecule::CMolecule(const CMolecule& molfrag_one, const CMolecule& molfrag_two)
 }
 
 auto
-CMolecule::addAtom(const std::string& label, const TPoint3D& coordinates, const std::string& units) -> void
+CMolecule::addAtom(const std::string& label, const TPoint3D& coordinates, const std::string& units, const std::string& basis_set_label) -> void
 {
     if (CChemicalElement elem; elem.setAtomType(fstr::upcase(label)))
     {
-        addAtom(elem.getIdentifier(), coordinates, units);
+        addAtom(elem.getIdentifier(), coordinates, units, basis_set_label);
     }
 }
 
 auto
-CMolecule::addAtom(const int64_t identifier, const TPoint3D& coordinates, const std::string& units) -> void
+CMolecule::addAtom(const int64_t identifier, const TPoint3D& coordinates, const std::string& units, const std::string& basis_set_label) -> void
 {
     if (CChemicalElement elem; (identifier >= 0) && (identifier <= elem.getMaxIdentifier()))
     {
         _identifiers.push_back(identifier);
+
+        _basis_set_labels.push_back(basis_set_label);
 
         if (_isAngstroms(units))
         {
@@ -344,6 +350,18 @@ CMolecule::getLabel(const int64_t iatom) const -> std::string
     {
         return std::string();
     }
+}
+
+auto
+CMolecule::getBasisSetLabels() const -> std::vector<std::string>
+{
+    return _basis_set_labels;
+}
+
+auto
+CMolecule::getAtomBasisSetLabel(const int64_t iatom) const -> std::string
+{
+    return _basis_set_labels[iatom];
 }
 
 auto

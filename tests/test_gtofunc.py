@@ -13,7 +13,7 @@ class TestGtoBlock:
                     H   0.000   1.400  -2.100
                     H   0.000  -1.400  -2.100"""
 
-        mol = Molecule.read_str(h2ostr, 'au')
+        mol = Molecule.read_molecule_string(h2ostr, 'au')
 
         bas = MolecularBasis.read(mol, 'DEF2-SVP', 'basis', ostream=None)
 

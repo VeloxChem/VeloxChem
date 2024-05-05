@@ -65,8 +65,9 @@ class TestMolecule:
 
         labels = self.nh3_labels()
         coords = self.nh3_coords()
+        basis_set_labels = ['' for x in labels]
 
-        return Molecule(labels, coords, "au")
+        return Molecule(labels, coords, "au", basis_set_labels)
 
     def test_constructors(self):
 
@@ -75,22 +76,23 @@ class TestMolecule:
         labels = self.nh3_labels()
         coords = self.nh3_coords()
         xyzstr = self.nh3_xyzstr()
+        basis_set_labels = ['' for x in labels]
 
         # test static read_str method
-        mol_a = Molecule(labels, coords, 'au')
-        mol_b = Molecule.read_str(xyzstr, 'au')
+        mol_a = Molecule(labels, coords, 'au', basis_set_labels)
+        mol_b = Molecule.read_molecule_string(xyzstr, 'au')
         Tester.compare_molecules(mol_a, mol_b)
 
         # test labels and identifiers based constructors
-        mol_b = Molecule([7, 1, 1, 1], coords, 'au')
+        mol_b = Molecule([7, 1, 1, 1], coords, 'au', basis_set_labels)
         Tester.compare_molecules(mol_a, mol_b)
 
         # test unit changes in constructors
         f = bohr_in_angstroms()
         coords_ang = [[r[0] * f, r[1] * f, r[2] * f] for r in coords]
-        mol_b = Molecule(labels, coords_ang, 'angstrom')
+        mol_b = Molecule(labels, coords_ang, 'angstrom', basis_set_labels)
         Tester.compare_molecules(mol_a, mol_b)
-        mol_b = Molecule([7, 1, 1, 1], coords_ang, 'angstrom')
+        mol_b = Molecule([7, 1, 1, 1], coords_ang, 'angstrom', basis_set_labels)
         Tester.compare_molecules(mol_a, mol_b)
 
         # test copy constructor
@@ -104,10 +106,10 @@ class TestMolecule:
         assert mol_b.number_of_atoms() == 0
 
         # test composition constructor
-        mol_b = Molecule.read_str(self.h2o_xyzstr(), 'au')
+        mol_b = Molecule.read_molecule_string(self.h2o_xyzstr(), 'au')
         mol_c = Molecule(mol_a, mol_b)
         xyzstr = self.nh3_h2o_xyzstr()
-        mol_d = Molecule.read_str(xyzstr, 'au')
+        mol_d = Molecule.read_molecule_string(xyzstr, 'au')
         Tester.compare_molecules(mol_c, mol_d)
 
     def test_add_atom(self):
@@ -116,18 +118,18 @@ class TestMolecule:
 
         # add_atom with identifier
         mol_b = Molecule()
-        mol_b.add_atom(7, [-3.710, 3.019, -0.037], 'au')
-        mol_b.add_atom(1, [-3.702, 4.942, 0.059], 'au')
-        mol_b.add_atom(1, [-4.704, 2.415, 1.497], 'au')
-        mol_b.add_atom(1, [-4.780, 2.569, -1.573], 'au')
+        mol_b.add_atom(7, [-3.710, 3.019, -0.037], 'au', '')
+        mol_b.add_atom(1, [-3.702, 4.942, 0.059], 'au', '')
+        mol_b.add_atom(1, [-4.704, 2.415, 1.497], 'au', '')
+        mol_b.add_atom(1, [-4.780, 2.569, -1.573], 'au', '')
         Tester.compare_molecules(mol_a, mol_b)
 
         # add_atom with label
         mol_b = Molecule()
-        mol_b.add_atom('N', [-3.710, 3.019, -0.037], 'au')
-        mol_b.add_atom('H', [-3.702, 4.942, 0.059], 'au')
-        mol_b.add_atom('H', [-4.704, 2.415, 1.497], 'au')
-        mol_b.add_atom('H', [-4.780, 2.569, -1.573], 'au')
+        mol_b.add_atom('N', [-3.710, 3.019, -0.037], 'au', '')
+        mol_b.add_atom('H', [-3.702, 4.942, 0.059], 'au', '')
+        mol_b.add_atom('H', [-4.704, 2.415, 1.497], 'au', '')
+        mol_b.add_atom('H', [-4.780, 2.569, -1.573], 'au', '')
         Tester.compare_molecules(mol_a, mol_b)
 
         # test unit changes in add atom
@@ -135,16 +137,16 @@ class TestMolecule:
         coords = self.nh3_coords()
         coords_ang = [[r[0] * f, r[1] * f, r[2] * f] for r in coords]
         mol_b = Molecule()
-        mol_b.add_atom('N', coords_ang[0], 'angstrom')
-        mol_b.add_atom('H', coords_ang[1], 'angstrom')
-        mol_b.add_atom('H', coords_ang[2], 'angstrom')
-        mol_b.add_atom('H', coords_ang[3], 'angstrom')
+        mol_b.add_atom('N', coords_ang[0], 'angstrom', '')
+        mol_b.add_atom('H', coords_ang[1], 'angstrom', '')
+        mol_b.add_atom('H', coords_ang[2], 'angstrom', '')
+        mol_b.add_atom('H', coords_ang[3], 'angstrom', '')
         Tester.compare_molecules(mol_a, mol_b)
         mol_b = Molecule()
-        mol_b.add_atom(7, coords_ang[0], 'angstrom')
-        mol_b.add_atom(1, coords_ang[1], 'angstrom')
-        mol_b.add_atom(1, coords_ang[2], 'angstrom')
-        mol_b.add_atom(1, coords_ang[3], 'angstrom')
+        mol_b.add_atom(7, coords_ang[0], 'angstrom', '')
+        mol_b.add_atom(1, coords_ang[1], 'angstrom', '')
+        mol_b.add_atom(1, coords_ang[2], 'angstrom', '')
+        mol_b.add_atom(1, coords_ang[3], 'angstrom', '')
         Tester.compare_molecules(mol_a, mol_b)
 
     def test_multiplicity(self):
@@ -296,7 +298,7 @@ class TestMolecule:
 
         tol = 1.0e-12
 
-        mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
+        mol = Molecule.read_molecule_string(self.h2o_xyzstr(), 'au')
         assert mt.isclose(mol.nuclear_repulsion_energy(),
                           9.34363815797054450919,
                           rel_tol=tol,
@@ -340,7 +342,7 @@ class TestMolecule:
                 fname = str(Path(temp_dir, 'mol.xyz'))
                 mol_a = self.nh3_molecule()
                 mol_a.write_xyz(fname)
-                mol_b = Molecule.read_xyz(fname)
+                mol_b = Molecule.read_xyz_file(fname)
                 Tester.compare_molecules(mol_a, mol_b)
 
     def test_read_dict(self):
@@ -400,7 +402,7 @@ class TestMolecule:
         tol = 1.0e-12
 
         xyzstr = self.ch4_xyzstr()
-        mol = Molecule.read_str(xyzstr, 'au')
+        mol = Molecule.read_molecule_string(xyzstr, 'au')
 
         imoms = mol.moments_of_inertia()
         rmoms = np.array(
@@ -410,11 +412,11 @@ class TestMolecule:
     def test_is_linear(self):
 
         xyzstr = self.ch4_xyzstr()
-        mol = Molecule.read_str(xyzstr, 'au')
+        mol = Molecule.read_molecule_string(xyzstr, 'au')
         assert not mol.is_linear()
 
         xyzstr = self.co2_xyzstr()
-        mol = Molecule.read_str(xyzstr, 'au')
+        mol = Molecule.read_molecule_string(xyzstr, 'au')
         assert mol.is_linear()
 
     def test_get_aufbau_occupation(self):
@@ -422,7 +424,7 @@ class TestMolecule:
         tol = 1.0e-12
 
         xyzstr = self.nh3_xyzstr()
-        mol = Molecule.read_str(xyzstr)
+        mol = Molecule.read_molecule_string(xyzstr)
         mol.set_charge(1.0)
         mol.set_multiplicity(2)
 

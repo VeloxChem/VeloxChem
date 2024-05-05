@@ -62,6 +62,11 @@ class CMolecule
     std::vector<int64_t> _identifiers;
 
     /**
+     The vector of basis set names of atoms.
+     */
+    std::vector<std::string> _basis_set_labels;
+
+    /**
      Checks if units are given in Angstroms.
 
      @param units the units of Cartesian coordinates of atoms.
@@ -81,8 +86,9 @@ class CMolecule
      @param identifiers the vector of chemical element identifiers.
      @param coordinates the vector of Cartesian coordinates of atoms.
      @param units the units of Cartesian coordinates of atoms.
+     @param basis_set_labels the names of atom basis sets.
      */
-    CMolecule(const std::vector<int64_t>& identifiers, const std::vector<TPoint3D>& coordinates, const std::string& units);
+    CMolecule(const std::vector<int64_t>& identifiers, const std::vector<TPoint3D>& coordinates, const std::string& units, const std::vector<std::string>& basis_set_labels);
 
     /**
      Creates a molecule.
@@ -90,8 +96,9 @@ class CMolecule
      @param labels the vector of chemical element labels.
      @param coordinates the vector of Cartesian coordinates of atoms.
      @param units the units of Cartesian coordinates of atoms.
+     @param basis_set_labels the names of atom basis sets.
      */
-    CMolecule(const std::vector<std::string>& labels, const std::vector<TPoint3D>& coordinates, const std::string& units);
+    CMolecule(const std::vector<std::string>& labels, const std::vector<TPoint3D>& coordinates, const std::string& units, const std::vector<std::string>& basis_set_labels);
 
     /**
      Creates a molecule by merging two molecular fragments.
@@ -107,8 +114,9 @@ class CMolecule
      @param label the label of atom.
      @param coordinates the coordinates of atom.
      @param units the units of Cartesian coordinates of atom.
+     @param basis_set_label the name of atom basis set.
     */
-    auto addAtom(const std::string& label, const TPoint3D& coordinates, const std::string& units) -> void;
+    auto addAtom(const std::string& label, const TPoint3D& coordinates, const std::string& units, const std::string& basis_set_label) -> void;
 
     /**
      Adds atom to molecule using given chemical element identifier and coordinates.
@@ -116,8 +124,9 @@ class CMolecule
      @param identifier the chemical element identifier of atom.
      @param coordinates the coordinates of atom.
      @param units the units of Cartesian coordinates of atom.
+     @param basis_set_label the name of atom basis set.
     */
-    auto addAtom(const int64_t identifier, const TPoint3D& coordinates, const std::string& units) -> void;
+    auto addAtom(const int64_t identifier, const TPoint3D& coordinates, const std::string& units, const std::string& basis_set_label) -> void;
 
     /**
      Sets charge of molecule.
@@ -229,6 +238,21 @@ class CMolecule
      @return the label of atom.
      */
     auto getLabel(const int64_t iatom) const -> std::string;
+
+    /**
+     Gets basis set names of all atoms in molecule.
+
+     @return the vector of basis set names.
+     */
+    auto getBasisSetLabels() const -> std::vector<std::string>;
+
+    /**
+     Gets basis set name of specific atom.
+
+     @param iatom the index of atom.
+     @return the name of atom basis set.
+     */
+    auto getAtomBasisSetLabel(const int64_t iatom) const -> std::string;
 
     /**
      Gets vector of atom coordinates of specific atom.

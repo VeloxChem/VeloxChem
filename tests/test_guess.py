@@ -18,7 +18,7 @@ class TestInitialGuess:
             H   0.0   1.4   1.1
             H   0.0  -1.4   1.1
             """
-            mol = Molecule.read_str(molstr, 'au')
+            mol = Molecule.read_molecule_string(molstr, 'au')
 
             bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
             min_bas = MolecularBasis.read(mol, 'ao-start-guess', ostream=None)

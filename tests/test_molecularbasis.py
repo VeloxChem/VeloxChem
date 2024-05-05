@@ -137,7 +137,7 @@ class TestMolecularBasis:
                     H   0.000   1.400  -2.100
                     H   0.000  -1.400  -2.100"""
 
-        return Molecule.read_str(h2ostr, 'au')
+        return Molecule.read_molecule_string(h2ostr, 'au')
 
     def get_h2o_svp(self):
 
