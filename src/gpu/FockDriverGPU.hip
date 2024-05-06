@@ -3849,6 +3849,10 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     timer.stop("Prep. sortQD");
 
+    CTimer prelink_timer;
+
+    prelink_timer.start();
+
     timer.start("Prep. Q_prime");
 
     // preLinK
@@ -3895,6 +3899,12 @@ computeFockOnGPU(const              CMolecule& molecule,
     hipSafe(hipFree(d_matrix_C));
 
     timer.stop("Prep. Q_prime");
+
+    prelink_timer.stop();
+
+    auto prelink_elapsed_time = prelink_timer.getElapsedTime();
+
+    screening.setPreLinkTime(prelink_elapsed_time);
 
     timer.start("Prep. preLinK");
 

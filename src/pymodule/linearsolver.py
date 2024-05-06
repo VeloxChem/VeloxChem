@@ -834,6 +834,7 @@ class LinearSolver:
         gs_density = dft_dict['gs_density']
 
         t0 = tm.time()
+        prelink_dt = 0.0
 
         fock_mat, fock_mat_erf_k = None, None
 
@@ -854,12 +855,16 @@ class LinearSolver:
                                                 self.eri_thresh,
                                                 self.prelink_thresh, screening)
 
+                    prelink_dt += float(screening.get_prelink_time().split()[0])
+
                     fock_mat_erf_k = compute_fock_gpu(molecule, basis, dens,
                                                       0.0, erf_k_coef, omega,
                                                       flag_exchange,
                                                       self.eri_thresh,
                                                       self.prelink_thresh,
                                                       screening)
+
+                    prelink_dt += float(screening.get_prelink_time().split()[0])
 
                 else:
                     # global hybrid
@@ -869,12 +874,16 @@ class LinearSolver:
                         flag_exchange, self.eri_thresh, self.prelink_thresh,
                         screening)
 
+                    prelink_dt += float(screening.get_prelink_time().split()[0])
+
             else:
                 # pure DFT
                 fock_mat = compute_fock_gpu(molecule, basis, dens,
                                             prefac_coulomb, 0.0, 0.0,
                                             flag_exchange, self.eri_thresh,
                                             self.prelink_thresh, screening)
+
+                prelink_dt += float(screening.get_prelink_time().split()[0])
 
         else:
             # Hartree-Fock
@@ -883,8 +892,12 @@ class LinearSolver:
                                         self.eri_thresh, self.prelink_thresh,
                                         screening)
 
+            prelink_dt += float(screening.get_prelink_time().split()[0])
+
         if profiler is not None:
-            profiler.add_timing_info('FockERI', tm.time() - t0)
+            eri_dt = tm.time() - t0
+            profiler.add_timing_info('FockERI', eri_dt - prelink_dt)
+            profiler.add_timing_info('PreLink', prelink_dt)
 
         if self._dft:
             t0 = tm.time()

@@ -1181,7 +1181,7 @@ class ScfDriver:
             fock_mat, vxc_mat = self._comp_2e_fock(dmat, molecule, ao_basis,
                                                    screener, e_grad, profiler)
 
-            profiler.start_timer('CompEnergy')
+            profiler.start_timer('ErrVec')
 
             e_el = self._comp_energy(fock_mat, vxc_mat, kin_mat, npot_mat,
                                      den_mat)
@@ -1240,7 +1240,7 @@ class ScfDriver:
 
             self._scf_energy = e_scf
 
-            profiler.stop_timer('CompEnergy')
+            profiler.stop_timer('ErrVec')
             profiler.check_memory_usage('Iteration {:d} Fock build'.format(
                 self._num_iter))
 
@@ -1553,6 +1553,7 @@ class ScfDriver:
         #     thresh_int = int(-math.log10(self._get_dyn_threshold(e_grad)))
 
         eri_t0 = tm.time()
+        prelink_dt = 0.0
 
         if self._dft and not self._first_step:
 
@@ -1571,11 +1572,15 @@ class ScfDriver:
                                                        self.prelink_thresh,
                                                        screener)
 
+                    prelink_dt += float(screener.get_prelink_time().split()[0])
+
                     fock_mat_erf_k = compute_fock_gpu(molecule, basis, dmat,
                                                       0.0, erf_k_coef, omega,
                                                       'symm', self.eri_thresh,
                                                       self.prelink_thresh,
                                                       screener)
+
+                    prelink_dt += float(screener.get_prelink_time().split()[0])
 
                     fock_mat_local = (fock_mat_full_k.to_numpy() +
                                       fock_mat_erf_k.to_numpy())
@@ -1588,6 +1593,8 @@ class ScfDriver:
                         self.eri_thresh, self.prelink_thresh, screener)
                     fock_mat_local = fock_mat.to_numpy()
 
+                    prelink_dt += float(screener.get_prelink_time().split()[0])
+
             else:
                 # pure DFT
                 fock_mat = compute_fock_gpu(molecule, basis, dmat, 2.0, 0.0,
@@ -1595,12 +1602,16 @@ class ScfDriver:
                                             self.prelink_thresh, screener)
                 fock_mat_local = fock_mat.to_numpy()
 
+                prelink_dt += float(screener.get_prelink_time().split()[0])
+
         else:
             # Hartree-Fock
             fock_mat = compute_fock_gpu(molecule, basis, dmat, 2.0, 1.0, 0.0,
                                         'symm', self.eri_thresh,
                                         self.prelink_thresh, screener)
             fock_mat_local = fock_mat.to_numpy()
+
+            prelink_dt += float(screener.get_prelink_time().split()[0])
 
         if self.rank == mpi_master():
             fock_mat = np.zeros(fock_mat_local.shape)
@@ -1615,7 +1626,9 @@ class ScfDriver:
         # TODO: add beta density
 
         if self.timing:
-            profiler.add_timing_info('FockERI', tm.time() - eri_t0)
+            eri_dt = tm.time() - eri_t0
+            profiler.add_timing_info('FockERI', eri_dt - prelink_dt)
+            profiler.add_timing_info('PreLink', prelink_dt)
         vxc_t0 = tm.time()
 
         if self._dft and not self._first_step:

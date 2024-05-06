@@ -27,6 +27,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <string>
 
 #include "AODensityMatrix.hpp"
 #include "DenseMatrix.hpp"
@@ -45,6 +46,8 @@ class CScreeningData
     double _pair_threshold{0.0};
 
     double _density_threshold{0.0};
+
+    std::string _prelink_time;
 
     CDenseMatrix _Q_matrix_ss;
     CDenseMatrix _Q_matrix_sp;
@@ -204,6 +207,9 @@ class CScreeningData
     CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node, const double pair_threshold, const double density_threshold);
 
     auto getNumGpusPerNode() const -> const int64_t;
+
+    auto setPreLinkTime(const std::string& prelink_elapsed_time) -> void;
+    auto getPreLinkTime() const -> const std::string;
 
     auto getQMatrixSS() const -> const CDenseMatrix&;
     auto getQMatrixSP() const -> const CDenseMatrix&;

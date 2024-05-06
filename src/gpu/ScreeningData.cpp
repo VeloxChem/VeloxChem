@@ -1179,6 +1179,18 @@ CScreeningData::getNumGpusPerNode() const -> const int64_t
 }
 
 auto
+CScreeningData::setPreLinkTime(const std::string& prelink_elapsed_time) -> void
+{
+    _prelink_time = prelink_elapsed_time;
+}
+
+auto
+CScreeningData::getPreLinkTime() const -> const std::string
+{
+    return _prelink_time;
+}
+
+auto
 CScreeningData::getQMatrixSS() const -> const CDenseMatrix&
 {
     return _Q_matrix_ss;
