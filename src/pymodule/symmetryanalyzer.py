@@ -189,45 +189,46 @@ class SymmetryAnalyzer:
 
         !!!Under construction!!!
         """
+        
         # Initializes
         self._symbols_atom_sym = []
         symmetrized_data = {}
 
         if pointgoup_to_symmetrize is None:
             pointgoup_to_symmetrize = self._schoenflies_symbol
+
+        def _reorient_molecule(coords):
+            """
+            Store the geometry reoriented in the conventional point group orientation
+            and attibute associated list of atomic labels.
+
+            :param coords:
+                The coordinates to reorient.
+            """
+            
+            symmetrized_data["new_pointgroup"] = "Initial geometry reoriented"
+            reoriented_coords = self._conventional_orientation(coords)
+            symmetrized_data["symmetrized_coord_in_angstrom"] = reoriented_coords * bohr_in_angstrom()
+            self._symbols_atom_sym = self._symbols
         
-        # Handle C1 and O(3) groups
-        if pointgoup_to_symmetrize in ["C1", "O(3)"]:
-            # Store the geometry reoriented in the conventional point group orientation
-            reoriented_coords = self._conventional_orientation(self._cent_coord)
-            symmetrized_data["reoriented_geom_in_angstrom"] = reoriented_coords * bohr_in_angstrom()
-            if pointgoup_to_symmetrize not in symmetry_data["Groups_for_symm"] and pointgoup_to_symmetrize != self._schoenflies_symbol:
-                raise KeyError("Point group not available for symmetrization.")
-            else:
-                symmetrized_data["new_pointgroup"] = pointgoup_to_symmetrize
+        # Handle C1 and O(3) groups and molecules larger than 60 atoms
+        if pointgoup_to_symmetrize in ["C1", "O(3)"] or self._natoms > 60:
+            _reorient_molecule(self._cent_coord)
 
         # Check that the chosen point group is available for symmetrization
         elif pointgoup_to_symmetrize not in symmetry_data["Groups_for_symm"]:
             if pointgoup_to_symmetrize == self._schoenflies_symbol:
-               # Store the geometry reoriented in the conventional point group orientation
-               symmetrized_data["new_pointgroup"] = "Initial geometry reoriented"  
-               reoriented_coords = self._conventional_orientation(self._cent_coord)
-               symmetrized_data["reoriented_geom_in_angstrom"] = reoriented_coords * bohr_in_angstrom()
+               _reorient_molecule(self._cent_coord)
 
             else:
                 raise KeyError("Point group not available for symmetrization.")
         
         # Symmetrize molecules smaller than 60 atoms and reorient
         else:
-            if self._natoms <= 60:
-                symmetrized_coords = self._symmetrize_molecule(pointgoup_to_symmetrize)
-                reoriented_coords = self._conventional_orientation(symmetrized_coords)
-                symmetrized_data["symmetrized_coord"] = reoriented_coords * bohr_in_angstrom()
-                symmetrized_data["new_pointgroup"] = pointgoup_to_symmetrize
-            else:
-                reoriented_coords = self._conventional_orientation(self._cent_coord)
-                symmetrized_data["reoriented_geom_in_angstrom"] = reoriented_coords * bohr_in_angstrom()
-                symmetrized_data["new_pointgroup"] = "Initial geometry reoriented"
+            symmetrized_coords = self._symmetrize_molecule(pointgoup_to_symmetrize)
+            reoriented_coords = self._conventional_orientation(symmetrized_coords)
+            symmetrized_data["symmetrized_coord_in_angstrom"] = reoriented_coords * bohr_in_angstrom()
+            symmetrized_data["new_pointgroup"] = pointgoup_to_symmetrize
 
         # Temporary
         symmetrized_data["inequiv_atoms_by_op"] = self._inequivalent_atoms
@@ -249,11 +250,7 @@ class SymmetryAnalyzer:
             The symmetrized coordinates (in a xyz file if a name is specified).
         """
 
-        if "symmetrized_coord" in results_symmetrization:
-            coords = results_symmetrization["symmetrized_coord"]
-        else:
-            coords = results_symmetrization["reoriented_geom_in_angstrom"]
-
+        coords = results_symmetrization["symmetrized_coord_in_angstrom"]
         pointgroup = results_symmetrization["new_pointgroup"]
 
         if xyz_filename:
