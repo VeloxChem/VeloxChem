@@ -48,7 +48,6 @@ from .molecularorbitals import MolecularOrbitals, molorb
 from .sadguessdriver import SadGuessDriver
 from .diis import Diis
 from .signalhandler import SignalHandler
-from .firstorderprop import FirstOrderProperties
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .sanitychecks import molecule_sanity_check
@@ -181,9 +180,6 @@ class ScfDriver:
 
         # scf tensors
         self._scf_tensors = None
-
-        # scf property
-        self._scf_prop = None
 
         # timing and profiling
         self.timing = False
@@ -565,18 +561,6 @@ class ScfDriver:
             s2 = self.compute_s2(molecule, self.scf_tensors)
             self._print_ground_state(molecule, s2)
 
-            # TODO: print orbitals
-            """
-            if self.print_level == 2:
-                self.molecular_orbitals.print_orbitals(molecule, ao_basis,
-                                                       False, self.ostream)
-            if self.print_level == 3:
-                self.molecular_orbitals.print_orbitals(molecule, ao_basis, True,
-                                                       self.ostream)
-            """
-
-            self._scf_prop.print_properties(molecule)
-
             self.ostream.flush()
 
         return self.scf_tensors
@@ -901,8 +885,6 @@ class ScfDriver:
 
         self._scf_tensors = None
 
-        self._scf_prop = FirstOrderProperties(self.comm, self.ostream)
-
         self._history = []
 
         if not self._first_step:
@@ -1169,13 +1151,7 @@ class ScfDriver:
             else:
                 self._scf_tensors = None
 
-            self._scf_prop.compute_scf_prop(molecule, ao_basis,
-                                            self.scf_tensors, screener)
-
             if self.rank == mpi_master():
-                self._scf_tensors['dipole_moment'] = np.array(
-                    self._scf_prop.get_property('dipole_moment'))
-
                 self._write_final_hdf5(molecule, ao_basis)
 
         if self.rank == mpi_master():
@@ -1371,7 +1347,8 @@ class ScfDriver:
         if self.timing:
             eri_dt = tm.time() - eri_t0
             profiler.add_timing_info(
-                'FockPrep', eri_dt - max_coulomb_timing - max_exchange_timing)
+                'FockPrep',
+                max(0.0, eri_dt - max_coulomb_timing - max_exchange_timing))
             profiler.add_timing_info('FockJ', max_coulomb_timing)
             profiler.add_timing_info('LoadImbJ', coulomb_load_imb)
             profiler.add_timing_info('FockK', max_exchange_timing)

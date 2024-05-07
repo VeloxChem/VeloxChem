@@ -193,6 +193,7 @@ export_general(py::module& m) -> void
     // exposing functions from MpiFunc.hpp
 
     m.def("mpi_master", &mpi::master, "Returns rank of MPI master process.");
+    m.def("mpi_initialized", &mpi::initialized, "Check if MPI has been initialized.");
 
     m.def(
         "mpi_size_limit",

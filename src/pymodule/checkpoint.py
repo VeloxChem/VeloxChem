@@ -60,6 +60,21 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
         hf.create_dataset('atom_coordinates',
                           data=molecule.get_coordinates_in_bohr())
 
+        hf.create_dataset('number_of_atoms',
+                          data=np.array([molecule.number_of_atoms()]))
+
+        hf.create_dataset('number_of_alpha_electrons',
+                          data=np.array([molecule.number_of_alpha_electrons()]))
+
+        hf.create_dataset('number_of_beta_electrons',
+                          data=np.array([molecule.number_of_beta_electrons()]))
+
+        hf.create_dataset('molecular_charge',
+                          data=np.array([molecule.get_charge()]))
+
+        hf.create_dataset('spin_multiplicity',
+                          data=np.array([molecule.get_multiplicity()]))
+
         hf.create_dataset('basis_set', data=np.string_([basis.get_label()]))
 
         hf.create_dataset('dft_func_label', data=np.string_([dft_func_label]))
@@ -69,24 +84,47 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
         hf.close()
 
 
-def write_scf_tensors(fname, scf_tensors):
+def write_scf_results_to_hdf5(fname, scf_results, scf_history):
     """
-    Writes SCF tensors to HDF5 file.
+    Writes SCF results to HDF5 file.
 
     :param fname:
         Name of the HDF5 file.
-    :param scf_tensors:
-        The dictionary of tensors from converged SCF wavefunction.
+    :param scf_results:
+        The dictionary containing SCF results.
+    :param scf_history:
+        The list containing SCF history.
     """
 
     valid_checkpoint = (fname and isinstance(fname, str) and
                         Path(fname).is_file())
 
     if valid_checkpoint:
+
         hf = h5py.File(fname, 'a')
-        keys = ['S'] + [f'{x}_{y}' for x in 'CEDF' for y in ['alpha', 'beta']]
+
+        # write SCF tensors
+        keys = ['S'] + [
+            f'{x}_{y}' for x in ['C', 'E', 'occ', 'D', 'F']
+            for y in ['alpha', 'beta']
+        ]
         for key in keys:
-            hf.create_dataset(key, data=scf_tensors[key])
+            # TODO: remove this if statement since all keys should be available
+            if key in scf_results:
+                hf.create_dataset(key, data=scf_results[key])
+
+        # write SCF energy
+        hf.create_dataset('scf_type',
+                          data=np.string_([scf_results['scf_type']]))
+        hf.create_dataset('scf_energy',
+                          data=np.array([scf_results['scf_energy']]))
+
+        # write SCF history
+        keys = list(scf_history[0].keys())
+        for key in keys:
+            data = np.array([step[key] for step in scf_history])
+            hf.create_dataset(f'scf_history_{key}', data=data)
+
         hf.close()
 
 

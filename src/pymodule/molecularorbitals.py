@@ -24,14 +24,11 @@
 
 from enum import Enum
 import numpy as np
-import time as tm
 import h5py
 import math
 import sys
 
 from .veloxchemlib import to_angular_momentum
-from .veloxchemlib import denmat
-from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import matmul_gpu
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
@@ -45,21 +42,53 @@ class molorb(Enum):
 
 class MolecularOrbitals:
     """
-    TODO
+    Implements the molecular orbitals class.
+
+    Instance variables
+        - _orbitals: The molecular orbitals.
+        - _energies: The molecular orbital energies.
+        - _occupations: The molecular orbital occupation numbers.
+        - _orbital_type: The type of molecular orbitals.
     """
 
     def __init__(self, orbs=None, enes=None, occs=None, orbs_type=None):
         """
-        TODO
+        Initializes the molecular orbitals object.
         """
 
         if (orbs is not None and enes is not None and occs is not None and
                 orbs_type is not None):
-            # TODO: make sure that the numpy arrays (not just the lists) are deep-copied
-            self._orbitals = list(orbs)
-            self._energies = list(enes)
-            self._occupations = list(occs)
+            # Note: all numpy arrays are deep-copied
+            self._orbitals = []
+            for orb in orbs:
+                self._orbitals.append(orb.copy())
+            self._energies = []
+            for ene in enes:
+                self._energies.append(ene.copy())
+            self._occupations = []
+            for occ in occs:
+                self._occupations.append(occ.copy())
             self._orbitals_type = orbs_type
+
+            assert_msg_critical(
+                self._orbitals_type
+                in [molorb.rest, molorb.unrest, molorb.restopen],
+                'MolecularOrbitals: Invalid orbitals type')
+
+            err_num = 'MolecularOrbitals: Inconsistent orbitals, energies or'
+            err_num += ' occupation numbers'
+            if self._orbitals_type == molorb.rest:
+                assert_msg_critical(
+                    len(self._orbitals) == 1 and len(self._energies) == 1 and
+                    len(self._occupations) == 1, err_num)
+            elif self._orbitals_type == molorb.unrest:
+                assert_msg_critical(
+                    len(self._orbitals) == 2 and len(self._energies) == 2 and
+                    len(self._occupations) == 2, err_num)
+            elif self._orbitals_type == molorb.restopen:
+                assert_msg_critical(
+                    len(self._orbitals) == 1 and len(self._energies) == 1 and
+                    len(self._occupations) == 2, err_num)
 
         else:
             self._orbitals = None
@@ -75,13 +104,34 @@ class MolecularOrbitals:
 
         return self._orbitals[0]
 
+    def beta_to_numpy(self):
+
+        if self._orbitals_type in [molorb.rest, molorb.restopen]:
+            return self._orbitals[0]
+        else:
+            return self._orbitals[1]
+
     def ea_to_numpy(self):
 
         return self._energies[0]
 
+    def eb_to_numpy(self):
+
+        if self._orbitals_type in [molorb.rest, molorb.restopen]:
+            return self._energies[0]
+        else:
+            return self._energies[1]
+
     def occa_to_numpy(self):
 
         return self._occupations[0]
+
+    def occb_to_numpy(self):
+
+        if self._orbitals_type == molorb.rest:
+            return self._occupations[0]
+        else:
+            return self._occupations[1]
 
     def number_of_aos(self):
 
@@ -112,7 +162,7 @@ class MolecularOrbitals:
 
         ao_map = basis.get_ao_basis_map(molecule)
 
-        if self.get_orbitals_type() in [molorb.rest, molorb.restopen]:
+        if self._orbitals_type in [molorb.rest, molorb.restopen]:
 
             ostream.print_blank()
             ostream.print_header("Spin Restricted Orbitals")
@@ -141,7 +191,7 @@ class MolecularOrbitals:
 
             ostream.print_blank()
 
-        elif self.get_orbitals_type() == molorb.unrest:
+        elif self._orbitals_type == molorb.unrest:
 
             ostream.print_blank()
             ostream.print_header("Spin Unrestricted Alpha Orbitals")
@@ -271,8 +321,8 @@ class MolecularOrbitals:
             The AO density matrix.
         """
 
-        if self.get_orbitals_type() == molorb.rest and (
-                scf_type is None or scf_type == 'restricted'):
+        if self._orbitals_type == molorb.rest and (scf_type is None or
+                                                   scf_type == 'restricted'):
 
             mo = self.alpha_to_numpy()
             occ = self.occa_to_numpy()
@@ -280,9 +330,9 @@ class MolecularOrbitals:
             occ_mo = occ * mo
             dens = matmul_gpu(occ_mo, occ_mo.T)
 
-            return AODensityMatrix([dens], denmat.rest)
+            return dens
 
-        elif self.get_orbitals_type() == molorb.unrest and (
+        elif self._orbitals_type == molorb.unrest and (
                 scf_type is None or scf_type == 'unrestricted'):
 
             mo_a = self.alpha_to_numpy()
@@ -297,9 +347,9 @@ class MolecularOrbitals:
             dens_a = np.matmul(occ_mo_a, occ_mo_a.T)
             dens_b = np.matmul(occ_mo_b, occ_mo_b.T)
 
-            return AODensityMatrix([dens_a, dens_b], denmat.unrest)
+            return (dens_a, dens_b)
 
-        elif self.get_orbitals_type() == molorb.restopen and (
+        elif self._orbitals_type == molorb.restopen and (
                 scf_type is None or scf_type == 'restricted_openshell'):
 
             mo = self.alpha_to_numpy()
@@ -313,7 +363,7 @@ class MolecularOrbitals:
             dens_a = np.matmul(occ_mo_a, occ_mo_a.T)
             dens_b = np.matmul(occ_mo_b, occ_mo_b.T)
 
-            return AODensityMatrix([dens_a, dens_b], denmat.unrest)
+            return (dens_a, dens_b)
 
         else:
 
@@ -339,12 +389,12 @@ class MolecularOrbitals:
         hf.create_dataset('alpha_energies', data=self.ea_to_numpy())
         hf.create_dataset('alpha_occupations', data=self.occa_to_numpy())
 
-        if self.get_orbitals_type() == molorb.unrest:
+        if self._orbitals_type == molorb.unrest:
             hf.create_dataset('beta_orbitals', data=self.beta_to_numpy())
             hf.create_dataset('beta_energies', data=self.eb_to_numpy())
             hf.create_dataset('beta_occupations', data=self.occb_to_numpy())
 
-        elif self.get_orbitals_type() == molorb.restopen:
+        elif self._orbitals_type == molorb.restopen:
             hf.create_dataset('beta_occupations', data=self.occb_to_numpy())
 
         if nuclear_charges is not None:
@@ -507,7 +557,7 @@ class MolecularOrbitals:
         """
 
         assert_msg_critical(
-            self.get_orbitals_type() == molorb.rest,
+            self._orbitals_type == molorb.rest,
             'MolecularOrbitals.is_nto: Only restricted case is implemented')
 
         nto_lambdas = self.occa_to_numpy()

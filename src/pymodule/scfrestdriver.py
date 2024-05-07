@@ -28,7 +28,6 @@ import numpy as np
 import sys
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import matmul_gpu, eigh_gpu, dot_product_gpu
 from .veloxchemlib import compute_error_vector_gpu
 from .veloxchemlib import transform_matrix_gpu
@@ -220,12 +219,7 @@ class ScfRestrictedDriver(ScfDriver):
             The string for spin restricted closed shell SCF calculation.
         """
 
-        pe_type = " with PE" if self._pe else ""
-
-        if self._dft:
-            return "Spin-Restricted Kohn-Sham" + pe_type
-
-        return "Spin-Restricted Hartree-Fock" + pe_type
+        return "Spin-Restricted Hartree-Fock"
 
     def __deepcopy__(self, memo):
         """
@@ -243,10 +237,6 @@ class ScfRestrictedDriver(ScfDriver):
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 pass
-            elif isinstance(val, XCFunctional):
-                new_scf_drv.key = XCFunctional(val)
-            elif isinstance(val, MolecularGrid):
-                new_scf_drv.key = MolecularGrid(val)
             else:
                 new_scf_drv.key = deepcopy(val)
 
