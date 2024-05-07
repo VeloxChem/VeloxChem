@@ -22,46 +22,25 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-import argparse
+from os import environ
+from pathlib import Path
 
-from . import __version__
 
-
-def cli():
+def get_basis_path():
     """
-    Generate command-line argument parser.
+    Returns location of basis files within module.
 
     :return:
-        The parser.
+        The location of basis files within module.
     """
 
-    usage = """
-=================   VeloxChem   =================
+    return Path(__file__).parent / "basis"
 
-%(prog)s input_file [output_file]
 
-or
-
-python -m veloxchem input_file [output_file]
+def set_vlxbasispath():
     """
-    parser = argparse.ArgumentParser(prog="vlx", usage=usage)
-    parser.add_argument(
-        '-v',
-        '--version',
-        action='version',
-        version=__version__,
-    )
-    parser.add_argument(
-        'input_file',
-        type=str,
-        help='Input file',
-    )
-    parser.add_argument(
-        'output_file',
-        type=str,
-        nargs="?",
-        default=".",
-        help='Output file (default: STDOUT)',
-    )
+    Sets location of basis files.
+    """
 
-    return parser
+    if 'VLXBASISPATH' not in environ:
+        environ['VLXBASISPATH'] = str(get_basis_path())

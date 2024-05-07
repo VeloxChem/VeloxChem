@@ -3,8 +3,7 @@
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2023 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -24,7 +23,7 @@
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 //
 //  This file contains derivative work of dftd4 (v2.4.0):
-//  Copyright © 2017-2019 Stefan Grimme, Sebastian Ehlert, Eike Caldeweyher
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 
 #ifndef PartialCharges_hpp
 #define PartialCharges_hpp

@@ -3,8 +3,7 @@
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2023 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -376,7 +375,7 @@ class OutputStream:
         self.print_title('VELOXCHEM')
         self.print_title('AN ELECTRONIC STRUCTURE CODE')
         self.print_title('')
-        self.print_title('Copyright (C) 2018-2023 VeloxChem developers.')
+        self.print_title('Copyright (C) 2018-2024 VeloxChem developers.')
         self.print_title('All rights reserved.')
         self.print_separator()
         exec_str = 'VeloxChem execution started'
