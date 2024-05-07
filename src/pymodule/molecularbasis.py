@@ -128,9 +128,14 @@ def _read_atom_basis(basis_data, elem_id, basis_name):
     while basis_data:
         shell_title = basis_data.pop(0).split()
         assert_msg_critical(
-            len(shell_title) == 2,
-            'Basis set parser: {}'.format(' '.join(shell_title)),
-        )
+            len(shell_title) == 2 or len(shell_title) == 3,
+            'Basis set parser: {}'.format(' '.join(shell_title)))
+
+        if len(shell_title) == 3:
+            ncgto = int(shell_title[2])
+            err_gc = 'MolcularBasis.read: '
+            err_gc += 'General contraction format is currently not supported'
+            assert_msg_critical(ncgto == 1, err_gc)
 
         if shell_title[0] == 'ECP':
             atom_basis.set_ecp_label(shell_title)
@@ -198,10 +203,8 @@ def _read_basis_file(basis_name, basis_path, ostream):
 
     basis_dict = InputParser(str(basis_file)).input_dict
 
-    assert_msg_critical(
-        fname.upper() == basis_dict['basis_set_name'].upper(),
-        '_read_basis_file: Inconsistent basis set name',
-    )
+    assert_msg_critical(fname.upper() == basis_dict['basis_set_name'].upper(),
+                        '_read_basis_file: Inconsistent basis set name')
 
     return basis_dict
 
