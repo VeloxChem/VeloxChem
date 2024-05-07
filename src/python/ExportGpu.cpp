@@ -37,7 +37,6 @@
 #include "FockDriverGPU.hpp"
 #include "ExportGeneral.hpp"
 #include "ScreeningData.hpp"
-#include "XCIntegratorGPU.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -68,28 +67,6 @@ export_gpu(py::module& m)
         },
         "Gets Q matrix.")
         ;
-
-    m.def(
-        "compute_gto_values",
-        [](const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) -> py::array_t<double> {
-            auto gtovalues = gpu::computeGtoValuesOnGridPoints(molecule, basis, molecularGrid);
-            return vlx_general::pointer_to_numpy(gtovalues.values(), {gtovalues.getNumberOfRows(), gtovalues.getNumberOfColumns()});
-        },
-        "Computes GTO values on grid points using GPU.");
-
-    m.def(
-        "compute_gto_values_and_derivatives",
-        [](const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) -> py::list {
-            auto     gto_values_derivs = gpu::computeGtoValuesAndDerivativesOnGridPoints(molecule, basis, molecularGrid);
-            py::list ret;
-            for (size_t i = 0; i < gto_values_derivs.size(); i++)
-            {
-                ret.append(vlx_general::pointer_to_numpy(gto_values_derivs[i].values(),
-                                                         {gto_values_derivs[i].getNumberOfRows(), gto_values_derivs[i].getNumberOfColumns()}));
-            }
-            return ret;
-        },
-        "Computes GTO values and derivatives on grid points using GPU.");
 
     m.def(
         "dot_product_gpu",
@@ -282,8 +259,6 @@ export_gpu(py::module& m)
 
             },
         "Diagonalizes matrix using GPU.");
-
-    m.def("integrate_vxc_fock_gpu", &gpu::integrateVxcFock, "Integrates Vxc matrix using GPU.");
 
     m.def("compute_fock_gpu", &gpu::computeFockOnGPU, "Computes Fock matrix using GPU.");
 

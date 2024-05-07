@@ -39,8 +39,7 @@ from .veloxchemlib import ScreeningData, GpuDevices
 from .veloxchemlib import mpi_master
 from .veloxchemlib import xcfun
 from .veloxchemlib import (compute_fock_gpu, matmul_gpu, eigh_gpu,
-                           dot_product_gpu, integrate_vxc_fock_gpu,
-                           compute_one_electron_integrals_gpu)
+                           dot_product_gpu, compute_one_electron_integrals_gpu)
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -2135,17 +2134,6 @@ class ScfDriver:
             return 'Two Level Direct Inversion of Iterative Subspace'
 
         return 'Undefined'
-
-    def _update_fock_type(self, fock_mat):
-        """
-        Updates Fock matrix to fit selected functional in Kohn-Sham
-        calculations.
-
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
-        """
-
-        return
 
     def _delete_mos(self, mol_orbs, mol_eigs):
         """
