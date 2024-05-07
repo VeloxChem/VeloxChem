@@ -449,31 +449,6 @@ def _Molecule_get_aufbau_beta_occupation(self, n_mo):
     return np.hstack((np.ones(nbeta), np.zeros(n_mo - nbeta)))
 
 
-def _Molecule_get_aufbau_occupation(self, n_mo, flag='restricted'):
-    """
-    Gets occupation vector(s) based on the aufbau principle.
-
-    :param n_mo:
-        The number of molecular orbitals.
-    :param flag:
-        The flag (restricted or unrestricted).
-
-    :return:
-        The occupation vector(s).
-    """
-
-    occ_a = self.get_aufbau_alpha_occupation(n_mo)
-    occ_b = self.get_aufbau_beta_occupation(n_mo)
-
-    if flag == 'restricted':
-        return 0.5 * (occ_a + occ_b)
-
-    elif flag == 'unrestricted':
-        return occ_a, occ_b
-
-    return None
-
-
 @staticmethod
 def _Molecule_get_input_keywords():
     """
@@ -538,7 +513,6 @@ Molecule.moments_of_inertia = _Molecule_moments_of_inertia
 Molecule.is_linear = _Molecule_is_linear
 Molecule.get_aufbau_alpha_occupation = _Molecule_get_aufbau_alpha_occupation
 Molecule.get_aufbau_beta_occupation = _Molecule_get_aufbau_beta_occupation
-Molecule.get_aufbau_occupation = _Molecule_get_aufbau_occupation
 Molecule.print_keywords = _Molecule_print_keywords
 Molecule.__deepcopy__ = _Molecule_deepcopy
 

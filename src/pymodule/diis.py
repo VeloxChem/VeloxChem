@@ -23,7 +23,6 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
-import time as tm
 
 from .veloxchemlib import weighted_sum_gpu, dot_product_gpu
 

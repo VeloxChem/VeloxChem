@@ -1,4 +1,4 @@
-from pathlib import Path
+from mpi4py import MPI
 import numpy as np
 
 from veloxchem.veloxchemlib import OverlapDriver
@@ -11,107 +11,106 @@ class TestInitialGuess:
 
     def test_sad_guess(self):
 
-        molstr = """
-        O   0.0   0.0   0.0
-        H   0.0   1.4   1.1
-        H   0.0  -1.4   1.1
-        """
-        mol = Molecule.read_str(molstr, 'au')
+        if MPI.COMM_WORLD.Get_rank() == 0:
 
-        here = Path(__file__).parent
-        basis_path = str(here.parent / 'basis')
-        bas = MolecularBasis.read(mol, 'def2-svp', basis_path, ostream=None)
-        min_bas = MolecularBasis.read(mol,
-                                      'ao-start-guess',
-                                      basis_path,
-                                      ostream=None)
+            molstr = """
+            O   0.0   0.0   0.0
+            H   0.0   1.4   1.1
+            H   0.0  -1.4   1.1
+            """
+            mol = Molecule.read_molecule_string(molstr, 'au')
 
-        ovl_drv = OverlapDriver()
-        ovl_mat = ovl_drv.compute(mol, bas)
-        S = ovl_mat.get_full_matrix().to_numpy()
+            bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+            min_bas = MolecularBasis.read(mol, 'ao-start-guess', ostream=None)
 
-        saddrv = SadGuessDriver()
-        D = saddrv.compute(mol, min_bas, bas, 'restricted')
+            ovl_drv = OverlapDriver()
+            ovl_mat = ovl_drv.compute(mol, bas)
+            S = ovl_mat.get_full_matrix().to_numpy()
 
-        assert D.ndim == 2
-        assert D.shape[0] == 24
-        assert D.shape[1] == 24
+            saddrv = SadGuessDriver()
+            D = saddrv.compute(mol, min_bas, bas, 'restricted')
 
-        assert mol.number_of_electrons() == 10
-        assert mol.number_of_alpha_electrons() == 5
-        assert mol.number_of_beta_electrons() == 5
+            assert D.ndim == 2
+            assert D.shape[0] == 24
+            assert D.shape[1] == 24
 
-        assert abs(np.sum(D * S) - 5.) < 1.0e-13
+            assert mol.number_of_electrons() == 10
+            assert mol.number_of_alpha_electrons() == 5
+            assert mol.number_of_beta_electrons() == 5
 
-        # compute other initial guess
+            assert abs(np.sum(D * S) - 5.) < 1.0e-13
 
-        charge = mol.get_charge()
-        multiplicity = mol.get_multiplicity()
+            # compute other initial guess
 
-        # closed-shell cation initial guess
+            charge = mol.get_charge()
+            multiplicity = mol.get_multiplicity()
 
-        mol.set_charge(charge + 2)
-        mol.set_multiplicity(multiplicity)
+            # closed-shell cation initial guess
 
-        D = saddrv.compute(mol, min_bas, bas, 'restricted')
+            mol.set_charge(charge + 2)
+            mol.set_multiplicity(multiplicity)
 
-        assert mol.number_of_electrons() == 8
-        assert mol.number_of_alpha_electrons() == 4
-        assert mol.number_of_beta_electrons() == 4
+            D = saddrv.compute(mol, min_bas, bas, 'restricted')
 
-        assert abs(np.sum(D * S) - 4.) < 1.0e-13
+            assert mol.number_of_electrons() == 8
+            assert mol.number_of_alpha_electrons() == 4
+            assert mol.number_of_beta_electrons() == 4
 
-        # closed-shell anion initial guess
+            assert abs(np.sum(D * S) - 4.) < 1.0e-13
 
-        mol.set_charge(charge - 2)
-        mol.set_multiplicity(multiplicity)
+            # closed-shell anion initial guess
 
-        D = saddrv.compute(mol, min_bas, bas, 'restricted')
+            mol.set_charge(charge - 2)
+            mol.set_multiplicity(multiplicity)
 
-        assert mol.number_of_electrons() == 12
-        assert mol.number_of_alpha_electrons() == 6
-        assert mol.number_of_beta_electrons() == 6
+            D = saddrv.compute(mol, min_bas, bas, 'restricted')
 
-        assert abs(np.sum(D * S) - 6.) < 1.0e-13
+            assert mol.number_of_electrons() == 12
+            assert mol.number_of_alpha_electrons() == 6
+            assert mol.number_of_beta_electrons() == 6
 
-        # open-shell cation initial guess
+            assert abs(np.sum(D * S) - 6.) < 1.0e-13
 
-        mol.set_charge(charge + 1)
-        mol.set_multiplicity(multiplicity + 1)
+            # open-shell cation initial guess
 
-        Da, Db = saddrv.compute(mol, min_bas, bas, 'unrestricted')
+            mol.set_charge(charge + 1)
+            mol.set_multiplicity(multiplicity + 1)
 
-        assert mol.number_of_electrons() == 9
-        assert mol.number_of_alpha_electrons() == 5
-        assert mol.number_of_beta_electrons() == 4
+            Da, Db = saddrv.compute(mol, min_bas, bas, 'unrestricted')
 
-        assert abs(np.sum(Da * S) - 5.) < 1.0e-13
-        assert abs(np.sum(Db * S) - 4.) < 1.0e-13
+            assert mol.number_of_electrons() == 9
+            assert mol.number_of_alpha_electrons() == 5
+            assert mol.number_of_beta_electrons() == 4
 
-        # open-shell anion initial guess
+            assert abs(np.sum(Da * S) - 5.) < 1.0e-13
+            assert abs(np.sum(Db * S) - 4.) < 1.0e-13
 
-        mol.set_charge(charge - 1)
-        mol.set_multiplicity(multiplicity + 1)
+            # open-shell anion initial guess
 
-        Da, Db = saddrv.compute(mol, min_bas, bas, 'unrestricted')
+            mol.set_charge(charge - 1)
+            mol.set_multiplicity(multiplicity + 1)
 
-        assert mol.number_of_electrons() == 11
-        assert mol.number_of_alpha_electrons() == 6
-        assert mol.number_of_beta_electrons() == 5
+            Da, Db = saddrv.compute(mol, min_bas, bas, 'unrestricted')
 
-        assert abs(np.sum(Da * S) - 6.) < 1.0e-13
-        assert abs(np.sum(Db * S) - 5.) < 1.0e-13
+            assert mol.number_of_electrons() == 11
+            assert mol.number_of_alpha_electrons() == 6
+            assert mol.number_of_beta_electrons() == 5
 
-        # open-shell triplet initial guess
+            assert abs(np.sum(Da * S) - 6.) < 1.0e-13
+            assert abs(np.sum(Db * S) - 5.) < 1.0e-13
 
-        mol.set_charge(charge)
-        mol.set_multiplicity(multiplicity + 2)
+            # open-shell triplet initial guess
 
-        Da, Db = saddrv.compute(mol, min_bas, bas, 'unrestricted')
+            mol.set_charge(charge)
+            mol.set_multiplicity(multiplicity + 2)
 
-        assert mol.number_of_electrons() == 10
-        assert mol.number_of_alpha_electrons() == 6
-        assert mol.number_of_beta_electrons() == 4
+            Da, Db = saddrv.compute(mol, min_bas, bas, 'unrestricted')
 
-        assert abs(np.sum(Da * S) - 6.) < 1.0e-13
-        assert abs(np.sum(Db * S) - 4.) < 1.0e-13
+            assert mol.number_of_electrons() == 10
+            assert mol.number_of_alpha_electrons() == 6
+            assert mol.number_of_beta_electrons() == 4
+
+            assert abs(np.sum(Da * S) - 6.) < 1.0e-13
+            assert abs(np.sum(Db * S) - 4.) < 1.0e-13
+
+        MPI.COMM_WORLD.barrier()
