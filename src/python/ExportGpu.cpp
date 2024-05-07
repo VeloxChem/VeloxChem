@@ -61,6 +61,8 @@ export_gpu(py::module& m)
         .def(py::init<const CMolecule&, const CMolecularBasis&, const int64_t, const double, const double>())
         .def("get_num_gpus_per_node", &CScreeningData::getNumGpusPerNode)
         .def("get_prelink_time", &CScreeningData::getPreLinkTime)
+        .def("get_coulomb_time", &CScreeningData::getCoulombTime)
+        .def("get_exchange_time", &CScreeningData::getExchangeTime)
         .def(
             "get_q_matrix",
             [](CScreeningData& self, const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) -> py::array_t<double> {

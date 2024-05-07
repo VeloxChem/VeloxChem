@@ -834,7 +834,8 @@ class LinearSolver:
         gs_density = dft_dict['gs_density']
 
         t0 = tm.time()
-        prelink_dt = 0.0
+        coulomb_timing = 0.0
+        exchange_timing = 0.0
 
         fock_mat, fock_mat_erf_k = None, None
 
@@ -855,7 +856,15 @@ class LinearSolver:
                                                 self.eri_thresh,
                                                 self.prelink_thresh, screening)
 
-                    prelink_dt += float(screening.get_prelink_time().split()[0])
+                    coulomb_timing += np.array([
+                        float(dt.split()[0])
+                        for dt in screening.get_coulomb_time()
+                    ])
+
+                    exchange_timing += np.array([
+                        float(dt.split()[0])
+                        for dt in screening.get_exchange_time()
+                    ])
 
                     fock_mat_erf_k = compute_fock_gpu(molecule, basis, dens,
                                                       0.0, erf_k_coef, omega,
@@ -864,7 +873,15 @@ class LinearSolver:
                                                       self.prelink_thresh,
                                                       screening)
 
-                    prelink_dt += float(screening.get_prelink_time().split()[0])
+                    coulomb_timing += np.array([
+                        float(dt.split()[0])
+                        for dt in screening.get_coulomb_time()
+                    ])
+
+                    exchange_timing += np.array([
+                        float(dt.split()[0])
+                        for dt in screening.get_exchange_time()
+                    ])
 
                 else:
                     # global hybrid
@@ -874,7 +891,15 @@ class LinearSolver:
                         flag_exchange, self.eri_thresh, self.prelink_thresh,
                         screening)
 
-                    prelink_dt += float(screening.get_prelink_time().split()[0])
+                    coulomb_timing += np.array([
+                        float(dt.split()[0])
+                        for dt in screening.get_coulomb_time()
+                    ])
+
+                    exchange_timing += np.array([
+                        float(dt.split()[0])
+                        for dt in screening.get_exchange_time()
+                    ])
 
             else:
                 # pure DFT
@@ -883,7 +908,14 @@ class LinearSolver:
                                             flag_exchange, self.eri_thresh,
                                             self.prelink_thresh, screening)
 
-                prelink_dt += float(screening.get_prelink_time().split()[0])
+                coulomb_timing += np.array([
+                    float(dt.split()[0]) for dt in screening.get_coulomb_time()
+                ])
+
+                exchange_timing += np.array([
+                    float(dt.split()[0])
+                    for dt in screening.get_exchange_time()
+                ])
 
         else:
             # Hartree-Fock
@@ -892,12 +924,34 @@ class LinearSolver:
                                         self.eri_thresh, self.prelink_thresh,
                                         screening)
 
-            prelink_dt += float(screening.get_prelink_time().split()[0])
+            coulomb_timing += np.array(
+                [float(dt.split()[0]) for dt in screening.get_coulomb_time()])
+
+            exchange_timing += np.array(
+                [float(dt.split()[0]) for dt in screening.get_exchange_time()])
+
+        all_coulomb_timing = self.comm.allgather(coulomb_timing)
+        all_exchange_timing = self.comm.allgather(exchange_timing)
+
+        all_coulomb_timing = np.array(all_coulomb_timing).reshape(-1)
+        all_exchange_timing = np.array(all_exchange_timing).reshape(-1)
+
+        max_coulomb_timing = np.max(all_coulomb_timing)
+        max_exchange_timing = np.max(all_exchange_timing)
+
+        coulomb_load_imb = 1.0 - np.sum(all_coulomb_timing) / (
+            all_coulomb_timing.size * max_coulomb_timing)
+        exchange_load_imb = 1.0 - np.sum(all_exchange_timing) / (
+            all_exchange_timing.size * max_exchange_timing)
 
         if profiler is not None:
             eri_dt = tm.time() - t0
-            profiler.add_timing_info('FockERI', eri_dt - prelink_dt)
-            profiler.add_timing_info('PreLink', prelink_dt)
+            profiler.add_timing_info(
+                'FockPrep', eri_dt - max_coulomb_timing - max_exchange_timing)
+            profiler.add_timing_info('FockJ', max_coulomb_timing)
+            profiler.add_timing_info('LoadImbJ', coulomb_load_imb)
+            profiler.add_timing_info('FockK', max_exchange_timing)
+            profiler.add_timing_info('LoadImbK', exchange_load_imb)
 
         if self._dft:
             t0 = tm.time()

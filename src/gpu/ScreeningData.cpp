@@ -1191,6 +1191,37 @@ CScreeningData::getPreLinkTime() const -> const std::string
 }
 
 auto
+CScreeningData::initTimers(const int64_t num_gpus_per_node) -> void
+{
+    _coulomb_time  = std::vector<std::string>(num_gpus_per_node);
+    _exchange_time = std::vector<std::string>(num_gpus_per_node);
+}
+
+auto
+CScreeningData::setCoulombTime(const int64_t gpu_id, const std::string& coulomb_elapsed_time) -> void
+{
+    _coulomb_time[gpu_id] = coulomb_elapsed_time;
+}
+
+auto
+CScreeningData::getCoulombTime() const -> const std::vector<std::string>
+{
+    return _coulomb_time;
+}
+
+auto
+CScreeningData::setExchangeTime(const int64_t gpu_id, const std::string& exchange_elapsed_time) -> void
+{
+    _exchange_time[gpu_id] = exchange_elapsed_time;
+}
+
+auto
+CScreeningData::getExchangeTime() const -> const std::vector<std::string>
+{
+    return _exchange_time;
+}
+
+auto
 CScreeningData::getQMatrixSS() const -> const CDenseMatrix&
 {
     return _Q_matrix_ss;

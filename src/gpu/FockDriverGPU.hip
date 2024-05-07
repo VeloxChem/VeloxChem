@@ -125,10 +125,6 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
-    // std::stringstream ss;
-    // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
-    // std::cout << ss.str();
-
     // TODO: double check by using different number of gpus per MPI
     hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
@@ -595,10 +591,6 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
     auto gpu_id = thread_id / num_threads_per_gpu;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
-
-    // std::stringstream ss;
-    // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
-    // std::cout << ss.str();
 
     hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
@@ -1180,10 +1172,6 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
-    // std::stringstream ss;
-    // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
-    // std::cout << ss.str();
-
     hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     // Boys function (tabulated for order 0-28)
@@ -1755,10 +1743,6 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule, const CMolecularB
     auto gpu_id = thread_id / num_threads_per_gpu;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
-
-    // std::stringstream ss;
-    // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
-    // std::cout << ss.str();
 
     hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
@@ -2385,10 +2369,6 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule, const CMolecularB
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
-    // std::stringstream ss;
-    // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
-    // std::cout << ss.str();
-
     hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     // GTOs blocks and number of AOs
@@ -2995,10 +2975,6 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule, const CMolecular
     auto gpu_id = thread_id / num_threads_per_gpu;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
-
-    // std::stringstream ss;
-    // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
-    // std::cout << ss.str();
 
     hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
@@ -3696,10 +3672,6 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     auto gpu_rank = rank * num_gpus_per_node;
 
-    // std::stringstream ss;
-    // ss << "\n(Prep.) rank " << rank << ",  gpu_rank " << gpu_rank << "\n";
-    // std::cout << ss.str();
-
     hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     CMultiTimer timer;
@@ -3929,6 +3901,8 @@ computeFockOnGPU(const              CMolecule& molecule,
         mat_Fock_omp[gpu_id] = CDenseMatrix(naos, naos);
     }
 
+    screening.initTimers(num_gpus_per_node);
+
     // std::cout << "\nTiming of prep. on rank " << rank << "\n";
     // std::cout << "-------------------------\n";
     // std::cout << timer.getSummary() << std::endl;
@@ -3942,10 +3916,6 @@ computeFockOnGPU(const              CMolecule& molecule,
     auto gpu_id = thread_id / num_threads_per_gpu;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
-
-    // std::stringstream ss;
-    // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
-    // std::cout << ss.str();
 
     hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
@@ -4311,6 +4281,10 @@ computeFockOnGPU(const              CMolecule& molecule,
     mat_Fock_omp[gpu_id].zero();
 
     hipSafe(hipDeviceSynchronize());
+
+    CTimer coulomb_timer;
+
+    coulomb_timer.start();
 
     timer.start("J computation");
 
@@ -6569,6 +6543,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     hipSafe(hipDeviceSynchronize());
 
+    coulomb_timer.stop();
+
+    auto coulomb_elapsed_time = coulomb_timer.getElapsedTime();
+
+    screening.setCoulombTime(gpu_id, coulomb_elapsed_time);
+
     hipSafe(hipFree(d_mat_D));
     hipSafe(hipFree(d_mat_J));
 
@@ -6899,6 +6879,10 @@ computeFockOnGPU(const              CMolecule& molecule,
     timer.stop("Exchange prep.");
 
     hipSafe(hipDeviceSynchronize());
+
+    CTimer exchange_timer;
+
+    exchange_timer.start();
 
     timer.start("K computation");
 
@@ -10007,6 +9991,12 @@ computeFockOnGPU(const              CMolecule& molecule,
     timer.stop("K computation");
 
     hipSafe(hipDeviceSynchronize());
+
+    exchange_timer.stop();
+
+    auto exchange_elapsed_time = exchange_timer.getElapsedTime();
+
+    screening.setExchangeTime(gpu_id, exchange_elapsed_time);
 
     hipSafe(hipFree(d_boys_func_table));
     hipSafe(hipFree(d_boys_func_ft));

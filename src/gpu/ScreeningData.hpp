@@ -48,6 +48,8 @@ class CScreeningData
     double _density_threshold{0.0};
 
     std::string _prelink_time;
+    std::vector<std::string> _coulomb_time;
+    std::vector<std::string> _exchange_time;
 
     CDenseMatrix _Q_matrix_ss;
     CDenseMatrix _Q_matrix_sp;
@@ -210,6 +212,14 @@ class CScreeningData
 
     auto setPreLinkTime(const std::string& prelink_elapsed_time) -> void;
     auto getPreLinkTime() const -> const std::string;
+
+    auto initTimers(const int64_t num_gpus_per_node) -> void;
+
+    auto setCoulombTime(const int64_t gpu_id, const std::string& coulomb_elapsed_time) -> void;
+    auto getCoulombTime() const -> const std::vector<std::string>;
+
+    auto setExchangeTime(const int64_t gpu_id, const std::string& exchange_elapsed_time) -> void;
+    auto getExchangeTime() const -> const std::vector<std::string>;
 
     auto getQMatrixSS() const -> const CDenseMatrix&;
     auto getQMatrixSP() const -> const CDenseMatrix&;

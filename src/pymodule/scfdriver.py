@@ -1553,7 +1553,8 @@ class ScfDriver:
         #     thresh_int = int(-math.log10(self._get_dyn_threshold(e_grad)))
 
         eri_t0 = tm.time()
-        prelink_dt = 0.0
+        coulomb_timing = 0.0
+        exchange_timing = 0.0
 
         if self._dft and not self._first_step:
 
@@ -1572,7 +1573,15 @@ class ScfDriver:
                                                        self.prelink_thresh,
                                                        screener)
 
-                    prelink_dt += float(screener.get_prelink_time().split()[0])
+                    coulomb_timing += np.array([
+                        float(dt.split()[0])
+                        for dt in screener.get_coulomb_time()
+                    ])
+
+                    exchange_timing += np.array([
+                        float(dt.split()[0])
+                        for dt in screener.get_exchange_time()
+                    ])
 
                     fock_mat_erf_k = compute_fock_gpu(molecule, basis, dmat,
                                                       0.0, erf_k_coef, omega,
@@ -1580,7 +1589,15 @@ class ScfDriver:
                                                       self.prelink_thresh,
                                                       screener)
 
-                    prelink_dt += float(screener.get_prelink_time().split()[0])
+                    coulomb_timing += np.array([
+                        float(dt.split()[0])
+                        for dt in screener.get_coulomb_time()
+                    ])
+
+                    exchange_timing += np.array([
+                        float(dt.split()[0])
+                        for dt in screener.get_exchange_time()
+                    ])
 
                     fock_mat_local = (fock_mat_full_k.to_numpy() +
                                       fock_mat_erf_k.to_numpy())
@@ -1593,7 +1610,15 @@ class ScfDriver:
                         self.eri_thresh, self.prelink_thresh, screener)
                     fock_mat_local = fock_mat.to_numpy()
 
-                    prelink_dt += float(screener.get_prelink_time().split()[0])
+                    coulomb_timing += np.array([
+                        float(dt.split()[0])
+                        for dt in screener.get_coulomb_time()
+                    ])
+
+                    exchange_timing += np.array([
+                        float(dt.split()[0])
+                        for dt in screener.get_exchange_time()
+                    ])
 
             else:
                 # pure DFT
@@ -1602,7 +1627,13 @@ class ScfDriver:
                                             self.prelink_thresh, screener)
                 fock_mat_local = fock_mat.to_numpy()
 
-                prelink_dt += float(screener.get_prelink_time().split()[0])
+                coulomb_timing += np.array([
+                    float(dt.split()[0]) for dt in screener.get_coulomb_time()
+                ])
+
+                exchange_timing += np.array([
+                    float(dt.split()[0]) for dt in screener.get_exchange_time()
+                ])
 
         else:
             # Hartree-Fock
@@ -1611,7 +1642,25 @@ class ScfDriver:
                                         self.prelink_thresh, screener)
             fock_mat_local = fock_mat.to_numpy()
 
-            prelink_dt += float(screener.get_prelink_time().split()[0])
+            coulomb_timing += np.array(
+                [float(dt.split()[0]) for dt in screener.get_coulomb_time()])
+
+            exchange_timing += np.array(
+                [float(dt.split()[0]) for dt in screener.get_exchange_time()])
+
+        all_coulomb_timing = self.comm.allgather(coulomb_timing)
+        all_exchange_timing = self.comm.allgather(exchange_timing)
+
+        all_coulomb_timing = np.array(all_coulomb_timing).reshape(-1)
+        all_exchange_timing = np.array(all_exchange_timing).reshape(-1)
+
+        max_coulomb_timing = np.max(all_coulomb_timing)
+        max_exchange_timing = np.max(all_exchange_timing)
+
+        coulomb_load_imb = 1.0 - np.sum(all_coulomb_timing) / (
+            all_coulomb_timing.size * max_coulomb_timing)
+        exchange_load_imb = 1.0 - np.sum(all_exchange_timing) / (
+            all_exchange_timing.size * max_exchange_timing)
 
         if self.rank == mpi_master():
             fock_mat = np.zeros(fock_mat_local.shape)
@@ -1627,8 +1676,12 @@ class ScfDriver:
 
         if self.timing:
             eri_dt = tm.time() - eri_t0
-            profiler.add_timing_info('FockERI', eri_dt - prelink_dt)
-            profiler.add_timing_info('PreLink', prelink_dt)
+            profiler.add_timing_info(
+                'FockPrep', eri_dt - max_coulomb_timing - max_exchange_timing)
+            profiler.add_timing_info('FockJ', max_coulomb_timing)
+            profiler.add_timing_info('LoadImbJ', coulomb_load_imb)
+            profiler.add_timing_info('FockK', max_exchange_timing)
+            profiler.add_timing_info('LoadImbK', exchange_load_imb)
         vxc_t0 = tm.time()
 
         if self._dft and not self._first_step:
@@ -2320,8 +2373,9 @@ class ScfDriver:
         valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
-        valstr = f'Nuclei-Point Charges Energy        :{enuc_mm:20.10f} a.u.'
-        self.ostream.print_header(valstr.ljust(92))
+        if self._pe:
+            valstr = f'Nuclei-Point Charges Energy        :{enuc_mm:20.10f} a.u.'
+            self.ostream.print_header(valstr.ljust(92))
 
         if self.dispersion:
             valstr = f'D4 Dispersion Correction           :{e_d4:20.10f} a.u.'
