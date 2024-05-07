@@ -177,8 +177,7 @@ export_general(py::module& m) -> void
         [](const int64_t source, const size_t width, const fmt_t aligment) -> std::string { return fstr::to_string(source, width, aligment); },
         "Formats integer number to string with specified alignment.");
 
-    m.def(
-        "to_string", [](const bool source) -> std::string { return fstr::to_string(source); }, "Formats bool to string.");
+    m.def("to_string", [](const bool source) -> std::string { return fstr::to_string(source); }, "Formats bool to string.");
 
     m.def(
         "to_angular_momentum",

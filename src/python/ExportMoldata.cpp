@@ -81,8 +81,8 @@ export_moldata(py::module& m)
             "check_multiplicity",
             [](const CMolecule& self) -> void {
                 auto multip = self.getMultiplicity() % 2;
-                auto nelec = self.getNumberOfElectrons() % 2;
-                bool flag = true;
+                auto nelec  = self.getNumberOfElectrons() % 2;
+                bool flag   = true;
                 if ((multip == 0) && (nelec != 1)) flag = false;
                 if ((multip == 1) && (nelec != 0)) flag = false;
                 std::string errmult("Molecule.check_multiplicity: Incompatible multiplicity and number of electrons");
@@ -107,7 +107,7 @@ export_moldata(py::module& m)
             "get_element_ids",
             [](const CMolecule& self) -> py::array_t<double> {
                 const auto elem_ids = self.getCharges();
-                const auto n_atoms = self.getNumberOfAtoms();
+                const auto n_atoms  = self.getNumberOfAtoms();
                 return vlx_general::pointer_to_numpy(elem_ids.data(), {n_atoms});
             },
             "Gets nuclear charges for molecule.")

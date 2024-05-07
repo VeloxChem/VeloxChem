@@ -125,13 +125,13 @@ CGtoPairBlock::CGtoPairBlock(const CGtoBlock& gto_block)
             for (int64_t k = 0; k < npgtos; k++)
             {
                 const auto koff = k * ncgtos + i;
-                
+
                 for (int64_t l = 0; l < npgtos; l++)
                 {
-                    const auto loff = l * ncgtos + j; 
-                 
+                    const auto loff = l * ncgtos + j;
+
                     const auto ijoff = (k * npgtos + l) * cdim + ij_idx;
-                    
+
                     _exponents[ijoff] = TPoint2D({gexps[koff], gexps[loff]});
 
                     _norms[ijoff] = TPoint2D({gnorms[koff], gnorms[loff]});
@@ -234,13 +234,13 @@ CGtoPairBlock::CGtoPairBlock(const CGtoBlock& bra_gto_block, const CGtoBlock& ke
             for (int64_t k = 0; k < bpgtos; k++)
             {
                 const auto koff = k * bcgtos + i;
-                
+
                 for (int64_t l = 0; l < kpgtos; l++)
                 {
                     const auto loff = l * kcgtos + j;
-                 
+
                     const auto ijoff = (k * kpgtos + l) * cdim + ij_idx;
-                    
+
                     _exponents[ijoff] = TPoint2D({bexps[koff], kexps[loff]});
 
                     _norms[ijoff] = TPoint2D({bnorms[koff], knorms[loff]});

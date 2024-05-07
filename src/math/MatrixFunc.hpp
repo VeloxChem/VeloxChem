@@ -51,7 +51,6 @@ auto makeMatrix(const CMolecularBasis& basis, const mat_t mtype) -> CMatrix;
  */
 auto makeMatrix(const CMolecularBasis& bra_basis, const CMolecularBasis& ket_basis) -> CMatrix;
 
-
 /**
  Creates matrix.
 

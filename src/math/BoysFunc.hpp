@@ -59,7 +59,7 @@ class CBoysFunc
     /**
      Destroys a Boys function evaluator object.
      */
-    ~CBoysFunc(){};
+    ~CBoysFunc() {};
 
     /**
      Computes Boys function values up to specified order (inclusively) for given

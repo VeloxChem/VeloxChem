@@ -266,13 +266,17 @@ export_gpu(py::module& m)
 
     m.def("transform_density", &gpu::transformDensity, "Transforms density matrix (spherical to Cartesian).");
 
-    m.def("compute_overlap_and_kinetic_energy_integrals_gpu", &gpu::computeOverlapAndKineticEnergyIntegralsOnGPU, "Computes one-electron integral matrices using GPU.");
+    m.def("compute_overlap_and_kinetic_energy_integrals_gpu",
+          &gpu::computeOverlapAndKineticEnergyIntegralsOnGPU,
+          "Computes one-electron integral matrices using GPU.");
 
-    m.def("compute_nuclear_potential_integrals_gpu", &gpu::computeNuclearPotentialIntegralsOnGPU, "Computes one-electron integral matrices using GPU.");
+    m.def(
+        "compute_nuclear_potential_integrals_gpu", &gpu::computeNuclearPotentialIntegralsOnGPU, "Computes one-electron integral matrices using GPU.");
 
     m.def(
         "compute_point_charges_integrals_gpu",
-        [](const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screener, const py::array_t<double>& point_charges) -> CDenseMatrix {
+        [](const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screener, const py::array_t<double>& point_charges)
+            -> CDenseMatrix {
             std::string errshape("compute_point_charges_integrals_gpu: Invalid shape of point_charges");
             std::string errstyle("compute_point_charges_integrals_gpu: Expecting contiguous numpy array");
             const auto  ndim    = static_cast<int64_t>(point_charges.shape(0));
