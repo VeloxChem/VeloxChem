@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -23,38 +22,36 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-# Automatically generated settings
-
 USE_MPI := true
 USE_GPU := true
 USE_MKL := false
 USE_XTB := false
 
-BUILD_LIB := /projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/build/lib/veloxchem
-VLX_TARGET := $(BUILD_LIB)/veloxchemlib.cpython-39-x86_64-linux-gnu.so
+VLX_HOME := /path/to/VeloxChem-gpu-hip
 
-#CXX := CC
 CXX := /opt/rocm-5.2.3/llvm/bin/clang++ ${shell CC --cray-print-opts=cflags} ${shell CC --cray-print-opts=libs}
+#CXX := CC
 
 CXX_REL_FLG := -fopenmp -std=c++17
 CXX_DEB_FLG := -fopenmp -std=c++17
 
-MATH_INC := -I/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/dependencies/openblas/include
-MATH_INC += -I/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/dependencies/magma/include
-#MATH_LIB := -lomp -lpthread -lm -ldl
-MATH_LIB := -L/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/dependencies/openblas/lib -lopenblas
-MATH_LIB += -L/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/dependencies/magma/lib -lmagma
+MATH_INC := -I$(VLX_HOME)/dependencies/openblas/include
+MATH_INC += -I$(VLX_HOME)/dependencies/magma/include
 
-XC_INC := -I/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/dependencies/libxc/include
-XC_LIB := -L/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/dependencies/libxc/lib
-XC_LIB += -Wl,-rpath,/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/dependencies/libxc/lib -lxc
+MATH_LIB := -L$(VLX_HOME)/dependencies/openblas/lib -lopenblas
+MATH_LIB += -L$(VLX_HOME)/dependencies/magma/lib -lmagma
+#MATH_LIB := -lomp -lpthread -lm -ldl
+
+XC_INC := -I$(VLX_HOME)/dependencies/libxc/include
+XC_LIB := -L$(VLX_HOME)/dependencies/libxc/lib
+XC_LIB += -Wl,-rpath,$(VLX_HOME)/dependencies/libxc/lib -lxc
 
 PYTHON := python3.10
 
 PYTHON_INC := -I/opt/cray/pe/python/3.10.10/include/python3.10
-PYTHON_INC += -I/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/vlxenv/lib/python3.10/site-packages/mpi4py/include
-PYTHON_INC += -I/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/vlxenv/lib/python3.10/site-packages/numpy/core/include
-PYTHON_INC += -I/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/vlxenv/lib/python3.10/site-packages/pybind11/include
+PYTHON_INC += -I$(VLX_HOME)/vlxenv/lib/python3.10/site-packages/mpi4py/include
+PYTHON_INC += -I$(VLX_HOME)/vlxenv/lib/python3.10/site-packages/numpy/core/include
+PYTHON_INC += -I$(VLX_HOME)/vlxenv/lib/python3.10/site-packages/pybind11/include
 
 DEVCC := hipcc --offload-arch=gfx90a -fopenmp -std=c++17
 DEVCC_REL_FLG := $(XC_INC) -fPIC
@@ -62,9 +59,9 @@ DEVCC_DEB_FLG := $(XC_INC) -fPIC
 DEVICE_LIB := -lhipblas
 #DEVICE_LIB := -lhipblas -lhipsolver
 
-MACLIBS := 
+MACLIBS :=
 
-LTOFLAG := 
+LTOFLAG :=
 
 # Generic settings
 
@@ -120,7 +117,7 @@ LIB_LIST += $(DEVICE_LIB)
 # XTB interface (optional)
 
 ifeq ($(USE_XTB),true)
-  CPP_REL_FLG += -DENABLE_XTB -DXTB_PARAMS="$(XTB_PATH)" 
+  CPP_REL_FLG += -DENABLE_XTB -DXTB_PARAMS="$(XTB_PATH)"
   CPP_DEB_FLG += -DENABLE_XTB -DXTB_PARAMS="$(XTB_PATH)"
   CXX_REL_FLG += $(XTB_INC)
   CXX_DEB_FLG += $(XTB_INC)

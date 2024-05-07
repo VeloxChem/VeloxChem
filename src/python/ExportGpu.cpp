@@ -3,8 +3,7 @@
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2023 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -32,10 +31,10 @@
 
 #include <vector>
 
-#include "GpuDevices.hpp"
 #include "ErrorHandler.hpp"
-#include "FockDriverGPU.hpp"
 #include "ExportGeneral.hpp"
+#include "FockDriverGPU.hpp"
+#include "GpuDevices.hpp"
 #include "ScreeningData.hpp"
 
 namespace py = pybind11;
@@ -60,13 +59,16 @@ export_gpu(py::module& m)
     py::class_<CScreeningData, std::shared_ptr<CScreeningData>>(m, "ScreeningData")
         .def(py::init<const CMolecule&, const CMolecularBasis&, const int64_t, const double, const double>())
         .def("get_num_gpus_per_node", &CScreeningData::getNumGpusPerNode)
-        .def("get_q_matrix",
-        [](CScreeningData& self, const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) -> py::array_t<double> {
-            const auto q_mat = self.get_mat_Q_full(s_prim_count, p_prim_count, d_prim_count);
-            return vlx_general::pointer_to_numpy(q_mat.values(), {q_mat.getNumberOfRows(), q_mat.getNumberOfColumns()});
-        },
-        "Gets Q matrix.")
-        ;
+        .def("get_prelink_time", &CScreeningData::getPreLinkTime)
+        .def("get_coulomb_time", &CScreeningData::getCoulombTime)
+        .def("get_exchange_time", &CScreeningData::getExchangeTime)
+        .def(
+            "get_q_matrix",
+            [](CScreeningData& self, const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) -> py::array_t<double> {
+                const auto q_mat = self.get_mat_Q_full(s_prim_count, p_prim_count, d_prim_count);
+                return vlx_general::pointer_to_numpy(q_mat.values(), {q_mat.getNumberOfRows(), q_mat.getNumberOfColumns()});
+            },
+            "Gets Q matrix.");
 
     m.def(
         "dot_product_gpu",
@@ -75,8 +77,8 @@ export_gpu(py::module& m)
             errors::assertMsgCritical(A.size() == B.size(), errsize);
 
             std::string errstyle("dot_product_gpu: Expecting contiguous numpy array");
-            auto c_style_A = py::detail::check_flags(A.ptr(), py::array::c_style);
-            auto c_style_B = py::detail::check_flags(B.ptr(), py::array::c_style);
+            auto        c_style_A = py::detail::check_flags(A.ptr(), py::array::c_style);
+            auto        c_style_B = py::detail::check_flags(B.ptr(), py::array::c_style);
             errors::assertMsgCritical(c_style_A && c_style_B, errstyle);
 
             const auto n = static_cast<int64_t>(A.size());
@@ -104,7 +106,7 @@ export_gpu(py::module& m)
             for (size_t i = 0; i < arrays.size(); i++)
             {
                 std::string errstyle("weighted_sum_gpu: Expecting contiguous numpy array");
-                auto c_style = py::detail::check_flags(arrays[i].ptr(), py::array::c_style);
+                auto        c_style = py::detail::check_flags(arrays[i].ptr(), py::array::c_style);
                 errors::assertMsgCritical(c_style, errstyle);
 
                 data_pointers.push_back(arrays[i].data());
@@ -118,7 +120,8 @@ export_gpu(py::module& m)
 
     m.def(
         "compute_error_vector_gpu",
-        [](const py::array_t<double>& X, const py::array_t<double>& F, const py::array_t<double>& D, const py::array_t<double>& S) -> py::array_t<double> {
+        [](const py::array_t<double>& X, const py::array_t<double>& F, const py::array_t<double>& D, const py::array_t<double>& S)
+            -> py::array_t<double> {
             std::string errshape("compute_error_vector_gpu: Mismatch in matrix shape");
             std::string errstyle("compute_error_vector_gpu: Expecting contiguous numpy array");
 
@@ -256,15 +259,30 @@ export_gpu(py::module& m)
             result.append(eigenVectors);
 
             return result;
-
-            },
+        },
         "Diagonalizes matrix using GPU.");
 
     m.def("compute_fock_gpu", &gpu::computeFockOnGPU, "Computes Fock matrix using GPU.");
 
     m.def("transform_density", &gpu::transformDensity, "Transforms density matrix (spherical to Cartesian).");
 
-    m.def("compute_one_electron_integrals_gpu", &gpu::computeOneElectronIntegralsOnGPU, "Computes one-electron integral matrices using GPU.");
+    m.def("compute_overlap_and_kinetic_energy_integrals_gpu", &gpu::computeOverlapAndKineticEnergyIntegralsOnGPU, "Computes one-electron integral matrices using GPU.");
+
+    m.def("compute_nuclear_potential_integrals_gpu", &gpu::computeNuclearPotentialIntegralsOnGPU, "Computes one-electron integral matrices using GPU.");
+
+    m.def(
+        "compute_point_charges_integrals_gpu",
+        [](const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screener, const py::array_t<double>& point_charges) -> CDenseMatrix {
+            std::string errshape("compute_point_charges_integrals_gpu: Invalid shape of point_charges");
+            std::string errstyle("compute_point_charges_integrals_gpu: Expecting contiguous numpy array");
+            const auto  ndim    = static_cast<int64_t>(point_charges.shape(0));
+            const auto  npoints = static_cast<int64_t>(point_charges.shape(1));
+            auto        c_style = py::detail::check_flags(point_charges.ptr(), py::array::c_style);
+            errors::assertMsgCritical(ndim == 4, errshape);
+            errors::assertMsgCritical(c_style, errstyle);
+            return gpu::computePointChargesIntegralsOnGPU(molecule, basis, screener, point_charges.data(), npoints);
+        },
+        "Computes point charges integrals using GPU.");
 
     m.def("compute_q_matrix_gpu", &gpu::computeQMatrixOnGPU, "Computes Q matrix using GPU.");
 }

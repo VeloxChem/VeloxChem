@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -28,6 +27,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <string>
 
 #include "AODensityMatrix.hpp"
 #include "DenseMatrix.hpp"
@@ -46,6 +46,10 @@ class CScreeningData
     double _pair_threshold{0.0};
 
     double _density_threshold{0.0};
+
+    std::string _prelink_time;
+    std::vector<std::string> _coulomb_time;
+    std::vector<std::string> _exchange_time;
 
     CDenseMatrix _Q_matrix_ss;
     CDenseMatrix _Q_matrix_sp;
@@ -206,6 +210,17 @@ class CScreeningData
 
     auto getNumGpusPerNode() const -> const int64_t;
 
+    auto setPreLinkTime(const std::string& prelink_elapsed_time) -> void;
+    auto getPreLinkTime() const -> const std::string;
+
+    auto initTimers(const int64_t num_gpus_per_node) -> void;
+
+    auto setCoulombTime(const int64_t gpu_id, const std::string& coulomb_elapsed_time) -> void;
+    auto getCoulombTime() const -> const std::vector<std::string>;
+
+    auto setExchangeTime(const int64_t gpu_id, const std::string& exchange_elapsed_time) -> void;
+    auto getExchangeTime() const -> const std::vector<std::string>;
+
     auto getQMatrixSS() const -> const CDenseMatrix&;
     auto getQMatrixSP() const -> const CDenseMatrix&;
     auto getQMatrixSD() const -> const CDenseMatrix&;
@@ -225,6 +240,15 @@ class CScreeningData
                 const int64_t naos,
                 const double* dens_ptr,
                 const double eri_threshold) -> void;
+
+    auto findMaxDensities(const int64_t s_prim_count,
+                          const int64_t p_prim_count,
+                          const int64_t d_prim_count,
+                          const std::vector<uint32_t>& s_prim_aoinds,
+                          const std::vector<uint32_t>& p_prim_aoinds,
+                          const std::vector<uint32_t>& d_prim_aoinds,
+                          const int64_t naos,
+                          const double* dens_ptr) -> void;
 
     auto get_ss_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
     auto get_sp_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;

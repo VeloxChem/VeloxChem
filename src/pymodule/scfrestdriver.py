@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -27,9 +26,9 @@ from mpi4py import MPI
 from copy import deepcopy
 import numpy as np
 import sys
-import os
 
 from .veloxchemlib import mpi_master
+from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import matmul_gpu, eigh_gpu, dot_product_gpu
 from .veloxchemlib import compute_error_vector_gpu
 from .veloxchemlib import transform_matrix_gpu
@@ -40,8 +39,8 @@ from .scfdriver import ScfDriver
 
 class ScfRestrictedDriver(ScfDriver):
     """
-    Implements spin restricted closed shell SCF method with C2-DIIS and
-    two-level C2-DIIS convergence accelerators.
+    Implements spin restricted closed shell SCF method with DIIS and
+    two-level DIIS convergence accelerators.
 
     :param comm:
         The MPI communicator.
@@ -88,9 +87,9 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            e_mat = compute_error_vector_gpu(oao_mat, fock_mat, den_mat.alpha_to_numpy(0), ovl_mat)
+            e_mat = compute_error_vector_gpu(oao_mat, fock_mat, den_mat,
+                                             ovl_mat)
             e_mat_shape = e_mat.shape
-            # e_grad = 2.0 * np.linalg.norm(e_mat)
             e_grad = 2.0 * np.sqrt(dot_product_gpu(e_mat, e_mat))
             max_grad = np.max(np.abs(e_mat))
         else:
@@ -123,11 +122,9 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            dmat = den_mat.alpha_to_numpy(0)
-            old_dmat = old_den_mat.alpha_to_numpy(0)
-            ddmat = dmat - old_dmat
+            ddmat = den_mat - old_den_mat
 
-            #diff_den = np.linalg.norm(ddmat)
+            # diff_den = np.linalg.norm(ddmat)
             diff_den = np.sqrt(dot_product_gpu(ddmat, ddmat))
         else:
             diff_den = 0.0
@@ -157,8 +154,8 @@ class ScfRestrictedDriver(ScfDriver):
                 self._fock_matrices_alpha.popleft()
                 self._density_matrices_alpha.popleft()
 
-            self._fock_matrices_alpha.append(fock_mat)
-            self._density_matrices_alpha.append(den_mat.alpha_to_numpy(0))
+            self._fock_matrices_alpha.append(fock_mat.copy())
+            self._density_matrices_alpha.append(den_mat.copy())
 
     def _get_scaled_fock(self, weights):
         """
@@ -246,6 +243,10 @@ class ScfRestrictedDriver(ScfDriver):
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 pass
+            elif isinstance(val, XCFunctional):
+                new_scf_drv.key = XCFunctional(val)
+            elif isinstance(val, MolecularGrid):
+                new_scf_drv.key = MolecularGrid(val)
             else:
                 new_scf_drv.key = deepcopy(val)
 

@@ -3,8 +3,7 @@
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2023 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -38,19 +37,24 @@ namespace gpu {
 
 auto computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> CDenseMatrix;
 
-auto computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> std::vector<CDenseMatrix>;
+auto computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> std::vector<CDenseMatrix>;
+
+auto computeNuclearPotentialIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> CDenseMatrix;
+
+auto computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening, const double* points_info_ptr, const int64_t npoints) -> CDenseMatrix;
 
 auto transformDensity(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> CDenseMatrix;
 
-auto computeFockOnGPU(const CMolecule& molecule,
-                      const CMolecularBasis& basis,
-                      const CAODensityMatrix& densityMatrix,
-                      const double prefac_coulomb,
-                      const double frac_exact_exchange,
-                      const double omega,
-                      const double eri_threshold,
-                      const double prelink_threshold,
-                      CScreeningData& screening) -> CDenseMatrix;
+auto computeFockOnGPU(const              CMolecule& molecule,
+                      const              CMolecularBasis& basis,
+                      const              CAODensityMatrix& densityMatrix,
+                      const double       prefac_coulomb,
+                      const double       frac_exact_exchange,
+                      const double       omega,
+                      const std::string& flag_K,
+                      const double       eri_threshold,
+                      const double       prelink_threshold,
+                      CScreeningData&    screening) -> CDenseMatrix;
 
 auto computeDotProduct(const double* A, const double* B, const int64_t size) -> double;
 
