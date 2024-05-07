@@ -175,93 +175,73 @@ class SymmetryAnalyzer:
 
         return tolerance_keywords
 
-    def symmetrize_pointgroup(self, symmetry_data, pointgoup_to_symmetrize=None):
+    def symmetrize_pointgroup(self, symmetry_data, pointgoup_to_symmetrize="C1"):
         """
         Symmetrize in chosen available Abelian group with real representation
-        and reorient molecules. Only reorient if more than 60 atoms.
+        and reorient molecules. Only reorient if more than 100 atoms.
 
         :param symmetry_data:
             The dictionary containing the different results from the pointgroup_symmetrize function.
 
         :param pointgoup_to_symmetrize:
-            The chosen point group in which themolecule will be symmetrized. 
-            Default: the detected point group.
+            The chosen point group in which the molecule will be symmetrized. 
+            Default: C1.
 
-        !!!Under construction!!!
+        :return:
+            The symmetrized molecule as a string.
         """
-        
-        # Initializes
+       
+        # Initializes variables
         self._symbols_atom_sym = []
-        symmetrized_data = {}
 
-        if pointgoup_to_symmetrize is None:
-            pointgoup_to_symmetrize = self._schoenflies_symbol
+        # Temporary
+        symmetrized_data = {}
 
         def _reorient_molecule(coords):
             """
             Store the geometry reoriented in the conventional point group orientation
-            and attibute associated list of atomic labels.
+            and attibute associated list of atomic labels. 
+            The spherical molecules are reoriented with their principal axis as z cartesian axis.
 
             :param coords:
                 The coordinates to reorient.
             """
-            
-            symmetrized_data["new_pointgroup"] = "Initial geometry reoriented"
-            reoriented_coords = self._conventional_orientation(coords)
-            symmetrized_data["symmetrized_coord_in_angstrom"] = reoriented_coords * bohr_in_angstrom()
+
+            if self._molecule_type == "spherical":    
+                reoriented_coords = self._conventional_orientation(self._main_axis, self._p_axis, coords)
+            else:
+                reoriented_coords = self._conventional_orientation(self._primary_axis, self._secondary_axis, coords)
+
+            symmetrized_coords_in_angstrom = reoriented_coords * bohr_in_angstrom()
             self._symbols_atom_sym = self._symbols
+
+            return symmetrized_coords_in_angstrom
         
-        # Handle C1 and O(3) groups and molecules larger than 60 atoms
-        if pointgoup_to_symmetrize in ["C1", "O(3)"] or self._natoms > 60:
-            _reorient_molecule(self._cent_coord)
+        # Handle C1 and O(3) groups
+        if pointgoup_to_symmetrize in ["C1", "O(3)"]:
+            symmetrized_coords_in_angstrom = _reorient_molecule(self._cent_coord)
 
         # Check that the chosen point group is available for symmetrization
-        elif pointgoup_to_symmetrize not in symmetry_data["Groups_for_symm"]:
-            if pointgoup_to_symmetrize == self._schoenflies_symbol:
-               _reorient_molecule(self._cent_coord)
-
-            else:
-                raise KeyError("Point group not available for symmetrization.")
+        elif pointgoup_to_symmetrize not in symmetry_data["Groups_for_symm"] or self._natoms > 100:
+            raise KeyError("Point group not available for symmetrization.")
         
-        # Symmetrize molecules smaller than 60 atoms and reorient
+        # Symmetrize molecules and reorient
+        # The spherical molecules are reorient with C2 axis along z cartesian axis (D2x orientation)
         else:
             symmetrized_coords = self._symmetrize_molecule(pointgoup_to_symmetrize)
-            reoriented_coords = self._conventional_orientation(symmetrized_coords)
-            symmetrized_data["symmetrized_coord_in_angstrom"] = reoriented_coords * bohr_in_angstrom()
-            symmetrized_data["new_pointgroup"] = pointgoup_to_symmetrize
+            reoriented_coords = self._conventional_orientation(self._primary_axis, self._secondary_axis, symmetrized_coords)
+            symmetrized_coords_in_angstrom = reoriented_coords * bohr_in_angstrom()
 
         # Temporary
         symmetrized_data["inequiv_atoms_by_op"] = self._inequivalent_atoms
 
-        return symmetrized_data
+        new_molecule_string = f'{self._natoms}\n\n'
 
-    def print_symmetrized_molecule(self, results_symmetrization, xyz_filename=None):
-        """
-        Build the output with the results of the symmetrized molecule.
-        The user can choose to print the new coordinates or create a new xyz file.
+        for a in range(self._natoms):
+            xa, ya, za = symmetrized_coords_in_angstrom[a]
+            new_molecule_string += f'{self._symbols_atom_sym[a]:<6s} {xa:22.8f} {ya:22.8f} {za:22.8f}\n'
 
-        :param results_dict:
-            The dictionary containing the different results from the pointgroup_symmetrize function.
-        
-        :param xyz_filename:
-            The name of the xyz file (without the .xyz extension).
-        
-        :return:
-            The symmetrized coordinates (in a xyz file if a name is specified).
-        """
-
-        coords = results_symmetrization["symmetrized_coord_in_angstrom"]
-        pointgroup = results_symmetrization["new_pointgroup"]
-
-        if xyz_filename:
-            write_xyz_file(self._symbols_atom_sym, coords, pointgroup, xyz_filename)
-        else:
-            for arr in coords:
-                formatted_string = np.array2string(arr, formatter={'float_kind': lambda x: "%12.8f" % x})
-                print(formatted_string)
-
-        # Temporary
-        print(results_symmetrization["inequiv_atoms_by_op"])
+        return new_molecule_string
 
     def _linear(self):
         """
@@ -370,6 +350,9 @@ class SymmetryAnalyzer:
 
         # Set type of molecule for reorientation
         self._molecule_type = "spherical"
+        # Set additional axis for reorientation in D2x group
+        self._main_axis = [1., 0., 0.]
+        self._p_axis = [0., 1., 0.]
 
         principal_axis = None
         while principal_axis is None:
@@ -379,26 +362,26 @@ class SymmetryAnalyzer:
                 c3 = Rotation(axis, order=3)
 
                 # Check for C5 axis
-                if self._check_op(c5, "C5", tol_factor=1.0):
+                if self._check_op(c5, "C5"):
                     self._schoenflies_symbol = "I"
                     principal_axis = axis
                     self._max_order = 5
                     break
                 # Check for C4 axis
-                elif self._check_op(c4, "C4", tol_factor=1.5):
+                elif self._check_op(c4, "C4"):
                     self._schoenflies_symbol = "O"
                     principal_axis = axis
                     self._max_order = 4
                     break
                 # Check for C3 axis
-                elif self._check_op(c3, "C3", tol_factor=1.5):
+                elif self._check_op(c3, "C3"):
                     self._schoenflies_symbol = "T"
                     principal_axis = axis
                     self._max_order = 3
         
         # Increase angular tolerance
         if principal_axis is None:
-            self._tolerance_ang *= 1.05
+            self._tolerance_ang *= 1.1
 
         p_axis_base = get_perpendicular(principal_axis)
 
@@ -434,23 +417,30 @@ class SymmetryAnalyzer:
 
             # Set orientation
             p_axis = _determine_orientation_I(principal_axis)
-            self._set_orientation(principal_axis, p_axis)
+            self._main_axis = principal_axis
+            self._p_axis = p_axis
 
             # Check for inverison center at center of mass
             if self._check_op(Inversion(), "i"):
                 self._schoenflies_symbol += 'h'
 
-                # Check for one reflexion plane containing a C5 axis as it is a generator for some subgroups
-                for angle in np.arange(0, np.pi, 0.1*np.pi / self._max_order + self._tolerance_ang):
-                    axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
-                    if self._check_op(Reflection(axis), "sigma"):
-                        break
+            # Check for any C2 axis (for reorientation)
+            for another_axis in get_cubed_sphere_grid_points(self._tolerance_ang):
+                c2 = Rotation(another_axis, order=2)
+                if self._check_op(c2, "C2"):
+                    self._primary_axis = another_axis
 
-            # Check for C2 axes perpendicular to principal axis
-            # Useful for reorienting and symmetrizing in D subgroups
-            for angle in np.arange(0, np.pi/2 + self._tolerance_ang, self._tolerance_ang):
-                axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
-                self._check_op(Rotation(axis, order=2), "C2")
+                    # Check for one reflexion plane (for symmetrization)
+                    self._check_op(Reflection(another_axis), "sigma_h")
+                    break
+
+            # Check for a C2 axis perpendicular to the first one (for reorientation)
+            C2_p_axis = get_perpendicular(another_axis)
+            for angle in np.arange(0, np.pi + self._tolerance_ang, 0.1*np.pi / 2):
+                h_axis = np.dot(C2_p_axis, rotation_matrix(another_axis, angle))
+                if self._check_op(Rotation(h_axis), "C2_p"):
+                    self._secondary_axis = h_axis
+                    break
 
         # O or Oh
         if self._schoenflies_symbol == 'O':
@@ -486,17 +476,18 @@ class SymmetryAnalyzer:
             if self._check_op(Inversion(), "i"):
                 self._schoenflies_symbol += 'h'
 
-                # Check for one reflexion plane containing a C4 axis as it is a generator for some subgroups
-                for angle in np.arange(0, np.pi, 0.1*np.pi / self._max_order + self._tolerance_ang):
-                    axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
-                    if self._check_op(Reflection(axis), "sigma"):
-                        break
+            # Check for any C2 axis (for reorientation)
+            if self._check_op(Rotation(self._main_axis, order=2), "C2"):
 
-            # Check for C2 axis perpendicular to principal axis
-            # Useful for reorienting and symmetrizing in D subgroups
-            for angle in np.arange(0, np.pi/2 + self._tolerance_ang, 0.2*np.pi / self._max_order + self._tolerance_ang):
-                axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
-                self._check_op(Rotation(axis, order=2), "C2")
+                # Check for one reflexion plane (for symmetrization)
+                self._check_op(Reflection(self._main_axis), "sigma_h")
+
+            # Check for a C2 axis perpendicular to the first one (for reorientation)
+            C2_p_axis = get_perpendicular(principal_axis)
+            for angle in np.arange(0, np.pi + self._tolerance_ang, 0.1*np.pi / 2):
+                h_axis = np.dot(C2_p_axis, rotation_matrix(principal_axis, angle))
+                if self._check_op(Rotation(h_axis), "C2_p"):
+                    break
 
         # T or Td, Th
         if self._schoenflies_symbol == 'T':
@@ -526,33 +517,31 @@ class SymmetryAnalyzer:
                         return np.dot(t_axis, rot_matrix.T)
 
             p_axis = _determine_orientation_T(principal_axis)
-            # Set orientation
-            self._set_orientation(principal_axis, p_axis)
+            self._main_axis = principal_axis
+            self._p_axis = p_axis
 
-            # Check for C2 axis perpendicular to principal axis
-            # Useful for reorienting and symmetrizing in D subgroups
-            for angle in np.arange(0, np.pi + self._tolerance_ang, 0.05*np.pi / self._max_order + self._tolerance_ang):
-                axis = np.dot(principal_axis, rotation_matrix(p_axis, angle))
-                if self._check_op(Rotation(axis, order=2), "C2"):
-                    temporary_principal_axis = axis
+            # Check for any C2 axis (for reorientation)
+            for another_axis in get_cubed_sphere_grid_points(self._tolerance_ang):
+                c2 = Rotation(another_axis, order=2)
+                if self._check_op(c2, "C2"):
+                    self._primary_axis = another_axis
+                    break
                     
-                    # Check for another C2 axis perpendicular to the first one
-                    # (Collect the generators of D2x subgroups)
-                    temporary_p_axis = get_perpendicular(temporary_principal_axis)
-                    for angle in np.arange(0, np.pi/2 + self._tolerance_ang, 0.1*np.pi / self._max_order + self._tolerance_ang):
-                        axis = np.dot(temporary_p_axis, rotation_matrix(temporary_principal_axis, angle))
-                        if self._check_op(Rotation(axis, order=2), "C2"):
-                            break
-                    # Check for one reflexion plane containing a C2 axis as it is a generator for some subgroups
-                    self._check_op(Reflection(temporary_principal_axis), "sigma")
+            # Check for a C2 axis perpendicular to the first one (for reorientation)
+            C2_p_axis = get_perpendicular(principal_axis)
+            for angle in np.arange(0, np.pi + self._tolerance_ang, 0.1*np.pi / 2):
+                h_axis = np.dot(C2_p_axis, rotation_matrix(principal_axis, angle))
+                if self._check_op(Rotation(h_axis), "C2_p"):
+                    self._p_axis = h_axis
+                    break
 
             # Check for inverison center at center of mass
             if self._check_op(Inversion(), "i"):
                 self._schoenflies_symbol += 'h'
                 return
-            
+
             # Check for any reflexion plane 
-            if self._check_op(Reflection([0, 0, 1]), "sigma"):
+            if self._check_op(Reflection(self._p_axis), "sigma_v"):
                 self._schoenflies_symbol += 'd'
                 return
 
@@ -810,7 +799,7 @@ class SymmetryAnalyzer:
 
                 # If the absolute difference is greater than a small tolerance value, 
                 # append both coordinates and symbols to the respective lists
-                if np.any(abs_diff > 0.5):
+                if np.any(abs_diff > 1.0):
                     full_symmetrized_coord.append(coord)
                     full_symmetrized_coord.append(op_coordinates[i])
                     full_symmetrized_symbols.append(symbol)
@@ -847,7 +836,7 @@ class SymmetryAnalyzer:
         orientation = np.array([principal_axis, p_axis, np.cross(principal_axis, p_axis)])
         self._cent_coord = np.dot(self._cent_coord, orientation.T)
     
-    def _conventional_orientation(self, coords):
+    def _conventional_orientation(self, main_axis, p_axis, coords):
         """
         Set molecular orientation in point group convention:
             - a right-handed cartesian,
@@ -859,15 +848,18 @@ class SymmetryAnalyzer:
             - if no rotational axis nor sigma plane, x and y are defined along the two principal inertia axes
               associated with the two smallest principal moments.
 
+        :param main_axis:
+            The axis to align with the z cartesian axis.
+
+        :param p_axis:
+            A axis perpendicular to main_axis to align with the x cartesian axis.
+
         :param coords:
             The coordinates to reorient.
             
         :return:
             A list of arrays with the cartesian coordinates.
         """
-
-        if self._molecule_type not in ["isolated_atom", "linear", "asym_top", "cyclic", "dihedral", "spherical"]:
-            raise KeyError("Molecule type not available.")
         
         if self._molecule_type =="isolated_atom":
             return
@@ -877,10 +869,11 @@ class SymmetryAnalyzer:
         elif self._molecule_type == "asym_top":
             reoriented_coordinates = coords
         else:
-            orientation = np.array([self._secondary_axis, np.cross(self._primary_axis, self._secondary_axis), self._primary_axis])
+            orientation = np.array([p_axis, np.cross(main_axis, p_axis), main_axis])
             reoriented_coordinates = np.dot(coords, orientation.T)
 
         return reoriented_coordinates
+
 
 
 """
@@ -1120,41 +1113,6 @@ def rotation_matrix(axis, angle):
 
     return np.array(rot_matrix)
 
-def write_xyz_file(symbols,
-                   coordinates_in_angstrom,
-                   pointgroup,
-                   xyz_filename):
-        """
-        Writes molecular geometry to xyz file.
-
-        :param symbols:
-            The list of atomic labels.
-
-        :param coordinates_in_angstrom:
-            An array of coordinates.
-
-        :param pointgroup:
-            The point group of symmetry.
-
-        :param xyz_filename:
-            The name of the xyz file.
-        
-        :return:
-            An xyz file with molecular geometry.
-        """
-
-        natoms = len(symbols)
-        xyz = f''
-
-        for a in range(natoms):
-            xa, ya, za = coordinates_in_angstrom[a]
-            xyz += f'{symbols[a]:<6s} {xa:22.8f} {ya:22.8f} {za:22.8f}\n'
-
-        with open(str(xyz_filename) + ".xyz", 'w') as new_geom:
-            new_geom.write(str(natoms)+'\n')
-            new_geom.write(pointgroup+'\n')
-            new_geom.write(str(xyz))
-
 
 
 all_symmetry_elements = {
@@ -1290,5 +1248,5 @@ generators = {
     "D2": ["C2", "C2_p"],
     "C2v": ["C2", "sigma_v"],
     "C2h": ["C2", "sigma_h"],
-    "D2h": ["C2", "C2_p", "sigma_h", "sigma_v"]
+    "D2h": ["C2", "C2_p", "sigma_h"]
 }
