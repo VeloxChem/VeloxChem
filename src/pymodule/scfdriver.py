@@ -47,7 +47,6 @@ from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
 from .sadguessdriver import SadGuessDriver
 from .diis import Diis
-from .signalhandler import SignalHandler
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .sanitychecks import molecule_sanity_check
@@ -974,11 +973,6 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self._print_scf_title()
-
-        if not self._first_step:
-            signal_handler = SignalHandler()
-            signal_handler.add_sigterm_function(self._graceful_exit, molecule,
-                                                ao_basis)
 
         for i in self._get_scf_range():
 
