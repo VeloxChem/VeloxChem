@@ -27,35 +27,27 @@ USE_GPU := true
 USE_MKL := false
 USE_XTB := false
 
-VLX_HOME := /path/to/VeloxChem-gpu-hip
+OPENBLAS_HOME := /path/to/openblas
+MAGMA_HOME    := /path/to/magma
 
-CXX := /opt/rocm-5.2.3/llvm/bin/clang++ ${shell CC --cray-print-opts=cflags} ${shell CC --cray-print-opts=libs}
-#CXX := CC
+CXX    := /opt/rocm/llvm/bin/clang++ ${shell CC --cray-print-opts=cflags} ${shell CC --cray-print-opts=libs}
+PYTHON := python3
+DEVCC  := hipcc --offload-arch=gfx90a -fopenmp -std=c++17
 
 CXX_REL_FLG := -fopenmp -std=c++17
 CXX_DEB_FLG := -fopenmp -std=c++17
 
-MATH_INC := -I$(VLX_HOME)/dependencies/openblas/include
-MATH_INC += -I$(VLX_HOME)/dependencies/magma/include
-
-MATH_LIB := -L$(VLX_HOME)/dependencies/openblas/lib -lopenblas
-MATH_LIB += -L$(VLX_HOME)/dependencies/magma/lib -lmagma
+MATH_INC := -I$(OPENBLAS_HOME)/include -I$(MAGMA_HOME)/include
+MATH_LIB := -L$(OPENBLAS_HOME)/lib -L$(MAGMA_HOME)/lib -lopenblas -lmagma
 #MATH_LIB := -lomp -lpthread -lm -ldl
 
-XC_INC := -I$(VLX_HOME)/dependencies/libxc/include
-XC_LIB := -L$(VLX_HOME)/dependencies/libxc/lib
-XC_LIB += -Wl,-rpath,$(VLX_HOME)/dependencies/libxc/lib -lxc
+PYTHON_INC := $(shell $(PYTHON)-config --includes)
+PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
+PYTHON_INC += -I$(shell $(PYTHON) -c "import numpy; print(numpy.get_include())")
+PYTHON_INC += $(shell $(PYTHON) -m pybind11 --includes)
 
-PYTHON := python3.10
-
-PYTHON_INC := -I/opt/cray/pe/python/3.10.10/include/python3.10
-PYTHON_INC += -I$(VLX_HOME)/vlxenv/lib/python3.10/site-packages/mpi4py/include
-PYTHON_INC += -I$(VLX_HOME)/vlxenv/lib/python3.10/site-packages/numpy/core/include
-PYTHON_INC += -I$(VLX_HOME)/vlxenv/lib/python3.10/site-packages/pybind11/include
-
-DEVCC := hipcc --offload-arch=gfx90a -fopenmp -std=c++17
-DEVCC_REL_FLG := $(XC_INC) -fPIC
-DEVCC_DEB_FLG := $(XC_INC) -fPIC
+DEVCC_REL_FLG := -fPIC
+DEVCC_DEB_FLG := -fPIC
 DEVICE_LIB := -lhipblas
 #DEVICE_LIB := -lhipblas -lhipsolver
 
