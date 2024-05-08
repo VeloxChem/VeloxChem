@@ -413,8 +413,6 @@ class ScfDriver:
             The minimal AO basis set.
         """
 
-        profiler = Profiler()
-
         if min_basis is None:
             if self.rank == mpi_master():
                 min_basis = MolecularBasis.read(molecule,
@@ -473,6 +471,8 @@ class ScfDriver:
         # DIIS method
         if self.acc_type.upper() == 'DIIS':
 
+            profiler = Profiler()
+
             if self.rank == mpi_master():
                 if self.restart:
                     den_mat = self.gen_initial_density_restart(molecule)
@@ -491,8 +491,12 @@ class ScfDriver:
 
             self._comp_diis(molecule, ao_basis, den_mat, profiler)
 
+            profiler.end(self.ostream, scf_flag=True)
+
         # two level DIIS method
         elif self.acc_type.upper() == 'L2_DIIS':
+
+            profiler = Profiler()
 
             # first step
             self._first_step = True
@@ -523,6 +527,10 @@ class ScfDriver:
 
             self._comp_diis(molecule, val_basis, den_mat, profiler)
 
+            profiler.end(self.ostream, scf_flag=True)
+
+            profiler = Profiler()
+
             # second step
             self._first_step = False
 
@@ -545,7 +553,7 @@ class ScfDriver:
 
             self._comp_diis(molecule, ao_basis, den_mat, profiler)
 
-        profiler.end(self.ostream, scf_flag=True)
+            profiler.end(self.ostream, scf_flag=True)
 
         if not self.is_converged:
             self.ostream.print_header(
@@ -886,13 +894,12 @@ class ScfDriver:
 
         self._history = []
 
-        if not self._first_step:
-            profiler.begin({
-                'timing': self.timing,
-                'profiling': self.profiling,
-                'memory_profiling': self.memory_profiling,
-                'memory_tracing': self.memory_tracing,
-            })
+        profiler.begin({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
 
         diis_start_time = tm.time()
 
@@ -1091,8 +1098,6 @@ class ScfDriver:
             self._V_es = None
 
         if not self._first_step:
-            signal_handler.remove_sigterm_function()
-
             self.write_checkpoint(molecule.get_element_ids(),
                                   ao_basis.get_label())
 

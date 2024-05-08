@@ -262,8 +262,8 @@ class Profiler:
             ostream.print_header(valstr.ljust(width))
 
             for key, val in self.timing_dict.items():
-                if scf_flag and key.lower() == 'iteration 0':
-                    continue
+                #if scf_flag and key.lower() == 'iteration 0':
+                #    continue
                 valstr = f'{key:<18s}'
                 for label in labels:
                     if label in val:
