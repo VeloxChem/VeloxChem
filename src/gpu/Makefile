@@ -1,12 +1,28 @@
 #
-#                      V.E.L.O.X. C.H.E.M. MP
-#      ---------------------------------------------------
-#           An Electronic Structure Code for Nanoscale
+#                              VELOXCHEM
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
 #
-#  Created by Zilvinas Rinkevicius (rinkevic@kth.se), KTH, Sweden.
-#  Copyright © 2018 by Velox Chem MP developers. All rights reserved.
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-# Makefile for internal Velox Chem MP library
+# Makefile for internal VeloxChem MP library
 
 LOCAL_LIB := gpu.a
 LOCAL_SCR := $(wildcard *.cpp)
