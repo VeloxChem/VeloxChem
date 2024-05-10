@@ -28,8 +28,6 @@ class SymmetryAnalyzer:
         - primary_axis: axis defined as z cartesian axis for reorientation in point group convention.
         - secondary_axis: axis perpendicular to primary axis to build conventional cartesian frame for reorientation.
         - molecule_type: the type of molecule on a detection tree (e.g., linear, cyclic, etc.).
-
-    Note: based on the open source pointgroup 0.4.1 package.
     """
 
     def __init__(self): 
@@ -56,6 +54,7 @@ class SymmetryAnalyzer:
 
         :param tolerance:
             A tolerance threshold string available in tolerance_keywords.
+            Default: tight
 
         :return:
             A dictionary containing:
@@ -78,6 +77,8 @@ class SymmetryAnalyzer:
         elif tolerance == 'very tight':
             self._tolerance_eig = 0.002
             self._tolerance_ang = 0.035     # about 2 degrees
+        else:
+            raise KeyError("Tolerance criterion not available.")
 
         # Read and express geometry in center of mass (COM) frame
         # Geom and COM in bohr because moments of inertia are defined in bohr in Molecule module
@@ -761,8 +762,6 @@ class SymmetryAnalyzer:
 
         :return:
             A array with the coordinates of the symmetrized molecule.
-
-        !!!Under construction!!!
         """
 
         # Initialize the list of coordinates for the inequivalent atoms after symmetrization
