@@ -32,7 +32,6 @@ from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
-from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check)
@@ -261,11 +260,6 @@ class LinearResponseSolver(LinearSolver):
         residuals = {}
         relative_residual_norm = {}
 
-        signal_handler = SignalHandler()
-        signal_handler.add_sigterm_function(self._graceful_exit, molecule,
-                                            basis, dft_dict, pe_dict,
-                                            rsp_vector_labels)
-
         iter_per_trial_in_hours = None
 
         # start iterations
@@ -436,8 +430,6 @@ class LinearResponseSolver(LinearSolver):
 
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
-
-        signal_handler.remove_sigterm_function()
 
         self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                rsp_vector_labels)

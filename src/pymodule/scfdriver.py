@@ -47,7 +47,6 @@ from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
 from .sadguessdriver import SadGuessDriver
 from .diis import Diis
-from .signalhandler import SignalHandler
 from .firstorderprop import FirstOrderProperties
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
@@ -1158,11 +1157,6 @@ class ScfDriver:
         if self.rank == mpi_master():
             self._print_scf_title()
 
-        if not self._first_step:
-            signal_handler = SignalHandler()
-            signal_handler.add_sigterm_function(self._graceful_exit, molecule,
-                                                ao_basis)
-
         for i in self._get_scf_range():
 
             # set the current number of SCF iterations
@@ -1306,8 +1300,6 @@ class ScfDriver:
             self._V_es = None
 
         if not self._first_step:
-            signal_handler.remove_sigterm_function()
-
             self.write_checkpoint(molecule.get_element_ids(),
                                   ao_basis.get_label())
 
