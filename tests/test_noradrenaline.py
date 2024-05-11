@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -19,7 +21,9 @@ class TestNoradrenaline:
 
     def test_hf(self):
 
-        mol = Molecule.read_xyz_file('noradrenaline.xyz')
+        here = Path(__file__).parent
+        xyz_file = str(here / 'data' / 'noradrenaline.xyz')
+        mol = Molecule.read_xyz_file(xyz_file)
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
         min_bas = MolecularBasis.read(mol, 'ao-start-guess', ostream=None)
 
