@@ -1,0 +1,20 @@
+@jobs
+task: scf
+@end
+
+@method settings
+basis: def2-svp
+@end
+
+@scf
+timing: yes
+# Note: This threshold is very loose and is only used for benchmark purposes.
+# It should not be used in production calculations.
+conv_thresh: 1.0e-3
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: g-quad-neutral.xyz
+@end
