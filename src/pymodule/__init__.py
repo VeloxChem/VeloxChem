@@ -125,6 +125,7 @@ from .tddftgradientdriver import TddftGradientDriver
 from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
 from .cphfsolver import CphfSolver
+from .hessianorbitalresponse import HessianOrbitalResponse
 from .tdhfhessiandriver import TdhfHessianDriver
 from .polarizabilitygradient import PolOrbitalResponse
 from .polarizabilitygradient import PolarizabilityGradient

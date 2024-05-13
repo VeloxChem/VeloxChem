@@ -148,9 +148,10 @@ class ScfHessianDriver(HessianDriver):
             'memory_tracing': self.memory_tracing,
         })
 
-        # Sanity check
-        if (self.pople_hessian) and (not self._dft):
-            raise ValueError('Pople Hessian only valid for DFT')
+        # TODO: remove (Iulia's comment: the "Pople" way to calculate the Hessian should be valid for both HF and DFT)
+        ## Sanity check
+        #if (self.pople_hessian) and (not self._dft):
+        #    raise ValueError('Pople Hessian only valid for DFT')
 
         # Save the electronic energy
         self.elec_energy = self.scf_driver.get_scf_energy()
@@ -678,12 +679,13 @@ class ScfHessianDriver(HessianDriver):
             density = None
             gs_density = AODensityMatrix()
 
-        grid_drv = GridDriver()
-        grid_level = (get_default_grid_level(self.xcfun)
-                      if self.scf_driver.grid_level is None else self.scf_driver.grid_level)
-        grid_drv.set_level(grid_level)
+        if self._dft:
+            grid_drv = GridDriver()
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.scf_driver.grid_level is None else self.scf_driver.grid_level)
+            grid_drv.set_level(grid_level)
+            mol_grid = grid_drv.generate(molecule)
 
-        mol_grid = grid_drv.generate(molecule)
         gs_density.broadcast(self.rank, self.comm)
 
         density = self.comm.bcast(density, root=mpi_master())
@@ -732,12 +734,12 @@ class ScfHessianDriver(HessianDriver):
             # derivatives
             hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
 
-        if self.scf_driver._dft: 
+        if self._dft: 
             xc_mol_hess = XCMolecularHessian()
         for i in range(natm):
             # upper triangular part
             for j in range(i, natm):
-                if self.scf_driver._dft:
+                if self._dft:
                     # First derivative of the Vxc matrix elements
                     vxc_deriv_j = xc_mol_hess.integrate_vxc_fock_gradient(
                                     molecule, ao_basis, gs_density, mol_grid,
@@ -748,7 +750,7 @@ class ScfHessianDriver(HessianDriver):
                     # First derivative of the Fock matrix
                     fock_deriv_j =  fock_deriv(molecule, ao_basis, density, j,
                                                self.scf_driver)
-                    if self.scf_driver._dft:
+                    if self._dft:
                         fock_deriv_j += vxc_deriv_j
 
                     # First derivative of overlap matrix
@@ -817,7 +819,7 @@ class ScfHessianDriver(HessianDriver):
             gs_density = AODensityMatrix()
             scf_tensors = None
 
-        if self.scf_driver._dft:
+        if self._dft:
             grid_drv = GridDriver()
             grid_level = (get_default_grid_level(self.xcfun)
                           if self.scf_driver.grid_level is None else self.scf_driver.grid_level)
@@ -861,11 +863,11 @@ class ScfHessianDriver(HessianDriver):
             # TODO why is this initiated here?
             hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
 
-        if self.scf_driver._dft: 
+        if self._dft: 
             xc_mol_hess = XCMolecularHessian()
         for i in range(natm):
             # First derivative of the Vxc matrix elements
-            if self.scf_driver._dft:
+            if self._dft:
                 vxc_deriv_i = xc_mol_hess.integrate_vxc_fock_gradient(
                                 molecule, ao_basis, gs_density, mol_grid,
                                 self.scf_driver.xcfun.get_func_label(), i)
@@ -873,14 +875,14 @@ class ScfHessianDriver(HessianDriver):
             if self.rank == mpi_master():
                 fock_deriv_i =  fock_deriv(molecule, ao_basis, density, i,
                                            self.scf_driver)
-                if self.scf_driver._dft:
+                if self._dft:
                     fock_deriv_i += vxc_deriv_i
                 ovlp_deriv_i = overlap_deriv(molecule, ao_basis, i)
 
             # upper triangular part
             for j in range(i, natm):
                 # First derivative of the Vxc matrix elements
-                if self.scf_driver._dft:
+                if self._dft:
                     vxc_deriv_j = xc_mol_hess.integrate_vxc_fock_gradient(
                                     molecule, ao_basis, gs_density, mol_grid,
                                     self.scf_driver.xcfun.get_func_label(), j)
@@ -889,7 +891,7 @@ class ScfHessianDriver(HessianDriver):
                 if self.rank == mpi_master():
                     fock_deriv_j =  fock_deriv(molecule, ao_basis, density, j,
                                                self.scf_driver)
-                    if self.scf_driver._dft:
+                    if self._dft:
                         fock_deriv_j += vxc_deriv_j
                     ovlp_deriv_j = overlap_deriv(molecule, ao_basis, j)
         
