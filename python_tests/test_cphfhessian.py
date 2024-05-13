@@ -9,7 +9,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.cphfsolver import CphfSolver
+from veloxchem.hessianorbitalresponse import HessianOrbitalResponse
 
 try:
     import pyscf
@@ -29,14 +29,14 @@ class TestCphfSolver(unittest.TestCase):
         scf_drv.ostream.mute()
         scf_tensors = scf_drv.compute(molecule, basis)
 
-        cphf_solver = CphfSolver()
-        cphf_settings = {'conv_thresh':2e-7}
-        cphf_solver.update_settings(cphf_settings, method_settings)
-        cphf_solver.ostream.mute()
-        cphf_solver.compute(molecule, basis, scf_tensors, scf_drv)
+        hess_orbrsp_drv = HessianOrbitalResponse()
+        orbrsp_settings = {'conv_thresh':2e-7}
+        hess_orbrsp_drv.update_settings(orbrsp_settings, method_settings)
+        hess_orbrsp_drv.ostream.mute()
+        hess_orbrsp_drv.compute(molecule, basis, scf_tensors, scf_drv)
 
         if scf_drv.rank == mpi_master():
-            cphf_results = cphf_solver.cphf_results
+            cphf_results = hess_orbrsp_drv.cphf_results
             cphf_coefficients = cphf_results['cphf_ov']
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
