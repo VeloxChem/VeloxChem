@@ -736,6 +736,9 @@ class ForceFieldGenerator:
 
         for at in self.unique_atom_types:
             atom_type_found = False
+            
+            # Auxilary variable for finding parameters in UFF
+            element = ''.join([i for i in at if not i.isdigit()])
 
             for line in ff_data_lines:
                 if line.startswith(f'  {at}     '):
@@ -751,14 +754,20 @@ class ForceFieldGenerator:
                     sigma, epsilon, comment = 3.15061e-01, 6.36386e-01, 'OW'
                 elif at == 'hw':
                     sigma, epsilon, comment = 0.0, 0.0, 'HW'
-                else:
+                # Case for atoms in UFF but not in GAFF
+                elif element in self.uff_param.keys():
                     warnmsg = f'ForceFieldGenerator: atom type {at} is not in GAFF. Sigma and Epsilon from UFF.'
                     self.ostream.print_warning(warnmsg)
-                    element = ''.join([i for i in at if not i.isdigit()])
                     sigma = self.uff_param[element]['sigma']
                     epsilon = self.uff_param[element]['epsilon']
                     comment = 'UFF'
-    
+                else:
+                    warnmsg = f'ForceFieldGenerator: atom type {at} is ill defined. Default values are used.'
+                    self.ostream.print_warning(warnmsg)
+                    sigma = 0.1
+                    epsilon = 0.1
+                    comment = 'Default'
+
             atom_type_params[at] = {
                 'sigma': sigma,
                 'epsilon': epsilon,
@@ -1903,7 +1912,8 @@ class ForceFieldGenerator:
         for i, atom in self.atoms.items():
             element = ''.join([i for i in atom['name'] if not i.isdigit()])  
             attributes = {
-                "name": atom['name'],
+                # Name is the atom type_molname
+                "name": atom['name'] + '_' + mol_name,
                 "class": str(i + 1),
                 "element": element,
                 "mass": str(atom['mass']) 
@@ -1914,7 +1924,7 @@ class ForceFieldGenerator:
         Residues = ET.SubElement(ForceField, "Residues")
         Residue = ET.SubElement(Residues, "Residue", name=mol_name)
         for atom_id, atom_data in atoms.items():
-            ET.SubElement(Residue, "Atom", name=atom_data['name'], type=atom_data['name'], charge=str(atom_data['charge']))
+            ET.SubElement(Residue, "Atom", name=atom_data['name'], type=atom_data['name'] + '_' + mol_name, charge=str(atom_data['charge']))
         for bond_id, bond_data in bonds.items():
             ET.SubElement(Residue, "Bond", atomName1=atoms[bond_id[0]]['name'], atomName2=atoms[bond_id[1]]['name'])
 
@@ -1951,9 +1961,9 @@ class ForceFieldGenerator:
                 "class2": str(dihedral_id[1] + 1),
                 "class3": str(dihedral_id[2] + 1),
                 "class4": str(dihedral_id[3] + 1),
-                "periodicity": str(dihedral_data['periodicity']),
-                "phase": str(dihedral_data['phase'] * np.pi / 180),
-                "k": str(dihedral_data['barrier'])
+                "periodicity1": str(dihedral_data['periodicity']),
+                "phase1": str(dihedral_data['phase'] * np.pi / 180),
+                "k1": str(dihedral_data['barrier'])
             }
             ET.SubElement(Dihedrals, "Proper", **attributes)
 
@@ -1979,14 +1989,18 @@ class ForceFieldGenerator:
         # Improper Dihedrals section
         Impropers = ET.SubElement(ForceField, "PeriodicTorsionForce")
         for improper_id, improper_data in self.impropers.items():
+
+            # The order of the atoms is defined in the OpenMM documentation
+            # http://docs.openmm.org/latest/userguide/application/06_creating_ffs.html
+
             attributes = {
-                "class1": str(improper_id[0] + 1),
-                "class2": str(improper_id[1] + 1),
+                "class1": str(improper_id[1] + 1),
+                "class2": str(improper_id[0] + 1),
                 "class3": str(improper_id[2] + 1),
                 "class4": str(improper_id[3] + 1),
-                "periodicity": str(improper_data['periodicity']),
-                "phase": str(improper_data['phase'] * np.pi / 180),
-                "k": str(improper_data['barrier'])
+                "periodicity1": str(improper_data['periodicity']),
+                "phase1": str(improper_data['phase'] * np.pi / 180),
+                "k1": str(improper_data['barrier'])
             }
             ET.SubElement(Impropers, "Improper", **attributes)
 
@@ -1994,7 +2008,7 @@ class ForceFieldGenerator:
         NonbondedForce = ET.SubElement(ForceField, "NonbondedForce", coulomb14scale=str(self.fudgeQQ), lj14scale=str(self.fudgeLJ))
         for atom_id, atom_data in atoms.items():
             attributes = {
-                "type": atom_data['name'],
+                "type": atom_data['name'] + '_' + mol_name,
                 "charge": str(atom_data['charge']),
                 "sigma": str(atom_data['sigma']),
                 "epsilon": str(atom_data['epsilon'])
