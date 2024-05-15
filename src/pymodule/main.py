@@ -57,6 +57,7 @@ from .rsptpatransition import TpaTransition
 from .rsptpa import TPA
 from .tdhfhessiandriver import TdhfHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
+from .vibrationalanalysis import VibrationalAnalysis
 from .cphfsolver import CphfSolver
 from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
@@ -403,7 +404,7 @@ def main():
             tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
                                   rsp_prop.rsp_driver)
     # Hessian
-
+    # TODO reconsider keeping this after introducing vibrationalanalysis class
     if task_type == 'hessian':
         hessian_dict = (task.input_dict['hessian']
                         if 'hessian' in task.input_dict else {})
@@ -418,8 +419,8 @@ def main():
             hessian_drv.update_settings(method_dict, hessian_dict)
             hessian_drv.compute(task.molecule, task.ao_basis)
 
-        if task.mpi_rank == mpi_master():
-            hessian_drv.vibrational_analysis(task.molecule)
+        #if task.mpi_rank == mpi_master():
+        #    hessian_drv.vibrational_analysis(task.molecule)
 
     # Geometry optimization
 
@@ -483,11 +484,12 @@ def main():
 
     # Ground state Hessian / Vibrational analysis
 
-    # TODO: shouldn't this go together with hessian?
-    if task_type in ['vib', 'vibrational']:
+    if task_type == 'vibrational':
 
         vib_dict = (task.input_dict['vibrational']
                     if 'vibrational' in task.input_dict else {})
+        hess_dict = (task.input_dict['hessian']
+                        if 'hessian' in task.input_dict else {})
         polgrad_dict = (task.input_dict['polarizability_gradient'] 
                         if 'polarizability_gradient' in task.input_dict else {})
         orbrsp_dict = (task.input_dict['orbital_response']
@@ -496,32 +498,18 @@ def main():
                     if 'response' in task.input_dict else {})
 
         hessian_drv = ScfHessianDriver(scf_drv)
-        hessian_drv.update_settings(method_dict, hess_dict = vib_dict, 
-                                    cphf_dict = orbrsp_dict, rsp_dict = rsp_dict,
-                                    polgrad_dict = polgrad_dict)
-        hessian_drv.compute(task.molecule, task.ao_basis)
+
+        vibrational_drv = VibrationalAnalysis(hessian_drv)
+        vibrational_drv.update_settings(method_dict, vib_dict, hess_dict=hess_dict,
+                                        cphf_dict = orbrsp_dict, rsp_dict = rsp_dict,
+                                        polgrad_dict = polgrad_dict)
+
         # TODO: add output file name for geomeTRIC vibrational analysis
-        if task.mpi_rank == mpi_master():
-            hessian_drv.vibrational_analysis(task.molecule)
-
-    # TODO: maybe remove (this was included for testing the MPI-parallelization)
-    # FIXME: this will no longer work after compute_rhs has been moved to
-    # hessianorbitalresponse class
-    #if task_type in ['cphf']:
-    #    if 'cphf_settings' in task.input_dict:
-    #        cphf_dict = task.input_dict['cphf_settings']
-    #    else:
-    #        cphf_dict = {}
-
-    #    cphf_drv = CphfSolver(task.mpi_comm, task.ostream)
-    #    cphf_drv.update_settings(cphf_dict, method_dict)
-    #    cphf_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors,
-    #                     scf_drv) 
-
+        vibrational_drv.compute(task.molecule, task.ao_basis)
 
     # Polarizability gradient
 
-    if task_type in ['polarizability_gradient']:
+    if task_type == 'polarizability_gradient':
 
         polgrad_dict = (task.input_dict['polarizability_gradient']
                      if 'polarizability_gradient' in task.input_dict else {})

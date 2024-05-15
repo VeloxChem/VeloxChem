@@ -6,6 +6,7 @@ from veloxchem.mpitask import MpiTask
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.xtbdriver import XtbDriver
 from veloxchem.xtbhessiandriver import XtbHessianDriver
+from veloxchem.vibrationalanalysis import VibrationalAnalysis
 
 from .addons import using_xtb
 
@@ -30,11 +31,14 @@ class TestXtbHessianDriver:
         xtb_drv.compute(task.molecule)
 
         xtb_hessian_drv = XtbHessianDriver(xtb_drv)
-        xtb_hessian_drv.ostream.mute()
-        xtb_hessian_drv.compute(task.molecule)
+
+        vib_settings = {'do_ir': 'yes', 'numerical_hessian':'yes'}
+        vibanalysis_drv = VibrationalAnalysis(xtb_hessian_drv)
+        vibanalysis_drv.update_settings(vib_dict = vib_settings)
+        vibanalysis_drv.ostream.mute()
+        vibanalysis_drv.compute(task.molecule)
 
         if is_mpi_master(task.mpi_comm):
-            xtb_hessian_drv.vibrational_analysis(task.molecule)
 
             hf = h5py.File(h5file)
             ref_hessian = np.array(hf.get('hessian'))
@@ -42,11 +46,11 @@ class TestXtbHessianDriver:
             ref_ir_intensities = np.array(hf.get('ir'))
             hf.close()
 
-            diff_hessian = np.max(np.abs(xtb_hessian_drv.hessian - ref_hessian))
+            diff_hessian = np.max(np.abs(vibanalysis_drv.hessian - ref_hessian))
             rel_diff_freq = np.max(
-                np.abs(xtb_hessian_drv.vib_frequencies / ref_frequencies - 1.0))
+                np.abs(vibanalysis_drv.vib_frequencies / ref_frequencies - 1.0))
             rel_diff_ir = np.max(
-                np.abs(xtb_hessian_drv.ir_intensities / ref_ir_intensities -
+                np.abs(vibanalysis_drv.ir_intensities / ref_ir_intensities -
                        1.0))
 
             assert diff_hessian < 1.0e-5

@@ -61,6 +61,7 @@ class PolarizabilityGradient():
 
         self.numerical = False
         self.do_four_point = False
+        self.do_print_polgrad = False
 
         self._dft = False
         self.grid_level = None
@@ -72,15 +73,14 @@ class PolarizabilityGradient():
 
         self._input_keywords = {
             'polarizabilitygradient': {
-                'vector_components':
-                    ('str_lower', 'Cartesian components of operator'),
+                'vector_components': ('str_lower', 'Cartesian components of operator'),
                 'frequencies': ('seq_range', 'frequencies'),
                 'numerical': ('bool', 'do numerical integration'),
-                'do_four_point':
-                    ('bool', 'do four-point numerical integration'),
+                'do_four_point': ('bool', 'do four-point numerical integration'),
                 'delta_h': ('float', 'the displacement for finite difference'),
                 'is_complex': ('bool', 'whether the polarizability is complex'),
                 'damping': ('float', 'damping parameter for complex numerical'),
+                'do_print_polgrad': ('bool', 'whether to print the pol. gradient'),
             },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
@@ -163,22 +163,26 @@ class PolarizabilityGradient():
         start_time = tm.time()
 
         if self.numerical:
+            # sanity checks SCF driver input
             if self.scf_drv is None:
                 error_message = 'PolarizabilityGradient: missing input SCF driver '
                 error_message += 'for numerical calculations'
                 raise ValueError(error_message)
+            # Compute
             if self.is_complex:
                 self.compute_numerical_complex(molecule, basis, self.scf_drv)
             else:
                 self.compute_numerical_real(molecule, basis, self.scf_drv)
         else:
+            # sanity checks linear response input
             if lr_results is None:
                 error_message = 'PolarizabilityGradient missing input: LR results'
                 error_message += 'for analytical gradient'
                 raise ValueError(error_message)
-            # sanity checks linear response input
-            polgrad_sanity_check(self, self.flag, lr_results)
-            self.check_real_or_complex_input(lr_results)
+            if self.rank == mpi_master():
+                polgrad_sanity_check(self, self.flag, lr_results)
+                self.check_real_or_complex_input(lr_results)
+            # Compute
             if self.is_complex:
                 self.compute_analytical_complex(molecule, basis, scf_tensors,
                                                 lr_results)
@@ -188,9 +192,7 @@ class PolarizabilityGradient():
 
         if self.rank == mpi_master():
             self.print_geometry(molecule)
-            if self.numerical:
-                self.print_polarizability_gradient(molecule)
-            else:
+            if self.do_print_polgrad:
                 self.print_polarizability_gradient(molecule)
             valstr = '*** Time spent in polarizability gradient calculation: '
             valstr += '{:.6f} sec ***'.format(tm.time() - start_time)
@@ -292,6 +294,8 @@ class PolarizabilityGradient():
                 # loop over atoms and contract integral derivatives
                 # with density matrices
                 # add the corresponding contribution to the gradient
+                # FIXME move to separate construct_gradient() function
+                # for _real() and _complex() shared
                 for i in range(natm):
 
                     integral_start_time = tm.time()
@@ -312,6 +316,7 @@ class PolarizabilityGradient():
 
                     gradient_start_time = tm.time()
                     # Calculate the analytic polarizability gradient
+                    # FIXME loop upper triangular only
                     for x in range(dof):
                         for y in range(dof):
                             for a in range(3):
@@ -548,6 +553,8 @@ class PolarizabilityGradient():
                 # loop over atoms and contract integral derivatives
                 # with density matrices
                 # add the corresponding contribution to the gradient
+                # FIXME move to separate construct_gradient() function
+                # for _real() and _complex() shared
                 for i in range(natm):
 
                     integral_start_time = tm.time()
@@ -568,6 +575,7 @@ class PolarizabilityGradient():
 
                     gradient_start_time = tm.time()
                     # Calculate the analytic polarizability gradient
+                    # FIXME loop upper triangular only
                     for x in range(dof):
                         for y in range(dof):
                             for a in range(3):
@@ -1260,6 +1268,7 @@ class PolarizabilityGradient():
             cur_str += 'Complex '
         else:
             cur_str += 'Real '
+            # TODO print damping value
         if self.numerical:
             cur_str += 'Numerical'
             cur_str2 = 'Numerical Method                : '

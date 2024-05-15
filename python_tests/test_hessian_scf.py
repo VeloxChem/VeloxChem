@@ -6,6 +6,7 @@ from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfhessiandriver import ScfHessianDriver
+from veloxchem.vibrationalanalysis import VibrationalAnalysis
 
 
 class TestScfHessianDriver:
@@ -21,15 +22,16 @@ class TestScfHessianDriver:
 
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        hessian_settings = {'do_raman': 'yes', 'numerical':'yes'}
+        vib_settings = {'do_ir': 'yes', 'do_raman': 'yes', 'numerical_hessian':'yes',
+                        'numerical_polgrad': 'yes'}
         method_settings = {}
         scf_hessian_drv = ScfHessianDriver(scf_drv)
-        scf_hessian_drv.update_settings(method_settings, hessian_settings)
-        scf_hessian_drv.ostream.mute()
-        scf_hessian_drv.compute(task.molecule, task.ao_basis)
+        vibanalysis_drv = VibrationalAnalysis(scf_hessian_drv)
+        vibanalysis_drv.update_settings(method_settings, vib_settings)
+        vibanalysis_drv.ostream.mute()
+        vibanalysis_drv.compute(task.molecule, task.ao_basis)
 
         if is_mpi_master(task.mpi_comm):
-            scf_hessian_drv.vibrational_analysis(task.molecule)
 
             hf = h5py.File(h5file)
             ref_hessian = np.array(hf.get('hessian'))
@@ -38,14 +40,14 @@ class TestScfHessianDriver:
             ref_raman_intensities = np.array(hf.get('raman'))
             hf.close()
 
-            diff_hessian = np.max(np.abs(scf_hessian_drv.hessian - ref_hessian))
+            diff_hessian = np.max(np.abs(vibanalysis_drv.hessian - ref_hessian))
             rel_diff_freq = np.max(
-                np.abs(scf_hessian_drv.vib_frequencies / ref_frequencies - 1.0))
+                np.abs(vibanalysis_drv.vib_frequencies / ref_frequencies - 1.0))
             rel_diff_ir = np.max(
-                np.abs(scf_hessian_drv.ir_intensities / ref_ir_intensities -
+                np.abs(vibanalysis_drv.ir_intensities / ref_ir_intensities -
                        1.0))
             rel_diff_raman = np.max(
-                np.abs(scf_hessian_drv.raman_intensities[0.0] /
+                np.abs(vibanalysis_drv.raman_intensities[0.0] /
                        ref_raman_intensities - 1.0))
 
             assert diff_hessian < 1.0e-5

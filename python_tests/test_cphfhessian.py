@@ -9,6 +9,10 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+<<<<<<< HEAD
+=======
+from veloxchem.cphfsolver import CphfSolver
+>>>>>>> tddft_grad_vibanalysis
 from veloxchem.hessianorbitalresponse import HessianOrbitalResponse
 
 try:
