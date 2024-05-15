@@ -436,7 +436,7 @@ class VibrationalAnalysis:
 
         for freq in freqs:
             # get gradient for current frequency
-            current_polarizability_gradient = self.polarizability_gradient[freq]
+            current_polarizability_gradient = (self.polarizability_gradient[freq])
             size_x = current_polarizability_gradient.shape[0]
             size_y = current_polarizability_gradient.shape[1]
             size_k = self.normal_modes.shape[0]
@@ -450,18 +450,22 @@ class VibrationalAnalysis:
             alpha_bar = np.zeros((number_of_modes))
             gamma_bar_sq = np.zeros((number_of_modes))
             for i in range(3):
-                alpha_bar += raman_transmom[i, i] / 3
+                alpha_bar += raman_transmom[i, i] / 3.0
                 for j in range(i + 1, 3):
-                    gamma_bar_sq += (0.5 * (raman_transmom[i, i] - raman_transmom[j, j])**2
-                                     + 3 * raman_transmom[i, j]**2)
+                    gamma_bar_tmp_1 = np.abs(raman_transmom[i, i] - raman_transmom[j, j])
+                    gamma_bar_tmp_2 = np.abs(raman_transmom[i, j])
+                    gamma_bar_sq += 0.5 * (gamma_bar_tmp_1)**2 + 3.0 * (gamma_bar_tmp_2)**2
+                    #gamma_bar_sq += (0.5 * (raman_transmom[i, i] - raman_transmom[j, j])**2
+                    #                 + 3 * raman_transmom[i, j]**2)
 
-            alpha_bar_sq = alpha_bar**2
+            #alpha_bar_sq = alpha_bar**2
+            alpha_bar_sq = np.abs(alpha_bar)**2
             raman_intensities[freq] = (
-                45 * alpha_bar_sq + 7 * gamma_bar_sq) * raman_conversion_factor
+                45.0 * alpha_bar_sq + 7.0 * gamma_bar_sq) * raman_conversion_factor
 
             if self.print_depolarization_ratio and (freq == 0.0): # TODO dynamic also?
-                int_pol = 45 * alpha_bar_sq + 4 * gamma_bar_sq
-                int_depol = 3 * gamma_bar_sq
+                int_pol = 45.0 * alpha_bar_sq + 4.0 * gamma_bar_sq
+                int_depol = 3.0 * gamma_bar_sq
                 depol_ratio = int_depol / int_pol
 
         return raman_intensities, depol_ratio
