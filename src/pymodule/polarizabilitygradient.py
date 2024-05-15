@@ -294,6 +294,8 @@ class PolarizabilityGradient():
                 # loop over atoms and contract integral derivatives
                 # with density matrices
                 # add the corresponding contribution to the gradient
+                # FIXME move to separate construct_gradient() function
+                # for _real() and _complex() shared
                 for i in range(natm):
 
                     integral_start_time = tm.time()
@@ -314,6 +316,7 @@ class PolarizabilityGradient():
 
                     gradient_start_time = tm.time()
                     # Calculate the analytic polarizability gradient
+                    # FIXME loop upper triangular only
                     for x in range(dof):
                         for y in range(dof):
                             for a in range(3):
@@ -550,6 +553,8 @@ class PolarizabilityGradient():
                 # loop over atoms and contract integral derivatives
                 # with density matrices
                 # add the corresponding contribution to the gradient
+                # FIXME move to separate construct_gradient() function
+                # for _real() and _complex() shared
                 for i in range(natm):
 
                     integral_start_time = tm.time()
@@ -570,6 +575,7 @@ class PolarizabilityGradient():
 
                     gradient_start_time = tm.time()
                     # Calculate the analytic polarizability gradient
+                    # FIXME loop upper triangular only
                     for x in range(dof):
                         for y in range(dof):
                             for a in range(3):
@@ -1262,6 +1268,7 @@ class PolarizabilityGradient():
             cur_str += 'Complex '
         else:
             cur_str += 'Real '
+            # TODO print damping value
         if self.numerical:
             cur_str += 'Numerical'
             cur_str2 = 'Numerical Method                : '

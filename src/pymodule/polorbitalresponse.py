@@ -249,6 +249,7 @@ class PolOrbitalResponse(CphfSolver):
                 # in MO basis
                 dm_oo = np.zeros((dof, dof, nocc, nocc), dtype=np.complex_)
                 dm_vv = np.zeros((dof, dof, nvir, nvir), dtype=np.complex_)
+                # FIXME loop upper triangular only
                 for x in range(dof):
                     for y in range(dof):
                         dm_vv[x, y] = 0.25 * (
@@ -274,6 +275,7 @@ class PolOrbitalResponse(CphfSolver):
                 # Transform unrelaxed one-particle density matrix to
                 # AO basis and create a list
                 unrel_dm_ao = np.zeros((dof, dof, nao, nao), dtype=np.complex_)
+                # FIXME loop upper triangular only
                 for x in range(dof):
                     for y in range(dof):
                         unrel_dm_ao[x, y] = (
@@ -294,7 +296,6 @@ class PolOrbitalResponse(CphfSolver):
                     dm_ao_list_imag + xpmy_ao_list_imag, denmat.rest)
 
                 if self._dft:
-                    # FIXME split vectors in Re/Im for list
                     # 3) Construct density matrices for E[3] term:
                     # XCIntegrator expects a DM with real and imaginary part,
                     # so we set the imaginary part to zero.
@@ -306,7 +307,7 @@ class PolOrbitalResponse(CphfSolver):
                     perturbed_dm_ao_list_imre = []
                     zero_dm_ao_list = []
 
-                    # TODO: only upper triangular matrix and transpose?
+                    # FIXME loop upper triangular only
                     for x in range(dof):
                         for y in range(dof):
 
@@ -372,6 +373,7 @@ class PolOrbitalResponse(CphfSolver):
             fock_ao_rhs_imag = AOFockMatrix(dm_ao_rhs_imag)
             # Set the vector-related components to general Fock matrix
             # (not 1PDM part)
+            # FIXME loop upper triangular only
             for ifock in range(dof**2, dof**2 + 2 * dof):
                 fock_ao_rhs_real.set_fock_type(fockmat.rgenjk, ifock)
                 fock_ao_rhs_imag.set_fock_type(fockmat.rgenjk, ifock)
@@ -504,6 +506,7 @@ class PolOrbitalResponse(CphfSolver):
                                          1j * fock_ao_rhs_x_minus_y_imag)
 
                 fock_mo_rhs_2dm = np.zeros((dof, dof, nocc, nvir), dtype=np.complex_)
+                # FIXME loop upper triangular only
                 for x in range(dof):
                     for y in range(dof):
                         # xmt,ymc->xytc
@@ -602,6 +605,7 @@ class PolOrbitalResponse(CphfSolver):
                         # cl,li,ta,xytc->xyia
                         fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
                             [mo_occ.T, ovlp.T, tmp.T, mo_vir])
+                # FIXME dimension when only upper triangular
                 fock_mo_rhs_2dm = 0.25 * fock_mo_rhs_2dm.reshape(
                     dof**2, nocc, nvir)
 
@@ -633,6 +637,7 @@ class PolOrbitalResponse(CphfSolver):
                 # Contract with vectors to get dipole contribution to the RHS
                 rhs_dipole_contrib = np.zeros((dof, dof, nocc, nvir),
                                               dtype=np.complex_)
+                # FIXME loop upper trianflular only
                 for x in range(dof):
                     for y in range(dof):
                         rhs_dipole_contrib[x, y] = (
@@ -645,6 +650,7 @@ class PolOrbitalResponse(CphfSolver):
                             + np.linalg.multi_dot( # yib,xab->xyia
                             [dipole_ints_vv[x], x_minus_y[y].T]).T))
 
+                # FIXME dimensions when upper triangular only
                 rhs_dipole_contrib = rhs_dipole_contrib.reshape(
                     dof**2, nocc, nvir)
 
@@ -653,8 +659,10 @@ class PolOrbitalResponse(CphfSolver):
 
                 # Add DFT E[3] contribution to the RHS:
                 if self._dft:
+                    # FIXME dimensions when upper triangular only
                     gxc_ao = np.zeros((dof**2, nao, nao), dtype=np.complex_)
 
+                    # FIXME dimensions when upper triangular only
                     for i in range(dof**2):
                         gxc_ao[i] = (fock_gxc_ao_rere.alpha_to_numpy(2 * i)
                                      - fock_gxc_ao_imim.alpha_to_numpy(2 * i)
@@ -662,6 +670,7 @@ class PolOrbitalResponse(CphfSolver):
                                      + fock_gxc_ao_imre.alpha_to_numpy(2 * i)
                                      ))
 
+                    # FIXME dimensions when upper triangular only
                     # mi,xmn,na->xia
                     gxc_mo = np.array([
                         np.linalg.multi_dot([mo_occ.T, gxc_ao[x], mo_vir])
@@ -804,8 +813,10 @@ class PolOrbitalResponse(CphfSolver):
 
                 # Calculate the symmetrized unrelaxed one-particle density matrix
                 # in MO basis
+                # FIXME dimensions when upper triangular only
                 dm_oo = np.zeros((dof, dof, nocc, nocc))
                 dm_vv = np.zeros((dof, dof, nvir, nvir))
+                # FIXME loop upper triangular only
                 for x in range(dof):
                     for y in range(dof):
                         dm_vv[x, y] = 0.25 * (
@@ -829,7 +840,9 @@ class PolOrbitalResponse(CphfSolver):
 
                 # Transform unrelaxed one-particle density matrix to
                 # AO basis and create a list
+                # FIXME dimensions when upper triangular only
                 unrel_dm_ao = np.zeros((dof, dof, nao, nao))
+                # FIXME loop upper triangular only
                 for x in range(dof):
                     for y in range(dof):
                         unrel_dm_ao[x, y] = (
@@ -837,6 +850,7 @@ class PolOrbitalResponse(CphfSolver):
                                 np.linalg.multi_dot([mo_occ, dm_oo[x, y], mo_occ.T])
                                 # ma,xyab,nb->xymn
                                 + np.linalg.multi_dot([mo_vir, dm_vv[x, y], mo_vir.T]))
+                # FIXME dimensions when upper triangular only
                 dm_ao_list = list(unrel_dm_ao.reshape(dof**2, nao, nao))
 
                 # 2) Construct the right-hand side
@@ -850,7 +864,7 @@ class PolOrbitalResponse(CphfSolver):
                     # Create lists with the corresponding vector components
                     perturbed_dm_ao_list = []
                     zero_dm_ao_list = []
-                    # TODO: only upper triangular matrix and transpose?
+                    # FIXME loop upper triangular only
                     for x in range(dof):
                         for y in range(dof):
                             perturbed_dm_ao_list.extend([
@@ -884,6 +898,7 @@ class PolOrbitalResponse(CphfSolver):
             fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
             # Set the vector-related components to general Fock matrix
             # (not 1PDM part)
+            # FIXME dimensions when upper triangular only
             for ifock in range(dof**2, dof**2 + 2 * dof):
                 fock_ao_rhs.set_fock_type(fockmat.rgenjk, ifock)
             if self._dft:
@@ -891,6 +906,7 @@ class PolOrbitalResponse(CphfSolver):
                 zero_dm_ao.broadcast(self.rank, self.comm)
                 # Fock matrix for computing the DFT E[3] term g^xc
                 fock_gxc_ao = AOFockMatrix(zero_dm_ao)
+                # FIXME loop upper triangular only
                 if self.xcfun.is_hybrid():
                     fact_xc = self.xcfun.get_frac_exact_exchange()
                     for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
@@ -930,12 +946,14 @@ class PolOrbitalResponse(CphfSolver):
             # Calculate the RHS and transform it to the MO basis
             if self.rank == mpi_master():
                 # extract the 1PDM contributions
+                # FIXME dimensions when upper triangular only
                 fock_ao_rhs_1dm = np.zeros((dof**2, nao, nao))
                 for i in range(dof**2):
                     fock_ao_rhs_1dm[i] = fock_ao_rhs.alpha_to_numpy(i)
 
                 # Transform to MO basis
                 # mi,xmn,na->xia
+                # FIXME dimensions when upper triangular only
                 fock_mo_rhs_1dm = np.array([
                     np.linalg.multi_dot([mo_occ.T, fock_ao_rhs_1dm[x], mo_vir])
                     for x in range(dof**2)
@@ -952,6 +970,7 @@ class PolOrbitalResponse(CphfSolver):
                         dof**2 + dof + i)
 
                 fock_mo_rhs_2dm = np.zeros((dof, dof, nocc, nvir))
+                # FIXME loop upper triangular only
                 for x in range(dof):
                     for y in range(dof):
                         # xmt,ymc->xytc
@@ -1050,6 +1069,7 @@ class PolOrbitalResponse(CphfSolver):
                         # cl,li,ta,xytc->xyia
                         fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
                             [mo_occ.T, ovlp.T, tmp.T, mo_vir])
+                # FIXME dimensions when upper triangular only
                 fock_mo_rhs_2dm = 0.25 * fock_mo_rhs_2dm.reshape(
                     dof**2, nocc, nvir)
 
@@ -1079,7 +1099,9 @@ class PolOrbitalResponse(CphfSolver):
                 ])
 
                 # Contract with vectors to get dipole contribution to the RHS
+                # FIXME dimensions when upper triangular only
                 rhs_dipole_contrib = np.zeros((dof, dof, nocc, nvir))
+                # FIXME loop upper triangular only
                 for x in range(dof):
                     for y in range(dof):
                         rhs_dipole_contrib[x, y] = (
@@ -1092,6 +1114,7 @@ class PolOrbitalResponse(CphfSolver):
                             + np.linalg.multi_dot( # yib,xab->xyia
                             [dipole_ints_vv[x], x_minus_y[y].T]).T))
 
+                # FIXME dimensions when upper triangular only
                 rhs_dipole_contrib = rhs_dipole_contrib.reshape(
                     dof**2, nocc, nvir)
 
@@ -1099,11 +1122,14 @@ class PolOrbitalResponse(CphfSolver):
 
                 # Add DFT E[3] contribution to the RHS:
                 if self._dft:
+                    # FIXME dimensions when upper triangular only
                     gxc_ao = np.zeros((dof**2, nao, nao))
 
+                    # FIXME dimensions when upper triangular only
                     for i in range(dof**2):
                         gxc_ao[i] = fock_gxc_ao.alpha_to_numpy(2 * i)
 
+                    # FIXME dimensions when upper triangular only
                     # mi,xmn,na->xia
                     gxc_mo = np.array([
                         np.linalg.multi_dot([mo_occ.T, gxc_ao[x], mo_vir])
@@ -1269,7 +1295,9 @@ class PolOrbitalResponse(CphfSolver):
                 ])
 
                 # Calculate the dipole moment integrals' contribution to omega
+                # FIXME dimensions when upper triangular only
                 dipole_ints_contrib_ao = np.zeros((dof, dof, nao, nao))
+                # FIXME loop upper triangular only
                 for x in range(dof):
                     for y in range(dof):
                         tmp_oo = 0.5 * (np.linalg.multi_dot([ # xjc,yic->xyij
@@ -1342,11 +1370,14 @@ class PolOrbitalResponse(CphfSolver):
             # the contraction of x_minus_y.
 
             if self.rank == mpi_master():
+                # FIXME dimensions when upper triangular only
                 omega = np.zeros((dof * dof, nao, nao))
 
                 # Construct epsilon_dm_ao
+                # FIXME dimensions when upper triangular only
                 epsilon_dm_ao = np.zeros((dof, dof, nao, nao))
                 epsilon_cphf_ao = np.zeros((dof, dof, nao, nao))
+                # FIXME loop upper triangular only
                 for x in range(dof):
                     for y in range(dof):
                         # mi,ii,xyij,nj->xymn
@@ -1356,6 +1387,7 @@ class PolOrbitalResponse(CphfSolver):
                         epsilon_dm_ao[x, y] -= np.linalg.multi_dot(
                             [mo_vir, ev_diag, dm_vv[x, y], mo_vir.T])
                         # mi,ii,xyia,na->xymn
+                        # FIXME reshape dimensions when upper triangular only
                         epsilon_cphf_ao[x, y] = np.linalg.multi_dot([
                             mo_occ, eo_diag,
                             cphf_ov.reshape(dof, dof, nocc, nvir)[x, y],
@@ -1366,6 +1398,7 @@ class PolOrbitalResponse(CphfSolver):
                 epsilon_dm_ao -= (epsilon_cphf_ao +
                                   epsilon_cphf_ao.transpose(0, 1, 3, 2))
 
+                # FIXME loop upper triangular only
                 for m in range(dof):
                     for n in range(dof):
                         # TODO: move outside for-loop when all Fock matrices can be
@@ -1376,11 +1409,13 @@ class PolOrbitalResponse(CphfSolver):
                         # and its transpose (VV, OV blocks)
                         # this comes from the transformation of the 2PDM contribution
                         # from MO to AO basis
+                        # FIXME dimensions when upper triangular only
                         fock_ao_rhs_1_m = fock_ao_rhs.alpha_to_numpy(
                             dof**2 + m)  # x_plus_y
                         fock_ao_rhs_2_m = fock_ao_rhs.alpha_to_numpy(
                             dof**2 + dof + m)  # x_minus_y
 
+                        # FIXME dimensions when upper triangular only
                         fock_ao_rhs_1_n = fock_ao_rhs.alpha_to_numpy(
                             dof**2 + n)  # x_plus_y
                         fock_ao_rhs_2_n = fock_ao_rhs.alpha_to_numpy(
@@ -1545,6 +1580,7 @@ class PolOrbitalResponse(CphfSolver):
                 dof = len(self.vector_components)
 
                 # reshape lambda vector to complex
+                # FIXME dimensions when upper triangular only
                 cphf_ov = cphf_ov[:dof**2] + 1j * cphf_ov[dof**2:]
 
                 # Extract the excitation and de-excitation components
@@ -1584,8 +1620,10 @@ class PolOrbitalResponse(CphfSolver):
                 ])
 
                 # Calculate the dipole moment integrals' contribution to omega
+                # FIXME dimensions when upper triangular only
                 dipole_ints_contrib_ao = np.zeros((dof, dof, nao, nao),
                                                   dtype=np.complex_)
+                # FIXME loop upper triangular only
                 for x in range(dof):
                     for y in range(dof):
                         tmp_oo = 0.5 * (np.linalg.multi_dot([ # xjc,yic->xyij
@@ -1629,10 +1667,12 @@ class PolOrbitalResponse(CphfSolver):
 
                 # Construct fock_lambda (or fock_cphf)
                 # mi,xia,na->xmn
+                # FIXME dimensions when upper triangular only
                 cphf_ao = np.array([
                     np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
                     for x in range(dof**2)
                 ])
+                # FIXME dimensions when upper triangular only
                 cphf_ao_list_real = list(
                     np.array([cphf_ao[x].real for x in range(dof**2)]))
                 cphf_ao_list_imag = list(
@@ -1671,13 +1711,16 @@ class PolOrbitalResponse(CphfSolver):
             # the contraction of x_minus_y.
 
             if self.rank == mpi_master():
+                # FIXME dimensions when upper triangular only
                 omega = np.zeros((dof * dof, nao, nao), dtype=np.complex_)
 
                 # Construct epsilon_dm_ao
+                # FIXME dimensions when upper triangular only
                 epsilon_dm_ao = np.zeros((dof, dof, nao, nao),
                                          dtype=np.complex_)
                 epsilon_cphf_ao = np.zeros((dof, dof, nao, nao),
                                            dtype=np.complex_)
+                # FIXME loop upper triangular only
                 for x in range(dof):
                     for y in range(dof):
                         # mi,ii,xyij,nj->xymn
@@ -1687,6 +1730,7 @@ class PolOrbitalResponse(CphfSolver):
                         epsilon_dm_ao[x, y] -= np.linalg.multi_dot(
                             [mo_vir, ev_diag, dm_vv[x, y], mo_vir.T])
                         # mi,ii,xyia,na->xymn
+                        # FIXME dimensions when upper triangular only
                         epsilon_cphf_ao[x, y] = np.linalg.multi_dot([
                             mo_occ, eo_diag,
                             cphf_ov.reshape(dof, dof, nocc, nvir)[x, y],
@@ -1697,6 +1741,7 @@ class PolOrbitalResponse(CphfSolver):
                 epsilon_dm_ao -= (epsilon_cphf_ao +
                                   epsilon_cphf_ao.transpose(0, 1, 3, 2))
 
+                # FIXME upper triangular only
                 for m in range(dof):
                     for n in range(dof):
                         # TODO: move outside for-loop when all Fock matrices can be
@@ -1708,6 +1753,7 @@ class PolOrbitalResponse(CphfSolver):
                         # this comes from the transformation of the 2PDM contribution
                         # from MO to AO basis
                         # complex
+                        # FIXME dimensions when upper triangular only
                         fock_ao_rhs_1_m = (
                             fock_ao_rhs_real.alpha_to_numpy(dof**2 + m) +
                             1j * fock_ao_rhs_imag.alpha_to_numpy(dof**2 + m)
@@ -1718,6 +1764,7 @@ class PolOrbitalResponse(CphfSolver):
                             fock_ao_rhs_imag.alpha_to_numpy(dof**2 + dof + m)
                         )  # x_minus_y
 
+                        # FIXME dimensions when upper triangular only
                         fock_ao_rhs_1_n = (
                             fock_ao_rhs_real.alpha_to_numpy(dof**2 + n) +
                             1j * fock_ao_rhs_imag.alpha_to_numpy(dof**2 + n)
