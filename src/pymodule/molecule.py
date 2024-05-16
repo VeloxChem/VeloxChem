@@ -108,39 +108,39 @@ def _Molecule_read_gro_file(grofile):
         The molecule.
     """
 
-    ion_residues = {'IB+': 'I', 'CA':'Ca', 'CL': 'Cl', 
-                    'NA': 'Na', 'MG': 'Mg', 'K':'K', 
-                    'RB':'Rb', 'CS':'Cs', 'LI':'Li', 
-                    'ZN':'Zn'}
+    ion_residues = {'IB+': 'I', 'CA': 'Ca', 'CL': 'Cl', 
+                    'NA': 'Na', 'MG': 'Mg', 'K': 'K', 
+                    'RB': 'Rb', 'CS': 'Cs', 'LI': 'Li', 
+                    'ZN': 'Zn'}
     
     protein_residues = ['URE', 'ACE', 'NME', 
-                         'NHE', 'NH2', 'ALA', 
-                         'GLY', 'SER', 'THR', 
-                         'LEU', 'ILE', 'VAL', 
-                         'ASN', 'GLN', 'ARG', 
-                         'HID', 'HIE', 'HIP', 
-                         'TRP', 'PHE', 'TYR', 
-                         'GLU', 'ASP', 'LYS', 
-                         'ORN', 'DAB', 'LYN', 
-                         'PRO', 'HYP', 'CYS', 
-                         'CYM', 'CYX', 'MET', 
-                         'ASH', 'GLH', 'CALA', 
-                         'CGLY', 'CSER', 'CTHR', 
-                         'CLEU', 'CILE', 'CVAL', 
-                         'CASN', 'CGLN', 'CARG', 
-                         'CHID', 'CHIE', 'CHIP', 
-                         'CTRP', 'CPHE', 'CTYR', 
-                         'CGLU', 'CASP', 'CLYS', 
-                         'CPRO', 'CCYS', 'CCYX', 
-                         'CMET', 'NALA', 'NGLY', 
-                         'NSER', 'NTHR', 'NLEU', 
-                         'NILE', 'NVAL', 'NASN', 
-                         'NGLN', 'NARG', 'NHID', 
-                         'NHIE', 'NHIP', 'NTRP', 
-                         'NPHE', 'NTYR', 'NGLU', 
-                         'NASP', 'NLYS', 'NORN', 
-                         'NDAB', 'NPRO', 'NCYS', 
-                         'NCYX', 'NMET']
+                        'NHE', 'NH2', 'ALA', 
+                        'GLY', 'SER', 'THR', 
+                        'LEU', 'ILE', 'VAL', 
+                        'ASN', 'GLN', 'ARG', 
+                        'HID', 'HIE', 'HIP', 
+                        'TRP', 'PHE', 'TYR', 
+                        'GLU', 'ASP', 'LYS', 
+                        'ORN', 'DAB', 'LYN', 
+                        'PRO', 'HYP', 'CYS', 
+                        'CYM', 'CYX', 'MET', 
+                        'ASH', 'GLH', 'CALA', 
+                        'CGLY', 'CSER', 'CTHR', 
+                        'CLEU', 'CILE', 'CVAL', 
+                        'CASN', 'CGLN', 'CARG', 
+                        'CHID', 'CHIE', 'CHIP', 
+                        'CTRP', 'CPHE', 'CTYR', 
+                        'CGLU', 'CASP', 'CLYS', 
+                        'CPRO', 'CCYS', 'CCYX', 
+                        'CMET', 'NALA', 'NGLY', 
+                        'NSER', 'NTHR', 'NLEU', 
+                        'NILE', 'NVAL', 'NASN', 
+                        'NGLN', 'NARG', 'NHID', 
+                        'NHIE', 'NHIP', 'NTRP', 
+                        'NPHE', 'NTYR', 'NGLU', 
+                        'NASP', 'NLYS', 'NORN', 
+                        'NDAB', 'NPRO', 'NCYS', 
+                        'NCYX', 'NMET']
     
     dna_residues = ["DA5", "DA", "DA3", "DAN", 
                     "DT5", "DT", "DT3", "DTN", 
@@ -156,49 +156,62 @@ def _Molecule_read_gro_file(grofile):
                          + dna_residues 
                          + rna_residues)
     
-    try:
-        with Path(grofile).open('r') as fh:
-            grostr = fh.read()
+    with Path(grofile).open('r') as fh:
+        grostr = fh.read()
 
-        coordinates = []
-        labels = []
+    coordinates = []
+    labels = []
 
-        lines = grostr.strip().splitlines()
-        for line in lines[2:-1]:  
-            if line:
-                content = line.split()
-
-                if len(content) < 6:
-                    raise ValueError(f"Line does not contain enough information: {line}")
-
-                # Exclude the residue number from the residue name                
-                residue_name = ''.join([i for i in content[0] if not i.isdigit()])
-
-                # Decision based on residue name
-                if residue_name in ion_residues:
-                    label = ion_residues[residue_name]
-                    labels.append(label)
-
-                elif residue_name in standard_residues:
-                    label = content[1][0]
-                    labels.append(label)
-                else:
-                    label = ''.join([i for i in content[1] if not i.isdigit()])
-                    labels.append(label)
+    lines = grostr.strip().splitlines()
+    for line in lines[2:-1]:  
+        if line:
+            line = line.strip()
+            # To access the content we will stick to the C format:
+            # %5d%-5s%5s%5d%8.3f%8.3f%8.3f
+            # It should skip the spaces
+            residue_number = line[0:5].strip()
+            print('Residue number: ', residue_number)
+            residue_name = line[5:10].strip()
+            print('Residue name: ', residue_name)
+            atom_name = line[10:15].strip()
+            print('Atom name: ', atom_name)
+            atom_number = line[15:20].strip()
+            print('Atom number: ', atom_number)
+            
+            try:
+                x = float(line[20:28].strip()) * 10
+                y = float(line[28:36].strip()) * 10
+                z = float(line[36:44].strip()) * 10
+            except ValueError as e:
+                print(f"Error converting coordinates: {e}")
+                continue
+            
+            # Append coordinates in angstroms
+            coordinates.append([x, y, z])
+            print('Identified label:')
+            if residue_name in ion_residues:
+                labels.append(ion_residues[residue_name])
+                print(ion_residues[residue_name])
+            elif residue_name in standard_residues:
+                # The first letter of the atom name is the element
+                labels.append(atom_name[0])
+                print(atom_name[0])
+            else:
+                # Take the first characters not being a digit
+                # For example C11' will be C or Ru13' will be Ru
+                name = ''
+                for c in atom_name:
+                    if not c.isdigit():
+                        name += c
+                    else:
+                        break
+                labels.append(name)
+                print(name)
                 
-                try:
-                    coordinates.append([float(x) * 10 for x in content[3:6]])
-                except ValueError:
-                    raise ValueError(f"Coordinate conversion failed for line: {line}")
+    return Molecule(labels, coordinates, 'angstrom')
 
-        return Molecule(labels, coordinates, 'angstrom')
-
-    except Exception as e:
-        print(f"An error occurred while reading the GRO file: {str(e)}")
-        return None
-    
 @staticmethod
-def _Molecule_read_PDB_file(pdbfile):
+def _Molecule_read_pdb_file(pdbfile):
     """
     Reads molecule from file in PDB format.
 
@@ -1040,7 +1053,7 @@ Molecule._get_input_keywords = _Molecule_get_input_keywords
 
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.read_gro_file = _Molecule_read_gro_file
-Molecule.read_PDB_file = _Molecule_read_PDB_file
+Molecule.read_pdb_file = _Molecule_read_pdb_file
 Molecule.show = _Molecule_show
 Molecule.draw_2d = _Molecule_draw_2d
 Molecule.read_smiles = _Molecule_read_smiles
