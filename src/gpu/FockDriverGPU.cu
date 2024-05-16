@@ -8505,7 +8505,7 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
     cudaSafe(cudaSetDevice(0));
 
     auto n = static_cast<int32_t>(nrows_A);
-    int32_t lwork;
+    int32_t lwork, info;
 
     double *d_A, *d_D, *d_work;
     int32_t *d_info;
@@ -8521,7 +8521,7 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
 
     cusolverSafe(cusolverDnDsyevd_bufferSize(handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_UPPER, n, d_A, n, d_D, &lwork));
 
-    cudaSafe(cudaMalloc(&d_work, lwork));
+    cudaSafe(cudaMalloc(&d_work, lwork * sizeof(double)));
 
     cusolverSafe(cusolverDnDsyevd(handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_UPPER, n, d_A, n, d_D, d_work, lwork, d_info));
 
@@ -8529,6 +8529,9 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
 
     cudaSafe(cudaMemcpy(A, d_A, n * n * sizeof(double), cudaMemcpyDeviceToHost));
     cudaSafe(cudaMemcpy(D, d_D, n * sizeof(double), cudaMemcpyDeviceToHost));
+    cudaSafe(cudaMemcpy(&info, d_info, sizeof(int32_t), cudaMemcpyDeviceToHost));
+
+    // TODO: check info
 
     cudaSafe(cudaFree(d_A));
     cudaSafe(cudaFree(d_D));

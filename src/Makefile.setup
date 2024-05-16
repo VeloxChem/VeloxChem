@@ -28,6 +28,8 @@ USE_MKL := false
 USE_XTB := false
 
 OPENBLAS_HOME := /path/to/openblas
+CUDA_HOME     := /path/to/cuda
+MPI_HOME      := /path/to/mpi
 
 CXX    := mpicxx
 PYTHON := python3
@@ -47,10 +49,9 @@ PYTHON_INC += $(shell $(PYTHON) -m pybind11 --includes)
 CXX_REL_FLG += -fPIC $(PYTHON_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC)
 
-DEVCC_REL_FLG := -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++17
-DEVCC_DEB_FLG := -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++17
-#DEVICE_LIB := -lcublas
-DEVICE_LIB := -lcudart -lcublas -lcusolver
+DEVCC_REL_FLG := -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++17 -I$(MPI_HOME)/include
+DEVCC_DEB_FLG := -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++17 -I$(MPI_HOME)/include
+DEVICE_LIB := -L$(CUDA_HOME)/lib64 -lcudart -lcublas -lcusolver
 
 MACLIBS :=
 

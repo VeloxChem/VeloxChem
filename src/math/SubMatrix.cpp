@@ -162,7 +162,7 @@ CSubMatrix::setOffsets(const int64_t row_offset, const int64_t col_offset) -> vo
 auto
 CSubMatrix::setValues(const std::vector<double>& values) -> void
 {
-    if (const auto nelements = _dimensions[2] * _dimensions[3]; nelements == values.size())
+    if (const auto nelements = _dimensions[2] * _dimensions[3]; nelements == static_cast<int64_t>(values.size()))
     {
         std::memcpy(_values, values.data(), nelements * sizeof(double));
     }
