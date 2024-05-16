@@ -96,17 +96,30 @@ def _Molecule_read_smiles(smiles_str):
 
     return Molecule.read_xyz_string(xyz)
 
+# GRO and PDB file format methods:
+# Auxiliary element guess method first
 @staticmethod
-def _Molecule_read_gro_file(grofile):
-    """
-    Reads molecule from file in GRO format.
+def _element_guesser(atom_name, residue_name):
+    """ 
+    Guesses the chemical element of an atom based on its name.
 
-    :param grofile:
-        File with molecular structure in GRO format.
-
-    :return:
-        The molecule.
+    :param atom_name: 
+        The name of the atom.
     """
+    periodic_table = ['H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
+                   'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca',
+                   'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
+                   'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb', 'Sr', 'Y', 'Zr',
+                   'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn',
+                   'Sb', 'Te', 'I', 'Xe', 'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd',
+                   'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb',
+                   'Lu', 'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg',
+                   'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Th',
+                   'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm',
+                   'Md', 'No', 'Lr', 'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt', 'Ds',
+                   'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og']
+
+    two_lett_elements = [el for el in periodic_table if len(el) == 2]
 
     ion_residues = {'IB+': 'I', 'CA': 'Ca', 'CL': 'Cl', 
                     'NA': 'Na', 'MG': 'Mg', 'K': 'K', 
@@ -156,6 +169,52 @@ def _Molecule_read_gro_file(grofile):
                          + dna_residues 
                          + rna_residues)
     
+    if residue_name in ion_residues:
+        element = ion_residues[atom_name]
+        if element not in periodic_table:
+            raise NameError(f"Element {element} not in periodic table")
+        
+        return element
+    
+    elif residue_name in standard_residues:
+        element = atom_name[0]
+        if element not in periodic_table:
+            raise NameError(f"Element {element} not in periodic table")
+        return element
+    
+    else:
+        # Take the first characters not being a digit
+        name = ''
+        for c in atom_name:
+            if not c.isdigit():
+                name += c
+            else:
+                break
+
+        # Check if the guessed name is a valid element
+        name = name.capitalize()
+        # Special cases where two character elements are capitalized
+        # Sometimes one can find OP instead of O in HETAM residues
+        if str(name) not in two_lett_elements:
+            name = name[0]
+        if name not in periodic_table:
+            raise NameError(f"Element {name} not in periodic table")
+
+        return name
+
+@staticmethod
+def _Molecule_read_gro_file(grofile):
+
+    """
+    Reads molecule from file in GRO format.
+
+    :param grofile:
+        File with molecular structure in GRO format.
+
+    :return:
+        The molecule.
+    """
+    
     with Path(grofile).open('r') as fh:
         grostr = fh.read()
 
@@ -163,51 +222,32 @@ def _Molecule_read_gro_file(grofile):
     labels = []
 
     lines = grostr.strip().splitlines()
+
     for line in lines[2:-1]:  
         if line:
-            line = line.strip()
             # To access the content we will stick to the C format:
             # %5d%-5s%5s%5d%8.3f%8.3f%8.3f
-            # It should skip the spaces
-            residue_number = line[0:5].strip()
-            print('Residue number: ', residue_number)
+
             residue_name = line[5:10].strip()
-            print('Residue name: ', residue_name)
             atom_name = line[10:15].strip()
-            print('Atom name: ', atom_name)
-            atom_number = line[15:20].strip()
-            print('Atom number: ', atom_number)
-            
+
             try:
                 x = float(line[20:28].strip()) * 10
                 y = float(line[28:36].strip()) * 10
                 z = float(line[36:44].strip()) * 10
+
             except ValueError as e:
                 print(f"Error converting coordinates: {e}")
                 continue
             
             # Append coordinates in angstroms
             coordinates.append([x, y, z])
-            print('Identified label:')
-            if residue_name in ion_residues:
-                labels.append(ion_residues[residue_name])
-                print(ion_residues[residue_name])
-            elif residue_name in standard_residues:
-                # The first letter of the atom name is the element
-                labels.append(atom_name[0])
-                print(atom_name[0])
-            else:
-                # Take the first characters not being a digit
-                # For example C11' will be C or Ru13' will be Ru
-                name = ''
-                for c in atom_name:
-                    if not c.isdigit():
-                        name += c
-                    else:
-                        break
-                labels.append(name)
-                print(name)
-                
+
+            # Assign label
+            name = _element_guesser(atom_name, residue_name)
+
+            labels.append(name)
+            
     return Molecule(labels, coordinates, 'angstrom')
 
 @staticmethod
@@ -222,31 +262,30 @@ def _Molecule_read_pdb_file(pdbfile):
         The molecule.
     """
 
-    try:
-        with Path(pdbfile).open('r') as fh:
-            pdbstr = fh.read()
+    with Path(pdbfile).open('r') as fh:
+        pdbstr = fh.read()
 
-        coordinates = []
-        labels = []
+    coordinates = []
+    labels = []
 
-        lines = pdbstr.strip().splitlines()
-        for line in lines:
-            if line.startswith('ATOM') or line.startswith('HETATM'):
+    lines = pdbstr.strip().splitlines()
+    for line in lines:
+        if line.startswith('ATOM') or line.startswith('HETATM'):
 
-                if line[76:78].strip() == '':
-                    error_msg = "No atom label found in PDB file. Please provide atom labels in columns 77-78."
-                    error_msg += "For more information, see: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html#ATOM"
-                    raise ValueError(error_msg)
-                
-                label = str(line[76:78]).strip()
-                labels.append(label)
-                coordinates.append([float(line[30:38]), float(line[38:46]), float(line[46:54])])
+            if line[76:78].strip() == '':
+                atom_name = line[12:15].strip()
+                residue_name = line[17:19].strip()
 
-        return Molecule(labels, coordinates, 'angstrom')
+                # Guess element
+                name = _element_guesser(atom_name, residue_name)
 
-    except Exception as e:
-        print(f"An error occurred while reading the PDB file: {str(e)}")
-        return None
+            else:
+                name = str(line[76:78]).strip()
+            
+            labels.append(name)
+            coordinates.append([float(line[30:38]), float(line[38:46]), float(line[46:54])])
+
+    return Molecule(labels, coordinates, 'angstrom')
 
 
 @staticmethod
