@@ -558,11 +558,19 @@ class ForceFieldGenerator:
                 self.partial_charges = self.comm.bcast(self.partial_charges,
                                                     root=mpi_master())
                 
-        # self.partial charges should be summing to a natural number
-        # it should be rounded to double precision
+        # self.partial charges should be summing to a whole number
+        if abs(sum(self.partial_charges) - round(sum(self.partial_charges))) > 1e-6:
+            # compensate with the largest partial charge
+            max_charge = max(self.partial_charges)
+            max_charge_index = np.argmax(self.partial_charges)
 
-        self.partial_charges = np.round(self.partial_charges, 16)
-
+            self.partial_charges[max_charge_index] -= sum(
+                self.partial_charges) - round(sum(self.partial_charges))
+            
+            msg = 'Sum of partial charges is not a whole number. '
+            msg += f'Compensating with the largest charge {max_charge:.6f}.'
+            self.ostream.print_warning(msg)
+            self.ostream.flush()
 
         # preparing atomtypes and atoms
 
