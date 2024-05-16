@@ -120,7 +120,6 @@ from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
 from .firstorderprop import FirstOrderProperties
 from .forcefieldgenerator import ForceFieldGenerator
-from .uffparameters import UffParameters
 from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer

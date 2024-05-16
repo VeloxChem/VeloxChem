@@ -47,7 +47,7 @@ from .seminario import Seminario
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
-from .uffparameters import UffParameters
+from .uffparameters import get_uff_parameters
 
 class ForceFieldGenerator:
     """
@@ -145,7 +145,7 @@ class ForceFieldGenerator:
         self.keep_files = True
 
         # UFF parameters
-        self.uff_param = UffParameters().uff_param
+        self.uff_param = get_uff_parameters()
         
         
     def update_settings(self, ffg_dict, resp_dict=None):
@@ -643,7 +643,12 @@ class ForceFieldGenerator:
             atom_type_found = False
             
             # Auxilary variable for finding parameters in UFF
-            element = ''.join([i for i in at if not i.isdigit()])
+            element = ''
+            for c in at:
+                if not c.isdigit():
+                    element += c
+                else:
+                    break
 
             for line in ff_data_lines:
                 if line.startswith(f'  {at}     '):
@@ -660,18 +665,16 @@ class ForceFieldGenerator:
                 elif at == 'hw':
                     sigma, epsilon, comment = 0.0, 0.0, 'HW'
                 # Case for atoms in UFF but not in GAFF
-                elif element in self.uff_param.keys():
+                elif element in self.uff_param:
                     warnmsg = f'ForceFieldGenerator: atom type {at} is not in GAFF. Sigma and Epsilon from UFF.'
                     self.ostream.print_warning(warnmsg)
                     sigma = self.uff_param[element]['sigma']
                     epsilon = self.uff_param[element]['epsilon']
                     comment = 'UFF'
                 else:
-                    warnmsg = f'ForceFieldGenerator: atom type {at} is ill defined. Default values are used.'
-                    self.ostream.print_warning(warnmsg)
-                    sigma = 0.35
-                    epsilon = 0.1
-                    comment = 'Default'
+                    assert_msg_critical(
+                        False,
+                        f'ForceFieldGenerator: atom type {at} not found in GAFF or UFF.')
 
             atom_type_params[at] = {
                 'sigma': sigma,
@@ -1249,17 +1252,17 @@ class ForceFieldGenerator:
             The equilibrium distance of the bond. If none it will be calculated.
         """
 
+        i, j = bond
+
         # Convert to zero-based indices
         i = i - 1
         j = j - 1
-
-        i, j = bond
 
         if equilibrium is None:
             coords = self.molecule.get_coordinates_in_angstrom()
             equilibrium = np.linalg.norm(coords[i] - coords[j]) * 0.1
 
-        self.bonds[bond] = {
+        self.bonds[(i, j)] = {
             'type': 'harmonic',
             'force_constant': force_constant,
             'equilibrium': equilibrium,
@@ -1278,12 +1281,12 @@ class ForceFieldGenerator:
             The equilibrium angle of the angle. If none it will be calculated.
         """
 
+        i, j, k = angle
+
         # Convert to zero-based indices
         i = i - 1
         j = j - 1
         k = k - 1
-
-        i, j, k = angle
 
         if equilibrium is None:
             coords = self.molecule.get_coordinates_in_angstrom()
@@ -1293,7 +1296,7 @@ class ForceFieldGenerator:
                 np.dot(a, b) / np.linalg.norm(a) /
                 np.linalg.norm(b)) * 180 / np.pi
 
-        self.angles[angle] = {
+        self.angles[(i, j, k)] = {
             'type': 'harmonic',
             'force_constant': force_constant,
             'equilibrium': equilibrium,
@@ -1743,9 +1746,6 @@ class ForceFieldGenerator:
 
         filename = str(xml_file)
 
-        atoms = self.atoms
-        bonds = self.bonds
-
         # Create the root element of the XML file
         ForceField = ET.Element("ForceField")
         
@@ -1753,7 +1753,15 @@ class ForceFieldGenerator:
         AtomTypes = ET.SubElement(ForceField, "AtomTypes")
 
         for i, atom in self.atoms.items():
-            element = ''.join([i for i in atom['name'] if not i.isdigit()])  
+
+            # Get the element of the atom
+            element = ''
+            for c in atom['name']:
+                if not c.isdigit():
+                    element += c
+                else:
+                    break
+              
             attributes = {
                 # Name is the atom type_molname
                 "name": atom['name'] + '_' + mol_name,
@@ -1766,14 +1774,14 @@ class ForceFieldGenerator:
         # Residues section
         Residues = ET.SubElement(ForceField, "Residues")
         Residue = ET.SubElement(Residues, "Residue", name=mol_name)
-        for atom_id, atom_data in atoms.items():
+        for atom_id, atom_data in self.atoms.items():
             ET.SubElement(Residue, "Atom", name=atom_data['name'], type=atom_data['name'] + '_' + mol_name, charge=str(atom_data['charge']))
-        for bond_id, bond_data in bonds.items():
-            ET.SubElement(Residue, "Bond", atomName1=atoms[bond_id[0]]['name'], atomName2=atoms[bond_id[1]]['name'])
+        for bond_id, bond_data in self.bonds.items():
+            ET.SubElement(Residue, "Bond", atomName1=self.atoms[bond_id[0]]['name'], atomName2=self.atoms[bond_id[1]]['name'])
 
         # Bonds section
         Bonds = ET.SubElement(ForceField, "HarmonicBondForce")
-        for bond_id, bond_data in bonds.items():
+        for bond_id, bond_data in self.bonds.items():
             attributes = {
                 "class1": str(bond_id[0] + 1),
                 "class2": str(bond_id[1] + 1),
@@ -1849,7 +1857,7 @@ class ForceFieldGenerator:
 
         # NonbondedForce section
         NonbondedForce = ET.SubElement(ForceField, "NonbondedForce", coulomb14scale=str(self.fudgeQQ), lj14scale=str(self.fudgeLJ))
-        for atom_id, atom_data in atoms.items():
+        for atom_id, atom_data in self.atoms.items():
             attributes = {
                 "type": atom_data['name'] + '_' + mol_name,
                 "charge": str(atom_data['charge']),
