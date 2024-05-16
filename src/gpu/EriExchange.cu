@@ -22,12 +22,77 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include <hip/hip_runtime.h>
-
-#include "BoysFuncGPU.hpp"
 #include "EriExchange.hpp"
 
 namespace gpu {  // gpu namespace
+
+__device__ void
+computeBoysFunctionEriK(double* values, const double fa, const uint32_t N, const double* bf_table, const double* ft)
+{
+    // Note: 847 = 121 * 7
+    const double* bf_data = bf_table + N * 847;
+
+    uint32_t pnt = (fa > 1.0e5) ? 1000000 : static_cast<uint32_t>(10.0 * fa + 0.5);
+
+    if (pnt < 121)
+    {
+        const double w = fa - 0.1 * pnt;
+
+        const double w2 = w * w;
+
+        const double w4 = w2 * w2;
+
+        values[N] = bf_data[pnt * 7 + 0] + bf_data[pnt * 7 + 1] * w + bf_data[pnt * 7 + 2] * w2 + bf_data[pnt * 7 + 3] * w2 * w
+
+                    + bf_data[pnt * 7 + 4] * w4 + bf_data[pnt * 7 + 5] * w4 * w + bf_data[pnt * 7 + 6] * w4 * w2;
+
+        const double f2a = fa + fa;
+
+        const double fx = exp(-fa);
+
+        for (uint32_t j = 0; j < N; j++)
+        {
+            values[N - j - 1] = ft[N - j - 1] * (f2a * values[N - j] + fx);
+        }
+    }
+    else
+    {
+        const double fia = 1.0 / fa;
+
+        double pf = 0.5 * fia;
+
+        values[0] = MATH_CONST_HALF_SQRT_PI * sqrt(fia);
+
+        if (pnt < 921)
+        {
+            const double fia2 = fia * fia;
+
+            const double f = 0.4999489092 * fia - 0.2473631686 * fia2 + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+
+            const double fx = exp(-fa);
+
+            values[0] -= f * fx;
+
+            const double rterm = pf * fx;
+
+            for (uint32_t j = 1; j <= N; j++)
+            {
+                values[j] = pf * values[j - 1] - rterm;
+
+                pf += fia;
+            }
+        }
+        else
+        {
+            for (uint32_t j = 1; j <= N; j++)
+            {
+                values[j] = pf * values[j - 1];
+
+                pf += fia;
+            }
+        }
+    }
+}
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSSS(double*         mat_K,
@@ -169,7 +234,7 @@ computeExchangeFockSSSS(double*         mat_K,
 
                     double F0_t[1];
 
-                    gpu::computeBoysFunction(F0_t, rho * d2 * r2_PQ, 0, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F0_t, rho * d2 * r2_PQ, 0, boys_func_table, boys_func_ft);
 
                     ERIs[threadIdx.y][threadIdx.x] = Lambda * S_ij_00 * S_kl_00 * F0_t[0] * mat_D_full_AO[j_cgto * naos + l_cgto];
                 }
@@ -367,7 +432,7 @@ computeExchangeFockSSSP(double*         mat_K,
 
                     double F1_t[2];
 
-                    gpu::computeBoysFunction(F1_t, rho * d2 * r2_PQ, 1, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F1_t, rho * d2 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
                     F1_t[1] *= d2;
 
@@ -575,7 +640,7 @@ computeExchangeFockSPSS(double*         mat_K,
 
                     double F1_t[2];
 
-                    gpu::computeBoysFunction(F1_t, rho * d2 * r2_PQ, 1, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F1_t, rho * d2 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
                     F1_t[1] *= d2;
 
@@ -784,7 +849,7 @@ computeExchangeFockSPSP(double*         mat_K,
 
                     double F2_t[3];
 
-                    gpu::computeBoysFunction(F2_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F2_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
                     F2_t[1] *= d2;
                     F2_t[2] *= d2 * d2;
@@ -1025,7 +1090,7 @@ computeExchangeFockSSPS(double*         mat_K,
 
                     double F1_t[2];
 
-                    gpu::computeBoysFunction(F1_t, rho * d2 * r2_PQ, 1, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F1_t, rho * d2 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
                     F1_t[1] *= d2;
 
@@ -1238,7 +1303,7 @@ computeExchangeFockSSPP(double*         mat_K,
 
                     double F2_t[3];
 
-                    gpu::computeBoysFunction(F2_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F2_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
                     F2_t[1] *= d2;
                     F2_t[2] *= d2 * d2;
@@ -1486,7 +1551,7 @@ computeExchangeFockSPPS(double*         mat_K,
 
                     double F2_t[3];
 
-                    gpu::computeBoysFunction(F2_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F2_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
                     F2_t[1] *= d2;
                     F2_t[2] *= d2 * d2;
@@ -1734,7 +1799,7 @@ computeExchangeFockSPPP(double*         mat_K,
 
                     double F3_t[4];
 
-                    gpu::computeBoysFunction(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F3_t[1] *= d2;
                     F3_t[2] *= d2 * d2;
@@ -2011,7 +2076,7 @@ computeExchangeFockPSPS(double*         mat_K,
 
                     double F2_t[3];
 
-                    gpu::computeBoysFunction(F2_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F2_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
                     F2_t[1] *= d2;
                     F2_t[2] *= d2 * d2;
@@ -2261,7 +2326,7 @@ computeExchangeFockPSPP(double*         mat_K,
 
                     double F3_t[4];
 
-                    gpu::computeBoysFunction(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F3_t[1] *= d2;
                     F3_t[2] *= d2 * d2;
@@ -2545,7 +2610,7 @@ computeExchangeFockPPPS(double*         mat_K,
 
                     double F3_t[4];
 
-                    gpu::computeBoysFunction(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F3_t[1] *= d2;
                     F3_t[2] *= d2 * d2;
@@ -2822,7 +2887,7 @@ computeExchangeFockPPPP(double*         mat_K,
 
                     double F4_t[5];
 
-                    gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F4_t[1] *= d2;
                     F4_t[2] *= d2 * d2;
@@ -3187,7 +3252,7 @@ computeExchangeFockSSSD(double*         mat_K,
 
                     double F2_t[3];
 
-                    gpu::computeBoysFunction(F2_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F2_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
                     F2_t[1] *= d2;
                     F2_t[2] *= d2 * d2;
@@ -3440,7 +3505,7 @@ computeExchangeFockSDSS(double*         mat_K,
 
                     double F2_t[3];
 
-                    gpu::computeBoysFunction(F2_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F2_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
                     F2_t[1] *= d2;
                     F2_t[2] *= d2 * d2;
@@ -3698,7 +3763,7 @@ computeExchangeFockSPSD(double*         mat_K,
 
                     double F3_t[4];
 
-                    gpu::computeBoysFunction(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F3_t[1] *= d2;
                     F3_t[2] *= d2 * d2;
@@ -3987,7 +4052,7 @@ computeExchangeFockSDSP(double*         mat_K,
 
                     double F3_t[4];
 
-                    gpu::computeBoysFunction(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F3_t[1] *= d2;
                     F3_t[2] *= d2 * d2;
@@ -4269,7 +4334,7 @@ computeExchangeFockSDSD(double*         mat_K,
 
                     double F4_t[5];
 
-                    gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F4_t[1] *= d2;
                     F4_t[2] *= d2 * d2;
@@ -4630,7 +4695,7 @@ computeExchangeFockSSPD(double*         mat_K,
 
                     double F3_t[4];
 
-                    gpu::computeBoysFunction(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F3_t[1] *= d2;
                     F3_t[2] *= d2 * d2;
@@ -4912,7 +4977,7 @@ computeExchangeFockSDPS(double*         mat_K,
 
                     double F3_t[4];
 
-                    gpu::computeBoysFunction(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F3_t[1] *= d2;
                     F3_t[2] *= d2 * d2;
@@ -5205,7 +5270,7 @@ computeExchangeFockSPPD(double*         mat_K,
 
                     double F4_t[5];
 
-                    gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F4_t[1] *= d2;
                     F4_t[2] *= d2 * d2;
@@ -5555,7 +5620,7 @@ computeExchangeFockSDPP(double*         mat_K,
 
                     double F4_t[5];
 
-                    gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F4_t[1] *= d2;
                     F4_t[2] *= d2 * d2;
@@ -5927,7 +5992,7 @@ computeExchangeFockSDPD(double*         mat_K,
 
                     double F5_t[6];
 
-                    gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
                     F5_t[1] *= d2;
                     F5_t[2] *= d2 * d2;
@@ -6575,7 +6640,7 @@ computeExchangeFockSSDS(double*         mat_K,
 
                     double F2_t[3];
 
-                    gpu::computeBoysFunction(F2_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F2_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
                     F2_t[1] *= d2;
                     F2_t[2] *= d2 * d2;
@@ -6834,7 +6899,7 @@ computeExchangeFockSSDP(double*         mat_K,
 
                     double F3_t[4];
 
-                    gpu::computeBoysFunction(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F3_t[1] *= d2;
                     F3_t[2] *= d2 * d2;
@@ -7117,7 +7182,7 @@ computeExchangeFockSPDS(double*         mat_K,
 
                     double F3_t[4];
 
-                    gpu::computeBoysFunction(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F3_t[1] *= d2;
                     F3_t[2] *= d2 * d2;
@@ -7411,7 +7476,7 @@ computeExchangeFockSPDP(double*         mat_K,
 
                     double F4_t[5];
 
-                    gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F4_t[1] *= d2;
                     F4_t[2] *= d2 * d2;
@@ -7758,7 +7823,7 @@ computeExchangeFockSSDD(double*         mat_K,
 
                     double F4_t[5];
 
-                    gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F4_t[1] *= d2;
                     F4_t[2] *= d2 * d2;
@@ -8093,7 +8158,7 @@ computeExchangeFockSDDS(double*         mat_K,
 
                     double F4_t[5];
 
-                    gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F4_t[1] *= d2;
                     F4_t[2] *= d2 * d2;
@@ -8466,7 +8531,7 @@ computeExchangeFockSPDD(double*         mat_K,
 
                     double F5_t[6];
 
-                    gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
                     F5_t[1] *= d2;
                     F5_t[2] *= d2 * d2;
@@ -9072,7 +9137,7 @@ computeExchangeFockSDDP(double*         mat_K,
 
                     double F5_t[6];
 
-                    gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
                     F5_t[1] *= d2;
                     F5_t[2] *= d2 * d2;
@@ -9728,7 +9793,7 @@ computeExchangeFockSDDD(double*         mat_K,
 
                     double F6_t[7];
 
-                    gpu::computeBoysFunction(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
                     F6_t[1] *= d2;
                     F6_t[2] *= d2 * d2;
@@ -10891,7 +10956,7 @@ computeExchangeFockPSPD(double*         mat_K,
 
                     double F4_t[5];
 
-                    gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F4_t[1] *= d2;
                     F4_t[2] *= d2 * d2;
@@ -11244,7 +11309,7 @@ computeExchangeFockPDPS(double*         mat_K,
 
                     double F4_t[5];
 
-                    gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F4_t[1] *= d2;
                     F4_t[2] *= d2 * d2;
@@ -11599,7 +11664,7 @@ computeExchangeFockPPPD(double*         mat_K,
 
                     double F5_t[6];
 
-                    gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
                     F5_t[1] *= d2;
                     F5_t[2] *= d2 * d2;
@@ -12258,7 +12323,7 @@ computeExchangeFockPDPP(double*         mat_K,
 
                     double F5_t[6];
 
-                    gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
                     F5_t[1] *= d2;
                     F5_t[2] *= d2 * d2;
@@ -12917,7 +12982,7 @@ computeExchangeFockPSDS(double*         mat_K,
 
                     double F3_t[4];
 
-                    gpu::computeBoysFunction(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F3_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F3_t[1] *= d2;
                     F3_t[2] *= d2 * d2;
@@ -13212,7 +13277,7 @@ computeExchangeFockPSDP(double*         mat_K,
 
                     double F4_t[5];
 
-                    gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F4_t[1] *= d2;
                     F4_t[2] *= d2 * d2;
@@ -13565,7 +13630,7 @@ computeExchangeFockPPDS(double*         mat_K,
 
                     double F4_t[5];
 
-                    gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F4_t[1] *= d2;
                     F4_t[2] *= d2 * d2;
@@ -13940,7 +14005,7 @@ computeExchangeFockPSDD(double*         mat_K,
 
                     double F5_t[6];
 
-                    gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
                     F5_t[1] *= d2;
                     F5_t[2] *= d2 * d2;
@@ -14548,7 +14613,7 @@ computeExchangeFockPDDS(double*         mat_K,
 
                     double F5_t[6];
 
-                    gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
                     F5_t[1] *= d2;
                     F5_t[2] *= d2 * d2;
@@ -15208,7 +15273,7 @@ computeExchangeFockPPDP(double*         mat_K,
 
                     double F5_t[6];
 
-                    gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
                     F5_t[1] *= d2;
                     F5_t[2] *= d2 * d2;
@@ -15868,7 +15933,7 @@ computeExchangeFockPPDD(double*         mat_K,
 
                     double F6_t[7];
 
-                    gpu::computeBoysFunction(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
                     F6_t[1] *= d2;
                     F6_t[2] *= d2 * d2;
@@ -17036,7 +17101,7 @@ computeExchangeFockPDDP(double*         mat_K,
 
                     double F6_t[7];
 
-                    gpu::computeBoysFunction(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
                     F6_t[1] *= d2;
                     F6_t[2] *= d2 * d2;
@@ -18201,7 +18266,7 @@ computeExchangeFockPDDD0(double*         mat_K,
 
                     double F7_t[2];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 1, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
 
@@ -18730,7 +18795,7 @@ computeExchangeFockPDDD1(double*         mat_K,
 
                     double F7_t[3];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -19255,7 +19320,7 @@ computeExchangeFockPDDD2(double*         mat_K,
 
                     double F7_t[4];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -20072,7 +20137,7 @@ computeExchangeFockPDDD3(double*         mat_K,
 
                     double F7_t[5];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -20893,7 +20958,7 @@ computeExchangeFockPDDD4(double*         mat_K,
 
                     double F7_t[5];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -21384,7 +21449,7 @@ computeExchangeFockPDDD5(double*         mat_K,
 
                     double F7_t[5];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -21647,7 +21712,7 @@ computeExchangeFockPDDD6(double*         mat_K,
 
                     double F7_t[8];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 7, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 7, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -22195,7 +22260,7 @@ computeExchangeFockDSDS(double*         mat_K,
 
                     double F4_t[5];
 
-                    gpu::computeBoysFunction(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F4_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F4_t[1] *= d2;
                     F4_t[2] *= d2 * d2;
@@ -22570,7 +22635,7 @@ computeExchangeFockDSDP(double*         mat_K,
 
                     double F5_t[6];
 
-                    gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
                     F5_t[1] *= d2;
                     F5_t[2] *= d2 * d2;
@@ -23232,7 +23297,7 @@ computeExchangeFockDPDS(double*         mat_K,
 
                     double F5_t[6];
 
-                    gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
                     F5_t[1] *= d2;
                     F5_t[2] *= d2 * d2;
@@ -23893,7 +23958,7 @@ computeExchangeFockDSDD(double*         mat_K,
 
                     double F6_t[7];
 
-                    gpu::computeBoysFunction(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
                     F6_t[1] *= d2;
                     F6_t[2] *= d2 * d2;
@@ -25061,7 +25126,7 @@ computeExchangeFockDDDS(double*         mat_K,
 
                     double F6_t[7];
 
-                    gpu::computeBoysFunction(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
                     F6_t[1] *= d2;
                     F6_t[2] *= d2 * d2;
@@ -26231,7 +26296,7 @@ computeExchangeFockDPDD0(double*         mat_K,
 
                     double F7_t[2];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 1, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
 
@@ -26760,7 +26825,7 @@ computeExchangeFockDPDD1(double*         mat_K,
 
                     double F7_t[3];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -27285,7 +27350,7 @@ computeExchangeFockDPDD2(double*         mat_K,
 
                     double F7_t[3];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -27822,7 +27887,7 @@ computeExchangeFockDPDD3(double*         mat_K,
 
                     double F7_t[4];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -28702,7 +28767,7 @@ computeExchangeFockDPDD4(double*         mat_K,
 
                     double F7_t[5];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -29268,7 +29333,7 @@ computeExchangeFockDPDD5(double*         mat_K,
 
                     double F7_t[5];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -29675,7 +29740,7 @@ computeExchangeFockDPDD6(double*         mat_K,
 
                     double F7_t[8];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 7, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 7, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -30233,7 +30298,7 @@ computeExchangeFockDDDP0(double*         mat_K,
 
                     double F7_t[2];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 1, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
 
@@ -30642,7 +30707,7 @@ computeExchangeFockDDDP1(double*         mat_K,
 
                     double F7_t[3];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -31131,7 +31196,7 @@ computeExchangeFockDDDP2(double*         mat_K,
 
                     double F7_t[3];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -31824,7 +31889,7 @@ computeExchangeFockDDDP3(double*         mat_K,
 
                     double F7_t[4];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -32659,7 +32724,7 @@ computeExchangeFockDDDP4(double*         mat_K,
 
                     double F7_t[5];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -33009,7 +33074,7 @@ computeExchangeFockDDDP5(double*         mat_K,
 
                     double F7_t[5];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -33707,7 +33772,7 @@ computeExchangeFockDDDP6(double*         mat_K,
 
                     double F7_t[8];
 
-                    gpu::computeBoysFunction(F7_t, rho * d2 * r2_PQ, 7, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F7_t, rho * d2 * r2_PQ, 7, boys_func_table, boys_func_ft);
 
                     F7_t[1] *= d2;
                     F7_t[2] *= d2 * d2;
@@ -34228,7 +34293,7 @@ computeExchangeFockDDDD0(double*         mat_K,
 
                     double F8_t[2];
 
-                    gpu::computeBoysFunction(F8_t, rho * d2 * r2_PQ, 1, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F8_t, rho * d2 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
                     F8_t[1] *= d2;
 
@@ -34697,7 +34762,7 @@ computeExchangeFockDDDD1(double*         mat_K,
 
                     double F8_t[2];
 
-                    gpu::computeBoysFunction(F8_t, rho * d2 * r2_PQ, 1, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F8_t, rho * d2 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
                     F8_t[1] *= d2;
 
@@ -35383,7 +35448,7 @@ computeExchangeFockDDDD2(double*         mat_K,
 
                     double F8_t[3];
 
-                    gpu::computeBoysFunction(F8_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F8_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
                     F8_t[1] *= d2;
                     F8_t[2] *= d2 * d2;
@@ -36307,7 +36372,7 @@ computeExchangeFockDDDD3(double*         mat_K,
 
                     double F8_t[3];
 
-                    gpu::computeBoysFunction(F8_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F8_t, rho * d2 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
                     F8_t[1] *= d2;
                     F8_t[2] *= d2 * d2;
@@ -37034,7 +37099,7 @@ computeExchangeFockDDDD4(double*         mat_K,
 
                     double F8_t[4];
 
-                    gpu::computeBoysFunction(F8_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F8_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F8_t[1] *= d2;
                     F8_t[2] *= d2 * d2;
@@ -38221,7 +38286,7 @@ computeExchangeFockDDDD5(double*         mat_K,
 
                     double F8_t[4];
 
-                    gpu::computeBoysFunction(F8_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F8_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F8_t[1] *= d2;
                     F8_t[2] *= d2 * d2;
@@ -38972,7 +39037,7 @@ computeExchangeFockDDDD6(double*         mat_K,
 
                     double F8_t[4];
 
-                    gpu::computeBoysFunction(F8_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F8_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F8_t[1] *= d2;
                     F8_t[2] *= d2 * d2;
@@ -39769,7 +39834,7 @@ computeExchangeFockDDDD7(double*         mat_K,
 
                     double F8_t[4];
 
-                    gpu::computeBoysFunction(F8_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F8_t, rho * d2 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
                     F8_t[1] *= d2;
                     F8_t[2] *= d2 * d2;
@@ -40084,7 +40149,7 @@ computeExchangeFockDDDD8(double*         mat_K,
 
                     double F8_t[5];
 
-                    gpu::computeBoysFunction(F8_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F8_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F8_t[1] *= d2;
                     F8_t[2] *= d2 * d2;
@@ -40875,7 +40940,7 @@ computeExchangeFockDDDD9(double*         mat_K,
 
                     double F8_t[5];
 
-                    gpu::computeBoysFunction(F8_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F8_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F8_t[1] *= d2;
                     F8_t[2] *= d2 * d2;
@@ -41531,7 +41596,7 @@ computeExchangeFockDDDD10(double*         mat_K,
 
                     double F8_t[5];
 
-                    gpu::computeBoysFunction(F8_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F8_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F8_t[1] *= d2;
                     F8_t[2] *= d2 * d2;
@@ -42415,7 +42480,7 @@ computeExchangeFockDDDD11(double*         mat_K,
 
                     double F8_t[5];
 
-                    gpu::computeBoysFunction(F8_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F8_t, rho * d2 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
                     F8_t[1] *= d2;
                     F8_t[2] *= d2 * d2;
@@ -42790,7 +42855,7 @@ computeExchangeFockDDDD12(double*         mat_K,
 
                     double F8_t[6];
 
-                    gpu::computeBoysFunction(F8_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F8_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
                     F8_t[1] *= d2;
                     F8_t[2] *= d2 * d2;
@@ -43657,7 +43722,7 @@ computeExchangeFockDDDD13(double*         mat_K,
 
                     double F8_t[6];
 
-                    gpu::computeBoysFunction(F8_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F8_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
                     F8_t[1] *= d2;
                     F8_t[2] *= d2 * d2;
@@ -44397,7 +44462,7 @@ computeExchangeFockDDDD14(double*         mat_K,
 
                     double F8_t[9];
 
-                    gpu::computeBoysFunction(F8_t, rho * d2 * r2_PQ, 8, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F8_t, rho * d2 * r2_PQ, 8, boys_func_table, boys_func_ft);
 
                     F8_t[1] *= d2;
                     F8_t[2] *= d2 * d2;
@@ -45092,7 +45157,7 @@ computeExchangeFockDPDP(double*         mat_K,
 
                     double F6_t[7];
 
-                    gpu::computeBoysFunction(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
                     F6_t[1] *= d2;
                     F6_t[2] *= d2 * d2;
@@ -46251,7 +46316,7 @@ computeExchangeFockPDPD(double*         mat_K,
 
                     double F6_t[7];
 
-                    gpu::computeBoysFunction(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
+                    gpu::computeBoysFunctionEriK(F6_t, rho * d2 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
                     F6_t[1] *= d2;
                     F6_t[2] *= d2 * d2;

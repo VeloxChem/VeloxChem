@@ -22,10 +22,8 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include <hip/hip_runtime.h>
-#include <hipblas/hipblas.h>
-//#include <hipsolver/hipsolver.h>
-#include <magma_v2.h>
+#include <cublas_v2.h>
+#include <cusolverDn.h>
 
 #include <omp.h>
 
@@ -123,7 +121,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
     auto gpu_count = nnodes * num_gpus_per_node;
 
     // TODO: double check by using different number of gpus per MPI
-    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    cudaSafe(cudaSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     // Boys function (tabulated for order 0-28)
 
@@ -131,17 +129,17 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
     double* d_boys_func_table;
 
-    hipSafe(hipMalloc(&d_boys_func_table, boys_func_table.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_boys_func_table, boys_func_table.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     const auto boys_func_ft = boysfunc::getBoysFuncFactors();
 
     double* d_boys_func_ft;
 
-    hipSafe(hipMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     // GTOs blocks and number of AOs
 
@@ -203,9 +201,9 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
     double*   d_s_prim_info;
 
-    hipSafe(hipMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     // P gto block
 
@@ -216,9 +214,9 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
     double*   d_p_prim_info;
 
-    hipSafe(hipMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     // D gto block
 
@@ -229,9 +227,9 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
     double*   d_d_prim_info;
 
-    hipSafe(hipMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     // GTO block pairs
 
@@ -272,45 +270,45 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
     uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
     uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
 
-    hipSafe(hipMalloc(&d_mat_Q, max_prim_pair_count_local * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_mat_Q, max_prim_pair_count_local * sizeof(double)));
 
-    hipSafe(hipMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipDeviceSynchronize());
+    cudaSafe(cudaDeviceSynchronize());
 
     Q_omp[gpu_id].zero();
 
@@ -326,7 +324,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
         dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeQMatrixSS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeQMatrixSS<<<num_blocks,threads_per_block>>>(
                            d_mat_Q,
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
@@ -336,7 +334,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipSafe(hipMemcpy(h_mat_Q.data(), d_mat_Q, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(h_mat_Q.data(), d_mat_Q, ss_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
         {
@@ -357,7 +355,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeQMatrixSP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeQMatrixSP<<<num_blocks,threads_per_block>>>(
                            d_mat_Q,
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
@@ -369,7 +367,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipSafe(hipMemcpy(h_mat_Q.data(), d_mat_Q, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(h_mat_Q.data(), d_mat_Q, sp_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
         {
@@ -389,7 +387,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
         dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeQMatrixSD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeQMatrixSD<<<num_blocks,threads_per_block>>>(
                            d_mat_Q,
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
@@ -401,7 +399,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipSafe(hipMemcpy(h_mat_Q.data(), d_mat_Q, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(h_mat_Q.data(), d_mat_Q, sd_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
         {
@@ -421,7 +419,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeQMatrixPP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeQMatrixPP<<<num_blocks,threads_per_block>>>(
                            d_mat_Q,
                            d_p_prim_info,
                            static_cast<uint32_t>(p_prim_count),
@@ -431,7 +429,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipSafe(hipMemcpy(h_mat_Q.data(), d_mat_Q, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(h_mat_Q.data(), d_mat_Q, pp_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
         {
@@ -452,7 +450,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
         dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeQMatrixPD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeQMatrixPD<<<num_blocks,threads_per_block>>>(
                            d_mat_Q,
                            d_p_prim_info,
                            static_cast<uint32_t>(p_prim_count),
@@ -464,7 +462,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipSafe(hipMemcpy(h_mat_Q.data(), d_mat_Q, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(h_mat_Q.data(), d_mat_Q, pd_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
         {
@@ -484,7 +482,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
         dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeQMatrixDD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeQMatrixDD<<<num_blocks,threads_per_block>>>(
                            d_mat_Q,
                            d_d_prim_info,
                            static_cast<uint32_t>(d_prim_count),
@@ -494,7 +492,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipSafe(hipMemcpy(h_mat_Q.data(), d_mat_Q, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(h_mat_Q.data(), d_mat_Q, dd_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
         {
@@ -507,29 +505,29 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
         }
     }
 
-    hipSafe(hipDeviceSynchronize());
+    cudaSafe(cudaDeviceSynchronize());
 
-    hipSafe(hipFree(d_boys_func_table));
-    hipSafe(hipFree(d_boys_func_ft));
+    cudaSafe(cudaFree(d_boys_func_table));
+    cudaSafe(cudaFree(d_boys_func_ft));
 
-    hipSafe(hipFree(d_s_prim_info));
-    hipSafe(hipFree(d_p_prim_info));
-    hipSafe(hipFree(d_d_prim_info));
+    cudaSafe(cudaFree(d_s_prim_info));
+    cudaSafe(cudaFree(d_p_prim_info));
+    cudaSafe(cudaFree(d_d_prim_info));
 
-    hipSafe(hipFree(d_mat_Q));
+    cudaSafe(cudaFree(d_mat_Q));
 
-    hipSafe(hipFree(d_ss_first_inds_local));
-    hipSafe(hipFree(d_ss_second_inds_local));
-    hipSafe(hipFree(d_sp_first_inds_local));
-    hipSafe(hipFree(d_sp_second_inds_local));
-    hipSafe(hipFree(d_sd_first_inds_local));
-    hipSafe(hipFree(d_sd_second_inds_local));
-    hipSafe(hipFree(d_pp_first_inds_local));
-    hipSafe(hipFree(d_pp_second_inds_local));
-    hipSafe(hipFree(d_pd_first_inds_local));
-    hipSafe(hipFree(d_pd_second_inds_local));
-    hipSafe(hipFree(d_dd_first_inds_local));
-    hipSafe(hipFree(d_dd_second_inds_local));
+    cudaSafe(cudaFree(d_ss_first_inds_local));
+    cudaSafe(cudaFree(d_ss_second_inds_local));
+    cudaSafe(cudaFree(d_sp_first_inds_local));
+    cudaSafe(cudaFree(d_sp_second_inds_local));
+    cudaSafe(cudaFree(d_sd_first_inds_local));
+    cudaSafe(cudaFree(d_sd_second_inds_local));
+    cudaSafe(cudaFree(d_pp_first_inds_local));
+    cudaSafe(cudaFree(d_pp_second_inds_local));
+    cudaSafe(cudaFree(d_pd_first_inds_local));
+    cudaSafe(cudaFree(d_pd_second_inds_local));
+    cudaSafe(cudaFree(d_dd_first_inds_local));
+    cudaSafe(cudaFree(d_dd_second_inds_local));
 
     }}
 
@@ -589,7 +587,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
-    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    cudaSafe(cudaSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     // GTOs blocks and number of AOs
 
@@ -653,9 +651,9 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 
     double*   d_s_prim_info;
 
-    hipSafe(hipMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     // P gto block
 
@@ -666,9 +664,9 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 
     double*   d_p_prim_info;
 
-    hipSafe(hipMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     // D gto block
 
@@ -679,9 +677,9 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 
     double*   d_d_prim_info;
 
-    hipSafe(hipMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     // GTO block pairs
 
@@ -723,44 +721,44 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
     uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
     uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
 
-    hipSafe(hipMalloc(&d_mat_S, max_prim_pair_count_local * sizeof(double)));
-    hipSafe(hipMalloc(&d_mat_T, max_prim_pair_count_local * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_mat_S, max_prim_pair_count_local * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_mat_T, max_prim_pair_count_local * sizeof(double)));
 
-    hipSafe(hipMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
     S_matrices[gpu_id].zero();
     T_matrices[gpu_id].zero();
@@ -768,7 +766,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
     auto& mat_overlap = S_matrices[gpu_id];
     auto& mat_kinetic_energy = T_matrices[gpu_id];
 
-    hipSafe(hipDeviceSynchronize());
+    cudaSafe(cudaDeviceSynchronize());
 
     // SS
 
@@ -778,7 +776,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 
         dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergySS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeOverlapAndKineticEnergySS<<<num_blocks,threads_per_block>>>(
                            d_mat_S,
                            d_mat_T,
                            d_s_prim_info,
@@ -787,8 +785,8 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
                            d_ss_second_inds_local,
                            static_cast<uint32_t>(ss_prim_pair_count_local));
 
-        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_S.data(), d_mat_S, ss_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_T.data(), d_mat_T, ss_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
         {
@@ -816,7 +814,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergySP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeOverlapAndKineticEnergySP<<<num_blocks,threads_per_block>>>(
                            d_mat_S,
                            d_mat_T,
                            d_s_prim_info,
@@ -827,8 +825,8 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
                            d_sp_second_inds_local,
                            static_cast<uint32_t>(sp_prim_pair_count_local));
 
-        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_S.data(), d_mat_S, sp_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_T.data(), d_mat_T, sp_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
         {
@@ -863,7 +861,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 
         dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergySD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeOverlapAndKineticEnergySD<<<num_blocks,threads_per_block>>>(
                            d_mat_S,
                            d_mat_T,
                            d_s_prim_info,
@@ -874,8 +872,8 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
                            d_sd_second_inds_local,
                            static_cast<uint32_t>(sd_prim_pair_count_local));
 
-        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_S.data(), d_mat_S, sd_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_T.data(), d_mat_T, sd_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
         {
@@ -910,7 +908,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergyPP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeOverlapAndKineticEnergyPP<<<num_blocks,threads_per_block>>>(
                            d_mat_S,
                            d_mat_T,
                            d_p_prim_info,
@@ -919,8 +917,8 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
                            d_pp_second_inds_local,
                            static_cast<uint32_t>(pp_prim_pair_count_local));
 
-        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_S.data(), d_mat_S, pp_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_T.data(), d_mat_T, pp_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
         {
@@ -964,7 +962,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 
         dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergyPD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeOverlapAndKineticEnergyPD<<<num_blocks,threads_per_block>>>(
                            d_mat_S,
                            d_mat_T,
                            d_p_prim_info,
@@ -975,8 +973,8 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
                            d_pd_second_inds_local,
                            static_cast<uint32_t>(pd_prim_pair_count_local));
 
-        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_S.data(), d_mat_S, pd_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_T.data(), d_mat_T, pd_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
         {
@@ -1018,7 +1016,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 
         dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeOverlapAndKineticEnergyDD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeOverlapAndKineticEnergyDD<<<num_blocks,threads_per_block>>>(
                            d_mat_S,
                            d_mat_T,
                            d_d_prim_info,
@@ -1027,8 +1025,8 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
                            d_dd_second_inds_local,
                            static_cast<uint32_t>(dd_prim_pair_count_local));
 
-        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_S.data(), d_mat_S, dd_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_T.data(), d_mat_T, dd_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
         {
@@ -1064,27 +1062,27 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
         }
     }
 
-    hipSafe(hipDeviceSynchronize());
+    cudaSafe(cudaDeviceSynchronize());
 
-    hipSafe(hipFree(d_s_prim_info));
-    hipSafe(hipFree(d_p_prim_info));
-    hipSafe(hipFree(d_d_prim_info));
+    cudaSafe(cudaFree(d_s_prim_info));
+    cudaSafe(cudaFree(d_p_prim_info));
+    cudaSafe(cudaFree(d_d_prim_info));
 
-    hipSafe(hipFree(d_mat_S));
-    hipSafe(hipFree(d_mat_T));
+    cudaSafe(cudaFree(d_mat_S));
+    cudaSafe(cudaFree(d_mat_T));
 
-    hipSafe(hipFree(d_ss_first_inds_local));
-    hipSafe(hipFree(d_ss_second_inds_local));
-    hipSafe(hipFree(d_sp_first_inds_local));
-    hipSafe(hipFree(d_sp_second_inds_local));
-    hipSafe(hipFree(d_sd_first_inds_local));
-    hipSafe(hipFree(d_sd_second_inds_local));
-    hipSafe(hipFree(d_pp_first_inds_local));
-    hipSafe(hipFree(d_pp_second_inds_local));
-    hipSafe(hipFree(d_pd_first_inds_local));
-    hipSafe(hipFree(d_pd_second_inds_local));
-    hipSafe(hipFree(d_dd_first_inds_local));
-    hipSafe(hipFree(d_dd_second_inds_local));
+    cudaSafe(cudaFree(d_ss_first_inds_local));
+    cudaSafe(cudaFree(d_ss_second_inds_local));
+    cudaSafe(cudaFree(d_sp_first_inds_local));
+    cudaSafe(cudaFree(d_sp_second_inds_local));
+    cudaSafe(cudaFree(d_sd_first_inds_local));
+    cudaSafe(cudaFree(d_sd_second_inds_local));
+    cudaSafe(cudaFree(d_pp_first_inds_local));
+    cudaSafe(cudaFree(d_pp_second_inds_local));
+    cudaSafe(cudaFree(d_pd_first_inds_local));
+    cudaSafe(cudaFree(d_pd_second_inds_local));
+    cudaSafe(cudaFree(d_dd_first_inds_local));
+    cudaSafe(cudaFree(d_dd_second_inds_local));
 
     }}
 
@@ -1169,7 +1167,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
-    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    cudaSafe(cudaSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     // Boys function (tabulated for order 0-28)
 
@@ -1177,17 +1175,17 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
     double* d_boys_func_table;
 
-    hipSafe(hipMalloc(&d_boys_func_table, boys_func_table.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_boys_func_table, boys_func_table.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     const auto boys_func_ft = boysfunc::getBoysFuncFactors();
 
     double* d_boys_func_ft;
 
-    hipSafe(hipMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     // GTOs blocks and number of AOs
 
@@ -1251,9 +1249,9 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
     double*   d_s_prim_info;
 
-    hipSafe(hipMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     // P gto block
 
@@ -1264,9 +1262,9 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
     double*   d_p_prim_info;
 
-    hipSafe(hipMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     // D gto block
 
@@ -1277,9 +1275,9 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
     double*   d_d_prim_info;
 
-    hipSafe(hipMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     // GTO block pairs
 
@@ -1320,43 +1318,43 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
     uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
     uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
 
-    hipSafe(hipMalloc(&d_mat_V, max_prim_pair_count_local * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_mat_V, max_prim_pair_count_local * sizeof(double)));
 
-    hipSafe(hipMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
     V_matrices[gpu_id].zero();
 
@@ -1364,11 +1362,11 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
     double *d_points_info;
 
-    hipSafe(hipMalloc(&d_points_info, npoints * 4 * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_points_info, npoints * 4 * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_points_info, points_info_ptr, npoints * 4 * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_points_info, points_info_ptr, npoints * 4 * sizeof(double), cudaMemcpyHostToDevice));
 
-    hipSafe(hipDeviceSynchronize());
+    cudaSafe(cudaDeviceSynchronize());
 
     // SS
 
@@ -1378,7 +1376,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
         dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeNuclearPotentialSS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeNuclearPotentialSS<<<num_blocks,threads_per_block>>>(
                            d_mat_V,
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
@@ -1390,7 +1388,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_V.data(), d_mat_V, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_V.data(), d_mat_V, ss_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
         {
@@ -1414,7 +1412,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeNuclearPotentialSP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeNuclearPotentialSP<<<num_blocks,threads_per_block>>>(
                            d_mat_V,
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
@@ -1428,7 +1426,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_V.data(), d_mat_V, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_V.data(), d_mat_V, sp_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
         {
@@ -1460,7 +1458,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
         dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeNuclearPotentialSD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeNuclearPotentialSD<<<num_blocks,threads_per_block>>>(
                            d_mat_V,
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
@@ -1474,7 +1472,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_V.data(), d_mat_V, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_V.data(), d_mat_V, sd_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
         {
@@ -1506,7 +1504,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeNuclearPotentialPP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeNuclearPotentialPP<<<num_blocks,threads_per_block>>>(
                            d_mat_V,
                            d_p_prim_info,
                            static_cast<uint32_t>(p_prim_count),
@@ -1518,7 +1516,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_V.data(), d_mat_V, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_V.data(), d_mat_V, pp_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
         {
@@ -1558,7 +1556,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
         dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeNuclearPotentialPD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeNuclearPotentialPD<<<num_blocks,threads_per_block>>>(
                            d_mat_V,
                            d_p_prim_info,
                            static_cast<uint32_t>(p_prim_count),
@@ -1572,7 +1570,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_V.data(), d_mat_V, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_V.data(), d_mat_V, pd_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
         {
@@ -1611,7 +1609,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
         dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::computeNuclearPotentialDD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeNuclearPotentialDD<<<num_blocks,threads_per_block>>>(
                            d_mat_V,
                            d_d_prim_info,
                            static_cast<uint32_t>(d_prim_count),
@@ -1623,7 +1621,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_V.data(), d_mat_V, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_V.data(), d_mat_V, dd_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
         {
@@ -1655,31 +1653,31 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
         }
     }
 
-    hipSafe(hipDeviceSynchronize());
+    cudaSafe(cudaDeviceSynchronize());
 
-    hipSafe(hipFree(d_boys_func_table));
-    hipSafe(hipFree(d_boys_func_ft));
+    cudaSafe(cudaFree(d_boys_func_table));
+    cudaSafe(cudaFree(d_boys_func_ft));
 
-    hipSafe(hipFree(d_s_prim_info));
-    hipSafe(hipFree(d_p_prim_info));
-    hipSafe(hipFree(d_d_prim_info));
+    cudaSafe(cudaFree(d_s_prim_info));
+    cudaSafe(cudaFree(d_p_prim_info));
+    cudaSafe(cudaFree(d_d_prim_info));
 
-    hipSafe(hipFree(d_mat_V));
+    cudaSafe(cudaFree(d_mat_V));
 
-    hipSafe(hipFree(d_ss_first_inds_local));
-    hipSafe(hipFree(d_ss_second_inds_local));
-    hipSafe(hipFree(d_sp_first_inds_local));
-    hipSafe(hipFree(d_sp_second_inds_local));
-    hipSafe(hipFree(d_sd_first_inds_local));
-    hipSafe(hipFree(d_sd_second_inds_local));
-    hipSafe(hipFree(d_pp_first_inds_local));
-    hipSafe(hipFree(d_pp_second_inds_local));
-    hipSafe(hipFree(d_pd_first_inds_local));
-    hipSafe(hipFree(d_pd_second_inds_local));
-    hipSafe(hipFree(d_dd_first_inds_local));
-    hipSafe(hipFree(d_dd_second_inds_local));
+    cudaSafe(cudaFree(d_ss_first_inds_local));
+    cudaSafe(cudaFree(d_ss_second_inds_local));
+    cudaSafe(cudaFree(d_sp_first_inds_local));
+    cudaSafe(cudaFree(d_sp_second_inds_local));
+    cudaSafe(cudaFree(d_sd_first_inds_local));
+    cudaSafe(cudaFree(d_sd_second_inds_local));
+    cudaSafe(cudaFree(d_pp_first_inds_local));
+    cudaSafe(cudaFree(d_pp_second_inds_local));
+    cudaSafe(cudaFree(d_pd_first_inds_local));
+    cudaSafe(cudaFree(d_pd_second_inds_local));
+    cudaSafe(cudaFree(d_dd_first_inds_local));
+    cudaSafe(cudaFree(d_dd_second_inds_local));
 
-    hipSafe(hipFree(d_points_info));
+    cudaSafe(cudaFree(d_points_info));
 
     }}
 
@@ -1812,7 +1810,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     auto gpu_rank = rank * num_gpus_per_node;
 
-    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    cudaSafe(cudaSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     CMultiTimer timer;
 
@@ -1976,39 +1974,39 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     auto mat_full = screening.get_mat_Q_full(s_prim_count, p_prim_count, d_prim_count);
 
-    hipSafe(hipMalloc(&d_matrix_A, mat_full.getNumberOfElements() * sizeof(double)));
-    hipSafe(hipMalloc(&d_matrix_B, mat_full.getNumberOfElements() * sizeof(double)));
-    hipSafe(hipMalloc(&d_matrix_C, mat_full.getNumberOfElements() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_matrix_A, mat_full.getNumberOfElements() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_matrix_B, mat_full.getNumberOfElements() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_matrix_C, mat_full.getNumberOfElements() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_matrix_A, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_matrix_A, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), cudaMemcpyHostToDevice));
 
     mat_full = screening.get_mat_D_abs_full(s_prim_count, p_prim_count, d_prim_count, s_prim_aoinds, p_prim_aoinds, d_prim_aoinds, cart_naos, cart_dens_ptr);
 
-    hipSafe(hipMemcpy(d_matrix_B, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_matrix_B, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), cudaMemcpyHostToDevice));
 
     const auto all_prim_count = mat_full.getNumberOfRows();
 
-    hipblasHandle_t handle;
-    hipblasSafe(hipblasCreate(&handle));
+    cublasHandle_t handle;
+    cublasSafe(cublasCreate(&handle));
 
     double alpha = 1.0, beta = 0.0;
 
     auto n = static_cast<int32_t>(all_prim_count);
 
-    // compute A^T * (B^T * A^T) since hipblas is column-major
-    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_B, n, d_matrix_A, n, &beta, d_matrix_C, n));
+    // compute A^T * (B^T * A^T) since cublas is column-major
+    cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, n, n, &alpha, d_matrix_B, n, d_matrix_A, n, &beta, d_matrix_C, n));
 
-    hipSafe(hipDeviceSynchronize());
+    cudaSafe(cudaDeviceSynchronize());
 
-    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
+    cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
 
-    hipSafe(hipMemcpy(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements() * sizeof(double), hipMemcpyDeviceToHost));
+    cudaSafe(cudaMemcpy(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements() * sizeof(double), cudaMemcpyDeviceToHost));
 
-    hipblasSafe(hipblasDestroy(handle));
+    cublasSafe(cublasDestroy(handle));
 
-    hipSafe(hipFree(d_matrix_A));
-    hipSafe(hipFree(d_matrix_B));
-    hipSafe(hipFree(d_matrix_C));
+    cudaSafe(cudaFree(d_matrix_A));
+    cudaSafe(cudaFree(d_matrix_B));
+    cudaSafe(cudaFree(d_matrix_C));
 
     timer.stop("Prep. Q_prime");
 
@@ -2057,7 +2055,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
-    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    cudaSafe(cudaSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     CMultiTimer timer;
 
@@ -2071,17 +2069,17 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     double* d_boys_func_table;
 
-    hipSafe(hipMalloc(&d_boys_func_table, boys_func_table.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_boys_func_table, boys_func_table.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     const auto boys_func_ft = boysfunc::getBoysFuncFactors();
 
     double* d_boys_func_ft;
 
-    hipSafe(hipMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     timer.stop("Boys func. prep.");
 
@@ -2121,11 +2119,11 @@ computeFockOnGPU(const              CMolecule& molecule,
     double*   d_s_prim_info;
     uint32_t* d_s_prim_aoinds;
 
-    hipSafe(hipMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_s_prim_aoinds, s_prim_aoinds.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_s_prim_aoinds, s_prim_aoinds.size() * sizeof(uint32_t)));
 
-    hipSafe(hipMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
     // P gto block
 
@@ -2137,11 +2135,11 @@ computeFockOnGPU(const              CMolecule& molecule,
     double*   d_p_prim_info;
     uint32_t* d_p_prim_aoinds;
 
-    hipSafe(hipMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_p_prim_aoinds, p_prim_aoinds.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_p_prim_aoinds, p_prim_aoinds.size() * sizeof(uint32_t)));
 
-    hipSafe(hipMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
     // D gto block
 
@@ -2153,11 +2151,11 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
-    hipSafe(hipMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_d_prim_aoinds, d_prim_aoinds.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_d_prim_aoinds, d_prim_aoinds.size() * sizeof(uint32_t)));
 
-    hipSafe(hipMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
     timer.stop("GTO block prep.");
 
@@ -2285,142 +2283,142 @@ computeFockOnGPU(const              CMolecule& molecule,
     double *d_ss_pair_data_local, *d_sp_pair_data_local, *d_sd_pair_data_local,
            *d_pp_pair_data_local, *d_pd_pair_data_local, *d_dd_pair_data_local;
 
-    hipSafe(hipMalloc(&d_mat_D, max_prim_pair_count * sizeof(double)));
-    hipSafe(hipMalloc(&d_mat_J, max_prim_pair_count_local * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_mat_D, max_prim_pair_count * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_mat_J, max_prim_pair_count_local * sizeof(double)));
 
-    hipSafe(hipMalloc(&d_ss_mat_Q, ss_prim_pair_count * sizeof(double)));
-    hipSafe(hipMalloc(&d_sp_mat_Q, sp_prim_pair_count * sizeof(double)));
-    hipSafe(hipMalloc(&d_sd_mat_Q, sd_prim_pair_count * sizeof(double)));
-    hipSafe(hipMalloc(&d_pp_mat_Q, pp_prim_pair_count * sizeof(double)));
-    hipSafe(hipMalloc(&d_pd_mat_Q, pd_prim_pair_count * sizeof(double)));
-    hipSafe(hipMalloc(&d_dd_mat_Q, dd_prim_pair_count * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_ss_mat_Q, ss_prim_pair_count * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_sp_mat_Q, sp_prim_pair_count * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_sd_mat_Q, sd_prim_pair_count * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pp_mat_Q, pp_prim_pair_count * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pd_mat_Q, pd_prim_pair_count * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_dd_mat_Q, dd_prim_pair_count * sizeof(double)));
 
-    hipSafe(hipMalloc(&d_ss_first_inds, ss_prim_pair_count * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_ss_second_inds, ss_prim_pair_count * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_ss_first_inds, ss_prim_pair_count * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_ss_second_inds, ss_prim_pair_count * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_sp_first_inds, sp_prim_pair_count * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_sp_second_inds, sp_prim_pair_count * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sp_first_inds, sp_prim_pair_count * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sp_second_inds, sp_prim_pair_count * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_sd_first_inds, sd_prim_pair_count * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_sd_second_inds, sd_prim_pair_count * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sd_first_inds, sd_prim_pair_count * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sd_second_inds, sd_prim_pair_count * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pp_first_inds, pp_prim_pair_count * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pp_second_inds, pp_prim_pair_count * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pp_first_inds, pp_prim_pair_count * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pp_second_inds, pp_prim_pair_count * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pd_first_inds, pd_prim_pair_count * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pd_second_inds, pd_prim_pair_count * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pd_first_inds, pd_prim_pair_count * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pd_second_inds, pd_prim_pair_count * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_dd_first_inds, dd_prim_pair_count * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_dd_second_inds, dd_prim_pair_count * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_dd_first_inds, dd_prim_pair_count * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_dd_second_inds, dd_prim_pair_count * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_ss_pair_data, ss_pair_data.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_sp_pair_data, sp_pair_data.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_sd_pair_data, sd_pair_data.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_pp_pair_data, pp_pair_data.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_pd_pair_data, pd_pair_data.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_dd_pair_data, dd_pair_data.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_ss_pair_data, ss_pair_data.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_sp_pair_data, sp_pair_data.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_sd_pair_data, sd_pair_data.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pp_pair_data, pp_pair_data.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pd_pair_data, pd_pair_data.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_dd_pair_data, dd_pair_data.size() * sizeof(double)));
 
-    hipSafe(hipMalloc(&d_ss_mat_Q_local, ss_prim_pair_count_local * sizeof(double)));
-    hipSafe(hipMalloc(&d_sp_mat_Q_local, sp_prim_pair_count_local * sizeof(double)));
-    hipSafe(hipMalloc(&d_sd_mat_Q_local, sd_prim_pair_count_local * sizeof(double)));
-    hipSafe(hipMalloc(&d_pp_mat_Q_local, pp_prim_pair_count_local * sizeof(double)));
-    hipSafe(hipMalloc(&d_pd_mat_Q_local, pd_prim_pair_count_local * sizeof(double)));
-    hipSafe(hipMalloc(&d_dd_mat_Q_local, dd_prim_pair_count_local * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_ss_mat_Q_local, ss_prim_pair_count_local * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_sp_mat_Q_local, sp_prim_pair_count_local * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_sd_mat_Q_local, sd_prim_pair_count_local * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pp_mat_Q_local, pp_prim_pair_count_local * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pd_mat_Q_local, pd_prim_pair_count_local * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_dd_mat_Q_local, dd_prim_pair_count_local * sizeof(double)));
 
-    hipSafe(hipMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_ss_pair_data_local, ss_pair_data_local.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_sp_pair_data_local, sp_pair_data_local.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_sd_pair_data_local, sd_pair_data_local.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_pp_pair_data_local, pp_pair_data_local.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_pd_pair_data_local, pd_pair_data_local.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_dd_pair_data_local, dd_pair_data_local.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_ss_pair_data_local, ss_pair_data_local.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_sp_pair_data_local, sp_pair_data_local.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_sd_pair_data_local, sd_pair_data_local.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pp_pair_data_local, pp_pair_data_local.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pd_pair_data_local, pd_pair_data_local.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_dd_pair_data_local, dd_pair_data_local.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_ss_mat_Q, ss_mat_Q.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sp_mat_Q, sp_mat_Q.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sd_mat_Q, sd_mat_Q.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pp_mat_Q, pp_mat_Q.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pd_mat_Q, pd_mat_Q.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_dd_mat_Q, dd_mat_Q.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_ss_mat_Q, ss_mat_Q.data(), ss_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sp_mat_Q, sp_mat_Q.data(), sp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sd_mat_Q, sd_mat_Q.data(), sd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pp_mat_Q, pp_mat_Q.data(), pp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pd_mat_Q, pd_mat_Q.data(), pd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_dd_mat_Q, dd_mat_Q.data(), dd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_ss_first_inds, ss_first_inds.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_ss_second_inds, ss_second_inds.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_ss_first_inds, ss_first_inds.data(), ss_prim_pair_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_ss_second_inds, ss_second_inds.data(), ss_prim_pair_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_sp_first_inds, sp_first_inds.data(), sp_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sp_second_inds, sp_second_inds.data(), sp_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sp_first_inds, sp_first_inds.data(), sp_prim_pair_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sp_second_inds, sp_second_inds.data(), sp_prim_pair_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_sd_first_inds, sd_first_inds.data(), sd_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sd_second_inds, sd_second_inds.data(), sd_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sd_first_inds, sd_first_inds.data(), sd_prim_pair_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sd_second_inds, sd_second_inds.data(), sd_prim_pair_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pp_first_inds, pp_first_inds.data(), pp_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pp_second_inds, pp_second_inds.data(), pp_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pp_first_inds, pp_first_inds.data(), pp_prim_pair_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pp_second_inds, pp_second_inds.data(), pp_prim_pair_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pd_first_inds, pd_first_inds.data(), pd_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pd_second_inds, pd_second_inds.data(), pd_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pd_first_inds, pd_first_inds.data(), pd_prim_pair_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pd_second_inds, pd_second_inds.data(), pd_prim_pair_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_dd_first_inds, dd_first_inds.data(), dd_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_dd_second_inds, dd_second_inds.data(), dd_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_dd_first_inds, dd_first_inds.data(), dd_prim_pair_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_dd_second_inds, dd_second_inds.data(), dd_prim_pair_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_ss_pair_data, ss_pair_data.data(), ss_pair_data.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sp_pair_data, sp_pair_data.data(), sp_pair_data.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sd_pair_data, sd_pair_data.data(), sd_pair_data.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pp_pair_data, pp_pair_data.data(), pp_pair_data.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pd_pair_data, pd_pair_data.data(), pd_pair_data.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_dd_pair_data, dd_pair_data.data(), dd_pair_data.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_ss_pair_data, ss_pair_data.data(), ss_pair_data.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sp_pair_data, sp_pair_data.data(), sp_pair_data.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sd_pair_data, sd_pair_data.data(), sd_pair_data.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pp_pair_data, pp_pair_data.data(), pp_pair_data.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pd_pair_data, pd_pair_data.data(), pd_pair_data.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_dd_pair_data, dd_pair_data.data(), dd_pair_data.size() * sizeof(double), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_ss_mat_Q_local, ss_mat_Q_local.data(), ss_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sp_mat_Q_local, sp_mat_Q_local.data(), sp_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sd_mat_Q_local, sd_mat_Q_local.data(), sd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pp_mat_Q_local, pp_mat_Q_local.data(), pp_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pd_mat_Q_local, pd_mat_Q_local.data(), pd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_dd_mat_Q_local, dd_mat_Q_local.data(), dd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_ss_mat_Q_local, ss_mat_Q_local.data(), ss_prim_pair_count_local * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sp_mat_Q_local, sp_mat_Q_local.data(), sp_prim_pair_count_local * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sd_mat_Q_local, sd_mat_Q_local.data(), sd_prim_pair_count_local * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pp_mat_Q_local, pp_mat_Q_local.data(), pp_prim_pair_count_local * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pd_mat_Q_local, pd_mat_Q_local.data(), pd_prim_pair_count_local * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_dd_mat_Q_local, dd_mat_Q_local.data(), dd_prim_pair_count_local * sizeof(double), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_ss_pair_data_local, ss_pair_data_local.data(), ss_pair_data_local.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sp_pair_data_local, sp_pair_data_local.data(), sp_pair_data_local.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_sd_pair_data_local, sd_pair_data_local.data(), sd_pair_data_local.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pp_pair_data_local, pp_pair_data_local.data(), pp_pair_data_local.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pd_pair_data_local, pd_pair_data_local.data(), pd_pair_data_local.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_dd_pair_data_local, dd_pair_data_local.data(), dd_pair_data_local.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_ss_pair_data_local, ss_pair_data_local.data(), ss_pair_data_local.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sp_pair_data_local, sp_pair_data_local.data(), sp_pair_data_local.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_sd_pair_data_local, sd_pair_data_local.data(), sd_pair_data_local.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pp_pair_data_local, pp_pair_data_local.data(), pp_pair_data_local.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pd_pair_data_local, pd_pair_data_local.data(), pd_pair_data_local.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_dd_pair_data_local, dd_pair_data_local.data(), dd_pair_data_local.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     timer.stop("Coulomb prep.");
 
     mat_Fock_omp[gpu_id].zero();
 
-    hipSafe(hipDeviceSynchronize());
+    cudaSafe(cudaDeviceSynchronize());
 
     CTimer coulomb_timer;
 
@@ -2445,9 +2443,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_J, static_cast<uint32_t>(ss_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(ss_prim_pair_count_local));
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // set up thread blocks for J
 
@@ -2460,11 +2458,11 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
             timer.start("    J block SSSS");
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSSSS, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSSSS<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2483,7 +2481,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
 
             timer.stop("    J block SSSS");
         }
@@ -2493,9 +2491,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSSSP, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSSSP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2516,7 +2514,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (SS|SD)
@@ -2524,9 +2522,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSSSD, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSSSD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2547,7 +2545,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (SS|PP)
@@ -2555,9 +2553,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSSPP, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSSPP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2578,7 +2576,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (SS|PD)
@@ -2586,9 +2584,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSSPD, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSSPD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2611,7 +2609,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (SS|DD)
@@ -2619,9 +2617,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSSDD, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSSDD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2642,10 +2640,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
-        hipSafe(hipMemcpy(mat_J.data(), d_mat_J, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_J.data(), d_mat_J, ss_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
         {
@@ -2675,9 +2673,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_J, static_cast<uint32_t>(sp_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(sp_prim_pair_count_local));
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // set up thread blocks for J
 
@@ -2690,9 +2688,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSPSS, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSPSS<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2713,7 +2711,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (SP|SP)
@@ -2721,9 +2719,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSPSP, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSPSP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2744,7 +2742,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (SP|SD)
@@ -2752,9 +2750,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSPSD, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSPSD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2777,7 +2775,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (SP|PP)
@@ -2785,9 +2783,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSPPP, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSPPP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2808,7 +2806,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (SP|PD)
@@ -2816,9 +2814,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSPPD, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSPPD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2841,7 +2839,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (SP|DD)
@@ -2849,9 +2847,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSPDD, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSPDD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2874,10 +2872,10 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
-        hipSafe(hipMemcpy(mat_J.data(), d_mat_J, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_J.data(), d_mat_J, sp_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
         {
@@ -2915,9 +2913,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_J, static_cast<uint32_t>(pp_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(pp_prim_pair_count_local));
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // set up thread blocks for J
 
@@ -2930,9 +2928,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPPSS, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPPSS<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2953,7 +2951,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (PP|SP)
@@ -2961,9 +2959,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPPSP, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPPSP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2984,7 +2982,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (PP|SD)
@@ -2992,9 +2990,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPPSD, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPPSD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3017,7 +3015,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (PP|PP)
@@ -3025,9 +3023,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPPPP, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPPPP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3046,7 +3044,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (PP|PD)
@@ -3054,9 +3052,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPPPD, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPPPD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3077,7 +3075,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (PP|DD)
@@ -3087,9 +3085,9 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             timer.start("    J block PPDD");
 
-            hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPPDD, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPPDD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3110,12 +3108,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
 
             timer.stop("    J block PPDD");
         }
 
-        hipSafe(hipMemcpy(mat_J.data(), d_mat_J, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_J.data(), d_mat_J, pp_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
         {
@@ -3161,9 +3159,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_J, static_cast<uint32_t>(sd_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(sd_prim_pair_count_local));
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // set up thread blocks for J
 
@@ -3176,9 +3174,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSDSS, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSDSS<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3199,7 +3197,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (SD|SP)
@@ -3207,9 +3205,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSDSP, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSDSP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3232,7 +3230,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (SD|SD)
@@ -3240,9 +3238,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSDSD, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSDSD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3263,7 +3261,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (SD|PP)
@@ -3271,9 +3269,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSDPP, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSDPP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3296,7 +3294,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (SD|PD)
@@ -3304,9 +3302,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSDPD, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSDPD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3329,7 +3327,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (SD|DD)
@@ -3339,9 +3337,9 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             timer.start("    J block SDDD");
 
-            hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockSDDD, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockSDDD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3362,12 +3360,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
 
             timer.stop("    J block SDDD");
         }
 
-        hipSafe(hipMemcpy(mat_J.data(), d_mat_J, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_J.data(), d_mat_J, sd_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
         {
@@ -3405,9 +3403,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_J, static_cast<uint32_t>(pd_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(pd_prim_pair_count_local));
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // set up thread blocks for J
 
@@ -3420,9 +3418,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPDSS, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPDSS<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3445,7 +3443,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (PD|SP)
@@ -3453,9 +3451,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPDSP, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPDSP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3478,7 +3476,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
         }
 
         // J: (PD|SD)
@@ -3488,9 +3486,9 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             timer.start("    J block PDSD");
 
-            hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPDSD, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPDSD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3513,7 +3511,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
 
             timer.stop("    J block PDSD");
         }
@@ -3525,9 +3523,9 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             timer.start("    J block PDPP");
 
-            hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPDPP, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPDPP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3548,7 +3546,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
 
             timer.stop("    J block PDPP");
         }
@@ -3560,9 +3558,9 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             timer.start("    J block PDPD");
 
-            hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPDPD, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPDPD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3583,7 +3581,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
 
             timer.stop("    J block PDPD");
         }
@@ -3595,9 +3593,9 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             timer.start("    J block PDDD");
 
-            hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPDDD0, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPDDD0<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3618,7 +3616,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPDDD1, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPDDD1<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3639,7 +3637,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPDDD2, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPDDD2<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3660,7 +3658,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPDDD3, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPDDD3<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3681,7 +3679,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPDDD4, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPDDD4<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3702,7 +3700,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockPDDD5, num_blocks, threads_per_block, 0, 0,
+            gpu::computeCoulombFockPDDD5<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3723,12 +3721,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
 
             timer.stop("    J block PDDD");
         }
 
-        hipSafe(hipMemcpy(mat_J.data(), d_mat_J, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_J.data(), d_mat_J, pd_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
         {
@@ -3773,9 +3771,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_J, static_cast<uint32_t>(dd_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(dd_prim_pair_count_local));
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // set up thread blocks for J
 
@@ -3790,13 +3788,13 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             timer.start("    J block DDSS");
 
-            hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDSS, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDSS<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3817,7 +3815,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
 
             timer.stop("    J block DDSS");
         }
@@ -3829,13 +3827,13 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             timer.start("    J block DDSP");
 
-            hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDSP, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDSP<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3858,7 +3856,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
 
             timer.stop("    J block DDSP");
         }
@@ -3870,13 +3868,13 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             timer.start("    J block DDSD");
 
-            hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDSD, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDSD<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3897,7 +3895,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
 
             timer.stop("    J block DDSD");
         }
@@ -3909,13 +3907,13 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             timer.start("    J block DDPP");
 
-            hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDPP, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDPP<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3936,7 +3934,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
 
             timer.stop("    J block DDPP");
         }
@@ -3948,13 +3946,13 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             timer.start("    J block DDPD");
 
-            hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDPD0, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDPD0<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3975,7 +3973,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDPD1, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDPD1<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3996,7 +3994,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDPD2, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDPD2<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4017,7 +4015,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDPD3, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDPD3<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4038,7 +4036,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDPD4, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDPD4<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4059,7 +4057,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDPD5, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDPD5<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4080,7 +4078,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDPD6, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDPD6<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4101,7 +4099,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDPD7, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDPD7<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4122,7 +4120,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDPD8, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDPD8<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4143,7 +4141,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDPD9, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDPD9<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4164,7 +4162,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
 
             timer.stop("    J block DDPD");
         }
@@ -4176,13 +4174,13 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             timer.start("    J block DDDD");
 
-            hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            cudaSafe(cudaMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
             dim3 dd_threads_per_block (TILE_DIM_SMALL, TILE_DIM_LARGE);
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD0, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD0<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4201,7 +4199,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD1, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD1<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4220,7 +4218,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD2, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD2<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4239,7 +4237,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD3, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD3<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4258,7 +4256,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD4, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD4<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4277,7 +4275,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD5, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD5<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4296,7 +4294,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD6, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD6<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4315,7 +4313,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD7, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD7<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4334,7 +4332,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD8, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD8<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4353,7 +4351,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD9, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD9<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4372,7 +4370,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD10, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD10<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4391,7 +4389,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD11, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD11<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4410,7 +4408,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD12, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD12<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4429,7 +4427,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD13, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD13<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4448,7 +4446,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD14, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD14<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4467,7 +4465,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD15, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD15<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4486,7 +4484,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD16, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD16<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4505,7 +4503,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD17, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD17<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4524,7 +4522,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD18, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD18<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4543,7 +4541,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD19, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD19<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4562,7 +4560,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD20, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD20<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4581,7 +4579,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD21, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD21<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4600,7 +4598,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD22, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD22<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4619,7 +4617,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipLaunchKernelGGL(gpu::computeCoulombFockDDDD23, dd_num_blocks, dd_threads_per_block, 0, 0,
+            gpu::computeCoulombFockDDDD23<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4638,12 +4636,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            hipSafe(hipDeviceSynchronize());
+            cudaSafe(cudaDeviceSynchronize());
 
             timer.stop("    J block DDDD");
         }
 
-        hipSafe(hipMemcpy(mat_J.data(), d_mat_J, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_J.data(), d_mat_J, dd_prim_pair_count_local * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
         {
@@ -4681,7 +4679,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     timer.stop("J computation");
 
-    hipSafe(hipDeviceSynchronize());
+    cudaSafe(cudaDeviceSynchronize());
 
     coulomb_timer.stop();
 
@@ -4689,62 +4687,62 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     screening.setCoulombTime(gpu_id, coulomb_elapsed_time);
 
-    hipSafe(hipFree(d_mat_D));
-    hipSafe(hipFree(d_mat_J));
+    cudaSafe(cudaFree(d_mat_D));
+    cudaSafe(cudaFree(d_mat_J));
 
-    hipSafe(hipFree(d_ss_mat_Q));
-    hipSafe(hipFree(d_sp_mat_Q));
-    hipSafe(hipFree(d_sd_mat_Q));
-    hipSafe(hipFree(d_pp_mat_Q));
-    hipSafe(hipFree(d_pd_mat_Q));
-    hipSafe(hipFree(d_dd_mat_Q));
+    cudaSafe(cudaFree(d_ss_mat_Q));
+    cudaSafe(cudaFree(d_sp_mat_Q));
+    cudaSafe(cudaFree(d_sd_mat_Q));
+    cudaSafe(cudaFree(d_pp_mat_Q));
+    cudaSafe(cudaFree(d_pd_mat_Q));
+    cudaSafe(cudaFree(d_dd_mat_Q));
 
-    hipSafe(hipFree(d_ss_first_inds));
-    hipSafe(hipFree(d_ss_second_inds));
-    hipSafe(hipFree(d_sp_first_inds));
-    hipSafe(hipFree(d_sp_second_inds));
-    hipSafe(hipFree(d_sd_first_inds));
-    hipSafe(hipFree(d_sd_second_inds));
-    hipSafe(hipFree(d_pp_first_inds));
-    hipSafe(hipFree(d_pp_second_inds));
-    hipSafe(hipFree(d_pd_first_inds));
-    hipSafe(hipFree(d_pd_second_inds));
-    hipSafe(hipFree(d_dd_first_inds));
-    hipSafe(hipFree(d_dd_second_inds));
+    cudaSafe(cudaFree(d_ss_first_inds));
+    cudaSafe(cudaFree(d_ss_second_inds));
+    cudaSafe(cudaFree(d_sp_first_inds));
+    cudaSafe(cudaFree(d_sp_second_inds));
+    cudaSafe(cudaFree(d_sd_first_inds));
+    cudaSafe(cudaFree(d_sd_second_inds));
+    cudaSafe(cudaFree(d_pp_first_inds));
+    cudaSafe(cudaFree(d_pp_second_inds));
+    cudaSafe(cudaFree(d_pd_first_inds));
+    cudaSafe(cudaFree(d_pd_second_inds));
+    cudaSafe(cudaFree(d_dd_first_inds));
+    cudaSafe(cudaFree(d_dd_second_inds));
 
-    hipSafe(hipFree(d_ss_pair_data));
-    hipSafe(hipFree(d_sp_pair_data));
-    hipSafe(hipFree(d_sd_pair_data));
-    hipSafe(hipFree(d_pp_pair_data));
-    hipSafe(hipFree(d_pd_pair_data));
-    hipSafe(hipFree(d_dd_pair_data));
+    cudaSafe(cudaFree(d_ss_pair_data));
+    cudaSafe(cudaFree(d_sp_pair_data));
+    cudaSafe(cudaFree(d_sd_pair_data));
+    cudaSafe(cudaFree(d_pp_pair_data));
+    cudaSafe(cudaFree(d_pd_pair_data));
+    cudaSafe(cudaFree(d_dd_pair_data));
 
-    hipSafe(hipFree(d_ss_mat_Q_local));
-    hipSafe(hipFree(d_sp_mat_Q_local));
-    hipSafe(hipFree(d_sd_mat_Q_local));
-    hipSafe(hipFree(d_pp_mat_Q_local));
-    hipSafe(hipFree(d_pd_mat_Q_local));
-    hipSafe(hipFree(d_dd_mat_Q_local));
+    cudaSafe(cudaFree(d_ss_mat_Q_local));
+    cudaSafe(cudaFree(d_sp_mat_Q_local));
+    cudaSafe(cudaFree(d_sd_mat_Q_local));
+    cudaSafe(cudaFree(d_pp_mat_Q_local));
+    cudaSafe(cudaFree(d_pd_mat_Q_local));
+    cudaSafe(cudaFree(d_dd_mat_Q_local));
 
-    hipSafe(hipFree(d_ss_first_inds_local));
-    hipSafe(hipFree(d_ss_second_inds_local));
-    hipSafe(hipFree(d_sp_first_inds_local));
-    hipSafe(hipFree(d_sp_second_inds_local));
-    hipSafe(hipFree(d_sd_first_inds_local));
-    hipSafe(hipFree(d_sd_second_inds_local));
-    hipSafe(hipFree(d_pp_first_inds_local));
-    hipSafe(hipFree(d_pp_second_inds_local));
-    hipSafe(hipFree(d_pd_first_inds_local));
-    hipSafe(hipFree(d_pd_second_inds_local));
-    hipSafe(hipFree(d_dd_first_inds_local));
-    hipSafe(hipFree(d_dd_second_inds_local));
+    cudaSafe(cudaFree(d_ss_first_inds_local));
+    cudaSafe(cudaFree(d_ss_second_inds_local));
+    cudaSafe(cudaFree(d_sp_first_inds_local));
+    cudaSafe(cudaFree(d_sp_second_inds_local));
+    cudaSafe(cudaFree(d_sd_first_inds_local));
+    cudaSafe(cudaFree(d_sd_second_inds_local));
+    cudaSafe(cudaFree(d_pp_first_inds_local));
+    cudaSafe(cudaFree(d_pp_second_inds_local));
+    cudaSafe(cudaFree(d_pd_first_inds_local));
+    cudaSafe(cudaFree(d_pd_second_inds_local));
+    cudaSafe(cudaFree(d_dd_first_inds_local));
+    cudaSafe(cudaFree(d_dd_second_inds_local));
 
-    hipSafe(hipFree(d_ss_pair_data_local));
-    hipSafe(hipFree(d_sp_pair_data_local));
-    hipSafe(hipFree(d_sd_pair_data_local));
-    hipSafe(hipFree(d_pp_pair_data_local));
-    hipSafe(hipFree(d_pd_pair_data_local));
-    hipSafe(hipFree(d_dd_pair_data_local));
+    cudaSafe(cudaFree(d_ss_pair_data_local));
+    cudaSafe(cudaFree(d_sp_pair_data_local));
+    cudaSafe(cudaFree(d_sd_pair_data_local));
+    cudaSafe(cudaFree(d_pp_pair_data_local));
+    cudaSafe(cudaFree(d_pd_pair_data_local));
+    cudaSafe(cudaFree(d_dd_pair_data_local));
 
     timer.start("Exchange prep.");
 
@@ -4852,43 +4850,43 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     std::vector<double> mat_K(max_pair_inds_count);
 
-    hipSafe(hipMalloc(&d_mat_K, max_pair_inds_count * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_mat_K, max_pair_inds_count * sizeof(double)));
 
-    hipSafe(hipMalloc(&d_pair_inds_i_for_K_ss, pair_inds_count_for_K_ss * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_inds_k_for_K_ss, pair_inds_count_for_K_ss * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_inds_i_for_K_ss, pair_inds_count_for_K_ss * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_inds_k_for_K_ss, pair_inds_count_for_K_ss * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pair_inds_i_for_K_sp, pair_inds_count_for_K_sp * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_inds_k_for_K_sp, pair_inds_count_for_K_sp * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_inds_i_for_K_sp, pair_inds_count_for_K_sp * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_inds_k_for_K_sp, pair_inds_count_for_K_sp * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pair_inds_i_for_K_sd, pair_inds_count_for_K_sd * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_inds_k_for_K_sd, pair_inds_count_for_K_sd * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_inds_i_for_K_sd, pair_inds_count_for_K_sd * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_inds_k_for_K_sd, pair_inds_count_for_K_sd * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pair_inds_i_for_K_pp, pair_inds_count_for_K_pp * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_inds_k_for_K_pp, pair_inds_count_for_K_pp * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_inds_i_for_K_pp, pair_inds_count_for_K_pp * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_inds_k_for_K_pp, pair_inds_count_for_K_pp * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pair_inds_i_for_K_pd, pair_inds_count_for_K_pd * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_inds_k_for_K_pd, pair_inds_count_for_K_pd * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_inds_i_for_K_pd, pair_inds_count_for_K_pd * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_inds_k_for_K_pd, pair_inds_count_for_K_pd * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pair_inds_i_for_K_dd, pair_inds_count_for_K_dd * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_inds_k_for_K_dd, pair_inds_count_for_K_dd * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_inds_i_for_K_dd, pair_inds_count_for_K_dd * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_inds_k_for_K_dd, pair_inds_count_for_K_dd * sizeof(uint32_t)));
 
-    hipSafe(hipMemcpy(d_pair_inds_i_for_K_ss, pair_inds_i_for_K_ss.data(), pair_inds_count_for_K_ss * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_inds_k_for_K_ss, pair_inds_k_for_K_ss.data(), pair_inds_count_for_K_ss * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_inds_i_for_K_ss, pair_inds_i_for_K_ss.data(), pair_inds_count_for_K_ss * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_inds_k_for_K_ss, pair_inds_k_for_K_ss.data(), pair_inds_count_for_K_ss * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pair_inds_i_for_K_sp, pair_inds_i_for_K_sp.data(), pair_inds_count_for_K_sp * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_inds_k_for_K_sp, pair_inds_k_for_K_sp.data(), pair_inds_count_for_K_sp * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_inds_i_for_K_sp, pair_inds_i_for_K_sp.data(), pair_inds_count_for_K_sp * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_inds_k_for_K_sp, pair_inds_k_for_K_sp.data(), pair_inds_count_for_K_sp * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pair_inds_i_for_K_sd, pair_inds_i_for_K_sd.data(), pair_inds_count_for_K_sd * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_inds_k_for_K_sd, pair_inds_k_for_K_sd.data(), pair_inds_count_for_K_sd * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_inds_i_for_K_sd, pair_inds_i_for_K_sd.data(), pair_inds_count_for_K_sd * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_inds_k_for_K_sd, pair_inds_k_for_K_sd.data(), pair_inds_count_for_K_sd * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pair_inds_i_for_K_pp, pair_inds_i_for_K_pp.data(), pair_inds_count_for_K_pp * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_inds_k_for_K_pp, pair_inds_k_for_K_pp.data(), pair_inds_count_for_K_pp * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_inds_i_for_K_pp, pair_inds_i_for_K_pp.data(), pair_inds_count_for_K_pp * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_inds_k_for_K_pp, pair_inds_k_for_K_pp.data(), pair_inds_count_for_K_pp * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pair_inds_i_for_K_pd, pair_inds_i_for_K_pd.data(), pair_inds_count_for_K_pd * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_inds_k_for_K_pd, pair_inds_k_for_K_pd.data(), pair_inds_count_for_K_pd * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_inds_i_for_K_pd, pair_inds_i_for_K_pd.data(), pair_inds_count_for_K_pd * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_inds_k_for_K_pd, pair_inds_k_for_K_pd.data(), pair_inds_count_for_K_pd * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pair_inds_i_for_K_dd, pair_inds_i_for_K_dd.data(), pair_inds_count_for_K_dd * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_inds_k_for_K_dd, pair_inds_k_for_K_dd.data(), pair_inds_count_for_K_dd * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_inds_i_for_K_dd, pair_inds_i_for_K_dd.data(), pair_inds_count_for_K_dd * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_inds_k_for_K_dd, pair_inds_k_for_K_dd.data(), pair_inds_count_for_K_dd * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
     double* d_mat_D_full_AO;
 
@@ -4912,113 +4910,113 @@ computeFockOnGPU(const              CMolecule& molecule,
              *d_pair_data_K_sd, *d_pair_data_K_ds, *d_pair_data_K_pp,
              *d_pair_data_K_pd, *d_pair_data_K_dp, *d_pair_data_K_dd;
 
-    hipSafe(hipMalloc(&d_mat_D_full_AO, cart_naos * cart_naos * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_mat_D_full_AO, cart_naos * cart_naos * sizeof(double)));
 
-    hipSafe(hipMalloc(&d_Q_K_ss, Q_K_ss.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_Q_K_sp, Q_K_sp.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_Q_K_ps, Q_K_ps.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_Q_K_sd, Q_K_sd.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_Q_K_ds, Q_K_ds.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_Q_K_pp, Q_K_pp.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_Q_K_pd, Q_K_pd.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_Q_K_dp, Q_K_dp.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_Q_K_dd, Q_K_dd.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_Q_K_ss, Q_K_ss.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_Q_K_sp, Q_K_sp.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_Q_K_ps, Q_K_ps.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_Q_K_sd, Q_K_sd.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_Q_K_ds, Q_K_ds.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_Q_K_pp, Q_K_pp.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_Q_K_pd, Q_K_pd.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_Q_K_dp, Q_K_dp.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_Q_K_dd, Q_K_dd.size() * sizeof(double)));
 
-    hipSafe(hipMalloc(&d_D_inds_K_ss, D_inds_K_ss.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_D_inds_K_sp, D_inds_K_sp.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_D_inds_K_ps, D_inds_K_ps.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_D_inds_K_sd, D_inds_K_sd.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_D_inds_K_ds, D_inds_K_ds.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_D_inds_K_pp, D_inds_K_pp.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_D_inds_K_pd, D_inds_K_pd.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_D_inds_K_dp, D_inds_K_dp.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_D_inds_K_dd, D_inds_K_dd.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_D_inds_K_ss, D_inds_K_ss.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_D_inds_K_sp, D_inds_K_sp.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_D_inds_K_ps, D_inds_K_ps.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_D_inds_K_sd, D_inds_K_sd.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_D_inds_K_ds, D_inds_K_ds.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_D_inds_K_pp, D_inds_K_pp.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_D_inds_K_pd, D_inds_K_pd.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_D_inds_K_dp, D_inds_K_dp.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_D_inds_K_dd, D_inds_K_dd.size() * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pair_displs_K_ss, pair_displs_K_ss.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_displs_K_sp, pair_displs_K_sp.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_displs_K_ps, pair_displs_K_ps.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_displs_K_sd, pair_displs_K_sd.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_displs_K_ds, pair_displs_K_ds.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_displs_K_pp, pair_displs_K_pp.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_displs_K_pd, pair_displs_K_pd.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_displs_K_dp, pair_displs_K_dp.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_displs_K_dd, pair_displs_K_dd.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_displs_K_ss, pair_displs_K_ss.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_displs_K_sp, pair_displs_K_sp.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_displs_K_ps, pair_displs_K_ps.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_displs_K_sd, pair_displs_K_sd.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_displs_K_ds, pair_displs_K_ds.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_displs_K_pp, pair_displs_K_pp.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_displs_K_pd, pair_displs_K_pd.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_displs_K_dp, pair_displs_K_dp.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_displs_K_dd, pair_displs_K_dd.size() * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pair_counts_K_ss, pair_counts_K_ss.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_counts_K_sp, pair_counts_K_sp.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_counts_K_ps, pair_counts_K_ps.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_counts_K_sd, pair_counts_K_sd.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_counts_K_ds, pair_counts_K_ds.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_counts_K_pp, pair_counts_K_pp.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_counts_K_pd, pair_counts_K_pd.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_counts_K_dp, pair_counts_K_dp.size() * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_counts_K_dd, pair_counts_K_dd.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_counts_K_ss, pair_counts_K_ss.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_counts_K_sp, pair_counts_K_sp.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_counts_K_ps, pair_counts_K_ps.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_counts_K_sd, pair_counts_K_sd.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_counts_K_ds, pair_counts_K_ds.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_counts_K_pp, pair_counts_K_pp.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_counts_K_pd, pair_counts_K_pd.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_counts_K_dp, pair_counts_K_dp.size() * sizeof(uint32_t)));
+    cudaSafe(cudaMalloc(&d_pair_counts_K_dd, pair_counts_K_dd.size() * sizeof(uint32_t)));
 
-    hipSafe(hipMalloc(&d_pair_data_K_ss, pair_data_K_ss.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_pair_data_K_sp, pair_data_K_sp.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_pair_data_K_ps, pair_data_K_ps.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_pair_data_K_sd, pair_data_K_sd.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_pair_data_K_ds, pair_data_K_ds.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_pair_data_K_pp, pair_data_K_pp.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_pair_data_K_pd, pair_data_K_pd.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_pair_data_K_dp, pair_data_K_dp.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_pair_data_K_dd, pair_data_K_dd.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pair_data_K_ss, pair_data_K_ss.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pair_data_K_sp, pair_data_K_sp.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pair_data_K_ps, pair_data_K_ps.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pair_data_K_sd, pair_data_K_sd.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pair_data_K_ds, pair_data_K_ds.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pair_data_K_pp, pair_data_K_pp.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pair_data_K_pd, pair_data_K_pd.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pair_data_K_dp, pair_data_K_dp.size() * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_pair_data_K_dd, pair_data_K_dd.size() * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_mat_D_full_AO, cart_dens_ptr, cart_naos * cart_naos * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_mat_D_full_AO, cart_dens_ptr, cart_naos * cart_naos * sizeof(double), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_Q_K_ss, Q_K_ss.data(), Q_K_ss.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_Q_K_sp, Q_K_sp.data(), Q_K_sp.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_Q_K_ps, Q_K_ps.data(), Q_K_ps.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_Q_K_sd, Q_K_sd.data(), Q_K_sd.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_Q_K_ds, Q_K_ds.data(), Q_K_ds.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_Q_K_pp, Q_K_pp.data(), Q_K_pp.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_Q_K_pd, Q_K_pd.data(), Q_K_pd.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_Q_K_dp, Q_K_dp.data(), Q_K_dp.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_Q_K_dd, Q_K_dd.data(), Q_K_dd.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_Q_K_ss, Q_K_ss.data(), Q_K_ss.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_Q_K_sp, Q_K_sp.data(), Q_K_sp.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_Q_K_ps, Q_K_ps.data(), Q_K_ps.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_Q_K_sd, Q_K_sd.data(), Q_K_sd.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_Q_K_ds, Q_K_ds.data(), Q_K_ds.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_Q_K_pp, Q_K_pp.data(), Q_K_pp.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_Q_K_pd, Q_K_pd.data(), Q_K_pd.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_Q_K_dp, Q_K_dp.data(), Q_K_dp.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_Q_K_dd, Q_K_dd.data(), Q_K_dd.size() * sizeof(double), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_D_inds_K_ss, D_inds_K_ss.data(), D_inds_K_ss.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_D_inds_K_sp, D_inds_K_sp.data(), D_inds_K_sp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_D_inds_K_ps, D_inds_K_ps.data(), D_inds_K_ps.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_D_inds_K_sd, D_inds_K_sd.data(), D_inds_K_sd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_D_inds_K_ds, D_inds_K_ds.data(), D_inds_K_ds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_D_inds_K_pp, D_inds_K_pp.data(), D_inds_K_pp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_D_inds_K_pd, D_inds_K_pd.data(), D_inds_K_pd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_D_inds_K_dp, D_inds_K_dp.data(), D_inds_K_dp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_D_inds_K_dd, D_inds_K_dd.data(), D_inds_K_dd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_D_inds_K_ss, D_inds_K_ss.data(), D_inds_K_ss.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_D_inds_K_sp, D_inds_K_sp.data(), D_inds_K_sp.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_D_inds_K_ps, D_inds_K_ps.data(), D_inds_K_ps.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_D_inds_K_sd, D_inds_K_sd.data(), D_inds_K_sd.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_D_inds_K_ds, D_inds_K_ds.data(), D_inds_K_ds.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_D_inds_K_pp, D_inds_K_pp.data(), D_inds_K_pp.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_D_inds_K_pd, D_inds_K_pd.data(), D_inds_K_pd.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_D_inds_K_dp, D_inds_K_dp.data(), D_inds_K_dp.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_D_inds_K_dd, D_inds_K_dd.data(), D_inds_K_dd.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pair_displs_K_ss, pair_displs_K_ss.data(), pair_displs_K_ss.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_displs_K_sp, pair_displs_K_sp.data(), pair_displs_K_sp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_displs_K_ps, pair_displs_K_ps.data(), pair_displs_K_ps.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_displs_K_sd, pair_displs_K_sd.data(), pair_displs_K_sd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_displs_K_ds, pair_displs_K_ds.data(), pair_displs_K_ds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_displs_K_pp, pair_displs_K_pp.data(), pair_displs_K_pp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_displs_K_pd, pair_displs_K_pd.data(), pair_displs_K_pd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_displs_K_dp, pair_displs_K_dp.data(), pair_displs_K_dp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_displs_K_dd, pair_displs_K_dd.data(), pair_displs_K_dd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_displs_K_ss, pair_displs_K_ss.data(), pair_displs_K_ss.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_displs_K_sp, pair_displs_K_sp.data(), pair_displs_K_sp.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_displs_K_ps, pair_displs_K_ps.data(), pair_displs_K_ps.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_displs_K_sd, pair_displs_K_sd.data(), pair_displs_K_sd.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_displs_K_ds, pair_displs_K_ds.data(), pair_displs_K_ds.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_displs_K_pp, pair_displs_K_pp.data(), pair_displs_K_pp.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_displs_K_pd, pair_displs_K_pd.data(), pair_displs_K_pd.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_displs_K_dp, pair_displs_K_dp.data(), pair_displs_K_dp.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_displs_K_dd, pair_displs_K_dd.data(), pair_displs_K_dd.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pair_counts_K_ss, pair_counts_K_ss.data(), pair_counts_K_ss.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_counts_K_sp, pair_counts_K_sp.data(), pair_counts_K_sp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_counts_K_ps, pair_counts_K_ps.data(), pair_counts_K_ps.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_counts_K_sd, pair_counts_K_sd.data(), pair_counts_K_sd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_counts_K_ds, pair_counts_K_ds.data(), pair_counts_K_ds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_counts_K_pp, pair_counts_K_pp.data(), pair_counts_K_pp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_counts_K_pd, pair_counts_K_pd.data(), pair_counts_K_pd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_counts_K_dp, pair_counts_K_dp.data(), pair_counts_K_dp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_counts_K_dd, pair_counts_K_dd.data(), pair_counts_K_dd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_counts_K_ss, pair_counts_K_ss.data(), pair_counts_K_ss.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_counts_K_sp, pair_counts_K_sp.data(), pair_counts_K_sp.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_counts_K_ps, pair_counts_K_ps.data(), pair_counts_K_ps.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_counts_K_sd, pair_counts_K_sd.data(), pair_counts_K_sd.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_counts_K_ds, pair_counts_K_ds.data(), pair_counts_K_ds.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_counts_K_pp, pair_counts_K_pp.data(), pair_counts_K_pp.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_counts_K_pd, pair_counts_K_pd.data(), pair_counts_K_pd.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_counts_K_dp, pair_counts_K_dp.data(), pair_counts_K_dp.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_counts_K_dd, pair_counts_K_dd.data(), pair_counts_K_dd.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_pair_data_K_ss, pair_data_K_ss.data(), pair_data_K_ss.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_data_K_sp, pair_data_K_sp.data(), pair_data_K_sp.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_data_K_ps, pair_data_K_ps.data(), pair_data_K_ps.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_data_K_sd, pair_data_K_sd.data(), pair_data_K_sd.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_data_K_ds, pair_data_K_ds.data(), pair_data_K_ds.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_data_K_pp, pair_data_K_pp.data(), pair_data_K_pp.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_data_K_pd, pair_data_K_pd.data(), pair_data_K_pd.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_data_K_dp, pair_data_K_dp.data(), pair_data_K_dp.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_data_K_dd, pair_data_K_dd.data(), pair_data_K_dd.size() * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_data_K_ss, pair_data_K_ss.data(), pair_data_K_ss.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_data_K_sp, pair_data_K_sp.data(), pair_data_K_sp.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_data_K_ps, pair_data_K_ps.data(), pair_data_K_ps.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_data_K_sd, pair_data_K_sd.data(), pair_data_K_sd.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_data_K_ds, pair_data_K_ds.data(), pair_data_K_ds.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_data_K_pp, pair_data_K_pp.data(), pair_data_K_pp.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_data_K_pd, pair_data_K_pd.data(), pair_data_K_pd.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_data_K_dp, pair_data_K_dp.data(), pair_data_K_dp.size() * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_pair_data_K_dd, pair_data_K_dd.data(), pair_data_K_dd.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     timer.stop("Exchange prep.");
 
-    hipSafe(hipDeviceSynchronize());
+    cudaSafe(cudaDeviceSynchronize());
 
     CTimer exchange_timer;
 
@@ -5043,9 +5041,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_ss + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_ss));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_ss));
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // set up thread blocks for K
 
@@ -5056,7 +5054,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SS|SS)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSSS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSSSS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5077,12 +5075,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SS|SP)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSSP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSSSP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5111,12 +5109,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SP|SS)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSPSS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSPSS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5145,12 +5143,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SP|SP)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSPSP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSPSP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5174,12 +5172,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SS|SD)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSSD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSSSD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5208,12 +5206,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SD|SS)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDSS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSDSS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5242,12 +5240,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SP|SD)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSPSD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSPSD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5279,12 +5277,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SD|SP)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDSP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSDSP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5316,12 +5314,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SD|SD)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDSD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSDSD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5345,7 +5343,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_ss; ik++)
         {
@@ -5377,9 +5375,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_sp + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_sp));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_sp));
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // set up thread blocks for K
 
@@ -5390,7 +5388,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SS|PS)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSPS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSSPS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -5419,12 +5417,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SS|PP)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSPP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSSPP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -5453,12 +5451,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SP|PS)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSPPS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSPPS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -5487,12 +5485,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SP|PP)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSPPP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSPPP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -5521,12 +5519,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SS|PD)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSPD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSSPD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -5558,12 +5556,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SD|PS)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDPS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSDPS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -5595,12 +5593,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SP|PD)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSPPD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSPPD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -5632,12 +5630,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SD|PP)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDPP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSDPP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -5669,12 +5667,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SD|PD)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDPD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSDPD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -5706,7 +5704,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_sp; ik++)
         {
@@ -5747,9 +5745,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_pp + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_pp));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_pp));
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // set up thread blocks for K
 
@@ -5762,7 +5760,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PSPS");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPSPS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPSPS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -5786,7 +5784,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PSPS");
 
@@ -5795,7 +5793,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PSPP");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPSPP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPSPP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -5824,7 +5822,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PSPP");
 
@@ -5833,7 +5831,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PPPS");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPPPS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPPPS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -5862,7 +5860,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PPPS");
 
@@ -5871,7 +5869,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PPPP");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPPPP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPPPP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -5892,7 +5890,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PPPP");
 
@@ -5901,7 +5899,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PSPD");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPSPD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPSPD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -5933,7 +5931,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PSPD");
 
@@ -5942,7 +5940,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PDPS");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDPS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPDPS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -5974,7 +5972,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PDPS");
 
@@ -5983,7 +5981,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PPPD");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPPPD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPPPD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6012,7 +6010,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PPPD");
 
@@ -6021,7 +6019,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PDPP");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDPP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPDPP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6050,7 +6048,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PDPP");
 
@@ -6059,7 +6057,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PDPD");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDPD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPDPD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6083,11 +6081,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PDPD");
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_pp; ik++)
         {
@@ -6135,9 +6133,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_sd + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_sd));
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // set up thread blocks for K
 
@@ -6148,7 +6146,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SS|DS)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSDS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSSDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6177,12 +6175,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SS|DP)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSDP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSSDP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6214,12 +6212,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SP|DS)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSPDS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSPDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6251,14 +6249,14 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (SP|DP)
         //     *  *
 
         timer.start("    K block SPDP");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSPDP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSPDP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6290,7 +6288,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block SPDP");
 
@@ -6299,7 +6297,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block SSDD");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSDD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSSDD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6328,7 +6326,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block SSDD");
 
@@ -6337,7 +6335,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block SDDS");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDDS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSDDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6366,7 +6364,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block SDDS");
 
@@ -6375,7 +6373,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block SPDD");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSPDD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSPDD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6407,7 +6405,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block SPDD");
 
@@ -6416,7 +6414,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block SDDP");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDDP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSDDP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6448,7 +6446,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block SDDP");
 
@@ -6457,7 +6455,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block SDDD");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDDD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockSDDD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6486,11 +6484,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block SDDD");
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sd * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sd * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_sd; ik++)
         {
@@ -6531,9 +6529,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_pd + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_pd));
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // set up thread blocks for K
 
@@ -6546,7 +6544,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PSDS");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPSDS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPSDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -6578,7 +6576,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PSDS");
 
@@ -6587,7 +6585,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PSDP");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPSDP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPSDP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -6619,7 +6617,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PSDP");
 
@@ -6628,7 +6626,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PPDS");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPPDS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPPDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -6660,7 +6658,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PPDS");
 
@@ -6669,7 +6667,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PSDD");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPSDD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPSDD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -6701,7 +6699,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PSDD");
 
@@ -6710,7 +6708,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PDDS");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPDDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -6742,7 +6740,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PDDS");
 
@@ -6751,7 +6749,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PPDP");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPPDP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPPDP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -6780,7 +6778,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PPDP");
 
@@ -6789,7 +6787,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PPDD");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPPDD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPPDD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -6818,7 +6816,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PPDD");
 
@@ -6827,7 +6825,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PDDP");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPDDP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -6856,7 +6854,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PDDP");
 
@@ -6865,7 +6863,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PDDD");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD0, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPDDD0<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -6894,7 +6892,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD1, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPDDD1<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -6923,7 +6921,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD2, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPDDD2<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -6952,7 +6950,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD3, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPDDD3<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -6981,7 +6979,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD4, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPDDD4<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -7010,7 +7008,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD5, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPDDD5<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -7039,7 +7037,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD6, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockPDDD6<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -7068,11 +7066,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block PDDD");
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_pd * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_pd * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_pd; ik++)
         {
@@ -7120,9 +7118,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_dd + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_dd));
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // set up thread blocks for K
 
@@ -7133,7 +7131,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (DS|DS)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDSDS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDSDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7157,12 +7155,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (DS|DP)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDSDP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDSDP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7194,12 +7192,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (DP|DS)
         //     *  *
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDPDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7231,14 +7229,14 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         // K: (DS|DD)
         //     *  *
 
         timer.start("    K block DSDD");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDSDD, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDSDD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7267,7 +7265,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block DSDD");
 
@@ -7276,7 +7274,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block DDDS");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDS, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7305,7 +7303,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block DDDS");
 
@@ -7314,7 +7312,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block DPDP");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDP, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDPDP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7338,7 +7336,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block DPDP");
 
@@ -7347,7 +7345,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block DPDD");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD0, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDPDD0<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7376,7 +7374,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD1, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDPDD1<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7405,7 +7403,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD2, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDPDD2<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7434,7 +7432,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD3, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDPDD3<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7463,7 +7461,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD4, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDPDD4<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7492,7 +7490,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD5, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDPDD5<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7521,7 +7519,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD6, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDPDD6<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7550,7 +7548,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block DPDD");
 
@@ -7559,7 +7557,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block DDDP");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP0, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDP0<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7588,7 +7586,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP1, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDP1<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7617,7 +7615,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP2, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDP2<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7646,7 +7644,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP3, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDP3<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7675,7 +7673,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP4, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDP4<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7704,7 +7702,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP5, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDP5<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7733,7 +7731,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP6, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDP6<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7762,7 +7760,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block DDDP");
 
@@ -7771,7 +7769,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block DDDD");
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD0, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDD0<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7792,7 +7790,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD1, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDD1<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7813,7 +7811,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD2, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDD2<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7834,7 +7832,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD3, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDD3<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7855,7 +7853,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD4, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDD4<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7876,7 +7874,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD5, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDD5<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7897,7 +7895,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD6, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDD6<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7918,7 +7916,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD7, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDD7<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7939,7 +7937,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD8, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDD8<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7960,7 +7958,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD9, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDD9<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7981,7 +7979,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD10, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDD10<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -8002,7 +8000,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD11, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDD11<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -8023,7 +8021,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD12, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDD12<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -8044,7 +8042,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD13, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDD13<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -8065,7 +8063,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD14, num_blocks, threads_per_block, 0, 0,
+        gpu::computeExchangeFockDDDD14<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -8086,11 +8084,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
+        cudaSafe(cudaDeviceSynchronize());
 
         timer.stop("    K block DDDD");
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_dd * sizeof(double), hipMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_dd * sizeof(double), cudaMemcpyDeviceToHost));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_dd; ik++)
         {
@@ -8130,7 +8128,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     timer.stop("K computation");
 
-    hipSafe(hipDeviceSynchronize());
+    cudaSafe(cudaDeviceSynchronize());
 
     exchange_timer.stop();
 
@@ -8138,84 +8136,84 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     screening.setExchangeTime(gpu_id, exchange_elapsed_time);
 
-    hipSafe(hipFree(d_boys_func_table));
-    hipSafe(hipFree(d_boys_func_ft));
+    cudaSafe(cudaFree(d_boys_func_table));
+    cudaSafe(cudaFree(d_boys_func_ft));
 
-    hipSafe(hipFree(d_s_prim_info));
-    hipSafe(hipFree(d_s_prim_aoinds));
+    cudaSafe(cudaFree(d_s_prim_info));
+    cudaSafe(cudaFree(d_s_prim_aoinds));
 
-    hipSafe(hipFree(d_p_prim_info));
-    hipSafe(hipFree(d_p_prim_aoinds));
+    cudaSafe(cudaFree(d_p_prim_info));
+    cudaSafe(cudaFree(d_p_prim_aoinds));
 
-    hipSafe(hipFree(d_d_prim_info));
-    hipSafe(hipFree(d_d_prim_aoinds));
+    cudaSafe(cudaFree(d_d_prim_info));
+    cudaSafe(cudaFree(d_d_prim_aoinds));
 
-    hipSafe(hipFree(d_mat_K));
+    cudaSafe(cudaFree(d_mat_K));
 
-    hipSafe(hipFree(d_pair_inds_i_for_K_ss));
-    hipSafe(hipFree(d_pair_inds_k_for_K_ss));
-    hipSafe(hipFree(d_pair_inds_i_for_K_sp));
-    hipSafe(hipFree(d_pair_inds_k_for_K_sp));
-    hipSafe(hipFree(d_pair_inds_i_for_K_sd));
-    hipSafe(hipFree(d_pair_inds_k_for_K_sd));
-    hipSafe(hipFree(d_pair_inds_i_for_K_pp));
-    hipSafe(hipFree(d_pair_inds_k_for_K_pp));
-    hipSafe(hipFree(d_pair_inds_i_for_K_pd));
-    hipSafe(hipFree(d_pair_inds_k_for_K_pd));
-    hipSafe(hipFree(d_pair_inds_i_for_K_dd));
-    hipSafe(hipFree(d_pair_inds_k_for_K_dd));
+    cudaSafe(cudaFree(d_pair_inds_i_for_K_ss));
+    cudaSafe(cudaFree(d_pair_inds_k_for_K_ss));
+    cudaSafe(cudaFree(d_pair_inds_i_for_K_sp));
+    cudaSafe(cudaFree(d_pair_inds_k_for_K_sp));
+    cudaSafe(cudaFree(d_pair_inds_i_for_K_sd));
+    cudaSafe(cudaFree(d_pair_inds_k_for_K_sd));
+    cudaSafe(cudaFree(d_pair_inds_i_for_K_pp));
+    cudaSafe(cudaFree(d_pair_inds_k_for_K_pp));
+    cudaSafe(cudaFree(d_pair_inds_i_for_K_pd));
+    cudaSafe(cudaFree(d_pair_inds_k_for_K_pd));
+    cudaSafe(cudaFree(d_pair_inds_i_for_K_dd));
+    cudaSafe(cudaFree(d_pair_inds_k_for_K_dd));
 
-    hipSafe(hipFree(d_mat_D_full_AO));
+    cudaSafe(cudaFree(d_mat_D_full_AO));
 
-    hipSafe(hipFree(d_Q_K_ss));
-    hipSafe(hipFree(d_Q_K_sp));
-    hipSafe(hipFree(d_Q_K_ps));
-    hipSafe(hipFree(d_Q_K_sd));
-    hipSafe(hipFree(d_Q_K_ds));
-    hipSafe(hipFree(d_Q_K_pp));
-    hipSafe(hipFree(d_Q_K_pd));
-    hipSafe(hipFree(d_Q_K_dp));
-    hipSafe(hipFree(d_Q_K_dd));
+    cudaSafe(cudaFree(d_Q_K_ss));
+    cudaSafe(cudaFree(d_Q_K_sp));
+    cudaSafe(cudaFree(d_Q_K_ps));
+    cudaSafe(cudaFree(d_Q_K_sd));
+    cudaSafe(cudaFree(d_Q_K_ds));
+    cudaSafe(cudaFree(d_Q_K_pp));
+    cudaSafe(cudaFree(d_Q_K_pd));
+    cudaSafe(cudaFree(d_Q_K_dp));
+    cudaSafe(cudaFree(d_Q_K_dd));
 
-    hipSafe(hipFree(d_D_inds_K_ss));
-    hipSafe(hipFree(d_D_inds_K_sp));
-    hipSafe(hipFree(d_D_inds_K_ps));
-    hipSafe(hipFree(d_D_inds_K_sd));
-    hipSafe(hipFree(d_D_inds_K_ds));
-    hipSafe(hipFree(d_D_inds_K_pp));
-    hipSafe(hipFree(d_D_inds_K_pd));
-    hipSafe(hipFree(d_D_inds_K_dp));
-    hipSafe(hipFree(d_D_inds_K_dd));
+    cudaSafe(cudaFree(d_D_inds_K_ss));
+    cudaSafe(cudaFree(d_D_inds_K_sp));
+    cudaSafe(cudaFree(d_D_inds_K_ps));
+    cudaSafe(cudaFree(d_D_inds_K_sd));
+    cudaSafe(cudaFree(d_D_inds_K_ds));
+    cudaSafe(cudaFree(d_D_inds_K_pp));
+    cudaSafe(cudaFree(d_D_inds_K_pd));
+    cudaSafe(cudaFree(d_D_inds_K_dp));
+    cudaSafe(cudaFree(d_D_inds_K_dd));
 
-    hipSafe(hipFree(d_pair_displs_K_ss));
-    hipSafe(hipFree(d_pair_displs_K_sp));
-    hipSafe(hipFree(d_pair_displs_K_ps));
-    hipSafe(hipFree(d_pair_displs_K_sd));
-    hipSafe(hipFree(d_pair_displs_K_ds));
-    hipSafe(hipFree(d_pair_displs_K_pp));
-    hipSafe(hipFree(d_pair_displs_K_pd));
-    hipSafe(hipFree(d_pair_displs_K_dp));
-    hipSafe(hipFree(d_pair_displs_K_dd));
+    cudaSafe(cudaFree(d_pair_displs_K_ss));
+    cudaSafe(cudaFree(d_pair_displs_K_sp));
+    cudaSafe(cudaFree(d_pair_displs_K_ps));
+    cudaSafe(cudaFree(d_pair_displs_K_sd));
+    cudaSafe(cudaFree(d_pair_displs_K_ds));
+    cudaSafe(cudaFree(d_pair_displs_K_pp));
+    cudaSafe(cudaFree(d_pair_displs_K_pd));
+    cudaSafe(cudaFree(d_pair_displs_K_dp));
+    cudaSafe(cudaFree(d_pair_displs_K_dd));
 
-    hipSafe(hipFree(d_pair_counts_K_ss));
-    hipSafe(hipFree(d_pair_counts_K_sp));
-    hipSafe(hipFree(d_pair_counts_K_ps));
-    hipSafe(hipFree(d_pair_counts_K_sd));
-    hipSafe(hipFree(d_pair_counts_K_ds));
-    hipSafe(hipFree(d_pair_counts_K_pp));
-    hipSafe(hipFree(d_pair_counts_K_pd));
-    hipSafe(hipFree(d_pair_counts_K_dp));
-    hipSafe(hipFree(d_pair_counts_K_dd));
+    cudaSafe(cudaFree(d_pair_counts_K_ss));
+    cudaSafe(cudaFree(d_pair_counts_K_sp));
+    cudaSafe(cudaFree(d_pair_counts_K_ps));
+    cudaSafe(cudaFree(d_pair_counts_K_sd));
+    cudaSafe(cudaFree(d_pair_counts_K_ds));
+    cudaSafe(cudaFree(d_pair_counts_K_pp));
+    cudaSafe(cudaFree(d_pair_counts_K_pd));
+    cudaSafe(cudaFree(d_pair_counts_K_dp));
+    cudaSafe(cudaFree(d_pair_counts_K_dd));
 
-    hipSafe(hipFree(d_pair_data_K_ss));
-    hipSafe(hipFree(d_pair_data_K_sp));
-    hipSafe(hipFree(d_pair_data_K_ps));
-    hipSafe(hipFree(d_pair_data_K_sd));
-    hipSafe(hipFree(d_pair_data_K_ds));
-    hipSafe(hipFree(d_pair_data_K_pp));
-    hipSafe(hipFree(d_pair_data_K_pd));
-    hipSafe(hipFree(d_pair_data_K_dp));
-    hipSafe(hipFree(d_pair_data_K_dd));
+    cudaSafe(cudaFree(d_pair_data_K_ss));
+    cudaSafe(cudaFree(d_pair_data_K_sp));
+    cudaSafe(cudaFree(d_pair_data_K_ps));
+    cudaSafe(cudaFree(d_pair_data_K_sd));
+    cudaSafe(cudaFree(d_pair_data_K_ds));
+    cudaSafe(cudaFree(d_pair_data_K_pp));
+    cudaSafe(cudaFree(d_pair_data_K_pd));
+    cudaSafe(cudaFree(d_pair_data_K_dp));
+    cudaSafe(cudaFree(d_pair_data_K_dd));
 
     timer.stop("Total timing");
 
@@ -8252,28 +8250,28 @@ computeDotProduct(const double* A, const double* B, const int64_t size) -> doubl
     std::string errmpirank("gpu::computeDotProduct: Should only be called from MPI master rank");
     errors::assertMsgCritical(rank == mpi::master(), errmpirank);
 
-    hipSafe(hipSetDevice(0));
+    cudaSafe(cudaSetDevice(0));
 
     auto n = static_cast<int32_t>(size);
 
     double *d_A, *d_B;
 
-    hipSafe(hipMalloc(&d_A, n * sizeof(double)));
-    hipSafe(hipMalloc(&d_B, n * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_A, n * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_B, n * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_A, A, n * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_B, B, n * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_A, A, n * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_B, B, n * sizeof(double), cudaMemcpyHostToDevice));
 
-    hipblasHandle_t handle;
-    hipblasSafe(hipblasCreate(&handle));
+    cublasHandle_t handle;
+    cublasSafe(cublasCreate(&handle));
 
     double dot_product;
-    hipblasSafe(hipblasDdot(handle, n, d_A, 1, d_B, 1, &dot_product));
+    cublasSafe(cublasDdot(handle, n, d_A, 1, d_B, 1, &dot_product));
 
-    hipblasSafe(hipblasDestroy(handle));
+    cublasSafe(cublasDestroy(handle));
 
-    hipSafe(hipFree(d_A));
-    hipSafe(hipFree(d_B));
+    cudaSafe(cudaFree(d_A));
+    cudaSafe(cudaFree(d_B));
 
     return dot_product;
 }
@@ -8286,35 +8284,35 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
     std::string errmpirank("gpu::computeWeightedSum: Should only be called from MPI master rank");
     errors::assertMsgCritical(rank == mpi::master(), errmpirank);
 
-    hipSafe(hipSetDevice(0));
+    cudaSafe(cudaSetDevice(0));
 
     auto n = static_cast<int32_t>(size);
 
     double *d_X, *d_Y;
 
-    hipSafe(hipMalloc(&d_X, n * sizeof(double)));
-    hipSafe(hipMalloc(&d_Y, n * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_X, n * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_Y, n * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_Y, weighted_data, n * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_Y, weighted_data, n * sizeof(double), cudaMemcpyHostToDevice));
 
-    hipblasHandle_t handle;
-    hipblasSafe(hipblasCreate(&handle));
+    cublasHandle_t handle;
+    cublasSafe(cublasCreate(&handle));
 
     for (size_t i = 0; i < data_pointers.size(); i++)
     {
         double alpha = weights[i];
 
-        hipSafe(hipMemcpy(d_X, data_pointers[i], n * sizeof(double), hipMemcpyHostToDevice));
+        cudaSafe(cudaMemcpy(d_X, data_pointers[i], n * sizeof(double), cudaMemcpyHostToDevice));
 
-        hipblasSafe(hipblasDaxpy(handle, n, &alpha, d_X, 1, d_Y, 1));
+        cublasSafe(cublasDaxpy(handle, n, &alpha, d_X, 1, d_Y, 1));
     }
 
-    hipblasSafe(hipblasDestroy(handle));
+    cublasSafe(cublasDestroy(handle));
 
-    hipSafe(hipMemcpy(weighted_data, d_Y, n * sizeof(double), hipMemcpyDeviceToHost));
+    cudaSafe(cudaMemcpy(weighted_data, d_Y, n * sizeof(double), cudaMemcpyDeviceToHost));
 
-    hipSafe(hipFree(d_X));
-    hipSafe(hipFree(d_Y));
+    cudaSafe(cudaFree(d_X));
+    cudaSafe(cudaFree(d_Y));
 }
 
 auto
@@ -8326,50 +8324,50 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     std::string errmpirank("gpu::computeErrorVector: Should only be called from MPI master rank");
     errors::assertMsgCritical(rank == mpi::master(), errmpirank);
 
-    hipSafe(hipSetDevice(0));
+    cudaSafe(cudaSetDevice(0));
 
-    hipblasHandle_t handle;
-    hipblasSafe(hipblasCreate(&handle));
+    cublasHandle_t handle;
+    cublasSafe(cublasCreate(&handle));
 
     auto nmo = static_cast<int32_t>(nmo_inp);
     auto nao = static_cast<int32_t>(nao_inp);
 
     double *d_A, *d_B, *d_C;
 
-    hipSafe(hipMalloc(&d_A, nao * nao * sizeof(double)));
-    hipSafe(hipMalloc(&d_B, nao * nao * sizeof(double)));
-    hipSafe(hipMalloc(&d_C, nao * nao * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_A, nao * nao * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_B, nao * nao * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_C, nao * nao * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_A, F, nao * nao * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_B, D, nao * nao * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_A, F, nao * nao * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_B, D, nao * nao * sizeof(double), cudaMemcpyHostToDevice));
 
     double alpha = 1.0, beta = 0.0;
 
-    // Note: we compute C^T = B^T * A^T since hipblas is column-major
+    // Note: we compute C^T = B^T * A^T since cublas is column-major
 
     // D^T F^T (=> FD)
-    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, nao, nao, nao, &alpha, d_B, nao, d_A, nao, &beta, d_C, nao));
+    cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, nao, nao, nao, &alpha, d_B, nao, d_A, nao, &beta, d_C, nao));
 
     // S^T(FD)^T (=> FDS)
-    hipSafe(hipMemcpy(d_A, S, nao * nao * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_A, S, nao * nao * sizeof(double), cudaMemcpyHostToDevice));
 
-    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, nao, nao, nao, &alpha, d_A, nao, d_C, nao, &beta, d_B, nao));
+    cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, nao, nao, nao, &alpha, d_A, nao, d_C, nao, &beta, d_B, nao));
 
-    hipSafe(hipDeviceSynchronize());
+    cudaSafe(cudaDeviceSynchronize());
 
     // FDS - (FDS)^T
     beta = -1.0;
 
-    hipblasSafe(hipblasDgeam(handle, HIPBLAS_OP_N, HIPBLAS_OP_T, nao, nao, &alpha, d_B, nao, &beta, d_B, nao, d_C, nao));
+    cublasSafe(cublasDgeam(handle, CUBLAS_OP_N, CUBLAS_OP_T, nao, nao, &alpha, d_B, nao, &beta, d_B, nao, d_C, nao));
 
     // X^T (FDS - (FDS)^T) X
     double* d_X = d_A;  // note: nao >= nmo
     double* d_Y = d_B;  // note: nao >= nmo
 
-    hipSafe(hipMemcpy(d_X, X, nmo * nao * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_X, X, nmo * nao * sizeof(double), cudaMemcpyHostToDevice));
 
-    auto op_X  = (trans_X == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
-    auto op_XT = (trans_X == std::string("N")) ? HIPBLAS_OP_T : HIPBLAS_OP_N;
+    auto op_X  = (trans_X == std::string("N")) ? CUBLAS_OP_N : CUBLAS_OP_T;
+    auto op_XT = (trans_X == std::string("N")) ? CUBLAS_OP_T : CUBLAS_OP_N;
 
     auto lda_X = (trans_X == std::string("N")) ? nmo : nao;
 
@@ -8379,20 +8377,20 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
 
     // let E == (FDS - SDF)
     // X^T E^T (=> EX)
-    hipblasSafe(hipblasDgemm(handle, op_X, HIPBLAS_OP_N, nmo, nao, nao, &alpha, d_X, lda_X, d_C, nao, &beta, d_Y, nmo));
+    cublasSafe(cublasDgemm(handle, op_X, CUBLAS_OP_N, nmo, nao, nao, &alpha, d_X, lda_X, d_C, nao, &beta, d_Y, nmo));
 
-    hipSafe(hipDeviceSynchronize());
+    cudaSafe(cudaDeviceSynchronize());
 
     // (EX)^T X (=> X^T(E)X)
-    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_C, nmo));
+    cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_C, nmo));
 
-    hipSafe(hipMemcpy(errvec, d_C, nmo * nmo * sizeof(double), hipMemcpyDeviceToHost));
+    cudaSafe(cudaMemcpy(errvec, d_C, nmo * nmo * sizeof(double), cudaMemcpyDeviceToHost));
 
-    hipblasSafe(hipblasDestroy(handle));
+    cublasSafe(cublasDestroy(handle));
 
-    hipSafe(hipFree(d_A));
-    hipSafe(hipFree(d_B));
-    hipSafe(hipFree(d_C));
+    cudaSafe(cudaFree(d_A));
+    cudaSafe(cudaFree(d_B));
+    cudaSafe(cudaFree(d_C));
 }
 
 auto
@@ -8404,48 +8402,48 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     std::string errmpirank("gpu::transformMatrix: Should only be called from MPI master rank");
     errors::assertMsgCritical(rank == mpi::master(), errmpirank);
 
-    hipSafe(hipSetDevice(0));
+    cudaSafe(cudaSetDevice(0));
 
-    hipblasHandle_t handle;
-    hipblasSafe(hipblasCreate(&handle));
+    cublasHandle_t handle;
+    cublasSafe(cublasCreate(&handle));
 
     auto nmo = static_cast<int32_t>(nmo_inp);
     auto nao = static_cast<int32_t>(nao_inp);
 
     double *d_F, *d_X, *d_Y;
 
-    hipSafe(hipMalloc(&d_F, nao * nao * sizeof(double)));
-    hipSafe(hipMalloc(&d_X, nmo * nao * sizeof(double)));
-    hipSafe(hipMalloc(&d_Y, nmo * nao * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_F, nao * nao * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_X, nmo * nao * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_Y, nmo * nao * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_F, F, nao * nao * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_X, X, nmo * nao * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_F, F, nao * nao * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_X, X, nmo * nao * sizeof(double), cudaMemcpyHostToDevice));
 
     double alpha = 1.0, beta = 0.0;
 
-    auto op_X = (trans_X == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
+    auto op_X = (trans_X == std::string("N")) ? CUBLAS_OP_N : CUBLAS_OP_T;
     auto lda_X = (trans_X == std::string("N")) ? nmo : nao;
 
-    auto op_XT = (trans_X == std::string("N")) ? HIPBLAS_OP_T : HIPBLAS_OP_N;
+    auto op_XT = (trans_X == std::string("N")) ? CUBLAS_OP_T : CUBLAS_OP_N;
     auto lda_XT = (trans_X == std::string("N")) ? nao : nmo;
 
-    // Note: we compute C^T = B^T * A^T since hipblas is column-major
+    // Note: we compute C^T = B^T * A^T since cublas is column-major
 
     // X^T F^T (=> FX)
-    hipblasSafe(hipblasDgemm(handle, op_X, HIPBLAS_OP_N, nmo, nao, nao, &alpha, d_X, lda_X, d_F, nao, &beta, d_Y, nmo));
+    cublasSafe(cublasDgemm(handle, op_X, CUBLAS_OP_N, nmo, nao, nao, &alpha, d_X, lda_X, d_F, nao, &beta, d_Y, nmo));
 
-    hipSafe(hipDeviceSynchronize());
+    cudaSafe(cudaDeviceSynchronize());
 
     // (FX)^T X (=> X^T(F)X)
-    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_F, nmo));
+    cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_F, nmo));
 
-    hipSafe(hipMemcpy(transformed_F, d_F, nmo * nmo * sizeof(double), hipMemcpyDeviceToHost));
+    cudaSafe(cudaMemcpy(transformed_F, d_F, nmo * nmo * sizeof(double), cudaMemcpyDeviceToHost));
 
-    hipblasSafe(hipblasDestroy(handle));
+    cublasSafe(cublasDestroy(handle));
 
-    hipSafe(hipFree(d_F));
-    hipSafe(hipFree(d_X));
-    hipSafe(hipFree(d_Y));
+    cudaSafe(cudaFree(d_F));
+    cudaSafe(cudaFree(d_X));
+    cudaSafe(cudaFree(d_Y));
 }
 
 auto
@@ -8461,7 +8459,7 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
 
     // TODO: matmul on multiple GPUs
 
-    hipSafe(hipSetDevice(0));
+    cudaSafe(cudaSetDevice(0));
 
     auto m = static_cast<int32_t>(m_inp);
     auto k = static_cast<int32_t>(k_inp);
@@ -8469,146 +8467,42 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
 
     double *d_A, *d_B, *d_C;
 
-    hipSafe(hipMalloc(&d_A, m * k * sizeof(double)));
-    hipSafe(hipMalloc(&d_B, k * n * sizeof(double)));
-    hipSafe(hipMalloc(&d_C, m * n * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_A, m * k * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_B, k * n * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_C, m * n * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_A, A, m * k * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_B, B, k * n * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_A, A, m * k * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_B, B, k * n * sizeof(double), cudaMemcpyHostToDevice));
 
-    hipblasHandle_t handle;
-    hipblasSafe(hipblasCreate(&handle));
+    cublasHandle_t handle;
+    cublasSafe(cublasCreate(&handle));
 
     double alpha = 1.0, beta = 0.0;
 
-    auto op_A = (trans_A == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
-    auto op_B = (trans_B == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
+    auto op_A = (trans_A == std::string("N")) ? CUBLAS_OP_N : CUBLAS_OP_T;
+    auto op_B = (trans_B == std::string("N")) ? CUBLAS_OP_N : CUBLAS_OP_T;
 
-    // Note: we compute C^T = B^T * A^T since hipblas is column-major
+    // Note: we compute C^T = B^T * A^T since cublas is column-major
     // Also need to adjust lda accordingly
 
     auto lda_A = (trans_A == std::string("N")) ? k : m;
     auto lda_B = (trans_B == std::string("N")) ? n : k;
 
-    hipblasSafe(hipblasDgemm(handle, op_B, op_A, n, m, k, &alpha, d_B, lda_B, d_A, lda_A, &beta, d_C, n));
+    cublasSafe(cublasDgemm(handle, op_B, op_A, n, m, k, &alpha, d_B, lda_B, d_A, lda_A, &beta, d_C, n));
 
-    hipSafe(hipMemcpy(C, d_C, m * n * sizeof(double), hipMemcpyDeviceToHost));
+    cudaSafe(cudaMemcpy(C, d_C, m * n * sizeof(double), cudaMemcpyDeviceToHost));
 
-    hipblasSafe(hipblasDestroy(handle));
+    cublasSafe(cublasDestroy(handle));
 
-    hipSafe(hipFree(d_A));
-    hipSafe(hipFree(d_B));
-    hipSafe(hipFree(d_C));
+    cudaSafe(cudaFree(d_A));
+    cudaSafe(cudaFree(d_B));
+    cudaSafe(cudaFree(d_C));
 }
 
-auto
-diagonalizeMatrix(double* A, double* W, const int64_t nrows_A) -> void
-{
-    // TODO allow diagonalizeMatrix on non-master MPI rank
-
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-
-    std::string errmpirank("gpu::diagonalizeMatrix: Should only be called from MPI master rank");
-    errors::assertMsgCritical(rank == mpi::master(), errmpirank);
-
-    hipSafe(hipSetDevice(0));
-
-    magmaSafe(magma_init());
-
-    magma_setdevice(0);
-
-    magma_int_t n = static_cast<magma_int_t>(nrows_A);
-    //magma_int_t ldda = magma_roundup(n, 32);
-
-    double *d_A;
-    //hipSafe(hipMalloc(&d_A, n * ldda * sizeof(double)));
-    //hipblasSafe(hipblasSetMatrix(n, n, sizeof(double), A, n, d_A, ldda));
-    hipSafe(hipMalloc(&d_A, n * n * sizeof(double)));
-    hipSafe(hipMemcpy(d_A, A, n * n * sizeof(double), hipMemcpyHostToDevice));
-
-    auto nb = magma_get_dsytrd_nb(n);
-    auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));
-    auto liwork = 3 + 5*n;
-
-    double *wA, *work;
-    magma_int_t *iwork;
-
-    hipSafe(hipHostMalloc(&wA, n * n * sizeof(double)));
-    hipSafe(hipHostMalloc(&work, lwork * sizeof(double)));
-    hipSafe(hipHostMalloc(&iwork, liwork * sizeof(magma_int_t)));
-
-    magma_int_t info;
-    //magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_A, ldda, W, wA, n, work, lwork, iwork, liwork, &info);
-    magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_A, n, W, wA, n, work, lwork, iwork, liwork, &info);
-
-    if (info != 0)
-    {
-        std::stringstream ss;
-        ss << "gpu::diagonalizeMatrix: (magma error) " << magma_strerror(info);
-        errors::assertMsgCritical(false, ss.str());
-    }
-
-    //hipblasSafe(hipblasGetMatrix(n, n, sizeof(double), d_A, ldda, A, n));
-    hipSafe(hipMemcpy(A, d_A, n * n * sizeof(double), hipMemcpyDeviceToHost));
-
-    hipSafe(hipFree(d_A));
-
-    hipSafe(hipHostFree(wA));
-    hipSafe(hipHostFree(work));
-    hipSafe(hipHostFree(iwork));
-
-    magmaSafe(magma_finalize());
-}
-
-auto
-diagonalizeMatrixMultiGPU(double* A, double* W, const int64_t nrows_A, const int64_t num_gpus_per_node) -> void
-{
-    // TODO allow diagonalizeMatrix on non-master MPI rank
-
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-
-    std::string errmpirank("gpu::diagonalizeMatrix: Should only be called from MPI master rank");
-    errors::assertMsgCritical(rank == mpi::master(), errmpirank);
-
-    magmaSafe(magma_init());
-
-    magma_int_t n = static_cast<magma_int_t>(nrows_A);
-
-    magma_int_t ngpu = static_cast<magma_int_t>(num_gpus_per_node);
-
-    auto nb = magma_get_dsytrd_nb(n);
-    auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));
-    auto liwork = 3 + 5*n;
-
-    double *wA, *work;
-    magma_int_t *iwork;
-
-    hipSafe(hipHostMalloc(&wA, n * n * sizeof(double)));
-    hipSafe(hipHostMalloc(&work, lwork * sizeof(double)));
-    hipSafe(hipHostMalloc(&iwork, liwork * sizeof(magma_int_t)));
-
-    magma_int_t info;
-    magma_dsyevd_m(ngpu, MagmaVec, MagmaUpper, n, A, n, W, work, lwork, iwork, liwork, &info);
-
-    if (info != 0)
-    {
-        std::stringstream ss;
-        ss << "gpu::diagonalizeMatrixMultiGPU: (magma error) " << magma_strerror(info);
-        errors::assertMsgCritical(false, ss.str());
-    }
-
-    hipSafe(hipHostFree(wA));
-    hipSafe(hipHostFree(work));
-    hipSafe(hipHostFree(iwork));
-
-    magmaSafe(magma_finalize());
-}
-
-/*
 auto
 diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
 {
-    hipSafe(hipSetDevice(0));
+    cudaSafe(cudaSetDevice(0));
 
     auto n = static_cast<int32_t>(nrows_A);
     int32_t lwork;
@@ -8616,35 +8510,30 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
     double *d_A, *d_D, *d_work;
     int32_t *d_info;
 
-    hipSafe(hipMalloc(&d_A, n * n * sizeof(double)));
-    hipSafe(hipMalloc(&d_D, n * sizeof(double)));
-    hipSafe(hipMalloc(&d_info, sizeof(int32_t)));
+    cudaSafe(cudaMalloc(&d_A, n * n * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_D, n * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_info, sizeof(int32_t)));
 
-    hipSafe(hipMemcpy(d_A, A, n * n * sizeof(double), hipMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_A, A, n * n * sizeof(double), cudaMemcpyHostToDevice));
 
-    hipsolverHandle_t handle;
-    hipsolverSafe(hipsolverCreate(&handle));
+    cusolverDnHandle_t handle;
+    cusolverSafe(cusolverDnCreate(&handle));
 
-    hipsolverSafe(hipsolverDsyevd_bufferSize(handle, HIPSOLVER_EIG_MODE_VECTOR, HIPSOLVER_FILL_MODE_UPPER, n, d_A, n, d_D, &lwork));
+    cusolverSafe(cusolverDnDsyevd_bufferSize(handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_UPPER, n, d_A, n, d_D, &lwork));
 
-    hipSafe(hipMalloc(&d_work, lwork));
+    cudaSafe(cudaMalloc(&d_work, lwork));
 
-    hipsolverSafe(hipsolverDsyevd(handle, HIPSOLVER_EIG_MODE_VECTOR, HIPSOLVER_FILL_MODE_UPPER, n, d_A, n, d_D, d_work, lwork, d_info));
+    cusolverSafe(cusolverDnDsyevd(handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_UPPER, n, d_A, n, d_D, d_work, lwork, d_info));
 
-    hipsolverSafe(hipsolverDestroy(handle));
+    cusolverSafe(cusolverDnDestroy(handle));
 
-    // TODO check h_info
-    int32_t h_info;
+    cudaSafe(cudaMemcpy(A, d_A, n * n * sizeof(double), cudaMemcpyDeviceToHost));
+    cudaSafe(cudaMemcpy(D, d_D, n * sizeof(double), cudaMemcpyDeviceToHost));
 
-    hipSafe(hipMemcpy(&h_info, d_info, sizeof(int32_t), hipMemcpyDeviceToHost));
-    hipSafe(hipMemcpy(A, d_A, n * n * sizeof(double), hipMemcpyDeviceToHost));
-    hipSafe(hipMemcpy(D, d_D, n * sizeof(double), hipMemcpyDeviceToHost));
-
-    hipSafe(hipFree(d_A));
-    hipSafe(hipFree(d_D));
-    hipSafe(hipFree(d_info));
-    hipSafe(hipFree(d_work));
+    cudaSafe(cudaFree(d_A));
+    cudaSafe(cudaFree(d_D));
+    cudaSafe(cudaFree(d_info));
+    cudaSafe(cudaFree(d_work));
 }
-*/
 
 }  // namespace gpu

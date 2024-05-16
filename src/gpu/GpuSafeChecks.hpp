@@ -27,45 +27,34 @@
 
 #include <iostream>
 
-#define hipSafe(e)                                                                                                       \
+#define cudaSafe(e)                                                                                                       \
     {                                                                                                                    \
-        hipError_t err = (e);                                                                                            \
-        if (err != hipSuccess)                                                                                           \
+        cudaError_t err = (e);                                                                                            \
+        if (err != cudaSuccess)                                                                                           \
         {                                                                                                                \
-            std::cerr << "HIP error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl;  \
+            std::cerr << "CUDA error in " << __FILE__ << ":" << __LINE__ << ": " << cudaGetErrorString(err) << std::endl;  \
             std::exit(EXIT_FAILURE);                                                                                     \
         }                                                                                                                \
     }
 
-#define hipblasSafe(e)                                                                            \
+#define cublasSafe(e)                                                                            \
     {                                                                                             \
-        hipblasStatus_t err = (e);                                                                \
-        if (err != HIPBLAS_STATUS_SUCCESS)                                                        \
+        cublasStatus_t err = (e);                                                                \
+        if (err != CUBLAS_STATUS_SUCCESS)                                                        \
         {                                                                                         \
-            std::cerr << "hipBLAS error in " << __FILE__ << ":" << __LINE__ << ": " << std::endl; \
+            std::cerr << "cudaBLAS error in " << __FILE__ << ":" << __LINE__ << ": " << std::endl; \
             std::exit(EXIT_FAILURE);                                                              \
         }                                                                                         \
     }
 
-#define magmaSafe(e)                                                                                                   \
-    {                                                                                                                  \
-        magma_int_t err = (e);                                                                                         \
-        if (err != MAGMA_SUCCESS) {                                                                                    \
-            std::cerr << "MAGMA error in " << __FILE__ << ":" << __LINE__ << ": " << magma_strerror(err) << std::endl; \
-            std::exit(EXIT_FAILURE);                                                                                   \
-        }                                                                                                              \
-    }
-
-/*
-#define hipsolverSafe(e)                                                                            \
+#define cusolverSafe(e)                                                                            \
     {                                                                                               \
-        hipsolverStatus_t err = (e);                                                                \
-        if (err != HIPSOLVER_STATUS_SUCCESS)                                                        \
+        cusolverStatus_t err = (e);                                                                \
+        if (err != CUSOLVER_STATUS_SUCCESS)                                                        \
         {                                                                                           \
-            std::cerr << "hipSolver error in " << __FILE__ << ":" << __LINE__ << ": " << std::endl; \
+            std::cerr << "cudaSolver error in " << __FILE__ << ":" << __LINE__ << ": " << std::endl; \
             std::exit(EXIT_FAILURE);                                                                \
         }                                                                                           \
     }
-*/
 
 #endif /* GpuSafeChecks_hpp */

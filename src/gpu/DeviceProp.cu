@@ -22,8 +22,6 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include <hip/hip_runtime.h>
-
 #include "DeviceProp.hpp"
 #include "GpuSafeChecks.hpp"
 
@@ -37,13 +35,13 @@ getDevicesProperty(std::vector<std::string>& namesOfDevices,
 {
     int device_count = 0;
 
-    hipSafe(hipGetDeviceCount(&device_count));
+    cudaSafe(cudaGetDeviceCount(&device_count));
 
     for (int i = 0; i < device_count; i++)
     {
-        hipDeviceProp_t prop;
+        cudaDeviceProp prop;
 
-        hipSafe(hipGetDeviceProperties(&prop, i));
+        cudaSafe(cudaGetDeviceProperties(&prop, i));
 
         namesOfDevices.push_back(std::string(prop.name));
 

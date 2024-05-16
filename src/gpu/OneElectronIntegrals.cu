@@ -22,8 +22,6 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include <hip/hip_runtime.h>
-
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -32,7 +30,6 @@
 #include <tuple>
 #include <vector>
 
-#include "BoysFuncTable.hpp"
 #include "OneElectronIntegrals.hpp"
 #include "ErrorHandler.hpp"
 #include "GpuConstants.hpp"
@@ -49,7 +46,7 @@
 namespace gpu {  // gpu namespace
 
 __device__ void
-computeBoysFunction(double* values, const double fa, const uint32_t N, const double* bf_table, const double* ft)
+computeBoysFunctionOneE(double* values, const double fa, const uint32_t N, const double* bf_table, const double* ft)
 {
     // Note: 847 = 121 * 7
     const double* bf_data = bf_table + N * 847;
@@ -745,7 +742,7 @@ computeNuclearPotentialSS(double*         mat_V,
 
             double F0_t[1];
 
-            gpu::computeBoysFunction(F0_t, (a_i + a_j) * r2_PC, 0, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionOneE(F0_t, (a_i + a_j) * r2_PC, 0, boys_func_table, boys_func_ft);
 
             V_ij += q_c * F0_t[0];
         }
@@ -820,7 +817,7 @@ computeNuclearPotentialSP(double*         mat_V,
 
             double F1_t[2];
 
-            gpu::computeBoysFunction(F1_t, (a_i + a_j) * r2_PC, 1, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionOneE(F1_t, (a_i + a_j) * r2_PC, 1, boys_func_table, boys_func_ft);
 
             V_ij += q_c * (
 
@@ -922,7 +919,7 @@ computeNuclearPotentialSD(double*         mat_V,
 
             double F2_t[3];
 
-            gpu::computeBoysFunction(F2_t, (a_i + a_j) * r2_PC, 2, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionOneE(F2_t, (a_i + a_j) * r2_PC, 2, boys_func_table, boys_func_ft);
 
             V_ij += q_c * (
 
@@ -1044,7 +1041,7 @@ computeNuclearPotentialPP(double*         mat_V,
 
             double F2_t[3];
 
-            gpu::computeBoysFunction(F2_t, (a_i + a_j) * r2_PC, 2, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionOneE(F2_t, (a_i + a_j) * r2_PC, 2, boys_func_table, boys_func_ft);
 
             V_ij += q_c * (
 
@@ -1179,7 +1176,7 @@ computeNuclearPotentialPD(double*         mat_V,
 
             double F3_t[4];
 
-            gpu::computeBoysFunction(F3_t, (a_i + a_j) * r2_PC, 3, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionOneE(F3_t, (a_i + a_j) * r2_PC, 3, boys_func_table, boys_func_ft);
 
             V_ij += q_c * (
 
@@ -1345,7 +1342,7 @@ computeNuclearPotentialDD(double*         mat_V,
 
             double F4_t[5];
 
-            gpu::computeBoysFunction(F4_t, (a_i + a_j) * r2_PC, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionOneE(F4_t, (a_i + a_j) * r2_PC, 4, boys_func_table, boys_func_ft);
 
             V_ij += q_c * (
 
@@ -1521,7 +1518,7 @@ computeQMatrixSS(double*         mat_Q,
 
         double F0_t[1];
 
-        gpu::computeBoysFunction(F0_t, 0.0, 0, boys_func_table, boys_func_ft);
+        gpu::computeBoysFunctionOneE(F0_t, 0.0, 0, boys_func_table, boys_func_ft);
 
         const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / S1, 1.5) * exp(-a_i * a_j / S1 * r2_ij);
 
@@ -1577,7 +1574,7 @@ computeQMatrixSP(double*         mat_Q,
 
         double F1_t[2];
 
-        gpu::computeBoysFunction(F1_t, 0.0, 1, boys_func_table, boys_func_ft);
+        gpu::computeBoysFunctionOneE(F1_t, 0.0, 1, boys_func_table, boys_func_ft);
 
         const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / S1, 1.5) * exp(-a_i * a_j / S1 * r2_ij);
 
@@ -1662,7 +1659,7 @@ computeQMatrixSD(double*         mat_Q,
 
         double F2_t[3];
 
-        gpu::computeBoysFunction(F2_t, 0.0, 2, boys_func_table, boys_func_ft);
+        gpu::computeBoysFunctionOneE(F2_t, 0.0, 2, boys_func_table, boys_func_ft);
 
         const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / S1, 1.5) * exp(-a_i * a_j / S1 * r2_ij);
 
@@ -1773,7 +1770,7 @@ computeQMatrixPP(double*         mat_Q,
 
         double F2_t[3];
 
-        gpu::computeBoysFunction(F2_t, 0.0, 2, boys_func_table, boys_func_ft);
+        gpu::computeBoysFunctionOneE(F2_t, 0.0, 2, boys_func_table, boys_func_ft);
 
         const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / S1, 1.5) * exp(-a_i * a_j / S1 * r2_ij);
 
@@ -1895,7 +1892,7 @@ computeQMatrixPD(double*         mat_Q,
 
         double F3_t[4];
 
-        gpu::computeBoysFunction(F3_t, 0.0, 3, boys_func_table, boys_func_ft);
+        gpu::computeBoysFunctionOneE(F3_t, 0.0, 3, boys_func_table, boys_func_ft);
 
         const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / S1, 1.5) * exp(-a_i * a_j / S1 * r2_ij);
 
@@ -2075,7 +2072,7 @@ computeQMatrixDD(double*         mat_Q,
 
         double F4_t[5];
 
-        gpu::computeBoysFunction(F4_t, 0.0, 4, boys_func_table, boys_func_ft);
+        gpu::computeBoysFunctionOneE(F4_t, 0.0, 4, boys_func_table, boys_func_ft);
 
         const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / S1, 1.5) * exp(-a_i * a_j / S1 * r2_ij);
 

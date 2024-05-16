@@ -28,17 +28,16 @@ USE_MKL := false
 USE_XTB := false
 
 OPENBLAS_HOME := /path/to/openblas
-MAGMA_HOME    := /path/to/magma
 
-CXX    := /opt/rocm/llvm/bin/clang++ ${shell CC --cray-print-opts=cflags} ${shell CC --cray-print-opts=libs}
+CXX    := mpicxx
 PYTHON := python3
-DEVCC  := hipcc --offload-arch=gfx90a
+DEVCC  := nvcc -gencode arch=compute_80,code=sm_80
 
 CXX_REL_FLG := -fopenmp -std=c++17
 CXX_DEB_FLG := -fopenmp -std=c++17
 
-MATH_INC := -I$(OPENBLAS_HOME)/include -I$(MAGMA_HOME)/include
-MATH_LIB := -L$(OPENBLAS_HOME)/lib -L$(MAGMA_HOME)/lib -lopenblas -lmagma
+MATH_INC := -I$(OPENBLAS_HOME)/include
+MATH_LIB := -L$(OPENBLAS_HOME)/lib -lopenblas
 
 PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")
@@ -48,10 +47,10 @@ PYTHON_INC += $(shell $(PYTHON) -m pybind11 --includes)
 CXX_REL_FLG += -fPIC $(PYTHON_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC)
 
-DEVCC_REL_FLG := -fPIC -fopenmp -std=c++17
-DEVCC_DEB_FLG := -fPIC -fopenmp -std=c++17
-DEVICE_LIB := -lhipblas
-#DEVICE_LIB := -lhipblas -lhipsolver
+DEVCC_REL_FLG := -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++17
+DEVCC_DEB_FLG := -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++17
+#DEVICE_LIB := -lcublas
+DEVICE_LIB := -lcudart -lcublas -lcusolver
 
 MACLIBS :=
 

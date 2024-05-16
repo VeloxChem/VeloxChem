@@ -22,12 +22,77 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include <hip/hip_runtime.h>
-
-#include "BoysFuncGPU.hpp"
 #include "EriCoulomb.hpp"
 
 namespace gpu {  // gpu namespace
+
+__device__ void
+computeBoysFunctionEriJ(double* values, const double fa, const uint32_t N, const double* bf_table, const double* ft)
+{
+    // Note: 847 = 121 * 7
+    const double* bf_data = bf_table + N * 847;
+
+    uint32_t pnt = (fa > 1.0e5) ? 1000000 : static_cast<uint32_t>(10.0 * fa + 0.5);
+
+    if (pnt < 121)
+    {
+        const double w = fa - 0.1 * pnt;
+
+        const double w2 = w * w;
+
+        const double w4 = w2 * w2;
+
+        values[N] = bf_data[pnt * 7 + 0] + bf_data[pnt * 7 + 1] * w + bf_data[pnt * 7 + 2] * w2 + bf_data[pnt * 7 + 3] * w2 * w
+
+                    + bf_data[pnt * 7 + 4] * w4 + bf_data[pnt * 7 + 5] * w4 * w + bf_data[pnt * 7 + 6] * w4 * w2;
+
+        const double f2a = fa + fa;
+
+        const double fx = exp(-fa);
+
+        for (uint32_t j = 0; j < N; j++)
+        {
+            values[N - j - 1] = ft[N - j - 1] * (f2a * values[N - j] + fx);
+        }
+    }
+    else
+    {
+        const double fia = 1.0 / fa;
+
+        double pf = 0.5 * fia;
+
+        values[0] = MATH_CONST_HALF_SQRT_PI * sqrt(fia);
+
+        if (pnt < 921)
+        {
+            const double fia2 = fia * fia;
+
+            const double f = 0.4999489092 * fia - 0.2473631686 * fia2 + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+
+            const double fx = exp(-fa);
+
+            values[0] -= f * fx;
+
+            const double rterm = pf * fx;
+
+            for (uint32_t j = 1; j <= N; j++)
+            {
+                values[j] = pf * values[j - 1] - rterm;
+
+                pf += fia;
+            }
+        }
+        else
+        {
+            for (uint32_t j = 1; j <= N; j++)
+            {
+                values[j] = pf * values[j - 1];
+
+                pf += fia;
+            }
+        }
+    }
+}
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSSSS(double*         mat_J,
@@ -128,7 +193,7 @@ computeCoulombFockSSSS(double*         mat_J,
 
             double F0_t[1];
 
-            gpu::computeBoysFunction(F0_t, S1 * S2 / S4 * r2_PQ, 0, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F0_t, S1 * S2 / S4 * r2_PQ, 0, boys_func_table, boys_func_ft);
 
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
@@ -269,7 +334,7 @@ computeCoulombFockSSSP(double*         mat_J,
 
             double F1_t[2];
 
-            gpu::computeBoysFunction(F1_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F1_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -431,7 +496,7 @@ computeCoulombFockSSSD(double*         mat_J,
 
             double F2_t[3];
 
-            gpu::computeBoysFunction(F2_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F2_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
             const auto QD_0 = (-a_k / S2) * rkl[d0];
             const auto QD_1 = (-a_k / S2) * rkl[d1];
@@ -617,7 +682,7 @@ computeCoulombFockSSPP(double*         mat_J,
 
             double F2_t[3];
 
-            gpu::computeBoysFunction(F2_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F2_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
             const auto QC_0 = (a_l / S2) * rkl[c0];
             const auto QD_0 = (-a_k / S2) * rkl[d0];
@@ -816,7 +881,7 @@ computeCoulombFockSSPD(double*         mat_J,
 
             double F3_t[4];
 
-            gpu::computeBoysFunction(F3_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F3_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
             const auto QC_0 = (a_l / S2) * rkl[c0];
             const auto QD_0 = (-a_k / S2) * rkl[d0];
@@ -1035,7 +1100,7 @@ computeCoulombFockSSDD(double*         mat_J,
 
             double F4_t[5];
 
-            gpu::computeBoysFunction(F4_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F4_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto QC_0 = (a_l / S2) * rkl[c0];
             const auto QC_1 = (a_l / S2) * rkl[c1];
@@ -1293,7 +1358,7 @@ computeCoulombFockSPSS(double*         mat_J,
 
             double F1_t[2];
 
-            gpu::computeBoysFunction(F1_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F1_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -1449,7 +1514,7 @@ computeCoulombFockSPSP(double*         mat_J,
 
             double F2_t[3];
 
-            gpu::computeBoysFunction(F2_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F2_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
             const auto PB_0 = (-a_i / S1) * rij[b0];
             const auto QD_0 = (-a_k / S2) * rkl[d0];
@@ -1646,7 +1711,7 @@ computeCoulombFockSPSD(double*         mat_J,
 
             double F3_t[4];
 
-            gpu::computeBoysFunction(F3_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F3_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
             const auto PB_0 = (-a_i / S1) * rij[b0];
             const auto QD_0 = (-a_k / S2) * rkl[d0];
@@ -1864,7 +1929,7 @@ computeCoulombFockSPPP(double*         mat_J,
 
             double F3_t[4];
 
-            gpu::computeBoysFunction(F3_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F3_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
             const auto PB_0 = (-a_i / S1) * rij[b0];
             const auto QC_0 = (a_l / S2) * rkl[c0];
@@ -2097,7 +2162,7 @@ computeCoulombFockSPPD(double*         mat_J,
 
             double F4_t[5];
 
-            gpu::computeBoysFunction(F4_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F4_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PB_0 = (-a_i / S1) * rij[b0];
             const auto QC_0 = (a_l / S2) * rkl[c0];
@@ -2372,7 +2437,7 @@ computeCoulombFockPPSS(double*         mat_J,
 
             double F2_t[3];
 
-            gpu::computeBoysFunction(F2_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F2_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -2563,7 +2628,7 @@ computeCoulombFockPPSP(double*         mat_J,
 
             double F3_t[4];
 
-            gpu::computeBoysFunction(F3_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F3_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -2791,7 +2856,7 @@ computeCoulombFockSDSS(double*         mat_J,
 
             double F2_t[3];
 
-            gpu::computeBoysFunction(F2_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F2_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
             const auto PB_0 = (-a_i / S1) * rij[b0];
             const auto PB_1 = (-a_i / S1) * rij[b1];
@@ -2990,7 +3055,7 @@ computeCoulombFockSDSP(double*         mat_J,
 
             double F3_t[4];
 
-            gpu::computeBoysFunction(F3_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F3_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
             const auto PB_0 = (-a_i / S1) * rij[b0];
             const auto PB_1 = (-a_i / S1) * rij[b1];
@@ -3217,7 +3282,7 @@ computeCoulombFockPDSS(double*         mat_J,
 
             double F3_t[4];
 
-            gpu::computeBoysFunction(F3_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F3_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -3442,7 +3507,7 @@ computeCoulombFockPDSP(double*         mat_J,
 
             double F4_t[5];
 
-            gpu::computeBoysFunction(F4_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F4_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -3730,7 +3795,7 @@ computeCoulombFockDDSS(double*         mat_J,
 
             double F4_t[5];
 
-            gpu::computeBoysFunction(F4_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F4_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -4011,7 +4076,7 @@ computeCoulombFockDDPD0(double*         mat_J,
 
             double F7_t[2];
 
-            gpu::computeBoysFunction(F7_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -4361,7 +4426,7 @@ computeCoulombFockDDPD1(double*         mat_J,
 
             double F7_t[3];
 
-            gpu::computeBoysFunction(F7_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -4790,7 +4855,7 @@ computeCoulombFockDDPD2(double*         mat_J,
 
             double F7_t[3];
 
-            gpu::computeBoysFunction(F7_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -5051,7 +5116,7 @@ computeCoulombFockDDPD3(double*         mat_J,
 
             double F7_t[3];
 
-            gpu::computeBoysFunction(F7_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -5534,7 +5599,7 @@ computeCoulombFockDDPD4(double*         mat_J,
 
             double F7_t[4];
 
-            gpu::computeBoysFunction(F7_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -6368,7 +6433,7 @@ computeCoulombFockDDPD5(double*         mat_J,
 
             double F7_t[5];
 
-            gpu::computeBoysFunction(F7_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -6678,7 +6743,7 @@ computeCoulombFockDDPD6(double*         mat_J,
 
             double F7_t[5];
 
-            gpu::computeBoysFunction(F7_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -6974,7 +7039,7 @@ computeCoulombFockDDPD7(double*         mat_J,
 
             double F7_t[5];
 
-            gpu::computeBoysFunction(F7_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -7349,7 +7414,7 @@ computeCoulombFockDDPD8(double*         mat_J,
 
             double F7_t[5];
 
-            gpu::computeBoysFunction(F7_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -7634,7 +7699,7 @@ computeCoulombFockDDPD9(double*         mat_J,
 
             double F7_t[8];
 
-            gpu::computeBoysFunction(F7_t, S1 * S2 / S4 * r2_PQ, 7, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 7, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -8096,7 +8161,7 @@ computeCoulombFockDDDD0(double*         mat_J,
 
             double F8_t[2];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -8468,7 +8533,7 @@ computeCoulombFockDDDD1(double*         mat_J,
 
             double F8_t[2];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -8901,7 +8966,7 @@ computeCoulombFockDDDD2(double*         mat_J,
 
             double F8_t[2];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -9097,7 +9162,7 @@ computeCoulombFockDDDD3(double*         mat_J,
 
             double F8_t[2];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -9365,7 +9430,7 @@ computeCoulombFockDDDD4(double*         mat_J,
 
             double F8_t[2];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -9648,7 +9713,7 @@ computeCoulombFockDDDD5(double*         mat_J,
 
             double F8_t[3];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -10273,7 +10338,7 @@ computeCoulombFockDDDD6(double*         mat_J,
 
             double F8_t[3];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -10826,7 +10891,7 @@ computeCoulombFockDDDD7(double*         mat_J,
 
             double F8_t[3];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -11343,7 +11408,7 @@ computeCoulombFockDDDD8(double*         mat_J,
 
             double F8_t[3];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -11715,7 +11780,7 @@ computeCoulombFockDDDD9(double*         mat_J,
 
             double F8_t[4];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -12163,7 +12228,7 @@ computeCoulombFockDDDD10(double*         mat_J,
 
             double F8_t[4];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -13382,7 +13447,7 @@ computeCoulombFockDDDD11(double*         mat_J,
 
             double F8_t[4];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -14177,7 +14242,7 @@ computeCoulombFockDDDD12(double*         mat_J,
 
             double F8_t[5];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -14950,7 +15015,7 @@ computeCoulombFockDDDD13(double*         mat_J,
 
             double F8_t[5];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -15551,7 +15616,7 @@ computeCoulombFockDDDD14(double*         mat_J,
 
             double F8_t[5];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -16161,7 +16226,7 @@ computeCoulombFockDDDD15(double*         mat_J,
 
             double F8_t[5];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -16552,7 +16617,7 @@ computeCoulombFockDDDD16(double*         mat_J,
 
             double F8_t[5];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -16798,7 +16863,7 @@ computeCoulombFockDDDD17(double*         mat_J,
 
             double F8_t[6];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -17172,7 +17237,7 @@ computeCoulombFockDDDD18(double*         mat_J,
 
             double F8_t[6];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -17855,7 +17920,7 @@ computeCoulombFockDDDD19(double*         mat_J,
 
             double F8_t[6];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -18465,7 +18530,7 @@ computeCoulombFockDDDD20(double*         mat_J,
 
             double F8_t[6];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -18711,7 +18776,7 @@ computeCoulombFockDDDD21(double*         mat_J,
 
             double F8_t[7];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -18962,7 +19027,7 @@ computeCoulombFockDDDD22(double*         mat_J,
 
             double F8_t[7];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -19186,7 +19251,7 @@ computeCoulombFockDDDD23(double*         mat_J,
 
             double F8_t[9];
 
-            gpu::computeBoysFunction(F8_t, S1 * S2 / S4 * r2_PQ, 8, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 8, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -19690,7 +19755,7 @@ computeCoulombFockDDPP(double*         mat_J,
 
             double F6_t[7];
 
-            gpu::computeBoysFunction(F6_t, S1 * S2 / S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 / S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -20796,7 +20861,7 @@ computeCoulombFockDDSD(double*         mat_J,
 
             double F6_t[7];
 
-            gpu::computeBoysFunction(F6_t, S1 * S2 / S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 / S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -21900,7 +21965,7 @@ computeCoulombFockDDSP(double*         mat_J,
 
             double F5_t[6];
 
-            gpu::computeBoysFunction(F5_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F5_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PA_1 = (a_j / S1) * rij[a1];
@@ -22444,7 +22509,7 @@ computeCoulombFockPDDD0(double*         mat_J,
 
             double F7_t[2];
 
-            gpu::computeBoysFunction(F7_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -22900,7 +22965,7 @@ computeCoulombFockPDDD1(double*         mat_J,
 
             double F7_t[3];
 
-            gpu::computeBoysFunction(F7_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -23369,7 +23434,7 @@ computeCoulombFockPDDD2(double*         mat_J,
 
             double F7_t[4];
 
-            gpu::computeBoysFunction(F7_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -24024,7 +24089,7 @@ computeCoulombFockPDDD3(double*         mat_J,
 
             double F7_t[4];
 
-            gpu::computeBoysFunction(F7_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -24649,7 +24714,7 @@ computeCoulombFockPDDD4(double*         mat_J,
 
             double F7_t[5];
 
-            gpu::computeBoysFunction(F7_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -25358,7 +25423,7 @@ computeCoulombFockPDDD5(double*         mat_J,
 
             double F7_t[8];
 
-            gpu::computeBoysFunction(F7_t, S1 * S2 / S4 * r2_PQ, 7, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 7, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -25851,7 +25916,7 @@ computeCoulombFockPDPD(double*         mat_J,
 
             double F6_t[7];
 
-            gpu::computeBoysFunction(F6_t, S1 * S2 / S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 / S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -26950,7 +27015,7 @@ computeCoulombFockPDPP(double*         mat_J,
 
             double F5_t[6];
 
-            gpu::computeBoysFunction(F5_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F5_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -27550,7 +27615,7 @@ computeCoulombFockPDSD(double*         mat_J,
 
             double F5_t[6];
 
-            gpu::computeBoysFunction(F5_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F5_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -28146,7 +28211,7 @@ computeCoulombFockSDDD(double*         mat_J,
 
             double F6_t[7];
 
-            gpu::computeBoysFunction(F6_t, S1 * S2 / S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 / S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
             const auto PB_0 = (-a_i / S1) * rij[b0];
             const auto PB_1 = (-a_i / S1) * rij[b1];
@@ -29248,7 +29313,7 @@ computeCoulombFockSDPD(double*         mat_J,
 
             double F5_t[6];
 
-            gpu::computeBoysFunction(F5_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F5_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
             const auto PB_0 = (-a_i / S1) * rij[b0];
             const auto PB_1 = (-a_i / S1) * rij[b1];
@@ -29839,7 +29904,7 @@ computeCoulombFockSDPP(double*         mat_J,
 
             double F4_t[5];
 
-            gpu::computeBoysFunction(F4_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F4_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PB_0 = (-a_i / S1) * rij[b0];
             const auto PB_1 = (-a_i / S1) * rij[b1];
@@ -30144,7 +30209,7 @@ computeCoulombFockSDSD(double*         mat_J,
 
             double F4_t[5];
 
-            gpu::computeBoysFunction(F4_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F4_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PB_0 = (-a_i / S1) * rij[b0];
             const auto PB_1 = (-a_i / S1) * rij[b1];
@@ -30447,7 +30512,7 @@ computeCoulombFockPPDD(double*         mat_J,
 
             double F6_t[7];
 
-            gpu::computeBoysFunction(F6_t, S1 * S2 / S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 / S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -31551,7 +31616,7 @@ computeCoulombFockPPPD(double*         mat_J,
 
             double F5_t[6];
 
-            gpu::computeBoysFunction(F5_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F5_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -32135,7 +32200,7 @@ computeCoulombFockPPPP(double*         mat_J,
 
             double F4_t[5];
 
-            gpu::computeBoysFunction(F4_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F4_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -32445,7 +32510,7 @@ computeCoulombFockPPSD(double*         mat_J,
 
             double F4_t[5];
 
-            gpu::computeBoysFunction(F4_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F4_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
             const auto PA_0 = (a_j / S1) * rij[a0];
             const auto PB_0 = (-a_i / S1) * rij[b0];
@@ -32755,7 +32820,7 @@ computeCoulombFockSPDD(double*         mat_J,
 
             double F5_t[6];
 
-            gpu::computeBoysFunction(F5_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunctionEriJ(F5_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
             const auto PB_0 = (-a_i / S1) * rij[b0];
             const auto QC_0 = (a_l / S2) * rkl[c0];
