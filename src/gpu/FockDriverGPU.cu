@@ -7784,7 +7784,36 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block DDDS");
 
-        gpu::computeExchangeFockDDDS<<<num_blocks,threads_per_block>>>(
+        gpu::computeExchangeFockDDDS0<<<num_blocks, threads_per_block>>>(
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           ds_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_Q_K_ds,
+                           d_D_inds_K_dd,
+                           d_D_inds_K_ds,
+                           d_pair_displs_K_dd,
+                           d_pair_displs_K_ds,
+                           d_pair_counts_K_dd,
+                           d_pair_counts_K_ds,
+                           d_pair_data_K_dd,
+                           d_pair_data_K_ds,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        gpu::computeExchangeFockDDDS1<<<num_blocks, threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
