@@ -1132,7 +1132,28 @@ computeCoulombFockDDPP1(double*         mat_J,
 
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDSD(double*         mat_J,
+computeCoulombFockDDSD0(double*         mat_J,
+                       const double*   s_prim_info,
+                       const uint32_t  s_prim_count,
+                       const double*   d_prim_info,
+                       const uint32_t  d_prim_count,
+                       const double*   sd_mat_D,
+                       const double*   dd_mat_Q_local,
+                       const double*   sd_mat_Q,
+                       const uint32_t* dd_first_inds_local,
+                       const uint32_t* dd_second_inds_local,
+                       const double*   dd_pair_data_local,
+                       const uint32_t  dd_prim_pair_count_local,
+                       const uint32_t* sd_first_inds,
+                       const uint32_t* sd_second_inds,
+                       const double*   sd_pair_data,
+                       const uint32_t  sd_prim_pair_count,
+                       const double*   boys_func_table,
+                       const double*   boys_func_ft,
+                       const double    eri_threshold);
+
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombFockDDSD1(double*         mat_J,
                        const double*   s_prim_info,
                        const uint32_t  s_prim_count,
                        const double*   d_prim_info,
