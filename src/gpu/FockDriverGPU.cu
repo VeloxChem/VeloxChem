@@ -8038,7 +8038,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block DDDP");
 
-        gpu::computeExchangeFockDDDP0<<<num_blocks,threads_per_block>>>(
+        gpu::computeExchangeFockDDDP0<<<num_blocks, threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -8067,7 +8067,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDP1<<<num_blocks,threads_per_block>>>(
+        gpu::computeExchangeFockDDDP1<<<num_blocks, threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -8096,7 +8096,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDP2<<<num_blocks,threads_per_block>>>(
+        gpu::computeExchangeFockDDDP2<<<num_blocks, threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -8125,7 +8125,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDP3<<<num_blocks,threads_per_block>>>(
+        gpu::computeExchangeFockDDDP3<<<num_blocks, threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -8154,7 +8154,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDP4<<<num_blocks,threads_per_block>>>(
+        gpu::computeExchangeFockDDDP4<<<num_blocks, threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -8183,7 +8183,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDP5<<<num_blocks,threads_per_block>>>(
+        gpu::computeExchangeFockDDDP5<<<num_blocks, threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -8212,7 +8212,65 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpu::computeExchangeFockDDDP6<<<num_blocks,threads_per_block>>>(
+        gpu::computeExchangeFockDDDP6<<<num_blocks, threads_per_block>>>(
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_Q_K_dp,
+                           d_D_inds_K_dd,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_dd,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_dd,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_dd,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        gpu::computeExchangeFockDDDP7<<<num_blocks, threads_per_block>>>(
+                           d_mat_K,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_Q_K_dp,
+                           d_D_inds_K_dd,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_dd,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_dd,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_dd,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        gpu::computeExchangeFockDDDP8<<<num_blocks, threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
