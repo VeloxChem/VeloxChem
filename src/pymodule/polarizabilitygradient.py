@@ -297,14 +297,14 @@ class PolarizabilityGradient():
                 lambda_ao += lambda_ao.transpose(0, 1, 3, 2)  # vir-occ
                 rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
 
-                # TODO move to separate function
-                if self._dft:
-                    if self.xcfun.is_hybrid():
-                        frac_K = self.xcfun.get_frac_exact_exchange()
-                    else:
-                        frac_K = 0.0
-                else:
-                    frac_K = 1.0
+                #if self._dft:
+                #    if self.xcfun.is_hybrid():
+                #        frac_K = self.xcfun.get_frac_exact_exchange()
+                #    else:
+                #        frac_K = 0.0
+                #else:
+                #    frac_K = 1.0
+                frac_K = self.get_k_fraction()
 
                 # initiate polarizability gradient variable with data type set in init()
                 pol_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
@@ -316,7 +316,7 @@ class PolarizabilityGradient():
                 # loop over atoms and contract integral derivatives
                 # with density matrices
                 # add the corresponding contribution to the gradient
-                # FIXME move to separate construct_gradient() function
+                # TODO move to separate construct_gradient() function
                 for i in range(natm):
 
                     integral_start_time = tm.time()
@@ -1745,6 +1745,24 @@ class PolarizabilityGradient():
                                                root=mpi_master())
 
         return polgrad_xcgrad_real + 1j * polgrad_xcgrad_imag
+
+    def get_k_fraction(self):
+        """
+        Returns the fraction prefactor for K
+        TODO: what actually is this
+
+        :return frac_k:
+            The fraction
+        """
+        if self._dft:
+            if self.xcfun.is_hybrid():
+                frac_k = self.xcfun.get_frac_exact_exchange()
+            else:
+                frac_k = 0.0
+        else:
+            frac_k = 1.0
+
+        return frac_k
 
     def _init_dft(self, molecule, scf_tensors):
         """
