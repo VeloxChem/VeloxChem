@@ -703,7 +703,7 @@ class PolOrbitalResponse(CphfSolver):
                     tot_rhs_mo = np.concatenate(
                         (tot_rhs_mo, rhs_mo.real, rhs_mo.imag))
 
-        valstr = '** Time spent on constructing the orbrsp real RHS for '
+        valstr = '** Time spent on constructing the orbrsp RHS for '
         valstr += '{} frequencies: '.format(len(self.frequencies))
         valstr += '{:.6f} sec **'.format(tm.time() - loop_start_time)
         self.ostream.print_header(valstr)
@@ -1157,7 +1157,7 @@ class PolOrbitalResponse(CphfSolver):
                 else:
                     tot_rhs_mo = np.append(tot_rhs_mo, rhs_mo, axis=0)
 
-        valstr = '** Time spent on constructing the orbrsp real RHS for '
+        valstr = '** Time spent on constructing the orbrsp RHS for '
         valstr += '{} frequencies: '.format(len(self.frequencies))
         valstr += '{:.6f} sec **'.format(tm.time() - loop_start_time)
         self.ostream.print_header(valstr)
@@ -1499,6 +1499,7 @@ class PolOrbitalResponse(CphfSolver):
                 self.cphf_results[(w)]['lambda_mo'] = cphf_ov
 
         if self.rank == mpi_master():
+            self.ostream.print_blank()
             valstr = '** Time spent on constructing omega multipliers '
             valstr += 'for {} frequencies: '.format(n_freqs)
             valstr += '{:.6f} sec **'.format(tm.time() - loop_start_time)
