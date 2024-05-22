@@ -261,8 +261,8 @@ class PolarizabilityGradient():
         for f, w in enumerate(self.frequencies):
             info_msg = 'Building gradient for frequency = {:4.3f}'.format(w)
             self.ostream.print_info(info_msg)
-            self.ostream.flush()
             self.ostream.print_blank()
+            self.ostream.flush()
 
             if self.rank == mpi_master():
                 orbrsp_results = all_orbrsp_results[w]
@@ -290,6 +290,7 @@ class PolarizabilityGradient():
                 # transform lambda multipliers to AO basis and
                 # calculate relaxed density matrix
                 # mi,xia,nm->xmn
+                # FIXME dimensions upper triangular only
                 lambda_ao = np.array([
                     np.linalg.multi_dot([mo_occ, lambda_mo[x], mo_vir.T])
                     for x in range(dof**2)]).reshape(dof, dof, nao, nao)
@@ -304,7 +305,7 @@ class PolarizabilityGradient():
                 #        frac_K = 0.0
                 #else:
                 #    frac_K = 1.0
-                frac_K = self.get_k_fraction()
+                #frac_K = self.get_k_fraction()
 
                 # initiate polarizability gradient variable with data type set in init()
                 pol_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
@@ -316,12 +317,10 @@ class PolarizabilityGradient():
                 # loop over atoms and contract integral derivatives
                 # with density matrices
                 # add the corresponding contribution to the gradient
-                # TODO move to separate construct_gradient() function
                 for i in range(natm):
 
-                    integral_start_time = tm.time()
-
                     # importing integral derivatives from pyscf
+                    integral_start_time = tm.time()
                     d_ovlp = overlap_deriv(molecule, basis, i)
                     d_hcore = hcore_deriv(molecule, basis, i)
                     d_eri = eri_deriv(molecule, basis, i)
@@ -335,105 +334,117 @@ class PolarizabilityGradient():
                     self.ostream.print_blank()
                     self.ostream.flush()
 
-                    gradient_start_time = tm.time()
-                    # Calculate the analytic polarizability gradient
-                    # FIXME loop upper triangular only
-                    for x in range(dof):
-                        for y in range(dof):
-                            for a in range(3):
-                                pol_gradient[x, y, i, a] += (
-                                    np.linalg.multi_dot([ # xymn,amn->xya
-                                        2.0 * rel_dm_ao[x, y].reshape(nao**2),
-                                        d_hcore[a].reshape(nao**2)
-                                    ]) + 1.0 * np.linalg.multi_dot([ # xymn,amn->xya
-                                        2.0 * omega_ao[x, y].reshape(nao**2),
-                                        d_ovlp[a].reshape(nao * nao)
-                                    ]) + 2.0 * np.linalg.multi_dot([ # mt,xynp,amtnp->xya
-                                        gs_dm.reshape(nao**2), d_eri[a].reshape(
-                                            nao**2, nao**2),
-                                        2.0 * rel_dm_ao[x, y].reshape(nao**2)
-                                    ]) - 1.0 * frac_K * np.linalg.multi_dot([ # mt,xynp,amnpt->xya
-                                        gs_dm.reshape(nao**2),
-                                        d_eri[a].transpose(0, 3, 1, 2).reshape(
-                                            nao**2, nao**2),
-                                        2.0 * rel_dm_ao[x, y].reshape(nao**2)
-                                    ]) + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->xya
-                                        x_plus_y[x].reshape(nao**2),
-                                        d_eri[a].transpose(2, 3, 1, 0).reshape(
-                                            nao**2, nao**2),
-                                        (x_plus_y[y] - x_plus_y[y].T).reshape(
-                                            nao**2)
-                                    ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->xya
-                                        x_plus_y[x].reshape(nao**2),
-                                        d_eri[a].transpose(2, 1, 3, 0).reshape(
-                                            nao**2, nao**2),
-                                        (x_plus_y[y] - x_plus_y[y].T).reshape(
-                                            nao**2)
-                                    ]) + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->xya
-                                        x_minus_y[x].reshape(nao**2),
-                                        d_eri[a].transpose(2, 3, 1, 0).reshape(
-                                            nao**2, nao**2),
-                                        (x_minus_y[y] + x_minus_y[y].T).reshape(
-                                            nao**2)
-                                    ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->xya
-                                        x_minus_y[x].reshape(nao**2),
-                                        d_eri[a].transpose(2, 1, 3, 0).reshape(
-                                            nao**2, nao**2),
-                                        (x_minus_y[y] + x_minus_y[y].T).reshape(
-                                            nao**2)
-                                    ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->xya
-                                        x_minus_y[x].reshape(nao**2),
-                                        d_dipole[y, a].reshape(nao**2)
-                                    ]))
+                    pol_gradient[:,:,i,:] = self.construct_scf_polgrad(
+                        gs_dm, rel_dm_ao, omega_ao, x_plus_y, x_minus_y,
+                        d_hcore, d_ovlp, d_eri, d_dipole, natm, nao, dof, i)
 
-                                pol_gradient[y, x, i, a] += (
-                                    1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->yxa
-                                        (x_plus_y[y] - x_plus_y[y].T
-                                        ).reshape(nao**2), d_eri[a].transpose(
-                                            1, 0, 2, 3).reshape(nao**2, nao**2),
-                                        x_plus_y[x].reshape(nao**2)
-                                    ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->yxa
-                                        (x_plus_y[y] - x_plus_y[y].T
-                                        ).reshape(nao**2), d_eri[a].transpose(
-                                            3, 0, 2, 1).reshape(nao**2, nao**2),
-                                        x_plus_y[x].reshape(nao**2)
-                                    ]) + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->yxa
-                                        (x_minus_y[y] + x_minus_y[y].T
-                                        ).reshape(nao**2), d_eri[a].transpose(
-                                            1, 0, 2, 3).reshape(nao**2, nao**2),
-                                        x_minus_y[x].reshape(nao**2)
-                                    ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->yxa
-                                        (x_minus_y[y] + x_minus_y[y].T
-                                        ).reshape(nao**2), d_eri[a].transpose(
-                                            3, 0, 2, 1).reshape(nao**2, nao**2),
-                                        x_minus_y[x].reshape(nao**2)
-                                    ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->yxa
-                                        d_dipole[y, a].reshape(nao**2),
-                                        x_minus_y[x].reshape(nao**2)
-                                    ]))
+                    #gradient_start_time = tm.time()
+                    ## Calculate the analytic polarizability gradient
+                    ## TODO move to separate function
+                    ## FIXME loop upper triangular only
+                    #for x in range(dof):
+                    #    for y in range(dof):
+                    #        for a in range(3):
+                    #            pol_gradient[x, y, i, a] += (
+                    #                np.linalg.multi_dot([ # xymn,amn->xya
+                    #                    2.0 * rel_dm_ao[x, y].reshape(nao**2),
+                    #                    d_hcore[a].reshape(nao**2)
+                    #                ]) + 1.0 * np.linalg.multi_dot([ # xymn,amn->xya
+                    #                    2.0 * omega_ao[x, y].reshape(nao**2),
+                    #                    d_ovlp[a].reshape(nao * nao)
+                    #                ]) + 2.0 * np.linalg.multi_dot([ # mt,xynp,amtnp->xya
+                    #                    gs_dm.reshape(nao**2), d_eri[a].reshape(
+                    #                        nao**2, nao**2),
+                    #                    2.0 * rel_dm_ao[x, y].reshape(nao**2)
+                    #                ]) - 1.0 * frac_K * np.linalg.multi_dot([ # mt,xynp,amnpt->xya
+                    #                    gs_dm.reshape(nao**2),
+                    #                    d_eri[a].transpose(0, 3, 1, 2).reshape(
+                    #                        nao**2, nao**2),
+                    #                    2.0 * rel_dm_ao[x, y].reshape(nao**2)
+                    #                ]) + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->xya
+                    #                    x_plus_y[x].reshape(nao**2),
+                    #                    d_eri[a].transpose(2, 3, 1, 0).reshape(
+                    #                        nao**2, nao**2),
+                    #                    (x_plus_y[y] - x_plus_y[y].T).reshape(
+                    #                        nao**2)
+                    #                ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->xya
+                    #                    x_plus_y[x].reshape(nao**2),
+                    #                    d_eri[a].transpose(2, 1, 3, 0).reshape(
+                    #                        nao**2, nao**2),
+                    #                    (x_plus_y[y] - x_plus_y[y].T).reshape(
+                    #                        nao**2)
+                    #                ]) + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->xya
+                    #                    x_minus_y[x].reshape(nao**2),
+                    #                    d_eri[a].transpose(2, 3, 1, 0).reshape(
+                    #                        nao**2, nao**2),
+                    #                    (x_minus_y[y] + x_minus_y[y].T).reshape(
+                    #                        nao**2)
+                    #                ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->xya
+                    #                    x_minus_y[x].reshape(nao**2),
+                    #                    d_eri[a].transpose(2, 1, 3, 0).reshape(
+                    #                        nao**2, nao**2),
+                    #                    (x_minus_y[y] + x_minus_y[y].T).reshape(
+                    #                        nao**2)
+                    #                ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->xya
+                    #                    x_minus_y[x].reshape(nao**2),
+                    #                    d_dipole[y, a].reshape(nao**2)
+                    #                ]))
 
-                    valstr = ' * Time spent constructing pol. gradient for '
-                    valstr += 'atom #{:d}: {:.6f} sec * '.format(
-                        (i + 1),
-                        tm.time() - gradient_start_time)
-                    self.ostream.print_header(valstr)
-                    self.ostream.print_blank()
-                    self.ostream.flush()
+                    #            pol_gradient[y, x, i, a] += (
+                    #                1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->yxa
+                    #                    (x_plus_y[y] - x_plus_y[y].T
+                    #                    ).reshape(nao**2), d_eri[a].transpose(
+                    #                        1, 0, 2, 3).reshape(nao**2, nao**2),
+                    #                    x_plus_y[x].reshape(nao**2)
+                    #                ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->yxa
+                    #                    (x_plus_y[y] - x_plus_y[y].T
+                    #                    ).reshape(nao**2), d_eri[a].transpose(
+                    #                        3, 0, 2, 1).reshape(nao**2, nao**2),
+                    #                    x_plus_y[x].reshape(nao**2)
+                    #                ]) + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->yxa
+                    #                    (x_minus_y[y] + x_minus_y[y].T
+                    #                    ).reshape(nao**2), d_eri[a].transpose(
+                    #                        1, 0, 2, 3).reshape(nao**2, nao**2),
+                    #                    x_minus_y[x].reshape(nao**2)
+                    #                ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->yxa
+                    #                    (x_minus_y[y] + x_minus_y[y].T
+                    #                    ).reshape(nao**2), d_eri[a].transpose(
+                    #                        3, 0, 2, 1).reshape(nao**2, nao**2),
+                    #                    x_minus_y[x].reshape(nao**2)
+                    #                ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->yxa
+                    #                    d_dipole[y, a].reshape(nao**2),
+                    #                    x_minus_y[x].reshape(nao**2)
+                    #                ]))
+
+                    #valstr = ' * Time spent constructing pol. gradient for '
+                    #valstr += 'atom #{:d}: {:.6f} sec * '.format(
+                    #    (i + 1),
+                    #    tm.time() - gradient_start_time)
+                    #self.ostream.print_header(valstr)
+                    #self.ostream.print_blank()
+                    #self.ostream.flush()
             else:
                 pol_gradient = None
 
-            pol_gradient = self.comm.bcast(pol_gradient, root=mpi_master())
+            #pol_gradient = self.comm.bcast(pol_gradient, root=mpi_master())
 
             # Add exchange-correlation contributions to the gradient
-            # for now by looping over each component of the polarizability
             if self._dft:
                 xcfun_label = self.xcfun.get_func_label()
-                if self.is_complex:
-                    xc_pol_gradient = self.add_polgrad_xc_contrib_complex(
-                        molecule, basis, gs_dm, rel_dm_ao, x_minus_y, xcfun_label)
+                polgrad_xc_contrib = self.compute_polgrad_xc_contrib(
+                    molecule, basis, gs_dm, rel_dm_ao, x_minus_y, xcfun_label)
 
-                    if self.rank == mpi_master():
-                        pol_gradient += xc_pol_gradient
+                if self.rank == mpi_master():
+                    pol_gradient += polgrad_xc_contrib
+
+            pol_gradient = self.comm.bcast(pol_gradient, root=mpi_master())
+
+                #if self.is_complex:
+                #    xc_pol_gradient = self.add_polgrad_xc_contrib_complex(
+                #        molecule, basis, gs_dm, rel_dm_ao, x_minus_y, xcfun_label)
+
+                    #if self.rank == mpi_master():
+                    #    pol_gradient += xc_pol_gradient
 
                     #for m in range(dof):
                     #    for n in range(dof):
@@ -502,12 +513,12 @@ class PolarizabilityGradient():
 
                     #        if self.rank == mpi_master():
                     #            pol_gradient[m, n] += polgrad_xcgrad
-                else: # Real
-                    xc_pol_gradient = self.add_polgrad_xc_contrib_real(
-                        molecule, basis, gs_dm, rel_dm_ao, x_minus_y, xcfun_label)
+                #else: # Real
+                #    xc_pol_gradient = self.add_polgrad_xc_contrib_real(
+                #        molecule, basis, gs_dm, rel_dm_ao, x_minus_y, xcfun_label)
 
-                    if self.rank == mpi_master():
-                        pol_gradient += xc_pol_gradient
+                #     if self.rank == mpi_master():
+                #         pol_gradient += xc_pol_gradient
 
                     #for m in range(dof):
                     #    for n in range(dof):
@@ -551,7 +562,6 @@ class PolarizabilityGradient():
                     #        if self.rank == mpi_master():
                     #            pol_gradient[m, n] += polgrad_xcgrad
 
-            #pol_gradient = self.comm.bcast(pol_gradient, root=mpi_master())
             if self.rank == mpi_master():
                 polgrad_results[w] = pol_gradient.reshape(dof, dof, 3 * natm)
 
@@ -566,7 +576,6 @@ class PolarizabilityGradient():
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
-    ## END WIP
 
 #    def compute_analytical_real(self, molecule, basis, scf_tensors, lr_results):
 #        """
@@ -1424,10 +1433,171 @@ class PolarizabilityGradient():
         scf_drv.ostream.unmute()
         cpp_drv.ostream.unmute()
 
-    def add_polgrad_xc_contrib_real(self, molecule, ao_basis, gs_dm, rel_dm_ao,
+    def construct_scf_polgrad(self, gs_dm, rel_dm_ao, omega_ao, x_plus_y, x_minus_y,
+                              d_hcore, d_ovlp, d_eri, d_dipole, natm, nao, dof, idx):
+        """
+        Constructs the SCF polarizability gradient
+
+        :param gs_dm:
+            The ground state density matrix.
+        :param rel_dm_ao:
+            The relaxed one-particle density matrix in AO basis.
+        :param omega_ao:
+            The omega Lagrangian multipliers.
+        :param x_plus_y:
+            The X+Y response vectors.
+        :param x_minus_y:
+            The X-Y response vectors.
+        :param d_hcore:
+            The derivative H_core integrals.
+        :param d_ovlp:
+            The derivative overlap integrals.
+        :param d_eri:
+            The derivative electron-repulsion integrals.
+        :param d_dipole:
+            The derivative dipole moment integrals.
+        :param natm:
+            The number of atoms.
+        :param nao:
+            The number of atomic orbitals.
+        :param dof:
+            Degrees of freedom of Lagrangian.
+        :param idx:
+            The index of the atom.
+
+        :return scf_polgrad:
+            The SCF polarizability gradient.
+        """
+
+        frac_K = self.get_k_fraction()
+        scf_polgrad = np.zeros((dof, dof, 3), dtype=self.grad_dt)
+
+        gradient_start_time = tm.time()
+
+        # Calculate the analytic polarizability gradient
+        # FIXME loop upper triangular only
+        for x in range(dof):
+            for y in range(dof):
+                for a in range(3):
+                    #scf_polgrad[x, y, idx, a] += (
+                    scf_polgrad[x, y, a] += (
+                        np.linalg.multi_dot([ # xymn,amn->xya
+                            2.0 * rel_dm_ao[x, y].reshape(nao**2),
+                            d_hcore[a].reshape(nao**2)
+                        ]) + 1.0 * np.linalg.multi_dot([ # xymn,amn->xya
+                            2.0 * omega_ao[x, y].reshape(nao**2),
+                            d_ovlp[a].reshape(nao * nao)
+                        ]) + 2.0 * np.linalg.multi_dot([ # mt,xynp,amtnp->xya
+                            gs_dm.reshape(nao**2), d_eri[a].reshape(
+                                nao**2, nao**2),
+                            2.0 * rel_dm_ao[x, y].reshape(nao**2)
+                        ]) - 1.0 * frac_K * np.linalg.multi_dot([ # mt,xynp,amnpt->xya
+                            gs_dm.reshape(nao**2),
+                            d_eri[a].transpose(0, 3, 1, 2).reshape(
+                                nao**2, nao**2),
+                            2.0 * rel_dm_ao[x, y].reshape(nao**2)
+                        ]) + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->xya
+                            x_plus_y[x].reshape(nao**2),
+                            d_eri[a].transpose(2, 3, 1, 0).reshape(
+                                nao**2, nao**2),
+                            (x_plus_y[y] - x_plus_y[y].T).reshape(
+                                nao**2)
+                        ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->xya
+                            x_plus_y[x].reshape(nao**2),
+                            d_eri[a].transpose(2, 1, 3, 0).reshape(
+                                nao**2, nao**2),
+                            (x_plus_y[y] - x_plus_y[y].T).reshape(
+                                nao**2)
+                        ]) + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->xya
+                            x_minus_y[x].reshape(nao**2),
+                            d_eri[a].transpose(2, 3, 1, 0).reshape(
+                                nao**2, nao**2),
+                            (x_minus_y[y] + x_minus_y[y].T).reshape(
+                                nao**2)
+                        ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->xya
+                            x_minus_y[x].reshape(nao**2),
+                            d_eri[a].transpose(2, 1, 3, 0).reshape(
+                                nao**2, nao**2),
+                            (x_minus_y[y] + x_minus_y[y].T).reshape(
+                                nao**2)
+                        ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->xya
+                            x_minus_y[x].reshape(nao**2),
+                            d_dipole[y, a].reshape(nao**2)
+                        ]))
+
+                    #scf_polgrad[y, x, idx, a] += (
+                    scf_polgrad[y, x, a] += (
+                        1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->yxa
+                            (x_plus_y[y] - x_plus_y[y].T
+                            ).reshape(nao**2), d_eri[a].transpose(
+                                1, 0, 2, 3).reshape(nao**2, nao**2),
+                            x_plus_y[x].reshape(nao**2)
+                        ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->yxa
+                            (x_plus_y[y] - x_plus_y[y].T
+                            ).reshape(nao**2), d_eri[a].transpose(
+                                3, 0, 2, 1).reshape(nao**2, nao**2),
+                            x_plus_y[x].reshape(nao**2)
+                        ]) + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->yxa
+                            (x_minus_y[y] + x_minus_y[y].T
+                            ).reshape(nao**2), d_eri[a].transpose(
+                                1, 0, 2, 3).reshape(nao**2, nao**2),
+                            x_minus_y[x].reshape(nao**2)
+                        ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->yxa
+                            (x_minus_y[y] + x_minus_y[y].T
+                            ).reshape(nao**2), d_eri[a].transpose(
+                                3, 0, 2, 1).reshape(nao**2, nao**2),
+                            x_minus_y[x].reshape(nao**2)
+                        ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->yxa
+                            d_dipole[y, a].reshape(nao**2),
+                            x_minus_y[x].reshape(nao**2)
+                        ]))
+
+        valstr = ' * Time spent constructing pol. gradient for '
+        valstr += 'atom #{:d}: {:.6f} sec * '.format(
+            (idx + 1),
+            tm.time() - gradient_start_time)
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        return scf_polgrad
+
+    def compute_polgrad_xc_contrib(self, molecule, ao_basis, gs_dm, rel_dm_ao,
                                     x_minus_y, xcfun_label):
         """
-        Adds the exchange-correlation contribution to the real
+        Directs the calculation of the exchange-correlation contribution to the DFT
+        polarizability gradient.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis.
+        :param gs_dm:
+            The ground state density matrix.
+        :param rel_dm_ao:
+            The relaxed density matric in AO basis.
+        :param x_minus_y:
+            The X-Y response vector.
+        :param xcfun_label:
+            The label for the XC functional
+
+        :return xc_contrib:
+            The XC-contribution to the polarizability gradient
+        """
+
+        if self.is_complex:
+            xc_contrib = self.compute_polgrad_xc_contrib_complex(
+                molecule, ao_basis, gs_dm, rel_dm_ao, x_minus_y, xcfun_label)
+        else:
+            xc_contrib = self.compute_polgrad_xc_contrib_real(
+                molecule, ao_basis, gs_dm, rel_dm_ao, x_minus_y, xcfun_label)
+
+        return xc_contrib
+
+    def compute_polgrad_xc_contrib_real(self, molecule, ao_basis, gs_dm, rel_dm_ao,
+                                    x_minus_y, xcfun_label):
+        """
+        Calculates the exchange-correlation contribution to the real
         polarizability gradient.
 
         :param molecule:
@@ -1495,10 +1665,10 @@ class PolarizabilityGradient():
 
         return xc_pol_gradient
 
-    def add_polgrad_xc_contrib_complex(self, molecule, ao_basis, gs_dm, rel_dm_ao,
+    def compute_polgrad_xc_contrib_complex(self, molecule, ao_basis, gs_dm, rel_dm_ao,
                                     x_minus_y, xcfun_label):
         """
-        Adds the exchange-correlation contribution to the complex
+        Calculates the exchange-correlation contribution to the complex
         polarizability gradient.
 
         :param molecule:
@@ -1592,6 +1762,7 @@ class PolarizabilityGradient():
 
         return xc_pol_gradient
 
+    # TODO rename
     def grad_polgrad_xc_contrib_real(self, molecule, ao_basis, rhow_den, x_minus_y_den_m,
                                      x_minus_y_den_n, gs_density, xcfun_label):
         """
@@ -1640,6 +1811,7 @@ class PolarizabilityGradient():
 
         return polgrad_xcgrad
 
+    # TODO rename
     def grad_polgrad_xc_contrib_complex(self, molecule, ao_basis, rhow_den_real,
                                         rhow_den_imag, x_minus_y_den_real_m,
                                         x_minus_y_den_real_n, x_minus_y_den_imag_m,
@@ -1748,7 +1920,7 @@ class PolarizabilityGradient():
 
     def get_k_fraction(self):
         """
-        Returns the fraction prefactor for K
+        Determines fraction prefactor for K
         TODO: what actually is this
 
         :return frac_k:
