@@ -126,8 +126,17 @@ class PolarizabilityGradient():
 
         dft_sanity_check(self, 'update_settings')
 
-        if 'frequencies' not in orbrsp_dict:
-            orbrsp_dict['frequencies'] = self.frequencies
+        #frequencylist = []
+        #for w in self.frequencies:
+        #    frequencylist.append(w)
+        #self.frequencies = frequencylist
+        self.frequencies = list(self.frequencies)
+        #self.orbrsp_dict['frequencies'] = frequencylist
+        #if 'frequencies' not in orbrsp_dict:
+        #    orbrsp_dict['frequencies'] = self.frequencies
+        # Enforce that the same frequencies are treated ib orbital response
+        # and polgrad calculation
+        orbrsp_dict['frequencies'] = self.frequencies
 
         if self._dft and (self.grid_level is None):
             self.grid_level = get_default_grid_level(self.xcfun) 
@@ -222,11 +231,11 @@ class PolarizabilityGradient():
         """
 
         # convert sequence of frequencies to list []
-        frequencylist = []
-        for w in self.frequencies:
-            frequencylist.append(w)
-        self.frequencies = frequencylist
-        self.orbrsp_dict['frequencies'] = frequencylist
+        #frequencylist = []
+        #for w in self.frequencies:
+        #    frequencylist.append(w)
+        #self.frequencies = frequencylist
+        #self.orbrsp_dict['frequencies'] = frequencylist
 
         # compute orbital response
         orbrsp_start_time = tm.time()
