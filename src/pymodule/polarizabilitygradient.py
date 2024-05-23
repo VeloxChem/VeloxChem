@@ -287,17 +287,20 @@ class PolarizabilityGradient():
                 # add the corresponding contribution to the gradient
                 for i in range(natm):
 
-                    # timing
-                    integral_start_time = tm.time()
-                    # importing integral derivatives from pyscf
-                    d_ovlp = overlap_deriv(molecule, basis, i)
-                    d_hcore = hcore_deriv(molecule, basis, i)
-                    d_eri = eri_deriv(molecule, basis, i)
-                    d_dipole = dipole_deriv(molecule, basis, i)
+                    ## timing
+                    #integral_start_time = tm.time()
+                    ## importing integral derivatives from pyscf
+                    #d_ovlp = overlap_deriv(molecule, basis, i)
+                    #d_hcore = hcore_deriv(molecule, basis, i)
+                    #d_eri = eri_deriv(molecule, basis, i)
+                    #d_dipole = dipole_deriv(molecule, basis, i)
 
-                    valstr = ' * Time spent importing integrals for atom #{}: '.format(
-                        i + 1)
-                    valstr += '{:.6f} sec * '.format(tm.time() - integral_start_time)
+                    d_hcore, d_ovlp, d_eri, d_dipole = self.import_integrals(
+                        molecule, basis, i)
+
+                    #valstr = ' * Time spent importing integrals for atom #{}: '.format(
+                    #    i + 1)
+                    #valstr += '{:.6f} sec * '.format(tm.time() - integral_start_time)
                     self.ostream.print_header(valstr)
                     self.ostream.print_blank()
                     self.ostream.flush()
@@ -699,6 +702,46 @@ class PolarizabilityGradient():
             lr_drv.frequencies = self.frequencies
 
         return lr_drv
+
+    def import_integrals(self, molecule, basis, idx):
+        """
+        Imports integrals from PySCF for analytical polarizability
+        gradient.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The MO coefficients.
+        :param idx:
+            The atom index
+
+        :return d_hcore:
+            The derivative H_core integrals.
+        :return d_ovlp:
+            The derivative overlap integrals.
+        :return d_eri:
+            The derivative electron-repulsion integrals.
+        :return d_dipole:
+            The derivative dipole moment integrals.
+        """
+
+        # timing
+        integral_start_time = tm.time()
+
+        # importing integral derivatives from pyscf
+        d_hcore = hcore_deriv(molecule, basis, idx)
+        d_ovlp = overlap_deriv(molecule, basis, idx)
+        d_eri = eri_deriv(molecule, basis, idx)
+        d_dipole = dipole_deriv(molecule, basis, idx)
+
+        valstr = ' * Time spent importing integrals for atom #{}: '.format(
+            idx + 1)
+        valstr += '{:.6f} sec * '.format(tm.time() - integral_start_time)
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        return d_hcore, d_ovlp, d_eri, d_dipole
 
     def construct_scf_polgrad(self, gs_dm, rel_dm_ao, omega_ao, x_plus_y, x_minus_y,
                               d_hcore, d_ovlp, d_eri, d_dipole, nao, dof, idx):
