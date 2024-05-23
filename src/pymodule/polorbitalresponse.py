@@ -1497,6 +1497,7 @@ class PolOrbitalResponse(CphfSolver):
                 # add omega multipliers in AO basis to cphf_results dictionary
                 self.cphf_results[(w)]['omega_ao'] = omega
                 self.cphf_results[(w)]['lambda_mo'] = cphf_ov
+                self.cphf_results[(w)]['lambda_ao'] = cphf_ao
 
         if self.rank == mpi_master():
             self.ostream.print_blank()
@@ -1861,6 +1862,7 @@ class PolOrbitalResponse(CphfSolver):
                 # add omega multipliers in AO basis to cphf_results dictionary
                 self.cphf_results[(w)]['omega_ao'] = omega
                 self.cphf_results[(w)]['lambda_mo'] = cphf_ov
+                self.cphf_results[(w)]['lambda_ao'] = cphf_ao
 
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing omega multipliers '
