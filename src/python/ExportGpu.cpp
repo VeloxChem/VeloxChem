@@ -35,6 +35,7 @@
 #include "ExportGeneral.hpp"
 #include "FockDriverGPU.hpp"
 #include "GpuDevices.hpp"
+#include "LinearAlgebraGPU.hpp"
 #include "ScreeningData.hpp"
 
 namespace py = pybind11;
