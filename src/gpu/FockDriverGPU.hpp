@@ -56,23 +56,6 @@ auto computeFockOnGPU(const              CMolecule& molecule,
                       const double       prelink_threshold,
                       CScreeningData&    screening) -> CDenseMatrix;
 
-auto computeDotProduct(const double* A, const double* B, const int64_t size) -> double;
-
-auto computeWeightedSum(double* weighted_data, const std::vector<double>& weights, const std::vector<const double*>& pointers, const int64_t size) -> void;
-
-auto computeErrorVector(double* errvec, const double* X, const double* F, const double* D, const double* S,
-                        const int64_t nmo_inp, const int64_t nao_inp, const std::string& trans_X) -> void;
-
-auto transformMatrix(double* transformed_F, const double* X, const double* F,
-                     const int64_t nmo_inp, const int64_t nao_inp, const std::string& trans_X) -> void;
-
-auto computeMatrixMultiplication(double* C, const double* A, const double* B, const std::string& trans_A, const std::string& trans_B,
-                                 const int64_t m_inp, const int64_t k_inp, const int64_t n_inp) -> void;
-
-auto diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void;
-
-auto diagonalizeMatrixMultiGPU(double* A, double* W, const int64_t nrows_A, const int64_t num_gpus_per_node) -> void;
-
 }  // namespace gpu
 
 #endif

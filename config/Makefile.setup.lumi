@@ -27,7 +27,6 @@ USE_GPU := true
 USE_MKL := false
 USE_XTB := false
 
-OPENBLAS_HOME := /path/to/openblas
 MAGMA_HOME    := /path/to/magma
 
 CXX    := /opt/rocm/llvm/bin/clang++ ${shell CC --cray-print-opts=cflags} ${shell CC --cray-print-opts=libs}
@@ -37,8 +36,8 @@ DEVCC  := hipcc --offload-arch=gfx90a
 CXX_REL_FLG := -fopenmp -std=c++17
 CXX_DEB_FLG := -fopenmp -std=c++17
 
-MATH_INC := -I$(OPENBLAS_HOME)/include -I$(MAGMA_HOME)/include
-MATH_LIB := -L$(OPENBLAS_HOME)/lib -L$(MAGMA_HOME)/lib -lopenblas -lmagma
+MATH_INC := -I$(MAGMA_HOME)/include
+MATH_LIB := -L$(MAGMA_HOME)/lib -lmagma
 
 PYTHON_INC := $(shell $(PYTHON)-config --includes)
 PYTHON_INC += -I$(shell $(PYTHON) -c "import mpi4py; print(mpi4py.get_include())")

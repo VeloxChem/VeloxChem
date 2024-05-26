@@ -28,12 +28,12 @@
 #include "PartialCharges.hpp"
 
 #include <cmath>
+#include <cstring>
 
 #include "CoordinationNumber.hpp"
-#include "DenseDiagonalizer.hpp"
-#include "DenseLinearAlgebra.hpp"
 #include "DenseMatrix.hpp"
 #include "ErrorHandler.hpp"
+#include "LinearAlgebraGPU.hpp"
 #include "MathConst.hpp"
 #include "Molecule.hpp"
 
@@ -41,14 +41,6 @@ namespace parchg {  // parchg namespace
 
 auto
 getPartialCharges(const CMolecule& molecule, const double netcharge) -> std::vector<double>
-{
-    CDenseMatrix dqdr;
-
-    return getPartialCharges(molecule, netcharge, dqdr);
-}
-
-auto
-getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatrix& dqdr) -> std::vector<double>
 {
     // Reference: dftd4 (v2.4.0)
 
@@ -139,7 +131,7 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     CDenseMatrix Amat(natoms_1, natoms_1);
 
-    const double sqrtpi = std::sqrt(mathconst::getPiValue());
+    //const double sqrtpi = std::sqrt(mathconst::getPiValue());
 
     const double sqrt2pi = std::sqrt(2.0 / mathconst::getPiValue());
 
@@ -176,17 +168,26 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     // get partial charges
 
-    CDenseDiagonalizer diagdrv;
+    // compute Amat^-1 via diagonalization
+    auto Adim = Amat.getNumberOfRows();
+    std::vector<double> Aevals(Adim);
+    CDenseMatrix Aevecs(Amat);
+    gpu::diagonalizeMatrix(Aevecs.values(), Aevals.data(), Adim);
 
-    diagdrv.diagonalize(Amat);
+    CDenseMatrix Aevals_inv_diag(Adim, Adim);
+    Aevals_inv_diag.zero();
+    for (int64_t i = 0; i < Adim; i++)
+    {
+        Aevals_inv_diag.row(i)[i] = 1.0 / Aevals[i];
+    }
 
-    std::string err_diag("parchg::getPartialCharges: Matrix diagonalization failed");
+    CDenseMatrix Ainv(Adim, Adim);
+    gpu::transformMatrix(Ainv.values(), Aevecs.values(), Aevals_inv_diag.values(), Adim, Adim, "N");
 
-    errors::assertMsgCritical(diagdrv.getState(), err_diag);
+    // compute solution as matmul(Ainv, Xvec)
+    CDenseMatrix solution(Ainv.getNumberOfRows(), Xvec.getNumberOfColumns());
 
-    auto Ainv = diagdrv.getInvertedMatrix();
-
-    auto solution = denblas::multAB(Ainv, Xvec);
+    gpu::computeMatrixMultiplication(solution.values(), Ainv.values(), Xvec.values(), "N", "N", Ainv.getNumberOfRows(), Ainv.getNumberOfColumns(), Xvec.getNumberOfColumns());
 
     std::vector<double> partialcharges(natoms);
 
@@ -195,86 +196,9 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
         partialcharges[i] = solution.values()[i];
     }
 
-    if (dqdr.getNumberOfElements() == 0)
-    {
-        return partialcharges;
-    }
-
-    // compute derivative of partial charges
-
-    std::string err_size("parchg::getPartialCharges: Mismatch in dqdr matrix size");
-
-    errors::assertMsgCritical(dqdr.getNumberOfRows() == 3 * natoms, err_size);
-
-    errors::assertMsgCritical(dqdr.getNumberOfColumns() == natoms, err_size);
-
-    CDenseMatrix dAmatdr(3 * natoms, natoms_1);
-
-    CDenseMatrix dXvecdr(3 * natoms, natoms_1);
-
-    CDenseMatrix Afac(3, natoms);
-
-    for (int64_t i = 0; i < natoms; i++)
-    {
-        for (int64_t dj = 0; dj < 3 * natoms; dj++)
-        {
-            dXvecdr.values()[dj * natoms_1 + i] = dcndr.values()[dj * natoms + i] * Xfac.values()[i];
-        }
-
-        for (int64_t j = 0; j < i; j++)
-        {
-            std::vector<double> rij({xyzcoord[i][0] - xyzcoord[j][0], xyzcoord[i][1] - xyzcoord[j][1], xyzcoord[i][2] - xyzcoord[j][2]});
-
-            double r2 = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
-
-            double gamij = 1.0 / std::sqrt(chg_alpha[i] + chg_alpha[j]);
-
-            double arg = gamij * gamij * r2;
-
-            double dval = 2.0 * gamij * std::exp(-arg) / (sqrtpi * r2) - Amat.values()[j * natoms_1 + i] / r2;
-
-            for (int64_t d = 0; d < 3; d++)
-            {
-                auto di = d * natoms + i;
-
-                auto dj = d * natoms + j;
-
-                Afac.values()[di] += dval * rij[d] * partialcharges[j];
-
-                Afac.values()[dj] -= dval * rij[d] * partialcharges[i];
-
-                dAmatdr.values()[di * natoms_1 + j] = dval * rij[d] * partialcharges[i];
-
-                dAmatdr.values()[dj * natoms_1 + i] = -dval * rij[d] * partialcharges[j];
-            }
-        }
-    }
-
-    for (int64_t d = 0; d < 3; d++)
-    {
-        for (int64_t i = 0; i < natoms; i++)
-        {
-            auto di = d * natoms + i;
-
-            dAmatdr.values()[di * natoms_1 + i] += Afac.values()[di];
-        }
-    }
-
-    auto prod_dmat = denblas::multAB(dAmatdr, Ainv);
-
-    auto prod_dvec = denblas::multAB(dXvecdr, Ainv);
-
-    auto prod_sum = denblas::addAB(prod_dmat, prod_dvec, 1.0);
-
-    for (int64_t dj = 0; dj < 3 * natoms; dj++)
-    {
-        for (int64_t i = 0; i < natoms; i++)
-        {
-            dqdr.values()[dj * natoms + i] = -prod_sum.values()[dj * natoms_1 + i];
-        }
-    }
-
     return partialcharges;
+
+    // Note: here we do not need to compute derivative of partial charges
 }
 
 }  // namespace parchg
