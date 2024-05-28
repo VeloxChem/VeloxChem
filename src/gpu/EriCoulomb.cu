@@ -7907,8 +7907,8 @@ computeCoulombFockDDPD11(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+            // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
+            // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
             const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
                                   (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
@@ -7929,13 +7929,13 @@ computeCoulombFockDDPD11(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j / S1) * rij[a0];
-            const auto PA_1 = (a_j / S1) * rij[a1];
-            const auto PB_0 = (-a_i / S1) * rij[b0];
-            const auto PB_1 = (-a_i / S1) * rij[b1];
-            const auto QC_0 = (a_l / S2) * rkl[c0];
-            const auto QD_0 = (-a_k / S2) * rkl[d0];
-            const auto QD_1 = (-a_k / S2) * rkl[d1];
+            // auto PA_0 = (a_j / S1) * rij[a0];
+            // auto PA_1 = (a_j / S1) * rij[a1];
+            // auto PB_0 = (-a_i / S1) * rij[b0];
+            // auto PB_1 = (-a_i / S1) * rij[b1];
+            // auto QC_0 = (a_l / S2) * rkl[c0];
+            // auto QD_0 = (-a_k / S2) * rkl[d0];
+            // auto QD_1 = (-a_k / S2) * rkl[d1];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -13066,7 +13066,7 @@ computeCoulombFockDDDD12(double*         mat_J,
             const auto d1 = d_cart_inds[l % 6][1];
 
             const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+            // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
             const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
                                   (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
@@ -13091,10 +13091,10 @@ computeCoulombFockDDDD12(double*         mat_J,
             const auto PA_1 = (a_j / S1) * rij[a1];
             const auto PB_0 = (-a_i / S1) * rij[b0];
             const auto PB_1 = (-a_i / S1) * rij[b1];
-            const auto QC_0 = (a_l / S2) * rkl[c0];
-            const auto QC_1 = (a_l / S2) * rkl[c1];
-            const auto QD_0 = (-a_k / S2) * rkl[d0];
-            const auto QD_1 = (-a_k / S2) * rkl[d1];
+            // auto QC_0 = (a_l / S2) * rkl[c0];
+            // auto QC_1 = (a_l / S2) * rkl[c1];
+            // auto QD_0 = (-a_k / S2) * rkl[d0];
+            // auto QD_1 = (-a_k / S2) * rkl[d1];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -13498,7 +13498,7 @@ computeCoulombFockDDDD13(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
+            // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
             const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
@@ -13520,10 +13520,10 @@ computeCoulombFockDDDD13(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j / S1) * rij[a0];
-            const auto PA_1 = (a_j / S1) * rij[a1];
-            const auto PB_0 = (-a_i / S1) * rij[b0];
-            const auto PB_1 = (-a_i / S1) * rij[b1];
+            // auto PA_0 = (a_j / S1) * rij[a0];
+            // auto PA_1 = (a_j / S1) * rij[a1];
+            // auto PB_0 = (-a_i / S1) * rij[b0];
+            // auto PB_1 = (-a_i / S1) * rij[b1];
             const auto QC_0 = (a_l / S2) * rkl[c0];
             const auto QC_1 = (a_l / S2) * rkl[c1];
             const auto QD_0 = (-a_k / S2) * rkl[d0];
@@ -14628,7 +14628,7 @@ computeCoulombFockDDDD15(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
+            // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
             const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
@@ -14650,10 +14650,10 @@ computeCoulombFockDDDD15(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j / S1) * rij[a0];
-            const auto PA_1 = (a_j / S1) * rij[a1];
-            const auto PB_0 = (-a_i / S1) * rij[b0];
-            const auto PB_1 = (-a_i / S1) * rij[b1];
+            // auto PA_0 = (a_j / S1) * rij[a0];
+            // auto PA_1 = (a_j / S1) * rij[a1];
+            // auto PB_0 = (-a_i / S1) * rij[b0];
+            // auto PB_1 = (-a_i / S1) * rij[b1];
             const auto QC_0 = (a_l / S2) * rkl[c0];
             const auto QC_1 = (a_l / S2) * rkl[c1];
             const auto QD_0 = (-a_k / S2) * rkl[d0];
@@ -16712,7 +16712,7 @@ computeCoulombFockDDDD20(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
+            // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
             const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
@@ -16734,10 +16734,10 @@ computeCoulombFockDDDD20(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j / S1) * rij[a0];
-            const auto PA_1 = (a_j / S1) * rij[a1];
-            const auto PB_0 = (-a_i / S1) * rij[b0];
-            const auto PB_1 = (-a_i / S1) * rij[b1];
+            // auto PA_0 = (a_j / S1) * rij[a0];
+            // auto PA_1 = (a_j / S1) * rij[a1];
+            // auto PB_0 = (-a_i / S1) * rij[b0];
+            // auto PB_1 = (-a_i / S1) * rij[b1];
             const auto QC_0 = (a_l / S2) * rkl[c0];
             const auto QC_1 = (a_l / S2) * rkl[c1];
             const auto QD_0 = (-a_k / S2) * rkl[d0];
@@ -17314,7 +17314,7 @@ computeCoulombFockDDDD21(double*         mat_J,
             const auto d1 = d_cart_inds[l % 6][1];
 
             const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+            // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
             const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
                                   (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
@@ -17339,10 +17339,10 @@ computeCoulombFockDDDD21(double*         mat_J,
             const auto PA_1 = (a_j / S1) * rij[a1];
             const auto PB_0 = (-a_i / S1) * rij[b0];
             const auto PB_1 = (-a_i / S1) * rij[b1];
-            const auto QC_0 = (a_l / S2) * rkl[c0];
-            const auto QC_1 = (a_l / S2) * rkl[c1];
-            const auto QD_0 = (-a_k / S2) * rkl[d0];
-            const auto QD_1 = (-a_k / S2) * rkl[d1];
+            // auto QC_0 = (a_l / S2) * rkl[c0];
+            // auto QC_1 = (a_l / S2) * rkl[c1];
+            // auto QD_0 = (-a_k / S2) * rkl[d0];
+            // auto QD_1 = (-a_k / S2) * rkl[d1];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -18095,7 +18095,7 @@ computeCoulombFockDDDD23(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
+            // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
             const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
@@ -18117,10 +18117,10 @@ computeCoulombFockDDDD23(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j / S1) * rij[a0];
-            const auto PA_1 = (a_j / S1) * rij[a1];
-            const auto PB_0 = (-a_i / S1) * rij[b0];
-            const auto PB_1 = (-a_i / S1) * rij[b1];
+            // auto PA_0 = (a_j / S1) * rij[a0];
+            // auto PA_1 = (a_j / S1) * rij[a1];
+            // auto PB_0 = (-a_i / S1) * rij[b0];
+            // auto PB_1 = (-a_i / S1) * rij[b1];
             const auto QC_0 = (a_l / S2) * rkl[c0];
             const auto QC_1 = (a_l / S2) * rkl[c1];
             const auto QD_0 = (-a_k / S2) * rkl[d0];
@@ -19790,7 +19790,7 @@ computeCoulombFockDDDD27(double*         mat_J,
             const auto d1 = d_cart_inds[l % 6][1];
 
             const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+            // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
             const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
                                   (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
@@ -19815,10 +19815,10 @@ computeCoulombFockDDDD27(double*         mat_J,
             const auto PA_1 = (a_j / S1) * rij[a1];
             const auto PB_0 = (-a_i / S1) * rij[b0];
             const auto PB_1 = (-a_i / S1) * rij[b1];
-            const auto QC_0 = (a_l / S2) * rkl[c0];
-            const auto QC_1 = (a_l / S2) * rkl[c1];
-            const auto QD_0 = (-a_k / S2) * rkl[d0];
-            const auto QD_1 = (-a_k / S2) * rkl[d1];
+            // auto QC_0 = (a_l / S2) * rkl[c0];
+            // auto QC_1 = (a_l / S2) * rkl[c1];
+            // auto QD_0 = (-a_k / S2) * rkl[d0];
+            // auto QD_1 = (-a_k / S2) * rkl[d1];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -20180,7 +20180,7 @@ computeCoulombFockDDDD28(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
+            // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
             const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
@@ -20202,10 +20202,10 @@ computeCoulombFockDDDD28(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 / S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j / S1) * rij[a0];
-            const auto PA_1 = (a_j / S1) * rij[a1];
-            const auto PB_0 = (-a_i / S1) * rij[b0];
-            const auto PB_1 = (-a_i / S1) * rij[b1];
+            // auto PA_0 = (a_j / S1) * rij[a0];
+            // auto PA_1 = (a_j / S1) * rij[a1];
+            // auto PB_0 = (-a_i / S1) * rij[b0];
+            // auto PB_1 = (-a_i / S1) * rij[b1];
             const auto QC_0 = (a_l / S2) * rkl[c0];
             const auto QC_1 = (a_l / S2) * rkl[c1];
             const auto QD_0 = (-a_k / S2) * rkl[d0];

@@ -21399,7 +21399,7 @@ computeExchangeFockPDDD6(double*         mat_K,
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
                     const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+                    // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
                                           (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
@@ -21432,10 +21432,10 @@ computeExchangeFockPDDD6(double*         mat_K,
                     const auto PA_0 = (a_j / S1) * rij[a0];
                     const auto PB_0 = (-a_i / S1) * rij[b0];
                     const auto PB_1 = (-a_i / S1) * rij[b1];
-                    const auto QC_0 = (a_l / S2) * rkl[c0];
-                    const auto QC_1 = (a_l / S2) * rkl[c1];
-                    const auto QD_0 = (-a_k / S2) * rkl[d0];
-                    const auto QD_1 = (-a_k / S2) * rkl[d1];
+                    // auto QC_0 = (a_l / S2) * rkl[c0];
+                    // auto QC_1 = (a_l / S2) * rkl[c1];
+                    // auto QD_0 = (-a_k / S2) * rkl[d0];
+                    // auto QD_1 = (-a_k / S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -37498,7 +37498,7 @@ computeExchangeFockDDDD3(double*         mat_K,
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    // __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -37513,9 +37513,9 @@ computeExchangeFockDDDD3(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        // delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        // delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        // delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -40379,7 +40379,7 @@ computeExchangeFockDDDD10(double*         mat_K,
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    // __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -40394,9 +40394,9 @@ computeExchangeFockDDDD10(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        // delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        // delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        // delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -40766,8 +40766,8 @@ computeExchangeFockDDDD11(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
+                    // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
                                           (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
@@ -40796,14 +40796,14 @@ computeExchangeFockDDDD11(double*         mat_K,
                     F8_t[2] *= d2 * d2;
                     F8_t[3] *= d2 * d2 * d2;
 
-                    const auto PA_0 = (a_j / S1) * rij[a0];
-                    const auto PA_1 = (a_j / S1) * rij[a1];
-                    const auto PB_0 = (-a_i / S1) * rij[b0];
-                    const auto PB_1 = (-a_i / S1) * rij[b1];
-                    const auto QC_0 = (a_l / S2) * rkl[c0];
-                    const auto QC_1 = (a_l / S2) * rkl[c1];
-                    const auto QD_0 = (-a_k / S2) * rkl[d0];
-                    const auto QD_1 = (-a_k / S2) * rkl[d1];
+                    // auto PA_0 = (a_j / S1) * rij[a0];
+                    // auto PA_1 = (a_j / S1) * rij[a1];
+                    // auto PB_0 = (-a_i / S1) * rij[b0];
+                    // auto PB_1 = (-a_i / S1) * rij[b1];
+                    // auto QC_0 = (a_l / S2) * rkl[c0];
+                    // auto QC_1 = (a_l / S2) * rkl[c1];
+                    // auto QD_0 = (-a_k / S2) * rkl[d0];
+                    // auto QD_1 = (-a_k / S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -41173,7 +41173,7 @@ computeExchangeFockDDDD12(double*         mat_K,
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
                     const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+                    // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
                                           (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
@@ -41206,10 +41206,10 @@ computeExchangeFockDDDD12(double*         mat_K,
                     const auto PA_1 = (a_j / S1) * rij[a1];
                     const auto PB_0 = (-a_i / S1) * rij[b0];
                     const auto PB_1 = (-a_i / S1) * rij[b1];
-                    const auto QC_0 = (a_l / S2) * rkl[c0];
-                    const auto QC_1 = (a_l / S2) * rkl[c1];
-                    const auto QD_0 = (-a_k / S2) * rkl[d0];
-                    const auto QD_1 = (-a_k / S2) * rkl[d1];
+                    // auto QC_0 = (a_l / S2) * rkl[c0];
+                    // auto QC_1 = (a_l / S2) * rkl[c1];
+                    // auto QD_0 = (-a_k / S2) * rkl[d0];
+                    // auto QD_1 = (-a_k / S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -41659,7 +41659,7 @@ computeExchangeFockDDDD13(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
+                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
@@ -41689,10 +41689,10 @@ computeExchangeFockDDDD13(double*         mat_K,
                     F8_t[2] *= d2 * d2;
                     F8_t[3] *= d2 * d2 * d2;
 
-                    const auto PA_0 = (a_j / S1) * rij[a0];
-                    const auto PA_1 = (a_j / S1) * rij[a1];
-                    const auto PB_0 = (-a_i / S1) * rij[b0];
-                    const auto PB_1 = (-a_i / S1) * rij[b1];
+                    // auto PA_0 = (a_j / S1) * rij[a0];
+                    // auto PA_1 = (a_j / S1) * rij[a1];
+                    // auto PB_0 = (-a_i / S1) * rij[b0];
+                    // auto PB_1 = (-a_i / S1) * rij[b1];
                     const auto QC_0 = (a_l / S2) * rkl[c0];
                     const auto QC_1 = (a_l / S2) * rkl[c1];
                     const auto QD_0 = (-a_k / S2) * rkl[d0];
@@ -45026,7 +45026,7 @@ computeExchangeFockDDDD19(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
+                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
@@ -45057,10 +45057,10 @@ computeExchangeFockDDDD19(double*         mat_K,
                     F8_t[3] *= d2 * d2 * d2;
                     F8_t[4] *= d2 * d2 * d2 * d2;
 
-                    const auto PA_0 = (a_j / S1) * rij[a0];
-                    const auto PA_1 = (a_j / S1) * rij[a1];
-                    const auto PB_0 = (-a_i / S1) * rij[b0];
-                    const auto PB_1 = (-a_i / S1) * rij[b1];
+                    // auto PA_0 = (a_j / S1) * rij[a0];
+                    // auto PA_1 = (a_j / S1) * rij[a1];
+                    // auto PB_0 = (-a_i / S1) * rij[b0];
+                    // auto PB_1 = (-a_i / S1) * rij[b1];
                     const auto QC_0 = (a_l / S2) * rkl[c0];
                     const auto QC_1 = (a_l / S2) * rkl[c1];
                     const auto QD_0 = (-a_k / S2) * rkl[d0];
@@ -45683,7 +45683,7 @@ computeExchangeFockDDDD20(double*         mat_K,
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
                     const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+                    // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
                                           (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
@@ -45717,10 +45717,10 @@ computeExchangeFockDDDD20(double*         mat_K,
                     const auto PA_1 = (a_j / S1) * rij[a1];
                     const auto PB_0 = (-a_i / S1) * rij[b0];
                     const auto PB_1 = (-a_i / S1) * rij[b1];
-                    const auto QC_0 = (a_l / S2) * rkl[c0];
-                    const auto QC_1 = (a_l / S2) * rkl[c1];
-                    const auto QD_0 = (-a_k / S2) * rkl[d0];
-                    const auto QD_1 = (-a_k / S2) * rkl[d1];
+                    // auto QC_0 = (a_l / S2) * rkl[c0];
+                    // auto QC_1 = (a_l / S2) * rkl[c1];
+                    // auto QD_0 = (-a_k / S2) * rkl[d0];
+                    // auto QD_1 = (-a_k / S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -46574,7 +46574,7 @@ computeExchangeFockDDDD22(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
+                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
@@ -46605,10 +46605,10 @@ computeExchangeFockDDDD22(double*         mat_K,
                     F8_t[3] *= d2 * d2 * d2;
                     F8_t[4] *= d2 * d2 * d2 * d2;
 
-                    const auto PA_0 = (a_j / S1) * rij[a0];
-                    const auto PA_1 = (a_j / S1) * rij[a1];
-                    const auto PB_0 = (-a_i / S1) * rij[b0];
-                    const auto PB_1 = (-a_i / S1) * rij[b1];
+                    // auto PA_0 = (a_j / S1) * rij[a0];
+                    // auto PA_1 = (a_j / S1) * rij[a1];
+                    // auto PB_0 = (-a_i / S1) * rij[b0];
+                    // auto PB_1 = (-a_i / S1) * rij[b1];
                     const auto QC_0 = (a_l / S2) * rkl[c0];
                     const auto QC_1 = (a_l / S2) * rkl[c1];
                     const auto QD_0 = (-a_k / S2) * rkl[d0];
@@ -48263,7 +48263,7 @@ computeExchangeFockDDDD25(double*         mat_K,
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
                     const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+                    // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
                                           (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
@@ -48298,10 +48298,10 @@ computeExchangeFockDDDD25(double*         mat_K,
                     const auto PA_1 = (a_j / S1) * rij[a1];
                     const auto PB_0 = (-a_i / S1) * rij[b0];
                     const auto PB_1 = (-a_i / S1) * rij[b1];
-                    const auto QC_0 = (a_l / S2) * rkl[c0];
-                    const auto QC_1 = (a_l / S2) * rkl[c1];
-                    const auto QD_0 = (-a_k / S2) * rkl[d0];
-                    const auto QD_1 = (-a_k / S2) * rkl[d1];
+                    // auto QC_0 = (a_l / S2) * rkl[c0];
+                    // auto QC_1 = (a_l / S2) * rkl[c1];
+                    // auto QD_0 = (-a_k / S2) * rkl[d0];
+                    // auto QD_1 = (-a_k / S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -48709,7 +48709,7 @@ computeExchangeFockDDDD26(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
+                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
@@ -48741,10 +48741,10 @@ computeExchangeFockDDDD26(double*         mat_K,
                     F8_t[4] *= d2 * d2 * d2 * d2;
                     F8_t[5] *= d2 * d2 * d2 * d2 * d2;
 
-                    const auto PA_0 = (a_j / S1) * rij[a0];
-                    const auto PA_1 = (a_j / S1) * rij[a1];
-                    const auto PB_0 = (-a_i / S1) * rij[b0];
-                    const auto PB_1 = (-a_i / S1) * rij[b1];
+                    // auto PA_0 = (a_j / S1) * rij[a0];
+                    // auto PA_1 = (a_j / S1) * rij[a1];
+                    // auto PB_0 = (-a_i / S1) * rij[b0];
+                    // auto PB_1 = (-a_i / S1) * rij[b1];
                     const auto QC_0 = (a_l / S2) * rkl[c0];
                     const auto QC_1 = (a_l / S2) * rkl[c1];
                     const auto QD_0 = (-a_k / S2) * rkl[d0];
