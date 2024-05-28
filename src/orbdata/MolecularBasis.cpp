@@ -699,7 +699,7 @@ CMolecularBasis::getIndexMap(const std::vector<int64_t>& atoms, const int64_t an
 
             for (size_t j = 0; j < natoms; j++)
             {
-                if (atoms[j] == i)
+                if (atoms[j] == static_cast<int64_t>(i))
                 {
                     for (const auto& gto : _basis_sets[_indexes[i]].getBasisFunctions(angmom))
                     {

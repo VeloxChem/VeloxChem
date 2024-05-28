@@ -453,7 +453,8 @@ class ScfDriver:
             self.ostream.print_blank()
 
         # ERI references
-        valstr = 'Using the following algorithms for ERI evaluation.'
+        valstr = 'Using the following algorithms for ERI evaluation '
+        valstr += 'and Fock matrix formation.'
         self.ostream.print_info(valstr)
         self.ostream.print_blank()
         valstr = 'S. Obara and A. Saika, J. Chem. Phys. 84, 3963-3974 (1986)'
