@@ -300,8 +300,6 @@ class VibrationalAnalysis:
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
-        # TODO print info on damping value if complex
-
         width = 52
         for k in range(number_of_modes):
 
