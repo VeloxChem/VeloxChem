@@ -208,9 +208,9 @@ class PolarizabilityGradient():
             The results of the linear response calculation.
         """
 
+        # TODO move orbital response calcs to separate function
         # timings
         orbrsp_start_time = tm.time()
-
         # setup orbital response driver
         orbrsp_drv = PolOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
@@ -259,6 +259,8 @@ class PolarizabilityGradient():
                 x_plus_y = orbrsp_results['x_plus_y_ao']
                 x_minus_y = orbrsp_results['x_minus_y_ao']
 
+                # TODO setup to use class variable vector_components
+                # DEPENDENCY: LR driver gets same vector component input
                 # number of vector components
                 dof = x_plus_y.shape[0]
 
@@ -266,6 +268,7 @@ class PolarizabilityGradient():
                 omega_ao = orbrsp_results['omega_ao'].reshape(
                     dof, dof, nao, nao)
                 lambda_mo = orbrsp_results['lambda_mo']
+                # TODO let lambda_ao be available from orbrsp calcs
 
                 # transform lambda multipliers to AO basis and
                 # calculate relaxed density matrix
@@ -308,6 +311,9 @@ class PolarizabilityGradient():
                         gs_dm, rel_dm_ao, omega_ao, x_plus_y, x_minus_y,
                         d_hcore, d_ovlp, d_eri, d_dipole, nao, dof, i)
             else:
+                gs_dm = None
+                rel_dm_ao = None
+                x_minus_y = None
                 pol_gradient = None
 
             # add exchange-correlation contributions to the gradient
@@ -1111,27 +1117,30 @@ class PolarizabilityGradient():
         cur_str = 'Polarizability gradient type    : '
         if self.is_complex:
             cur_str += 'Complex '
+            cur_str2 = 'Damping value                   : '
+            cur_str2 += str(self.damping) + ' a.u.'
         else:
             cur_str += 'Real '
-            # TODO print damping value
         if self.numerical:
             cur_str += 'Numerical'
-            cur_str2 = 'Numerical Method                : '
+            cur_str3 = 'Numerical Method                : '
             if self.do_four_point:
-                cur_str2 += 'Five-Point Stencil'
+                cur_str3 += 'Five-Point Stencil'
             else:
-                cur_str2 += 'Symmetric Difference Quotient'
-            cur_str3 = 'Finite Difference Step Size     : '
-            cur_str3 += str(self.delta_h) + ' a.u.'
+                cur_str3 += 'Symmetric Difference Quotient'
+            cur_str4 = 'Finite Difference Step Size     : '
+            cur_str4 += str(self.delta_h) + ' a.u.'
         else:
             cur_str += 'Analytical'
 
         self.ostream.print_blank()
         self.ostream.print_header(cur_str.ljust(str_width))
+        if self.is_complex:
+            self.ostream.print_header(cur_str2.ljust(str_width))
 
         if self.numerical:
-            self.ostream.print_header(cur_str2.ljust(str_width))
             self.ostream.print_header(cur_str3.ljust(str_width))
+            self.ostream.print_header(cur_str4.ljust(str_width))
 
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
