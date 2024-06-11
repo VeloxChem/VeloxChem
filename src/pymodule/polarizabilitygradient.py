@@ -127,14 +127,11 @@ class PolarizabilityGradient():
         dft_sanity_check(self, 'update_settings')
 
         self.frequencies = list(self.frequencies)
-        # Enforce that the same frequencies are treated in orbital response
-        orbrsp_dict['frequencies'] = self.frequencies
-        orbrsp_dict['is_complex'] = self.is_complex
 
         if self._dft and (self.grid_level is None):
             self.grid_level = get_default_grid_level(self.xcfun) 
 
-        # Set data type of pol. gradient for use in compute_analytical()
+        # set data type of pol. gradient for use in compute_analytical()
         if self.is_complex:
             self.grad_dt = np.complex_
 
@@ -171,14 +168,10 @@ class PolarizabilityGradient():
                 error_message = 'PolarizabilityGradient: missing input SCF driver '
                 error_message += 'for numerical calculations'
                 raise ValueError(error_message)
-            # Compute
+            # compute
             self.compute_numerical(molecule, basis, self.scf_drv)
-            #if self.is_complex:
-            #    self.compute_numerical_complex(molecule, basis, self.scf_drv)
-            #else:
-            #    self.compute_numerical_real(molecule, basis, self.scf_drv)
         else:
-            # Sanity checks linear response input
+            # sanity checks linear response input
             if lr_results is None:
                 error_message = 'PolarizabilityGradient missing input: LR results'
                 error_message += 'for analytical gradient'
@@ -186,7 +179,7 @@ class PolarizabilityGradient():
             if self.rank == mpi_master():
                 polgrad_sanity_check(self, self.flag, lr_results)
                 self.check_real_or_complex_input(lr_results)
-            # Compute
+            # compute
             self.compute_analytical(molecule, basis, scf_tensors, lr_results)
 
         if self.rank == mpi_master():
@@ -215,14 +208,20 @@ class PolarizabilityGradient():
             The results of the linear response calculation.
         """
 
-        # compute orbital response
+        # timings
         orbrsp_start_time = tm.time()
 
+        # setup orbital response driver
         orbrsp_drv = PolOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
+        # enforce the frequencies to be the same as in current driver
+        orbrsp_drv.frequencies = self.frequencies
+        orbrsp_drv.is_complex = self.is_complex
+        # compute orbital response
         orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
         orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
-        all_orbrsp_results = orbrsp_drv.cphf_results
+        if self.rank == mpi_master():
+            all_orbrsp_results = orbrsp_drv.cphf_results
 
         valstr = '** Time spent on orbital response for {} frequencies: '.format(
             len(self.frequencies))
@@ -311,7 +310,7 @@ class PolarizabilityGradient():
             else:
                 pol_gradient = None
 
-            # Add exchange-correlation contributions to the gradient
+            # add exchange-correlation contributions to the gradient
             if self._dft:
                 xcfun_label = self.xcfun.get_func_label()
 
@@ -377,7 +376,7 @@ class PolarizabilityGradient():
                 polgrad_results[w] = num_polgradient[f]
             self.polgradient = dict(polgrad_results)
 
-        # Unmute the output streams
+        # unmute the output streams
         scf_drv.ostream.unmute()
         lr_drv.ostream.unmute()
 
@@ -478,7 +477,7 @@ class PolarizabilityGradient():
 
         gradient_start_time = tm.time()
 
-        # Calculate the analytic polarizability gradient
+        # calculate the analytic polarizability gradient
         # FIXME loop upper triangular only
         for x in range(dof):
             for y in range(dof):
@@ -712,7 +711,7 @@ class PolarizabilityGradient():
                     rhow_den_sym_imag = AODensityMatrix(
                         rhow_dm_sym_list_imag, denmat.rest)
 
-                    # The sqrt2 takes into account the fact that we need to
+                    # the sqrt2 takes into account the fact that we need to
                     # symmetrize with respect to the polarizability
                     # components.
                     # (see contraction with two-electron integrals above).
@@ -846,7 +845,7 @@ class PolarizabilityGradient():
 
         xcgrad_drv = XCMolecularGradient(self.comm)
 
-        # Real contribution
+        # real contribution
         polgrad_xcgrad_real = xcgrad_drv.integrate_vxc_gradient(  # Re DM
             molecule, ao_basis, rhow_den_real, gs_density, mol_grid,
             xcfun_label)
@@ -883,7 +882,7 @@ class PolarizabilityGradient():
         polgrad_xcgrad_real = self.comm.reduce(polgrad_xcgrad_real,
                                                root=mpi_master())
 
-        # Imaginary contribution
+        # imaginary contribution
         polgrad_xcgrad_imag = xcgrad_drv.integrate_vxc_gradient(  # Im DM
             molecule, ao_basis, rhow_den_imag, gs_density, mol_grid,
             xcfun_label)
