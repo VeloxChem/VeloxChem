@@ -158,7 +158,7 @@ class VibrationalAnalysis:
         self.do_print_polgrad = False
         self.print_depolarization_ratio = False
 
-        # Thermodynamics
+        # thermodynamics
         self.elec_energy = 0.0
         self.temperature = 298.15
         self.pressure = 1.0
@@ -212,7 +212,7 @@ class VibrationalAnalysis:
 
         parse_input(self, vib_keywords, vib_dict)
 
-        # Settings for property modules
+        # settings for property modules
         if hess_dict is None:
             hess_dict = {}
         if cphf_dict is None:
@@ -243,33 +243,33 @@ class VibrationalAnalysis:
             The minimal AO basis set.
         """
 
-        # Compute the Hessian
+        # compute the Hessian
         self.compute_hessian(molecule, ao_basis)
 
-        # Compute the polarizability gradient for Raman intensities
+        # compute the polarizability gradient for Raman intensities
         if self.do_raman:
             self.compute_polarizability_gradient(molecule, ao_basis)
 
         if self.rank == mpi_master():
-            # Get vibrational frequencies and normal modes
+            # get vibrational frequencies and normal modes
             # TODO what to do about that filename input
             self.frequency_analysis(molecule, filename=None)
 
-            # Calculate force constants
+            # calculate force constants
             self.force_constants = self.calculate_force_constant()
 
-            # Calculate the gradient of the dipole moment for IR intensities
+            # calculate the gradient of the dipole moment for IR intensities
             if self.do_ir:
                 self.ir_intensities = self.calculate_ir_intensity(self.normal_modes)
 
-            # Calculate the analytical polarizability gradient for Raman intensities
+            # calculate the analytical polarizability gradient for Raman intensities
             if self.do_raman and self.is_scf:
                 self.raman_intensities, depol_ratio = self.calculate_raman_activity(
                         self.normal_modes)
             elif self.do_raman and self.is_xtb:
                 self.ostream.print_info('Raman not available for XTB.')
 
-            # Print the vibrational properties
+            # print the vibrational properties
             self.print_vibrational_analysis(molecule)
 
         return
@@ -291,7 +291,7 @@ class VibrationalAnalysis:
         elem = molecule.get_labels()
         number_of_modes = len(self.vib_frequencies)
 
-        # Normalize the normal modes -- as done in geomeTRIC
+        # normalize the normal modes -- as done in geomeTRIC
         self.normal_modes /= np.linalg.norm(self.normal_modes,
                                             axis=1)[:, np.newaxis]
 
@@ -305,7 +305,7 @@ class VibrationalAnalysis:
         width = 52
         for k in range(number_of_modes):
 
-            # Print indices and vibrational frequencies:
+            # print indices and vibrational frequencies:
             index_string = '{:22s}{:d}'.format('Vibrational Mode', k + 1)
             self.ostream.print_header(index_string.ljust(width))
             self.ostream.print_header('-' * width)
@@ -363,7 +363,7 @@ class VibrationalAnalysis:
                 '', 'X', 'Y', 'Z')
             self.ostream.print_header(normal_mode_string.ljust(width))
 
-            # Print normal modes:
+            # print normal modes:
             for atom_index in range(natm):
                 valstr = '{:<8d}'.format(atom_index + 1)
                 valstr += '{:<8s}'.format(elem[atom_index])
@@ -421,7 +421,7 @@ class VibrationalAnalysis:
             The raman activity.
         """
 
-        # Get information from polarizability gradient dictionary
+        # get information from polarizability gradient dictionary
         raman_conversion_factor = self.get_conversion_factor('raman')
 
         # frequency of electric field
@@ -446,7 +446,7 @@ class VibrationalAnalysis:
                 current_polarizability_gradient.reshape(size_x * size_y, -1),
                 normal_modes.T).reshape(size_x, size_y, size_k)
 
-            # Calculate rotational invariants
+            # calculate rotational invariants
             alpha_bar = np.zeros((number_of_modes))
             gamma_bar_sq = np.zeros((number_of_modes))
             for i in range(3):
@@ -499,13 +499,13 @@ class VibrationalAnalysis:
             Force constants of vibrational normal modes.
         """
 
-        # Constants and conversion factors
+        # constants and conversion factors
         c = speed_of_light_in_vacuum_in_SI()
         cm_to_m = 1e-2  # centimeters in meters
         N_to_mdyne = 1e+8  # Newton in milli dyne
         m_to_A = 1e+10  # meters in Angstroms
 
-        # Diagonalizes Hessian and calculates the reduced masses
+        # diagonalizes Hessian and calculates the reduced masses
         # einsum 'ki->i'
         # TODO is this a good place for reduced masses?
         self.reduced_masses = 1.0 / np.sum(self.normal_modes.T**2, axis=0)
@@ -528,11 +528,11 @@ class VibrationalAnalysis:
 
         """
 
-        # Constants and conversion factors
+        # constants and conversion factors
         alpha = fine_structure_constant()
         bohr_in_km = bohr_in_angstrom() * 1e-13
 
-        # Conversion factor of IR intensity to km/mol
+        # conversion factor of IR intensity to km/mol
         if (prop == 'ir'):
             conv_factor = conv_ir_ea0amu2kmmol = (electron_mass_in_amu() * avogadro_constant()
                                     * alpha**2 * bohr_in_km * np.pi / 3.0)
@@ -562,10 +562,10 @@ class VibrationalAnalysis:
 
         hessian_drv.compute(molecule, ao_basis)
 
-        # Save gradients
+        # save gradients
         self.hessian = hessian_drv.hessian
         self.dipole_gradient = hessian_drv.dipole_gradient
-        # Save the electronic energy
+        # save the electronic energy
         self.elec_energy = hessian_drv.elec_energy
 
     def compute_polarizability_gradient(self, molecule, ao_basis):
@@ -581,25 +581,26 @@ class VibrationalAnalysis:
         """
 
         # TODO sanity check: not both normal and resonance Raman
+        # INCLUDE check: if both, check if damping is non-zero
+        # If zero: run normal Raman
 
         scf_tensors = self.scf_driver.scf_tensors
 
-        # Set up the polarizability gradient driver and run
+        # set up the polarizability gradient driver
         polgrad_drv = PolarizabilityGradient(self.comm, self.ostream)
+        if 'frequencies' not in self.polgrad_dict:
+            polgrad_drv.frequencies = self.frequencies
         polgrad_drv.update_settings(self.polgrad_dict,
                                     orbrsp_dict = self.cphf_dict,
                                     method_dict = self.method_dict, 
                                     scf_drv = self.scf_driver)
 
-        # Transfer settings for vibrational task to polgrad driver
+        # transfer settings for vibrational task to polgrad driver
         polgrad_drv.numerical = self.numerical_polgrad
         polgrad_drv.do_four_point = self.do_four_point_polgrad
         polgrad_drv.do_print_polgrad = self.do_print_polgrad
-        # TODO will we do it this way around?
-        if 'frequencies' not in self.polgrad_dict:
-            polgrad_drv.frequencies = self.frequencies
 
-        # Perform a linear response calculation
+        # perform a linear response calculation
         if self.do_resonance_raman:
             polgrad_drv.is_complex = True
             lr_drv = ComplexResponse()
@@ -615,9 +616,9 @@ class VibrationalAnalysis:
                 lr_drv.frequencies = self.frequencies
             lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
 
-        # Compute polarizability gradient
+        # compute polarizability gradient
         polgrad_drv.compute(molecule, ao_basis, scf_tensors, lr_results)
 
-        # Save the gradient
+        # save the gradient
         self.polarizability_gradient = polgrad_drv.polgradient
 
