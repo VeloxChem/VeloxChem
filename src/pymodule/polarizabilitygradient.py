@@ -208,27 +208,32 @@ class PolarizabilityGradient():
             The results of the linear response calculation.
         """
 
-        # TODO move orbital response calcs to separate function
-        # timings
-        orbrsp_start_time = tm.time()
-        # setup orbital response driver
-        orbrsp_drv = PolOrbitalResponse(self.comm, self.ostream)
-        orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
-        # enforce the frequencies to be the same as in current driver
-        orbrsp_drv.frequencies = self.frequencies
-        orbrsp_drv.is_complex = self.is_complex
-        # compute orbital response
-        orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
-        orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
-        if self.rank == mpi_master():
-            all_orbrsp_results = orbrsp_drv.cphf_results
+        ## TODO move orbital response calcs to separate function
+        ## timings
+        #orbrsp_start_time = tm.time()
+        ## setup orbital response driver
+        #orbrsp_drv = PolOrbitalResponse(self.comm, self.ostream)
+        #orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
+        ## enforce the frequencies to be the same as in current driver
+        #orbrsp_drv.frequencies = self.frequencies
+        #orbrsp_drv.is_complex = self.is_complex
+        ## compute orbital response
+        #orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
+        #orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
+        #if self.rank == mpi_master():
+        #    all_orbrsp_results = orbrsp_drv.cphf_results
 
-        valstr = '** Time spent on orbital response for {} frequencies: '.format(
-            len(self.frequencies))
-        valstr += '{:.6f} sec **'.format(tm.time() - orbrsp_start_time)
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-        self.ostream.flush()
+        #valstr = '** Time spent on orbital response for {} frequencies: '.format(
+        #    len(self.frequencies))
+        #valstr += '{:.6f} sec **'.format(tm.time() - orbrsp_start_time)
+        #self.ostream.print_header(valstr)
+        #self.ostream.print_blank()
+        #self.ostream.flush()
+
+        # get orbital response results
+        if self.rank == mpi_master():
+            all_orbrsp_results = self.compute_orbital_response(
+                molecule, basis, scf_tensors, lr_results)
 
         # number of frequencies
         n_freqs = len(self.frequencies)
@@ -299,13 +304,6 @@ class PolarizabilityGradient():
 
                     d_hcore, d_ovlp, d_eri, d_dipole = self.import_integrals(
                         molecule, basis, i)
-
-                    #valstr = ' * Time spent importing integrals for atom #{}: '.format(
-                    #    i + 1)
-                    #valstr += '{:.6f} sec * '.format(tm.time() - integral_start_time)
-                    self.ostream.print_header(valstr)
-                    self.ostream.print_blank()
-                    self.ostream.flush()
 
                     pol_gradient[:,:,i,:] = self.construct_scf_polgrad(
                         gs_dm, rel_dm_ao, omega_ao, x_plus_y, x_minus_y,
@@ -403,6 +401,46 @@ class PolarizabilityGradient():
             lr_drv.frequencies = self.frequencies
 
         return lr_drv
+
+    def compute_orbital_response(self, molecule, basis, scf_tensors, lr_results):
+        """
+        Directs the calculation of the orbital response.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param scf_tensors:
+            The SCF tensors.
+        :param lr_results:
+            The linear response results.
+        """
+
+        # timings
+        orbrsp_start_time = tm.time()
+
+        # setup orbital response driver
+        orbrsp_drv = PolOrbitalResponse(self.comm, self.ostream)
+        orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
+
+        # enforce the frequencies to be the same as in current driver
+        orbrsp_drv.frequencies = self.frequencies
+        orbrsp_drv.is_complex = self.is_complex
+
+        # compute orbital response
+        orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
+        orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
+        #if self.rank == mpi_master():
+        #    all_orbrsp_results = orbrsp_drv.cphf_results
+
+        valstr = '** Time spent on orbital response for {} frequencies: '.format(
+            len(self.frequencies))
+        valstr += '{:.6f} sec **'.format(tm.time() - orbrsp_start_time)
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        return orbrsp_drv.cphf_results
 
     def import_integrals(self, molecule, basis, idx):
         """
