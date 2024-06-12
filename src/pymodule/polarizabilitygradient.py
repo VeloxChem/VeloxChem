@@ -164,7 +164,7 @@ class PolarizabilityGradient():
 
         if self.numerical:
             # sanity checks SCF driver input
-            if self.scf_drv is None:
+            if (self.rank == mpi_master()) and (self.scf_drv is None):
                 error_message = 'PolarizabilityGradient: missing input SCF driver '
                 error_message += 'for numerical calculations'
                 raise ValueError(error_message)
@@ -172,7 +172,7 @@ class PolarizabilityGradient():
             self.compute_numerical(molecule, basis, self.scf_drv)
         else:
             # sanity checks linear response input
-            if lr_results is None:
+            if (self.rank == mpi_master()) and (lr_results is None):
                 error_message = 'PolarizabilityGradient missing input: LR results'
                 error_message += 'for analytical gradient'
                 raise ValueError(error_message)
@@ -208,28 +208,6 @@ class PolarizabilityGradient():
             The results of the linear response calculation.
         """
 
-        ## TODO move orbital response calcs to separate function
-        ## timings
-        #orbrsp_start_time = tm.time()
-        ## setup orbital response driver
-        #orbrsp_drv = PolOrbitalResponse(self.comm, self.ostream)
-        #orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
-        ## enforce the frequencies to be the same as in current driver
-        #orbrsp_drv.frequencies = self.frequencies
-        #orbrsp_drv.is_complex = self.is_complex
-        ## compute orbital response
-        #orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
-        #orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
-        #if self.rank == mpi_master():
-        #    all_orbrsp_results = orbrsp_drv.cphf_results
-
-        #valstr = '** Time spent on orbital response for {} frequencies: '.format(
-        #    len(self.frequencies))
-        #valstr += '{:.6f} sec **'.format(tm.time() - orbrsp_start_time)
-        #self.ostream.print_header(valstr)
-        #self.ostream.print_blank()
-        #self.ostream.flush()
-
         # get orbital response results
         if self.rank == mpi_master():
             all_orbrsp_results = self.compute_orbital_response(
@@ -264,68 +242,54 @@ class PolarizabilityGradient():
                 x_plus_y = orbrsp_results['x_plus_y_ao']
                 x_minus_y = orbrsp_results['x_minus_y_ao']
 
-                # TODO setup to use class variable vector_components
-                # DEPENDENCY: LR driver gets same vector component input
-                # number of vector components
-                dof = x_plus_y.shape[0]
+                dof = len(self.vector_components)
 
                 # Lagrange multipliers
                 omega_ao = orbrsp_results['omega_ao'].reshape(
                     dof, dof, nao, nao)
-                lambda_mo = orbrsp_results['lambda_mo']
+                #lambda_mo = orbrsp_results['lambda_mo']
                 # TODO let lambda_ao be available from orbrsp calcs
 
                 # transform lambda multipliers to AO basis and
                 # calculate relaxed density matrix
                 # FIXME dimensions upper triangular only
                 # mi,xia,nm->xmn
-                lambda_ao = np.array([
-                    np.linalg.multi_dot([mo_occ, lambda_mo[x], mo_vir.T])
-                    for x in range(dof**2)]).reshape(dof, dof, nao, nao)
+                #lambda_ao = np.array([
+                #    np.linalg.multi_dot([mo_occ, lambda_mo[x], mo_vir.T])
+                #    for x in range(dof**2)]).reshape(dof, dof, nao, nao)
 
+                # TEST
+                # FIXME dimensions upper triangular only
+                lambda_ao = orbrsp_results['lambda_ao'].reshape(dof, dof, nao, nao)
                 lambda_ao += lambda_ao.transpose(0, 1, 3, 2)  # vir-occ
                 rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
 
                 # initiate polarizability gradient variable with data type set in init()
                 pol_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
-                # loop over atoms and contract integral derivatives
-                # with density matrices
-                # add the corresponding contribution to the gradient
+                # loop over atoms and contract integral derivatives with density matrices
                 for i in range(natm):
-
-                    ## timing
-                    #integral_start_time = tm.time()
-                    ## importing integral derivatives from pyscf
-                    #d_ovlp = overlap_deriv(molecule, basis, i)
-                    #d_hcore = hcore_deriv(molecule, basis, i)
-                    #d_eri = eri_deriv(molecule, basis, i)
-                    #d_dipole = dipole_deriv(molecule, basis, i)
-
+                    # import integrals
                     d_hcore, d_ovlp, d_eri, d_dipole = self.import_integrals(
                         molecule, basis, i)
-
+                    # construct polarizability gradient
                     pol_gradient[:,:,i,:] = self.construct_scf_polgrad(
                         gs_dm, rel_dm_ao, omega_ao, x_plus_y, x_minus_y,
-                        d_hcore, d_ovlp, d_eri, d_dipole, nao, dof, i)
+                        d_hcore, d_ovlp, d_eri, d_dipole, nao, i)
             else:
                 gs_dm = None
                 rel_dm_ao = None
                 x_minus_y = None
                 pol_gradient = None
 
-            # add exchange-correlation contributions to the gradient
             if self._dft:
                 xcfun_label = self.xcfun.get_func_label()
-
+                # compute the XC contribution
                 polgrad_xc_contrib = self.compute_polgrad_xc_contrib(
                     molecule, basis, gs_dm, rel_dm_ao, x_minus_y, xcfun_label)
-
+                # add contribution to the SCF polarizability gradient
                 if self.rank == mpi_master():
                     pol_gradient += polgrad_xc_contrib
-
-            # TODO is it necessary to broadcast?
-            #pol_gradient = self.comm.bcast(pol_gradient, root=mpi_master())
 
             if self.rank == mpi_master():
                 polgrad_results[w] = pol_gradient.reshape(dof, dof, 3 * natm)
@@ -413,7 +377,7 @@ class PolarizabilityGradient():
         :param scf_tensors:
             The SCF tensors.
         :param lr_results:
-            The linear response results.
+            The results of the linear response calculation.
         """
 
         # timings
@@ -430,8 +394,6 @@ class PolarizabilityGradient():
         # compute orbital response
         orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
         orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
-        #if self.rank == mpi_master():
-        #    all_orbrsp_results = orbrsp_drv.cphf_results
 
         valstr = '** Time spent on orbital response for {} frequencies: '.format(
             len(self.frequencies))
@@ -464,7 +426,7 @@ class PolarizabilityGradient():
             The derivative dipole moment integrals.
         """
 
-        # timing
+        # timings
         integral_start_time = tm.time()
 
         # importing integral derivatives from pyscf
@@ -483,7 +445,7 @@ class PolarizabilityGradient():
         return d_hcore, d_ovlp, d_eri, d_dipole
 
     def construct_scf_polgrad(self, gs_dm, rel_dm_ao, omega_ao, x_plus_y, x_minus_y,
-                              d_hcore, d_ovlp, d_eri, d_dipole, nao, dof, idx):
+                              d_hcore, d_ovlp, d_eri, d_dipole, nao, idx):
         """
         Constructs the SCF polarizability gradient
 
@@ -507,8 +469,6 @@ class PolarizabilityGradient():
             The derivative dipole moment integrals.
         :param nao:
             The number of atomic orbitals.
-        :param dof:
-            Degrees of freedom of Lagrangian.
         :param idx:
             The index of the atom.
 
@@ -516,17 +476,18 @@ class PolarizabilityGradient():
             The SCF polarizability gradient.
         """
 
+        dof = len(self.vector_components)
+
         frac_K = self.get_k_fraction()
         scf_polgrad = np.zeros((dof, dof, 3), dtype=self.grad_dt)
 
         gradient_start_time = tm.time()
 
-        # calculate the analytic polarizability gradient
+        # construct the analytic polarizability gradient
         # FIXME loop upper triangular only
         for x in range(dof):
             for y in range(dof):
                 for a in range(3):
-                    #scf_polgrad[x, y, idx, a] += (
                     scf_polgrad[x, y, a] += (
                         np.linalg.multi_dot([ # xymn,amn->xya
                             2.0 * rel_dm_ao[x, y].reshape(nao**2),
@@ -572,7 +533,6 @@ class PolarizabilityGradient():
                             d_dipole[y, a].reshape(nao**2)
                         ]))
 
-                    #scf_polgrad[y, x, idx, a] += (
                     scf_polgrad[y, x, a] += (
                         1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->yxa
                             (x_plus_y[y] - x_plus_y[y].T
@@ -665,7 +625,7 @@ class PolarizabilityGradient():
         """
 
         natm = molecule.number_of_atoms()
-        dof = x_minus_y.shape[0]
+        dof = len(self.vector_components)
         xc_pol_gradient = np.zeros((dof, dof, natm, 3))
 
         for m in range(dof):
@@ -736,7 +696,7 @@ class PolarizabilityGradient():
         """
 
         natm = molecule.number_of_atoms()
-        dof = x_minus_y.shape[0]
+        dof = len(self.vector_components)
         xc_pol_gradient = np.zeros((dof, dof, natm, 3), dtype=np.complex_)
 
         for m in range(dof):
@@ -842,16 +802,16 @@ class PolarizabilityGradient():
         polgrad_xcgrad += xcgrad_drv.integrate_fxc_gradient(
             molecule, ao_basis, rhow_den, gs_density, gs_density, mol_grid,
             xcfun_label)
-        polgrad_xcgrad += 0.5*xcgrad_drv.integrate_fxc_gradient(
+        polgrad_xcgrad += 0.5 * xcgrad_drv.integrate_fxc_gradient(
             molecule, ao_basis, x_minus_y_den_m, x_minus_y_den_n, gs_density,
             mol_grid, xcfun_label)
-        polgrad_xcgrad += 0.5*xcgrad_drv.integrate_kxc_gradient(
+        polgrad_xcgrad += 0.5 * xcgrad_drv.integrate_kxc_gradient(
             molecule, ao_basis, x_minus_y_den_m, x_minus_y_den_n, gs_density,
             mol_grid, xcfun_label)
-        polgrad_xcgrad += 0.5*xcgrad_drv.integrate_fxc_gradient(
+        polgrad_xcgrad += 0.5 * xcgrad_drv.integrate_fxc_gradient(
             molecule, ao_basis, x_minus_y_den_n, x_minus_y_den_m, gs_density,
             mol_grid, xcfun_label)
-        polgrad_xcgrad += 0.5*xcgrad_drv.integrate_kxc_gradient(
+        polgrad_xcgrad += 0.5 * xcgrad_drv.integrate_kxc_gradient(
             molecule, ao_basis, x_minus_y_den_n, x_minus_y_den_m, gs_density,
             mol_grid, xcfun_label)
         polgrad_xcgrad = self.comm.reduce(polgrad_xcgrad, root=mpi_master())
@@ -1126,7 +1086,6 @@ class PolarizabilityGradient():
             else:
                 gs_density = AODensityMatrix()
             gs_density.broadcast(self.rank, self.comm)
-            # molgrid.broadcast(self.rank, self.comm) # TODO double check
 
             dft_func_label = self.xcfun.get_func_label().upper()
         else:
@@ -1288,7 +1247,7 @@ class PolarizabilityGradient():
         both real or both complex.
 
         :param lr_results:
-            Results from linear response calculation.
+            The results of the linear response calculation.
         """
 
         response_functions = lr_results.get('response_functions', None)
