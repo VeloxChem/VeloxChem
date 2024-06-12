@@ -190,7 +190,6 @@ class PolOrbitalResponse(CphfSolver):
                     'Building RHS for w = {:4.3f}'.format(w))
                 self.ostream.flush()
 
-                # 1) Calculate unrelaxed one-particle and transition density matrix
                 ovlp = scf_tensors['S']
                 mo = scf_tensors['C']  # only alpha part
 
@@ -200,7 +199,7 @@ class PolOrbitalResponse(CphfSolver):
                 mo_vir = mo[:, nocc:].copy()
                 nvir = mo_vir.shape[1]
 
-                # Check if response vectors exist for desired frequency of gradient
+                # check if response vectors exist for desired frequency of gradient
                 polgrad_sanity_check(self, self.flag, lr_results)
 
             full_vec = ([
@@ -210,10 +209,10 @@ class PolOrbitalResponse(CphfSolver):
             self.ostream.flush()
 
             if self.rank == mpi_master():
-                # Save the number of vector components
+                # number of vector components
                 dof = len(self.vector_components)
 
-                # Extract the excitation and de-excitation components
+                # extract the excitation and de-excitation components
                 # from the full solution vector.
                 exc_vec = (1.0 / self.sqrt2 *
                            np.array(full_vec)[:, :nocc * nvir].reshape(
@@ -222,13 +221,12 @@ class PolOrbitalResponse(CphfSolver):
                              np.array(full_vec)[:, nocc * nvir:].reshape(
                                  dof, nocc, nvir))
 
-                # Construct plus/minus combinations of excitation and
+                # construct plus/minus combinations of excitation and
                 # de-excitation part
                 x_plus_y = exc_vec + deexc_vec
                 x_minus_y = exc_vec - deexc_vec
-                self.ostream.flush()
 
-                # Transform the vectors to the AO basis
+                # transform to AO basis
                 # mi,xia,na->xmn
                 x_plus_y_ao = np.array([
                     np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T])
@@ -239,16 +237,18 @@ class PolOrbitalResponse(CphfSolver):
                     for x in range(x_minus_y.shape[0])
                 ])
 
-                # Turn them into a list (for AODensityMatrix)
+                # turn them into a list for AODensityMatrix
                 xpmy_ao_list_real = list(np.array(x_plus_y_ao.real)) + list(
                     np.array(x_minus_y_ao.real))
                 xpmy_ao_list_imag = list(np.array(x_plus_y_ao.imag)) + list(
                     np.array(x_minus_y_ao.imag))
 
-                # Calculate the symmetrized unrelaxed one-particle density matrix
+                # calculate the symmetrized unrelaxed one-particle density matrix
                 # in MO basis
+                # FIXME dimensions when upper triangular only
                 dm_oo = np.zeros((dof, dof, nocc, nocc), dtype=np.complex_)
                 dm_vv = np.zeros((dof, dof, nvir, nvir), dtype=np.complex_)
+
                 # FIXME loop upper triangular only
                 for x in range(dof):
                     for y in range(dof):
@@ -272,8 +272,8 @@ class PolOrbitalResponse(CphfSolver):
                             # yja,xia->xyij
                             + np.linalg.multi_dot([x_minus_y[x], x_minus_y[y].T]).T)
 
-                # Transform unrelaxed one-particle density matrix to
-                # AO basis and create a list
+                # transform AO basis and create list
+                # FIXME dimensions when upper triangular only
                 unrel_dm_ao = np.zeros((dof, dof, nao, nao), dtype=np.complex_)
                 # FIXME loop upper triangular only
                 for x in range(dof):
@@ -289,17 +289,16 @@ class PolOrbitalResponse(CphfSolver):
                 dm_ao_list_imag = list(
                     np.array(unrel_dm_ao.imag).reshape(dof**2, nao, nao))
 
-                # 2) Construct the right-hand side
+                # density matrix for RHS
                 dm_ao_rhs_real = AODensityMatrix(
                     dm_ao_list_real + xpmy_ao_list_real, denmat.rest)
                 dm_ao_rhs_imag = AODensityMatrix(
                     dm_ao_list_imag + xpmy_ao_list_imag, denmat.rest)
 
                 if self._dft:
-                    # 3) Construct density matrices for E[3] term:
+                    # construct density matrices for E[3] term:
                     # XCIntegrator expects a DM with real and imaginary part,
                     # so we set the imaginary part to zero.
-                    # Create lists with the corresponding vector components
 
                     perturbed_dm_ao_list_rere = []
                     perturbed_dm_ao_list_imim = []
@@ -310,7 +309,6 @@ class PolOrbitalResponse(CphfSolver):
                     # FIXME loop upper triangular only
                     for x in range(dof):
                         for y in range(dof):
-
                             perturbed_dm_ao_list_rere.extend([
                                 np.array(x_minus_y_ao[x].real),
                                 np.array(0 * x_minus_y_ao[x].real),
@@ -371,7 +369,7 @@ class PolOrbitalResponse(CphfSolver):
             # Fock matrices with corresponding type
             fock_ao_rhs_real = AOFockMatrix(dm_ao_rhs_real)
             fock_ao_rhs_imag = AOFockMatrix(dm_ao_rhs_imag)
-            # Set the vector-related components to general Fock matrix
+            # set the vector-related components to general Fock matrix
             # (not 1PDM part)
             # FIXME loop upper triangular only
             for ifock in range(dof**2, dof**2 + 2 * dof):
@@ -464,11 +462,11 @@ class PolOrbitalResponse(CphfSolver):
                                basis, eri_dict, dft_dict, pe_dict,
                                self.profiler)
 
-            # Calculate the RHS and transform it to the MO basis
+            # calculate the RHS
             if self.rank == mpi_master():
                 # extract the 1PDM contributions
-                fock_ao_rhs_1dm = np.zeros((dof**2, nao, nao),
-                                           dtype=np.complex_)
+                # FIXME dimensions when upper triangular only
+                fock_ao_rhs_1dm = np.zeros((dof**2, nao, nao), dtype=np.complex_)
                 fock_ao_rhs_1dm_real = np.zeros((dof**2, nao, nao))
                 fock_ao_rhs_1dm_imag = np.zeros((dof**2, nao, nao))
                 for i in range(dof**2):
@@ -477,7 +475,7 @@ class PolOrbitalResponse(CphfSolver):
                 # combine to complex array
                 fock_ao_rhs_1dm = fock_ao_rhs_1dm_real + 1j * fock_ao_rhs_1dm_imag
 
-                # Transform to MO basis
+                # transform to MO basis
                 # mi,xmn,na->xia
                 fock_mo_rhs_1dm = np.array([
                     np.linalg.multi_dot([mo_occ.T, fock_ao_rhs_1dm[x], mo_vir])
@@ -505,6 +503,7 @@ class PolOrbitalResponse(CphfSolver):
                 fock_ao_rhs_x_minus_y = (fock_ao_rhs_x_minus_y_real +
                                          1j * fock_ao_rhs_x_minus_y_imag)
 
+                # FIXME dimensions when upper triangular only
                 fock_mo_rhs_2dm = np.zeros((dof, dof, nocc, nvir), dtype=np.complex_)
                 # FIXME loop upper triangular only
                 for x in range(dof):
@@ -609,8 +608,7 @@ class PolOrbitalResponse(CphfSolver):
                 fock_mo_rhs_2dm = 0.25 * fock_mo_rhs_2dm.reshape(
                     dof**2, nocc, nvir)
 
-                # Calculate the dipole contributions to the RHS:
-                # Dipole integrals in AO basis
+                # get the dipole integrals in AO basis
                 dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
                 dipole_mats = dipole_drv.compute(molecule, basis)
                 dipole_ints_ao = np.zeros((dof, nao, nao))
@@ -624,7 +622,7 @@ class PolOrbitalResponse(CphfSolver):
                 if 'z' in self.vector_components:
                     dipole_ints_ao[k] = dipole_mats.z_to_numpy()
 
-                # Transform them to MO basis (oo and vv blocks only)
+                # transform to MO basis (oo and vv blocks only)
                 dipole_ints_oo = np.array([
                     np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
                     for x in range(dof)
@@ -634,10 +632,11 @@ class PolOrbitalResponse(CphfSolver):
                     for x in range(dof)
                 ])
 
-                # Contract with vectors to get dipole contribution to the RHS
+                # FIXME dimensions when upper triangular only
                 rhs_dipole_contrib = np.zeros((dof, dof, nocc, nvir),
                                               dtype=np.complex_)
-                # FIXME loop upper trianflular only
+                # calculate dipole contributions to the RHS
+                # FIXME loop upper triangular only
                 for x in range(dof):
                     for y in range(dof):
                         rhs_dipole_contrib[x, y] = (
@@ -654,10 +653,10 @@ class PolOrbitalResponse(CphfSolver):
                 rhs_dipole_contrib = rhs_dipole_contrib.reshape(
                     dof**2, nocc, nvir)
 
+                # sum RHS contributions
                 rhs_mo = fock_mo_rhs_1dm + fock_mo_rhs_2dm + rhs_dipole_contrib
-                self.ostream.flush()
 
-                # Add DFT E[3] contribution to the RHS:
+                # add DFT E[3] contribution to the RHS
                 if self._dft:
                     # FIXME dimensions when upper triangular only
                     gxc_ao = np.zeros((dof**2, nao, nao), dtype=np.complex_)
@@ -718,7 +717,7 @@ class PolOrbitalResponse(CphfSolver):
 
     def compute_rhs_real(self, molecule, basis, scf_tensors, lr_results):
         """
-        Computes the right-hand side (RHS) of the polarizability
+        Computes the right-hand side (RHS) of the Real polarizability
         orbital response equation including the necessary density matrices
         using molecular data.
 
@@ -761,7 +760,6 @@ class PolOrbitalResponse(CphfSolver):
                     'Building RHS for w = {:4.3f}'.format(w))
                 self.ostream.flush()
 
-                # 1) Calculate unrelaxed one-particle and transition density matrix
                 ovlp = scf_tensors['S']
                 mo = scf_tensors['C']  # only alpha part
 
@@ -771,7 +769,7 @@ class PolOrbitalResponse(CphfSolver):
                 mo_vir = mo[:, nocc:].copy()
                 nvir = mo_vir.shape[1]
 
-                # Check if response vectors exist for desired frequency of gradient
+                # check if response vectors exist for desired frequency of gradient
                 polgrad_sanity_check(self, self.flag, lr_results)
 
             full_vec = ([
@@ -780,10 +778,10 @@ class PolOrbitalResponse(CphfSolver):
             ])
 
             if self.rank == mpi_master():
-                # Save the number of vector components
+                # number of vector components
                 dof = len(self.vector_components)
 
-                # Extract the excitation and de-excitation components
+                # extract the excitation and de-excitation components
                 # from the full solution vector.
                 exc_vec = (1.0 / self.sqrt2 *
                            np.array(full_vec)[:, :nocc * nvir].reshape(
@@ -792,12 +790,12 @@ class PolOrbitalResponse(CphfSolver):
                              np.array(full_vec)[:, nocc * nvir:].reshape(
                                  dof, nocc, nvir))
 
-                # Construct plus/minus combinations of excitation and
+                # construct plus/minus combinations of excitation and
                 # de-excitation part
                 x_plus_y = exc_vec + deexc_vec
                 x_minus_y = exc_vec - deexc_vec
 
-                # Transform the vectors to the AO basis
+                # transform to AO basis
                 # mi,xia,na->xmn
                 x_plus_y_ao = np.array([
                     np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T])
@@ -808,10 +806,10 @@ class PolOrbitalResponse(CphfSolver):
                     for x in range(x_minus_y.shape[0])
                 ])
 
-                # Turn them into a list (for AODensityMatrix)
+                # turn them into a list for AODensityMatrix
                 xpmy_ao_list = list(x_plus_y_ao) + list(x_minus_y_ao)
 
-                # Calculate the symmetrized unrelaxed one-particle density matrix
+                # calculate the symmetrized unrelaxed one-particle density matrix
                 # in MO basis
                 # FIXME dimensions when upper triangular only
                 dm_oo = np.zeros((dof, dof, nocc, nocc))
@@ -838,8 +836,7 @@ class PolOrbitalResponse(CphfSolver):
                             # yja,xia->xyij
                             + np.linalg.multi_dot([x_minus_y[x], x_minus_y[y].T]).T)
 
-                # Transform unrelaxed one-particle density matrix to
-                # AO basis and create a list
+                # transform AO basis and create list
                 # FIXME dimensions when upper triangular only
                 unrel_dm_ao = np.zeros((dof, dof, nao, nao))
                 # FIXME loop upper triangular only
@@ -853,17 +850,18 @@ class PolOrbitalResponse(CphfSolver):
                 # FIXME dimensions when upper triangular only
                 dm_ao_list = list(unrel_dm_ao.reshape(dof**2, nao, nao))
 
-                # 2) Construct the right-hand side
+                # density matrix for RHS
                 dm_ao_rhs = AODensityMatrix(dm_ao_list + xpmy_ao_list,
                                             denmat.rest)
 
                 if self._dft:
-                    # 3) Construct density matrices for E[3] term:
+                    # construct density matrices for E[3] term:
                     # XCIntegrator expects a DM with real and imaginary part,
                     # so we set the imaginary part to zero.
-                    # Create lists with the corresponding vector components
+
                     perturbed_dm_ao_list = []
                     zero_dm_ao_list = []
+
                     # FIXME loop upper triangular only
                     for x in range(dof):
                         for y in range(dof):
@@ -896,7 +894,8 @@ class PolOrbitalResponse(CphfSolver):
 
             # Fock matrices with corresponding type
             fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
-            # Set the vector-related components to general Fock matrix
+
+            # set the vector-related components to general Fock matrix
             # (not 1PDM part)
             # FIXME dimensions when upper triangular only
             for ifock in range(dof**2, dof**2 + 2 * dof):
@@ -943,7 +942,7 @@ class PolOrbitalResponse(CphfSolver):
             self._comp_lr_fock(fock_ao_rhs, dm_ao_rhs, molecule, basis,
                                eri_dict, dft_dict, pe_dict, self.profiler)
 
-            # Calculate the RHS and transform it to the MO basis
+            # calculate the RHS
             if self.rank == mpi_master():
                 # extract the 1PDM contributions
                 # FIXME dimensions when upper triangular only
@@ -951,7 +950,7 @@ class PolOrbitalResponse(CphfSolver):
                 for i in range(dof**2):
                     fock_ao_rhs_1dm[i] = fock_ao_rhs.alpha_to_numpy(i)
 
-                # Transform to MO basis
+                # transform to MO basis
                 # mi,xmn,na->xia
                 # FIXME dimensions when upper triangular only
                 fock_mo_rhs_1dm = np.array([
@@ -1073,8 +1072,7 @@ class PolOrbitalResponse(CphfSolver):
                 fock_mo_rhs_2dm = 0.25 * fock_mo_rhs_2dm.reshape(
                     dof**2, nocc, nvir)
 
-                # Calculate the dipole contributions to the RHS:
-                # Dipole integrals in AO basis
+                # get the dipole integrals in AO basis
                 dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
                 dipole_mats = dipole_drv.compute(molecule, basis)
                 dipole_ints_ao = np.zeros((dof, nao, nao))
@@ -1088,7 +1086,7 @@ class PolOrbitalResponse(CphfSolver):
                 if 'z' in self.vector_components:
                     dipole_ints_ao[k] = dipole_mats.z_to_numpy()
 
-                # Transform them to MO basis (oo and vv blocks only)
+                # transform to MO basis (oo and vv blocks only)
                 dipole_ints_oo = np.array([
                     np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
                     for x in range(dof)
@@ -1098,9 +1096,9 @@ class PolOrbitalResponse(CphfSolver):
                     for x in range(dof)
                 ])
 
-                # Contract with vectors to get dipole contribution to the RHS
                 # FIXME dimensions when upper triangular only
                 rhs_dipole_contrib = np.zeros((dof, dof, nocc, nvir))
+                # calculate dipole contributions to the RHS
                 # FIXME loop upper triangular only
                 for x in range(dof):
                     for y in range(dof):
@@ -1118,9 +1116,10 @@ class PolOrbitalResponse(CphfSolver):
                 rhs_dipole_contrib = rhs_dipole_contrib.reshape(
                     dof**2, nocc, nvir)
 
+                # sum RHS contributions
                 rhs_mo = fock_mo_rhs_1dm + fock_mo_rhs_2dm + rhs_dipole_contrib
 
-                # Add DFT E[3] contribution to the RHS:
+                # add DFT E[3] contribution to the RHS
                 if self._dft:
                     # FIXME dimensions when upper triangular only
                     gxc_ao = np.zeros((dof**2, nao, nao))
@@ -1181,6 +1180,15 @@ class PolOrbitalResponse(CphfSolver):
         """
         Guides the calculation of the polarizability Lagrange multipliers
         for the overlap matrix according to is_complex instance variable
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param lr_results:
+            The results from the linear response calculation.
         """
 
         if self.is_complex:
@@ -1212,8 +1220,15 @@ class PolOrbitalResponse(CphfSolver):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
-        n_freqs = len(self.frequencies)
+        if self.rank == mpi_master():
+            # number of vector components
+            dof = len(self.vector_components)
+            # number of frequencies
+            n_freqs = len(self.frequencies)
+            # get CPHF results
+            all_cphf_ov = self.cphf_results['cphf_ov']
 
+        # timings
         loop_start_time = tm.time()
 
         for f, w in enumerate(self.frequencies):
@@ -1221,8 +1236,6 @@ class PolOrbitalResponse(CphfSolver):
             self.ostream.flush()
 
             if self.rank == mpi_master():
-
-                # Get overlap, MO coefficients from scf_tensors
                 ovlp = scf_tensors['S']
                 nocc = molecule.number_of_alpha_electrons()
                 mo = scf_tensors['C']
@@ -1238,16 +1251,13 @@ class PolOrbitalResponse(CphfSolver):
                 eo_diag = np.diag(eocc)
                 ev_diag = np.diag(evir)
 
-                # Get fock matrices from cphf_results
+                # get fock matrices from cphf_results
                 fock_ao_rhs = self.cphf_results[w]['fock_ao_rhs']
                 fock_gxc_ao = self.cphf_results[w]['fock_gxc_ao']
                 dm_oo = self.cphf_results[w]['dm_oo']
                 dm_vv = self.cphf_results[w]['dm_vv']
 
-                # TODO: MPI should this be done before loop over freqs?
-                all_cphf_ov = self.cphf_results['cphf_ov']
-                dof = int(all_cphf_ov.shape[0] / n_freqs)
-                cphf_ov = all_cphf_ov.reshape(n_freqs, dof, nocc, nvir)[f]
+                cphf_ov = all_cphf_ov.reshape(n_freqs, dof**2, nocc, nvir)[f]
 
             full_vec = ([
                 self.get_full_solution_vector(lr_results['solutions'][x, w])
@@ -1255,10 +1265,10 @@ class PolOrbitalResponse(CphfSolver):
             ])
 
             if self.rank == mpi_master():
-                # Save the number of vector components
+                # number of vector components
                 dof = len(self.vector_components)
 
-                # Extract the excitation and de-excitation components
+                # extract the excitation and de-excitation components
                 # from the full solution vector.
                 exc_vec = (1.0 / self.sqrt2 *
                            np.array(full_vec)[:, :nocc * nvir].reshape(
@@ -1270,7 +1280,7 @@ class PolOrbitalResponse(CphfSolver):
                 x_plus_y = exc_vec + deexc_vec
                 x_minus_y = exc_vec - deexc_vec
 
-                # Get dipole moment integrals and transform to MO
+                # get dipole moment integrals
                 dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
                 dipole_mats = dipole_drv.compute(molecule, basis)
                 dipole_ints_ao = np.zeros((dof, nao, nao))
@@ -1284,7 +1294,7 @@ class PolOrbitalResponse(CphfSolver):
                 if 'z' in self.vector_components:
                     dipole_ints_ao[k] = dipole_mats.z_to_numpy()
 
-                # Transform them to MO basis (oo and ov blocks only)
+                # transform to MO basis (oo and ov blocks only)
                 dipole_ints_oo = np.array([
                     np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
                     for x in range(dof)
@@ -1294,7 +1304,7 @@ class PolOrbitalResponse(CphfSolver):
                     for x in range(dof)
                 ])
 
-                # Calculate the dipole moment integrals' contribution to omega
+                # calculate the dipole contribution to omega
                 # FIXME dimensions when upper triangular only
                 dipole_ints_contrib_ao = np.zeros((dof, dof, nao, nao))
                 # FIXME loop upper triangular only
@@ -1322,7 +1332,7 @@ class PolOrbitalResponse(CphfSolver):
                             # ma,xyab,nb->xymn
                             np.linalg.multi_dot([mo_vir, tmp_vv, mo_vir.T]))
 
-                # Transform the vectors to the AO basis
+                # transform the vectors to the AO basis
                 # mi,xia,na->xmn
                 x_plus_y_ao = np.array([
                     np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T])
