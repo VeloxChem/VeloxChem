@@ -245,23 +245,13 @@ class PolarizabilityGradient():
                 dof = len(self.vector_components)
 
                 # Lagrange multipliers
+                # FIXME dimensions upper triangular only
                 omega_ao = orbrsp_results['omega_ao'].reshape(
                     dof, dof, nao, nao)
-                #lambda_mo = orbrsp_results['lambda_mo']
-                # TODO let lambda_ao be available from orbrsp calcs
-
-                # transform lambda multipliers to AO basis and
-                # calculate relaxed density matrix
-                # FIXME dimensions upper triangular only
-                # mi,xia,nm->xmn
-                #lambda_ao = np.array([
-                #    np.linalg.multi_dot([mo_occ, lambda_mo[x], mo_vir.T])
-                #    for x in range(dof**2)]).reshape(dof, dof, nao, nao)
-
-                # TEST
-                # FIXME dimensions upper triangular only
                 lambda_ao = orbrsp_results['lambda_ao'].reshape(dof, dof, nao, nao)
                 lambda_ao += lambda_ao.transpose(0, 1, 3, 2)  # vir-occ
+
+                # calculate relaxed density matrix
                 rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
 
                 # initiate polarizability gradient variable with data type set in init()
@@ -638,10 +628,7 @@ class PolarizabilityGradient():
                     rhow_den_sym = AODensityMatrix([rhow_dm_sym],
                                                    denmat.rest)
 
-                    # The sqrt2 takes into account the fact that we need to
-                    # symmetrize with respect to the polarizability
-                    # components.
-                    # (see contraction with two-electron integrals above).
+                    # symmetrize
                     x_minus_y_sym_m = np.sqrt(2) * 0.5 * (x_minus_y[m] +
                                                           x_minus_y[m].T)
                     x_minus_y_den_sym_m = AODensityMatrix([x_minus_y_sym_m],
@@ -715,10 +702,7 @@ class PolarizabilityGradient():
                     rhow_den_sym_imag = AODensityMatrix(
                         rhow_dm_sym_list_imag, denmat.rest)
 
-                    # the sqrt2 takes into account the fact that we need to
-                    # symmetrize with respect to the polarizability
-                    # components.
-                    # (see contraction with two-electron integrals above).
+                    # symmetrize
                     x_minus_y_sym_m = np.sqrt(2) * 0.5 * (x_minus_y[m] +
                                                           x_minus_y[m].T)
                     x_minus_y_sym_m_list_real = [
