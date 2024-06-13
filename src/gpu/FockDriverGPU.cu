@@ -323,7 +323,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
         dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeQMatrixSS<<<num_blocks, threads_per_block>>>(
+        gpu::computeQMatrixSS<<<num_blocks,threads_per_block>>>(
                            d_mat_Q,
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
@@ -354,7 +354,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeQMatrixSP<<<num_blocks, threads_per_block>>>(
+        gpu::computeQMatrixSP<<<num_blocks,threads_per_block>>>(
                            d_mat_Q,
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
@@ -386,7 +386,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
         dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeQMatrixSD<<<num_blocks, threads_per_block>>>(
+        gpu::computeQMatrixSD<<<num_blocks,threads_per_block>>>(
                            d_mat_Q,
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
@@ -418,7 +418,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeQMatrixPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeQMatrixPP<<<num_blocks,threads_per_block>>>(
                            d_mat_Q,
                            d_p_prim_info,
                            static_cast<uint32_t>(p_prim_count),
@@ -449,7 +449,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
         dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeQMatrixPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeQMatrixPD<<<num_blocks,threads_per_block>>>(
                            d_mat_Q,
                            d_p_prim_info,
                            static_cast<uint32_t>(p_prim_count),
@@ -481,7 +481,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
         dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeQMatrixDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeQMatrixDD<<<num_blocks,threads_per_block>>>(
                            d_mat_Q,
                            d_d_prim_info,
                            static_cast<uint32_t>(d_prim_count),
@@ -775,7 +775,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 
         dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeOverlapAndKineticEnergySS<<<num_blocks, threads_per_block>>>(
+        gpu::computeOverlapAndKineticEnergySS<<<num_blocks,threads_per_block>>>(
                            d_mat_S,
                            d_mat_T,
                            d_s_prim_info,
@@ -813,7 +813,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeOverlapAndKineticEnergySP<<<num_blocks, threads_per_block>>>(
+        gpu::computeOverlapAndKineticEnergySP<<<num_blocks,threads_per_block>>>(
                            d_mat_S,
                            d_mat_T,
                            d_s_prim_info,
@@ -860,7 +860,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 
         dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeOverlapAndKineticEnergySD<<<num_blocks, threads_per_block>>>(
+        gpu::computeOverlapAndKineticEnergySD<<<num_blocks,threads_per_block>>>(
                            d_mat_S,
                            d_mat_T,
                            d_s_prim_info,
@@ -907,7 +907,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeOverlapAndKineticEnergyPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeOverlapAndKineticEnergyPP<<<num_blocks,threads_per_block>>>(
                            d_mat_S,
                            d_mat_T,
                            d_p_prim_info,
@@ -961,7 +961,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 
         dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeOverlapAndKineticEnergyPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeOverlapAndKineticEnergyPD<<<num_blocks,threads_per_block>>>(
                            d_mat_S,
                            d_mat_T,
                            d_p_prim_info,
@@ -1015,7 +1015,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 
         dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeOverlapAndKineticEnergyDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeOverlapAndKineticEnergyDD<<<num_blocks,threads_per_block>>>(
                            d_mat_S,
                            d_mat_T,
                            d_d_prim_info,
@@ -1375,7 +1375,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
         dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeNuclearPotentialSS<<<num_blocks, threads_per_block>>>(
+        gpu::computeNuclearPotentialSS<<<num_blocks,threads_per_block>>>(
                            d_mat_V,
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
@@ -1411,7 +1411,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeNuclearPotentialSP<<<num_blocks, threads_per_block>>>(
+        gpu::computeNuclearPotentialSP<<<num_blocks,threads_per_block>>>(
                            d_mat_V,
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
@@ -1457,7 +1457,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
         dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeNuclearPotentialSD<<<num_blocks, threads_per_block>>>(
+        gpu::computeNuclearPotentialSD<<<num_blocks,threads_per_block>>>(
                            d_mat_V,
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
@@ -1503,7 +1503,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeNuclearPotentialPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeNuclearPotentialPP<<<num_blocks,threads_per_block>>>(
                            d_mat_V,
                            d_p_prim_info,
                            static_cast<uint32_t>(p_prim_count),
@@ -1555,7 +1555,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
         dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeNuclearPotentialPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeNuclearPotentialPD<<<num_blocks,threads_per_block>>>(
                            d_mat_V,
                            d_p_prim_info,
                            static_cast<uint32_t>(p_prim_count),
@@ -1608,7 +1608,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
         dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::computeNuclearPotentialDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeNuclearPotentialDD<<<num_blocks,threads_per_block>>>(
                            d_mat_V,
                            d_d_prim_info,
                            static_cast<uint32_t>(d_prim_count),
@@ -2442,7 +2442,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_J,static_cast<uint32_t>(ss_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(ss_prim_pair_count_local));
 
         cudaSafe(cudaDeviceSynchronize());
 
@@ -2451,10 +2451,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
         num_blocks = dim3((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
-
-        dim3 threads_per_block_large(1, TILE_DIM_LARGE);
-
-        dim3 num_blocks_large((ss_prim_pair_count_local + threads_per_block_large.x - 1) / threads_per_block_large.x, 1);
 
         // J: (SS|SS)
         //     **
@@ -2465,7 +2461,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             timer.start("    J block SSSS");
 
-            gpu::computeCoulombFockSSSS<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSSSS<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2496,7 +2492,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSSSP<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSSSP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2527,7 +2523,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSSSD<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSSSD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2558,7 +2554,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSSPP<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSSPP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2589,7 +2585,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSSPD<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSSPD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2622,7 +2618,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSSDD<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSSDD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2676,7 +2672,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_J,static_cast<uint32_t>(sp_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(sp_prim_pair_count_local));
 
         cudaSafe(cudaDeviceSynchronize());
 
@@ -2686,10 +2682,6 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         num_blocks = dim3((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
-        dim3 threads_per_block_large(1, TILE_DIM_LARGE);
-
-        dim3 num_blocks_large((sp_prim_pair_count_local + threads_per_block_large.x - 1) / threads_per_block_large.x, 1);
-
         // J: (SP|SS)
         //     **
 
@@ -2697,7 +2689,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSPSS<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSPSS<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2728,7 +2720,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSPSP<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSPSP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2759,7 +2751,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSPSD<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSPSD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2792,7 +2784,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSPPP<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSPPP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2823,7 +2815,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSPPD<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSPPD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2856,7 +2848,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSPDD<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSPDD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2920,7 +2912,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_J,static_cast<uint32_t>(pp_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(pp_prim_pair_count_local));
 
         cudaSafe(cudaDeviceSynchronize());
 
@@ -2930,10 +2922,6 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         num_blocks = dim3((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
-        dim3 threads_per_block_large(1, TILE_DIM_LARGE);
-
-        dim3 num_blocks_large((pp_prim_pair_count_local + threads_per_block_large.x - 1) / threads_per_block_large.x, 1);
-
         // J: (PP|SS)
         //     **
 
@@ -2941,7 +2929,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockPPSS<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPPSS<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -2972,7 +2960,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockPPSP<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPPSP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3003,7 +2991,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockPPSD<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPPSD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3036,7 +3024,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockPPPP<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPPPP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3065,7 +3053,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockPPPD<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPPPD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3098,7 +3086,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             cudaSafe(cudaMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockPPDD0<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPPDD0<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3119,7 +3107,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPPDD1<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPPDD1<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3191,7 +3179,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_J,static_cast<uint32_t>(sd_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(sd_prim_pair_count_local));
 
         cudaSafe(cudaDeviceSynchronize());
 
@@ -3201,10 +3189,6 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         num_blocks = dim3((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
-        dim3 threads_per_block_large(1, TILE_DIM_LARGE);
-
-        dim3 num_blocks_large((sd_prim_pair_count_local + threads_per_block_large.x - 1) / threads_per_block_large.x, 1);
-
         // J: (SD|SS)
         //     **
 
@@ -3212,7 +3196,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSDSS<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSDSS<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3243,7 +3227,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSDSP<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSDSP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3276,7 +3260,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSDSD<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSDSD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3307,7 +3291,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSDPP<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSDPP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3340,7 +3324,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSDPD<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSDPD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3375,7 +3359,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             cudaSafe(cudaMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockSDDD0<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSDDD0<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3396,7 +3380,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockSDDD1<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockSDDD1<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3460,7 +3444,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_J,static_cast<uint32_t>(pd_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(pd_prim_pair_count_local));
 
         cudaSafe(cudaDeviceSynchronize());
 
@@ -3470,10 +3454,6 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         num_blocks = dim3((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
-        dim3 threads_per_block_large(1, TILE_DIM_LARGE);
-
-        dim3 num_blocks_large((pd_prim_pair_count_local + threads_per_block_large.x - 1) / threads_per_block_large.x, 1);
-
         // J: (PD|SS)
         //     **
 
@@ -3481,7 +3461,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockPDSS<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPDSS<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3514,7 +3494,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             cudaSafe(cudaMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockPDSP<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPDSP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3549,7 +3529,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             cudaSafe(cudaMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockPDSD<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPDSD<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -3586,7 +3566,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             cudaSafe(cudaMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockPDPP<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPDPP<<<num_blocks,threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3621,7 +3601,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             cudaSafe(cudaMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockPDPD0<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPDPD0<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3642,7 +3622,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPDPD1<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPDPD1<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3677,7 +3657,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             cudaSafe(cudaMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), cudaMemcpyHostToDevice));
 
-            gpu::computeCoulombFockPDDD0<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPDDD0<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3698,7 +3678,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPDDD1<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPDDD1<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3719,7 +3699,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPDDD2<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPDDD2<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3740,7 +3720,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPDDD3<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPDDD3<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3761,7 +3741,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPDDD4<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPDDD4<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3782,7 +3762,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPDDD5<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPDDD5<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3803,7 +3783,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPDDD6<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPDDD6<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3824,7 +3804,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPDDD7<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPDDD7<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3845,7 +3825,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPDDD8<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPDDD8<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3866,7 +3846,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockPDDD9<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockPDDD9<<<num_blocks, threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -3937,7 +3917,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_J,static_cast<uint32_t>(dd_prim_pair_count_local));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(dd_prim_pair_count_local));
 
         cudaSafe(cudaDeviceSynchronize());
 
@@ -3946,10 +3926,6 @@ computeFockOnGPU(const              CMolecule& molecule,
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
         num_blocks = dim3((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
-
-        dim3 threads_per_block_large(1, TILE_DIM_LARGE);
-
-        dim3 num_blocks_large((dd_prim_pair_count_local + threads_per_block_large.x - 1) / threads_per_block_large.x, 1);
 
         // J: (DD|SS)
         //     **
@@ -3964,7 +3940,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            gpu::computeCoulombFockDDSS<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDSS<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -4003,7 +3979,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            gpu::computeCoulombFockDDSP<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDSP<<<dd_num_blocks,dd_threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -4044,7 +4020,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            gpu::computeCoulombFockDDSD0<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDSD0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -4065,7 +4041,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDSD1<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDSD1<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
@@ -4104,7 +4080,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            gpu::computeCoulombFockDDPP0<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDPP0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4125,7 +4101,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPP1<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDPP1<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4164,7 +4140,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            gpu::computeCoulombFockDDPD0<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDPD0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4185,7 +4161,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD1<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDPD1<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4206,7 +4182,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD2<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDPD2<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4227,7 +4203,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD3<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDPD3<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4248,7 +4224,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD4<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDPD4<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4269,7 +4245,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD5<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDPD5<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4290,7 +4266,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD6<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDPD6<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4311,7 +4287,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD7<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDPD7<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4332,7 +4308,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD8<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDPD8<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4353,7 +4329,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD9<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDPD9<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4374,7 +4350,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD10<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDPD10<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4395,7 +4371,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD11<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDPD11<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4416,7 +4392,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDPD12<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDPD12<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_p_prim_info,
                                static_cast<uint32_t>(p_prim_count),
@@ -4455,7 +4431,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             dim3 dd_num_blocks ((dd_prim_pair_count_local + dd_threads_per_block.x - 1) / dd_threads_per_block.x, 1);
 
-            gpu::computeCoulombFockDDDD0<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD0<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4474,7 +4450,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD1<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD1<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4493,7 +4469,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD2<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD2<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4512,7 +4488,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD3<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD3<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4531,7 +4507,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD4<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD4<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4550,7 +4526,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD5<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD5<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4569,7 +4545,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD6<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD6<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4588,7 +4564,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD7<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD7<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4607,7 +4583,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD8<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD8<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4626,7 +4602,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD9<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD9<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4645,7 +4621,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD10<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD10<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4664,7 +4640,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD11<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD11<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4683,7 +4659,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD12<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD12<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4702,7 +4678,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD13<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD13<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4721,7 +4697,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD14<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD14<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4740,7 +4716,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD15<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD15<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4759,7 +4735,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD16<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD16<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4778,7 +4754,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD17<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD17<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4797,7 +4773,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD18<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD18<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4816,7 +4792,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD19<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD19<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4835,7 +4811,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD20<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD20<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4854,7 +4830,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD21<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD21<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4873,7 +4849,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD22<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD22<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4892,7 +4868,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD23<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD23<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4911,7 +4887,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD24<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD24<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4930,7 +4906,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD25<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD25<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4949,7 +4925,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD26<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD26<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4968,7 +4944,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD27<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD27<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -4987,7 +4963,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD28<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD28<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -5006,7 +4982,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD29<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD29<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -5025,7 +5001,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD30<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD30<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -5044,7 +5020,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD31<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD31<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -5063,7 +5039,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            gpu::computeCoulombFockDDDD32<<<num_blocks_large, threads_per_block_large>>>(
+            gpu::computeCoulombFockDDDD32<<<dd_num_blocks, dd_threads_per_block>>>(
                                d_mat_J,
                                d_d_prim_info,
                                static_cast<uint32_t>(d_prim_count),
@@ -5487,7 +5463,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_ss + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_ss));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_ss));
 
         cudaSafe(cudaDeviceSynchronize());
 
@@ -5500,7 +5476,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SS|SS)
         //     *  *
 
-        gpu::computeExchangeFockSSSS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSSS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5526,7 +5502,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SS|SP)
         //     *  *
 
-        gpu::computeExchangeFockSSSP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSSP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5560,7 +5536,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SP|SS)
         //     *  *
 
-        gpu::computeExchangeFockSPSS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPSS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5594,7 +5570,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SP|SP)
         //     *  *
 
-        gpu::computeExchangeFockSPSP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPSP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5623,7 +5599,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SS|SD)
         //     *  *
 
-        gpu::computeExchangeFockSSSD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSSD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5657,7 +5633,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SD|SS)
         //     *  *
 
-        gpu::computeExchangeFockSDSS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDSS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5691,7 +5667,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SP|SD)
         //     *  *
 
-        gpu::computeExchangeFockSPSD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPSD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5728,7 +5704,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SD|SP)
         //     *  *
 
-        gpu::computeExchangeFockSDSP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDSP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5765,7 +5741,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SD|SD)
         //     *  *
 
-        gpu::computeExchangeFockSDSD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDSD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
@@ -5821,7 +5797,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_sp + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_sp));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_sp));
 
         cudaSafe(cudaDeviceSynchronize());
 
@@ -5834,7 +5810,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SS|PS)
         //     *  *
 
-        gpu::computeExchangeFockSSPS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSPS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -5868,7 +5844,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SS|PP)
         //     *  *
 
-        gpu::computeExchangeFockSSPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSPP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -5902,7 +5878,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SP|PS)
         //     *  *
 
-        gpu::computeExchangeFockSPPS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPPS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -5936,7 +5912,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SP|PP)
         //     *  *
 
-        gpu::computeExchangeFockSPPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPPP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -5970,7 +5946,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SS|PD)
         //     *  *
 
-        gpu::computeExchangeFockSSPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSPD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -6007,7 +5983,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SD|PS)
         //     *  *
 
-        gpu::computeExchangeFockSDPS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDPS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -6044,7 +6020,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SP|PD)
         //     *  *
 
-        gpu::computeExchangeFockSPPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPPD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -6081,7 +6057,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SD|PP)
         //     *  *
 
-        gpu::computeExchangeFockSDPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDPP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -6118,7 +6094,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SD|PD)
         //     *  *
 
-        gpu::computeExchangeFockSDPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDPD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
@@ -6191,7 +6167,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_pp + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_pp));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_pp));
 
         cudaSafe(cudaDeviceSynchronize());
 
@@ -6206,7 +6182,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PSPS");
 
-        gpu::computeExchangeFockPSPS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPSPS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6239,7 +6215,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PSPP");
 
-        gpu::computeExchangeFockPSPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPSPP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6277,7 +6253,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PPPS");
 
-        gpu::computeExchangeFockPPPS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPPPS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6315,7 +6291,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PPPP");
 
-        gpu::computeExchangeFockPPPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPPPP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6345,7 +6321,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PSPD");
 
-        gpu::computeExchangeFockPSPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPSPD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6386,7 +6362,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PDPS");
 
-        gpu::computeExchangeFockPDPS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDPS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6427,7 +6403,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PPPD");
 
-        gpu::computeExchangeFockPPPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPPPD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6465,7 +6441,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PDPP");
 
-        gpu::computeExchangeFockPDPP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDPP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6503,7 +6479,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PDPD");
 
-        gpu::computeExchangeFockPDPD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDPD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
@@ -6579,7 +6555,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_sd + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_sd));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_sd));
 
         cudaSafe(cudaDeviceSynchronize());
 
@@ -6592,7 +6568,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SS|DS)
         //     *  *
 
-        gpu::computeExchangeFockSSDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6626,7 +6602,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SS|DP)
         //     *  *
 
-        gpu::computeExchangeFockSSDP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSDP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6663,7 +6639,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SP|DS)
         //     *  *
 
-        gpu::computeExchangeFockSPDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6702,7 +6678,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block SPDP");
 
-        gpu::computeExchangeFockSPDP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPDP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6743,7 +6719,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block SSDD");
 
-        gpu::computeExchangeFockSSDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSSDD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6781,7 +6757,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block SDDS");
 
-        gpu::computeExchangeFockSDDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6819,7 +6795,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block SPDD");
 
-        gpu::computeExchangeFockSPDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSPDD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6860,7 +6836,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block SDDP");
 
-        gpu::computeExchangeFockSDDP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDDP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6901,7 +6877,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block SDDD");
 
-        gpu::computeExchangeFockSDDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockSDDD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
@@ -6975,7 +6951,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_pd + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_pd));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_pd));
 
         cudaSafe(cudaDeviceSynchronize());
 
@@ -6990,7 +6966,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PSDS");
 
-        gpu::computeExchangeFockPSDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPSDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -7031,7 +7007,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PSDP");
 
-        gpu::computeExchangeFockPSDP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPSDP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -7072,7 +7048,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PPDS");
 
-        gpu::computeExchangeFockPPDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPPDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -7113,7 +7089,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PSDD");
 
-        gpu::computeExchangeFockPSDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPSDD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -7154,7 +7130,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PDDS");
 
-        gpu::computeExchangeFockPDDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -7195,7 +7171,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PPDP");
 
-        gpu::computeExchangeFockPPDP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPPDP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -7233,7 +7209,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PPDD");
 
-        gpu::computeExchangeFockPPDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPPDD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -7271,7 +7247,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block PDDP");
 
-        gpu::computeExchangeFockPDDP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockPDDP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
@@ -7651,7 +7627,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks((pair_inds_count_for_K_dd + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_dd));
+        gpu::zeroData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_dd));
 
         cudaSafe(cudaDeviceSynchronize());
 
@@ -7664,7 +7640,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (DS|DS)
         //     *  *
 
-        gpu::computeExchangeFockDSDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDSDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7693,7 +7669,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (DS|DP)
         //     *  *
 
-        gpu::computeExchangeFockDSDP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDSDP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7730,7 +7706,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (DP|DS)
         //     *  *
 
-        gpu::computeExchangeFockDPDS<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDPDS<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7769,7 +7745,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block DSDD");
 
-        gpu::computeExchangeFockDSDD<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDSDD<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
@@ -7874,7 +7850,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block DPDP");
 
-        gpu::computeExchangeFockDPDP<<<num_blocks, threads_per_block>>>(
+        gpu::computeExchangeFockDPDP<<<num_blocks,threads_per_block>>>(
                            d_mat_K,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
