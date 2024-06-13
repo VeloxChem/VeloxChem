@@ -131,7 +131,6 @@ computeExchangeFockSSSS(double*         mat_K,
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
 
-
         if (ik < pair_inds_count_for_K_ss)
         {
             i = pair_inds_i_for_K_ss[ik];
@@ -217,7 +216,6 @@ computeExchangeFockSSSS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ss[displ_k + l];
 
-
                     // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
@@ -250,7 +248,6 @@ computeExchangeFockSSSS(double*         mat_K,
                     if (omega != 0.0)
                     {
                     }
-
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -351,7 +348,6 @@ computeExchangeFockSSSP(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
-
 
         if (ik < pair_inds_count_for_K_ss)
         {
@@ -584,7 +580,6 @@ computeExchangeFockSPSS(double*         mat_K,
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
 
-
         if (ik < pair_inds_count_for_K_ss)
         {
             i = pair_inds_i_for_K_ss[ik];
@@ -816,7 +811,6 @@ computeExchangeFockSPSP(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_ss)
         {
@@ -1068,7 +1062,6 @@ computeExchangeFockSSPS(double*         mat_K,
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
 
-
         if (ik < pair_inds_count_for_K_sp)
         {
             i = pair_inds_i_for_K_sp[ik];
@@ -1305,7 +1298,6 @@ computeExchangeFockSSPP(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_sp)
         {
@@ -1564,7 +1556,6 @@ computeExchangeFockSPPS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-
         if (ik < pair_inds_count_for_K_sp)
         {
             i = pair_inds_i_for_K_sp[ik];
@@ -1821,7 +1812,6 @@ computeExchangeFockSPPP(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_sp)
         {
@@ -2109,7 +2099,6 @@ computeExchangeFockPSPS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-
         if (ik < pair_inds_count_for_K_pp)
         {
             i = pair_inds_i_for_K_pp[ik];
@@ -2367,7 +2356,6 @@ computeExchangeFockPSPP(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_pp)
         {
@@ -2661,7 +2649,6 @@ computeExchangeFockPPPS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-
         if (ik < pair_inds_count_for_K_pp)
         {
             i = pair_inds_i_for_K_pp[ik];
@@ -2947,7 +2934,6 @@ computeExchangeFockPPPP(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_pp)
         {
@@ -3324,7 +3310,6 @@ computeExchangeFockSSSD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-
         if (ik < pair_inds_count_for_K_ss)
         {
             i = pair_inds_i_for_K_ss[ik];
@@ -3588,7 +3573,6 @@ computeExchangeFockSDSS(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_ss)
         {
@@ -3856,7 +3840,6 @@ computeExchangeFockSPSD(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_ss)
         {
@@ -4157,7 +4140,6 @@ computeExchangeFockSDSP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-
         if (ik < pair_inds_count_for_K_ss)
         {
             i = pair_inds_i_for_K_ss[ik];
@@ -4449,7 +4431,6 @@ computeExchangeFockSDSD(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_ss)
         {
@@ -4822,7 +4803,6 @@ computeExchangeFockSSPD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-
         if (ik < pair_inds_count_for_K_sp)
         {
             i = pair_inds_i_for_K_sp[ik];
@@ -5115,7 +5095,6 @@ computeExchangeFockSDPS(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_sp)
         {
@@ -5418,7 +5397,6 @@ computeExchangeFockSPPD(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_sp)
         {
@@ -5777,7 +5755,6 @@ computeExchangeFockSDPP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-
         if (ik < pair_inds_count_for_K_sp)
         {
             i = pair_inds_i_for_K_sp[ik];
@@ -6092,7 +6069,6 @@ computeExchangeFockSDPP(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDPD(double*         mat_K,
 
@@ -6152,7 +6128,6 @@ computeExchangeFockSDPD(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_sp)
         {
@@ -6586,7 +6561,6 @@ computeExchangeFockSDPD(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSDS(double*         mat_K,
 
@@ -6643,7 +6617,6 @@ computeExchangeFockSSDS(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_sd)
         {
@@ -6913,7 +6886,6 @@ computeExchangeFockSSDP(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_sd)
         {
@@ -7208,7 +7180,6 @@ computeExchangeFockSPDS(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_sd)
         {
@@ -7512,7 +7483,6 @@ computeExchangeFockSPDP(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_sd)
         {
@@ -7870,7 +7840,6 @@ computeExchangeFockSSDD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-
         if (ik < pair_inds_count_for_K_sd)
         {
             i = pair_inds_i_for_K_sd[ik];
@@ -8210,7 +8179,6 @@ computeExchangeFockSDDS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-
         if (ik < pair_inds_count_for_K_sd)
         {
             i = pair_inds_i_for_K_sd[ik];
@@ -8528,7 +8496,6 @@ computeExchangeFockSDDS(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPDD(double*         mat_K,
 
@@ -8588,7 +8555,6 @@ computeExchangeFockSPDD(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_sd)
         {
@@ -8989,7 +8955,6 @@ computeExchangeFockSPDD(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDP(double*         mat_K,
 
@@ -9049,7 +9014,6 @@ computeExchangeFockSDDP(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_sd)
         {
@@ -9486,7 +9450,6 @@ computeExchangeFockSDDP(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDD(double*         mat_K,
 
@@ -9543,7 +9506,6 @@ computeExchangeFockSDDD(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_sd)
         {
@@ -10240,7 +10202,6 @@ computeExchangeFockSDDD(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSPD(double*         mat_K,
 
@@ -10300,7 +10261,6 @@ computeExchangeFockPSPD(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_pp)
         {
@@ -10661,7 +10621,6 @@ computeExchangeFockPDPS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-
         if (ik < pair_inds_count_for_K_pp)
         {
             i = pair_inds_i_for_K_pp[ik];
@@ -10962,7 +10921,6 @@ computeExchangeFockPDPS(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPPD(double*         mat_K,
 
@@ -11019,7 +10977,6 @@ computeExchangeFockPPPD(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_pp)
         {
@@ -11457,7 +11414,6 @@ computeExchangeFockPPPD(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPP(double*         mat_K,
 
@@ -11514,7 +11470,6 @@ computeExchangeFockPDPP(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_pp)
         {
@@ -11952,7 +11907,6 @@ computeExchangeFockPDPP(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSDS(double*         mat_K,
 
@@ -12012,7 +11966,6 @@ computeExchangeFockPSDS(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_pd)
         {
@@ -12317,7 +12270,6 @@ computeExchangeFockPSDP(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_pd)
         {
@@ -12679,7 +12631,6 @@ computeExchangeFockPPDS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-
         if (ik < pair_inds_count_for_K_pd)
         {
             i = pair_inds_i_for_K_pd[ik];
@@ -12999,7 +12950,6 @@ computeExchangeFockPPDS(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSDD(double*         mat_K,
 
@@ -13059,7 +13009,6 @@ computeExchangeFockPSDD(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_pd)
         {
@@ -13462,7 +13411,6 @@ computeExchangeFockPSDD(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDS(double*         mat_K,
 
@@ -13522,7 +13470,6 @@ computeExchangeFockPDDS(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_pd)
         {
@@ -13961,7 +13908,6 @@ computeExchangeFockPDDS(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDP(double*         mat_K,
 
@@ -14018,7 +13964,6 @@ computeExchangeFockPPDP(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_pd)
         {
@@ -14457,7 +14402,6 @@ computeExchangeFockPPDP(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDD(double*         mat_K,
 
@@ -14514,7 +14458,6 @@ computeExchangeFockPPDD(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_pd)
         {
@@ -15215,7 +15158,6 @@ computeExchangeFockPPDD(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDP(double*         mat_K,
 
@@ -15272,7 +15214,6 @@ computeExchangeFockPDDP(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_pd)
         {
@@ -15999,8 +15940,6 @@ computeExchangeFockPDDP(double*         mat_K,
         mat_K[ik] += K_ik;
     }
 }
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD0(double*         mat_K,
@@ -17902,7 +17841,7 @@ computeExchangeFockPDDD4(double*         mat_K,
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -17917,9 +17856,9 @@ computeExchangeFockPDDD4(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_pd)
         {
@@ -18920,7 +18859,7 @@ computeExchangeFockPDDD7(double*         mat_K,
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -18935,9 +18874,9 @@ computeExchangeFockPDDD7(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_pd)
         {
@@ -19191,7 +19130,7 @@ computeExchangeFockPDDD8(double*         mat_K,
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -19206,9 +19145,9 @@ computeExchangeFockPDDD8(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_pd)
         {
@@ -19898,14 +19837,6 @@ computeExchangeFockPDDD9(double*         mat_K,
     }
 }
 
-
-
-
-
-
-
-
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDS(double*         mat_K,
 
@@ -19958,7 +19889,6 @@ computeExchangeFockDSDS(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -20279,7 +20209,6 @@ computeExchangeFockDSDS(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDP(double*         mat_K,
 
@@ -20339,7 +20268,6 @@ computeExchangeFockDSDP(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -20778,7 +20706,6 @@ computeExchangeFockDSDP(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDS(double*         mat_K,
 
@@ -20838,7 +20765,6 @@ computeExchangeFockDPDS(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -21277,7 +21203,6 @@ computeExchangeFockDPDS(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDD(double*         mat_K,
 
@@ -21334,7 +21259,6 @@ computeExchangeFockDSDD(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -22034,8 +21958,6 @@ computeExchangeFockDSDD(double*         mat_K,
         mat_K[ik] += K_ik;
     }
 }
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDS0(double*         mat_K,
@@ -23271,7 +23193,6 @@ computeExchangeFockDDDS1(double*         mat_K,
         mat_K[ik] += K_ik;
     }
 }
-
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD0(double*         mat_K,
@@ -25409,7 +25330,7 @@ computeExchangeFockDPDD5(double*         mat_K,
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -25424,9 +25345,9 @@ computeExchangeFockDPDD5(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -26189,7 +26110,7 @@ computeExchangeFockDPDD7(double*         mat_K,
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -26204,9 +26125,9 @@ computeExchangeFockDPDD7(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -26928,14 +26849,6 @@ computeExchangeFockDPDD8(double*         mat_K,
         mat_K[ik] += K_ik;
     }
 }
-
-
-
-
-
-
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP0(double*         mat_K,
@@ -30594,14 +30507,6 @@ computeExchangeFockDDDP8(double*         mat_K,
         mat_K[ik] += K_ik;
     }
 }
-
-
-
-
-
-
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD0(double*         mat_K,
@@ -36255,7 +36160,7 @@ computeExchangeFockDDDD17(double*         mat_K,
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -36270,9 +36175,9 @@ computeExchangeFockDDDD17(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -38133,7 +38038,7 @@ computeExchangeFockDDDD22(double*         mat_K,
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -38148,9 +38053,9 @@ computeExchangeFockDDDD22(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -38376,7 +38281,7 @@ computeExchangeFockDDDD23(double*         mat_K,
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -38391,9 +38296,9 @@ computeExchangeFockDDDD23(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -39571,7 +39476,7 @@ computeExchangeFockDDDD26(double*         mat_K,
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -39586,9 +39491,9 @@ computeExchangeFockDDDD26(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -39818,7 +39723,7 @@ computeExchangeFockDDDD27(double*         mat_K,
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -39833,9 +39738,9 @@ computeExchangeFockDDDD27(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -40627,33 +40532,6 @@ computeExchangeFockDDDD28(double*         mat_K,
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDP(double*         mat_K,
 
@@ -40706,7 +40584,6 @@ computeExchangeFockDPDP(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -41434,7 +41311,6 @@ computeExchangeFockDPDP(double*         mat_K,
     }
 }
 
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPD(double*         mat_K,
 
@@ -41487,7 +41363,6 @@ computeExchangeFockPDPD(double*         mat_K,
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
 
         if (ik < pair_inds_count_for_K_pp)
         {
@@ -42213,6 +42088,5 @@ computeExchangeFockPDPD(double*         mat_K,
         mat_K[ik] += K_ik;
     }
 }
-
 
 }  // namespace gpu
