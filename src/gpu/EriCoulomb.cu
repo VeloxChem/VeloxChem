@@ -94,8 +94,6 @@ computeBoysFunctionEriJ(double* values, const double fa, const uint32_t N, const
     }
 }
 
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSSSS(double*         mat_J,
                        const double*   s_prim_info,
@@ -179,8 +177,6 @@ computeCoulombFockSSSS(double*         mat_J,
 
             const auto S_kl_00 = ss_pair_data[kl];
 
-
-
             const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
                                   (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
                                   (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
@@ -202,7 +198,6 @@ computeCoulombFockSSSS(double*         mat_J,
             double F0_t[1];
 
             gpu::computeBoysFunctionEriJ(F0_t, S1 * S2 * inv_S4 * r2_PQ, 0, boys_func_table, boys_func_ft);
-
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -250,8 +245,6 @@ computeCoulombFockSSSS(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSSSP(double*         mat_J,
@@ -419,8 +412,6 @@ computeCoulombFockSSSP(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSSSD(double*         mat_J,
@@ -621,8 +612,6 @@ computeCoulombFockSSSD(double*         mat_J,
     }
 }
 
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSSPP(double*         mat_J,
                        const double*   s_prim_info,
@@ -815,8 +804,6 @@ computeCoulombFockSSPP(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSSPD(double*         mat_J,
@@ -1043,8 +1030,6 @@ computeCoulombFockSSPD(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSSDD(double*         mat_J,
@@ -1319,8 +1304,6 @@ computeCoulombFockSSDD(double*         mat_J,
     }
 }
 
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSPSS(double*         mat_J,
                        const double*   s_prim_info,
@@ -1488,8 +1471,6 @@ computeCoulombFockSPSS(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSPSP(double*         mat_J,
@@ -1681,8 +1662,6 @@ computeCoulombFockSPSP(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSPSD(double*         mat_J,
@@ -1917,8 +1896,6 @@ computeCoulombFockSPSD(double*         mat_J,
     }
 }
 
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSPPP(double*         mat_J,
                        const double*   s_prim_info,
@@ -2144,8 +2121,6 @@ computeCoulombFockSPPP(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSPPD(double*         mat_J,
@@ -2437,8 +2412,6 @@ computeCoulombFockSPPD(double*         mat_J,
     }
 }
 
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPPSS(double*         mat_J,
                        const double*   s_prim_info,
@@ -2632,8 +2605,6 @@ computeCoulombFockPPSS(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPPSP(double*         mat_J,
@@ -2862,8 +2833,6 @@ computeCoulombFockPPSP(double*         mat_J,
     }
 }
 
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSDSS(double*         mat_J,
                        const double*   s_prim_info,
@@ -3063,8 +3032,6 @@ computeCoulombFockSDSS(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSDSP(double*         mat_J,
@@ -3299,8 +3266,6 @@ computeCoulombFockSDSP(double*         mat_J,
     }
 }
 
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDSS(double*         mat_J,
                        const double*   s_prim_info,
@@ -3528,8 +3493,6 @@ computeCoulombFockPDSS(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDSP(double*         mat_J,
@@ -3823,8 +3786,6 @@ computeCoulombFockPDSP(double*         mat_J,
     }
 }
 
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDSS(double*         mat_J,
                        const double*   s_prim_info,
@@ -4098,9 +4059,6 @@ computeCoulombFockDDSS(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD0(double*         mat_J,
@@ -7883,31 +7841,6 @@ computeCoulombFockDDPD12(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD0(double*         mat_J,
@@ -17000,71 +16933,6 @@ computeCoulombFockDDDD32(double*         mat_J,
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPP0(double*         mat_J,
                        const double*   p_prim_info,
@@ -18172,9 +18040,6 @@ computeCoulombFockDDPP1(double*         mat_J,
     }
 }
 
-
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDSD0(double*         mat_J,
                        const double*   s_prim_info,
@@ -19279,9 +19144,6 @@ computeCoulombFockDDSD1(double*         mat_J,
     }
 }
 
-
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDSP(double*         mat_J,
                        const double*   s_prim_info,
@@ -19674,9 +19536,6 @@ computeCoulombFockDDSP(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDDD0(double*         mat_J,
@@ -22948,25 +22807,6 @@ computeCoulombFockPDDD9(double*         mat_J,
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDPD0(double*         mat_J,
                        const double*   p_prim_info,
@@ -24086,9 +23926,6 @@ computeCoulombFockPDPD1(double*         mat_J,
     }
 }
 
-
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDPP(double*         mat_J,
                        const double*   p_prim_info,
@@ -24516,9 +24353,6 @@ computeCoulombFockPDPP(double*         mat_J,
     }
 }
 
-
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDSD(double*         mat_J,
                        const double*   s_prim_info,
@@ -24945,9 +24779,6 @@ computeCoulombFockPDSD(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSDDD0(double*         mat_J,
@@ -26052,9 +25883,6 @@ computeCoulombFockSDDD1(double*         mat_J,
     }
 }
 
-
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSDPD(double*         mat_J,
                        const double*   s_prim_info,
@@ -26479,9 +26307,6 @@ computeCoulombFockSDPD(double*         mat_J,
     }
 }
 
-
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSDPP(double*         mat_J,
                        const double*   s_prim_info,
@@ -26790,8 +26615,6 @@ computeCoulombFockSDPP(double*         mat_J,
     }
 }
 
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSDSD(double*         mat_J,
                        const double*   s_prim_info,
@@ -27093,9 +26916,6 @@ computeCoulombFockSDSD(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPPDD0(double*         mat_J,
@@ -28204,9 +28024,6 @@ computeCoulombFockPPDD1(double*         mat_J,
     }
 }
 
-
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPPPD(double*         mat_J,
                        const double*   p_prim_info,
@@ -28633,9 +28450,6 @@ computeCoulombFockPPPD(double*         mat_J,
     }
 }
 
-
-
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPPPP(double*         mat_J,
                        const double*   p_prim_info,
@@ -28935,8 +28749,6 @@ computeCoulombFockPPPP(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPPSD(double*         mat_J,
@@ -29247,9 +29059,6 @@ computeCoulombFockPPSD(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSPDD(double*         mat_J,
@@ -29642,6 +29451,5 @@ computeCoulombFockSPDD(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 
 }  // namespace gpu
