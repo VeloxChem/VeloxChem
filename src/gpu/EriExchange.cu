@@ -96,7 +96,6 @@ computeBoysFunctionEriK(double* values, const double fa, const uint32_t N, const
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSSS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
                         const uint32_t  pair_inds_count_for_K_ss,
@@ -111,7 +110,6 @@ computeExchangeFockSSSS(double*         mat_K,
                         const uint32_t* pair_displs_K_ss,
                         const uint32_t* pair_counts_K_ss,
                         const double*   pair_data_K_ss,
-
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -153,6 +151,7 @@ computeExchangeFockSSSS(double*         mat_K,
             r_k[0] = s_prim_info[k + s_prim_count * 2];
             r_k[1] = s_prim_info[k + s_prim_count * 3];
             r_k[2] = s_prim_info[k + s_prim_count * 4];
+
         }
         else
         {
@@ -170,7 +169,7 @@ computeExchangeFockSSSS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -187,7 +186,11 @@ computeExchangeFockSSSS(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ss[displ_i + j];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -216,16 +219,13 @@ computeExchangeFockSSSS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ss[displ_k + l];
 
-                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+                    // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -244,10 +244,6 @@ computeExchangeFockSSSS(double*         mat_K,
                     double F0_t[1];
 
                     gpu::computeBoysFunctionEriK(F0_t, rho * d2 * r2_PQ, 0, boys_func_table, boys_func_ft);
-
-                    if (omega != 0.0)
-                    {
-                    }
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -307,7 +303,6 @@ computeExchangeFockSSSS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSSP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
                         const uint32_t  pair_inds_count_for_K_ss,
@@ -371,6 +366,7 @@ computeExchangeFockSSSP(double*         mat_K,
             r_k[0] = s_prim_info[k + s_prim_count * 2];
             r_k[1] = s_prim_info[k + s_prim_count * 3];
             r_k[2] = s_prim_info[k + s_prim_count * 4];
+
         }
         else
         {
@@ -388,7 +384,7 @@ computeExchangeFockSSSP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -405,7 +401,11 @@ computeExchangeFockSSSP(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ss[displ_i + j];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -436,16 +436,13 @@ computeExchangeFockSSSP(double*         mat_K,
 
                     const auto d0 = l_prim % 3;
 
-                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+                    // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -538,7 +535,6 @@ computeExchangeFockSSSP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPSS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
                         const uint32_t  pair_inds_count_for_K_ss,
@@ -602,6 +598,7 @@ computeExchangeFockSPSS(double*         mat_K,
             r_k[0] = s_prim_info[k + s_prim_count * 2];
             r_k[1] = s_prim_info[k + s_prim_count * 3];
             r_k[2] = s_prim_info[k + s_prim_count * 4];
+
         }
         else
         {
@@ -619,8 +616,8 @@ computeExchangeFockSPSS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
         {
@@ -636,7 +633,19 @@ computeExchangeFockSPSS(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -665,18 +674,13 @@ computeExchangeFockSPSS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ss[displ_k + l];
 
-                    const auto b0 = j_prim % 3;
-
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+                    // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -700,8 +704,6 @@ computeExchangeFockSPSS(double*         mat_K,
                     {
                         F1_t[1] *= d2;
                     }
-
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -769,7 +771,6 @@ computeExchangeFockSPSS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPSP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
                         const uint32_t  pair_inds_count_for_K_ss,
@@ -787,7 +788,6 @@ computeExchangeFockSPSP(double*         mat_K,
                         const uint32_t* pair_displs_K_sp,
                         const uint32_t* pair_counts_K_sp,
                         const double*   pair_data_K_sp,
-
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -834,6 +834,7 @@ computeExchangeFockSPSP(double*         mat_K,
             r_k[0] = s_prim_info[k + s_prim_count * 2];
             r_k[1] = s_prim_info[k + s_prim_count * 3];
             r_k[2] = s_prim_info[k + s_prim_count * 4];
+
         }
         else
         {
@@ -851,8 +852,8 @@ computeExchangeFockSPSP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
         {
@@ -868,7 +869,19 @@ computeExchangeFockSPSP(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -897,19 +910,15 @@ computeExchangeFockSPSP(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_sp[displ_k + l];
 
-                    const auto b0 = j_prim % 3;
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+                    // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -935,7 +944,6 @@ computeExchangeFockSPSP(double*         mat_K,
                         F2_t[2] *= d2 * d2;
                     }
 
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
@@ -1020,7 +1028,6 @@ computeExchangeFockSPSP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSPS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
                         const uint32_t  pair_inds_count_for_K_sp,
@@ -1054,6 +1061,7 @@ computeExchangeFockSSPS(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0;
 
     const uint32_t ik = blockIdx.x;
 
@@ -1084,6 +1092,9 @@ computeExchangeFockSSPS(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            c0 = k % 3;
+
         }
         else
         {
@@ -1101,7 +1112,7 @@ computeExchangeFockSSPS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -1118,7 +1129,11 @@ computeExchangeFockSSPS(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ss[displ_i + j];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -1147,18 +1162,13 @@ computeExchangeFockSSPS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ps[displ_k + l];
 
-                    const auto c0 = k % 3;
-
-                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+                    // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -1252,7 +1262,6 @@ computeExchangeFockSSPS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSPP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
                         const uint32_t  pair_inds_count_for_K_sp,
@@ -1286,6 +1295,7 @@ computeExchangeFockSSPP(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0;
     __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
@@ -1321,6 +1331,9 @@ computeExchangeFockSSPP(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            c0 = k % 3;
+
         }
         else
         {
@@ -1338,7 +1351,7 @@ computeExchangeFockSSPP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -1355,7 +1368,11 @@ computeExchangeFockSSPP(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ss[displ_i + j];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -1384,19 +1401,15 @@ computeExchangeFockSSPP(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
-                    const auto c0 = k % 3;
                     const auto d0 = l_prim % 3;
 
-                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+                    // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -1509,7 +1522,6 @@ computeExchangeFockSSPP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPPS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
                         const uint32_t  pair_inds_count_for_K_sp,
@@ -1543,6 +1555,7 @@ computeExchangeFockSPPS(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0;
     __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
@@ -1578,6 +1591,9 @@ computeExchangeFockSPPS(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            c0 = k % 3;
+
         }
         else
         {
@@ -1595,8 +1611,8 @@ computeExchangeFockSPPS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
         {
@@ -1612,7 +1628,19 @@ computeExchangeFockSPPS(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -1641,19 +1669,13 @@ computeExchangeFockSPPS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ps[displ_k + l];
 
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = k % 3;
-
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+                    // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -1679,7 +1701,6 @@ computeExchangeFockSPPS(double*         mat_K,
                         F2_t[2] *= d2 * d2;
                     }
 
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
@@ -1766,7 +1787,6 @@ computeExchangeFockSPPS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPPP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
                         const uint32_t  pair_inds_count_for_K_sp,
@@ -1800,6 +1820,7 @@ computeExchangeFockSPPP(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0;
     __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
@@ -1835,6 +1856,9 @@ computeExchangeFockSPPP(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            c0 = k % 3;
+
         }
         else
         {
@@ -1852,8 +1876,8 @@ computeExchangeFockSPPP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
         {
@@ -1869,7 +1893,19 @@ computeExchangeFockSPPP(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -1898,20 +1934,15 @@ computeExchangeFockSPPP(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = k % 3;
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+                    // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -1938,7 +1969,6 @@ computeExchangeFockSPPP(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
@@ -2056,7 +2086,6 @@ computeExchangeFockSPPP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSPS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
                         const uint32_t  pair_inds_count_for_K_pp,
@@ -2074,7 +2103,6 @@ computeExchangeFockPSPS(double*         mat_K,
                         const uint32_t* pair_displs_K_ps,
                         const uint32_t* pair_counts_K_ps,
                         const double*   pair_data_K_ps,
-
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -2086,6 +2114,7 @@ computeExchangeFockPSPS(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0;
     __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
@@ -2121,6 +2150,10 @@ computeExchangeFockPSPS(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = k % 3;
+
         }
         else
         {
@@ -2138,7 +2171,7 @@ computeExchangeFockPSPS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -2155,7 +2188,17 @@ computeExchangeFockPSPS(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ps[displ_i + j];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -2184,19 +2227,13 @@ computeExchangeFockPSPS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ps[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto c0 = k % 3;
-
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+                    // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -2222,7 +2259,6 @@ computeExchangeFockPSPS(double*         mat_K,
                         F2_t[2] *= d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
@@ -2310,7 +2346,6 @@ computeExchangeFockPSPS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSPP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
                         const uint32_t  pair_inds_count_for_K_pp,
@@ -2344,6 +2379,7 @@ computeExchangeFockPSPP(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0;
     __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
@@ -2379,6 +2415,10 @@ computeExchangeFockPSPP(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = k % 3;
+
         }
         else
         {
@@ -2396,7 +2436,7 @@ computeExchangeFockPSPP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -2413,7 +2453,17 @@ computeExchangeFockPSPP(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ps[displ_i + j];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -2442,20 +2492,15 @@ computeExchangeFockPSPP(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto c0 = k % 3;
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+                    // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -2482,7 +2527,6 @@ computeExchangeFockPSPP(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
@@ -2602,7 +2646,6 @@ computeExchangeFockPSPP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPPS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
                         const uint32_t  pair_inds_count_for_K_pp,
@@ -2636,6 +2679,7 @@ computeExchangeFockPPPS(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0;
     __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
@@ -2671,6 +2715,10 @@ computeExchangeFockPPPS(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = k % 3;
+
         }
         else
         {
@@ -2688,8 +2736,8 @@ computeExchangeFockPPPS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
         {
@@ -2705,7 +2753,20 @@ computeExchangeFockPPPS(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -2734,20 +2795,13 @@ computeExchangeFockPPPS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ps[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = k % 3;
-
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+                    // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -2774,8 +2828,6 @@ computeExchangeFockPPPS(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
@@ -2895,7 +2947,6 @@ computeExchangeFockPPPS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPPP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
                         const uint32_t  pair_inds_count_for_K_pp,
@@ -2910,7 +2961,6 @@ computeExchangeFockPPPP(double*         mat_K,
                         const uint32_t* pair_displs_K_pp,
                         const uint32_t* pair_counts_K_pp,
                         const double*   pair_data_K_pp,
-
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -2922,6 +2972,7 @@ computeExchangeFockPPPP(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0;
     __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
@@ -2957,6 +3008,10 @@ computeExchangeFockPPPP(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = k % 3;
+
         }
         else
         {
@@ -2974,8 +3029,8 @@ computeExchangeFockPPPP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
         {
@@ -2991,7 +3046,20 @@ computeExchangeFockPPPP(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -3020,21 +3088,15 @@ computeExchangeFockPPPP(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = k % 3;
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+                    // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -3062,8 +3124,6 @@ computeExchangeFockPPPP(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
@@ -3255,7 +3315,6 @@ computeExchangeFockPPPP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSSD(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
                         const uint32_t  pair_inds_count_for_K_ss,
@@ -3332,6 +3391,7 @@ computeExchangeFockSSSD(double*         mat_K,
             r_k[0] = s_prim_info[k + s_prim_count * 2];
             r_k[1] = s_prim_info[k + s_prim_count * 3];
             r_k[2] = s_prim_info[k + s_prim_count * 4];
+
         }
         else
         {
@@ -3349,7 +3409,7 @@ computeExchangeFockSSSD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -3366,7 +3426,11 @@ computeExchangeFockSSSD(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ss[displ_i + j];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -3398,16 +3462,12 @@ computeExchangeFockSSSD(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -3519,7 +3579,6 @@ computeExchangeFockSSSD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDSS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
                         const uint32_t  pair_inds_count_for_K_ss,
@@ -3596,6 +3655,7 @@ computeExchangeFockSDSS(double*         mat_K,
             r_k[0] = s_prim_info[k + s_prim_count * 2];
             r_k[1] = s_prim_info[k + s_prim_count * 3];
             r_k[2] = s_prim_info[k + s_prim_count * 4];
+
         }
         else
         {
@@ -3613,8 +3673,8 @@ computeExchangeFockSDSS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
         {
@@ -3630,7 +3690,21 @@ computeExchangeFockSDSS(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -3659,19 +3733,12 @@ computeExchangeFockSDSS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ss[displ_k + l];
 
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -3696,9 +3763,6 @@ computeExchangeFockSDSS(double*         mat_K,
                         F2_t[1] *= d2;
                         F2_t[2] *= d2 * d2;
                     }
-
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -3783,7 +3847,6 @@ computeExchangeFockSDSS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPSD(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
                         const uint32_t  pair_inds_count_for_K_ss,
@@ -3863,6 +3926,7 @@ computeExchangeFockSPSD(double*         mat_K,
             r_k[0] = s_prim_info[k + s_prim_count * 2];
             r_k[1] = s_prim_info[k + s_prim_count * 3];
             r_k[2] = s_prim_info[k + s_prim_count * 4];
+
         }
         else
         {
@@ -3880,8 +3944,8 @@ computeExchangeFockSPSD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
         {
@@ -3897,7 +3961,19 @@ computeExchangeFockSPSD(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -3926,20 +4002,15 @@ computeExchangeFockSPSD(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_sd[displ_k + l];
 
-                    const auto b0 = j_prim % 3;
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -3966,7 +4037,6 @@ computeExchangeFockSPSD(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
@@ -4082,7 +4152,6 @@ computeExchangeFockSPSD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDSP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
                         const uint32_t  pair_inds_count_for_K_ss,
@@ -4162,6 +4231,7 @@ computeExchangeFockSDSP(double*         mat_K,
             r_k[0] = s_prim_info[k + s_prim_count * 2];
             r_k[1] = s_prim_info[k + s_prim_count * 3];
             r_k[2] = s_prim_info[k + s_prim_count * 4];
+
         }
         else
         {
@@ -4179,8 +4249,8 @@ computeExchangeFockSDSP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
         {
@@ -4196,7 +4266,21 @@ computeExchangeFockSDSP(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -4225,20 +4309,14 @@ computeExchangeFockSDSP(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_sp[displ_k + l];
 
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -4265,8 +4343,6 @@ computeExchangeFockSDSP(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
@@ -4381,7 +4457,6 @@ computeExchangeFockSDSP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDSD(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_ss,
                         const uint32_t* pair_inds_k_for_K_ss,
                         const uint32_t  pair_inds_count_for_K_ss,
@@ -4399,7 +4474,6 @@ computeExchangeFockSDSD(double*         mat_K,
                         const uint32_t* pair_displs_K_sd,
                         const uint32_t* pair_counts_K_sd,
                         const double*   pair_data_K_sd,
-
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -4454,6 +4528,7 @@ computeExchangeFockSDSD(double*         mat_K,
             r_k[0] = s_prim_info[k + s_prim_count * 2];
             r_k[1] = s_prim_info[k + s_prim_count * 3];
             r_k[2] = s_prim_info[k + s_prim_count * 4];
+
         }
         else
         {
@@ -4471,8 +4546,8 @@ computeExchangeFockSDSD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
         {
@@ -4488,7 +4563,21 @@ computeExchangeFockSDSD(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -4517,21 +4606,15 @@ computeExchangeFockSDSD(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_sd[displ_k + l];
 
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -4559,8 +4642,6 @@ computeExchangeFockSDSD(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
@@ -4745,7 +4826,6 @@ computeExchangeFockSDSD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSPD(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
                         const uint32_t  pair_inds_count_for_K_sp,
@@ -4782,6 +4862,7 @@ computeExchangeFockSSPD(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -4825,6 +4906,9 @@ computeExchangeFockSSPD(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            c0 = k % 3;
+
         }
         else
         {
@@ -4842,7 +4926,7 @@ computeExchangeFockSSPD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -4859,7 +4943,11 @@ computeExchangeFockSSPD(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ss[displ_i + j];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -4888,20 +4976,15 @@ computeExchangeFockSSPD(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_pd[displ_k + l];
 
-                    const auto c0 = k % 3;
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -5038,7 +5121,6 @@ computeExchangeFockSSPD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDPS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
                         const uint32_t  pair_inds_count_for_K_sp,
@@ -5075,6 +5157,7 @@ computeExchangeFockSDPS(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -5118,6 +5201,9 @@ computeExchangeFockSDPS(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            c0 = k % 3;
+
         }
         else
         {
@@ -5135,8 +5221,8 @@ computeExchangeFockSDPS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
         {
@@ -5152,7 +5238,21 @@ computeExchangeFockSDPS(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -5181,20 +5281,12 @@ computeExchangeFockSDPS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ps[displ_k + l];
 
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = k % 3;
-
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -5221,8 +5313,6 @@ computeExchangeFockSDPS(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
@@ -5340,7 +5430,6 @@ computeExchangeFockSDPS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPPD(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
                         const uint32_t  pair_inds_count_for_K_sp,
@@ -5377,6 +5466,7 @@ computeExchangeFockSPPD(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -5420,6 +5510,9 @@ computeExchangeFockSPPD(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            c0 = k % 3;
+
         }
         else
         {
@@ -5437,8 +5530,8 @@ computeExchangeFockSPPD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
         {
@@ -5454,7 +5547,19 @@ computeExchangeFockSPPD(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -5483,21 +5588,15 @@ computeExchangeFockSPPD(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_pd[displ_k + l];
 
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = k % 3;
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -5525,7 +5624,6 @@ computeExchangeFockSPPD(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -5697,7 +5795,6 @@ computeExchangeFockSPPD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDPP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
                         const uint32_t  pair_inds_count_for_K_sp,
@@ -5734,6 +5831,7 @@ computeExchangeFockSDPP(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -5777,6 +5875,9 @@ computeExchangeFockSDPP(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            c0 = k % 3;
+
         }
         else
         {
@@ -5794,8 +5895,8 @@ computeExchangeFockSDPP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
         {
@@ -5811,7 +5912,21 @@ computeExchangeFockSDPP(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -5840,21 +5955,14 @@ computeExchangeFockSDPP(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = k % 3;
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -5882,8 +5990,6 @@ computeExchangeFockSDPP(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
@@ -6071,7 +6177,6 @@ computeExchangeFockSDPP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDPD(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sp,
                         const uint32_t* pair_inds_k_for_K_sp,
                         const uint32_t  pair_inds_count_for_K_sp,
@@ -6108,6 +6213,7 @@ computeExchangeFockSDPD(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -6151,6 +6257,9 @@ computeExchangeFockSDPD(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            c0 = k % 3;
+
         }
         else
         {
@@ -6168,8 +6277,8 @@ computeExchangeFockSDPD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
         {
@@ -6185,7 +6294,21 @@ computeExchangeFockSDPD(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -6214,22 +6337,15 @@ computeExchangeFockSDPD(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_pd[displ_k + l];
 
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = k % 3;
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -6258,8 +6374,6 @@ computeExchangeFockSDPD(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -6563,7 +6677,6 @@ computeExchangeFockSDPD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSDS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
                         const uint32_t  pair_inds_count_for_K_sd,
@@ -6597,6 +6710,7 @@ computeExchangeFockSSDS(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -6640,6 +6754,10 @@ computeExchangeFockSSDS(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -6657,7 +6775,7 @@ computeExchangeFockSSDS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -6674,7 +6792,11 @@ computeExchangeFockSSDS(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ss[displ_i + j];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -6703,19 +6825,12 @@ computeExchangeFockSSDS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
-
-                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -6829,7 +6944,6 @@ computeExchangeFockSSDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSDP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
                         const uint32_t  pair_inds_count_for_K_sd,
@@ -6866,6 +6980,7 @@ computeExchangeFockSSDP(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -6909,6 +7024,10 @@ computeExchangeFockSSDP(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -6926,7 +7045,7 @@ computeExchangeFockSSDP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -6943,7 +7062,11 @@ computeExchangeFockSSDP(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ss[displ_i + j];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -6972,20 +7095,14 @@ computeExchangeFockSSDP(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -7123,7 +7240,6 @@ computeExchangeFockSSDP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPDS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
                         const uint32_t  pair_inds_count_for_K_sd,
@@ -7160,6 +7276,7 @@ computeExchangeFockSPDS(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -7203,6 +7320,10 @@ computeExchangeFockSPDS(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -7220,8 +7341,8 @@ computeExchangeFockSPDS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
         {
@@ -7237,7 +7358,19 @@ computeExchangeFockSPDS(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -7266,20 +7399,12 @@ computeExchangeFockSPDS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
-
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -7306,7 +7431,6 @@ computeExchangeFockSPDS(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
 
@@ -7426,7 +7550,6 @@ computeExchangeFockSPDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPDP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
                         const uint32_t  pair_inds_count_for_K_sd,
@@ -7463,6 +7586,7 @@ computeExchangeFockSPDP(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -7506,6 +7630,10 @@ computeExchangeFockSPDP(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -7523,8 +7651,8 @@ computeExchangeFockSPDP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
         {
@@ -7540,7 +7668,19 @@ computeExchangeFockSPDP(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -7569,21 +7709,14 @@ computeExchangeFockSPDP(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -7611,7 +7744,6 @@ computeExchangeFockSPDP(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -7785,7 +7917,6 @@ computeExchangeFockSPDP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSDD(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
                         const uint32_t  pair_inds_count_for_K_sd,
@@ -7819,6 +7950,7 @@ computeExchangeFockSSDD(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -7862,6 +7994,10 @@ computeExchangeFockSSDD(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -7879,7 +8015,7 @@ computeExchangeFockSSDD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -7896,7 +8032,11 @@ computeExchangeFockSSDD(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ss[displ_i + j];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -7925,21 +8065,15 @@ computeExchangeFockSSDD(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -8124,7 +8258,6 @@ computeExchangeFockSSDD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
                         const uint32_t  pair_inds_count_for_K_sd,
@@ -8158,6 +8291,7 @@ computeExchangeFockSDDS(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -8201,6 +8335,10 @@ computeExchangeFockSDDS(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -8218,8 +8356,8 @@ computeExchangeFockSDDS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
         {
@@ -8235,7 +8373,21 @@ computeExchangeFockSDDS(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -8264,21 +8416,12 @@ computeExchangeFockSDDS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
-
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -8306,8 +8449,6 @@ computeExchangeFockSDDS(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
 
@@ -8498,7 +8639,6 @@ computeExchangeFockSDDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPDD(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
                         const uint32_t  pair_inds_count_for_K_sd,
@@ -8535,6 +8675,7 @@ computeExchangeFockSPDD(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -8578,6 +8719,10 @@ computeExchangeFockSPDD(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -8595,8 +8740,8 @@ computeExchangeFockSPDD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
         {
@@ -8612,7 +8757,19 @@ computeExchangeFockSPDD(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -8641,22 +8798,15 @@ computeExchangeFockSPDD(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -8685,7 +8835,6 @@ computeExchangeFockSPDD(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -8957,7 +9106,6 @@ computeExchangeFockSPDD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
                         const uint32_t  pair_inds_count_for_K_sd,
@@ -8994,6 +9142,7 @@ computeExchangeFockSDDP(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -9037,6 +9186,10 @@ computeExchangeFockSDDP(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -9054,8 +9207,8 @@ computeExchangeFockSDDP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
         {
@@ -9071,7 +9224,21 @@ computeExchangeFockSDDP(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -9100,22 +9267,14 @@ computeExchangeFockSDDP(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -9144,8 +9303,6 @@ computeExchangeFockSDDP(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -9452,7 +9609,6 @@ computeExchangeFockSDDP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDD(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_sd,
                         const uint32_t* pair_inds_k_for_K_sd,
                         const uint32_t  pair_inds_count_for_K_sd,
@@ -9486,6 +9642,7 @@ computeExchangeFockSDDD(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -9529,6 +9686,10 @@ computeExchangeFockSDDD(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -9546,8 +9707,8 @@ computeExchangeFockSDDD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
         {
@@ -9563,7 +9724,21 @@ computeExchangeFockSDDD(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_sd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -9592,23 +9767,15 @@ computeExchangeFockSDDD(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -9638,8 +9805,6 @@ computeExchangeFockSDDD(double*         mat_K,
                         F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -10204,7 +10369,6 @@ computeExchangeFockSDDD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSPD(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
                         const uint32_t  pair_inds_count_for_K_pp,
@@ -10241,6 +10405,7 @@ computeExchangeFockPSPD(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -10284,6 +10449,10 @@ computeExchangeFockPSPD(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = k % 3;
+
         }
         else
         {
@@ -10301,7 +10470,7 @@ computeExchangeFockPSPD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -10318,7 +10487,17 @@ computeExchangeFockPSPD(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ps[displ_i + j];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -10347,21 +10526,15 @@ computeExchangeFockPSPD(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_pd[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto c0 = k % 3;
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -10389,7 +10562,6 @@ computeExchangeFockPSPD(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -10563,7 +10735,6 @@ computeExchangeFockPSPD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
                         const uint32_t  pair_inds_count_for_K_pp,
@@ -10600,6 +10771,7 @@ computeExchangeFockPDPS(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -10643,6 +10815,10 @@ computeExchangeFockPDPS(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = k % 3;
+
         }
         else
         {
@@ -10660,8 +10836,8 @@ computeExchangeFockPDPS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
         {
@@ -10677,7 +10853,22 @@ computeExchangeFockPDPS(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -10706,21 +10897,12 @@ computeExchangeFockPDPS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ps[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = k % 3;
-
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -10748,9 +10930,6 @@ computeExchangeFockPDPS(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
@@ -10923,7 +11102,6 @@ computeExchangeFockPDPS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPPD(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
                         const uint32_t  pair_inds_count_for_K_pp,
@@ -10957,6 +11135,7 @@ computeExchangeFockPPPD(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -11000,6 +11179,10 @@ computeExchangeFockPPPD(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = k % 3;
+
         }
         else
         {
@@ -11017,8 +11200,8 @@ computeExchangeFockPPPD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
         {
@@ -11034,7 +11217,20 @@ computeExchangeFockPPPD(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -11063,22 +11259,15 @@ computeExchangeFockPPPD(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_pd[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = k % 3;
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -11107,8 +11296,6 @@ computeExchangeFockPPPD(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -11416,7 +11603,6 @@ computeExchangeFockPPPD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
                         const uint32_t  pair_inds_count_for_K_pp,
@@ -11450,6 +11636,7 @@ computeExchangeFockPDPP(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -11493,6 +11680,10 @@ computeExchangeFockPDPP(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = k % 3;
+
         }
         else
         {
@@ -11510,8 +11701,8 @@ computeExchangeFockPDPP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
         {
@@ -11527,7 +11718,22 @@ computeExchangeFockPDPP(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -11556,22 +11762,14 @@ computeExchangeFockPDPP(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = k % 3;
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -11600,9 +11798,6 @@ computeExchangeFockPDPP(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
@@ -11909,7 +12104,6 @@ computeExchangeFockPDPP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSDS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
                         const uint32_t  pair_inds_count_for_K_pd,
@@ -11946,6 +12140,7 @@ computeExchangeFockPSDS(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -11989,6 +12184,11 @@ computeExchangeFockPSDS(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -12006,7 +12206,7 @@ computeExchangeFockPSDS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -12023,7 +12223,17 @@ computeExchangeFockPSDS(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ps[displ_i + j];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -12052,20 +12262,12 @@ computeExchangeFockPSDS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
-
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -12092,7 +12294,6 @@ computeExchangeFockPSDS(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
 
@@ -12213,7 +12414,6 @@ computeExchangeFockPSDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSDP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
                         const uint32_t  pair_inds_count_for_K_pd,
@@ -12250,6 +12450,7 @@ computeExchangeFockPSDP(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -12293,6 +12494,11 @@ computeExchangeFockPSDP(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -12310,7 +12516,7 @@ computeExchangeFockPSDP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -12327,7 +12533,17 @@ computeExchangeFockPSDP(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ps[displ_i + j];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -12356,21 +12572,14 @@ computeExchangeFockPSDP(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -12398,7 +12607,6 @@ computeExchangeFockPSDP(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -12573,7 +12781,6 @@ computeExchangeFockPSDP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
                         const uint32_t  pair_inds_count_for_K_pd,
@@ -12610,6 +12817,7 @@ computeExchangeFockPPDS(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -12653,6 +12861,11 @@ computeExchangeFockPPDS(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -12670,8 +12883,8 @@ computeExchangeFockPPDS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
@@ -12687,7 +12900,20 @@ computeExchangeFockPPDS(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -12716,21 +12942,12 @@ computeExchangeFockPPDS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
-
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -12758,8 +12975,6 @@ computeExchangeFockPPDS(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
 
@@ -12952,7 +13167,6 @@ computeExchangeFockPPDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSDD(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
                         const uint32_t  pair_inds_count_for_K_pd,
@@ -12989,6 +13203,7 @@ computeExchangeFockPSDD(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -13032,6 +13247,11 @@ computeExchangeFockPSDD(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -13049,7 +13269,7 @@ computeExchangeFockPSDD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -13066,7 +13286,17 @@ computeExchangeFockPSDD(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ps[displ_i + j];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -13095,22 +13325,15 @@ computeExchangeFockPSDD(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -13139,7 +13362,6 @@ computeExchangeFockPSDD(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -13413,7 +13635,6 @@ computeExchangeFockPSDD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
                         const uint32_t  pair_inds_count_for_K_pd,
@@ -13450,6 +13671,7 @@ computeExchangeFockPDDS(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -13493,6 +13715,11 @@ computeExchangeFockPDDS(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -13510,8 +13737,8 @@ computeExchangeFockPDDS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
@@ -13527,7 +13754,22 @@ computeExchangeFockPDDS(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -13556,22 +13798,12 @@ computeExchangeFockPDDS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
-
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -13600,9 +13832,6 @@ computeExchangeFockPDDS(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
 
@@ -13910,7 +14139,6 @@ computeExchangeFockPDDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
                         const uint32_t  pair_inds_count_for_K_pd,
@@ -13944,6 +14172,7 @@ computeExchangeFockPPDP(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -13987,6 +14216,11 @@ computeExchangeFockPPDP(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -14004,8 +14238,8 @@ computeExchangeFockPPDP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
@@ -14021,7 +14255,20 @@ computeExchangeFockPPDP(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -14050,22 +14297,14 @@ computeExchangeFockPPDP(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -14094,8 +14333,6 @@ computeExchangeFockPPDP(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -14404,7 +14641,6 @@ computeExchangeFockPPDP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDD(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
                         const uint32_t  pair_inds_count_for_K_pd,
@@ -14438,6 +14674,7 @@ computeExchangeFockPPDD(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -14481,6 +14718,11 @@ computeExchangeFockPPDD(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -14498,8 +14740,8 @@ computeExchangeFockPPDD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
@@ -14515,7 +14757,20 @@ computeExchangeFockPPDD(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -14544,23 +14799,15 @@ computeExchangeFockPPDD(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -14590,8 +14837,6 @@ computeExchangeFockPPDD(double*         mat_K,
                         F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -15160,7 +15405,6 @@ computeExchangeFockPPDD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
                         const uint32_t  pair_inds_count_for_K_pd,
@@ -15194,6 +15438,7 @@ computeExchangeFockPDDP(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -15237,6 +15482,11 @@ computeExchangeFockPDDP(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -15254,8 +15504,8 @@ computeExchangeFockPDDP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
@@ -15271,7 +15521,22 @@ computeExchangeFockPDDP(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -15300,23 +15565,14 @@ computeExchangeFockPDDP(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -15346,9 +15602,6 @@ computeExchangeFockPDDP(double*         mat_K,
                         F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -15971,11 +16224,12 @@ computeExchangeFockPDDD0(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -15985,6 +16239,7 @@ computeExchangeFockPDDD0(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -16018,12 +16273,18 @@ computeExchangeFockPDDD0(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -16035,8 +16296,8 @@ computeExchangeFockPDDD0(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
@@ -16052,7 +16313,22 @@ computeExchangeFockPDDD0(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -16081,24 +16357,15 @@ computeExchangeFockPDDD0(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -16123,30 +16390,26 @@ computeExchangeFockPDDD0(double*         mat_K,
                         F7_t[1] *= d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[0] * (
-        
+
                                 0.125 * inv_S1 * inv_S2 * inv_S2 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PA_0)
                                     + (delta[a0][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][b1] * delta[c0][d1] * delta[c1][d0]) * (PB_0)
                                     + (delta[a0][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[c0][d1] * delta[c1][d0]) * (PB_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[0] * (
-        
+
                                 + 0.25 * inv_S1 * inv_S2 * (
                                     delta[b0][b1] * delta[d0][d1] * (PA_0 * QC_0 * QC_1)
                                     + delta[b0][b1] * delta[c1][d1] * (PA_0 * QD_0 * QC_0)
@@ -16167,35 +16430,35 @@ computeExchangeFockPDDD0(double*         mat_K,
                                     + delta[a0][b1] * delta[c0][c1] * (PB_0 * QD_0 * QD_1)
                                     + delta[a0][b0] * delta[c0][c1] * (PB_1 * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[0] * (
-        
+
                                 + 0.25 * inv_S2 * inv_S2 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1 * PA_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[0] * (
-        
+
                                 + 0.5 * inv_S1 * (
                                     delta[b0][b1] * (PA_0 * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a0][b1] * (PB_0 * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a0][b0] * (PB_1 * QD_0 * QD_1 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[0] * (
-        
+
                                 + 0.5 * inv_S2 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PA_0 * QC_0 * QC_1)
                                     + delta[c1][d1] * (PB_0 * PB_1 * PA_0 * QD_0 * QC_0)
@@ -16204,24 +16467,24 @@ computeExchangeFockPDDD0(double*         mat_K,
                                     + delta[c0][d0] * (PB_0 * PB_1 * PA_0 * QD_1 * QC_1)
                                     + delta[c0][c1] * (PB_0 * PB_1 * PA_0 * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[0] * (
-        
+
                                 + (
                                     
                                     + PB_0 * PB_1 * PA_0 * QD_0 * QD_1 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 0.125 * inv_S1 * inv_S2 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PA_0 * (-1.0) + PQ[a0])
                                     + (delta[a0][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][b1] * delta[c0][d1] * delta[c1][d0]) * (PB_0 * (-1.0) + PQ[b0])
@@ -16231,35 +16494,35 @@ computeExchangeFockPDDD0(double*         mat_K,
                                     + (delta[a0][b0] * delta[b1][c0] * delta[c1][d1] + delta[a0][b0] * delta[b1][c1] * delta[c0][d1] + delta[a0][b0] * delta[b1][d1] * delta[c0][c1] + delta[a0][b1] * delta[b0][c0] * delta[c1][d1] + delta[a0][b1] * delta[b0][c1] * delta[c0][d1] + delta[a0][b1] * delta[b0][d1] * delta[c0][c1] + delta[a0][c0] * delta[b0][b1] * delta[c1][d1] + delta[a0][c1] * delta[b0][b1] * delta[c0][d1] + delta[a0][d1] * delta[b0][b1] * delta[c0][c1]) * (QD_0)
                                     + (delta[a0][b0] * delta[b1][c0] * delta[c1][d0] + delta[a0][b0] * delta[b1][c1] * delta[c0][d0] + delta[a0][b0] * delta[b1][d0] * delta[c0][c1] + delta[a0][b1] * delta[b0][c0] * delta[c1][d0] + delta[a0][b1] * delta[b0][c1] * delta[c0][d0] + delta[a0][b1] * delta[b0][d0] * delta[c0][c1] + delta[a0][c0] * delta[b0][b1] * delta[c1][d0] + delta[a0][c1] * delta[b0][b1] * delta[c0][d0] + delta[a0][d0] * delta[b0][b1] * delta[c0][c1]) * (QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + (-0.25) * inv_S2 * inv_S2 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PA_0)
                                     + (delta[a0][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][b1] * delta[c0][d1] * delta[c1][d0]) * (PB_0)
                                     + (delta[a0][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[c0][d1] * delta[c1][d0]) * (PB_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + (-0.5) * S1 * inv_S2 * inv_S2 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1 * PA_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + 0.25 * inv_S1 * inv_S4 * (
                                     delta[b0][b1] * delta[d0][d1] * (PA_0 * QC_0 * QC_1 * (-1.0) + PQ[a0] * QC_0 * QC_1)
                                     + delta[b0][b1] * delta[c1][d1] * (PA_0 * QD_0 * QC_0 * (-1.0) + PQ[a0] * QD_0 * QC_0)
@@ -16284,13 +16547,13 @@ computeExchangeFockPDDD0(double*         mat_K,
                                     + (delta[a0][b0] * delta[b1][c1] + delta[a0][b1] * delta[b0][c1] + delta[a0][c1] * delta[b0][b1]) * (QD_0 * QD_1 * QC_0)
                                     + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (QD_0 * QD_1 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + 0.25 * inv_S2 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1 * PQ[a0] + PB_0 * PA_0 * PQ[b1] + PB_1 * PA_0 * PQ[b0])
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PB_0 * PA_0 * QC_0)
@@ -16324,13 +16587,13 @@ computeExchangeFockPDDD0(double*         mat_K,
                                     + (delta[a0][c0] * delta[c1][d1] + delta[a0][c1] * delta[c0][d1] + delta[a0][d1] * delta[c0][c1]) * (PB_0 * PB_1 * QD_0)
                                     + (delta[a0][c0] * delta[c1][d0] + delta[a0][c1] * delta[c0][d0] + delta[a0][d0] * delta[c0][c1]) * (PB_0 * PB_1 * QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + (-0.5) * S1 * inv_S2 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PA_0 * PQ[c0] * QC_1 + PB_0 * PB_1 * PA_0 * PQ[c1] * QC_0 + PB_0 * PB_1 * PA_0 * QC_0 * QC_1)
                                     + delta[c1][d1] * (PB_0 * PB_1 * PA_0 * PQ[c0] * QD_0 + PB_0 * PB_1 * PA_0 * PQ[d0] * QC_0 + PB_0 * PB_1 * PA_0 * QD_0 * QC_0)
@@ -16339,7 +16602,7 @@ computeExchangeFockPDDD0(double*         mat_K,
                                     + delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PQ[c1] * QD_1 + PB_0 * PB_1 * PA_0 * PQ[d1] * QC_1 + PB_0 * PB_1 * PA_0 * QD_1 * QC_1)
                                     + delta[c0][c1] * (PB_0 * PB_1 * PA_0 * PQ[d0] * QD_1 + PB_0 * PB_1 * PA_0 * PQ[d1] * QD_0 + PB_0 * PB_1 * PA_0 * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             );
@@ -16417,11 +16680,12 @@ computeExchangeFockPDDD1(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -16431,6 +16695,7 @@ computeExchangeFockPDDD1(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -16464,12 +16729,18 @@ computeExchangeFockPDDD1(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -16481,8 +16752,8 @@ computeExchangeFockPDDD1(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
@@ -16498,7 +16769,22 @@ computeExchangeFockPDDD1(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -16527,24 +16813,15 @@ computeExchangeFockPDDD1(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -16570,30 +16847,26 @@ computeExchangeFockPDDD1(double*         mat_K,
                         F7_t[2] *= d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[1] * (
-        
+
                                 + 0.5 * S2 * inv_S1 * inv_S4 * (
                                     delta[b0][b1] * (PA_0 * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[a0] * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a0][b1] * (PB_0 * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a0][b0] * (PB_1 * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + 0.5 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PQ[a0] * QC_0 * QC_1 + PB_0 * PA_0 * PQ[b1] * QC_0 * QC_1 + PB_1 * PA_0 * PQ[b0] * QC_0 * QC_1)
                                     + delta[c1][d1] * (PB_0 * PB_1 * PQ[a0] * QD_0 * QC_0 + PB_0 * PA_0 * PQ[b1] * QD_0 * QC_0 + PB_1 * PA_0 * PQ[b0] * QD_0 * QC_0)
@@ -16617,13 +16890,13 @@ computeExchangeFockPDDD1(double*         mat_K,
                                     + delta[a0][b1] * (PB_0 * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PB_0 * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PB_0 * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PB_0 * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0))
                                     + delta[a0][b0] * (PB_1 * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PB_1 * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PB_1 * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + S1 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
@@ -16631,38 +16904,38 @@ computeExchangeFockPDDD1(double*         mat_K,
                                     + PB_0 * PB_1 * PA_0 * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
                                     + PB_0 * PB_1 * PA_0 * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + S2 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * QD_0 * QD_1 * QC_0 * QC_1
                                     + PB_0 * PA_0 * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1
                                     + PB_1 * PA_0 * PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 0.125 * S1 * inv_S2 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PA_0)
                                     + (delta[a0][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][b1] * delta[c0][d1] * delta[c1][d0]) * (PB_0)
                                     + (delta[a0][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[c0][d1] * delta[c1][d0]) * (PB_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + (-0.125) * inv_S1 * inv_S4 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PQ[a0])
                                     + (delta[a0][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][b1] * delta[c0][d1] * delta[c1][d0]) * (PQ[b0])
@@ -16672,13 +16945,13 @@ computeExchangeFockPDDD1(double*         mat_K,
                                     + (delta[a0][b0] * delta[b1][c0] * delta[c1][d1] + delta[a0][b0] * delta[b1][c1] * delta[c0][d1] + delta[a0][b0] * delta[b1][d1] * delta[c0][c1] + delta[a0][b1] * delta[b0][c0] * delta[c1][d1] + delta[a0][b1] * delta[b0][c1] * delta[c0][d1] + delta[a0][b1] * delta[b0][d1] * delta[c0][c1] + delta[a0][c0] * delta[b0][b1] * delta[c1][d1] + delta[a0][c1] * delta[b0][b1] * delta[c0][d1] + delta[a0][d1] * delta[b0][b1] * delta[c0][c1]) * (QD_0)
                                     + (delta[a0][b0] * delta[b1][c0] * delta[c1][d0] + delta[a0][b0] * delta[b1][c1] * delta[c0][d0] + delta[a0][b0] * delta[b1][d0] * delta[c0][c1] + delta[a0][b1] * delta[b0][c0] * delta[c1][d0] + delta[a0][b1] * delta[b0][c1] * delta[c0][d0] + delta[a0][b1] * delta[b0][d0] * delta[c0][c1] + delta[a0][c0] * delta[b0][b1] * delta[c1][d0] + delta[a0][c1] * delta[b0][b1] * delta[c0][d0] + delta[a0][d0] * delta[b0][b1] * delta[c0][c1]) * (QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.125 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PQ[a0] * (-2.0) + PA_0 * 2.0)
                                     + (delta[b0][c0] * delta[b1][c1] * delta[d0][d1] + delta[b0][c0] * delta[b1][d0] * delta[c1][d1] + delta[b0][c0] * delta[b1][d1] * delta[c1][d0] + delta[b0][c1] * delta[b1][c0] * delta[d0][d1] + delta[b0][c1] * delta[b1][d0] * delta[c0][d1] + delta[b0][c1] * delta[b1][d1] * delta[c0][d0] + delta[b0][d0] * delta[b1][c0] * delta[c1][d1] + delta[b0][d0] * delta[b1][c1] * delta[c0][d1] + delta[b0][d0] * delta[b1][d1] * delta[c0][c1] + delta[b0][d1] * delta[b1][c0] * delta[c1][d0] + delta[b0][d1] * delta[b1][c1] * delta[c0][d0] + delta[b0][d1] * delta[b1][d0] * delta[c0][c1]) * (PA_0)
@@ -16691,23 +16964,23 @@ computeExchangeFockPDDD1(double*         mat_K,
                                     + (delta[a0][c0] * delta[b1][c1] * delta[d0][d1] + delta[a0][c0] * delta[b1][d0] * delta[c1][d1] + delta[a0][c0] * delta[b1][d1] * delta[c1][d0] + delta[a0][c1] * delta[b1][c0] * delta[d0][d1] + delta[a0][c1] * delta[b1][d0] * delta[c0][d1] + delta[a0][c1] * delta[b1][d1] * delta[c0][d0] + delta[a0][d0] * delta[b1][c0] * delta[c1][d1] + delta[a0][d0] * delta[b1][c1] * delta[c0][d1] + delta[a0][d0] * delta[b1][d1] * delta[c0][c1] + delta[a0][d1] * delta[b1][c0] * delta[c1][d0] + delta[a0][d1] * delta[b1][c1] * delta[c0][d0] + delta[a0][d1] * delta[b1][d0] * delta[c0][c1]) * (PB_0)
                                     + (delta[a0][c0] * delta[b0][c1] * delta[d0][d1] + delta[a0][c0] * delta[b0][d0] * delta[c1][d1] + delta[a0][c0] * delta[b0][d1] * delta[c1][d0] + delta[a0][c1] * delta[b0][c0] * delta[d0][d1] + delta[a0][c1] * delta[b0][d0] * delta[c0][d1] + delta[a0][c1] * delta[b0][d1] * delta[c0][d0] + delta[a0][d0] * delta[b0][c0] * delta[c1][d1] + delta[a0][d0] * delta[b0][c1] * delta[c0][d1] + delta[a0][d0] * delta[b0][d1] * delta[c0][c1] + delta[a0][d1] * delta[b0][c0] * delta[c1][d0] + delta[a0][d1] * delta[b0][c1] * delta[c0][d0] + delta[a0][d1] * delta[b0][d0] * delta[c0][c1]) * (PB_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.25 * S1 * S1 * inv_S2 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1 * PA_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.25 * S1 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1 * PQ[a0] * (-2.0) + PB_0 * PA_0 * PQ[b1] * (-2.0) + PB_1 * PA_0 * PQ[b0] * (-2.0))
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PB_0 * PA_0 * PQ[c0] * (-1.0) + PB_0 * PA_0 * QC_0 * (-1.0))
@@ -16741,13 +17014,13 @@ computeExchangeFockPDDD1(double*         mat_K,
                                     + delta[a0][b1] * delta[c0][c1] * (PB_0 * PQ[d0] * PQ[d1] + PB_0 * PQ[d0] * QD_1 + PB_0 * PQ[d1] * QD_0)
                                     + delta[a0][b0] * delta[c0][c1] * (PB_1 * PQ[d0] * PQ[d1] + PB_1 * PQ[d0] * QD_1 + PB_1 * PQ[d1] * QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + (-0.25) * S2 * inv_S1 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * delta[d0][d1] * (PQ[a0] * QC_0 * QC_1)
                                     + delta[b0][b1] * delta[c1][d1] * (PQ[a0] * QD_0 * QC_0)
@@ -16772,13 +17045,13 @@ computeExchangeFockPDDD1(double*         mat_K,
                                     + (delta[a0][b0] * delta[b1][c1] + delta[a0][b1] * delta[b0][c1] + delta[a0][c1] * delta[b0][b1]) * (QD_0 * QD_1 * QC_0)
                                     + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (QD_0 * QD_1 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.25 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PQ[a0] * PQ[b1] + PB_1 * PQ[a0] * PQ[b0] + PA_0 * PQ[b0] * PQ[b1])
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PB_0 * PQ[a0] * QC_0 + PA_0 * PQ[b0] * QC_0)
@@ -16834,7 +17107,7 @@ computeExchangeFockPDDD1(double*         mat_K,
                                     + (delta[a0][c0] * delta[b1][c1] + delta[a0][c1] * delta[b1][c0]) * (PB_0 * QD_0 * QD_1)
                                     + (delta[a0][c0] * delta[b0][c1] + delta[a0][c1] * delta[b0][c0]) * (PB_1 * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             );
@@ -16912,11 +17185,12 @@ computeExchangeFockPDDD2(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -16926,6 +17200,7 @@ computeExchangeFockPDDD2(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -16959,12 +17234,18 @@ computeExchangeFockPDDD2(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -16976,8 +17257,8 @@ computeExchangeFockPDDD2(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
@@ -16993,7 +17274,22 @@ computeExchangeFockPDDD2(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -17022,24 +17318,15 @@ computeExchangeFockPDDD2(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -17066,18 +17353,14 @@ computeExchangeFockPDDD2(double*         mat_K,
                         F7_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[2] * (
-        
+
                                 + 0.5 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PA_0 * PQ[c0] * PQ[c1] + PB_0 * PB_1 * PA_0 * PQ[c0] * QC_1 + PB_0 * PB_1 * PA_0 * PQ[c1] * QC_0)
                                     + delta[c1][d1] * (PB_0 * PB_1 * PA_0 * PQ[c0] * PQ[d0] + PB_0 * PB_1 * PA_0 * PQ[c0] * QD_0 + PB_0 * PB_1 * PA_0 * PQ[d0] * QC_0)
@@ -17086,13 +17369,13 @@ computeExchangeFockPDDD2(double*         mat_K,
                                     + delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PQ[c1] * PQ[d1] + PB_0 * PB_1 * PA_0 * PQ[c1] * QD_1 + PB_0 * PB_1 * PA_0 * PQ[d1] * QC_1)
                                     + delta[c0][c1] * (PB_0 * PB_1 * PA_0 * PQ[d0] * PQ[d1] + PB_0 * PB_1 * PA_0 * PQ[d0] * QD_1 + PB_0 * PB_1 * PA_0 * PQ[d1] * QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.5 * S1 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PQ[a0] * PQ[c0] * QC_1 * (-1.0) + PB_0 * PB_1 * PQ[a0] * PQ[c1] * QC_0 * (-1.0) + PB_0 * PB_1 * PQ[a0] * QC_0 * QC_1 * (-1.0) + PB_0 * PA_0 * PQ[b1] * PQ[c0] * QC_1 * (-1.0) + PB_0 * PA_0 * PQ[b1] * PQ[c1] * QC_0 * (-1.0) + PB_0 * PA_0 * PQ[b1] * QC_0 * QC_1 * (-1.0) + PB_1 * PA_0 * PQ[b0] * PQ[c0] * QC_1 * (-1.0) + PB_1 * PA_0 * PQ[b0] * PQ[c1] * QC_0 * (-1.0) + PB_1 * PA_0 * PQ[b0] * QC_0 * QC_1 * (-1.0))
                                     + delta[c1][d1] * (PB_0 * PB_1 * PQ[a0] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PB_1 * PQ[a0] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PB_1 * PQ[a0] * QD_0 * QC_0 * (-1.0) + PB_0 * PA_0 * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PA_0 * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PA_0 * PQ[b1] * QD_0 * QC_0 * (-1.0) + PB_1 * PA_0 * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PB_1 * PA_0 * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PA_0 * PQ[b0] * QD_0 * QC_0 * (-1.0))
@@ -17116,25 +17399,25 @@ computeExchangeFockPDDD2(double*         mat_K,
                                     + delta[a0][b1] * (PB_0 * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PB_0 * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PB_0 * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PB_0 * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PB_0 * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PB_0 * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                     + delta[a0][b0] * (PB_1 * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PB_1 * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PB_1 * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PB_1 * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PB_1 * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PB_1 * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + (-0.5) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * (PQ[a0] * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a0][b1] * (PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a0][b0] * (PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.5 * S2 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PQ[a0] * PQ[b1] * QC_0 * QC_1 + PB_1 * PQ[a0] * PQ[b0] * QC_0 * QC_1 + PA_0 * PQ[b0] * PQ[b1] * QC_0 * QC_1)
                                     + delta[c1][d1] * (PB_0 * PQ[a0] * PQ[b1] * QD_0 * QC_0 + PB_1 * PQ[a0] * PQ[b0] * QD_0 * QC_0 + PA_0 * PQ[b0] * PQ[b1] * QD_0 * QC_0)
@@ -17158,13 +17441,13 @@ computeExchangeFockPDDD2(double*         mat_K,
                                     + delta[a0][b1] * (PQ[b0] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PQ[b0] * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PQ[b0] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[b0] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0) + PB_0 * PQ[c0] * QD_0 * QD_1 * QC_1 + PB_0 * PQ[c1] * QD_0 * QD_1 * QC_0 + PB_0 * PQ[d0] * QD_1 * QC_0 * QC_1 + PB_0 * PQ[d1] * QD_0 * QC_0 * QC_1)
                                     + delta[a0][b0] * (PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PQ[b1] * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[c0] * QD_0 * QD_1 * QC_1 + PB_1 * PQ[c1] * QD_0 * QD_1 * QC_0 + PB_1 * PQ[d0] * QD_1 * QC_0 * QC_1 + PB_1 * PQ[d1] * QD_0 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + S1 * S1 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PQ[c0] * PQ[c1] * QD_0 * QD_1
@@ -17174,13 +17457,13 @@ computeExchangeFockPDDD2(double*         mat_K,
                                     + PB_0 * PB_1 * PA_0 * PQ[c1] * PQ[d1] * QD_0 * QC_0
                                     + PB_0 * PB_1 * PA_0 * PQ[d0] * PQ[d1] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + S1 * S2 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
@@ -17196,26 +17479,26 @@ computeExchangeFockPDDD2(double*         mat_K,
                                     + PB_1 * PA_0 * PQ[b0] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
                                     + PB_1 * PA_0 * PQ[b0] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + S2 * S2 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1
                                     + PB_1 * PQ[a0] * PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1
                                     + PA_0 * PQ[b0] * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 0.125 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PA_0 * (-1.0) + PQ[a0])
                                     + (delta[b0][c0] * delta[b1][c1] * delta[d0][d1] + delta[b0][c0] * delta[b1][d0] * delta[c1][d1] + delta[b0][c0] * delta[b1][d1] * delta[c1][d0] + delta[b0][c1] * delta[b1][c0] * delta[d0][d1] + delta[b0][c1] * delta[b1][d0] * delta[c0][d1] + delta[b0][c1] * delta[b1][d1] * delta[c0][d0] + delta[b0][d0] * delta[b1][c0] * delta[c1][d1] + delta[b0][d0] * delta[b1][c1] * delta[c0][d1] + delta[b0][d0] * delta[b1][d1] * delta[c0][c1] + delta[b0][d1] * delta[b1][c0] * delta[c1][d0] + delta[b0][d1] * delta[b1][c1] * delta[c0][d0] + delta[b0][d1] * delta[b1][d0] * delta[c0][c1]) * (PA_0 * (-1.0))
@@ -17228,13 +17511,13 @@ computeExchangeFockPDDD2(double*         mat_K,
                                     + (delta[a0][b0] * delta[b1][c0] * delta[c1][d1] + delta[a0][b0] * delta[b1][c1] * delta[c0][d1] + delta[a0][b0] * delta[b1][d1] * delta[c0][c1] + delta[a0][b1] * delta[b0][c0] * delta[c1][d1] + delta[a0][b1] * delta[b0][c1] * delta[c0][d1] + delta[a0][b1] * delta[b0][d1] * delta[c0][c1] + delta[a0][c0] * delta[b0][b1] * delta[c1][d1] + delta[a0][c1] * delta[b0][b1] * delta[c0][d1] + delta[a0][d1] * delta[b0][b1] * delta[c0][c1]) * (PQ[d0])
                                     + (delta[a0][b0] * delta[b1][c0] * delta[c1][d0] + delta[a0][b0] * delta[b1][c1] * delta[c0][d0] + delta[a0][b0] * delta[b1][d0] * delta[c0][c1] + delta[a0][b1] * delta[b0][c0] * delta[c1][d0] + delta[a0][b1] * delta[b0][c1] * delta[c0][d0] + delta[a0][b1] * delta[b0][d0] * delta[c0][c1] + delta[a0][c0] * delta[b0][b1] * delta[c1][d0] + delta[a0][c1] * delta[b0][b1] * delta[c0][d0] + delta[a0][d0] * delta[b0][b1] * delta[c0][c1]) * (PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.125 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[a0][b0] * delta[b1][c1] * delta[d0][d1] + delta[a0][b0] * delta[b1][d0] * delta[c1][d1] + delta[a0][b0] * delta[b1][d1] * delta[c1][d0] + delta[a0][b1] * delta[b0][c1] * delta[d0][d1] + delta[a0][b1] * delta[b0][d0] * delta[c1][d1] + delta[a0][b1] * delta[b0][d1] * delta[c1][d0] + delta[a0][c1] * delta[b0][b1] * delta[d0][d1] + delta[a0][d0] * delta[b0][b1] * delta[c1][d1] + delta[a0][d1] * delta[b0][b1] * delta[c1][d0]) * (PQ[c0] + QC_0)
                                     + (delta[a0][c1] * delta[b0][d0] * delta[b1][d1] + delta[a0][c1] * delta[b0][d1] * delta[b1][d0] + delta[a0][d0] * delta[b0][c1] * delta[b1][d1] + delta[a0][d0] * delta[b0][d1] * delta[b1][c1] + delta[a0][d1] * delta[b0][c1] * delta[b1][d0] + delta[a0][d1] * delta[b0][d0] * delta[b1][c1]) * (QC_0)
@@ -17251,13 +17534,13 @@ computeExchangeFockPDDD2(double*         mat_K,
                                     + (delta[a0][c0] * delta[b0][c1] * delta[b1][d1] + delta[a0][c0] * delta[b0][d1] * delta[b1][c1] + delta[a0][c1] * delta[b0][c0] * delta[b1][d1] + delta[a0][c1] * delta[b0][d1] * delta[b1][c0] + delta[a0][d1] * delta[b0][c0] * delta[b1][c1] + delta[a0][d1] * delta[b0][c1] * delta[b1][c0]) * (QD_0)
                                     + (delta[a0][c0] * delta[b0][c1] * delta[b1][d0] + delta[a0][c0] * delta[b0][d0] * delta[b1][c1] + delta[a0][c1] * delta[b0][c0] * delta[b1][d0] + delta[a0][c1] * delta[b0][d0] * delta[b1][c0] + delta[a0][d0] * delta[b0][c0] * delta[b1][c1] + delta[a0][d0] * delta[b0][c1] * delta[b1][c0]) * (QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.25 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1 * PQ[a0] + PB_0 * PA_0 * PQ[b1] + PB_1 * PA_0 * PQ[b0])
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PB_0 * PA_0 * PQ[c0])
@@ -17291,13 +17574,13 @@ computeExchangeFockPDDD2(double*         mat_K,
                                     + (delta[a0][c0] * delta[c1][d1] + delta[a0][c1] * delta[c0][d1] + delta[a0][d1] * delta[c0][c1]) * (PB_0 * PB_1 * PQ[d0])
                                     + (delta[a0][c0] * delta[c1][d0] + delta[a0][c1] * delta[c0][d0] + delta[a0][d0] * delta[c0][c1]) * (PB_0 * PB_1 * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.25 * S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PQ[a0] * PQ[b1] * (-2.0) + PB_1 * PQ[a0] * PQ[b0] * (-2.0) + PA_0 * PQ[b0] * PQ[b1] * (-2.0))
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PB_0 * PQ[a0] * PQ[c0] * (-1.0) + PB_0 * PQ[a0] * QC_0 * (-1.0) + PA_0 * PQ[b0] * PQ[c0] * (-1.0) + PA_0 * PQ[b0] * QC_0 * (-1.0))
@@ -17353,13 +17636,13 @@ computeExchangeFockPDDD2(double*         mat_K,
                                     + (delta[a0][b0] * delta[b1][c1] + delta[a0][b1] * delta[b0][c1] + delta[a0][c1] * delta[b0][b1]) * (PQ[c0] * PQ[d0] * QD_1 + PQ[c0] * PQ[d1] * QD_0 + PQ[d0] * PQ[d1] * QC_0)
                                     + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (PQ[c1] * PQ[d0] * QD_1 + PQ[c1] * PQ[d1] * QD_0 + PQ[d0] * PQ[d1] * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.25 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PQ[a0] * PQ[b0] * QC_0)
                                     + (delta[b1][c0] * delta[d0][d1] + delta[b1][d0] * delta[c0][d1] + delta[b1][d1] * delta[c0][d0]) * (PQ[a0] * PQ[b0] * QC_1)
@@ -17415,13 +17698,13 @@ computeExchangeFockPDDD2(double*         mat_K,
                                     + delta[a0][b0] * delta[c0][c1] * (PQ[b1] * PQ[d0] * QD_1 + PQ[b1] * PQ[d1] * QD_0 + PQ[b1] * QD_0 * QD_1)
                                     + (delta[a0][c0] * delta[b0][c1] + delta[a0][c1] * delta[b0][c0]) * (PQ[b1] * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + (-0.5) * S1 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PA_0 * PQ[c0] * PQ[c1])
                                     + delta[c1][d1] * (PB_0 * PB_1 * PA_0 * PQ[c0] * PQ[d0])
@@ -17430,7 +17713,7 @@ computeExchangeFockPDDD2(double*         mat_K,
                                     + delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PQ[c1] * PQ[d1])
                                     + delta[c0][c1] * (PB_0 * PB_1 * PA_0 * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             );
@@ -17508,11 +17791,12 @@ computeExchangeFockPDDD3(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -17522,6 +17806,7 @@ computeExchangeFockPDDD3(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -17555,12 +17840,18 @@ computeExchangeFockPDDD3(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -17572,8 +17863,8 @@ computeExchangeFockPDDD3(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
@@ -17589,7 +17880,22 @@ computeExchangeFockPDDD3(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -17618,24 +17924,15 @@ computeExchangeFockPDDD3(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -17662,18 +17959,14 @@ computeExchangeFockPDDD3(double*         mat_K,
                         F7_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[3] * (
-        
+
                                 + 0.5 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PQ[a0] * PQ[c0] * PQ[c1] + PB_0 * PB_1 * PQ[a0] * PQ[c0] * QC_1 + PB_0 * PB_1 * PQ[a0] * PQ[c1] * QC_0 + PB_0 * PA_0 * PQ[b1] * PQ[c0] * PQ[c1] + PB_0 * PA_0 * PQ[b1] * PQ[c0] * QC_1 + PB_0 * PA_0 * PQ[b1] * PQ[c1] * QC_0 + PB_1 * PA_0 * PQ[b0] * PQ[c0] * PQ[c1] + PB_1 * PA_0 * PQ[b0] * PQ[c0] * QC_1 + PB_1 * PA_0 * PQ[b0] * PQ[c1] * QC_0)
                                     + delta[c1][d1] * (PB_0 * PB_1 * PQ[a0] * PQ[c0] * PQ[d0] + PB_0 * PB_1 * PQ[a0] * PQ[c0] * QD_0 + PB_0 * PB_1 * PQ[a0] * PQ[d0] * QC_0 + PB_0 * PA_0 * PQ[b1] * PQ[c0] * PQ[d0] + PB_0 * PA_0 * PQ[b1] * PQ[c0] * QD_0 + PB_0 * PA_0 * PQ[b1] * PQ[d0] * QC_0 + PB_1 * PA_0 * PQ[b0] * PQ[c0] * PQ[d0] + PB_1 * PA_0 * PQ[b0] * PQ[c0] * QD_0 + PB_1 * PA_0 * PQ[b0] * PQ[d0] * QC_0)
@@ -17697,13 +17990,13 @@ computeExchangeFockPDDD3(double*         mat_K,
                                     + delta[a0][b1] * (PB_0 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PB_0 * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PB_0 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PB_0 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0))
                                     + delta[a0][b0] * (PB_1 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PB_1 * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PB_1 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PB_1 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.5 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * QC_1 * (-1.0) + PB_0 * PQ[a0] * PQ[b1] * PQ[c1] * QC_0 * (-1.0) + PB_0 * PQ[a0] * PQ[b1] * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * QC_1 * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * PQ[c1] * QC_0 * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * QC_0 * QC_1 * (-1.0) + PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 * (-1.0) + PA_0 * PQ[b0] * PQ[b1] * PQ[c1] * QC_0 * (-1.0) + PA_0 * PQ[b0] * PQ[b1] * QC_0 * QC_1 * (-1.0))
                                     + delta[c1][d1] * (PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PQ[a0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PQ[a0] * PQ[b1] * QD_0 * QC_0 * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * QD_0 * QC_0 * (-1.0) + PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PA_0 * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PA_0 * PQ[b0] * PQ[b1] * QD_0 * QC_0 * (-1.0))
@@ -17727,13 +18020,13 @@ computeExchangeFockPDDD3(double*         mat_K,
                                     + delta[a0][b1] * (PB_0 * PQ[c0] * PQ[c1] * QD_0 * QD_1 * (-1.0) + PB_0 * PQ[c0] * PQ[d0] * QD_1 * QC_1 * (-1.0) + PB_0 * PQ[c0] * PQ[d1] * QD_0 * QC_1 * (-1.0) + PB_0 * PQ[c1] * PQ[d0] * QD_1 * QC_0 * (-1.0) + PB_0 * PQ[c1] * PQ[d1] * QD_0 * QC_0 * (-1.0) + PB_0 * PQ[d0] * PQ[d1] * QC_0 * QC_1 * (-1.0) + PQ[b0] * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PQ[b0] * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PQ[b0] * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PQ[b0] * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PQ[b0] * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PQ[b0] * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                     + delta[a0][b0] * (PB_1 * PQ[c0] * PQ[c1] * QD_0 * QD_1 * (-1.0) + PB_1 * PQ[c0] * PQ[d0] * QD_1 * QC_1 * (-1.0) + PB_1 * PQ[c0] * PQ[d1] * QD_0 * QC_1 * (-1.0) + PB_1 * PQ[c1] * PQ[d0] * QD_1 * QC_0 * (-1.0) + PB_1 * PQ[c1] * PQ[d1] * QD_0 * QC_0 * (-1.0) + PB_1 * PQ[d0] * PQ[d1] * QC_0 * QC_1 * (-1.0) + PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PQ[b1] * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PQ[b1] * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PQ[b1] * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.5 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PQ[a0] * PQ[b0] * PQ[b1] * QC_0 * QC_1)
                                     + delta[c1][d1] * (PQ[a0] * PQ[b0] * PQ[b1] * QD_0 * QC_0)
@@ -17757,7 +18050,7 @@ computeExchangeFockPDDD3(double*         mat_K,
                                     + delta[a0][b0] * (PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 + PQ[b1] * PQ[c1] * QD_0 * QD_1 * QC_0 + PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 + PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1)
                                     + delta[c0][c1] * (PQ[a0] * PQ[b0] * PQ[b1] * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             );
@@ -17835,13 +18128,14 @@ computeExchangeFockPDDD4(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    //__shared__ double   delta[3][3];
+    __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -17849,6 +18143,7 @@ computeExchangeFockPDDD4(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -17856,9 +18151,9 @@ computeExchangeFockPDDD4(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_pd)
         {
@@ -17882,12 +18177,18 @@ computeExchangeFockPDDD4(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -17899,8 +18200,8 @@ computeExchangeFockPDDD4(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
@@ -17916,7 +18217,22 @@ computeExchangeFockPDDD4(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -17945,24 +18261,15 @@ computeExchangeFockPDDD4(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -17989,18 +18296,14 @@ computeExchangeFockPDDD4(double*         mat_K,
                         F7_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[3] * (
-        
+
                                 + S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0)
@@ -18008,13 +18311,13 @@ computeExchangeFockPDDD4(double*         mat_K,
                                     + PB_0 * PB_1 * PA_0 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0)
                                     + PB_0 * PB_1 * PA_0 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * PQ[c0] * PQ[c1] * QD_0 * QD_1
@@ -18036,13 +18339,13 @@ computeExchangeFockPDDD4(double*         mat_K,
                                     + PB_1 * PA_0 * PQ[b0] * PQ[c1] * PQ[d1] * QD_0 * QC_0
                                     + PB_1 * PA_0 * PQ[b0] * PQ[d0] * PQ[d1] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
@@ -18058,7 +18361,7 @@ computeExchangeFockPDDD4(double*         mat_K,
                                     + PA_0 * PQ[b0] * PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
                                     + PA_0 * PQ[b0] * PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             );
@@ -18136,11 +18439,12 @@ computeExchangeFockPDDD5(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -18150,6 +18454,7 @@ computeExchangeFockPDDD5(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -18183,12 +18488,18 @@ computeExchangeFockPDDD5(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -18200,8 +18511,8 @@ computeExchangeFockPDDD5(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
@@ -18217,7 +18528,22 @@ computeExchangeFockPDDD5(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -18246,24 +18572,15 @@ computeExchangeFockPDDD5(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -18291,29 +18608,25 @@ computeExchangeFockPDDD5(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[3] * (
-        
+
                                 + S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PQ[a0] * PQ[b0] * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 (-0.125) * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0] + delta[b0][c0] * delta[b1][c1] * delta[d0][d1] + delta[b0][c0] * delta[b1][d0] * delta[c1][d1] + delta[b0][c0] * delta[b1][d1] * delta[c1][d0] + delta[b0][c1] * delta[b1][c0] * delta[d0][d1] + delta[b0][c1] * delta[b1][d0] * delta[c0][d1] + delta[b0][c1] * delta[b1][d1] * delta[c0][d0] + delta[b0][d0] * delta[b1][c0] * delta[c1][d1] + delta[b0][d0] * delta[b1][c1] * delta[c0][d1] + delta[b0][d0] * delta[b1][d1] * delta[c0][c1] + delta[b0][d1] * delta[b1][c0] * delta[c1][d0] + delta[b0][d1] * delta[b1][c1] * delta[c0][d0] + delta[b0][d1] * delta[b1][d0] * delta[c0][c1]) * (PQ[a0])
                                     + (delta[a0][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][c0] * delta[b1][c1] * delta[d0][d1] + delta[a0][c0] * delta[b1][d0] * delta[c1][d1] + delta[a0][c0] * delta[b1][d1] * delta[c1][d0] + delta[a0][c1] * delta[b1][c0] * delta[d0][d1] + delta[a0][c1] * delta[b1][d0] * delta[c0][d1] + delta[a0][c1] * delta[b1][d1] * delta[c0][d0] + delta[a0][d0] * delta[b1][c0] * delta[c1][d1] + delta[a0][d0] * delta[b1][c1] * delta[c0][d1] + delta[a0][d0] * delta[b1][d1] * delta[c0][c1] + delta[a0][d1] * delta[b1][c0] * delta[c1][d0] + delta[a0][d1] * delta[b1][c1] * delta[c0][d0] + delta[a0][d1] * delta[b1][d0] * delta[c0][c1]) * (PQ[b0])
@@ -18323,13 +18636,13 @@ computeExchangeFockPDDD5(double*         mat_K,
                                     + (delta[a0][b0] * delta[b1][c0] * delta[c1][d1] + delta[a0][b0] * delta[b1][c1] * delta[c0][d1] + delta[a0][b0] * delta[b1][d1] * delta[c0][c1] + delta[a0][b1] * delta[b0][c0] * delta[c1][d1] + delta[a0][b1] * delta[b0][c1] * delta[c0][d1] + delta[a0][b1] * delta[b0][d1] * delta[c0][c1] + delta[a0][c0] * delta[b0][b1] * delta[c1][d1] + delta[a0][c0] * delta[b0][c1] * delta[b1][d1] + delta[a0][c0] * delta[b0][d1] * delta[b1][c1] + delta[a0][c1] * delta[b0][b1] * delta[c0][d1] + delta[a0][c1] * delta[b0][c0] * delta[b1][d1] + delta[a0][c1] * delta[b0][d1] * delta[b1][c0] + delta[a0][d1] * delta[b0][b1] * delta[c0][c1] + delta[a0][d1] * delta[b0][c0] * delta[b1][c1] + delta[a0][d1] * delta[b0][c1] * delta[b1][c0]) * (PQ[d0])
                                     + (delta[a0][b0] * delta[b1][c0] * delta[c1][d0] + delta[a0][b0] * delta[b1][c1] * delta[c0][d0] + delta[a0][b0] * delta[b1][d0] * delta[c0][c1] + delta[a0][b1] * delta[b0][c0] * delta[c1][d0] + delta[a0][b1] * delta[b0][c1] * delta[c0][d0] + delta[a0][b1] * delta[b0][d0] * delta[c0][c1] + delta[a0][c0] * delta[b0][b1] * delta[c1][d0] + delta[a0][c0] * delta[b0][c1] * delta[b1][d0] + delta[a0][c0] * delta[b0][d0] * delta[b1][c1] + delta[a0][c1] * delta[b0][b1] * delta[c0][d0] + delta[a0][c1] * delta[b0][c0] * delta[b1][d0] + delta[a0][c1] * delta[b0][d0] * delta[b1][c0] + delta[a0][d0] * delta[b0][b1] * delta[c0][c1] + delta[a0][d0] * delta[b0][c0] * delta[b1][c1] + delta[a0][d0] * delta[b0][c1] * delta[b1][c0]) * (PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + 0.25 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PQ[a0] * PQ[b1] + PB_1 * PQ[a0] * PQ[b0] + PA_0 * PQ[b0] * PQ[b1])
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PB_0 * PQ[a0] * PQ[c0] + PA_0 * PQ[b0] * PQ[c0])
@@ -18385,13 +18698,13 @@ computeExchangeFockPDDD5(double*         mat_K,
                                     + (delta[a0][c0] * delta[b0][d0] + delta[a0][d0] * delta[b0][c0]) * (PB_1 * PQ[c1] * PQ[d1])
                                     + (delta[a0][c0] * delta[b0][c1] + delta[a0][c1] * delta[b0][c0]) * (PB_1 * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + 0.25 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PQ[a0] * PQ[b0] * PQ[b1] * (-2.0))
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PQ[a0] * PQ[b0] * PQ[c0] * (-1.0) + PQ[a0] * PQ[b0] * QC_0 * (-1.0))
@@ -18447,13 +18760,13 @@ computeExchangeFockPDDD5(double*         mat_K,
                                     + (delta[a0][b0] * delta[b1][c1] + delta[a0][b1] * delta[b0][c1] + delta[a0][c1] * delta[b0][b1]) * (PQ[c0] * PQ[d0] * QD_1 * (-1.0) + PQ[c0] * PQ[d1] * QD_0 * (-1.0) + PQ[d0] * PQ[d1] * QC_0 * (-1.0))
                                     + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PQ[d0] * PQ[d1] * QC_1 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + 0.5 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PQ[a0] * PQ[c0] * PQ[c1] * (-1.0) + PB_0 * PA_0 * PQ[b1] * PQ[c0] * PQ[c1] * (-1.0) + PB_1 * PA_0 * PQ[b0] * PQ[c0] * PQ[c1] * (-1.0))
                                     + delta[c1][d1] * (PB_0 * PB_1 * PQ[a0] * PQ[c0] * PQ[d0] * (-1.0) + PB_0 * PA_0 * PQ[b1] * PQ[c0] * PQ[d0] * (-1.0) + PB_1 * PA_0 * PQ[b0] * PQ[c0] * PQ[d0] * (-1.0))
@@ -18477,13 +18790,13 @@ computeExchangeFockPDDD5(double*         mat_K,
                                     + delta[a0][b1] * (PB_0 * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                     + delta[a0][b0] * (PB_1 * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + 0.5 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * PQ[c1] + PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * QC_1 + PB_0 * PQ[a0] * PQ[b1] * PQ[c1] * QC_0 + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[c1] + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * QC_1 + PB_1 * PQ[a0] * PQ[b0] * PQ[c1] * QC_0 + PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] + PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 + PA_0 * PQ[b0] * PQ[b1] * PQ[c1] * QC_0)
                                     + delta[c1][d1] * (PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * PQ[d0] + PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * QD_0 + PB_0 * PQ[a0] * PQ[b1] * PQ[d0] * QC_0 + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[d0] + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * QD_0 + PB_1 * PQ[a0] * PQ[b0] * PQ[d0] * QC_0 + PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] + PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 + PA_0 * PQ[b0] * PQ[b1] * PQ[d0] * QC_0)
@@ -18507,7 +18820,7 @@ computeExchangeFockPDDD5(double*         mat_K,
                                     + delta[a0][b1] * (PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PQ[b0] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PQ[b0] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PQ[b0] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0) + PB_0 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 + PB_0 * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 + PB_0 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 + PB_0 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0)
                                     + delta[a0][b0] * (PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PQ[b1] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PQ[b1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PQ[b1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0) + PB_1 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 + PB_1 * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 + PB_1 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 + PB_1 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0)
                                 )
-        
+
                             )
 
                             );
@@ -18585,11 +18898,12 @@ computeExchangeFockPDDD6(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -18599,6 +18913,7 @@ computeExchangeFockPDDD6(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -18632,12 +18947,18 @@ computeExchangeFockPDDD6(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -18649,8 +18970,8 @@ computeExchangeFockPDDD6(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;//, rij[3], PA_0, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
@@ -18666,7 +18987,22 @@ computeExchangeFockPDDD6(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            //rij[0] = r_j[0] - r_i[0];
+            //rij[1] = r_j[1] - r_i[1];
+            //rij[2] = r_j[2] - r_i[2];
+
+            //PA_0 = (a_j * inv_S1) * rij[a0];
+            //PB_0 = (-a_i * inv_S1) * rij[b0];
+            //PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -18695,24 +19031,15 @@ computeExchangeFockPDDD6(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -18740,18 +19067,14 @@ computeExchangeFockPDDD6(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    // auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    // auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    // auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[4] * (
-        
+
                                 + (-0.5) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 + PQ[a0] * PQ[b0] * PQ[b1] * PQ[c1] * QC_0 + PQ[a0] * PQ[b0] * PQ[b1] * QC_0 * QC_1)
                                     + delta[c1][d1] * (PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 + PQ[a0] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 + PQ[a0] * PQ[b0] * PQ[b1] * QD_0 * QC_0)
@@ -18775,7 +19098,7 @@ computeExchangeFockPDDD6(double*         mat_K,
                                     + delta[a0][b1] * (PQ[b0] * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PQ[b0] * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PQ[b0] * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PQ[b0] * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PQ[b0] * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PQ[b0] * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                     + delta[a0][b0] * (PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PQ[b1] * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PQ[b1] * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PQ[b1] * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             );
@@ -18853,13 +19176,14 @@ computeExchangeFockPDDD7(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    //__shared__ double   delta[3][3];
+    __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -18867,6 +19191,7 @@ computeExchangeFockPDDD7(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -18874,9 +19199,9 @@ computeExchangeFockPDDD7(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_pd)
         {
@@ -18900,12 +19225,18 @@ computeExchangeFockPDDD7(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -18917,8 +19248,8 @@ computeExchangeFockPDDD7(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
@@ -18934,7 +19265,22 @@ computeExchangeFockPDDD7(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -18963,24 +19309,15 @@ computeExchangeFockPDDD7(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -19008,29 +19345,25 @@ computeExchangeFockPDDD7(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[4] * (
-        
+
                                 + S1 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0)
@@ -19046,7 +19379,7 @@ computeExchangeFockPDDD7(double*         mat_K,
                                     + PB_1 * PA_0 * PQ[b0] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0)
                                     + PB_1 * PA_0 * PQ[b0] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0)
                                 )
-        
+
                             )
 
                             );
@@ -19124,13 +19457,14 @@ computeExchangeFockPDDD8(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    //__shared__ double   delta[3][3];
+    __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -19138,6 +19472,7 @@ computeExchangeFockPDDD8(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -19145,9 +19480,9 @@ computeExchangeFockPDDD8(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_pd)
         {
@@ -19171,12 +19506,18 @@ computeExchangeFockPDDD8(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -19188,8 +19529,8 @@ computeExchangeFockPDDD8(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
@@ -19205,7 +19546,22 @@ computeExchangeFockPDDD8(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -19234,24 +19590,15 @@ computeExchangeFockPDDD8(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -19279,18 +19626,14 @@ computeExchangeFockPDDD8(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[4] * (
-        
+
                                 + S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * QD_1
@@ -19312,7 +19655,7 @@ computeExchangeFockPDDD8(double*         mat_K,
                                     + PA_0 * PQ[b0] * PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0
                                     + PA_0 * PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             );
@@ -19390,11 +19733,12 @@ computeExchangeFockPDDD9(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -19404,6 +19748,7 @@ computeExchangeFockPDDD9(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -19437,12 +19782,18 @@ computeExchangeFockPDDD9(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -19454,8 +19805,8 @@ computeExchangeFockPDDD9(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
@@ -19471,7 +19822,22 @@ computeExchangeFockPDDD9(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -19500,24 +19866,15 @@ computeExchangeFockPDDD9(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -19548,18 +19905,14 @@ computeExchangeFockPDDD9(double*         mat_K,
                         F7_t[7] *= d2 * d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[4] * (
-        
+
                                 + S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
@@ -19567,13 +19920,13 @@ computeExchangeFockPDDD9(double*         mat_K,
                                     + PQ[a0] * PQ[b0] * PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
                                     + PQ[a0] * PQ[b0] * PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 0.5 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * PQ[c1] * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[c1] * (-1.0) + PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * (-1.0))
                                     + delta[c1][d1] * (PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * PQ[d0] * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[d0] * (-1.0) + PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * (-1.0))
@@ -19597,13 +19950,13 @@ computeExchangeFockPDDD9(double*         mat_K,
                                     + delta[a0][b1] * (PB_0 * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1] * (-1.0) + PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                     + delta[a0][b0] * (PB_1 * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1] * (-1.0) + PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 + 0.5 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] + PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 + PQ[a0] * PQ[b0] * PQ[b1] * PQ[c1] * QC_0)
                                     + delta[c1][d1] * (PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] + PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 + PQ[a0] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0)
@@ -19627,26 +19980,26 @@ computeExchangeFockPDDD9(double*         mat_K,
                                     + delta[a0][b0] * (PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 + PQ[b1] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 + PQ[b1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 + PQ[b1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0)
                                     + delta[c0][c1] * (PQ[a0] * PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] + PQ[a0] * PQ[b0] * PQ[b1] * PQ[d0] * QD_1 + PQ[a0] * PQ[b0] * PQ[b1] * PQ[d1] * QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 + S1 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                     + PB_0 * PA_0 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                     + PB_1 * PA_0 * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 + S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0)
@@ -19662,13 +20015,13 @@ computeExchangeFockPDDD9(double*         mat_K,
                                     + PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0)
                                     + PA_0 * PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 + S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * QD_1
@@ -19678,13 +20031,13 @@ computeExchangeFockPDDD9(double*         mat_K,
                                     + PQ[a0] * PQ[b0] * PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0
                                     + PQ[a0] * PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 + 0.25 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PQ[a0] * PQ[b0] * PQ[b1])
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PQ[a0] * PQ[b0] * PQ[c0])
@@ -19722,13 +20075,13 @@ computeExchangeFockPDDD9(double*         mat_K,
                                     + (delta[a0][b0] * delta[b1][c1] + delta[a0][b1] * delta[b0][c1] + delta[a0][c1] * delta[b0][b1]) * (PQ[c0] * PQ[d0] * PQ[d1])
                                     + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (PQ[c1] * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[6] * (
-        
+
                                 (-0.5) * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1])
                                     + delta[c1][d1] * (PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0])
@@ -19752,43 +20105,43 @@ computeExchangeFockPDDD9(double*         mat_K,
                                     + delta[a0][b1] * (PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                     + delta[a0][b0] * (PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[6] * (
-        
+
                                 + S1 * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                     + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                     + PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[6] * (
-        
+
                                 + (-1.0) * S1 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1
                                     + PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0
                                     + PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1
                                     + PQ[a0] * PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[7] * (
-        
+
                                 S1 * S1 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                 )
-        
+
                             )
 
                             );
@@ -19836,10 +20189,8 @@ computeExchangeFockPDDD9(double*         mat_K,
         mat_K[ik] += K_ik;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -19857,7 +20208,6 @@ computeExchangeFockDSDS(double*         mat_K,
                         const uint32_t* pair_displs_K_ds,
                         const uint32_t* pair_counts_K_ds,
                         const double*   pair_data_K_ds,
-
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -19869,6 +20219,7 @@ computeExchangeFockDSDS(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -19912,6 +20263,12 @@ computeExchangeFockDSDS(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -19929,7 +20286,7 @@ computeExchangeFockDSDS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -19946,7 +20303,18 @@ computeExchangeFockDSDS(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ds[displ_i + j];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -19975,21 +20343,12 @@ computeExchangeFockDSDS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
-
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -20017,8 +20376,6 @@ computeExchangeFockDSDS(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
 
@@ -20211,7 +20568,6 @@ computeExchangeFockDSDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -20248,6 +20604,7 @@ computeExchangeFockDSDP(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -20291,6 +20648,12 @@ computeExchangeFockDSDP(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -20308,7 +20671,7 @@ computeExchangeFockDSDP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -20325,7 +20688,18 @@ computeExchangeFockDSDP(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ds[displ_i + j];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -20354,22 +20728,14 @@ computeExchangeFockDSDP(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -20398,8 +20764,6 @@ computeExchangeFockDSDP(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -20708,7 +21072,6 @@ computeExchangeFockDSDP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDS(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -20745,6 +21108,7 @@ computeExchangeFockDPDS(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -20788,6 +21152,12 @@ computeExchangeFockDPDS(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -20805,8 +21175,8 @@ computeExchangeFockDPDS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -20822,7 +21192,21 @@ computeExchangeFockDPDS(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -20851,22 +21235,12 @@ computeExchangeFockDPDS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
-
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -20895,9 +21269,6 @@ computeExchangeFockDPDS(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
 
@@ -21205,7 +21576,6 @@ computeExchangeFockDPDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDD(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -21239,6 +21609,7 @@ computeExchangeFockDSDD(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -21282,6 +21653,12 @@ computeExchangeFockDSDD(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -21299,7 +21676,7 @@ computeExchangeFockDSDD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -21316,7 +21693,18 @@ computeExchangeFockDSDD(double*         mat_K,
             r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
             r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_ds[displ_i + j];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -21345,23 +21733,15 @@ computeExchangeFockDSDD(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -21391,8 +21771,6 @@ computeExchangeFockDSDD(double*         mat_K,
                         F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -21989,11 +22367,12 @@ computeExchangeFockDDDS0(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -22003,6 +22382,7 @@ computeExchangeFockDDDS0(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -22036,12 +22416,19 @@ computeExchangeFockDDDS0(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -22053,8 +22440,8 @@ computeExchangeFockDDDS0(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -22070,7 +22457,23 @@ computeExchangeFockDDDS0(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -22099,23 +22502,12 @@ computeExchangeFockDDDS0(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
-
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -22141,27 +22533,22 @@ computeExchangeFockDDDS0(double*         mat_K,
                         F6_t[2] *= d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F6_t[0] * (
-        
+
                                 0.25 * inv_S1 * inv_S1 * (
                                     (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[0] * (
-        
+
                                 + 0.25 * inv_S1 * inv_S2 * (
                                     delta[b0][b1] * delta[c0][c1] * (PA_0 * PA_1)
                                     + delta[a1][b1] * delta[c0][c1] * (PB_0 * PA_0)
@@ -22170,13 +22557,13 @@ computeExchangeFockDDDS0(double*         mat_K,
                                     + delta[a0][b0] * delta[c0][c1] * (PB_1 * PA_1)
                                     + delta[a0][a1] * delta[c0][c1] * (PB_0 * PB_1)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[0] * (
-        
+
                                 + 0.5 * inv_S1 * (
                                     delta[b0][b1] * (PA_0 * PA_1 * QC_0 * QC_1)
                                     + delta[a1][b1] * (PB_0 * PA_0 * QC_0 * QC_1)
@@ -22185,74 +22572,74 @@ computeExchangeFockDDDS0(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * PB_1 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[0] * (
-        
+
                                 + 0.5 * inv_S2 * (
                                     delta[c0][c1] * (PB_0 * PB_1 * PA_0 * PA_1)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[0] * (
-        
+
                                 + (
                                     
                                     + PB_0 * PB_1 * PA_0 * PA_1 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[0] * (
-        
+
                                 + 0.125 * inv_S1 * inv_S1 * inv_S2 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1])
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[1] * (
-        
+
                                 (-0.25) * inv_S1 * inv_S1 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1])
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[1] * (
-        
+
                                 + (-0.125) * inv_S1 * inv_S2 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1])
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[1] * (
-        
+
                                 + (-0.5) * S2 * inv_S1 * inv_S1 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[1] * (
-        
+
                                 + 0.25 * inv_S1 * inv_S4 * (
                                     delta[b0][b1] * delta[c0][c1] * (PA_0 * PA_1 * (-1.0) + PA_0 * PQ[a1] + PA_1 * PQ[a0])
                                     + delta[a1][b1] * delta[c0][c1] * (PB_0 * PA_0 * (-1.0) + PB_0 * PQ[a0] + PA_0 * PQ[b0])
@@ -22270,13 +22657,13 @@ computeExchangeFockDDDS0(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PB_1 * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * QC_1 * (-1.0) + PQ[c1] * QC_0 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[1] * (
-        
+
                                 + (-0.25) * inv_S2 * inv_S4 * (
                                     delta[b0][b1] * delta[c0][c1] * (PA_0 * PA_1)
                                     + delta[a1][b1] * delta[c0][c1] * (PB_0 * PA_0)
@@ -22285,23 +22672,23 @@ computeExchangeFockDDDS0(double*         mat_K,
                                     + delta[a0][b0] * delta[c0][c1] * (PB_1 * PA_1)
                                     + delta[a0][a1] * delta[c0][c1] * (PB_0 * PB_1)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[1] * (
-        
+
                                 + (-0.5) * S1 * inv_S2 * inv_S4 * (
                                     delta[c0][c1] * (PB_0 * PB_1 * PA_0 * PA_1)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[1] * (
-        
+
                                 + 0.5 * S2 * inv_S1 * inv_S4 * (
                                     delta[b0][b1] * (PA_0 * PA_1 * QC_0 * QC_1 * (-1.0) + PA_0 * PQ[a1] * QC_0 * QC_1 + PA_1 * PQ[a0] * QC_0 * QC_1)
                                     + delta[a1][b1] * (PB_0 * PA_0 * QC_0 * QC_1 * (-1.0) + PB_0 * PQ[a0] * QC_0 * QC_1 + PA_0 * PQ[b0] * QC_0 * QC_1)
@@ -22310,13 +22697,13 @@ computeExchangeFockDDDS0(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[a1] * QC_0 * QC_1 + PA_1 * PQ[b1] * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * PB_1 * QC_0 * QC_1 * (-1.0) + PB_0 * PQ[b1] * QC_0 * QC_1 + PB_1 * PQ[b0] * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[1] * (
-        
+
                                 + 0.5 * inv_S4 * (
                                     delta[c0][c1] * (PB_0 * PB_1 * PA_0 * PQ[a1] + PB_0 * PB_1 * PA_1 * PQ[a0] + PB_0 * PA_0 * PA_1 * PQ[b1] + PB_1 * PA_0 * PA_1 * PQ[b0])
                                     + delta[b1][c1] * (PB_0 * PA_0 * PA_1 * QC_0)
@@ -22334,25 +22721,25 @@ computeExchangeFockDDDS0(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * QC_1 * (-1.0) + PB_1 * PA_1 * PQ[c1] * QC_0 * (-1.0))
                                     + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * QC_1 * (-1.0) + PB_0 * PB_1 * PQ[c1] * QC_0 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[1] * (
-        
+
                                 + S1 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * QC_1 * (-1.0)
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c1] * QC_0 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[1] * (
-        
+
                                 + S2 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PQ[a1] * QC_0 * QC_1
@@ -22360,23 +22747,23 @@ computeExchangeFockDDDS0(double*         mat_K,
                                     + PB_0 * PA_0 * PA_1 * PQ[b1] * QC_0 * QC_1
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[2] * (
-        
+
                                 0.25 * S2 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[2] * (
-        
+
                                 + 0.25 * S2 * inv_S1 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * delta[c0][c1] * (PA_0 * PQ[a1] * (-1.0) + PA_1 * PQ[a0] * (-1.0) + PQ[a0] * PQ[a1])
                                     + delta[a1][b1] * delta[c0][c1] * (PB_0 * PQ[a0] * (-1.0) + PA_0 * PQ[b0] * (-1.0) + PQ[a0] * PQ[b0])
@@ -22394,13 +22781,13 @@ computeExchangeFockDDDS0(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PB_1 * QC_1 * (-1.0) + PQ[b1] * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * QC_1 * 2.0 + PQ[c1] * QC_0 * 2.0)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[2] * (
-        
+
                                 + 0.25 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * delta[c0][c1] * (PA_0 * PQ[a1] * (-1.0) + PA_1 * PQ[a0] * (-1.0) + PA_0 * PA_1)
                                     + (delta[b0][c0] * delta[b1][c1] + delta[b0][c1] * delta[b1][c0]) * (PA_0 * PA_1)
@@ -22424,13 +22811,13 @@ computeExchangeFockDDDS0(double*         mat_K,
                                     + (delta[a0][c0] * delta[a1][c1] + delta[a0][c1] * delta[a1][c0]) * (PB_0 * PB_1)
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[c1])
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[2] * (
-        
+
                                 + 0.5 * S1 * inv_S4 * inv_S4 * (
                                     delta[c0][c1] * (PB_0 * PB_1 * PA_0 * PQ[a1] * (-1.0) + PB_0 * PB_1 * PA_1 * PQ[a0] * (-1.0) + PB_0 * PA_0 * PA_1 * PQ[b1] * (-1.0) + PB_1 * PA_0 * PA_1 * PQ[b0] * (-1.0))
                                     + delta[b1][c1] * (PB_0 * PA_0 * PA_1 * PQ[c0] * (-1.0))
@@ -22448,13 +22835,13 @@ computeExchangeFockDDDS0(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * PQ[c1])
                                     + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * PQ[c1])
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[2] * (
-        
+
                                 + 0.5 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * (PA_0 * PQ[a1] * QC_0 * QC_1 * (-1.0) + PA_1 * PQ[a0] * QC_0 * QC_1 * (-1.0) + PQ[a0] * PQ[a1] * QC_0 * QC_1)
                                     + delta[a1][b1] * (PB_0 * PQ[a0] * QC_0 * QC_1 * (-1.0) + PA_0 * PQ[b0] * QC_0 * QC_1 * (-1.0) + PQ[a0] * PQ[b0] * QC_0 * QC_1)
@@ -22463,13 +22850,13 @@ computeExchangeFockDDDS0(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PQ[a1] * QC_0 * QC_1 * (-1.0) + PA_1 * PQ[b1] * QC_0 * QC_1 * (-1.0) + PQ[a1] * PQ[b1] * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * PQ[b1] * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[b0] * QC_0 * QC_1 * (-1.0) + PQ[b0] * PQ[b1] * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[2] * (
-        
+
                                 + 0.5 * S2 * inv_S4 * inv_S4 * (
                                     delta[c0][c1] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] + PB_0 * PA_0 * PQ[a1] * PQ[b1] + PB_0 * PA_1 * PQ[a0] * PQ[b1] + PB_1 * PA_0 * PQ[a1] * PQ[b0] + PB_1 * PA_1 * PQ[a0] * PQ[b0] + PA_0 * PA_1 * PQ[b0] * PQ[b1])
                                     + delta[b1][c1] * (PB_0 * PA_0 * PQ[a1] * QC_0 + PB_0 * PA_1 * PQ[a0] * QC_0 + PA_0 * PA_1 * PQ[b0] * QC_0)
@@ -22487,18 +22874,18 @@ computeExchangeFockDDDS0(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PQ[a1] * PQ[c0] * QC_1 * (-1.0) + PB_1 * PQ[a1] * PQ[c1] * QC_0 * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * QC_1 * (-1.0) + PA_1 * PQ[b1] * PQ[c1] * QC_0 * (-1.0) + PB_1 * PA_1 * PQ[c0] * QC_1 + PB_1 * PA_1 * PQ[c1] * QC_0)
                                     + delta[a0][a1] * (PB_0 * PQ[b1] * PQ[c0] * QC_1 * (-1.0) + PB_0 * PQ[b1] * PQ[c1] * QC_0 * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * QC_1 * (-1.0) + PB_1 * PQ[b0] * PQ[c1] * QC_0 * (-1.0) + PB_0 * PB_1 * PQ[c0] * QC_1 + PB_0 * PB_1 * PQ[c1] * QC_0)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[2] * (
-        
+
                                 + S1 * S1 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * PQ[c1]
                                 )
-        
+
                             )
 
                             );
@@ -22576,11 +22963,12 @@ computeExchangeFockDDDS1(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -22590,6 +22978,7 @@ computeExchangeFockDDDS1(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -22623,12 +23012,19 @@ computeExchangeFockDDDS1(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -22640,8 +23036,8 @@ computeExchangeFockDDDS1(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -22657,7 +23053,23 @@ computeExchangeFockDDDS1(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -22686,23 +23098,12 @@ computeExchangeFockDDDS1(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
-
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -22732,17 +23133,12 @@ computeExchangeFockDDDS1(double*         mat_K,
                         F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F6_t[2] * (
-        
+
                                 + S1 * S2 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * QC_1 * (-1.0)
@@ -22754,13 +23150,13 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * QC_1 * (-1.0)
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c1] * QC_0 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[2] * (
-        
+
                                 + S2 * S2 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * PQ[a1] * QC_0 * QC_1
@@ -22770,44 +23166,44 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + PB_1 * PA_1 * PQ[a0] * PQ[b0] * QC_0 * QC_1
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[2] * (
-        
+
                                 + 0.125 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1])
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[2] * (
-        
+
                                 + 0.125 * inv_S1 * inv_S4 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1]) * 2.0
                                     + (delta[a0][a1] * delta[b0][c0] * delta[b1][c1] + delta[a0][a1] * delta[b0][c1] * delta[b1][c0] + delta[a0][b0] * delta[a1][c0] * delta[b1][c1] + delta[a0][b0] * delta[a1][c1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] * delta[b0][c1] + delta[a0][b1] * delta[a1][c1] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][c1] + delta[a0][c0] * delta[a1][b1] * delta[b0][c1] + delta[a0][c0] * delta[a1][c1] * delta[b0][b1] + delta[a0][c1] * delta[a1][b0] * delta[b1][c0] + delta[a0][c1] * delta[a1][b1] * delta[b0][c0] + delta[a0][c1] * delta[a1][c0] * delta[b0][b1])
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[3] * (
-        
+
                                 (-0.125) * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][a1] * delta[b0][c0] * delta[b1][c1] + delta[a0][a1] * delta[b0][c1] * delta[b1][c0] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[b1][c1] + delta[a0][b0] * delta[a1][c1] * delta[b1][c0] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1] + delta[a0][b1] * delta[a1][c0] * delta[b0][c1] + delta[a0][b1] * delta[a1][c1] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][c1] + delta[a0][c0] * delta[a1][b1] * delta[b0][c1] + delta[a0][c0] * delta[a1][c1] * delta[b0][b1] + delta[a0][c1] * delta[a1][b0] * delta[b1][c0] + delta[a0][c1] * delta[a1][b1] * delta[b0][c0] + delta[a0][c1] * delta[a1][c0] * delta[b0][b1])
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[3] * (
-        
+
                                 + (-0.25) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * delta[c0][c1] * (PQ[a0] * PQ[a1])
                                     + delta[a1][b1] * delta[c0][c1] * (PQ[a0] * PQ[b0])
@@ -22825,13 +23221,13 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[b1] * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * QC_1 + PQ[c1] * QC_0)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[3] * (
-        
+
                                 + 0.25 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * delta[c0][c1] * (PQ[a0] * PQ[a1] * (-1.0) + PA_0 * PQ[a1] + PA_1 * PQ[a0])
                                     + (delta[b0][c0] * delta[b1][c1] + delta[b0][c1] * delta[b1][c0]) * (PA_0 * PQ[a1] + PA_1 * PQ[a0])
@@ -22855,13 +23251,13 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[c1] * (-2.0))
                                     + (delta[a0][c0] * delta[a1][c1] + delta[a0][c1] * delta[a1][c0]) * (PB_0 * PQ[b1] + PB_1 * PQ[b0])
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[3] * (
-        
+
                                 + 0.5 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[c0][c1] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[b1] * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[b1] * (-1.0) + PB_1 * PA_0 * PQ[a1] * PQ[b0] * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[b0] * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[b1] * (-1.0))
                                     + delta[b1][c1] * (PB_0 * PA_0 * PQ[a1] * PQ[c0] * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[c0] * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[c0] * (-1.0))
@@ -22879,13 +23275,13 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * PQ[c1] * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * PQ[c1] + PA_1 * PQ[b1] * PQ[c0] * PQ[c1])
                                     + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * PQ[c1] * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * PQ[c1] + PB_1 * PQ[b0] * PQ[c0] * PQ[c1])
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[3] * (
-        
+
                                 + (-0.5) * S2 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * (PQ[a0] * PQ[a1] * QC_0 * QC_1)
                                     + delta[a1][b1] * (PQ[a0] * PQ[b0] * QC_0 * QC_1)
@@ -22894,13 +23290,13 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[b1] * QC_0 * QC_1)
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[3] * (
-        
+
                                 + 0.5 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[c0][c1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] + PA_1 * PQ[a0] * PQ[b0] * PQ[b1])
                                     + delta[b1][c1] * (PB_0 * PQ[a0] * PQ[a1] * QC_0 + PA_0 * PQ[a1] * PQ[b0] * QC_0 + PA_1 * PQ[a0] * PQ[b0] * QC_0)
@@ -22918,13 +23314,13 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[b1] * PQ[c0] * QC_1 * (-1.0) + PQ[a1] * PQ[b1] * PQ[c1] * QC_0 * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * QC_1 + PB_1 * PQ[a1] * PQ[c1] * QC_0 + PA_1 * PQ[b1] * PQ[c0] * QC_1 + PA_1 * PQ[b1] * PQ[c1] * QC_0)
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * QC_1 * (-1.0) + PQ[b0] * PQ[b1] * PQ[c1] * QC_0 * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * QC_1 + PB_0 * PQ[b1] * PQ[c1] * QC_0 + PB_1 * PQ[b0] * PQ[c0] * QC_1 + PB_1 * PQ[b0] * PQ[c1] * QC_0)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[3] * (
-        
+
                                 + S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * PQ[c1]
@@ -22932,13 +23328,13 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] * PQ[c1]
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[c1]
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[3] * (
-        
+
                                 + S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * QC_1 * (-1.0)
@@ -22954,13 +23350,13 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 * (-1.0)
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c1] * QC_0 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[3] * (
-        
+
                                 + S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * QC_0 * QC_1
@@ -22968,13 +23364,13 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * QC_0 * QC_1
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[4] * (
-        
+
                                 0.5 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[c0][c1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * (-1.0) + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * (-1.0))
                                     + delta[b1][c1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[c0] * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * (-1.0))
@@ -22992,13 +23388,13 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PQ[a1] * PQ[c0] * PQ[c1] * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * PQ[c1] * (-1.0) + PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1])
                                     + delta[a0][a1] * (PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * (-1.0) + PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1])
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[4] * (
-        
+
                                 + 0.5 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[b1][c1] * (PQ[a0] * PQ[a1] * PQ[b0] * QC_0)
                                     + delta[b1][c0] * (PQ[a0] * PQ[a1] * PQ[b0] * QC_1)
@@ -23016,13 +23412,13 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * QC_1 + PQ[b0] * PQ[b1] * PQ[c1] * QC_0)
                                     + delta[c0][c1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1])
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[4] * (
-        
+
                                 + S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[c1]
@@ -23032,13 +23428,13 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[c1]
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1]
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[4] * (
-        
+
                                 + S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * QC_1 * (-1.0)
@@ -23050,24 +23446,24 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 * (-1.0)
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c1] * QC_0 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[4] * (
-        
+
                                 + S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[4] * (
-        
+
                                 + 0.25 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] + delta[b0][c0] * delta[b1][c1] + delta[b0][c1] * delta[b1][c0]) * (PQ[a0] * PQ[a1])
                                     + (delta[a1][b1] * delta[c0][c1] + delta[a1][c0] * delta[b1][c1] + delta[a1][c1] * delta[b1][c0]) * (PQ[a0] * PQ[b0])
@@ -23085,13 +23481,13 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[b1] * PQ[c1])
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[c1])
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[5] * (
-        
+
                                 (-0.5) * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[c0][c1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1])
                                     + delta[b1][c1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0])
@@ -23109,13 +23505,13 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1])
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1])
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[5] * (
-        
+
                                 + S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1]
@@ -23123,29 +23519,29 @@ computeExchangeFockDDDS1(double*         mat_K,
                                     + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1]
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1]
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[5] * (
-        
+
                                 + S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 * (-1.0)
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c1] * QC_0 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F6_t[6] * (
-        
+
                                 S1 * S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1]
                                 )
-        
+
                             )
 
                             );
@@ -23193,7 +23589,6 @@ computeExchangeFockDDDS1(double*         mat_K,
         mat_K[ik] += K_ik;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD0(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
@@ -23224,11 +23619,12 @@ computeExchangeFockDPDD0(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -23238,6 +23634,7 @@ computeExchangeFockDPDD0(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -23271,12 +23668,19 @@ computeExchangeFockDPDD0(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -23288,8 +23692,8 @@ computeExchangeFockDPDD0(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -23305,7 +23709,21 @@ computeExchangeFockDPDD0(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -23334,24 +23752,15 @@ computeExchangeFockDPDD0(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -23376,30 +23785,26 @@ computeExchangeFockDPDD0(double*         mat_K,
                         F7_t[1] *= d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[0] * (
-        
+
                                 0.125 * inv_S1 * inv_S2 * inv_S2 * (
                                     (delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a1][b0] * delta[c0][d1] * delta[c1][d0]) * (PA_0)
                                     + (delta[a0][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[c0][d1] * delta[c1][d0]) * (PA_1)
                                     + (delta[a0][a1] * delta[c0][c1] * delta[d0][d1] + delta[a0][a1] * delta[c0][d0] * delta[c1][d1] + delta[a0][a1] * delta[c0][d1] * delta[c1][d0]) * (PB_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[0] * (
-        
+
                                 + 0.25 * inv_S1 * inv_S2 * (
                                     delta[a1][b0] * delta[d0][d1] * (PA_0 * QC_0 * QC_1)
                                     + delta[a1][b0] * delta[c1][d1] * (PA_0 * QD_0 * QC_0)
@@ -23420,35 +23825,35 @@ computeExchangeFockDPDD0(double*         mat_K,
                                     + delta[a0][a1] * delta[c0][d0] * (PB_0 * QD_1 * QC_1)
                                     + delta[a0][a1] * delta[c0][c1] * (PB_0 * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[0] * (
-        
+
                                 + 0.25 * inv_S2 * inv_S2 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PA_0 * PA_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[0] * (
-        
+
                                 + 0.5 * inv_S1 * (
                                     delta[a1][b0] * (PA_0 * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a0][b0] * (PA_1 * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * QD_0 * QD_1 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[0] * (
-        
+
                                 + 0.5 * inv_S2 * (
                                     delta[d0][d1] * (PB_0 * PA_0 * PA_1 * QC_0 * QC_1)
                                     + delta[c1][d1] * (PB_0 * PA_0 * PA_1 * QD_0 * QC_0)
@@ -23457,24 +23862,24 @@ computeExchangeFockDPDD0(double*         mat_K,
                                     + delta[c0][d0] * (PB_0 * PA_0 * PA_1 * QD_1 * QC_1)
                                     + delta[c0][c1] * (PB_0 * PA_0 * PA_1 * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[0] * (
-        
+
                                 + (
                                     
                                     + PB_0 * PA_0 * PA_1 * QD_0 * QD_1 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 0.125 * inv_S1 * inv_S2 * inv_S4 * (
                                     (delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a1][b0] * delta[c0][d1] * delta[c1][d0]) * (PA_0 * (-1.0) + PQ[a0])
                                     + (delta[a0][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[c0][d1] * delta[c1][d0]) * (PA_1 * (-1.0) + PQ[a1])
@@ -23484,35 +23889,35 @@ computeExchangeFockDPDD0(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] * delta[c1][d1] + delta[a0][a1] * delta[b0][c1] * delta[c0][d1] + delta[a0][a1] * delta[b0][d1] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[c1][d1] + delta[a0][b0] * delta[a1][c1] * delta[c0][d1] + delta[a0][b0] * delta[a1][d1] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[c1][d1] + delta[a0][c1] * delta[a1][b0] * delta[c0][d1] + delta[a0][d1] * delta[a1][b0] * delta[c0][c1]) * (QD_0)
                                     + (delta[a0][a1] * delta[b0][c0] * delta[c1][d0] + delta[a0][a1] * delta[b0][c1] * delta[c0][d0] + delta[a0][a1] * delta[b0][d0] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[c1][d0] + delta[a0][b0] * delta[a1][c1] * delta[c0][d0] + delta[a0][b0] * delta[a1][d0] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[c1][d0] + delta[a0][c1] * delta[a1][b0] * delta[c0][d0] + delta[a0][d0] * delta[a1][b0] * delta[c0][c1]) * (QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + (-0.25) * inv_S2 * inv_S2 * inv_S4 * (
                                     (delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a1][b0] * delta[c0][d1] * delta[c1][d0]) * (PA_0)
                                     + (delta[a0][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[c0][d1] * delta[c1][d0]) * (PA_1)
                                     + (delta[a0][a1] * delta[c0][c1] * delta[d0][d1] + delta[a0][a1] * delta[c0][d0] * delta[c1][d1] + delta[a0][a1] * delta[c0][d1] * delta[c1][d0]) * (PB_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + (-0.5) * S1 * inv_S2 * inv_S2 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PA_0 * PA_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + 0.25 * inv_S1 * inv_S4 * (
                                     delta[a1][b0] * delta[d0][d1] * (PA_0 * QC_0 * QC_1 * (-1.0) + PQ[a0] * QC_0 * QC_1)
                                     + delta[a1][b0] * delta[c1][d1] * (PA_0 * QD_0 * QC_0 * (-1.0) + PQ[a0] * QD_0 * QC_0)
@@ -23537,13 +23942,13 @@ computeExchangeFockDPDD0(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c1] + delta[a0][b0] * delta[a1][c1] + delta[a0][c1] * delta[a1][b0]) * (QD_0 * QD_1 * QC_0)
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (QD_0 * QD_1 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + 0.25 * inv_S2 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PA_0 * PQ[a1] + PB_0 * PA_1 * PQ[a0] + PA_0 * PA_1 * PQ[b0])
                                     + (delta[b0][c1] * delta[d0][d1] + delta[b0][d0] * delta[c1][d1] + delta[b0][d1] * delta[c1][d0]) * (PA_0 * PA_1 * QC_0)
@@ -23577,13 +23982,13 @@ computeExchangeFockDPDD0(double*         mat_K,
                                     + delta[a0][a1] * delta[c0][d0] * (PB_0 * PQ[c1] * QD_1 * (-1.0) + PB_0 * PQ[d1] * QC_1 * (-1.0) + PB_0 * QD_1 * QC_1 * (-1.0))
                                     + delta[a0][a1] * delta[c0][c1] * (PB_0 * PQ[d0] * QD_1 * (-1.0) + PB_0 * PQ[d1] * QD_0 * (-1.0) + PB_0 * QD_0 * QD_1 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + (-0.5) * S1 * inv_S2 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PA_0 * PA_1 * PQ[c0] * QC_1 + PB_0 * PA_0 * PA_1 * PQ[c1] * QC_0 + PB_0 * PA_0 * PA_1 * QC_0 * QC_1)
                                     + delta[c1][d1] * (PB_0 * PA_0 * PA_1 * PQ[c0] * QD_0 + PB_0 * PA_0 * PA_1 * PQ[d0] * QC_0 + PB_0 * PA_0 * PA_1 * QD_0 * QC_0)
@@ -23592,7 +23997,7 @@ computeExchangeFockDPDD0(double*         mat_K,
                                     + delta[c0][d0] * (PB_0 * PA_0 * PA_1 * PQ[c1] * QD_1 + PB_0 * PA_0 * PA_1 * PQ[d1] * QC_1 + PB_0 * PA_0 * PA_1 * QD_1 * QC_1)
                                     + delta[c0][c1] * (PB_0 * PA_0 * PA_1 * PQ[d0] * QD_1 + PB_0 * PA_0 * PA_1 * PQ[d1] * QD_0 + PB_0 * PA_0 * PA_1 * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             );
@@ -23670,11 +24075,12 @@ computeExchangeFockDPDD1(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -23684,6 +24090,7 @@ computeExchangeFockDPDD1(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -23717,12 +24124,19 @@ computeExchangeFockDPDD1(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -23734,8 +24148,8 @@ computeExchangeFockDPDD1(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -23751,7 +24165,21 @@ computeExchangeFockDPDD1(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -23780,24 +24208,15 @@ computeExchangeFockDPDD1(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -23823,30 +24242,26 @@ computeExchangeFockDPDD1(double*         mat_K,
                         F7_t[2] *= d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[1] * (
-        
+
                                 + 0.5 * S2 * inv_S1 * inv_S4 * (
                                     delta[a1][b0] * (PA_0 * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[a0] * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a0][b0] * (PA_1 * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[a1] * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + 0.5 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PA_0 * PQ[a1] * QC_0 * QC_1 + PB_0 * PA_1 * PQ[a0] * QC_0 * QC_1 + PA_0 * PA_1 * PQ[b0] * QC_0 * QC_1)
                                     + delta[c1][d1] * (PB_0 * PA_0 * PQ[a1] * QD_0 * QC_0 + PB_0 * PA_1 * PQ[a0] * QD_0 * QC_0 + PA_0 * PA_1 * PQ[b0] * QD_0 * QC_0)
@@ -23870,13 +24285,13 @@ computeExchangeFockDPDD1(double*         mat_K,
                                     + delta[a0][b0] * (PA_1 * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PA_1 * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PA_1 * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PA_1 * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0))
                                     + delta[a0][a1] * (PB_0 * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PB_0 * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PB_0 * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PB_0 * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + S1 * inv_S4 * (
                                     
                                     + PB_0 * PA_0 * PA_1 * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
@@ -23884,38 +24299,38 @@ computeExchangeFockDPDD1(double*         mat_K,
                                     + PB_0 * PA_0 * PA_1 * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
                                     + PB_0 * PA_0 * PA_1 * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + S2 * inv_S4 * (
                                     
                                     + PB_0 * PA_0 * PQ[a1] * QD_0 * QD_1 * QC_0 * QC_1
                                     + PB_0 * PA_1 * PQ[a0] * QD_0 * QD_1 * QC_0 * QC_1
                                     + PA_0 * PA_1 * PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 0.125 * S1 * inv_S2 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a1][b0] * delta[c0][d1] * delta[c1][d0]) * (PA_0)
                                     + (delta[a0][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[c0][d1] * delta[c1][d0]) * (PA_1)
                                     + (delta[a0][a1] * delta[c0][c1] * delta[d0][d1] + delta[a0][a1] * delta[c0][d0] * delta[c1][d1] + delta[a0][a1] * delta[c0][d1] * delta[c1][d0]) * (PB_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + (-0.125) * inv_S1 * inv_S4 * inv_S4 * (
                                     (delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a1][b0] * delta[c0][d1] * delta[c1][d0]) * (PQ[a0])
                                     + (delta[a0][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[c0][d1] * delta[c1][d0]) * (PQ[a1])
@@ -23925,13 +24340,13 @@ computeExchangeFockDPDD1(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] * delta[c1][d1] + delta[a0][a1] * delta[b0][c1] * delta[c0][d1] + delta[a0][a1] * delta[b0][d1] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[c1][d1] + delta[a0][b0] * delta[a1][c1] * delta[c0][d1] + delta[a0][b0] * delta[a1][d1] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[c1][d1] + delta[a0][c1] * delta[a1][b0] * delta[c0][d1] + delta[a0][d1] * delta[a1][b0] * delta[c0][c1]) * (QD_0)
                                     + (delta[a0][a1] * delta[b0][c0] * delta[c1][d0] + delta[a0][a1] * delta[b0][c1] * delta[c0][d0] + delta[a0][a1] * delta[b0][d0] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[c1][d0] + delta[a0][b0] * delta[a1][c1] * delta[c0][d0] + delta[a0][b0] * delta[a1][d0] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[c1][d0] + delta[a0][c1] * delta[a1][b0] * delta[c0][d0] + delta[a0][d0] * delta[a1][b0] * delta[c0][c1]) * (QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.125 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a1][b0] * delta[c0][d1] * delta[c1][d0]) * (PQ[a0] * (-2.0) + PA_0 * 2.0)
                                     + (delta[a1][c0] * delta[b0][c1] * delta[d0][d1] + delta[a1][c0] * delta[b0][d0] * delta[c1][d1] + delta[a1][c0] * delta[b0][d1] * delta[c1][d0] + delta[a1][c1] * delta[b0][c0] * delta[d0][d1] + delta[a1][c1] * delta[b0][d0] * delta[c0][d1] + delta[a1][c1] * delta[b0][d1] * delta[c0][d0] + delta[a1][d0] * delta[b0][c0] * delta[c1][d1] + delta[a1][d0] * delta[b0][c1] * delta[c0][d1] + delta[a1][d0] * delta[b0][d1] * delta[c0][c1] + delta[a1][d1] * delta[b0][c0] * delta[c1][d0] + delta[a1][d1] * delta[b0][c1] * delta[c0][d0] + delta[a1][d1] * delta[b0][d0] * delta[c0][c1]) * (PA_0)
@@ -23944,23 +24359,23 @@ computeExchangeFockDPDD1(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] * delta[c1][d0] + delta[a0][a1] * delta[b0][c1] * delta[c0][d0] + delta[a0][a1] * delta[b0][d0] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[c1][d0] + delta[a0][b0] * delta[a1][c1] * delta[c0][d0] + delta[a0][b0] * delta[a1][d0] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[c1][d0] + delta[a0][c1] * delta[a1][b0] * delta[c0][d0] + delta[a0][d0] * delta[a1][b0] * delta[c0][c1]) * (PQ[d1] * (-1.0) + QD_1 * (-1.0))
                                     + (delta[a0][c0] * delta[a1][c1] * delta[d0][d1] + delta[a0][c0] * delta[a1][d0] * delta[c1][d1] + delta[a0][c0] * delta[a1][d1] * delta[c1][d0] + delta[a0][c1] * delta[a1][c0] * delta[d0][d1] + delta[a0][c1] * delta[a1][d0] * delta[c0][d1] + delta[a0][c1] * delta[a1][d1] * delta[c0][d0] + delta[a0][d0] * delta[a1][c0] * delta[c1][d1] + delta[a0][d0] * delta[a1][c1] * delta[c0][d1] + delta[a0][d0] * delta[a1][d1] * delta[c0][c1] + delta[a0][d1] * delta[a1][c0] * delta[c1][d0] + delta[a0][d1] * delta[a1][c1] * delta[c0][d0] + delta[a0][d1] * delta[a1][d0] * delta[c0][c1]) * (PB_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.25 * S1 * S1 * inv_S2 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PA_0 * PA_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.25 * S1 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PA_0 * PQ[a1] * (-2.0) + PB_0 * PA_1 * PQ[a0] * (-2.0) + PA_0 * PA_1 * PQ[b0] * (-2.0))
                                     + (delta[b0][c1] * delta[d0][d1] + delta[b0][d0] * delta[c1][d1] + delta[b0][d1] * delta[c1][d0]) * (PA_0 * PA_1 * PQ[c0] * (-1.0) + PA_0 * PA_1 * QC_0 * (-1.0))
@@ -23994,13 +24409,13 @@ computeExchangeFockDPDD1(double*         mat_K,
                                     + delta[a0][a1] * delta[c0][d0] * (PB_0 * PQ[c1] * PQ[d1] + PB_0 * PQ[c1] * QD_1 + PB_0 * PQ[d1] * QC_1)
                                     + delta[a0][a1] * delta[c0][c1] * (PB_0 * PQ[d0] * PQ[d1] + PB_0 * PQ[d0] * QD_1 + PB_0 * PQ[d1] * QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + (-0.25) * S2 * inv_S1 * inv_S4 * inv_S4 * (
                                     delta[a1][b0] * delta[d0][d1] * (PQ[a0] * QC_0 * QC_1)
                                     + delta[a1][b0] * delta[c1][d1] * (PQ[a0] * QD_0 * QC_0)
@@ -24025,13 +24440,13 @@ computeExchangeFockDPDD1(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c1] + delta[a0][b0] * delta[a1][c1] + delta[a0][c1] * delta[a1][b0]) * (QD_0 * QD_1 * QC_0)
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (QD_0 * QD_1 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.25 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PQ[a0] * PQ[a1] + PA_0 * PQ[a1] * PQ[b0] + PA_1 * PQ[a0] * PQ[b0])
                                     + (delta[b0][c1] * delta[d0][d1] + delta[b0][d0] * delta[c1][d1] + delta[b0][d1] * delta[c1][d0]) * (PA_0 * PQ[a1] * QC_0 + PA_1 * PQ[a0] * QC_0)
@@ -24087,7 +24502,7 @@ computeExchangeFockDPDD1(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[c1] * QD_0 * QD_1 * (-1.0) + PQ[d0] * QD_1 * QC_1 * (-1.0) + PQ[d1] * QD_0 * QC_1 * (-1.0))
                                     + (delta[a0][c0] * delta[a1][c1] + delta[a0][c1] * delta[a1][c0]) * (PB_0 * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             );
@@ -24165,11 +24580,12 @@ computeExchangeFockDPDD2(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -24179,6 +24595,7 @@ computeExchangeFockDPDD2(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -24212,12 +24629,19 @@ computeExchangeFockDPDD2(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -24229,8 +24653,8 @@ computeExchangeFockDPDD2(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -24246,7 +24670,21 @@ computeExchangeFockDPDD2(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -24275,24 +24713,15 @@ computeExchangeFockDPDD2(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -24318,18 +24747,14 @@ computeExchangeFockDPDD2(double*         mat_K,
                         F7_t[2] *= d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[2] * (
-        
+
                                 + 0.5 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PA_0 * PA_1 * PQ[c0] * PQ[c1] + PB_0 * PA_0 * PA_1 * PQ[c0] * QC_1 + PB_0 * PA_0 * PA_1 * PQ[c1] * QC_0)
                                     + delta[c1][d1] * (PB_0 * PA_0 * PA_1 * PQ[c0] * PQ[d0] + PB_0 * PA_0 * PA_1 * PQ[c0] * QD_0 + PB_0 * PA_0 * PA_1 * PQ[d0] * QC_0)
@@ -24338,13 +24763,13 @@ computeExchangeFockDPDD2(double*         mat_K,
                                     + delta[c0][d0] * (PB_0 * PA_0 * PA_1 * PQ[c1] * PQ[d1] + PB_0 * PA_0 * PA_1 * PQ[c1] * QD_1 + PB_0 * PA_0 * PA_1 * PQ[d1] * QC_1)
                                     + delta[c0][c1] * (PB_0 * PA_0 * PA_1 * PQ[d0] * PQ[d1] + PB_0 * PA_0 * PA_1 * PQ[d0] * QD_1 + PB_0 * PA_0 * PA_1 * PQ[d1] * QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.5 * S1 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PA_0 * PQ[a1] * PQ[c0] * QC_1 * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[c1] * QC_0 * (-1.0) + PB_0 * PA_0 * PQ[a1] * QC_0 * QC_1 * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[c0] * QC_1 * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[c1] * QC_0 * (-1.0) + PB_0 * PA_1 * PQ[a0] * QC_0 * QC_1 * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[c0] * QC_1 * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[c1] * QC_0 * (-1.0) + PA_0 * PA_1 * PQ[b0] * QC_0 * QC_1 * (-1.0))
                                     + delta[c1][d1] * (PB_0 * PA_0 * PQ[a1] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PA_0 * PQ[a1] * QD_0 * QC_0 * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PA_1 * PQ[a0] * QD_0 * QC_0 * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PA_0 * PA_1 * PQ[b0] * QD_0 * QC_0 * (-1.0))
@@ -24368,25 +24793,25 @@ computeExchangeFockDPDD2(double*         mat_K,
                                     + delta[a0][b0] * (PA_1 * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PA_1 * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PA_1 * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PA_1 * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PA_1 * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PA_1 * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PB_0 * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PB_0 * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PB_0 * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PB_0 * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PB_0 * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + (-0.5) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * (
                                     delta[a1][b0] * (PQ[a0] * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a0][b0] * (PQ[a1] * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a0][a1] * (PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.5 * S2 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PQ[a0] * PQ[a1] * QC_0 * QC_1 + PA_0 * PQ[a1] * PQ[b0] * QC_0 * QC_1 + PA_1 * PQ[a0] * PQ[b0] * QC_0 * QC_1)
                                     + delta[c1][d1] * (PB_0 * PQ[a0] * PQ[a1] * QD_0 * QC_0 + PA_0 * PQ[a1] * PQ[b0] * QD_0 * QC_0 + PA_1 * PQ[a0] * PQ[b0] * QD_0 * QC_0)
@@ -24410,13 +24835,13 @@ computeExchangeFockDPDD2(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PQ[a1] * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PQ[a1] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[a1] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0) + PA_1 * PQ[c0] * QD_0 * QD_1 * QC_1 + PA_1 * PQ[c1] * QD_0 * QD_1 * QC_0 + PA_1 * PQ[d0] * QD_1 * QC_0 * QC_1 + PA_1 * PQ[d1] * QD_0 * QC_0 * QC_1)
                                     + delta[a0][a1] * (PQ[b0] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PQ[b0] * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PQ[b0] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[b0] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0) + PB_0 * PQ[c0] * QD_0 * QD_1 * QC_1 + PB_0 * PQ[c1] * QD_0 * QD_1 * QC_0 + PB_0 * PQ[d0] * QD_1 * QC_0 * QC_1 + PB_0 * PQ[d1] * QD_0 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + S1 * S1 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PA_0 * PA_1 * PQ[c0] * PQ[c1] * QD_0 * QD_1
@@ -24426,13 +24851,13 @@ computeExchangeFockDPDD2(double*         mat_K,
                                     + PB_0 * PA_0 * PA_1 * PQ[c1] * PQ[d1] * QD_0 * QC_0
                                     + PB_0 * PA_0 * PA_1 * PQ[d0] * PQ[d1] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + S1 * S2 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PA_0 * PQ[a1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
@@ -24448,20 +24873,20 @@ computeExchangeFockDPDD2(double*         mat_K,
                                     + PA_0 * PA_1 * PQ[b0] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
                                     + PA_0 * PA_1 * PQ[b0] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + S2 * S2 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * QD_0 * QD_1 * QC_0 * QC_1
                                     + PA_0 * PQ[a1] * PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1
                                     + PA_1 * PQ[a0] * PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             );
@@ -24539,11 +24964,12 @@ computeExchangeFockDPDD3(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -24553,6 +24979,7 @@ computeExchangeFockDPDD3(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -24586,12 +25013,19 @@ computeExchangeFockDPDD3(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -24603,8 +25037,8 @@ computeExchangeFockDPDD3(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -24620,7 +25054,21 @@ computeExchangeFockDPDD3(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -24649,24 +25097,15 @@ computeExchangeFockDPDD3(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -24693,18 +25132,14 @@ computeExchangeFockDPDD3(double*         mat_K,
                         F7_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[3] * (
-        
+
                                 0.125 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a1][b0] * delta[c0][d1] * delta[c1][d0]) * (PA_0 * (-1.0) + PQ[a0])
                                     + (delta[a1][c0] * delta[b0][c1] * delta[d0][d1] + delta[a1][c0] * delta[b0][d0] * delta[c1][d1] + delta[a1][c0] * delta[b0][d1] * delta[c1][d0] + delta[a1][c1] * delta[b0][c0] * delta[d0][d1] + delta[a1][c1] * delta[b0][d0] * delta[c0][d1] + delta[a1][c1] * delta[b0][d1] * delta[c0][d0] + delta[a1][d0] * delta[b0][c0] * delta[c1][d1] + delta[a1][d0] * delta[b0][c1] * delta[c0][d1] + delta[a1][d0] * delta[b0][d1] * delta[c0][c1] + delta[a1][d1] * delta[b0][c0] * delta[c1][d0] + delta[a1][d1] * delta[b0][c1] * delta[c0][d0] + delta[a1][d1] * delta[b0][d0] * delta[c0][c1]) * (PA_0 * (-1.0))
@@ -24717,13 +25152,13 @@ computeExchangeFockDPDD3(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] * delta[c1][d1] + delta[a0][a1] * delta[b0][c1] * delta[c0][d1] + delta[a0][a1] * delta[b0][d1] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[c1][d1] + delta[a0][b0] * delta[a1][c1] * delta[c0][d1] + delta[a0][b0] * delta[a1][d1] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[c1][d1] + delta[a0][c1] * delta[a1][b0] * delta[c0][d1] + delta[a0][d1] * delta[a1][b0] * delta[c0][c1]) * (PQ[d0])
                                     + (delta[a0][a1] * delta[b0][c0] * delta[c1][d0] + delta[a0][a1] * delta[b0][c1] * delta[c0][d0] + delta[a0][a1] * delta[b0][d0] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[c1][d0] + delta[a0][b0] * delta[a1][c1] * delta[c0][d0] + delta[a0][b0] * delta[a1][d0] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[c1][d0] + delta[a0][c1] * delta[a1][b0] * delta[c0][d0] + delta[a0][d0] * delta[a1][b0] * delta[c0][c1]) * (PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.125 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][c1] * delta[d0][d1] + delta[a0][a1] * delta[b0][d0] * delta[c1][d1] + delta[a0][a1] * delta[b0][d1] * delta[c1][d0] + delta[a0][b0] * delta[a1][c1] * delta[d0][d1] + delta[a0][b0] * delta[a1][d0] * delta[c1][d1] + delta[a0][b0] * delta[a1][d1] * delta[c1][d0] + delta[a0][c1] * delta[a1][b0] * delta[d0][d1] + delta[a0][d0] * delta[a1][b0] * delta[c1][d1] + delta[a0][d1] * delta[a1][b0] * delta[c1][d0]) * (PQ[c0] + QC_0)
                                     + (delta[a0][c1] * delta[a1][d0] * delta[b0][d1] + delta[a0][c1] * delta[a1][d1] * delta[b0][d0] + delta[a0][d0] * delta[a1][c1] * delta[b0][d1] + delta[a0][d0] * delta[a1][d1] * delta[b0][c1] + delta[a0][d1] * delta[a1][c1] * delta[b0][d0] + delta[a0][d1] * delta[a1][d0] * delta[b0][c1]) * (QC_0)
@@ -24740,13 +25175,13 @@ computeExchangeFockDPDD3(double*         mat_K,
                                     + (delta[a0][c0] * delta[a1][c1] * delta[b0][d1] + delta[a0][c0] * delta[a1][d1] * delta[b0][c1] + delta[a0][c1] * delta[a1][c0] * delta[b0][d1] + delta[a0][c1] * delta[a1][d1] * delta[b0][c0] + delta[a0][d1] * delta[a1][c0] * delta[b0][c1] + delta[a0][d1] * delta[a1][c1] * delta[b0][c0]) * (QD_0)
                                     + (delta[a0][c0] * delta[a1][c1] * delta[b0][d0] + delta[a0][c0] * delta[a1][d0] * delta[b0][c1] + delta[a0][c1] * delta[a1][c0] * delta[b0][d0] + delta[a0][c1] * delta[a1][d0] * delta[b0][c0] + delta[a0][d0] * delta[a1][c0] * delta[b0][c1] + delta[a0][d0] * delta[a1][c1] * delta[b0][c0]) * (QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.25 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PA_0 * PQ[a1] + PB_0 * PA_1 * PQ[a0] + PA_0 * PA_1 * PQ[b0])
                                     + (delta[b0][c1] * delta[d0][d1] + delta[b0][d0] * delta[c1][d1] + delta[b0][d1] * delta[c1][d0]) * (PA_0 * PA_1 * PQ[c0])
@@ -24780,13 +25215,13 @@ computeExchangeFockDPDD3(double*         mat_K,
                                     + delta[a0][a1] * delta[c0][d0] * (PB_0 * PQ[c1] * PQ[d1] * (-1.0))
                                     + delta[a0][a1] * delta[c0][c1] * (PB_0 * PQ[d0] * PQ[d1] * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.25 * S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PQ[a0] * PQ[a1] * (-2.0) + PA_0 * PQ[a1] * PQ[b0] * (-2.0) + PA_1 * PQ[a0] * PQ[b0] * (-2.0))
                                     + (delta[b0][c1] * delta[d0][d1] + delta[b0][d0] * delta[c1][d1] + delta[b0][d1] * delta[c1][d0]) * (PA_0 * PQ[a1] * PQ[c0] * (-1.0) + PA_0 * PQ[a1] * QC_0 * (-1.0) + PA_1 * PQ[a0] * PQ[c0] * (-1.0) + PA_1 * PQ[a0] * QC_0 * (-1.0))
@@ -24842,13 +25277,13 @@ computeExchangeFockDPDD3(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c1] + delta[a0][b0] * delta[a1][c1] + delta[a0][c1] * delta[a1][b0]) * (PQ[c0] * PQ[d0] * QD_1 + PQ[c0] * PQ[d1] * QD_0 + PQ[d0] * PQ[d1] * QC_0)
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[c1] * PQ[d0] * QD_1 + PQ[c1] * PQ[d1] * QD_0 + PQ[d0] * PQ[d1] * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.25 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[b0][c1] * delta[d0][d1] + delta[b0][d0] * delta[c1][d1] + delta[b0][d1] * delta[c1][d0]) * (PQ[a0] * PQ[a1] * QC_0)
                                     + (delta[b0][c0] * delta[d0][d1] + delta[b0][d0] * delta[c0][d1] + delta[b0][d1] * delta[c0][d0]) * (PQ[a0] * PQ[a1] * QC_1)
@@ -24904,13 +25339,13 @@ computeExchangeFockDPDD3(double*         mat_K,
                                     + delta[a0][a1] * delta[c0][c1] * (PQ[b0] * PQ[d0] * QD_1 + PQ[b0] * PQ[d1] * QD_0 + PQ[b0] * QD_0 * QD_1)
                                     + (delta[a0][c0] * delta[a1][c1] + delta[a0][c1] * delta[a1][c0]) * (PQ[b0] * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + (-0.5) * S1 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PA_0 * PA_1 * PQ[c0] * PQ[c1])
                                     + delta[c1][d1] * (PB_0 * PA_0 * PA_1 * PQ[c0] * PQ[d0])
@@ -24919,7 +25354,7 @@ computeExchangeFockDPDD3(double*         mat_K,
                                     + delta[c0][d0] * (PB_0 * PA_0 * PA_1 * PQ[c1] * PQ[d1])
                                     + delta[c0][c1] * (PB_0 * PA_0 * PA_1 * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             );
@@ -24997,11 +25432,12 @@ computeExchangeFockDPDD4(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -25011,6 +25447,7 @@ computeExchangeFockDPDD4(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -25044,12 +25481,19 @@ computeExchangeFockDPDD4(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -25061,8 +25505,8 @@ computeExchangeFockDPDD4(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -25078,7 +25522,21 @@ computeExchangeFockDPDD4(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -25107,24 +25565,15 @@ computeExchangeFockDPDD4(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -25151,18 +25600,14 @@ computeExchangeFockDPDD4(double*         mat_K,
                         F7_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[3] * (
-        
+
                                 + 0.5 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PA_0 * PQ[a1] * PQ[c0] * PQ[c1] + PB_0 * PA_0 * PQ[a1] * PQ[c0] * QC_1 + PB_0 * PA_0 * PQ[a1] * PQ[c1] * QC_0 + PB_0 * PA_1 * PQ[a0] * PQ[c0] * PQ[c1] + PB_0 * PA_1 * PQ[a0] * PQ[c0] * QC_1 + PB_0 * PA_1 * PQ[a0] * PQ[c1] * QC_0 + PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[c1] + PA_0 * PA_1 * PQ[b0] * PQ[c0] * QC_1 + PA_0 * PA_1 * PQ[b0] * PQ[c1] * QC_0)
                                     + delta[c1][d1] * (PB_0 * PA_0 * PQ[a1] * PQ[c0] * PQ[d0] + PB_0 * PA_0 * PQ[a1] * PQ[c0] * QD_0 + PB_0 * PA_0 * PQ[a1] * PQ[d0] * QC_0 + PB_0 * PA_1 * PQ[a0] * PQ[c0] * PQ[d0] + PB_0 * PA_1 * PQ[a0] * PQ[c0] * QD_0 + PB_0 * PA_1 * PQ[a0] * PQ[d0] * QC_0 + PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[d0] + PA_0 * PA_1 * PQ[b0] * PQ[c0] * QD_0 + PA_0 * PA_1 * PQ[b0] * PQ[d0] * QC_0)
@@ -25186,13 +25631,13 @@ computeExchangeFockDPDD4(double*         mat_K,
                                     + delta[a0][b0] * (PA_1 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PA_1 * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PA_1 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PA_1 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0))
                                     + delta[a0][a1] * (PB_0 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PB_0 * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PB_0 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PB_0 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.5 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[c0] * QC_1 * (-1.0) + PB_0 * PQ[a0] * PQ[a1] * PQ[c1] * QC_0 * (-1.0) + PB_0 * PQ[a0] * PQ[a1] * QC_0 * QC_1 * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * QC_1 * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[c1] * QC_0 * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * QC_0 * QC_1 * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * QC_1 * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[c1] * QC_0 * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * QC_0 * QC_1 * (-1.0))
                                     + delta[c1][d1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PQ[a0] * PQ[a1] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PQ[a0] * PQ[a1] * QD_0 * QC_0 * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * QD_0 * QC_0 * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * QD_0 * QC_0 * (-1.0))
@@ -25216,13 +25661,13 @@ computeExchangeFockDPDD4(double*         mat_K,
                                     + delta[a0][b0] * (PA_1 * PQ[c0] * PQ[c1] * QD_0 * QD_1 * (-1.0) + PA_1 * PQ[c0] * PQ[d0] * QD_1 * QC_1 * (-1.0) + PA_1 * PQ[c0] * PQ[d1] * QD_0 * QC_1 * (-1.0) + PA_1 * PQ[c1] * PQ[d0] * QD_1 * QC_0 * (-1.0) + PA_1 * PQ[c1] * PQ[d1] * QD_0 * QC_0 * (-1.0) + PA_1 * PQ[d0] * PQ[d1] * QC_0 * QC_1 * (-1.0) + PQ[a1] * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PQ[a1] * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PQ[a1] * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PQ[a1] * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PQ[a1] * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PQ[a1] * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * PQ[c0] * PQ[c1] * QD_0 * QD_1 * (-1.0) + PB_0 * PQ[c0] * PQ[d0] * QD_1 * QC_1 * (-1.0) + PB_0 * PQ[c0] * PQ[d1] * QD_0 * QC_1 * (-1.0) + PB_0 * PQ[c1] * PQ[d0] * QD_1 * QC_0 * (-1.0) + PB_0 * PQ[c1] * PQ[d1] * QD_0 * QC_0 * (-1.0) + PB_0 * PQ[d0] * PQ[d1] * QC_0 * QC_1 * (-1.0) + PQ[b0] * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PQ[b0] * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PQ[b0] * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PQ[b0] * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PQ[b0] * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PQ[b0] * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.5 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PQ[a0] * PQ[a1] * PQ[b0] * QC_0 * QC_1)
                                     + delta[c1][d1] * (PQ[a0] * PQ[a1] * PQ[b0] * QD_0 * QC_0)
@@ -25246,7 +25691,7 @@ computeExchangeFockDPDD4(double*         mat_K,
                                     + delta[a0][a1] * (PQ[b0] * PQ[c0] * QD_0 * QD_1 * QC_1 + PQ[b0] * PQ[c1] * QD_0 * QD_1 * QC_0 + PQ[b0] * PQ[d0] * QD_1 * QC_0 * QC_1 + PQ[b0] * PQ[d1] * QD_0 * QC_0 * QC_1)
                                     + delta[c0][c1] * (PQ[a0] * PQ[a1] * PQ[b0] * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             );
@@ -25324,13 +25769,14 @@ computeExchangeFockDPDD5(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    //__shared__ double   delta[3][3];
+    __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -25338,6 +25784,7 @@ computeExchangeFockDPDD5(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -25345,9 +25792,9 @@ computeExchangeFockDPDD5(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -25371,12 +25818,19 @@ computeExchangeFockDPDD5(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -25388,8 +25842,8 @@ computeExchangeFockDPDD5(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -25405,7 +25859,21 @@ computeExchangeFockDPDD5(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -25434,24 +25902,15 @@ computeExchangeFockDPDD5(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -25478,18 +25937,14 @@ computeExchangeFockDPDD5(double*         mat_K,
                         F7_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[3] * (
-        
+
                                 + S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PA_0 * PA_1 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0)
@@ -25497,13 +25952,13 @@ computeExchangeFockDPDD5(double*         mat_K,
                                     + PB_0 * PA_0 * PA_1 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0)
                                     + PB_0 * PA_0 * PA_1 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PA_0 * PQ[a1] * PQ[c0] * PQ[c1] * QD_0 * QD_1
@@ -25525,13 +25980,13 @@ computeExchangeFockDPDD5(double*         mat_K,
                                     + PA_0 * PA_1 * PQ[b0] * PQ[c1] * PQ[d1] * QD_0 * QC_0
                                     + PA_0 * PA_1 * PQ[b0] * PQ[d0] * PQ[d1] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
@@ -25547,7 +26002,7 @@ computeExchangeFockDPDD5(double*         mat_K,
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             );
@@ -25625,11 +26080,12 @@ computeExchangeFockDPDD6(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -25639,6 +26095,7 @@ computeExchangeFockDPDD6(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -25672,12 +26129,19 @@ computeExchangeFockDPDD6(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -25689,8 +26153,8 @@ computeExchangeFockDPDD6(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -25706,7 +26170,21 @@ computeExchangeFockDPDD6(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -25735,24 +26213,15 @@ computeExchangeFockDPDD6(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -25780,29 +26249,25 @@ computeExchangeFockDPDD6(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[3] * (
-        
+
                                 + S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PQ[a0] * PQ[a1] * PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 (-0.125) * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a1][b0] * delta[c0][d1] * delta[c1][d0] + delta[a1][c0] * delta[b0][c1] * delta[d0][d1] + delta[a1][c0] * delta[b0][d0] * delta[c1][d1] + delta[a1][c0] * delta[b0][d1] * delta[c1][d0] + delta[a1][c1] * delta[b0][c0] * delta[d0][d1] + delta[a1][c1] * delta[b0][d0] * delta[c0][d1] + delta[a1][c1] * delta[b0][d1] * delta[c0][d0] + delta[a1][d0] * delta[b0][c0] * delta[c1][d1] + delta[a1][d0] * delta[b0][c1] * delta[c0][d1] + delta[a1][d0] * delta[b0][d1] * delta[c0][c1] + delta[a1][d1] * delta[b0][c0] * delta[c1][d0] + delta[a1][d1] * delta[b0][c1] * delta[c0][d0] + delta[a1][d1] * delta[b0][d0] * delta[c0][c1]) * (PQ[a0])
                                     + (delta[a0][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[c0][d1] * delta[c1][d0] + delta[a0][c0] * delta[b0][c1] * delta[d0][d1] + delta[a0][c0] * delta[b0][d0] * delta[c1][d1] + delta[a0][c0] * delta[b0][d1] * delta[c1][d0] + delta[a0][c1] * delta[b0][c0] * delta[d0][d1] + delta[a0][c1] * delta[b0][d0] * delta[c0][d1] + delta[a0][c1] * delta[b0][d1] * delta[c0][d0] + delta[a0][d0] * delta[b0][c0] * delta[c1][d1] + delta[a0][d0] * delta[b0][c1] * delta[c0][d1] + delta[a0][d0] * delta[b0][d1] * delta[c0][c1] + delta[a0][d1] * delta[b0][c0] * delta[c1][d0] + delta[a0][d1] * delta[b0][c1] * delta[c0][d0] + delta[a0][d1] * delta[b0][d0] * delta[c0][c1]) * (PQ[a1])
@@ -25812,13 +26277,13 @@ computeExchangeFockDPDD6(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] * delta[c1][d1] + delta[a0][a1] * delta[b0][c1] * delta[c0][d1] + delta[a0][a1] * delta[b0][d1] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[c1][d1] + delta[a0][b0] * delta[a1][c1] * delta[c0][d1] + delta[a0][b0] * delta[a1][d1] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[c1][d1] + delta[a0][c0] * delta[a1][c1] * delta[b0][d1] + delta[a0][c0] * delta[a1][d1] * delta[b0][c1] + delta[a0][c1] * delta[a1][b0] * delta[c0][d1] + delta[a0][c1] * delta[a1][c0] * delta[b0][d1] + delta[a0][c1] * delta[a1][d1] * delta[b0][c0] + delta[a0][d1] * delta[a1][b0] * delta[c0][c1] + delta[a0][d1] * delta[a1][c0] * delta[b0][c1] + delta[a0][d1] * delta[a1][c1] * delta[b0][c0]) * (PQ[d0])
                                     + (delta[a0][a1] * delta[b0][c0] * delta[c1][d0] + delta[a0][a1] * delta[b0][c1] * delta[c0][d0] + delta[a0][a1] * delta[b0][d0] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[c1][d0] + delta[a0][b0] * delta[a1][c1] * delta[c0][d0] + delta[a0][b0] * delta[a1][d0] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[c1][d0] + delta[a0][c0] * delta[a1][c1] * delta[b0][d0] + delta[a0][c0] * delta[a1][d0] * delta[b0][c1] + delta[a0][c1] * delta[a1][b0] * delta[c0][d0] + delta[a0][c1] * delta[a1][c0] * delta[b0][d0] + delta[a0][c1] * delta[a1][d0] * delta[b0][c0] + delta[a0][d0] * delta[a1][b0] * delta[c0][c1] + delta[a0][d0] * delta[a1][c0] * delta[b0][c1] + delta[a0][d0] * delta[a1][c1] * delta[b0][c0]) * (PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + 0.25 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PQ[a0] * PQ[a1] + PA_0 * PQ[a1] * PQ[b0] + PA_1 * PQ[a0] * PQ[b0])
                                     + (delta[b0][c1] * delta[d0][d1] + delta[b0][d0] * delta[c1][d1] + delta[b0][d1] * delta[c1][d0]) * (PA_0 * PQ[a1] * PQ[c0] + PA_1 * PQ[a0] * PQ[c0])
@@ -25874,13 +26339,13 @@ computeExchangeFockDPDD6(double*         mat_K,
                                     + (delta[a0][c0] * delta[a1][d0] + delta[a0][d0] * delta[a1][c0]) * (PB_0 * PQ[c1] * PQ[d1])
                                     + (delta[a0][c0] * delta[a1][c1] + delta[a0][c1] * delta[a1][c0]) * (PB_0 * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + 0.25 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PQ[a0] * PQ[a1] * PQ[b0] * (-2.0))
                                     + (delta[b0][c1] * delta[d0][d1] + delta[b0][d0] * delta[c1][d1] + delta[b0][d1] * delta[c1][d0]) * (PQ[a0] * PQ[a1] * PQ[c0] * (-1.0) + PQ[a0] * PQ[a1] * QC_0 * (-1.0))
@@ -25936,13 +26401,13 @@ computeExchangeFockDPDD6(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c1] + delta[a0][b0] * delta[a1][c1] + delta[a0][c1] * delta[a1][b0]) * (PQ[c0] * PQ[d0] * QD_1 * (-1.0) + PQ[c0] * PQ[d1] * QD_0 * (-1.0) + PQ[d0] * PQ[d1] * QC_0 * (-1.0))
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PQ[d0] * PQ[d1] * QC_1 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + 0.5 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PA_0 * PQ[a1] * PQ[c0] * PQ[c1] * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[c0] * PQ[c1] * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[c1] * (-1.0))
                                     + delta[c1][d1] * (PB_0 * PA_0 * PQ[a1] * PQ[c0] * PQ[d0] * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[c0] * PQ[d0] * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[d0] * (-1.0))
@@ -25966,13 +26431,13 @@ computeExchangeFockDPDD6(double*         mat_K,
                                     + delta[a0][b0] * (PA_1 * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                     + delta[a0][a1] * (PB_0 * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + 0.5 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[c1] + PB_0 * PQ[a0] * PQ[a1] * PQ[c0] * QC_1 + PB_0 * PQ[a0] * PQ[a1] * PQ[c1] * QC_0 + PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * PQ[c1] + PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * QC_1 + PA_0 * PQ[a1] * PQ[b0] * PQ[c1] * QC_0 + PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[c1] + PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * QC_1 + PA_1 * PQ[a0] * PQ[b0] * PQ[c1] * QC_0)
                                     + delta[c1][d1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[d0] + PB_0 * PQ[a0] * PQ[a1] * PQ[c0] * QD_0 + PB_0 * PQ[a0] * PQ[a1] * PQ[d0] * QC_0 + PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0] + PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * QD_0 + PA_0 * PQ[a1] * PQ[b0] * PQ[d0] * QC_0 + PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[d0] + PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * QD_0 + PA_1 * PQ[a0] * PQ[b0] * PQ[d0] * QC_0)
@@ -25996,13 +26461,13 @@ computeExchangeFockDPDD6(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PQ[a1] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PQ[a1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PQ[a1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0) + PA_1 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 + PA_1 * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 + PA_1 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 + PA_1 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0)
                                     + delta[a0][a1] * (PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PQ[b0] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PQ[b0] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PQ[b0] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0) + PB_0 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 + PB_0 * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 + PB_0 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 + PB_0 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + (-0.5) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * QC_1 + PQ[a0] * PQ[a1] * PQ[b0] * PQ[c1] * QC_0 + PQ[a0] * PQ[a1] * PQ[b0] * QC_0 * QC_1)
                                     + delta[c1][d1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * QD_0 + PQ[a0] * PQ[a1] * PQ[b0] * PQ[d0] * QC_0 + PQ[a0] * PQ[a1] * PQ[b0] * QD_0 * QC_0)
@@ -26026,7 +26491,7 @@ computeExchangeFockDPDD6(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PQ[a1] * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PQ[a1] * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PQ[a1] * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PQ[a1] * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PQ[a1] * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                     + delta[a0][a1] * (PQ[b0] * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PQ[b0] * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PQ[b0] * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PQ[b0] * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PQ[b0] * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PQ[b0] * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             );
@@ -26104,13 +26569,14 @@ computeExchangeFockDPDD7(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    //__shared__ double   delta[3][3];
+    __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -26118,6 +26584,7 @@ computeExchangeFockDPDD7(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -26125,9 +26592,9 @@ computeExchangeFockDPDD7(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -26151,12 +26618,19 @@ computeExchangeFockDPDD7(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -26168,8 +26642,8 @@ computeExchangeFockDPDD7(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -26185,7 +26659,21 @@ computeExchangeFockDPDD7(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -26214,24 +26702,15 @@ computeExchangeFockDPDD7(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -26259,29 +26738,25 @@ computeExchangeFockDPDD7(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[4] * (
-        
+
                                 + S1 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PA_0 * PA_1 * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PA_0 * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0)
@@ -26297,13 +26772,13 @@ computeExchangeFockDPDD7(double*         mat_K,
                                     + PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0)
                                     + PA_0 * PA_1 * PQ[b0] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[c1] * QD_0 * QD_1
@@ -26325,7 +26800,7 @@ computeExchangeFockDPDD7(double*         mat_K,
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[c1] * PQ[d1] * QD_0 * QC_0
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[d0] * PQ[d1] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             );
@@ -26403,11 +26878,12 @@ computeExchangeFockDPDD8(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -26417,6 +26893,7 @@ computeExchangeFockDPDD8(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -26450,12 +26927,19 @@ computeExchangeFockDPDD8(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -26467,8 +26951,8 @@ computeExchangeFockDPDD8(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -26484,7 +26968,21 @@ computeExchangeFockDPDD8(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -26513,24 +27011,15 @@ computeExchangeFockDPDD8(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -26561,18 +27050,14 @@ computeExchangeFockDPDD8(double*         mat_K,
                         F7_t[7] *= d2 * d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[4] * (
-        
+
                                 + S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
@@ -26580,13 +27065,13 @@ computeExchangeFockDPDD8(double*         mat_K,
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 0.5 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[c1] * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * PQ[c1] * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[c1] * (-1.0))
                                     + delta[c1][d1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[d0] * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0] * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[d0] * (-1.0))
@@ -26610,13 +27095,13 @@ computeExchangeFockDPDD8(double*         mat_K,
                                     + delta[a0][b0] * (PA_1 * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1] * (-1.0) + PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                     + delta[a0][a1] * (PB_0 * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1] * (-1.0) + PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 + 0.5 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * PQ[c1] + PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * QC_1 + PQ[a0] * PQ[a1] * PQ[b0] * PQ[c1] * QC_0)
                                     + delta[c1][d1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0] + PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * QD_0 + PQ[a0] * PQ[a1] * PQ[b0] * PQ[d0] * QC_0)
@@ -26640,26 +27125,26 @@ computeExchangeFockDPDD8(double*         mat_K,
                                     + delta[a0][a1] * (PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 + PQ[b0] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 + PQ[b0] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 + PQ[b0] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0)
                                     + delta[c0][c1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[d0] * PQ[d1] + PQ[a0] * PQ[a1] * PQ[b0] * PQ[d0] * QD_1 + PQ[a0] * PQ[a1] * PQ[b0] * PQ[d1] * QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 + S1 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PA_0 * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                     + PB_0 * PA_1 * PQ[a0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                     + PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 + S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0)
@@ -26675,13 +27160,13 @@ computeExchangeFockDPDD8(double*         mat_K,
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0)
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 + S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * PQ[c1] * QD_0 * QD_1
@@ -26691,13 +27176,13 @@ computeExchangeFockDPDD8(double*         mat_K,
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[c1] * PQ[d1] * QD_0 * QC_0
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[d0] * PQ[d1] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 + 0.25 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PQ[a0] * PQ[a1] * PQ[b0])
                                     + (delta[b0][c1] * delta[d0][d1] + delta[b0][d0] * delta[c1][d1] + delta[b0][d1] * delta[c1][d0]) * (PQ[a0] * PQ[a1] * PQ[c0])
@@ -26735,13 +27220,13 @@ computeExchangeFockDPDD8(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c1] + delta[a0][b0] * delta[a1][c1] + delta[a0][c1] * delta[a1][b0]) * (PQ[c0] * PQ[d0] * PQ[d1])
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[c1] * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[6] * (
-        
+
                                 (-0.5) * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * PQ[c1])
                                     + delta[c1][d1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0])
@@ -26765,43 +27250,43 @@ computeExchangeFockDPDD8(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                     + delta[a0][a1] * (PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[6] * (
-        
+
                                 + S1 * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                     + PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[6] * (
-        
+
                                 + (-1.0) * S1 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[7] * (
-        
+
                                 S1 * S1 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                 )
-        
+
                             )
 
                             );
@@ -26880,11 +27365,12 @@ computeExchangeFockDDDP0(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -26894,6 +27380,7 @@ computeExchangeFockDDDP0(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -26927,12 +27414,19 @@ computeExchangeFockDDDP0(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -26944,8 +27438,8 @@ computeExchangeFockDDDP0(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -26961,7 +27455,23 @@ computeExchangeFockDDDP0(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -26990,24 +27500,14 @@ computeExchangeFockDDDP0(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -27032,40 +27532,35 @@ computeExchangeFockDDDP0(double*         mat_K,
                         F7_t[1] *= d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[0] * (
-        
+
                                 0.125 * inv_S1 * inv_S1 * inv_S2 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c1][d0] + delta[a0][b0] * delta[a1][b1] * delta[c1][d0] + delta[a0][b1] * delta[a1][b0] * delta[c1][d0]) * (QC_0)
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0]) * (QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1]) * (QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[0] * (
-        
+
                                 + 0.25 * inv_S1 * inv_S1 * (
                                     (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (QD_0 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[0] * (
-        
+
                                 + 0.25 * inv_S1 * inv_S2 * (
                                     delta[b0][b1] * delta[c1][d0] * (PA_0 * PA_1 * QC_0)
                                     + delta[b0][b1] * delta[c0][d0] * (PA_0 * PA_1 * QC_1)
@@ -27086,13 +27581,13 @@ computeExchangeFockDDDP0(double*         mat_K,
                                     + delta[a0][a1] * delta[c0][d0] * (PB_0 * PB_1 * QC_1)
                                     + delta[a0][a1] * delta[c0][c1] * (PB_0 * PB_1 * QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[0] * (
-        
+
                                 + 0.5 * inv_S1 * (
                                     delta[b0][b1] * (PA_0 * PA_1 * QD_0 * QC_0 * QC_1)
                                     + delta[a1][b1] * (PB_0 * PA_0 * QD_0 * QC_0 * QC_1)
@@ -27101,48 +27596,48 @@ computeExchangeFockDDDP0(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * QD_0 * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * PB_1 * QD_0 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[0] * (
-        
+
                                 + 0.5 * inv_S2 * (
                                     delta[c1][d0] * (PB_0 * PB_1 * PA_0 * PA_1 * QC_0)
                                     + delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PA_1 * QC_1)
                                     + delta[c0][c1] * (PB_0 * PB_1 * PA_0 * PA_1 * QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[0] * (
-        
+
                                 + (
                                     
                                     + PB_0 * PB_1 * PA_0 * PA_1 * QD_0 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 (-0.25) * inv_S1 * inv_S1 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c1][d0] + delta[a0][b0] * delta[a1][b1] * delta[c1][d0] + delta[a0][b1] * delta[a1][b0] * delta[c1][d0]) * (QC_0)
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0]) * (QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1]) * (QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + 0.125 * inv_S1 * inv_S2 * inv_S4 * (
                                     (delta[a1][b0] * delta[b1][c0] * delta[c1][d0] + delta[a1][b0] * delta[b1][c1] * delta[c0][d0] + delta[a1][b0] * delta[b1][d0] * delta[c0][c1] + delta[a1][b1] * delta[b0][c0] * delta[c1][d0] + delta[a1][b1] * delta[b0][c1] * delta[c0][d0] + delta[a1][b1] * delta[b0][d0] * delta[c0][c1] + delta[a1][c0] * delta[b0][b1] * delta[c1][d0] + delta[a1][c1] * delta[b0][b1] * delta[c0][d0] + delta[a1][d0] * delta[b0][b1] * delta[c0][c1]) * (PA_0)
                                     + (delta[a0][b0] * delta[b1][c0] * delta[c1][d0] + delta[a0][b0] * delta[b1][c1] * delta[c0][d0] + delta[a0][b0] * delta[b1][d0] * delta[c0][c1] + delta[a0][b1] * delta[b0][c0] * delta[c1][d0] + delta[a0][b1] * delta[b0][c1] * delta[c0][d0] + delta[a0][b1] * delta[b0][d0] * delta[c0][c1] + delta[a0][c0] * delta[b0][b1] * delta[c1][d0] + delta[a0][c1] * delta[b0][b1] * delta[c0][d0] + delta[a0][d0] * delta[b0][b1] * delta[c0][c1]) * (PA_1)
@@ -27152,17 +27647,17 @@ computeExchangeFockDDDP0(double*         mat_K,
                                     + (delta[a0][a1] * delta[b1][c0] * delta[c1][d0] + delta[a0][a1] * delta[b1][c1] * delta[c0][d0] + delta[a0][a1] * delta[b1][d0] * delta[c0][c1] + delta[a0][b1] * delta[a1][c0] * delta[c1][d0] + delta[a0][b1] * delta[a1][c1] * delta[c0][d0] + delta[a0][b1] * delta[a1][d0] * delta[c0][c1] + delta[a0][c0] * delta[a1][b1] * delta[c1][d0] + delta[a0][c1] * delta[a1][b1] * delta[c0][d0] + delta[a0][d0] * delta[a1][b1] * delta[c0][c1]) * (PB_0)
                                     + (delta[a0][a1] * delta[b0][c0] * delta[c1][d0] + delta[a0][a1] * delta[b0][c1] * delta[c0][d0] + delta[a0][a1] * delta[b0][d0] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[c1][d0] + delta[a0][b0] * delta[a1][c1] * delta[c0][d0] + delta[a0][b0] * delta[a1][d0] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[c1][d0] + delta[a0][c1] * delta[a1][b0] * delta[c0][d0] + delta[a0][d0] * delta[a1][b0] * delta[c0][c1]) * (PB_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + (-0.5) * S2 * inv_S1 * inv_S1 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (QD_0 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             );
@@ -27240,11 +27735,12 @@ computeExchangeFockDDDP1(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -27254,6 +27750,7 @@ computeExchangeFockDDDP1(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -27287,12 +27784,19 @@ computeExchangeFockDDDP1(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -27304,8 +27808,8 @@ computeExchangeFockDDDP1(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -27321,7 +27825,23 @@ computeExchangeFockDDDP1(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -27350,24 +27870,14 @@ computeExchangeFockDDDP1(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -27393,18 +27903,13 @@ computeExchangeFockDDDP1(double*         mat_K,
                         F7_t[2] *= d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[1] * (
-        
+
                                 + 0.25 * inv_S1 * inv_S4 * (
                                     delta[b0][b1] * delta[c1][d0] * (PA_0 * PA_1 * QC_0 * (-1.0) + PA_0 * PQ[a1] * QC_0 + PA_1 * PQ[a0] * QC_0)
                                     + delta[b0][b1] * delta[c0][d0] * (PA_0 * PA_1 * QC_1 * (-1.0) + PA_0 * PQ[a1] * QC_1 + PA_1 * PQ[a0] * QC_1)
@@ -27438,13 +27943,13 @@ computeExchangeFockDDDP1(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PB_1 * QD_0 * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * QD_0 * QC_1 * (-1.0) + PQ[c1] * QD_0 * QC_0 * (-1.0) + PQ[d0] * QC_0 * QC_1 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + 0.25 * inv_S2 * inv_S4 * (
                                     (delta[b1][c0] * delta[c1][d0] + delta[b1][c1] * delta[c0][d0] + delta[b1][d0] * delta[c0][c1]) * (PB_0 * PA_0 * PA_1)
                                     + (delta[b0][c0] * delta[c1][d0] + delta[b0][c1] * delta[c0][d0] + delta[b0][d0] * delta[c0][c1]) * (PB_1 * PA_0 * PA_1)
@@ -27469,25 +27974,25 @@ computeExchangeFockDDDP1(double*         mat_K,
                                     + delta[a0][a1] * delta[c0][d0] * (PB_0 * PB_1 * PQ[c1] * (-1.0) + PB_0 * PB_1 * QC_1 * (-1.0))
                                     + delta[a0][a1] * delta[c0][c1] * (PB_0 * PB_1 * PQ[d0] * (-1.0) + PB_0 * PB_1 * QD_0 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + (-0.5) * S1 * inv_S2 * inv_S4 * (
                                     delta[c1][d0] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] + PB_0 * PB_1 * PA_0 * PA_1 * QC_0)
                                     + delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[c1] + PB_0 * PB_1 * PA_0 * PA_1 * QC_1)
                                     + delta[c0][c1] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[d0] + PB_0 * PB_1 * PA_0 * PA_1 * QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + 0.5 * S2 * inv_S1 * inv_S4 * (
                                     delta[b0][b1] * (PA_0 * PA_1 * QD_0 * QC_0 * QC_1 * (-1.0) + PA_0 * PQ[a1] * QD_0 * QC_0 * QC_1 + PA_1 * PQ[a0] * QD_0 * QC_0 * QC_1)
                                     + delta[a1][b1] * (PB_0 * PA_0 * QD_0 * QC_0 * QC_1 * (-1.0) + PB_0 * PQ[a0] * QD_0 * QC_0 * QC_1 + PA_0 * PQ[b0] * QD_0 * QC_0 * QC_1)
@@ -27496,13 +28001,13 @@ computeExchangeFockDDDP1(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * QD_0 * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[a1] * QD_0 * QC_0 * QC_1 + PA_1 * PQ[b1] * QD_0 * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * PB_1 * QD_0 * QC_0 * QC_1 * (-1.0) + PB_0 * PQ[b1] * QD_0 * QC_0 * QC_1 + PB_1 * PQ[b0] * QD_0 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + 0.5 * inv_S4 * (
                                     delta[c1][d0] * (PB_0 * PB_1 * PA_0 * PQ[a1] * QC_0 + PB_0 * PB_1 * PA_1 * PQ[a0] * QC_0 + PB_0 * PA_0 * PA_1 * PQ[b1] * QC_0 + PB_1 * PA_0 * PA_1 * PQ[b0] * QC_0)
                                     + delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PQ[a1] * QC_1 + PB_0 * PB_1 * PA_1 * PQ[a0] * QC_1 + PB_0 * PA_0 * PA_1 * PQ[b1] * QC_1 + PB_1 * PA_0 * PA_1 * PQ[b0] * QC_1)
@@ -27526,26 +28031,26 @@ computeExchangeFockDDDP1(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * QD_0 * QC_1 * (-1.0) + PB_1 * PA_1 * PQ[c1] * QD_0 * QC_0 * (-1.0) + PB_1 * PA_1 * PQ[d0] * QC_0 * QC_1 * (-1.0))
                                     + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * QD_0 * QC_1 * (-1.0) + PB_0 * PB_1 * PQ[c1] * QD_0 * QC_0 * (-1.0) + PB_0 * PB_1 * PQ[d0] * QC_0 * QC_1 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + S1 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * QD_0 * QC_1 * (-1.0)
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c1] * QD_0 * QC_0 * (-1.0)
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[d0] * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[1] * (
-        
+
                                 + S2 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PQ[a1] * QD_0 * QC_0 * QC_1
@@ -27553,25 +28058,25 @@ computeExchangeFockDDDP1(double*         mat_K,
                                     + PB_0 * PA_0 * PA_1 * PQ[b1] * QD_0 * QC_0 * QC_1
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * QD_0 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 0.125 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c1][d0] + delta[a0][b0] * delta[a1][b1] * delta[c1][d0] + delta[a0][b1] * delta[a1][b0] * delta[c1][d0]) * (QC_0)
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0]) * (QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1]) * (QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.125 * inv_S1 * inv_S4 * inv_S4 * (
                                     (delta[a1][b0] * delta[b1][c0] * delta[c1][d0] + delta[a1][b0] * delta[b1][c1] * delta[c0][d0] + delta[a1][b0] * delta[b1][d0] * delta[c0][c1] + delta[a1][b1] * delta[b0][c0] * delta[c1][d0] + delta[a1][b1] * delta[b0][c1] * delta[c0][d0] + delta[a1][b1] * delta[b0][d0] * delta[c0][c1] + delta[a1][c0] * delta[b0][b1] * delta[c1][d0] + delta[a1][c1] * delta[b0][b1] * delta[c0][d0] + delta[a1][d0] * delta[b0][b1] * delta[c0][c1]) * (PA_0 * (-1.0) + PQ[a0])
                                     + (delta[a0][b0] * delta[b1][c0] * delta[c1][d0] + delta[a0][b0] * delta[b1][c1] * delta[c0][d0] + delta[a0][b0] * delta[b1][d0] * delta[c0][c1] + delta[a0][b1] * delta[b0][c0] * delta[c1][d0] + delta[a0][b1] * delta[b0][c1] * delta[c0][d0] + delta[a0][b1] * delta[b0][d0] * delta[c0][c1] + delta[a0][c0] * delta[b0][b1] * delta[c1][d0] + delta[a0][c1] * delta[b0][b1] * delta[c0][d0] + delta[a0][d0] * delta[b0][b1] * delta[c0][c1]) * (PA_1 * (-1.0) + PQ[a1])
@@ -27584,13 +28089,13 @@ computeExchangeFockDDDP1(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1]) * (PQ[d0] * 2.0 + QD_0 * 2.0)
                                     + (delta[a0][a1] * delta[b0][c0] * delta[b1][c1] + delta[a0][a1] * delta[b0][c1] * delta[b1][c0] + delta[a0][b0] * delta[a1][c0] * delta[b1][c1] + delta[a0][b0] * delta[a1][c1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] * delta[b0][c1] + delta[a0][b1] * delta[a1][c1] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][c1] + delta[a0][c0] * delta[a1][b1] * delta[b0][c1] + delta[a0][c0] * delta[a1][c1] * delta[b0][b1] + delta[a0][c1] * delta[a1][b0] * delta[b1][c0] + delta[a0][c1] * delta[a1][b1] * delta[b0][c0] + delta[a0][c1] * delta[a1][c0] * delta[b0][b1]) * (QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.125 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[a1][b0] * delta[b1][c0] * delta[c1][d0] + delta[a1][b0] * delta[b1][c1] * delta[c0][d0] + delta[a1][b0] * delta[b1][d0] * delta[c0][c1] + delta[a1][b1] * delta[b0][c0] * delta[c1][d0] + delta[a1][b1] * delta[b0][c1] * delta[c0][d0] + delta[a1][b1] * delta[b0][d0] * delta[c0][c1] + delta[a1][c0] * delta[b0][b1] * delta[c1][d0] + delta[a1][c1] * delta[b0][b1] * delta[c0][d0] + delta[a1][d0] * delta[b0][b1] * delta[c0][c1]) * (PA_0 * (-1.0))
                                     + (delta[a0][b0] * delta[b1][c0] * delta[c1][d0] + delta[a0][b0] * delta[b1][c1] * delta[c0][d0] + delta[a0][b0] * delta[b1][d0] * delta[c0][c1] + delta[a0][b1] * delta[b0][c0] * delta[c1][d0] + delta[a0][b1] * delta[b0][c1] * delta[c0][d0] + delta[a0][b1] * delta[b0][d0] * delta[c0][c1] + delta[a0][c0] * delta[b0][b1] * delta[c1][d0] + delta[a0][c1] * delta[b0][b1] * delta[c0][d0] + delta[a0][d0] * delta[b0][b1] * delta[c0][c1]) * (PA_1 * (-1.0))
@@ -27600,13 +28105,13 @@ computeExchangeFockDDDP1(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0]) * (PQ[c1])
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1]) * (PQ[d0])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.25 * S1 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[b1][c0] * delta[c1][d0] + delta[b1][c1] * delta[c0][d0] + delta[b1][d0] * delta[c0][c1]) * (PB_0 * PA_0 * PA_1 * (-1.0))
                                     + (delta[b0][c0] * delta[c1][d0] + delta[b0][c1] * delta[c0][d0] + delta[b0][d0] * delta[c0][c1]) * (PB_1 * PA_0 * PA_1 * (-1.0))
@@ -27631,7 +28136,7 @@ computeExchangeFockDDDP1(double*         mat_K,
                                     + delta[a0][a1] * delta[c0][d0] * (PB_0 * PB_1 * PQ[c1])
                                     + delta[a0][a1] * delta[c0][c1] * (PB_0 * PB_1 * PQ[d0])
                                 )
-        
+
                             )
 
                             );
@@ -27709,11 +28214,12 @@ computeExchangeFockDDDP2(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -27723,6 +28229,7 @@ computeExchangeFockDDDP2(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -27756,12 +28263,19 @@ computeExchangeFockDDDP2(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -27773,8 +28287,8 @@ computeExchangeFockDDDP2(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -27790,7 +28304,23 @@ computeExchangeFockDDDP2(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -27819,24 +28349,14 @@ computeExchangeFockDDDP2(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -27862,28 +28382,23 @@ computeExchangeFockDDDP2(double*         mat_K,
                         F7_t[2] *= d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[2] * (
-        
+
                                 + 0.25 * S2 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (QD_0 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.25 * S2 * inv_S1 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * delta[c1][d0] * (PA_0 * PQ[a1] * QC_0 * (-1.0) + PA_1 * PQ[a0] * QC_0 * (-1.0) + PQ[a0] * PQ[a1] * QC_0)
                                     + delta[b0][b1] * delta[c0][d0] * (PA_0 * PQ[a1] * QC_1 * (-1.0) + PA_1 * PQ[a0] * QC_1 * (-1.0) + PQ[a0] * PQ[a1] * QC_1)
@@ -27917,13 +28432,13 @@ computeExchangeFockDDDP2(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PB_1 * QD_0 * QC_1 * (-1.0) + PQ[b1] * QD_0 * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * QD_0 * QC_1 * 2.0 + PQ[c1] * QD_0 * QC_0 * 2.0 + PQ[d0] * QC_0 * QC_1 * 2.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.25 * inv_S4 * inv_S4 * (
                                     (delta[b1][c0] * delta[c1][d0] + delta[b1][c1] * delta[c0][d0] + delta[b1][d0] * delta[c0][c1]) * (PB_0 * PA_0 * PQ[a1] + PB_0 * PA_1 * PQ[a0] + PA_0 * PA_1 * PQ[b0])
                                     + (delta[b0][c0] * delta[c1][d0] + delta[b0][c1] * delta[c0][d0] + delta[b0][d0] * delta[c0][c1]) * (PB_1 * PA_0 * PQ[a1] + PB_1 * PA_1 * PQ[a0] + PA_0 * PA_1 * PQ[b1])
@@ -27979,25 +28494,25 @@ computeExchangeFockDDDP2(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[c1] * QD_0 + PQ[c0] * PQ[d0] * QC_1 + PQ[c1] * PQ[d0] * QC_0)
                                     + (delta[a0][c0] * delta[a1][c1] + delta[a0][c1] * delta[a1][c0]) * (PB_0 * PB_1 * QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.5 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * (
                                     delta[c1][d0] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0])
                                     + delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[c1])
                                     + delta[c0][c1] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[d0])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.5 * S1 * inv_S4 * inv_S4 * (
                                     delta[c1][d0] * (PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * (-1.0) + PB_0 * PB_1 * PA_0 * PQ[a1] * QC_0 * (-1.0) + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c0] * (-1.0) + PB_0 * PB_1 * PA_1 * PQ[a0] * QC_0 * (-1.0) + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] * (-1.0) + PB_0 * PA_0 * PA_1 * PQ[b1] * QC_0 * (-1.0) + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * (-1.0) + PB_1 * PA_0 * PA_1 * PQ[b0] * QC_0 * (-1.0))
                                     + delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c1] * (-1.0) + PB_0 * PB_1 * PA_0 * PQ[a1] * QC_1 * (-1.0) + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c1] * (-1.0) + PB_0 * PB_1 * PA_1 * PQ[a0] * QC_1 * (-1.0) + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c1] * (-1.0) + PB_0 * PA_0 * PA_1 * PQ[b1] * QC_1 * (-1.0) + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c1] * (-1.0) + PB_1 * PA_0 * PA_1 * PQ[b0] * QC_1 * (-1.0))
@@ -28021,13 +28536,13 @@ computeExchangeFockDDDP2(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * PQ[c1] * QD_0 + PB_1 * PA_1 * PQ[c0] * PQ[d0] * QC_1 + PB_1 * PA_1 * PQ[c1] * PQ[d0] * QC_0)
                                     + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * PQ[c1] * QD_0 + PB_0 * PB_1 * PQ[c0] * PQ[d0] * QC_1 + PB_0 * PB_1 * PQ[c1] * PQ[d0] * QC_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.5 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * (PA_0 * PQ[a1] * QD_0 * QC_0 * QC_1 * (-1.0) + PA_1 * PQ[a0] * QD_0 * QC_0 * QC_1 * (-1.0) + PQ[a0] * PQ[a1] * QD_0 * QC_0 * QC_1)
                                     + delta[a1][b1] * (PB_0 * PQ[a0] * QD_0 * QC_0 * QC_1 * (-1.0) + PA_0 * PQ[b0] * QD_0 * QC_0 * QC_1 * (-1.0) + PQ[a0] * PQ[b0] * QD_0 * QC_0 * QC_1)
@@ -28036,13 +28551,13 @@ computeExchangeFockDDDP2(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PQ[a1] * QD_0 * QC_0 * QC_1 * (-1.0) + PA_1 * PQ[b1] * QD_0 * QC_0 * QC_1 * (-1.0) + PQ[a1] * PQ[b1] * QD_0 * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * PQ[b1] * QD_0 * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[b0] * QD_0 * QC_0 * QC_1 * (-1.0) + PQ[b0] * PQ[b1] * QD_0 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + 0.5 * S2 * inv_S4 * inv_S4 * (
                                     delta[c1][d0] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * QC_0 + PB_0 * PA_0 * PQ[a1] * PQ[b1] * QC_0 + PB_0 * PA_1 * PQ[a0] * PQ[b1] * QC_0 + PB_1 * PA_0 * PQ[a1] * PQ[b0] * QC_0 + PB_1 * PA_1 * PQ[a0] * PQ[b0] * QC_0 + PA_0 * PA_1 * PQ[b0] * PQ[b1] * QC_0)
                                     + delta[c0][d0] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * QC_1 + PB_0 * PA_0 * PQ[a1] * PQ[b1] * QC_1 + PB_0 * PA_1 * PQ[a0] * PQ[b1] * QC_1 + PB_1 * PA_0 * PQ[a1] * PQ[b0] * QC_1 + PB_1 * PA_1 * PQ[a0] * PQ[b0] * QC_1 + PA_0 * PA_1 * PQ[b0] * PQ[b1] * QC_1)
@@ -28066,26 +28581,26 @@ computeExchangeFockDDDP2(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PQ[a1] * PQ[c0] * QD_0 * QC_1 * (-1.0) + PB_1 * PQ[a1] * PQ[c1] * QD_0 * QC_0 * (-1.0) + PB_1 * PQ[a1] * PQ[d0] * QC_0 * QC_1 * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * QD_0 * QC_1 * (-1.0) + PA_1 * PQ[b1] * PQ[c1] * QD_0 * QC_0 * (-1.0) + PA_1 * PQ[b1] * PQ[d0] * QC_0 * QC_1 * (-1.0) + PB_1 * PA_1 * PQ[c0] * QD_0 * QC_1 + PB_1 * PA_1 * PQ[c1] * QD_0 * QC_0 + PB_1 * PA_1 * PQ[d0] * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * PQ[b1] * PQ[c0] * QD_0 * QC_1 * (-1.0) + PB_0 * PQ[b1] * PQ[c1] * QD_0 * QC_0 * (-1.0) + PB_0 * PQ[b1] * PQ[d0] * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * QD_0 * QC_1 * (-1.0) + PB_1 * PQ[b0] * PQ[c1] * QD_0 * QC_0 * (-1.0) + PB_1 * PQ[b0] * PQ[d0] * QC_0 * QC_1 * (-1.0) + PB_0 * PB_1 * PQ[c0] * QD_0 * QC_1 + PB_0 * PB_1 * PQ[c1] * QD_0 * QC_0 + PB_0 * PB_1 * PQ[d0] * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + S1 * S1 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * PQ[c1] * QD_0
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * PQ[d0] * QC_1
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c1] * PQ[d0] * QC_0
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + S1 * S2 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * QD_0 * QC_1 * (-1.0)
@@ -28101,13 +28616,13 @@ computeExchangeFockDDDP2(double*         mat_K,
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c1] * QD_0 * QC_0 * (-1.0)
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[d0] * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[2] * (
-        
+
                                 + S2 * S2 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * PQ[a1] * QD_0 * QC_0 * QC_1
@@ -28117,7 +28632,7 @@ computeExchangeFockDDDP2(double*         mat_K,
                                     + PB_1 * PA_1 * PQ[a0] * PQ[b0] * QD_0 * QC_0 * QC_1
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * QD_0 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             );
@@ -28195,11 +28710,12 @@ computeExchangeFockDDDP3(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -28209,6 +28725,7 @@ computeExchangeFockDDDP3(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -28242,12 +28759,19 @@ computeExchangeFockDDDP3(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -28259,8 +28783,8 @@ computeExchangeFockDDDP3(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -28276,7 +28800,23 @@ computeExchangeFockDDDP3(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -28305,24 +28845,14 @@ computeExchangeFockDDDP3(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -28349,18 +28879,13 @@ computeExchangeFockDDDP3(double*         mat_K,
                         F7_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[3] * (
-        
+
                                 (-0.125) * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[a1][b0] * delta[b1][c0] * delta[c1][d0] + delta[a1][b0] * delta[b1][c1] * delta[c0][d0] + delta[a1][b0] * delta[b1][d0] * delta[c0][c1] + delta[a1][b1] * delta[b0][c0] * delta[c1][d0] + delta[a1][b1] * delta[b0][c1] * delta[c0][d0] + delta[a1][b1] * delta[b0][d0] * delta[c0][c1] + delta[a1][c0] * delta[b0][b1] * delta[c1][d0] + delta[a1][c1] * delta[b0][b1] * delta[c0][d0] + delta[a1][d0] * delta[b0][b1] * delta[c0][c1]) * (PQ[a0])
                                     + (delta[a0][b0] * delta[b1][c0] * delta[c1][d0] + delta[a0][b0] * delta[b1][c1] * delta[c0][d0] + delta[a0][b0] * delta[b1][d0] * delta[c0][c1] + delta[a0][b1] * delta[b0][c0] * delta[c1][d0] + delta[a0][b1] * delta[b0][c1] * delta[c0][d0] + delta[a0][b1] * delta[b0][d0] * delta[c0][c1] + delta[a0][c0] * delta[b0][b1] * delta[c1][d0] + delta[a0][c1] * delta[b0][b1] * delta[c0][d0] + delta[a0][d0] * delta[b0][b1] * delta[c0][c1]) * (PQ[a1])
@@ -28373,13 +28898,13 @@ computeExchangeFockDDDP3(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] * delta[b1][d0] + delta[a0][a1] * delta[b0][d0] * delta[b1][c0] + delta[a0][b0] * delta[a1][c0] * delta[b1][d0] + delta[a0][b0] * delta[a1][d0] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] * delta[b0][d0] + delta[a0][b1] * delta[a1][d0] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][d0] + delta[a0][c0] * delta[a1][b1] * delta[b0][d0] + delta[a0][c0] * delta[a1][d0] * delta[b0][b1] + delta[a0][d0] * delta[a1][b0] * delta[b1][c0] + delta[a0][d0] * delta[a1][b1] * delta[b0][c0] + delta[a0][d0] * delta[a1][c0] * delta[b0][b1]) * (QC_1)
                                     + (delta[a0][a1] * delta[b0][c0] * delta[b1][c1] + delta[a0][a1] * delta[b0][c1] * delta[b1][c0] + delta[a0][b0] * delta[a1][c0] * delta[b1][c1] + delta[a0][b0] * delta[a1][c1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] * delta[b0][c1] + delta[a0][b1] * delta[a1][c1] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][c1] + delta[a0][c0] * delta[a1][b1] * delta[b0][c1] + delta[a0][c0] * delta[a1][c1] * delta[b0][b1] + delta[a0][c1] * delta[a1][b0] * delta[b1][c0] + delta[a0][c1] * delta[a1][b1] * delta[b0][c0] + delta[a0][c1] * delta[a1][c0] * delta[b0][b1]) * (QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.125 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[a1][b0] * delta[b1][c0] * delta[c1][d0] + delta[a1][b0] * delta[b1][c1] * delta[c0][d0] + delta[a1][b0] * delta[b1][d0] * delta[c0][c1] + delta[a1][b1] * delta[b0][c0] * delta[c1][d0] + delta[a1][b1] * delta[b0][c1] * delta[c0][d0] + delta[a1][b1] * delta[b0][d0] * delta[c0][c1] + delta[a1][c0] * delta[b0][b1] * delta[c1][d0] + delta[a1][c1] * delta[b0][b1] * delta[c0][d0] + delta[a1][d0] * delta[b0][b1] * delta[c0][c1]) * (PQ[a0] * (-1.0) + PA_0)
                                     + (delta[a1][c0] * delta[b0][c1] * delta[b1][d0] + delta[a1][c0] * delta[b0][d0] * delta[b1][c1] + delta[a1][c1] * delta[b0][c0] * delta[b1][d0] + delta[a1][c1] * delta[b0][d0] * delta[b1][c0] + delta[a1][d0] * delta[b0][c0] * delta[b1][c1] + delta[a1][d0] * delta[b0][c1] * delta[b1][c0]) * (PA_0)
@@ -28396,13 +28921,13 @@ computeExchangeFockDDDP3(double*         mat_K,
                                     + (delta[a0][c0] * delta[a1][c1] * delta[b1][d0] + delta[a0][c0] * delta[a1][d0] * delta[b1][c1] + delta[a0][c1] * delta[a1][c0] * delta[b1][d0] + delta[a0][c1] * delta[a1][d0] * delta[b1][c0] + delta[a0][d0] * delta[a1][c0] * delta[b1][c1] + delta[a0][d0] * delta[a1][c1] * delta[b1][c0]) * (PB_0)
                                     + (delta[a0][c0] * delta[a1][c1] * delta[b0][d0] + delta[a0][c0] * delta[a1][d0] * delta[b0][c1] + delta[a0][c1] * delta[a1][c0] * delta[b0][d0] + delta[a0][c1] * delta[a1][d0] * delta[b0][c0] + delta[a0][d0] * delta[a1][c0] * delta[b0][c1] + delta[a0][d0] * delta[a1][c1] * delta[b0][c0]) * (PB_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.25 * S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[b1][c0] * delta[c1][d0] + delta[b1][c1] * delta[c0][d0] + delta[b1][d0] * delta[c0][c1]) * (PB_0 * PA_0 * PQ[a1] * (-1.0) + PB_0 * PA_1 * PQ[a0] * (-1.0) + PA_0 * PA_1 * PQ[b0] * (-1.0))
                                     + (delta[b0][c0] * delta[c1][d0] + delta[b0][c1] * delta[c0][d0] + delta[b0][d0] * delta[c0][c1]) * (PB_1 * PA_0 * PQ[a1] * (-1.0) + PB_1 * PA_1 * PQ[a0] * (-1.0) + PA_0 * PA_1 * PQ[b1] * (-1.0))
@@ -28458,13 +28983,13 @@ computeExchangeFockDDDP3(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c1] + delta[a0][b0] * delta[a1][c1] + delta[a0][c1] * delta[a1][b0]) * (PB_1 * PQ[c0] * PQ[d0])
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PB_1 * PQ[c1] * PQ[d0])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + (-0.25) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * delta[c1][d0] * (PQ[a0] * PQ[a1] * QC_0)
                                     + delta[b0][b1] * delta[c0][d0] * (PQ[a0] * PQ[a1] * QC_1)
@@ -28498,13 +29023,13 @@ computeExchangeFockDDDP3(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[b1] * QD_0 * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * QD_0 * QC_1 + PQ[c1] * QD_0 * QC_0 + PQ[d0] * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.25 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[b1][c0] * delta[c1][d0] + delta[b1][c1] * delta[c0][d0] + delta[b1][d0] * delta[c0][c1]) * (PB_0 * PQ[a0] * PQ[a1] + PA_0 * PQ[a1] * PQ[b0] + PA_1 * PQ[a0] * PQ[b0])
                                     + (delta[b0][c0] * delta[c1][d0] + delta[b0][c1] * delta[c0][d0] + delta[b0][d0] * delta[c0][c1]) * (PB_1 * PQ[a0] * PQ[a1] + PA_0 * PQ[a1] * PQ[b1] + PA_1 * PQ[a0] * PQ[b1])
@@ -28560,7 +29085,7 @@ computeExchangeFockDDDP3(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[c1] * QD_0 * (-2.0) + PQ[c0] * PQ[d0] * QC_1 * (-2.0) + PQ[c1] * PQ[d0] * QC_0 * (-2.0))
                                     + (delta[a0][c0] * delta[a1][c1] + delta[a0][c1] * delta[a1][c0]) * (PB_0 * PQ[b1] * QD_0 + PB_1 * PQ[b0] * QD_0)
                                 )
-        
+
                             )
 
                             );
@@ -28638,11 +29163,12 @@ computeExchangeFockDDDP4(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -28652,6 +29178,7 @@ computeExchangeFockDDDP4(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -28685,12 +29212,19 @@ computeExchangeFockDDDP4(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -28702,8 +29236,8 @@ computeExchangeFockDDDP4(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -28719,7 +29253,23 @@ computeExchangeFockDDDP4(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -28748,24 +29298,14 @@ computeExchangeFockDDDP4(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -28792,18 +29332,13 @@ computeExchangeFockDDDP4(double*         mat_K,
                         F7_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[3] * (
-        
+
                                 + 0.5 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[c1][d0] * (PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c0] + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0])
                                     + delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c1] + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c1] + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c1] + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c1])
@@ -28827,13 +29362,13 @@ computeExchangeFockDDDP4(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0))
                                     + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.5 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[c1][d0] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * (-1.0) + PB_0 * PB_1 * PQ[a0] * PQ[a1] * QC_0 * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c0] * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[b1] * QC_0 * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c0] * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[b1] * QC_0 * (-1.0) + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * (-1.0) + PB_1 * PA_0 * PQ[a1] * PQ[b0] * QC_0 * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[b0] * QC_0 * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[b1] * QC_0 * (-1.0))
                                     + delta[c0][d0] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c1] * (-1.0) + PB_0 * PB_1 * PQ[a0] * PQ[a1] * QC_1 * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c1] * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[b1] * QC_1 * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c1] * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[b1] * QC_1 * (-1.0) + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c1] * (-1.0) + PB_1 * PA_0 * PQ[a1] * PQ[b0] * QC_1 * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c1] * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[b0] * QC_1 * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c1] * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[b1] * QC_1 * (-1.0))
@@ -28857,13 +29392,13 @@ computeExchangeFockDDDP4(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * PQ[c1] * QD_0 * (-1.0) + PB_1 * PA_1 * PQ[c0] * PQ[d0] * QC_1 * (-1.0) + PB_1 * PA_1 * PQ[c1] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * PQ[c1] * QD_0 + PB_1 * PQ[a1] * PQ[c0] * PQ[d0] * QC_1 + PB_1 * PQ[a1] * PQ[c1] * PQ[d0] * QC_0 + PA_1 * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 + PA_1 * PQ[b1] * PQ[c0] * PQ[d0] * QC_1 + PA_1 * PQ[b1] * PQ[c1] * PQ[d0] * QC_0)
                                     + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * PQ[c1] * QD_0 * (-1.0) + PB_0 * PB_1 * PQ[c0] * PQ[d0] * QC_1 * (-1.0) + PB_0 * PB_1 * PQ[c1] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 + PB_0 * PQ[b1] * PQ[c0] * PQ[d0] * QC_1 + PB_0 * PQ[b1] * PQ[c1] * PQ[d0] * QC_0 + PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * QD_0 + PB_1 * PQ[b0] * PQ[c0] * PQ[d0] * QC_1 + PB_1 * PQ[b0] * PQ[c1] * PQ[d0] * QC_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + (-0.5) * S2 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * (PQ[a0] * PQ[a1] * QD_0 * QC_0 * QC_1)
                                     + delta[a1][b1] * (PQ[a0] * PQ[b0] * QD_0 * QC_0 * QC_1)
@@ -28872,13 +29407,13 @@ computeExchangeFockDDDP4(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[b1] * QD_0 * QC_0 * QC_1)
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * QD_0 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + 0.5 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[c1][d0] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * QC_0 + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * QC_0 + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * QC_0 + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * QC_0)
                                     + delta[c0][d0] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * QC_1 + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * QC_1 + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * QC_1 + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * QC_1)
@@ -28902,18 +29437,18 @@ computeExchangeFockDDDP4(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[b1] * PQ[c0] * QD_0 * QC_1 * (-1.0) + PQ[a1] * PQ[b1] * PQ[c1] * QD_0 * QC_0 * (-1.0) + PQ[a1] * PQ[b1] * PQ[d0] * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * QD_0 * QC_1 + PB_1 * PQ[a1] * PQ[c1] * QD_0 * QC_0 + PB_1 * PQ[a1] * PQ[d0] * QC_0 * QC_1 + PA_1 * PQ[b1] * PQ[c0] * QD_0 * QC_1 + PA_1 * PQ[b1] * PQ[c1] * QD_0 * QC_0 + PA_1 * PQ[b1] * PQ[d0] * QC_0 * QC_1)
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * QC_1 * (-1.0) + PQ[b0] * PQ[b1] * PQ[c1] * QD_0 * QC_0 * (-1.0) + PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * QC_1 * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * QD_0 * QC_1 + PB_0 * PQ[b1] * PQ[c1] * QD_0 * QC_0 + PB_0 * PQ[b1] * PQ[d0] * QC_0 * QC_1 + PB_1 * PQ[b0] * PQ[c0] * QD_0 * QC_1 + PB_1 * PQ[b0] * PQ[c1] * QD_0 * QC_0 + PB_1 * PQ[b0] * PQ[d0] * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0)
                                 )
-        
+
                             )
 
                             );
@@ -28991,11 +29526,12 @@ computeExchangeFockDDDP5(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -29005,6 +29541,7 @@ computeExchangeFockDDDP5(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -29038,12 +29575,19 @@ computeExchangeFockDDDP5(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -29055,8 +29599,8 @@ computeExchangeFockDDDP5(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -29072,7 +29616,23 @@ computeExchangeFockDDDP5(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -29101,24 +29661,14 @@ computeExchangeFockDDDP5(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -29146,18 +29696,13 @@ computeExchangeFockDDDP5(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[3] * (
-        
+
                                 + S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * PQ[c1] * QD_0
@@ -29173,13 +29718,13 @@ computeExchangeFockDDDP5(double*         mat_K,
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[d0] * QC_1
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c1] * PQ[d0] * QC_0
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * QD_0 * QC_1 * (-1.0)
@@ -29201,13 +29746,13 @@ computeExchangeFockDDDP5(double*         mat_K,
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c1] * QD_0 * QC_0 * (-1.0)
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[3] * (
-        
+
                                 + S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * QD_0 * QC_0 * QC_1
@@ -29215,13 +29760,13 @@ computeExchangeFockDDDP5(double*         mat_K,
                                     + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * QD_0 * QC_0 * QC_1
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * QD_0 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 0.25 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[b1][c0] * delta[c1][d0] + delta[b1][c1] * delta[c0][d0] + delta[b1][d0] * delta[c0][c1]) * (PB_0 * PQ[a0] * PQ[a1] * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * (-1.0))
                                     + (delta[b0][c0] * delta[c1][d0] + delta[b0][c1] * delta[c0][d0] + delta[b0][d0] * delta[c0][c1]) * (PB_1 * PQ[a0] * PQ[a1] * (-1.0) + PA_0 * PQ[a1] * PQ[b1] * (-1.0) + PA_1 * PQ[a0] * PQ[b1] * (-1.0))
@@ -29277,13 +29822,13 @@ computeExchangeFockDDDP5(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PB_1 * PQ[c1] * PQ[d0] * (-1.0) + PQ[b1] * PQ[c1] * PQ[d0])
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[c1] * PQ[d0] * 2.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + 0.25 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * delta[c1][d0] * (PQ[a0] * PQ[a1] * PQ[c0] + PQ[a0] * PQ[a1] * QC_0)
                                     + (delta[b0][c1] * delta[b1][d0] + delta[b0][d0] * delta[b1][c1]) * (PQ[a0] * PQ[a1] * QC_0)
@@ -29339,7 +29884,7 @@ computeExchangeFockDDDP5(double*         mat_K,
                                     + delta[a0][a1] * delta[c0][c1] * (PQ[b0] * PQ[b1] * PQ[d0] + PQ[b0] * PQ[b1] * QD_0)
                                     + (delta[a0][c0] * delta[a1][c1] + delta[a0][c1] * delta[a1][c0]) * (PQ[b0] * PQ[b1] * QD_0)
                                 )
-        
+
                             )
 
                             );
@@ -29417,11 +29962,12 @@ computeExchangeFockDDDP6(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -29431,6 +29977,7 @@ computeExchangeFockDDDP6(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -29464,12 +30011,19 @@ computeExchangeFockDDDP6(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -29481,8 +30035,8 @@ computeExchangeFockDDDP6(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -29498,7 +30052,23 @@ computeExchangeFockDDDP6(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -29527,24 +30097,14 @@ computeExchangeFockDDDP6(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -29572,18 +30132,13 @@ computeExchangeFockDDDP6(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[4] * (
-        
+
                                 + 0.5 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[c1][d0] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c0] + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c0] + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c0] + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0])
                                     + delta[c0][d0] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c1] + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c1] + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c1] + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c1] + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c1] + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c1])
@@ -29607,13 +30162,13 @@ computeExchangeFockDDDP6(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0) + PB_1 * PA_1 * PQ[c0] * PQ[c1] * PQ[d0])
                                     + delta[a0][a1] * (PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0) + PB_0 * PB_1 * PQ[c0] * PQ[c1] * PQ[d0])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + 0.5 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[c1][d0] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * (-1.0) + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * QC_0 * (-1.0) + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * (-1.0) + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * QC_0 * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * QC_0 * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * QC_0 * (-1.0))
                                     + delta[c0][d0] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c1] * (-1.0) + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * QC_1 * (-1.0) + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c1] * (-1.0) + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * QC_1 * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c1] * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * QC_1 * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c1] * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * QC_1 * (-1.0))
@@ -29637,13 +30192,13 @@ computeExchangeFockDDDP6(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PQ[a1] * PQ[c0] * PQ[c1] * QD_0 * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * PQ[d0] * QC_1 * (-1.0) + PB_1 * PQ[a1] * PQ[c1] * PQ[d0] * QC_0 * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * PQ[d0] * QC_1 * (-1.0) + PA_1 * PQ[b1] * PQ[c1] * PQ[d0] * QC_0 * (-1.0) + PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 + PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0] * QC_1 + PQ[a1] * PQ[b1] * PQ[c1] * PQ[d0] * QC_0)
                                     + delta[a0][a1] * (PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * PQ[d0] * QC_1 * (-1.0) + PB_0 * PQ[b1] * PQ[c1] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * QD_0 * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * PQ[d0] * QC_1 * (-1.0) + PB_1 * PQ[b0] * PQ[c1] * PQ[d0] * QC_0 * (-1.0) + PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 + PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * QC_1 + PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] * QC_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + 0.5 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[c1][d0] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * QC_0)
                                     + delta[c0][d0] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * QC_1)
@@ -29667,13 +30222,13 @@ computeExchangeFockDDDP6(double*         mat_K,
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * QC_1 + PQ[b0] * PQ[b1] * PQ[c1] * QD_0 * QC_0 + PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * QC_1)
                                     + delta[c0][c1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0)
@@ -29681,7 +30236,7 @@ computeExchangeFockDDDP6(double*         mat_K,
                                     + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0)
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0)
                                 )
-        
+
                             )
 
                             );
@@ -29759,11 +30314,12 @@ computeExchangeFockDDDP7(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -29773,6 +30329,7 @@ computeExchangeFockDDDP7(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -29806,12 +30363,19 @@ computeExchangeFockDDDP7(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -29823,8 +30387,8 @@ computeExchangeFockDDDP7(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -29840,7 +30404,23 @@ computeExchangeFockDDDP7(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -29869,24 +30449,14 @@ computeExchangeFockDDDP7(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -29914,18 +30484,13 @@ computeExchangeFockDDDP7(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[4] * (
-        
+
                                 + S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[c1] * QD_0
@@ -29947,13 +30512,13 @@ computeExchangeFockDDDP7(double*         mat_K,
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * QC_1
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] * QC_0
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * QD_0 * QC_1 * (-1.0)
@@ -29969,24 +30534,24 @@ computeExchangeFockDDDP7(double*         mat_K,
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c1] * QD_0 * QC_0 * (-1.0)
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * QD_0 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[4] * (
-        
+
                                 + 0.125 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[a1][b0] * delta[b1][c0] * delta[c1][d0] + delta[a1][b0] * delta[b1][c1] * delta[c0][d0] + delta[a1][b0] * delta[b1][d0] * delta[c0][c1] + delta[a1][b1] * delta[b0][c0] * delta[c1][d0] + delta[a1][b1] * delta[b0][c1] * delta[c0][d0] + delta[a1][b1] * delta[b0][d0] * delta[c0][c1] + delta[a1][c0] * delta[b0][b1] * delta[c1][d0] + delta[a1][c0] * delta[b0][c1] * delta[b1][d0] + delta[a1][c0] * delta[b0][d0] * delta[b1][c1] + delta[a1][c1] * delta[b0][b1] * delta[c0][d0] + delta[a1][c1] * delta[b0][c0] * delta[b1][d0] + delta[a1][c1] * delta[b0][d0] * delta[b1][c0] + delta[a1][d0] * delta[b0][b1] * delta[c0][c1] + delta[a1][d0] * delta[b0][c0] * delta[b1][c1] + delta[a1][d0] * delta[b0][c1] * delta[b1][c0]) * (PQ[a0])
                                     + (delta[a0][b0] * delta[b1][c0] * delta[c1][d0] + delta[a0][b0] * delta[b1][c1] * delta[c0][d0] + delta[a0][b0] * delta[b1][d0] * delta[c0][c1] + delta[a0][b1] * delta[b0][c0] * delta[c1][d0] + delta[a0][b1] * delta[b0][c1] * delta[c0][d0] + delta[a0][b1] * delta[b0][d0] * delta[c0][c1] + delta[a0][c0] * delta[b0][b1] * delta[c1][d0] + delta[a0][c0] * delta[b0][c1] * delta[b1][d0] + delta[a0][c0] * delta[b0][d0] * delta[b1][c1] + delta[a0][c1] * delta[b0][b1] * delta[c0][d0] + delta[a0][c1] * delta[b0][c0] * delta[b1][d0] + delta[a0][c1] * delta[b0][d0] * delta[b1][c0] + delta[a0][d0] * delta[b0][b1] * delta[c0][c1] + delta[a0][d0] * delta[b0][c0] * delta[b1][c1] + delta[a0][d0] * delta[b0][c1] * delta[b1][c0]) * (PQ[a1])
@@ -29996,7 +30561,7 @@ computeExchangeFockDDDP7(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][a1] * delta[b0][c0] * delta[b1][d0] + delta[a0][a1] * delta[b0][d0] * delta[b1][c0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][c0] * delta[b1][d0] + delta[a0][b0] * delta[a1][d0] * delta[b1][c0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0] + delta[a0][b1] * delta[a1][c0] * delta[b0][d0] + delta[a0][b1] * delta[a1][d0] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][d0] + delta[a0][c0] * delta[a1][b1] * delta[b0][d0] + delta[a0][c0] * delta[a1][d0] * delta[b0][b1] + delta[a0][d0] * delta[a1][b0] * delta[b1][c0] + delta[a0][d0] * delta[a1][b1] * delta[b0][c0] + delta[a0][d0] * delta[a1][c0] * delta[b0][b1]) * (PQ[c1])
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][a1] * delta[b0][c0] * delta[b1][c1] + delta[a0][a1] * delta[b0][c1] * delta[b1][c0] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[b1][c1] + delta[a0][b0] * delta[a1][c1] * delta[b1][c0] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1] + delta[a0][b1] * delta[a1][c0] * delta[b0][c1] + delta[a0][b1] * delta[a1][c1] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][c1] + delta[a0][c0] * delta[a1][b1] * delta[b0][c1] + delta[a0][c0] * delta[a1][c1] * delta[b0][b1] + delta[a0][c1] * delta[a1][b0] * delta[b1][c0] + delta[a0][c1] * delta[a1][b1] * delta[b0][c0] + delta[a0][c1] * delta[a1][c0] * delta[b0][b1]) * (PQ[d0])
                                 )
-        
+
                             )
 
                             );
@@ -30074,11 +30639,12 @@ computeExchangeFockDDDP8(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -30088,6 +30654,7 @@ computeExchangeFockDDDP8(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -30121,12 +30688,19 @@ computeExchangeFockDDDP8(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -30138,8 +30712,8 @@ computeExchangeFockDDDP8(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -30155,7 +30729,23 @@ computeExchangeFockDDDP8(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -30184,24 +30774,14 @@ computeExchangeFockDDDP8(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -30232,18 +30812,13 @@ computeExchangeFockDDDP8(double*         mat_K,
                         F7_t[7] *= d2 * d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F7_t[5] * (
-        
+
                                 (-0.25) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[b1][c0] * delta[c1][d0] + delta[b1][c1] * delta[c0][d0] + delta[b1][d0] * delta[c0][c1]) * (PQ[a0] * PQ[a1] * PQ[b0])
                                     + (delta[b0][c0] * delta[c1][d0] + delta[b0][c1] * delta[c0][d0] + delta[b0][d0] * delta[c0][c1]) * (PQ[a0] * PQ[a1] * PQ[b1])
@@ -30281,13 +30856,13 @@ computeExchangeFockDDDP8(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[b1] * PQ[c1] * PQ[d0])
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[c1] * PQ[d0])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 + 0.5 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[c1][d0] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0])
                                     + delta[c0][d0] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c1] + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c1] + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c1] + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c1])
@@ -30311,13 +30886,13 @@ computeExchangeFockDDDP8(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] + PA_1 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0])
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] + PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 + (-0.5) * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[c1][d0] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * QC_0)
                                     + delta[c0][d0] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c1] + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * QC_1)
@@ -30341,13 +30916,13 @@ computeExchangeFockDDDP8(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 + PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0] * QC_1 + PQ[a1] * PQ[b1] * PQ[c1] * PQ[d0] * QC_0)
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 + PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * QC_1 + PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] * QC_0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 + S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0)
@@ -30357,13 +30932,13 @@ computeExchangeFockDDDP8(double*         mat_K,
                                     + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0)
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 + S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0
@@ -30379,26 +30954,26 @@ computeExchangeFockDDDP8(double*         mat_K,
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * QC_1
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] * QC_0
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[5] * (
-        
+
                                 + S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * QC_1 * (-1.0)
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c1] * QD_0 * QC_0 * (-1.0)
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[6] * (
-        
+
                                 S1 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0)
@@ -30406,26 +30981,26 @@ computeExchangeFockDDDP8(double*         mat_K,
                                     + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0)
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[6] * (
-        
+
                                 + S1 * S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * QC_1
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] * QC_0
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[6] * (
-        
+
                                 + 0.5 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[c1][d0] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0])
                                     + delta[c0][d0] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c1])
@@ -30449,17 +31024,17 @@ computeExchangeFockDDDP8(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0])
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0])
                                 )
-        
+
                             )
 
                             +
 
                             F7_t[7] * (
-        
+
                                 (-1.0) * S1 * S1 * S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0]
                                 )
-        
+
                             )
 
                             );
@@ -30530,11 +31105,12 @@ computeExchangeFockDDDD0(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -30544,6 +31120,7 @@ computeExchangeFockDDDD0(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -30577,12 +31154,19 @@ computeExchangeFockDDDD0(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -30594,8 +31178,8 @@ computeExchangeFockDDDD0(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -30611,7 +31195,23 @@ computeExchangeFockDDDD0(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -30640,25 +31240,15 @@ computeExchangeFockDDDD0(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -30683,19 +31273,14 @@ computeExchangeFockDDDD0(double*         mat_K,
                         F8_t[1] *= d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[0] * (
-        
+
                                 0.125 * inv_S1 * inv_S1 * inv_S2 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[d0][d1] + delta[a0][b0] * delta[a1][b1] * delta[d0][d1] + delta[a0][b1] * delta[a1][b0] * delta[d0][d1]) * (QC_0 * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c1][d1] + delta[a0][b0] * delta[a1][b1] * delta[c1][d1] + delta[a0][b1] * delta[a1][b0] * delta[c1][d1]) * (QD_0 * QC_0)
@@ -30704,13 +31289,13 @@ computeExchangeFockDDDD0(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0]) * (QD_1 * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1]) * (QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[0] * (
-        
+
                                 + 0.125 * inv_S1 * inv_S2 * inv_S2 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PA_0 * PA_1)
                                     + (delta[a1][b1] * delta[c0][c1] * delta[d0][d1] + delta[a1][b1] * delta[c0][d0] * delta[c1][d1] + delta[a1][b1] * delta[c0][d1] * delta[c1][d0]) * (PB_0 * PA_0)
@@ -30719,23 +31304,23 @@ computeExchangeFockDDDD0(double*         mat_K,
                                     + (delta[a0][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[c0][d1] * delta[c1][d0]) * (PB_1 * PA_1)
                                     + (delta[a0][a1] * delta[c0][c1] * delta[d0][d1] + delta[a0][a1] * delta[c0][d0] * delta[c1][d1] + delta[a0][a1] * delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[0] * (
-        
+
                                 + 0.25 * inv_S1 * inv_S1 * (
                                     (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (QD_0 * QD_1 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[0] * (
-        
+
                                 + 0.25 * inv_S1 * inv_S2 * (
                                     delta[b0][b1] * delta[d0][d1] * (PA_0 * PA_1 * QC_0 * QC_1)
                                     + delta[b0][b1] * delta[c1][d1] * (PA_0 * PA_1 * QD_0 * QC_0)
@@ -30774,23 +31359,23 @@ computeExchangeFockDDDD0(double*         mat_K,
                                     + delta[a0][a1] * delta[c0][d0] * (PB_0 * PB_1 * QD_1 * QC_1)
                                     + delta[a0][a1] * delta[c0][c1] * (PB_0 * PB_1 * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[0] * (
-        
+
                                 + 0.25 * inv_S2 * inv_S2 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1 * PA_0 * PA_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[0] * (
-        
+
                                 + 0.5 * inv_S1 * (
                                     delta[b0][b1] * (PA_0 * PA_1 * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a1][b1] * (PB_0 * PA_0 * QD_0 * QD_1 * QC_0 * QC_1)
@@ -30799,13 +31384,13 @@ computeExchangeFockDDDD0(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * PB_1 * QD_0 * QD_1 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[0] * (
-        
+
                                 + 0.5 * inv_S2 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PA_0 * PA_1 * QC_0 * QC_1)
                                     + delta[c1][d1] * (PB_0 * PB_1 * PA_0 * PA_1 * QD_0 * QC_0)
@@ -30814,54 +31399,54 @@ computeExchangeFockDDDD0(double*         mat_K,
                                     + delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PA_1 * QD_1 * QC_1)
                                     + delta[c0][c1] * (PB_0 * PB_1 * PA_0 * PA_1 * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[0] * (
-        
+
                                 + (
                                     
                                     + PB_0 * PB_1 * PA_0 * PA_1 * QD_0 * QD_1 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[0] * (
-        
+
                                 + 0.0625 * inv_S1 * inv_S1 * inv_S2 * inv_S2 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d1] * delta[c1][d0])
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[1] * (
-        
+
                                 (-0.125) * inv_S1 * inv_S1 * inv_S2 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d1] * delta[c1][d0])
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[1] * (
-        
+
                                 + (-0.125) * inv_S1 * inv_S2 * inv_S2 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d1] * delta[c1][d0])
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[1] * (
-        
+
                                 + (-0.25) * inv_S1 * inv_S1 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[d0][d1] + delta[a0][b0] * delta[a1][b1] * delta[d0][d1] + delta[a0][b1] * delta[a1][b0] * delta[d0][d1]) * (QC_0 * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c1][d1] + delta[a0][b0] * delta[a1][b1] * delta[c1][d1] + delta[a0][b1] * delta[a1][b0] * delta[c1][d1]) * (QD_0 * QC_0)
@@ -30870,7 +31455,7 @@ computeExchangeFockDDDD0(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0]) * (QD_1 * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1]) * (QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             );
@@ -30940,11 +31525,12 @@ computeExchangeFockDDDD1(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -30954,6 +31540,7 @@ computeExchangeFockDDDD1(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -30987,12 +31574,19 @@ computeExchangeFockDDDD1(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -31004,8 +31598,8 @@ computeExchangeFockDDDD1(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -31021,7 +31615,23 @@ computeExchangeFockDDDD1(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -31050,25 +31660,15 @@ computeExchangeFockDDDD1(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -31093,19 +31693,14 @@ computeExchangeFockDDDD1(double*         mat_K,
                         F8_t[1] *= d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[1] * (
-        
+
                                 + 0.125 * inv_S1 * inv_S2 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PA_0 * PA_1 * (-1.0) + PA_0 * PQ[a1] + PA_1 * PQ[a0])
                                     + (delta[a1][b1] * delta[c0][c1] * delta[d0][d1] + delta[a1][b1] * delta[c0][d0] * delta[c1][d1] + delta[a1][b1] * delta[c0][d1] * delta[c1][d0]) * (PB_0 * PA_0 * (-1.0) + PB_0 * PQ[a0] + PA_0 * PQ[b0])
@@ -31136,13 +31731,13 @@ computeExchangeFockDDDD1(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] * delta[c1][d1] + delta[a0][a1] * delta[b0][c1] * delta[c0][d1] + delta[a0][a1] * delta[b0][d1] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[c1][d1] + delta[a0][b0] * delta[a1][c1] * delta[c0][d1] + delta[a0][b0] * delta[a1][d1] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[c1][d1] + delta[a0][c1] * delta[a1][b0] * delta[c0][d1] + delta[a0][d1] * delta[a1][b0] * delta[c0][c1]) * (PB_1 * QD_0)
                                     + (delta[a0][a1] * delta[b0][c0] * delta[c1][d0] + delta[a0][a1] * delta[b0][c1] * delta[c0][d0] + delta[a0][a1] * delta[b0][d0] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[c1][d0] + delta[a0][b0] * delta[a1][c1] * delta[c0][d0] + delta[a0][b0] * delta[a1][d0] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[c1][d0] + delta[a0][c1] * delta[a1][b0] * delta[c0][d0] + delta[a0][d0] * delta[a1][b0] * delta[c0][c1]) * (PB_1 * QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[1] * (
-        
+
                                 + (-0.25) * inv_S2 * inv_S2 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PA_0 * PA_1)
                                     + (delta[a1][b1] * delta[c0][c1] * delta[d0][d1] + delta[a1][b1] * delta[c0][d0] * delta[c1][d1] + delta[a1][b1] * delta[c0][d1] * delta[c1][d0]) * (PB_0 * PA_0)
@@ -31151,33 +31746,33 @@ computeExchangeFockDDDD1(double*         mat_K,
                                     + (delta[a0][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[c0][d1] * delta[c1][d0]) * (PB_1 * PA_1)
                                     + (delta[a0][a1] * delta[c0][c1] * delta[d0][d1] + delta[a0][a1] * delta[c0][d0] * delta[c1][d1] + delta[a0][a1] * delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[1] * (
-        
+
                                 + (-0.5) * S1 * inv_S2 * inv_S2 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1 * PA_0 * PA_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[1] * (
-        
+
                                 + (-0.5) * S2 * inv_S1 * inv_S1 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (QD_0 * QD_1 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[1] * (
-        
+
                                 + 0.25 * inv_S1 * inv_S4 * (
                                     delta[b0][b1] * delta[d0][d1] * (PA_0 * PA_1 * QC_0 * QC_1 * (-1.0) + PA_0 * PQ[a1] * QC_0 * QC_1 + PA_1 * PQ[a0] * QC_0 * QC_1)
                                     + delta[b0][b1] * delta[c1][d1] * (PA_0 * PA_1 * QD_0 * QC_0 * (-1.0) + PA_0 * PQ[a1] * QD_0 * QC_0 + PA_1 * PQ[a0] * QD_0 * QC_0)
@@ -31233,13 +31828,13 @@ computeExchangeFockDDDD1(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PB_1 * QD_0 * QD_1 * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[1] * (
-        
+
                                 + 0.25 * inv_S2 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1 * PA_0 * PQ[a1] + PB_0 * PB_1 * PA_1 * PQ[a0] + PB_0 * PA_0 * PA_1 * PQ[b1] + PB_1 * PA_0 * PA_1 * PQ[b0])
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PB_0 * PA_0 * PA_1 * QC_0)
@@ -31295,13 +31890,13 @@ computeExchangeFockDDDD1(double*         mat_K,
                                     + delta[a0][a1] * delta[c0][d0] * (PB_0 * PB_1 * PQ[c1] * QD_1 * (-1.0) + PB_0 * PB_1 * PQ[d1] * QC_1 * (-1.0) + PB_0 * PB_1 * QD_1 * QC_1 * (-1.0))
                                     + delta[a0][a1] * delta[c0][c1] * (PB_0 * PB_1 * PQ[d0] * QD_1 * (-1.0) + PB_0 * PB_1 * PQ[d1] * QD_0 * (-1.0) + PB_0 * PB_1 * QD_0 * QD_1 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[1] * (
-        
+
                                 + (-0.5) * S1 * inv_S2 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * QC_1 + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c1] * QC_0 + PB_0 * PB_1 * PA_0 * PA_1 * QC_0 * QC_1)
                                     + delta[c1][d1] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * QD_0 + PB_0 * PB_1 * PA_0 * PA_1 * PQ[d0] * QC_0 + PB_0 * PB_1 * PA_0 * PA_1 * QD_0 * QC_0)
@@ -31310,13 +31905,13 @@ computeExchangeFockDDDD1(double*         mat_K,
                                     + delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[c1] * QD_1 + PB_0 * PB_1 * PA_0 * PA_1 * PQ[d1] * QC_1 + PB_0 * PB_1 * PA_0 * PA_1 * QD_1 * QC_1)
                                     + delta[c0][c1] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[d0] * QD_1 + PB_0 * PB_1 * PA_0 * PA_1 * PQ[d1] * QD_0 + PB_0 * PB_1 * PA_0 * PA_1 * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[1] * (
-        
+
                                 + 0.5 * S2 * inv_S1 * inv_S4 * (
                                     delta[b0][b1] * (PA_0 * PA_1 * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PA_0 * PQ[a1] * QD_0 * QD_1 * QC_0 * QC_1 + PA_1 * PQ[a0] * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a1][b1] * (PB_0 * PA_0 * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PB_0 * PQ[a0] * QD_0 * QD_1 * QC_0 * QC_1 + PA_0 * PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1)
@@ -31325,7 +31920,7 @@ computeExchangeFockDDDD1(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[a1] * QD_0 * QD_1 * QC_0 * QC_1 + PA_1 * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * PB_1 * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PB_0 * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1 + PB_1 * PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             );
@@ -31395,11 +31990,12 @@ computeExchangeFockDDDD2(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -31409,6 +32005,7 @@ computeExchangeFockDDDD2(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -31442,12 +32039,19 @@ computeExchangeFockDDDD2(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -31459,8 +32063,8 @@ computeExchangeFockDDDD2(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -31476,7 +32080,23 @@ computeExchangeFockDDDD2(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -31505,25 +32125,15 @@ computeExchangeFockDDDD2(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -31549,19 +32159,14 @@ computeExchangeFockDDDD2(double*         mat_K,
                         F8_t[2] *= d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[1] * (
-        
+
                                 + 0.5 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PA_0 * PQ[a1] * QC_0 * QC_1 + PB_0 * PB_1 * PA_1 * PQ[a0] * QC_0 * QC_1 + PB_0 * PA_0 * PA_1 * PQ[b1] * QC_0 * QC_1 + PB_1 * PA_0 * PA_1 * PQ[b0] * QC_0 * QC_1)
                                     + delta[c1][d1] * (PB_0 * PB_1 * PA_0 * PQ[a1] * QD_0 * QC_0 + PB_0 * PB_1 * PA_1 * PQ[a0] * QD_0 * QC_0 + PB_0 * PA_0 * PA_1 * PQ[b1] * QD_0 * QC_0 + PB_1 * PA_0 * PA_1 * PQ[b0] * QD_0 * QC_0)
@@ -31592,13 +32197,13 @@ computeExchangeFockDDDD2(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PB_1 * PA_1 * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PB_1 * PA_1 * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PB_1 * PA_1 * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0))
                                     + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PB_0 * PB_1 * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PB_0 * PB_1 * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PB_0 * PB_1 * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[1] * (
-        
+
                                 + S1 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
@@ -31606,13 +32211,13 @@ computeExchangeFockDDDD2(double*         mat_K,
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[1] * (
-        
+
                                 + S2 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PQ[a1] * QD_0 * QD_1 * QC_0 * QC_1
@@ -31620,13 +32225,13 @@ computeExchangeFockDDDD2(double*         mat_K,
                                     + PB_0 * PA_0 * PA_1 * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[2] * (
-        
+
                                 0.125 * S1 * inv_S2 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PA_0 * PA_1)
                                     + (delta[a1][b1] * delta[c0][c1] * delta[d0][d1] + delta[a1][b1] * delta[c0][d0] * delta[c1][d1] + delta[a1][b1] * delta[c0][d1] * delta[c1][d0]) * (PB_0 * PA_0)
@@ -31635,13 +32240,13 @@ computeExchangeFockDDDD2(double*         mat_K,
                                     + (delta[a0][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[c0][d1] * delta[c1][d0]) * (PB_1 * PA_1)
                                     + (delta[a0][a1] * delta[c0][c1] * delta[d0][d1] + delta[a0][a1] * delta[c0][d0] * delta[c1][d1] + delta[a0][a1] * delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[2] * (
-        
+
                                 + 0.125 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[d0][d1] + delta[a0][b0] * delta[a1][b1] * delta[d0][d1] + delta[a0][b1] * delta[a1][b0] * delta[d0][d1]) * (QC_0 * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c1][d1] + delta[a0][b0] * delta[a1][b1] * delta[c1][d1] + delta[a0][b1] * delta[a1][b0] * delta[c1][d1]) * (QD_0 * QC_0)
@@ -31650,7 +32255,7 @@ computeExchangeFockDDDD2(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0]) * (QD_1 * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1]) * (QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             );
@@ -31720,11 +32325,12 @@ computeExchangeFockDDDD3(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -31734,6 +32340,7 @@ computeExchangeFockDDDD3(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -31767,12 +32374,19 @@ computeExchangeFockDDDD3(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -31784,8 +32398,8 @@ computeExchangeFockDDDD3(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -31801,7 +32415,23 @@ computeExchangeFockDDDD3(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -31830,25 +32460,15 @@ computeExchangeFockDDDD3(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -31874,19 +32494,14 @@ computeExchangeFockDDDD3(double*         mat_K,
                         F8_t[2] *= d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[2] * (
-        
+
                                 + 0.125 * inv_S1 * inv_S4 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PA_0 * PQ[a1] * (-1.0) + PA_1 * PQ[a0] * (-1.0) + PQ[a0] * PQ[a1])
                                     + (delta[a1][b1] * delta[c0][c1] * delta[d0][d1] + delta[a1][b1] * delta[c0][d0] * delta[c1][d1] + delta[a1][b1] * delta[c0][d1] * delta[c1][d0]) * (PB_0 * PQ[a0] * (-1.0) + PA_0 * PQ[b0] * (-1.0) + PQ[a0] * PQ[b0])
@@ -31923,7 +32538,7 @@ computeExchangeFockDDDD3(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1]) * (PQ[d0] * QD_1 * 2.0 + PQ[d1] * QD_0 * 2.0 + QD_0 * QD_1 * 2.0)
                                     + (delta[a0][a1] * delta[b0][c0] * delta[b1][c1] + delta[a0][a1] * delta[b0][c1] * delta[b1][c0] + delta[a0][b0] * delta[a1][c0] * delta[b1][c1] + delta[a0][b0] * delta[a1][c1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] * delta[b0][c1] + delta[a0][b1] * delta[a1][c1] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][c1] + delta[a0][c0] * delta[a1][b1] * delta[b0][c1] + delta[a0][c0] * delta[a1][c1] * delta[b0][b1] + delta[a0][c1] * delta[a1][b0] * delta[b1][c0] + delta[a0][c1] * delta[a1][b1] * delta[b0][c0] + delta[a0][c1] * delta[a1][c0] * delta[b0][b1]) * (QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             );
@@ -31993,11 +32608,12 @@ computeExchangeFockDDDD4(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -32007,6 +32623,7 @@ computeExchangeFockDDDD4(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -32040,12 +32657,19 @@ computeExchangeFockDDDD4(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -32057,8 +32681,8 @@ computeExchangeFockDDDD4(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -32074,7 +32698,23 @@ computeExchangeFockDDDD4(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -32103,25 +32743,15 @@ computeExchangeFockDDDD4(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -32147,19 +32777,14 @@ computeExchangeFockDDDD4(double*         mat_K,
                         F8_t[2] *= d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[2] * (
-        
+
                                 + 0.125 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PA_0 * PQ[a1] * (-2.0) + PA_1 * PQ[a0] * (-2.0) + PA_0 * PA_1 * 2.0)
                                     + (delta[b0][c0] * delta[b1][c1] * delta[d0][d1] + delta[b0][c0] * delta[b1][d0] * delta[c1][d1] + delta[b0][c0] * delta[b1][d1] * delta[c1][d0] + delta[b0][c1] * delta[b1][c0] * delta[d0][d1] + delta[b0][c1] * delta[b1][d0] * delta[c0][d1] + delta[b0][c1] * delta[b1][d1] * delta[c0][d0] + delta[b0][d0] * delta[b1][c0] * delta[c1][d1] + delta[b0][d0] * delta[b1][c1] * delta[c0][d1] + delta[b0][d0] * delta[b1][d1] * delta[c0][c1] + delta[b0][d1] * delta[b1][c0] * delta[c1][d0] + delta[b0][d1] * delta[b1][c1] * delta[c0][d0] + delta[b0][d1] * delta[b1][d0] * delta[c0][c1]) * (PA_0 * PA_1)
@@ -32196,17 +32821,17 @@ computeExchangeFockDDDD4(double*         mat_K,
                                     + (delta[a0][c0] * delta[a1][c1] * delta[d0][d1] + delta[a0][c0] * delta[a1][d0] * delta[c1][d1] + delta[a0][c0] * delta[a1][d1] * delta[c1][d0] + delta[a0][c1] * delta[a1][c0] * delta[d0][d1] + delta[a0][c1] * delta[a1][d0] * delta[c0][d1] + delta[a0][c1] * delta[a1][d1] * delta[c0][d0] + delta[a0][d0] * delta[a1][c0] * delta[c1][d1] + delta[a0][d0] * delta[a1][c1] * delta[c0][d1] + delta[a0][d0] * delta[a1][d1] * delta[c0][c1] + delta[a0][d1] * delta[a1][c0] * delta[c1][d0] + delta[a0][d1] * delta[a1][c1] * delta[c0][d0] + delta[a0][d1] * delta[a1][d0] * delta[c0][c1]) * (PB_0 * PB_1)
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1]) * (PQ[d0] * PQ[d1] + PQ[d0] * QD_1 + PQ[d1] * QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[2] * (
-        
+
                                 + 0.25 * S1 * S1 * inv_S2 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1 * PA_0 * PA_1)
                                 )
-        
+
                             )
 
                             );
@@ -32276,11 +32901,12 @@ computeExchangeFockDDDD5(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -32290,6 +32916,7 @@ computeExchangeFockDDDD5(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -32323,12 +32950,19 @@ computeExchangeFockDDDD5(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -32340,8 +32974,8 @@ computeExchangeFockDDDD5(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -32357,7 +32991,23 @@ computeExchangeFockDDDD5(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -32386,25 +33036,15 @@ computeExchangeFockDDDD5(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -32430,19 +33070,14 @@ computeExchangeFockDDDD5(double*         mat_K,
                         F8_t[2] *= d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[2] * (
-        
+
                                 + 0.25 * S1 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1 * PA_0 * PQ[a1] * (-2.0) + PB_0 * PB_1 * PA_1 * PQ[a0] * (-2.0) + PB_0 * PA_0 * PA_1 * PQ[b1] * (-2.0) + PB_1 * PA_0 * PA_1 * PQ[b0] * (-2.0))
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PB_0 * PA_0 * PA_1 * PQ[c0] * (-1.0) + PB_0 * PA_0 * PA_1 * QC_0 * (-1.0))
@@ -32498,7 +33133,7 @@ computeExchangeFockDDDD5(double*         mat_K,
                                     + delta[a0][a1] * delta[c0][d0] * (PB_0 * PB_1 * PQ[c1] * PQ[d1] + PB_0 * PB_1 * PQ[c1] * QD_1 + PB_0 * PB_1 * PQ[d1] * QC_1)
                                     + delta[a0][a1] * delta[c0][c1] * (PB_0 * PB_1 * PQ[d0] * PQ[d1] + PB_0 * PB_1 * PQ[d0] * QD_1 + PB_0 * PB_1 * PQ[d1] * QD_0)
                                 )
-        
+
                             )
 
                             );
@@ -32568,11 +33203,12 @@ computeExchangeFockDDDD6(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -32582,6 +33218,7 @@ computeExchangeFockDDDD6(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -32615,12 +33252,19 @@ computeExchangeFockDDDD6(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -32632,8 +33276,8 @@ computeExchangeFockDDDD6(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;//, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -32649,7 +33293,23 @@ computeExchangeFockDDDD6(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            //rij[0] = r_j[0] - r_i[0];
+            //rij[1] = r_j[1] - r_i[1];
+            //rij[2] = r_j[2] - r_i[2];
+
+            //PA_0 = (a_j * inv_S1) * rij[a0];
+            //PA_1 = (a_j * inv_S1) * rij[a1];
+            //PB_0 = (-a_i * inv_S1) * rij[b0];
+            //PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -32678,25 +33338,15 @@ computeExchangeFockDDDD6(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -32722,23 +33372,18 @@ computeExchangeFockDDDD6(double*         mat_K,
                         F8_t[2] *= d2 * d2;
                     }
 
-                    // auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    // auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    // auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    // auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[2] * (
-        
+
                                 + 0.25 * S2 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (QD_0 * QD_1 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             );
@@ -32808,11 +33453,12 @@ computeExchangeFockDDDD7(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -32822,6 +33468,7 @@ computeExchangeFockDDDD7(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -32855,12 +33502,19 @@ computeExchangeFockDDDD7(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -32872,8 +33526,8 @@ computeExchangeFockDDDD7(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -32889,7 +33543,23 @@ computeExchangeFockDDDD7(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -32918,25 +33588,15 @@ computeExchangeFockDDDD7(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -32962,19 +33622,14 @@ computeExchangeFockDDDD7(double*         mat_K,
                         F8_t[2] *= d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[2] * (
-        
+
                                 + 0.25 * S2 * inv_S1 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * delta[d0][d1] * (PA_0 * PQ[a1] * QC_0 * QC_1 * (-1.0) + PA_1 * PQ[a0] * QC_0 * QC_1 * (-1.0) + PQ[a0] * PQ[a1] * QC_0 * QC_1)
                                     + delta[b0][b1] * delta[c1][d1] * (PA_0 * PQ[a1] * QD_0 * QC_0 * (-1.0) + PA_1 * PQ[a0] * QD_0 * QC_0 * (-1.0) + PQ[a0] * PQ[a1] * QD_0 * QC_0)
@@ -33030,13 +33685,13 @@ computeExchangeFockDDDD7(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PB_1 * QD_0 * QD_1 * QC_1 * (-1.0) + PQ[b1] * QD_0 * QD_1 * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * QD_0 * QD_1 * QC_1 * 2.0 + PQ[c1] * QD_0 * QD_1 * QC_0 * 2.0 + PQ[d0] * QD_1 * QC_0 * QC_1 * 2.0 + PQ[d1] * QD_0 * QC_0 * QC_1 * 2.0)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[2] * (
-        
+
                                 + 0.25 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1 * PQ[a0] * PQ[a1] + PB_0 * PA_0 * PQ[a1] * PQ[b1] + PB_0 * PA_1 * PQ[a0] * PQ[b1] + PB_1 * PA_0 * PQ[a1] * PQ[b0] + PB_1 * PA_1 * PQ[a0] * PQ[b0] + PA_0 * PA_1 * PQ[b0] * PQ[b1])
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PB_0 * PA_0 * PQ[a1] * QC_0 + PB_0 * PA_1 * PQ[a0] * QC_0 + PA_0 * PA_1 * PQ[b0] * QC_0)
@@ -33145,13 +33800,13 @@ computeExchangeFockDDDD7(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[c1] * QD_0 * QD_1 + PQ[c0] * PQ[d0] * QD_1 * QC_1 + PQ[c0] * PQ[d1] * QD_0 * QC_1 + PQ[c1] * PQ[d0] * QD_1 * QC_0 + PQ[c1] * PQ[d1] * QD_0 * QC_0 + PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                     + (delta[a0][c0] * delta[a1][c1] + delta[a0][c1] * delta[a1][c0]) * (PB_0 * PB_1 * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[2] * (
-        
+
                                 + 0.5 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * PQ[c1] + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * QC_1 + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c1] * QC_0)
                                     + delta[c1][d1] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * PQ[d0] + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * QD_0 + PB_0 * PB_1 * PA_0 * PA_1 * PQ[d0] * QC_0)
@@ -33160,13 +33815,13 @@ computeExchangeFockDDDD7(double*         mat_K,
                                     + delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[c1] * PQ[d1] + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c1] * QD_1 + PB_0 * PB_1 * PA_0 * PA_1 * PQ[d1] * QC_1)
                                     + delta[c0][c1] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[d0] * PQ[d1] + PB_0 * PB_1 * PA_0 * PA_1 * PQ[d0] * QD_1 + PB_0 * PB_1 * PA_0 * PA_1 * PQ[d1] * QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[2] * (
-        
+
                                 + 0.5 * S1 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * QC_1 * (-1.0) + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c1] * QC_0 * (-1.0) + PB_0 * PB_1 * PA_0 * PQ[a1] * QC_0 * QC_1 * (-1.0) + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c0] * QC_1 * (-1.0) + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c1] * QC_0 * (-1.0) + PB_0 * PB_1 * PA_1 * PQ[a0] * QC_0 * QC_1 * (-1.0) + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] * QC_1 * (-1.0) + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c1] * QC_0 * (-1.0) + PB_0 * PA_0 * PA_1 * PQ[b1] * QC_0 * QC_1 * (-1.0) + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * QC_1 * (-1.0) + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c1] * QC_0 * (-1.0) + PB_1 * PA_0 * PA_1 * PQ[b0] * QC_0 * QC_1 * (-1.0))
                                     + delta[c1][d1] * (PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PB_1 * PA_0 * PQ[a1] * QD_0 * QC_0 * (-1.0) + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PB_1 * PA_1 * PQ[a0] * QD_0 * QC_0 * (-1.0) + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PA_0 * PA_1 * PQ[b1] * QD_0 * QC_0 * (-1.0) + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PA_0 * PA_1 * PQ[b0] * QD_0 * QC_0 * (-1.0))
@@ -33197,7 +33852,7 @@ computeExchangeFockDDDD7(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PB_1 * PA_1 * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PB_1 * PA_1 * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PB_1 * PA_1 * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PB_1 * PA_1 * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PB_1 * PA_1 * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PB_0 * PB_1 * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PB_0 * PB_1 * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PB_0 * PB_1 * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PB_0 * PB_1 * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PB_0 * PB_1 * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             );
@@ -33267,11 +33922,12 @@ computeExchangeFockDDDD8(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -33281,6 +33937,7 @@ computeExchangeFockDDDD8(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -33314,12 +33971,19 @@ computeExchangeFockDDDD8(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -33331,8 +33995,8 @@ computeExchangeFockDDDD8(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -33348,7 +34012,23 @@ computeExchangeFockDDDD8(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -33377,25 +34057,15 @@ computeExchangeFockDDDD8(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -33421,19 +34091,14 @@ computeExchangeFockDDDD8(double*         mat_K,
                         F8_t[2] *= d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[2] * (
-        
+
                                 + 0.5 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * (PA_0 * PQ[a1] * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PA_1 * PQ[a0] * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[a0] * PQ[a1] * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a1][b1] * (PB_0 * PQ[a0] * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PA_0 * PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[a0] * PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1)
@@ -33442,13 +34107,13 @@ computeExchangeFockDDDD8(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PQ[a1] * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PA_1 * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[a1] * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[b0] * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[2] * (
-        
+
                                 + 0.5 * S2 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * QC_0 * QC_1 + PB_0 * PA_0 * PQ[a1] * PQ[b1] * QC_0 * QC_1 + PB_0 * PA_1 * PQ[a0] * PQ[b1] * QC_0 * QC_1 + PB_1 * PA_0 * PQ[a1] * PQ[b0] * QC_0 * QC_1 + PB_1 * PA_1 * PQ[a0] * PQ[b0] * QC_0 * QC_1 + PA_0 * PA_1 * PQ[b0] * PQ[b1] * QC_0 * QC_1)
                                     + delta[c1][d1] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * QD_0 * QC_0 + PB_0 * PA_0 * PQ[a1] * PQ[b1] * QD_0 * QC_0 + PB_0 * PA_1 * PQ[a0] * PQ[b1] * QD_0 * QC_0 + PB_1 * PA_0 * PQ[a1] * PQ[b0] * QD_0 * QC_0 + PB_1 * PA_1 * PQ[a0] * PQ[b0] * QD_0 * QC_0 + PA_0 * PA_1 * PQ[b0] * PQ[b1] * QD_0 * QC_0)
@@ -33479,13 +34144,13 @@ computeExchangeFockDDDD8(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PQ[a1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PB_1 * PQ[a1] * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PB_1 * PQ[a1] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[a1] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PA_1 * PQ[b1] * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PA_1 * PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PA_1 * PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0) + PB_1 * PA_1 * PQ[c0] * QD_0 * QD_1 * QC_1 + PB_1 * PA_1 * PQ[c1] * QD_0 * QD_1 * QC_0 + PB_1 * PA_1 * PQ[d0] * QD_1 * QC_0 * QC_1 + PB_1 * PA_1 * PQ[d1] * QD_0 * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PB_0 * PQ[b1] * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PB_0 * PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PB_0 * PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PB_1 * PQ[b0] * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PB_1 * PQ[b0] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[b0] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0) + PB_0 * PB_1 * PQ[c0] * QD_0 * QD_1 * QC_1 + PB_0 * PB_1 * PQ[c1] * QD_0 * QD_1 * QC_0 + PB_0 * PB_1 * PQ[d0] * QD_1 * QC_0 * QC_1 + PB_0 * PB_1 * PQ[d1] * QD_0 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[2] * (
-        
+
                                 + S1 * S1 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * PQ[c1] * QD_0 * QD_1
@@ -33495,13 +34160,13 @@ computeExchangeFockDDDD8(double*         mat_K,
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c1] * PQ[d1] * QD_0 * QC_0
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[d0] * PQ[d1] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[2] * (
-        
+
                                 + S1 * S2 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
@@ -33521,7 +34186,7 @@ computeExchangeFockDDDD8(double*         mat_K,
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             );
@@ -33591,11 +34256,12 @@ computeExchangeFockDDDD9(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -33605,6 +34271,7 @@ computeExchangeFockDDDD9(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -33638,12 +34305,19 @@ computeExchangeFockDDDD9(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -33655,8 +34329,8 @@ computeExchangeFockDDDD9(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -33672,7 +34346,23 @@ computeExchangeFockDDDD9(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -33701,25 +34391,15 @@ computeExchangeFockDDDD9(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -33746,19 +34426,14 @@ computeExchangeFockDDDD9(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[2] * (
-        
+
                                 + S2 * S2 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * PQ[a1] * QD_0 * QD_1 * QC_0 * QC_1
@@ -33768,60 +34443,60 @@ computeExchangeFockDDDD9(double*         mat_K,
                                     + PB_1 * PA_1 * PQ[a0] * PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[2] * (
-        
+
                                 + 0.0625 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d1] * delta[c1][d0])
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[2] * (
-        
+
                                 + 0.0625 * inv_S1 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d1] * delta[c1][d0]) * 4.0
                                     + (delta[a0][a1] * delta[b0][c0] * delta[b1][c1] * delta[d0][d1] + delta[a0][a1] * delta[b0][c0] * delta[b1][d0] * delta[c1][d1] + delta[a0][a1] * delta[b0][c0] * delta[b1][d1] * delta[c1][d0] + delta[a0][a1] * delta[b0][c1] * delta[b1][c0] * delta[d0][d1] + delta[a0][a1] * delta[b0][c1] * delta[b1][d0] * delta[c0][d1] + delta[a0][a1] * delta[b0][c1] * delta[b1][d1] * delta[c0][d0] + delta[a0][a1] * delta[b0][d0] * delta[b1][c0] * delta[c1][d1] + delta[a0][a1] * delta[b0][d0] * delta[b1][c1] * delta[c0][d1] + delta[a0][a1] * delta[b0][d0] * delta[b1][d1] * delta[c0][c1] + delta[a0][a1] * delta[b0][d1] * delta[b1][c0] * delta[c1][d0] + delta[a0][a1] * delta[b0][d1] * delta[b1][c1] * delta[c0][d0] + delta[a0][a1] * delta[b0][d1] * delta[b1][d0] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[b1][c1] * delta[d0][d1] + delta[a0][b0] * delta[a1][c0] * delta[b1][d0] * delta[c1][d1] + delta[a0][b0] * delta[a1][c0] * delta[b1][d1] * delta[c1][d0] + delta[a0][b0] * delta[a1][c1] * delta[b1][c0] * delta[d0][d1] + delta[a0][b0] * delta[a1][c1] * delta[b1][d0] * delta[c0][d1] + delta[a0][b0] * delta[a1][c1] * delta[b1][d1] * delta[c0][d0] + delta[a0][b0] * delta[a1][d0] * delta[b1][c0] * delta[c1][d1] + delta[a0][b0] * delta[a1][d0] * delta[b1][c1] * delta[c0][d1] + delta[a0][b0] * delta[a1][d0] * delta[b1][d1] * delta[c0][c1] + delta[a0][b0] * delta[a1][d1] * delta[b1][c0] * delta[c1][d0] + delta[a0][b0] * delta[a1][d1] * delta[b1][c1] * delta[c0][d0] + delta[a0][b0] * delta[a1][d1] * delta[b1][d0] * delta[c0][c1] + delta[a0][b1] * delta[a1][c0] * delta[b0][c1] * delta[d0][d1] + delta[a0][b1] * delta[a1][c0] * delta[b0][d0] * delta[c1][d1] + delta[a0][b1] * delta[a1][c0] * delta[b0][d1] * delta[c1][d0] + delta[a0][b1] * delta[a1][c1] * delta[b0][c0] * delta[d0][d1] + delta[a0][b1] * delta[a1][c1] * delta[b0][d0] * delta[c0][d1] + delta[a0][b1] * delta[a1][c1] * delta[b0][d1] * delta[c0][d0] + delta[a0][b1] * delta[a1][d0] * delta[b0][c0] * delta[c1][d1] + delta[a0][b1] * delta[a1][d0] * delta[b0][c1] * delta[c0][d1] + delta[a0][b1] * delta[a1][d0] * delta[b0][d1] * delta[c0][c1] + delta[a0][b1] * delta[a1][d1] * delta[b0][c0] * delta[c1][d0] + delta[a0][b1] * delta[a1][d1] * delta[b0][c1] * delta[c0][d0] + delta[a0][b1] * delta[a1][d1] * delta[b0][d0] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[b1][c1] * delta[d0][d1] + delta[a0][c0] * delta[a1][b0] * delta[b1][d0] * delta[c1][d1] + delta[a0][c0] * delta[a1][b0] * delta[b1][d1] * delta[c1][d0] + delta[a0][c0] * delta[a1][b1] * delta[b0][c1] * delta[d0][d1] + delta[a0][c0] * delta[a1][b1] * delta[b0][d0] * delta[c1][d1] + delta[a0][c0] * delta[a1][b1] * delta[b0][d1] * delta[c1][d0] + delta[a0][c0] * delta[a1][c1] * delta[b0][b1] * delta[d0][d1] + delta[a0][c0] * delta[a1][d0] * delta[b0][b1] * delta[c1][d1] + delta[a0][c0] * delta[a1][d1] * delta[b0][b1] * delta[c1][d0] + delta[a0][c1] * delta[a1][b0] * delta[b1][c0] * delta[d0][d1] + delta[a0][c1] * delta[a1][b0] * delta[b1][d0] * delta[c0][d1] + delta[a0][c1] * delta[a1][b0] * delta[b1][d1] * delta[c0][d0] + delta[a0][c1] * delta[a1][b1] * delta[b0][c0] * delta[d0][d1] + delta[a0][c1] * delta[a1][b1] * delta[b0][d0] * delta[c0][d1] + delta[a0][c1] * delta[a1][b1] * delta[b0][d1] * delta[c0][d0] + delta[a0][c1] * delta[a1][c0] * delta[b0][b1] * delta[d0][d1] + delta[a0][c1] * delta[a1][d0] * delta[b0][b1] * delta[c0][d1] + delta[a0][c1] * delta[a1][d1] * delta[b0][b1] * delta[c0][d0] + delta[a0][d0] * delta[a1][b0] * delta[b1][c0] * delta[c1][d1] + delta[a0][d0] * delta[a1][b0] * delta[b1][c1] * delta[c0][d1] + delta[a0][d0] * delta[a1][b0] * delta[b1][d1] * delta[c0][c1] + delta[a0][d0] * delta[a1][b1] * delta[b0][c0] * delta[c1][d1] + delta[a0][d0] * delta[a1][b1] * delta[b0][c1] * delta[c0][d1] + delta[a0][d0] * delta[a1][b1] * delta[b0][d1] * delta[c0][c1] + delta[a0][d0] * delta[a1][c0] * delta[b0][b1] * delta[c1][d1] + delta[a0][d0] * delta[a1][c1] * delta[b0][b1] * delta[c0][d1] + delta[a0][d0] * delta[a1][d1] * delta[b0][b1] * delta[c0][c1] + delta[a0][d1] * delta[a1][b0] * delta[b1][c0] * delta[c1][d0] + delta[a0][d1] * delta[a1][b0] * delta[b1][c1] * delta[c0][d0] + delta[a0][d1] * delta[a1][b0] * delta[b1][d0] * delta[c0][c1] + delta[a0][d1] * delta[a1][b1] * delta[b0][c0] * delta[c1][d0] + delta[a0][d1] * delta[a1][b1] * delta[b0][c1] * delta[c0][d0] + delta[a0][d1] * delta[a1][b1] * delta[b0][d0] * delta[c0][c1] + delta[a0][d1] * delta[a1][c0] * delta[b0][b1] * delta[c1][d0] + delta[a0][d1] * delta[a1][c1] * delta[b0][b1] * delta[c0][d0] + delta[a0][d1] * delta[a1][d0] * delta[b0][b1] * delta[c0][c1])
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[2] * (
-        
+
                                 + 0.0625 * inv_S2 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d1] * delta[c1][d0])
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[3] * (
-        
+
                                 0.0625 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d1] * delta[c1][d0]) * (-2.0)
                                     + (delta[a0][a1] * delta[b0][c0] * delta[b1][c1] * delta[d0][d1] + delta[a0][a1] * delta[b0][c0] * delta[b1][d0] * delta[c1][d1] + delta[a0][a1] * delta[b0][c0] * delta[b1][d1] * delta[c1][d0] + delta[a0][a1] * delta[b0][c1] * delta[b1][c0] * delta[d0][d1] + delta[a0][a1] * delta[b0][c1] * delta[b1][d0] * delta[c0][d1] + delta[a0][a1] * delta[b0][c1] * delta[b1][d1] * delta[c0][d0] + delta[a0][a1] * delta[b0][d0] * delta[b1][c0] * delta[c1][d1] + delta[a0][a1] * delta[b0][d0] * delta[b1][c1] * delta[c0][d1] + delta[a0][a1] * delta[b0][d0] * delta[b1][d1] * delta[c0][c1] + delta[a0][a1] * delta[b0][d1] * delta[b1][c0] * delta[c1][d0] + delta[a0][a1] * delta[b0][d1] * delta[b1][c1] * delta[c0][d0] + delta[a0][a1] * delta[b0][d1] * delta[b1][d0] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[b1][c1] * delta[d0][d1] + delta[a0][b0] * delta[a1][c0] * delta[b1][d0] * delta[c1][d1] + delta[a0][b0] * delta[a1][c0] * delta[b1][d1] * delta[c1][d0] + delta[a0][b0] * delta[a1][c1] * delta[b1][c0] * delta[d0][d1] + delta[a0][b0] * delta[a1][c1] * delta[b1][d0] * delta[c0][d1] + delta[a0][b0] * delta[a1][c1] * delta[b1][d1] * delta[c0][d0] + delta[a0][b0] * delta[a1][d0] * delta[b1][c0] * delta[c1][d1] + delta[a0][b0] * delta[a1][d0] * delta[b1][c1] * delta[c0][d1] + delta[a0][b0] * delta[a1][d0] * delta[b1][d1] * delta[c0][c1] + delta[a0][b0] * delta[a1][d1] * delta[b1][c0] * delta[c1][d0] + delta[a0][b0] * delta[a1][d1] * delta[b1][c1] * delta[c0][d0] + delta[a0][b0] * delta[a1][d1] * delta[b1][d0] * delta[c0][c1] + delta[a0][b1] * delta[a1][c0] * delta[b0][c1] * delta[d0][d1] + delta[a0][b1] * delta[a1][c0] * delta[b0][d0] * delta[c1][d1] + delta[a0][b1] * delta[a1][c0] * delta[b0][d1] * delta[c1][d0] + delta[a0][b1] * delta[a1][c1] * delta[b0][c0] * delta[d0][d1] + delta[a0][b1] * delta[a1][c1] * delta[b0][d0] * delta[c0][d1] + delta[a0][b1] * delta[a1][c1] * delta[b0][d1] * delta[c0][d0] + delta[a0][b1] * delta[a1][d0] * delta[b0][c0] * delta[c1][d1] + delta[a0][b1] * delta[a1][d0] * delta[b0][c1] * delta[c0][d1] + delta[a0][b1] * delta[a1][d0] * delta[b0][d1] * delta[c0][c1] + delta[a0][b1] * delta[a1][d1] * delta[b0][c0] * delta[c1][d0] + delta[a0][b1] * delta[a1][d1] * delta[b0][c1] * delta[c0][d0] + delta[a0][b1] * delta[a1][d1] * delta[b0][d0] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[b1][c1] * delta[d0][d1] + delta[a0][c0] * delta[a1][b0] * delta[b1][d0] * delta[c1][d1] + delta[a0][c0] * delta[a1][b0] * delta[b1][d1] * delta[c1][d0] + delta[a0][c0] * delta[a1][b1] * delta[b0][c1] * delta[d0][d1] + delta[a0][c0] * delta[a1][b1] * delta[b0][d0] * delta[c1][d1] + delta[a0][c0] * delta[a1][b1] * delta[b0][d1] * delta[c1][d0] + delta[a0][c0] * delta[a1][c1] * delta[b0][b1] * delta[d0][d1] + delta[a0][c0] * delta[a1][d0] * delta[b0][b1] * delta[c1][d1] + delta[a0][c0] * delta[a1][d1] * delta[b0][b1] * delta[c1][d0] + delta[a0][c1] * delta[a1][b0] * delta[b1][c0] * delta[d0][d1] + delta[a0][c1] * delta[a1][b0] * delta[b1][d0] * delta[c0][d1] + delta[a0][c1] * delta[a1][b0] * delta[b1][d1] * delta[c0][d0] + delta[a0][c1] * delta[a1][b1] * delta[b0][c0] * delta[d0][d1] + delta[a0][c1] * delta[a1][b1] * delta[b0][d0] * delta[c0][d1] + delta[a0][c1] * delta[a1][b1] * delta[b0][d1] * delta[c0][d0] + delta[a0][c1] * delta[a1][c0] * delta[b0][b1] * delta[d0][d1] + delta[a0][c1] * delta[a1][d0] * delta[b0][b1] * delta[c0][d1] + delta[a0][c1] * delta[a1][d1] * delta[b0][b1] * delta[c0][d0] + delta[a0][d0] * delta[a1][b0] * delta[b1][c0] * delta[c1][d1] + delta[a0][d0] * delta[a1][b0] * delta[b1][c1] * delta[c0][d1] + delta[a0][d0] * delta[a1][b0] * delta[b1][d1] * delta[c0][c1] + delta[a0][d0] * delta[a1][b1] * delta[b0][c0] * delta[c1][d1] + delta[a0][d0] * delta[a1][b1] * delta[b0][c1] * delta[c0][d1] + delta[a0][d0] * delta[a1][b1] * delta[b0][d1] * delta[c0][c1] + delta[a0][d0] * delta[a1][c0] * delta[b0][b1] * delta[c1][d1] + delta[a0][d0] * delta[a1][c1] * delta[b0][b1] * delta[c0][d1] + delta[a0][d0] * delta[a1][d1] * delta[b0][b1] * delta[c0][c1] + delta[a0][d1] * delta[a1][b0] * delta[b1][c0] * delta[c1][d0] + delta[a0][d1] * delta[a1][b0] * delta[b1][c1] * delta[c0][d0] + delta[a0][d1] * delta[a1][b0] * delta[b1][d0] * delta[c0][c1] + delta[a0][d1] * delta[a1][b1] * delta[b0][c0] * delta[c1][d0] + delta[a0][d1] * delta[a1][b1] * delta[b0][c1] * delta[c0][d0] + delta[a0][d1] * delta[a1][b1] * delta[b0][d0] * delta[c0][c1] + delta[a0][d1] * delta[a1][c0] * delta[b0][b1] * delta[c1][d0] + delta[a0][d1] * delta[a1][c1] * delta[b0][b1] * delta[c0][d0] + delta[a0][d1] * delta[a1][d0] * delta[b0][b1] * delta[c0][c1]) * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[3] * (
-        
+
                                 + 0.0625 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d1] * delta[c1][d0]) * (-2.0)
                                     + (delta[a0][a1] * delta[b0][c0] * delta[b1][c1] * delta[d0][d1] + delta[a0][a1] * delta[b0][c0] * delta[b1][d0] * delta[c1][d1] + delta[a0][a1] * delta[b0][c0] * delta[b1][d1] * delta[c1][d0] + delta[a0][a1] * delta[b0][c1] * delta[b1][c0] * delta[d0][d1] + delta[a0][a1] * delta[b0][c1] * delta[b1][d0] * delta[c0][d1] + delta[a0][a1] * delta[b0][c1] * delta[b1][d1] * delta[c0][d0] + delta[a0][a1] * delta[b0][d0] * delta[b1][c0] * delta[c1][d1] + delta[a0][a1] * delta[b0][d0] * delta[b1][c1] * delta[c0][d1] + delta[a0][a1] * delta[b0][d0] * delta[b1][d1] * delta[c0][c1] + delta[a0][a1] * delta[b0][d1] * delta[b1][c0] * delta[c1][d0] + delta[a0][a1] * delta[b0][d1] * delta[b1][c1] * delta[c0][d0] + delta[a0][a1] * delta[b0][d1] * delta[b1][d0] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[b1][c1] * delta[d0][d1] + delta[a0][b0] * delta[a1][c0] * delta[b1][d0] * delta[c1][d1] + delta[a0][b0] * delta[a1][c0] * delta[b1][d1] * delta[c1][d0] + delta[a0][b0] * delta[a1][c1] * delta[b1][c0] * delta[d0][d1] + delta[a0][b0] * delta[a1][c1] * delta[b1][d0] * delta[c0][d1] + delta[a0][b0] * delta[a1][c1] * delta[b1][d1] * delta[c0][d0] + delta[a0][b0] * delta[a1][d0] * delta[b1][c0] * delta[c1][d1] + delta[a0][b0] * delta[a1][d0] * delta[b1][c1] * delta[c0][d1] + delta[a0][b0] * delta[a1][d0] * delta[b1][d1] * delta[c0][c1] + delta[a0][b0] * delta[a1][d1] * delta[b1][c0] * delta[c1][d0] + delta[a0][b0] * delta[a1][d1] * delta[b1][c1] * delta[c0][d0] + delta[a0][b0] * delta[a1][d1] * delta[b1][d0] * delta[c0][c1] + delta[a0][b1] * delta[a1][c0] * delta[b0][c1] * delta[d0][d1] + delta[a0][b1] * delta[a1][c0] * delta[b0][d0] * delta[c1][d1] + delta[a0][b1] * delta[a1][c0] * delta[b0][d1] * delta[c1][d0] + delta[a0][b1] * delta[a1][c1] * delta[b0][c0] * delta[d0][d1] + delta[a0][b1] * delta[a1][c1] * delta[b0][d0] * delta[c0][d1] + delta[a0][b1] * delta[a1][c1] * delta[b0][d1] * delta[c0][d0] + delta[a0][b1] * delta[a1][d0] * delta[b0][c0] * delta[c1][d1] + delta[a0][b1] * delta[a1][d0] * delta[b0][c1] * delta[c0][d1] + delta[a0][b1] * delta[a1][d0] * delta[b0][d1] * delta[c0][c1] + delta[a0][b1] * delta[a1][d1] * delta[b0][c0] * delta[c1][d0] + delta[a0][b1] * delta[a1][d1] * delta[b0][c1] * delta[c0][d0] + delta[a0][b1] * delta[a1][d1] * delta[b0][d0] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[b1][c1] * delta[d0][d1] + delta[a0][c0] * delta[a1][b0] * delta[b1][d0] * delta[c1][d1] + delta[a0][c0] * delta[a1][b0] * delta[b1][d1] * delta[c1][d0] + delta[a0][c0] * delta[a1][b1] * delta[b0][c1] * delta[d0][d1] + delta[a0][c0] * delta[a1][b1] * delta[b0][d0] * delta[c1][d1] + delta[a0][c0] * delta[a1][b1] * delta[b0][d1] * delta[c1][d0] + delta[a0][c0] * delta[a1][c1] * delta[b0][b1] * delta[d0][d1] + delta[a0][c0] * delta[a1][d0] * delta[b0][b1] * delta[c1][d1] + delta[a0][c0] * delta[a1][d1] * delta[b0][b1] * delta[c1][d0] + delta[a0][c1] * delta[a1][b0] * delta[b1][c0] * delta[d0][d1] + delta[a0][c1] * delta[a1][b0] * delta[b1][d0] * delta[c0][d1] + delta[a0][c1] * delta[a1][b0] * delta[b1][d1] * delta[c0][d0] + delta[a0][c1] * delta[a1][b1] * delta[b0][c0] * delta[d0][d1] + delta[a0][c1] * delta[a1][b1] * delta[b0][d0] * delta[c0][d1] + delta[a0][c1] * delta[a1][b1] * delta[b0][d1] * delta[c0][d0] + delta[a0][c1] * delta[a1][c0] * delta[b0][b1] * delta[d0][d1] + delta[a0][c1] * delta[a1][d0] * delta[b0][b1] * delta[c0][d1] + delta[a0][c1] * delta[a1][d1] * delta[b0][b1] * delta[c0][d0] + delta[a0][d0] * delta[a1][b0] * delta[b1][c0] * delta[c1][d1] + delta[a0][d0] * delta[a1][b0] * delta[b1][c1] * delta[c0][d1] + delta[a0][d0] * delta[a1][b0] * delta[b1][d1] * delta[c0][c1] + delta[a0][d0] * delta[a1][b1] * delta[b0][c0] * delta[c1][d1] + delta[a0][d0] * delta[a1][b1] * delta[b0][c1] * delta[c0][d1] + delta[a0][d0] * delta[a1][b1] * delta[b0][d1] * delta[c0][c1] + delta[a0][d0] * delta[a1][c0] * delta[b0][b1] * delta[c1][d1] + delta[a0][d0] * delta[a1][c1] * delta[b0][b1] * delta[c0][d1] + delta[a0][d0] * delta[a1][d1] * delta[b0][b1] * delta[c0][c1] + delta[a0][d1] * delta[a1][b0] * delta[b1][c0] * delta[c1][d0] + delta[a0][d1] * delta[a1][b0] * delta[b1][c1] * delta[c0][d0] + delta[a0][d1] * delta[a1][b0] * delta[b1][d0] * delta[c0][c1] + delta[a0][d1] * delta[a1][b1] * delta[b0][c0] * delta[c1][d0] + delta[a0][d1] * delta[a1][b1] * delta[b0][c1] * delta[c0][d0] + delta[a0][d1] * delta[a1][b1] * delta[b0][d0] * delta[c0][c1] + delta[a0][d1] * delta[a1][c0] * delta[b0][b1] * delta[c1][d0] + delta[a0][d1] * delta[a1][c1] * delta[b0][b1] * delta[c0][d0] + delta[a0][d1] * delta[a1][d0] * delta[b0][b1] * delta[c0][c1]) * (-1.0)
                                 )
-        
+
                             )
 
                             );
@@ -33891,11 +34566,12 @@ computeExchangeFockDDDD10(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -33905,6 +34581,7 @@ computeExchangeFockDDDD10(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -33938,12 +34615,19 @@ computeExchangeFockDDDD10(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -33955,8 +34639,8 @@ computeExchangeFockDDDD10(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -33972,7 +34656,23 @@ computeExchangeFockDDDD10(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -34001,25 +34701,15 @@ computeExchangeFockDDDD10(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -34046,19 +34736,14 @@ computeExchangeFockDDDD10(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[3] * (
-        
+
                                 + 0.125 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PA_0 * PA_1 * (-1.0) + PA_0 * PQ[a1] + PA_1 * PQ[a0])
                                     + (delta[b0][c0] * delta[b1][c1] * delta[d0][d1] + delta[b0][c0] * delta[b1][d0] * delta[c1][d1] + delta[b0][c0] * delta[b1][d1] * delta[c1][d0] + delta[b0][c1] * delta[b1][c0] * delta[d0][d1] + delta[b0][c1] * delta[b1][d0] * delta[c0][d1] + delta[b0][c1] * delta[b1][d1] * delta[c0][d0] + delta[b0][d0] * delta[b1][c0] * delta[c1][d1] + delta[b0][d0] * delta[b1][c1] * delta[c0][d1] + delta[b0][d0] * delta[b1][d1] * delta[c0][c1] + delta[b0][d1] * delta[b1][c0] * delta[c1][d0] + delta[b0][d1] * delta[b1][c1] * delta[c0][d0] + delta[b0][d1] * delta[b1][d0] * delta[c0][c1]) * (PA_0 * PA_1 * (-1.0))
@@ -34095,13 +34780,13 @@ computeExchangeFockDDDD10(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] * delta[c1][d1] + delta[a0][a1] * delta[b0][c1] * delta[c0][d1] + delta[a0][a1] * delta[b0][d1] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[c1][d1] + delta[a0][b0] * delta[a1][c1] * delta[c0][d1] + delta[a0][b0] * delta[a1][d1] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[c1][d1] + delta[a0][c1] * delta[a1][b0] * delta[c0][d1] + delta[a0][d1] * delta[a1][b0] * delta[c0][c1]) * (PB_1 * PQ[d0])
                                     + (delta[a0][a1] * delta[b0][c0] * delta[c1][d0] + delta[a0][a1] * delta[b0][c1] * delta[c0][d0] + delta[a0][a1] * delta[b0][d0] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[c1][d0] + delta[a0][b0] * delta[a1][c1] * delta[c0][d0] + delta[a0][b0] * delta[a1][d0] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[c1][d0] + delta[a0][c1] * delta[a1][b0] * delta[c0][d0] + delta[a0][d0] * delta[a1][b0] * delta[c0][c1]) * (PB_1 * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[3] * (
-        
+
                                 + (-0.125) * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PQ[a0] * PQ[a1])
                                     + (delta[a1][b1] * delta[c0][c1] * delta[d0][d1] + delta[a1][b1] * delta[c0][d0] * delta[c1][d1] + delta[a1][b1] * delta[c0][d1] * delta[c1][d0]) * (PQ[a0] * PQ[b0])
@@ -34138,7 +34823,7 @@ computeExchangeFockDDDD10(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] * delta[b1][d0] + delta[a0][a1] * delta[b0][d0] * delta[b1][c0] + delta[a0][b0] * delta[a1][c0] * delta[b1][d0] + delta[a0][b0] * delta[a1][d0] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] * delta[b0][d0] + delta[a0][b1] * delta[a1][d0] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][d0] + delta[a0][c0] * delta[a1][b1] * delta[b0][d0] + delta[a0][c0] * delta[a1][d0] * delta[b0][b1] + delta[a0][d0] * delta[a1][b0] * delta[b1][c0] + delta[a0][d0] * delta[a1][b1] * delta[b0][c0] + delta[a0][d0] * delta[a1][c0] * delta[b0][b1]) * (QD_1 * QC_1)
                                     + (delta[a0][a1] * delta[b0][c0] * delta[b1][c1] + delta[a0][a1] * delta[b0][c1] * delta[b1][c0] + delta[a0][b0] * delta[a1][c0] * delta[b1][c1] + delta[a0][b0] * delta[a1][c1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] * delta[b0][c1] + delta[a0][b1] * delta[a1][c1] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][c1] + delta[a0][c0] * delta[a1][b1] * delta[b0][c1] + delta[a0][c0] * delta[a1][c1] * delta[b0][b1] + delta[a0][c1] * delta[a1][b0] * delta[b1][c0] + delta[a0][c1] * delta[a1][b1] * delta[b0][c0] + delta[a0][c1] * delta[a1][c0] * delta[b0][b1]) * (QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             );
@@ -34208,11 +34893,12 @@ computeExchangeFockDDDD11(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -34222,6 +34908,7 @@ computeExchangeFockDDDD11(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -34255,12 +34942,19 @@ computeExchangeFockDDDD11(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -34272,8 +34966,8 @@ computeExchangeFockDDDD11(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -34289,7 +34983,23 @@ computeExchangeFockDDDD11(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -34318,25 +35028,15 @@ computeExchangeFockDDDD11(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -34363,19 +35063,14 @@ computeExchangeFockDDDD11(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[3] * (
-        
+
                                 + 0.125 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PQ[a0] * PQ[a1] * (-2.0) + PA_0 * PQ[a1] * 2.0 + PA_1 * PQ[a0] * 2.0)
                                     + (delta[b0][c0] * delta[b1][c1] * delta[d0][d1] + delta[b0][c0] * delta[b1][d0] * delta[c1][d1] + delta[b0][c0] * delta[b1][d1] * delta[c1][d0] + delta[b0][c1] * delta[b1][c0] * delta[d0][d1] + delta[b0][c1] * delta[b1][d0] * delta[c0][d1] + delta[b0][c1] * delta[b1][d1] * delta[c0][d0] + delta[b0][d0] * delta[b1][c0] * delta[c1][d1] + delta[b0][d0] * delta[b1][c1] * delta[c0][d1] + delta[b0][d0] * delta[b1][d1] * delta[c0][c1] + delta[b0][d1] * delta[b1][c0] * delta[c1][d0] + delta[b0][d1] * delta[b1][c1] * delta[c0][d0] + delta[b0][d1] * delta[b1][d0] * delta[c0][c1]) * (PA_0 * PQ[a1] + PA_1 * PQ[a0])
@@ -34434,13 +35129,13 @@ computeExchangeFockDDDD11(double*         mat_K,
                                     + (delta[a0][c0] * delta[a1][c1] * delta[b0][d1] + delta[a0][c0] * delta[a1][d1] * delta[b0][c1] + delta[a0][c1] * delta[a1][c0] * delta[b0][d1] + delta[a0][c1] * delta[a1][d1] * delta[b0][c0] + delta[a0][d1] * delta[a1][c0] * delta[b0][c1] + delta[a0][d1] * delta[a1][c1] * delta[b0][c0]) * (PB_1 * QD_0)
                                     + (delta[a0][c0] * delta[a1][c1] * delta[b0][d0] + delta[a0][c0] * delta[a1][d0] * delta[b0][c1] + delta[a0][c1] * delta[a1][c0] * delta[b0][d0] + delta[a0][c1] * delta[a1][d0] * delta[b0][c0] + delta[a0][d0] * delta[a1][c0] * delta[b0][c1] + delta[a0][d0] * delta[a1][c1] * delta[b0][c0]) * (PB_1 * QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[3] * (
-        
+
                                 + 0.25 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1 * PA_0 * PQ[a1] + PB_0 * PB_1 * PA_1 * PQ[a0] + PB_0 * PA_0 * PA_1 * PQ[b1] + PB_1 * PA_0 * PA_1 * PQ[b0])
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PB_0 * PA_0 * PA_1 * PQ[c0])
@@ -34496,7 +35191,7 @@ computeExchangeFockDDDD11(double*         mat_K,
                                     + delta[a0][a1] * delta[c0][d0] * (PB_0 * PB_1 * PQ[c1] * PQ[d1] * (-1.0))
                                     + delta[a0][a1] * delta[c0][c1] * (PB_0 * PB_1 * PQ[d0] * PQ[d1] * (-1.0))
                                 )
-        
+
                             )
 
                             );
@@ -34566,11 +35261,12 @@ computeExchangeFockDDDD12(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -34580,6 +35276,7 @@ computeExchangeFockDDDD12(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -34613,12 +35310,19 @@ computeExchangeFockDDDD12(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -34630,8 +35334,8 @@ computeExchangeFockDDDD12(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -34647,7 +35351,23 @@ computeExchangeFockDDDD12(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -34676,25 +35396,15 @@ computeExchangeFockDDDD12(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -34721,19 +35431,14 @@ computeExchangeFockDDDD12(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[3] * (
-        
+
                                 + 0.25 * S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * (-2.0) + PB_0 * PA_0 * PQ[a1] * PQ[b1] * (-2.0) + PB_0 * PA_1 * PQ[a0] * PQ[b1] * (-2.0) + PB_1 * PA_0 * PQ[a1] * PQ[b0] * (-2.0) + PB_1 * PA_1 * PQ[a0] * PQ[b0] * (-2.0) + PA_0 * PA_1 * PQ[b0] * PQ[b1] * (-2.0))
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PB_0 * PA_0 * PQ[a1] * PQ[c0] * (-1.0) + PB_0 * PA_0 * PQ[a1] * QC_0 * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[c0] * (-1.0) + PB_0 * PA_1 * PQ[a0] * QC_0 * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[c0] * (-1.0) + PA_0 * PA_1 * PQ[b0] * QC_0 * (-1.0))
@@ -34842,7 +35547,7 @@ computeExchangeFockDDDD12(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PB_1 * PQ[c1] * PQ[d0] * QD_1 + PB_1 * PQ[c1] * PQ[d1] * QD_0 + PB_1 * PQ[d0] * PQ[d1] * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0))
                                 )
-        
+
                             )
 
                             );
@@ -34912,11 +35617,12 @@ computeExchangeFockDDDD13(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -34926,6 +35632,7 @@ computeExchangeFockDDDD13(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -34959,12 +35666,19 @@ computeExchangeFockDDDD13(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -34976,8 +35690,8 @@ computeExchangeFockDDDD13(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;//, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -34993,7 +35707,23 @@ computeExchangeFockDDDD13(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            //rij[0] = r_j[0] - r_i[0];
+            //rij[1] = r_j[1] - r_i[1];
+            //rij[2] = r_j[2] - r_i[2];
+
+            //PA_0 = (a_j * inv_S1) * rij[a0];
+            //PA_1 = (a_j * inv_S1) * rij[a1];
+            //PB_0 = (-a_i * inv_S1) * rij[b0];
+            //PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -35022,25 +35752,15 @@ computeExchangeFockDDDD13(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -35067,19 +35787,14 @@ computeExchangeFockDDDD13(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    // auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    // auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    // auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    // auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[3] * (
-        
+
                                 + (-0.25) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * delta[d0][d1] * (PQ[a0] * PQ[a1] * QC_0 * QC_1)
                                     + delta[b0][b1] * delta[c1][d1] * (PQ[a0] * PQ[a1] * QD_0 * QC_0)
@@ -35135,7 +35850,7 @@ computeExchangeFockDDDD13(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[b1] * QD_0 * QD_1 * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * QD_0 * QD_1 * QC_1 + PQ[c1] * QD_0 * QD_1 * QC_0 + PQ[d0] * QD_1 * QC_0 * QC_1 + PQ[d1] * QD_0 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             );
@@ -35205,11 +35920,12 @@ computeExchangeFockDDDD14(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -35219,6 +35935,7 @@ computeExchangeFockDDDD14(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -35252,12 +35969,19 @@ computeExchangeFockDDDD14(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -35269,8 +35993,8 @@ computeExchangeFockDDDD14(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -35286,7 +36010,23 @@ computeExchangeFockDDDD14(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -35315,25 +36055,15 @@ computeExchangeFockDDDD14(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -35360,19 +36090,14 @@ computeExchangeFockDDDD14(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[3] * (
-        
+
                                 + 0.25 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] + PA_1 * PQ[a0] * PQ[b0] * PQ[b1])
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PB_0 * PQ[a0] * PQ[a1] * QC_0 + PA_0 * PQ[a1] * PQ[b0] * QC_0 + PA_1 * PQ[a0] * PQ[b0] * QC_0)
@@ -35481,13 +36206,13 @@ computeExchangeFockDDDD14(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[c1] * QD_0 * QD_1 * (-2.0) + PQ[c0] * PQ[d0] * QD_1 * QC_1 * (-2.0) + PQ[c0] * PQ[d1] * QD_0 * QC_1 * (-2.0) + PQ[c1] * PQ[d0] * QD_1 * QC_0 * (-2.0) + PQ[c1] * PQ[d1] * QD_0 * QC_0 * (-2.0) + PQ[d0] * PQ[d1] * QC_0 * QC_1 * (-2.0))
                                     + (delta[a0][c0] * delta[a1][c1] + delta[a0][c1] * delta[a1][c0]) * (PB_0 * PQ[b1] * QD_0 * QD_1 + PB_1 * PQ[b0] * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[3] * (
-        
+
                                 + (-0.5) * S1 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * PQ[c1])
                                     + delta[c1][d1] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * PQ[d0])
@@ -35496,7 +36221,7 @@ computeExchangeFockDDDD14(double*         mat_K,
                                     + delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[c1] * PQ[d1])
                                     + delta[c0][c1] * (PB_0 * PB_1 * PA_0 * PA_1 * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             );
@@ -35566,11 +36291,12 @@ computeExchangeFockDDDD15(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -35580,6 +36306,7 @@ computeExchangeFockDDDD15(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -35613,12 +36340,19 @@ computeExchangeFockDDDD15(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -35630,8 +36364,8 @@ computeExchangeFockDDDD15(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -35647,7 +36381,23 @@ computeExchangeFockDDDD15(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -35676,25 +36426,15 @@ computeExchangeFockDDDD15(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -35721,19 +36461,14 @@ computeExchangeFockDDDD15(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[3] * (
-        
+
                                 + 0.5 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * PQ[c1] + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * QC_1 + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c1] * QC_0 + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c0] * PQ[c1] + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c0] * QC_1 + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c1] * QC_0 + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] * PQ[c1] + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] * QC_1 + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c1] * QC_0 + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[c1] + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * QC_1 + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c1] * QC_0)
                                     + delta[c1][d1] * (PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * PQ[d0] + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * QD_0 + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[d0] * QC_0 + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c0] * PQ[d0] + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c0] * QD_0 + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[d0] * QC_0 + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] * PQ[d0] + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] * QD_0 + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[d0] * QC_0 + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[d0] + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * QD_0 + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[d0] * QC_0)
@@ -35764,13 +36499,13 @@ computeExchangeFockDDDD15(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PB_1 * PA_1 * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PB_1 * PA_1 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PB_1 * PA_1 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0))
                                     + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PB_0 * PB_1 * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PB_0 * PB_1 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PB_0 * PB_1 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[3] * (
-        
+
                                 + 0.5 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * QC_1 * (-1.0) + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c1] * QC_0 * (-1.0) + PB_0 * PB_1 * PQ[a0] * PQ[a1] * QC_0 * QC_1 * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c0] * QC_1 * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c1] * QC_0 * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[b1] * QC_0 * QC_1 * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c0] * QC_1 * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c1] * QC_0 * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[b1] * QC_0 * QC_1 * (-1.0) + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * QC_1 * (-1.0) + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c1] * QC_0 * (-1.0) + PB_1 * PA_0 * PQ[a1] * PQ[b0] * QC_0 * QC_1 * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * QC_1 * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c1] * QC_0 * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[b0] * QC_0 * QC_1 * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c1] * QC_0 * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[b1] * QC_0 * QC_1 * (-1.0))
                                     + delta[c1][d1] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PB_1 * PQ[a0] * PQ[a1] * QD_0 * QC_0 * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[b1] * QD_0 * QC_0 * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[b1] * QD_0 * QC_0 * (-1.0) + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PA_0 * PQ[a1] * PQ[b0] * QD_0 * QC_0 * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[b0] * QD_0 * QC_0 * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[b1] * QD_0 * QC_0 * (-1.0))
@@ -35801,7 +36536,7 @@ computeExchangeFockDDDD15(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * PQ[c1] * QD_0 * QD_1 * (-1.0) + PB_1 * PA_1 * PQ[c0] * PQ[d0] * QD_1 * QC_1 * (-1.0) + PB_1 * PA_1 * PQ[c0] * PQ[d1] * QD_0 * QC_1 * (-1.0) + PB_1 * PA_1 * PQ[c1] * PQ[d0] * QD_1 * QC_0 * (-1.0) + PB_1 * PA_1 * PQ[c1] * PQ[d1] * QD_0 * QC_0 * (-1.0) + PB_1 * PA_1 * PQ[d0] * PQ[d1] * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PB_1 * PQ[a1] * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PB_1 * PQ[a1] * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PB_1 * PQ[a1] * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PB_1 * PQ[a1] * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PB_1 * PQ[a1] * PQ[d0] * PQ[d1] * QC_0 * QC_1 + PA_1 * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PA_1 * PQ[b1] * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PA_1 * PQ[b1] * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PA_1 * PQ[b1] * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PA_1 * PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PA_1 * PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * PQ[c1] * QD_0 * QD_1 * (-1.0) + PB_0 * PB_1 * PQ[c0] * PQ[d0] * QD_1 * QC_1 * (-1.0) + PB_0 * PB_1 * PQ[c0] * PQ[d1] * QD_0 * QC_1 * (-1.0) + PB_0 * PB_1 * PQ[c1] * PQ[d0] * QD_1 * QC_0 * (-1.0) + PB_0 * PB_1 * PQ[c1] * PQ[d1] * QD_0 * QC_0 * (-1.0) + PB_0 * PB_1 * PQ[d0] * PQ[d1] * QC_0 * QC_1 * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PB_0 * PQ[b1] * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PB_0 * PQ[b1] * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PB_0 * PQ[b1] * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PB_0 * PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PB_0 * PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1 + PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PB_1 * PQ[b0] * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PB_1 * PQ[b0] * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PB_1 * PQ[b0] * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PB_1 * PQ[b0] * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PB_1 * PQ[b0] * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             );
@@ -35871,11 +36606,12 @@ computeExchangeFockDDDD16(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -35885,6 +36621,7 @@ computeExchangeFockDDDD16(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -35918,12 +36655,19 @@ computeExchangeFockDDDD16(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -35935,8 +36679,8 @@ computeExchangeFockDDDD16(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -35952,7 +36696,23 @@ computeExchangeFockDDDD16(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -35981,25 +36741,15 @@ computeExchangeFockDDDD16(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -36026,19 +36776,14 @@ computeExchangeFockDDDD16(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[3] * (
-        
+
                                 + (-0.5) * S2 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[b0][b1] * (PQ[a0] * PQ[a1] * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a1][b1] * (PQ[a0] * PQ[b0] * QD_0 * QD_1 * QC_0 * QC_1)
@@ -36047,13 +36792,13 @@ computeExchangeFockDDDD16(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1)
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[3] * (
-        
+
                                 + 0.5 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * QC_0 * QC_1 + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * QC_0 * QC_1 + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * QC_0 * QC_1 + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * QC_0 * QC_1)
                                     + delta[c1][d1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * QD_0 * QC_0 + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * QD_0 * QC_0 + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * QD_0 * QC_0 + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * QD_0 * QC_0)
@@ -36084,7 +36829,7 @@ computeExchangeFockDDDD16(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PQ[a1] * PQ[b1] * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PQ[a1] * PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[a1] * PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * QD_0 * QD_1 * QC_1 + PB_1 * PQ[a1] * PQ[c1] * QD_0 * QD_1 * QC_0 + PB_1 * PQ[a1] * PQ[d0] * QD_1 * QC_0 * QC_1 + PB_1 * PQ[a1] * PQ[d1] * QD_0 * QC_0 * QC_1 + PA_1 * PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 + PA_1 * PQ[b1] * PQ[c1] * QD_0 * QD_1 * QC_0 + PA_1 * PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 + PA_1 * PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1)
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0) + PQ[b0] * PQ[b1] * PQ[c1] * QD_0 * QD_1 * QC_0 * (-1.0) + PQ[b0] * PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0) + PQ[b0] * PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 + PB_0 * PQ[b1] * PQ[c1] * QD_0 * QD_1 * QC_0 + PB_0 * PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 + PB_0 * PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1 + PB_1 * PQ[b0] * PQ[c0] * QD_0 * QD_1 * QC_1 + PB_1 * PQ[b0] * PQ[c1] * QD_0 * QD_1 * QC_0 + PB_1 * PQ[b0] * PQ[d0] * QD_1 * QC_0 * QC_1 + PB_1 * PQ[b0] * PQ[d1] * QD_0 * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             );
@@ -36154,13 +36899,14 @@ computeExchangeFockDDDD17(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    //__shared__ double   delta[3][3];
+    __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -36168,6 +36914,7 @@ computeExchangeFockDDDD17(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -36175,9 +36922,9 @@ computeExchangeFockDDDD17(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -36201,12 +36948,19 @@ computeExchangeFockDDDD17(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -36218,8 +36972,8 @@ computeExchangeFockDDDD17(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -36235,7 +36989,23 @@ computeExchangeFockDDDD17(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -36264,25 +37034,15 @@ computeExchangeFockDDDD17(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -36309,19 +37069,14 @@ computeExchangeFockDDDD17(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[3] * (
-        
+
                                 + S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0)
@@ -36329,13 +37084,13 @@ computeExchangeFockDDDD17(double*         mat_K,
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0)
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[3] * (
-        
+
                                 + S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * PQ[c1] * QD_0 * QD_1
@@ -36363,13 +37118,13 @@ computeExchangeFockDDDD17(double*         mat_K,
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c1] * PQ[d1] * QD_0 * QC_0
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[d0] * PQ[d1] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[3] * (
-        
+
                                 + S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
@@ -36397,7 +37152,7 @@ computeExchangeFockDDDD17(double*         mat_K,
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             );
@@ -36467,11 +37222,12 @@ computeExchangeFockDDDD18(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -36481,6 +37237,7 @@ computeExchangeFockDDDD18(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -36514,12 +37271,19 @@ computeExchangeFockDDDD18(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -36531,8 +37295,8 @@ computeExchangeFockDDDD18(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -36548,7 +37312,23 @@ computeExchangeFockDDDD18(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -36577,25 +37357,15 @@ computeExchangeFockDDDD18(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -36623,19 +37393,14 @@ computeExchangeFockDDDD18(double*         mat_K,
                         F8_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[3] * (
-        
+
                                 + S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1
@@ -36643,13 +37408,13 @@ computeExchangeFockDDDD18(double*         mat_K,
                                     + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[4] * (
-        
+
                                 0.125 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0]) * (PA_0 * PQ[a1] * (-1.0) + PA_1 * PQ[a0] * (-1.0) + PQ[a0] * PQ[a1])
                                     + (delta[b0][c0] * delta[b1][c1] * delta[d0][d1] + delta[b0][c0] * delta[b1][d0] * delta[c1][d1] + delta[b0][c0] * delta[b1][d1] * delta[c1][d0] + delta[b0][c1] * delta[b1][c0] * delta[d0][d1] + delta[b0][c1] * delta[b1][d0] * delta[c0][d1] + delta[b0][c1] * delta[b1][d1] * delta[c0][d0] + delta[b0][d0] * delta[b1][c0] * delta[c1][d1] + delta[b0][d0] * delta[b1][c1] * delta[c0][d1] + delta[b0][d0] * delta[b1][d1] * delta[c0][c1] + delta[b0][d1] * delta[b1][c0] * delta[c1][d0] + delta[b0][d1] * delta[b1][c1] * delta[c0][d0] + delta[b0][d1] * delta[b1][d0] * delta[c0][c1]) * (PA_0 * PQ[a1] * (-1.0) + PA_1 * PQ[a0] * (-1.0))
@@ -36708,13 +37473,13 @@ computeExchangeFockDDDD18(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1]) * (PQ[d0] * PQ[d1] * 2.0)
                                     + (delta[a0][a1] * delta[b0][c0] * delta[b1][c1] + delta[a0][a1] * delta[b0][c1] * delta[b1][c0] + delta[a0][b0] * delta[a1][c0] * delta[b1][c1] + delta[a0][b0] * delta[a1][c1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] * delta[b0][c1] + delta[a0][b1] * delta[a1][c1] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][c1] + delta[a0][c0] * delta[a1][b1] * delta[b0][c1] + delta[a0][c0] * delta[a1][c1] * delta[b0][b1] + delta[a0][c1] * delta[a1][b0] * delta[b1][c0] + delta[a0][c1] * delta[a1][b1] * delta[b0][c0] + delta[a0][c1] * delta[a1][c0] * delta[b0][b1]) * (PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[4] * (
-        
+
                                 + 0.125 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[a1][b0] * delta[b1][c1] * delta[d0][d1] + delta[a1][b0] * delta[b1][d0] * delta[c1][d1] + delta[a1][b0] * delta[b1][d1] * delta[c1][d0] + delta[a1][b1] * delta[b0][c1] * delta[d0][d1] + delta[a1][b1] * delta[b0][d0] * delta[c1][d1] + delta[a1][b1] * delta[b0][d1] * delta[c1][d0] + delta[a1][c1] * delta[b0][b1] * delta[d0][d1] + delta[a1][d0] * delta[b0][b1] * delta[c1][d1] + delta[a1][d1] * delta[b0][b1] * delta[c1][d0]) * (PQ[a0] * PQ[c0] + PQ[a0] * QC_0)
                                     + (delta[a1][c1] * delta[b0][d0] * delta[b1][d1] + delta[a1][c1] * delta[b0][d1] * delta[b1][d0] + delta[a1][d0] * delta[b0][c1] * delta[b1][d1] + delta[a1][d0] * delta[b0][d1] * delta[b1][c1] + delta[a1][d1] * delta[b0][c1] * delta[b1][d0] + delta[a1][d1] * delta[b0][d0] * delta[b1][c1]) * (PQ[a0] * QC_0)
@@ -36773,13 +37538,13 @@ computeExchangeFockDDDD18(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1]) * (PQ[d0] * PQ[d1] + PQ[d0] * QD_1 + PQ[d1] * QD_0)
                                     + (delta[a0][a1] * delta[b0][c0] * delta[b1][c1] + delta[a0][a1] * delta[b0][c1] * delta[b1][c0] + delta[a0][b0] * delta[a1][c0] * delta[b1][c1] + delta[a0][b0] * delta[a1][c1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] * delta[b0][c1] + delta[a0][b1] * delta[a1][c1] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][c1] + delta[a0][c0] * delta[a1][b1] * delta[b0][c1] + delta[a0][c0] * delta[a1][c1] * delta[b0][b1] + delta[a0][c1] * delta[a1][b0] * delta[b1][c0] + delta[a0][c1] * delta[a1][b1] * delta[b0][c0] + delta[a0][c1] * delta[a1][c0] * delta[b0][b1]) * (PQ[d0] * QD_1 + PQ[d1] * QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[4] * (
-        
+
                                 + 0.25 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PB_1 * PQ[a0] * PQ[a1] + PB_0 * PA_0 * PQ[a1] * PQ[b1] + PB_0 * PA_1 * PQ[a0] * PQ[b1] + PB_1 * PA_0 * PQ[a1] * PQ[b0] + PB_1 * PA_1 * PQ[a0] * PQ[b0] + PA_0 * PA_1 * PQ[b0] * PQ[b1])
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PB_0 * PA_0 * PQ[a1] * PQ[c0] + PB_0 * PA_1 * PQ[a0] * PQ[c0] + PA_0 * PA_1 * PQ[b0] * PQ[c0])
@@ -36888,13 +37653,13 @@ computeExchangeFockDDDD18(double*         mat_K,
                                     + (delta[a0][c0] * delta[a1][c1] + delta[a0][c1] * delta[a1][c0]) * (PB_0 * PB_1 * PQ[d0] * PQ[d1])
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[4] * (
-        
+
                                 + 0.25 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * (-2.0) + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * (-2.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * (-2.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * (-2.0))
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PB_0 * PQ[a0] * PQ[a1] * PQ[c0] * (-1.0) + PB_0 * PQ[a0] * PQ[a1] * QC_0 * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * QC_0 * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * QC_0 * (-1.0))
@@ -37003,13 +37768,13 @@ computeExchangeFockDDDD18(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PB_1 * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PB_1 * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PB_1 * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PQ[b1] * PQ[c1] * PQ[d0] * QD_1 + PQ[b1] * PQ[c1] * PQ[d1] * QD_0 + PQ[b1] * PQ[d0] * PQ[d1] * QC_1)
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * 2.0 + PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * 2.0 + PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * 2.0 + PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * 2.0)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[4] * (
-        
+
                                 + 0.25 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PQ[a0] * PQ[a1] * PQ[b0] * QC_0)
                                     + (delta[b1][c0] * delta[d0][d1] + delta[b1][d0] * delta[c0][d1] + delta[b1][d1] * delta[c0][d0]) * (PQ[a0] * PQ[a1] * PQ[b0] * QC_1)
@@ -37118,13 +37883,13 @@ computeExchangeFockDDDD18(double*         mat_K,
                                     + delta[a0][a1] * delta[c0][c1] * (PQ[b0] * PQ[b1] * PQ[d0] * QD_1 + PQ[b0] * PQ[b1] * PQ[d1] * QD_0 + PQ[b0] * PQ[b1] * QD_0 * QD_1)
                                     + (delta[a0][c0] * delta[a1][c1] + delta[a0][c1] * delta[a1][c0]) * (PQ[b0] * PQ[b1] * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[4] * (
-        
+
                                 + 0.5 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * PQ[c1] * (-1.0) + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c0] * PQ[c1] * (-1.0) + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] * PQ[c1] * (-1.0) + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[c1] * (-1.0))
                                     + delta[c1][d1] * (PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * PQ[d0] * (-1.0) + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c0] * PQ[d0] * (-1.0) + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] * PQ[d0] * (-1.0) + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[d0] * (-1.0))
@@ -37155,7 +37920,7 @@ computeExchangeFockDDDD18(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                     + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             );
@@ -37225,11 +37990,12 @@ computeExchangeFockDDDD19(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -37239,6 +38005,7 @@ computeExchangeFockDDDD19(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -37272,12 +38039,19 @@ computeExchangeFockDDDD19(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -37289,8 +38063,8 @@ computeExchangeFockDDDD19(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -37306,7 +38080,23 @@ computeExchangeFockDDDD19(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -37335,25 +38125,15 @@ computeExchangeFockDDDD19(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -37381,19 +38161,14 @@ computeExchangeFockDDDD19(double*         mat_K,
                         F8_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[4] * (
-        
+
                                 + 0.5 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[c1] + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * QC_1 + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c1] * QC_0 + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c0] * QC_1 + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c1] * QC_0 + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c0] * PQ[c1] + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c0] * QC_1 + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c1] * QC_0 + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * PQ[c1] + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * QC_1 + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c1] * QC_0 + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[c1] + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * QC_1 + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c1] * QC_0 + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c1] * QC_0)
                                     + delta[c1][d1] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[d0] + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * QD_0 + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[d0] * QC_0 + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0] + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c0] * QD_0 + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[d0] * QC_0 + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c0] * PQ[d0] + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c0] * QD_0 + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[d0] * QC_0 + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0] + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * QD_0 + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[d0] * QC_0 + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[d0] + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * QD_0 + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[d0] * QC_0 + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[d0] * QC_0)
@@ -37424,7 +38199,7 @@ computeExchangeFockDDDD19(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PB_1 * PQ[a1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PA_1 * PQ[b1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0) + PB_1 * PA_1 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 + PB_1 * PA_1 * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 + PB_1 * PA_1 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 + PB_1 * PA_1 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0)
                                     + delta[a0][a1] * (PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PB_0 * PQ[b1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PB_1 * PQ[b0] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0) + PB_0 * PB_1 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 + PB_0 * PB_1 * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 + PB_0 * PB_1 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 + PB_0 * PB_1 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0)
                                 )
-        
+
                             )
 
                             );
@@ -37494,11 +38269,12 @@ computeExchangeFockDDDD20(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -37508,6 +38284,7 @@ computeExchangeFockDDDD20(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -37541,12 +38318,19 @@ computeExchangeFockDDDD20(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -37558,8 +38342,8 @@ computeExchangeFockDDDD20(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -37575,7 +38359,23 @@ computeExchangeFockDDDD20(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -37604,25 +38404,15 @@ computeExchangeFockDDDD20(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -37650,19 +38440,14 @@ computeExchangeFockDDDD20(double*         mat_K,
                         F8_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[4] * (
-        
+
                                 + 0.5 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * QC_1 * (-1.0) + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c1] * QC_0 * (-1.0) + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * QC_1 * (-1.0) + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c1] * QC_0 * (-1.0) + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * QC_0 * QC_1 * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c1] * QC_0 * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * QC_0 * QC_1 * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c1] * QC_0 * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * QC_0 * QC_1 * (-1.0))
                                     + delta[c1][d1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * QD_0 * QC_0 * (-1.0) + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * QD_0 * QC_0 * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * QD_0 * QC_0 * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * QD_0 * QC_0 * (-1.0))
@@ -37693,7 +38478,7 @@ computeExchangeFockDDDD20(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PQ[a1] * PQ[c0] * PQ[c1] * QD_0 * QD_1 * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * PQ[d0] * QD_1 * QC_1 * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * PQ[d1] * QD_0 * QC_1 * (-1.0) + PB_1 * PQ[a1] * PQ[c1] * PQ[d0] * QD_1 * QC_0 * (-1.0) + PB_1 * PQ[a1] * PQ[c1] * PQ[d1] * QD_0 * QC_0 * (-1.0) + PB_1 * PQ[a1] * PQ[d0] * PQ[d1] * QC_0 * QC_1 * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * QD_1 * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * PQ[d0] * QD_1 * QC_1 * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * PQ[d1] * QD_0 * QC_1 * (-1.0) + PA_1 * PQ[b1] * PQ[c1] * PQ[d0] * QD_1 * QC_0 * (-1.0) + PA_1 * PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0 * (-1.0) + PA_1 * PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1 * (-1.0) + PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PQ[a1] * PQ[b1] * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PQ[a1] * PQ[b1] * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PQ[a1] * PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PQ[a1] * PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                     + delta[a0][a1] * (PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * QD_1 * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * PQ[d0] * QD_1 * QC_1 * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * PQ[d1] * QD_0 * QC_1 * (-1.0) + PB_0 * PQ[b1] * PQ[c1] * PQ[d0] * QD_1 * QC_0 * (-1.0) + PB_0 * PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0 * (-1.0) + PB_0 * PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * QD_0 * QD_1 * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * PQ[d0] * QD_1 * QC_1 * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * PQ[d1] * QD_0 * QC_1 * (-1.0) + PB_1 * PQ[b0] * PQ[c1] * PQ[d0] * QD_1 * QC_0 * (-1.0) + PB_1 * PQ[b0] * PQ[c1] * PQ[d1] * QD_0 * QC_0 * (-1.0) + PB_1 * PQ[b0] * PQ[d0] * PQ[d1] * QC_0 * QC_1 * (-1.0) + PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PQ[b0] * PQ[b1] * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PQ[b0] * PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             );
@@ -37763,11 +38548,12 @@ computeExchangeFockDDDD21(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -37777,6 +38563,7 @@ computeExchangeFockDDDD21(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -37810,12 +38597,19 @@ computeExchangeFockDDDD21(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -37827,8 +38621,8 @@ computeExchangeFockDDDD21(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;//, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -37844,7 +38638,23 @@ computeExchangeFockDDDD21(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            //rij[0] = r_j[0] - r_i[0];
+            //rij[1] = r_j[1] - r_i[1];
+            //rij[2] = r_j[2] - r_i[2];
+
+            //PA_0 = (a_j * inv_S1) * rij[a0];
+            //PA_1 = (a_j * inv_S1) * rij[a1];
+            //PB_0 = (-a_i * inv_S1) * rij[b0];
+            //PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -37873,25 +38683,15 @@ computeExchangeFockDDDD21(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -37919,19 +38719,14 @@ computeExchangeFockDDDD21(double*         mat_K,
                         F8_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    // auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    // auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    // auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    // auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[4] * (
-        
+
                                 + 0.5 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * QC_0 * QC_1)
                                     + delta[c1][d1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * QD_0 * QC_0)
@@ -37962,7 +38757,7 @@ computeExchangeFockDDDD21(double*         mat_K,
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 + PQ[b0] * PQ[b1] * PQ[c1] * QD_0 * QD_1 * QC_0 + PQ[b0] * PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 + PQ[b0] * PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1)
                                     + delta[c0][c1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * QD_0 * QD_1)
                                 )
-        
+
                             )
 
                             );
@@ -38032,13 +38827,14 @@ computeExchangeFockDDDD22(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    //__shared__ double   delta[3][3];
+    __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -38046,6 +38842,7 @@ computeExchangeFockDDDD22(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -38053,9 +38850,9 @@ computeExchangeFockDDDD22(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -38079,12 +38876,19 @@ computeExchangeFockDDDD22(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -38096,8 +38900,8 @@ computeExchangeFockDDDD22(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -38113,7 +38917,23 @@ computeExchangeFockDDDD22(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -38142,25 +38962,15 @@ computeExchangeFockDDDD22(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -38188,24 +38998,19 @@ computeExchangeFockDDDD22(double*         mat_K,
                         F8_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     // auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     // auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     // auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     // auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[4] * (
-        
+
                                 + S1 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                 )
-        
+
                             )
 
                             );
@@ -38275,13 +39080,14 @@ computeExchangeFockDDDD23(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    //__shared__ double   delta[3][3];
+    __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -38289,6 +39095,7 @@ computeExchangeFockDDDD23(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -38296,9 +39103,9 @@ computeExchangeFockDDDD23(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -38322,12 +39129,19 @@ computeExchangeFockDDDD23(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -38339,8 +39153,8 @@ computeExchangeFockDDDD23(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -38356,7 +39170,23 @@ computeExchangeFockDDDD23(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -38385,25 +39215,15 @@ computeExchangeFockDDDD23(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -38431,19 +39251,14 @@ computeExchangeFockDDDD23(double*         mat_K,
                         F8_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[4] * (
-        
+
                                 + S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0)
@@ -38463,13 +39278,13 @@ computeExchangeFockDDDD23(double*         mat_K,
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0)
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[4] * (
-        
+
                                 + S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[c1] * QD_0 * QD_1
@@ -38509,13 +39324,13 @@ computeExchangeFockDDDD23(double*         mat_K,
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[4] * (
-        
+
                                 + S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
@@ -38535,18 +39350,18 @@ computeExchangeFockDDDD23(double*         mat_K,
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[4] * (
-        
+
                                 + S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * QD_0 * QD_1 * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             );
@@ -38616,11 +39431,12 @@ computeExchangeFockDDDD24(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -38630,6 +39446,7 @@ computeExchangeFockDDDD24(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -38663,12 +39480,19 @@ computeExchangeFockDDDD24(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -38680,8 +39504,8 @@ computeExchangeFockDDDD24(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -38697,7 +39521,23 @@ computeExchangeFockDDDD24(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -38726,25 +39566,15 @@ computeExchangeFockDDDD24(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -38773,29 +39603,24 @@ computeExchangeFockDDDD24(double*         mat_K,
                         F8_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[4] * (
-        
+
                                 + 0.0625 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][a1] * delta[b0][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][a1] * delta[b0][c0] * delta[b1][c1] * delta[d0][d1] + delta[a0][a1] * delta[b0][c0] * delta[b1][d0] * delta[c1][d1] + delta[a0][a1] * delta[b0][c0] * delta[b1][d1] * delta[c1][d0] + delta[a0][a1] * delta[b0][c1] * delta[b1][c0] * delta[d0][d1] + delta[a0][a1] * delta[b0][c1] * delta[b1][d0] * delta[c0][d1] + delta[a0][a1] * delta[b0][c1] * delta[b1][d1] * delta[c0][d0] + delta[a0][a1] * delta[b0][d0] * delta[b1][c0] * delta[c1][d1] + delta[a0][a1] * delta[b0][d0] * delta[b1][c1] * delta[c0][d1] + delta[a0][a1] * delta[b0][d0] * delta[b1][d1] * delta[c0][c1] + delta[a0][a1] * delta[b0][d1] * delta[b1][c0] * delta[c1][d0] + delta[a0][a1] * delta[b0][d1] * delta[b1][c1] * delta[c0][d0] + delta[a0][a1] * delta[b0][d1] * delta[b1][d0] * delta[c0][c1] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] * delta[d0][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] * delta[c1][d1] + delta[a0][b0] * delta[a1][b1] * delta[c0][d1] * delta[c1][d0] + delta[a0][b0] * delta[a1][c0] * delta[b1][c1] * delta[d0][d1] + delta[a0][b0] * delta[a1][c0] * delta[b1][d0] * delta[c1][d1] + delta[a0][b0] * delta[a1][c0] * delta[b1][d1] * delta[c1][d0] + delta[a0][b0] * delta[a1][c1] * delta[b1][c0] * delta[d0][d1] + delta[a0][b0] * delta[a1][c1] * delta[b1][d0] * delta[c0][d1] + delta[a0][b0] * delta[a1][c1] * delta[b1][d1] * delta[c0][d0] + delta[a0][b0] * delta[a1][d0] * delta[b1][c0] * delta[c1][d1] + delta[a0][b0] * delta[a1][d0] * delta[b1][c1] * delta[c0][d1] + delta[a0][b0] * delta[a1][d0] * delta[b1][d1] * delta[c0][c1] + delta[a0][b0] * delta[a1][d1] * delta[b1][c0] * delta[c1][d0] + delta[a0][b0] * delta[a1][d1] * delta[b1][c1] * delta[c0][d0] + delta[a0][b0] * delta[a1][d1] * delta[b1][d0] * delta[c0][c1] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1] * delta[d0][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0] * delta[c1][d1] + delta[a0][b1] * delta[a1][b0] * delta[c0][d1] * delta[c1][d0] + delta[a0][b1] * delta[a1][c0] * delta[b0][c1] * delta[d0][d1] + delta[a0][b1] * delta[a1][c0] * delta[b0][d0] * delta[c1][d1] + delta[a0][b1] * delta[a1][c0] * delta[b0][d1] * delta[c1][d0] + delta[a0][b1] * delta[a1][c1] * delta[b0][c0] * delta[d0][d1] + delta[a0][b1] * delta[a1][c1] * delta[b0][d0] * delta[c0][d1] + delta[a0][b1] * delta[a1][c1] * delta[b0][d1] * delta[c0][d0] + delta[a0][b1] * delta[a1][d0] * delta[b0][c0] * delta[c1][d1] + delta[a0][b1] * delta[a1][d0] * delta[b0][c1] * delta[c0][d1] + delta[a0][b1] * delta[a1][d0] * delta[b0][d1] * delta[c0][c1] + delta[a0][b1] * delta[a1][d1] * delta[b0][c0] * delta[c1][d0] + delta[a0][b1] * delta[a1][d1] * delta[b0][c1] * delta[c0][d0] + delta[a0][b1] * delta[a1][d1] * delta[b0][d0] * delta[c0][c1] + delta[a0][c0] * delta[a1][b0] * delta[b1][c1] * delta[d0][d1] + delta[a0][c0] * delta[a1][b0] * delta[b1][d0] * delta[c1][d1] + delta[a0][c0] * delta[a1][b0] * delta[b1][d1] * delta[c1][d0] + delta[a0][c0] * delta[a1][b1] * delta[b0][c1] * delta[d0][d1] + delta[a0][c0] * delta[a1][b1] * delta[b0][d0] * delta[c1][d1] + delta[a0][c0] * delta[a1][b1] * delta[b0][d1] * delta[c1][d0] + delta[a0][c0] * delta[a1][c1] * delta[b0][b1] * delta[d0][d1] + delta[a0][c0] * delta[a1][c1] * delta[b0][d0] * delta[b1][d1] + delta[a0][c0] * delta[a1][c1] * delta[b0][d1] * delta[b1][d0] + delta[a0][c0] * delta[a1][d0] * delta[b0][b1] * delta[c1][d1] + delta[a0][c0] * delta[a1][d0] * delta[b0][c1] * delta[b1][d1] + delta[a0][c0] * delta[a1][d0] * delta[b0][d1] * delta[b1][c1] + delta[a0][c0] * delta[a1][d1] * delta[b0][b1] * delta[c1][d0] + delta[a0][c0] * delta[a1][d1] * delta[b0][c1] * delta[b1][d0] + delta[a0][c0] * delta[a1][d1] * delta[b0][d0] * delta[b1][c1] + delta[a0][c1] * delta[a1][b0] * delta[b1][c0] * delta[d0][d1] + delta[a0][c1] * delta[a1][b0] * delta[b1][d0] * delta[c0][d1] + delta[a0][c1] * delta[a1][b0] * delta[b1][d1] * delta[c0][d0] + delta[a0][c1] * delta[a1][b1] * delta[b0][c0] * delta[d0][d1] + delta[a0][c1] * delta[a1][b1] * delta[b0][d0] * delta[c0][d1] + delta[a0][c1] * delta[a1][b1] * delta[b0][d1] * delta[c0][d0] + delta[a0][c1] * delta[a1][c0] * delta[b0][b1] * delta[d0][d1] + delta[a0][c1] * delta[a1][c0] * delta[b0][d0] * delta[b1][d1] + delta[a0][c1] * delta[a1][c0] * delta[b0][d1] * delta[b1][d0] + delta[a0][c1] * delta[a1][d0] * delta[b0][b1] * delta[c0][d1] + delta[a0][c1] * delta[a1][d0] * delta[b0][c0] * delta[b1][d1] + delta[a0][c1] * delta[a1][d0] * delta[b0][d1] * delta[b1][c0] + delta[a0][c1] * delta[a1][d1] * delta[b0][b1] * delta[c0][d0] + delta[a0][c1] * delta[a1][d1] * delta[b0][c0] * delta[b1][d0] + delta[a0][c1] * delta[a1][d1] * delta[b0][d0] * delta[b1][c0] + delta[a0][d0] * delta[a1][b0] * delta[b1][c0] * delta[c1][d1] + delta[a0][d0] * delta[a1][b0] * delta[b1][c1] * delta[c0][d1] + delta[a0][d0] * delta[a1][b0] * delta[b1][d1] * delta[c0][c1] + delta[a0][d0] * delta[a1][b1] * delta[b0][c0] * delta[c1][d1] + delta[a0][d0] * delta[a1][b1] * delta[b0][c1] * delta[c0][d1] + delta[a0][d0] * delta[a1][b1] * delta[b0][d1] * delta[c0][c1] + delta[a0][d0] * delta[a1][c0] * delta[b0][b1] * delta[c1][d1] + delta[a0][d0] * delta[a1][c0] * delta[b0][c1] * delta[b1][d1] + delta[a0][d0] * delta[a1][c0] * delta[b0][d1] * delta[b1][c1] + delta[a0][d0] * delta[a1][c1] * delta[b0][b1] * delta[c0][d1] + delta[a0][d0] * delta[a1][c1] * delta[b0][c0] * delta[b1][d1] + delta[a0][d0] * delta[a1][c1] * delta[b0][d1] * delta[b1][c0] + delta[a0][d0] * delta[a1][d1] * delta[b0][b1] * delta[c0][c1] + delta[a0][d0] * delta[a1][d1] * delta[b0][c0] * delta[b1][c1] + delta[a0][d0] * delta[a1][d1] * delta[b0][c1] * delta[b1][c0] + delta[a0][d1] * delta[a1][b0] * delta[b1][c0] * delta[c1][d0] + delta[a0][d1] * delta[a1][b0] * delta[b1][c1] * delta[c0][d0] + delta[a0][d1] * delta[a1][b0] * delta[b1][d0] * delta[c0][c1] + delta[a0][d1] * delta[a1][b1] * delta[b0][c0] * delta[c1][d0] + delta[a0][d1] * delta[a1][b1] * delta[b0][c1] * delta[c0][d0] + delta[a0][d1] * delta[a1][b1] * delta[b0][d0] * delta[c0][c1] + delta[a0][d1] * delta[a1][c0] * delta[b0][b1] * delta[c1][d0] + delta[a0][d1] * delta[a1][c0] * delta[b0][c1] * delta[b1][d0] + delta[a0][d1] * delta[a1][c0] * delta[b0][d0] * delta[b1][c1] + delta[a0][d1] * delta[a1][c1] * delta[b0][b1] * delta[c0][d0] + delta[a0][d1] * delta[a1][c1] * delta[b0][c0] * delta[b1][d0] + delta[a0][d1] * delta[a1][c1] * delta[b0][d0] * delta[b1][c0] + delta[a0][d1] * delta[a1][d0] * delta[b0][b1] * delta[c0][c1] + delta[a0][d1] * delta[a1][d0] * delta[b0][c0] * delta[b1][c1] + delta[a0][d1] * delta[a1][d0] * delta[b0][c1] * delta[b1][c0])
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[5] * (
-        
+
                                 (-0.125) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d0][d1] + delta[b0][b1] * delta[c0][d0] * delta[c1][d1] + delta[b0][b1] * delta[c0][d1] * delta[c1][d0] + delta[b0][c0] * delta[b1][c1] * delta[d0][d1] + delta[b0][c0] * delta[b1][d0] * delta[c1][d1] + delta[b0][c0] * delta[b1][d1] * delta[c1][d0] + delta[b0][c1] * delta[b1][c0] * delta[d0][d1] + delta[b0][c1] * delta[b1][d0] * delta[c0][d1] + delta[b0][c1] * delta[b1][d1] * delta[c0][d0] + delta[b0][d0] * delta[b1][c0] * delta[c1][d1] + delta[b0][d0] * delta[b1][c1] * delta[c0][d1] + delta[b0][d0] * delta[b1][d1] * delta[c0][c1] + delta[b0][d1] * delta[b1][c0] * delta[c1][d0] + delta[b0][d1] * delta[b1][c1] * delta[c0][d0] + delta[b0][d1] * delta[b1][d0] * delta[c0][c1]) * (PQ[a0] * PQ[a1])
                                     + (delta[a1][b1] * delta[c0][c1] * delta[d0][d1] + delta[a1][b1] * delta[c0][d0] * delta[c1][d1] + delta[a1][b1] * delta[c0][d1] * delta[c1][d0] + delta[a1][c0] * delta[b1][c1] * delta[d0][d1] + delta[a1][c0] * delta[b1][d0] * delta[c1][d1] + delta[a1][c0] * delta[b1][d1] * delta[c1][d0] + delta[a1][c1] * delta[b1][c0] * delta[d0][d1] + delta[a1][c1] * delta[b1][d0] * delta[c0][d1] + delta[a1][c1] * delta[b1][d1] * delta[c0][d0] + delta[a1][d0] * delta[b1][c0] * delta[c1][d1] + delta[a1][d0] * delta[b1][c1] * delta[c0][d1] + delta[a1][d0] * delta[b1][d1] * delta[c0][c1] + delta[a1][d1] * delta[b1][c0] * delta[c1][d0] + delta[a1][d1] * delta[b1][c1] * delta[c0][d0] + delta[a1][d1] * delta[b1][d0] * delta[c0][c1]) * (PQ[a0] * PQ[b0])
@@ -38826,13 +39651,13 @@ computeExchangeFockDDDD24(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][a1] * delta[b0][c0] * delta[b1][d0] + delta[a0][a1] * delta[b0][d0] * delta[b1][c0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][c0] * delta[b1][d0] + delta[a0][b0] * delta[a1][d0] * delta[b1][c0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0] + delta[a0][b1] * delta[a1][c0] * delta[b0][d0] + delta[a0][b1] * delta[a1][d0] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][d0] + delta[a0][c0] * delta[a1][b1] * delta[b0][d0] + delta[a0][c0] * delta[a1][d0] * delta[b0][b1] + delta[a0][d0] * delta[a1][b0] * delta[b1][c0] + delta[a0][d0] * delta[a1][b1] * delta[b0][c0] + delta[a0][d0] * delta[a1][c0] * delta[b0][b1]) * (PQ[c1] * PQ[d1])
                                     + (delta[a0][a1] * delta[b0][b1] * delta[c0][c1] + delta[a0][a1] * delta[b0][c0] * delta[b1][c1] + delta[a0][a1] * delta[b0][c1] * delta[b1][c0] + delta[a0][b0] * delta[a1][b1] * delta[c0][c1] + delta[a0][b0] * delta[a1][c0] * delta[b1][c1] + delta[a0][b0] * delta[a1][c1] * delta[b1][c0] + delta[a0][b1] * delta[a1][b0] * delta[c0][c1] + delta[a0][b1] * delta[a1][c0] * delta[b0][c1] + delta[a0][b1] * delta[a1][c1] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][c1] + delta[a0][c0] * delta[a1][b1] * delta[b0][c1] + delta[a0][c0] * delta[a1][c1] * delta[b0][b1] + delta[a0][c1] * delta[a1][b0] * delta[b1][c0] + delta[a0][c1] * delta[a1][b1] * delta[b0][c0] + delta[a0][c1] * delta[a1][c0] * delta[b0][b1]) * (PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[5] * (
-        
+
                                 + 0.25 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] + PA_1 * PQ[a0] * PQ[b0] * PQ[b1])
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PB_0 * PQ[a0] * PQ[a1] * PQ[c0] + PA_0 * PQ[a1] * PQ[b0] * PQ[c0] + PA_1 * PQ[a0] * PQ[b0] * PQ[c0])
@@ -38941,13 +39766,13 @@ computeExchangeFockDDDD24(double*         mat_K,
                                     + (delta[a0][c0] * delta[a1][d0] + delta[a0][d0] * delta[a1][c0]) * (PB_0 * PQ[b1] * PQ[c1] * PQ[d1] + PB_1 * PQ[b0] * PQ[c1] * PQ[d1])
                                     + (delta[a0][c0] * delta[a1][c1] + delta[a0][c1] * delta[a1][c0]) * (PB_0 * PQ[b1] * PQ[d0] * PQ[d1] + PB_1 * PQ[b0] * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[5] * (
-        
+
                                 + 0.25 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * (-2.0))
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * (-1.0) + PQ[a0] * PQ[a1] * PQ[b0] * QC_0 * (-1.0))
@@ -39056,13 +39881,13 @@ computeExchangeFockDDDD24(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[b1] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PQ[b1] * PQ[d0] * PQ[d1] * QC_1 * (-1.0))
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0))
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[5] * (
-        
+
                                 + 0.5 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[c1] * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c0] * PQ[c1] * (-1.0) + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * PQ[c1] * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[c1] * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * (-1.0))
                                     + delta[c1][d1] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[d0] * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0] * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c0] * PQ[d0] * (-1.0) + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0] * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[d0] * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * (-1.0))
@@ -39093,13 +39918,13 @@ computeExchangeFockDDDD24(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1] * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1] + PA_1 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                     + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1] * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1] + PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[5] * (
-        
+
                                 + 0.5 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * QC_1 + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c1] * QC_0 + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * PQ[c1] + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * QC_1 + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c1] * QC_0 + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c1] * QC_0 + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c1] * QC_0)
                                     + delta[c1][d1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0] + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * QD_0 + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[d0] * QC_0 + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0] + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * QD_0 + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[d0] * QC_0 + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0)
@@ -39130,7 +39955,7 @@ computeExchangeFockDDDD24(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PQ[a1] * PQ[b1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 + PB_1 * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 + PB_1 * PQ[a1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 + PB_1 * PQ[a1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 + PA_1 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 + PA_1 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 + PA_1 * PQ[b1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 + PA_1 * PQ[b1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0)
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0) + PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 * (-1.0) + PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0) + PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 + PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 + PB_0 * PQ[b1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 + PB_0 * PQ[b1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 + PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 + PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 + PB_1 * PQ[b0] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 + PB_1 * PQ[b0] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0)
                                 )
-        
+
                             )
 
                             );
@@ -39200,11 +40025,12 @@ computeExchangeFockDDDD25(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -39214,6 +40040,7 @@ computeExchangeFockDDDD25(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -39247,12 +40074,19 @@ computeExchangeFockDDDD25(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -39264,8 +40098,8 @@ computeExchangeFockDDDD25(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;//, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -39281,7 +40115,23 @@ computeExchangeFockDDDD25(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            //rij[0] = r_j[0] - r_i[0];
+            //rij[1] = r_j[1] - r_i[1];
+            //rij[2] = r_j[2] - r_i[2];
+
+            //PA_0 = (a_j * inv_S1) * rij[a0];
+            //PA_1 = (a_j * inv_S1) * rij[a1];
+            //PB_0 = (-a_i * inv_S1) * rij[b0];
+            //PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -39310,25 +40160,15 @@ computeExchangeFockDDDD25(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -39357,19 +40197,14 @@ computeExchangeFockDDDD25(double*         mat_K,
                         F8_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    // auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    // auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    // auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    // auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[5] * (
-        
+
                                 + (-0.5) * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c1] * QC_0 + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * QC_0 * QC_1)
                                     + delta[c1][d1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * QD_0 * QC_0)
@@ -39400,7 +40235,7 @@ computeExchangeFockDDDD25(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PQ[a1] * PQ[b1] * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PQ[a1] * PQ[b1] * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PQ[a1] * PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PQ[a1] * PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * QD_1 + PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * QD_1 * QC_1 + PQ[b0] * PQ[b1] * PQ[c0] * PQ[d1] * QD_0 * QC_1 + PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] * QD_1 * QC_0 + PQ[b0] * PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0 + PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1)
                                 )
-        
+
                             )
 
                             );
@@ -39470,13 +40305,14 @@ computeExchangeFockDDDD26(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    //__shared__ double   delta[3][3];
+    __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -39484,6 +40320,7 @@ computeExchangeFockDDDD26(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -39491,9 +40328,9 @@ computeExchangeFockDDDD26(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -39517,12 +40354,19 @@ computeExchangeFockDDDD26(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -39534,8 +40378,8 @@ computeExchangeFockDDDD26(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -39551,7 +40395,23 @@ computeExchangeFockDDDD26(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -39580,25 +40440,15 @@ computeExchangeFockDDDD26(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -39627,19 +40477,14 @@ computeExchangeFockDDDD26(double*         mat_K,
                         F8_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     // auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     // auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     // auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     // auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[5] * (
-        
+
                                 + S1 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
@@ -39647,7 +40492,7 @@ computeExchangeFockDDDD26(double*         mat_K,
                                     + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                     + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                 )
-        
+
                             )
 
                             );
@@ -39717,13 +40562,14 @@ computeExchangeFockDDDD27(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    //__shared__ double   delta[3][3];
+    __shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -39731,6 +40577,7 @@ computeExchangeFockDDDD27(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -39738,9 +40585,9 @@ computeExchangeFockDDDD27(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -39764,12 +40611,19 @@ computeExchangeFockDDDD27(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -39781,8 +40635,8 @@ computeExchangeFockDDDD27(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -39798,7 +40652,23 @@ computeExchangeFockDDDD27(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -39827,25 +40697,15 @@ computeExchangeFockDDDD27(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -39874,19 +40734,14 @@ computeExchangeFockDDDD27(double*         mat_K,
                         F8_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[5] * (
-        
+
                                 + S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0)
@@ -39914,13 +40769,13 @@ computeExchangeFockDDDD27(double*         mat_K,
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0)
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[5] * (
-        
+
                                 + S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * QD_1
@@ -39948,7 +40803,7 @@ computeExchangeFockDDDD27(double*         mat_K,
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             );
@@ -40018,11 +40873,12 @@ computeExchangeFockDDDD28(double*         mat_K,
                         const double    eri_threshold)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -40032,6 +40888,7 @@ computeExchangeFockDDDD28(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
         d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
@@ -40065,12 +40922,19 @@ computeExchangeFockDDDD28(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
             count_i = 0;
             count_k = 0;
         }
+
     }
 
     __syncthreads();
@@ -40082,8 +40946,8 @@ computeExchangeFockDDDD28(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -40099,7 +40963,23 @@ computeExchangeFockDDDD28(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -40128,25 +41008,15 @@ computeExchangeFockDDDD28(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -40178,19 +41048,14 @@ computeExchangeFockDDDD28(double*         mat_K,
                         F8_t[8] *= d2 * d2 * d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
                             F8_t[5] * (
-        
+
                                 + S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * QD_1 * QC_1 * (-1.0)
@@ -40198,13 +41063,13 @@ computeExchangeFockDDDD28(double*         mat_K,
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[d0] * QD_1 * QC_0 * QC_1 * (-1.0)
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[d1] * QD_0 * QC_0 * QC_1 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[6] * (
-        
+
                                 0.5 * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * (-1.0) + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * PQ[c1] * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * (-1.0))
                                     + delta[c1][d1] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0] * (-1.0) + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0] * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * (-1.0))
@@ -40235,13 +41100,13 @@ computeExchangeFockDDDD28(double*         mat_K,
                                     + delta[a0][b0] * (PB_1 * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1] * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1] * (-1.0) + PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                     + delta[a0][a1] * (PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1] * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1] * (-1.0) + PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[6] * (
-        
+
                                 + 0.5 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c1] * QC_0)
                                     + delta[c1][d1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0)
@@ -40272,13 +41137,13 @@ computeExchangeFockDDDD28(double*         mat_K,
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 + PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 + PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 + PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0)
                                     + delta[c0][c1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[d0] * QD_1 + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[d1] * QD_0)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[6] * (
-        
+
                                 + S1 * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
@@ -40288,13 +41153,13 @@ computeExchangeFockDDDD28(double*         mat_K,
                                     + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                     + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[6] * (
-        
+
                                 + S1 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 * (-1.0)
@@ -40314,13 +41179,13 @@ computeExchangeFockDDDD28(double*         mat_K,
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 * (-1.0)
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0 * (-1.0)
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[6] * (
-        
+
                                 + S1 * S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 * QD_1
@@ -40330,13 +41195,13 @@ computeExchangeFockDDDD28(double*         mat_K,
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c1] * PQ[d1] * QD_0 * QC_0
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] * QC_0 * QC_1
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[6] * (
-        
+
                                 + 0.25 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1])
                                     + (delta[b1][c1] * delta[d0][d1] + delta[b1][d0] * delta[c1][d1] + delta[b1][d1] * delta[c1][d0]) * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0])
@@ -40409,13 +41274,13 @@ computeExchangeFockDDDD28(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[b1] * PQ[c1] * PQ[d0] * PQ[d1])
                                     + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[7] * (
-        
+
                                 (-0.5) * S1 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[d0][d1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1])
                                     + delta[c1][d1] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0])
@@ -40446,13 +41311,13 @@ computeExchangeFockDDDD28(double*         mat_K,
                                     + delta[a0][b0] * (PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                     + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[7] * (
-        
+
                                 + S1 * S1 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     
                                     + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
@@ -40460,30 +41325,30 @@ computeExchangeFockDDDD28(double*         mat_K,
                                     + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                     + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[7] * (
-        
+
                                 + (-1.0) * S1 * S1 * S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * QD_1
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d1] * QD_0
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * PQ[d1] * QC_1
                                     + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] * PQ[d1] * QC_0
                                 )
-        
+
                             )
 
                             +
 
                             F8_t[8] * (
-        
+
                                 S1 * S1 * S1 * S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1]
                                 )
-        
+
                             )
 
                             );
@@ -40531,10 +41396,8 @@ computeExchangeFockDDDD28(double*         mat_K,
         mat_K[ik] += K_ik;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDP(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -40552,7 +41415,6 @@ computeExchangeFockDPDP(double*         mat_K,
                         const uint32_t* pair_displs_K_dp,
                         const uint32_t* pair_counts_K_dp,
                         const double*   pair_data_K_dp,
-
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -40564,6 +41426,7 @@ computeExchangeFockDPDP(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -40607,6 +41470,12 @@ computeExchangeFockDPDP(double*         mat_K,
             r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
             r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
             r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+
+            a0 = d_cart_inds[i % 6][0];
+            a1 = d_cart_inds[i % 6][1];
+            c0 = d_cart_inds[k % 6][0];
+            c1 = d_cart_inds[k % 6][1];
+
         }
         else
         {
@@ -40624,8 +41493,8 @@ computeExchangeFockDPDP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
         {
@@ -40641,7 +41510,21 @@ computeExchangeFockDPDP(double*         mat_K,
             r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
             r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_dp[displ_i + j];
+
+            b0 = j_prim % 3;
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_1 = (a_j * inv_S1) * rij[a1];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -40670,23 +41553,14 @@ computeExchangeFockDPDP(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
-                    const auto a0 = d_cart_inds[i % 6][0];
-                    const auto a1 = d_cart_inds[i % 6][1];
-                    const auto b0 = j_prim % 3;
-                    const auto c0 = d_cart_inds[k % 6][0];
-                    const auto c1 = d_cart_inds[k % 6][1];
                     const auto d0 = l_prim % 3;
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -40716,9 +41590,6 @@ computeExchangeFockDPDP(double*         mat_K,
                         F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PA_1 = (a_j * inv_S1) * rij[a1];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QC_1 = (a_l * inv_S2) * rkl[c1];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -41313,7 +42184,6 @@ computeExchangeFockDPDP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPD(double*         mat_K,
-
                         const uint32_t* pair_inds_i_for_K_pp,
                         const uint32_t* pair_inds_k_for_K_pp,
                         const uint32_t  pair_inds_count_for_K_pp,
@@ -41331,7 +42201,6 @@ computeExchangeFockPDPD(double*         mat_K,
                         const uint32_t* pair_displs_K_pd,
                         const uint32_t* pair_counts_K_pd,
                         const double*   pair_data_K_pd,
-
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -41343,6 +42212,7 @@ computeExchangeFockPDPD(double*         mat_K,
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
+    __shared__ uint32_t a0, c0;
     __shared__ uint32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
@@ -41386,6 +42256,10 @@ computeExchangeFockPDPD(double*         mat_K,
             r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
             r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
             r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+
+            a0 = i % 3;
+            c0 = k % 3;
+
         }
         else
         {
@@ -41403,8 +42277,8 @@ computeExchangeFockPDPD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00;
-        uint32_t j_prim, j_cgto;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
         {
@@ -41420,7 +42294,22 @@ computeExchangeFockPDPD(double*         mat_K,
             r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
             r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
 
+            S1 = a_i + a_j;
+            inv_S1 = 1.0 / S1;
+
             S_ij_00 = pair_data_K_pd[displ_i + j];
+
+            b0 = d_cart_inds[j_prim % 6][0];
+            b1 = d_cart_inds[j_prim % 6][1];
+
+            rij[0] = r_j[0] - r_i[0];
+            rij[1] = r_j[1] - r_i[1];
+            rij[2] = r_j[2] - r_i[2];
+
+            PA_0 = (a_j * inv_S1) * rij[a0];
+            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_1 = (-a_i * inv_S1) * rij[b1];
+
         }
 
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
@@ -41449,23 +42338,15 @@ computeExchangeFockPDPD(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_pd[displ_k + l];
 
-                    const auto a0 = i % 3;
-                    const auto b0 = d_cart_inds[j_prim % 6][0];
-                    const auto b1 = d_cart_inds[j_prim % 6][1];
-                    const auto c0 = k % 3;
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
                     const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                    const auto S1 = a_i + a_j;
                     const auto S2 = a_k + a_l;
 
-                    const auto inv_S1 = 1.0 / S1;
                     const auto inv_S2 = 1.0 / S2;
                     const auto inv_S4 = 1.0 / (S1 + S2);
 
@@ -41495,9 +42376,6 @@ computeExchangeFockPDPD(double*         mat_K,
                         F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto PA_0 = (a_j * inv_S1) * rij[a0];
-                    const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-                    const auto PB_1 = (-a_i * inv_S1) * rij[b1];
                     const auto QC_0 = (a_l * inv_S2) * rkl[c0];
                     const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
                     const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
