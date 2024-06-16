@@ -7165,7 +7165,7 @@ computeCoulombFockDDPD10(double*         mat_J,
     __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -7185,9 +7185,9 @@ computeCoulombFockDDPD10(double*         mat_J,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
     }
 
@@ -14632,7 +14632,7 @@ computeCoulombFockDDDD23(double*         mat_J,
     __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -14652,9 +14652,9 @@ computeCoulombFockDDDD23(double*         mat_J,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
     }
 
@@ -14825,7 +14825,7 @@ computeCoulombFockDDDD24(double*         mat_J,
     __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -14845,9 +14845,9 @@ computeCoulombFockDDDD24(double*         mat_J,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
     }
 
@@ -16050,7 +16050,7 @@ computeCoulombFockDDDD28(double*         mat_J,
     __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -16070,9 +16070,9 @@ computeCoulombFockDDDD28(double*         mat_J,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
     }
 
@@ -16246,7 +16246,7 @@ computeCoulombFockDDDD29(double*         mat_J,
     __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -16266,9 +16266,9 @@ computeCoulombFockDDDD29(double*         mat_J,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
     }
 
@@ -16766,7 +16766,7 @@ computeCoulombFockDDDD31(double*         mat_J,
     __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -16786,9 +16786,9 @@ computeCoulombFockDDDD31(double*         mat_J,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
     }
 
@@ -22663,7 +22663,7 @@ computeCoulombFockPDDD8(double*         mat_J,
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -22683,9 +22683,9 @@ computeCoulombFockPDDD8(double*         mat_J,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
     }
 

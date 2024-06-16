@@ -18135,7 +18135,7 @@ computeExchangeFockPDDD4(double*         mat_K,
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -18151,9 +18151,9 @@ computeExchangeFockPDDD4(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_pd)
         {
@@ -19183,7 +19183,7 @@ computeExchangeFockPDDD7(double*         mat_K,
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -19199,9 +19199,9 @@ computeExchangeFockPDDD7(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_pd)
         {
@@ -19464,7 +19464,7 @@ computeExchangeFockPDDD8(double*         mat_K,
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -19480,9 +19480,9 @@ computeExchangeFockPDDD8(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_pd)
         {
@@ -25776,7 +25776,7 @@ computeExchangeFockDPDD5(double*         mat_K,
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -25792,9 +25792,9 @@ computeExchangeFockDPDD5(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -26576,7 +26576,7 @@ computeExchangeFockDPDD7(double*         mat_K,
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -26592,9 +26592,9 @@ computeExchangeFockDPDD7(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -36906,7 +36906,7 @@ computeExchangeFockDDDD17(double*         mat_K,
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -36922,9 +36922,9 @@ computeExchangeFockDDDD17(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -38834,7 +38834,7 @@ computeExchangeFockDDDD22(double*         mat_K,
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -38850,9 +38850,9 @@ computeExchangeFockDDDD22(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -39087,7 +39087,7 @@ computeExchangeFockDDDD23(double*         mat_K,
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -39103,9 +39103,9 @@ computeExchangeFockDDDD23(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -40312,7 +40312,7 @@ computeExchangeFockDDDD26(double*         mat_K,
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -40328,9 +40328,9 @@ computeExchangeFockDDDD26(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
@@ -40569,7 +40569,7 @@ computeExchangeFockDDDD27(double*         mat_K,
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t a0, a1, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -40585,9 +40585,9 @@ computeExchangeFockDDDD27(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ik < pair_inds_count_for_K_dd)
         {
