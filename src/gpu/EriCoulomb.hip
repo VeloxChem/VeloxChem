@@ -58,8 +58,16 @@ computeCoulombFockSSSS(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     uint32_t i, j;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+    }
+
+    __syncthreads();
 
     if (ij < ss_prim_pair_count_local)
     {
@@ -78,16 +86,12 @@ computeCoulombFockSSSS(double*         mat_J,
         r_j[1] = s_prim_info[j + s_prim_count * 3];
         r_j[2] = s_prim_info[j + s_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = ss_pair_data_local[ij];
-    }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
 
     }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -112,21 +116,19 @@ computeCoulombFockSSSS(double*         mat_J,
 
             const auto S_kl_00 = ss_pair_data[kl];
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
             // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            // auto inv_S1 = 1.0 / S1;
-            // auto inv_S2 = 1.0 / S2;
+            const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -212,8 +214,16 @@ computeCoulombFockSSSP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     uint32_t i, j;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+    }
+
+    __syncthreads();
 
     if (ij < ss_prim_pair_count_local)
     {
@@ -232,16 +242,12 @@ computeCoulombFockSSSP(double*         mat_J,
         r_j[1] = s_prim_info[j + s_prim_count * 3];
         r_j[2] = s_prim_info[j + s_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = ss_pair_data_local[ij];
-    }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
 
     }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (sp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -269,22 +275,19 @@ computeCoulombFockSSSP(double*         mat_J,
             const auto d0 = l % 3;
 
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
             // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            // auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -381,28 +384,8 @@ computeCoulombFockSSSD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     uint32_t i, j;
-
-    if (ij < ss_prim_pair_count_local)
-    {
-        i = ss_first_inds_local[ij];
-        j = ss_second_inds_local[ij];
-
-        a_i = s_prim_info[i + s_prim_count * 0];
-
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
-
-        a_j = s_prim_info[j + s_prim_count * 0];
-
-        r_j[0] = s_prim_info[j + s_prim_count * 2];
-        r_j[1] = s_prim_info[j + s_prim_count * 3];
-        r_j[2] = s_prim_info[j + s_prim_count * 4];
-
-        S_ij_00 = ss_pair_data_local[ij];
-    }
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -422,6 +405,30 @@ computeCoulombFockSSSD(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < ss_prim_pair_count_local)
+    {
+        i = ss_first_inds_local[ij];
+        j = ss_second_inds_local[ij];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_j = s_prim_info[j + s_prim_count * 0];
+
+        r_j[0] = s_prim_info[j + s_prim_count * 2];
+        r_j[1] = s_prim_info[j + s_prim_count * 3];
+        r_j[2] = s_prim_info[j + s_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = ss_pair_data_local[ij];
+
+    }
 
     for (uint32_t m = 0; m < (sd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -450,22 +457,18 @@ computeCoulombFockSSSD(double*         mat_J,
             const auto d1 = d_cart_inds[l % 6][1];
 
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            // auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -579,8 +582,20 @@ computeCoulombFockSSPP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     uint32_t i, j;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < ss_prim_pair_count_local)
     {
@@ -599,20 +614,12 @@ computeCoulombFockSSPP(double*         mat_J,
         r_j[1] = s_prim_info[j + s_prim_count * 3];
         r_j[2] = s_prim_info[j + s_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = ss_pair_data_local[ij];
-    }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
     }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -641,22 +648,19 @@ computeCoulombFockSSPP(double*         mat_J,
             const auto d0 = l % 3;
 
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
             // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            // auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -775,28 +779,8 @@ computeCoulombFockSSPD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     uint32_t i, j;
-
-    if (ij < ss_prim_pair_count_local)
-    {
-        i = ss_first_inds_local[ij];
-        j = ss_second_inds_local[ij];
-
-        a_i = s_prim_info[i + s_prim_count * 0];
-
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
-
-        a_j = s_prim_info[j + s_prim_count * 0];
-
-        r_j[0] = s_prim_info[j + s_prim_count * 2];
-        r_j[1] = s_prim_info[j + s_prim_count * 3];
-        r_j[2] = s_prim_info[j + s_prim_count * 4];
-
-        S_ij_00 = ss_pair_data_local[ij];
-    }
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -816,6 +800,30 @@ computeCoulombFockSSPD(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < ss_prim_pair_count_local)
+    {
+        i = ss_first_inds_local[ij];
+        j = ss_second_inds_local[ij];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_j = s_prim_info[j + s_prim_count * 0];
+
+        r_j[0] = s_prim_info[j + s_prim_count * 2];
+        r_j[1] = s_prim_info[j + s_prim_count * 3];
+        r_j[2] = s_prim_info[j + s_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = ss_pair_data_local[ij];
+
+    }
 
     for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -845,22 +853,18 @@ computeCoulombFockSSPD(double*         mat_J,
             const auto d1 = d_cart_inds[l % 6][1];
 
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            // auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -999,28 +1003,8 @@ computeCoulombFockSSDD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     uint32_t i, j;
-
-    if (ij < ss_prim_pair_count_local)
-    {
-        i = ss_first_inds_local[ij];
-        j = ss_second_inds_local[ij];
-
-        a_i = s_prim_info[i + s_prim_count * 0];
-
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
-
-        a_j = s_prim_info[j + s_prim_count * 0];
-
-        r_j[0] = s_prim_info[j + s_prim_count * 2];
-        r_j[1] = s_prim_info[j + s_prim_count * 3];
-        r_j[2] = s_prim_info[j + s_prim_count * 4];
-
-        S_ij_00 = ss_pair_data_local[ij];
-    }
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -1040,6 +1024,30 @@ computeCoulombFockSSDD(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < ss_prim_pair_count_local)
+    {
+        i = ss_first_inds_local[ij];
+        j = ss_second_inds_local[ij];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_j = s_prim_info[j + s_prim_count * 0];
+
+        r_j[0] = s_prim_info[j + s_prim_count * 2];
+        r_j[1] = s_prim_info[j + s_prim_count * 3];
+        r_j[2] = s_prim_info[j + s_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = ss_pair_data_local[ij];
+
+    }
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -1070,22 +1078,18 @@ computeCoulombFockSSDD(double*         mat_J,
             const auto d1 = d_cart_inds[l % 6][1];
 
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            // auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -1270,8 +1274,16 @@ computeCoulombFockSPSS(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+    uint32_t i, j, b0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+    }
+
+    __syncthreads();
 
     if (ij < sp_prim_pair_count_local)
     {
@@ -1290,16 +1302,20 @@ computeCoulombFockSPSS(double*         mat_J,
         r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
         r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = sp_pair_data_local[ij];
+
+        b0 = j % 3;
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -1324,33 +1340,25 @@ computeCoulombFockSPSS(double*         mat_J,
 
             const auto S_kl_00 = ss_pair_data[kl];
 
-            const auto b0 = j % 3;
-
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
             // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
-            // auto inv_S2 = 1.0 / S2;
+            const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F1_t[2];
 
             gpu::computeBoysFunction(F1_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
-
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -1439,8 +1447,20 @@ computeCoulombFockSPSP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+    uint32_t i, j, b0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < sp_prim_pair_count_local)
     {
@@ -1459,20 +1479,20 @@ computeCoulombFockSPSP(double*         mat_J,
         r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
         r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = sp_pair_data_local[ij];
+
+        b0 = j % 3;
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (sp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -1497,27 +1517,22 @@ computeCoulombFockSPSP(double*         mat_J,
 
             const auto S_kl_00 = sp_pair_data[kl];
 
-            const auto b0 = j % 3;
             const auto d0 = l % 3;
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
             // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -1525,7 +1540,6 @@ computeCoulombFockSPSP(double*         mat_J,
 
             gpu::computeBoysFunction(F2_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
@@ -1633,28 +1647,8 @@ computeCoulombFockSPSD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < sp_prim_pair_count_local)
-    {
-        i = sp_first_inds_local[ij];
-        j = sp_second_inds_local[ij];
-
-        a_i = s_prim_info[i + s_prim_count * 0];
-
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
-
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
-
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
-
-        S_ij_00 = sp_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+    uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -1674,6 +1668,38 @@ computeCoulombFockSPSD(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < sp_prim_pair_count_local)
+    {
+        i = sp_first_inds_local[ij];
+        j = sp_second_inds_local[ij];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+
+        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
+        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
+        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = sp_pair_data_local[ij];
+
+        b0 = j % 3;
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+
+    }
 
     for (uint32_t m = 0; m < (sd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -1698,28 +1724,22 @@ computeCoulombFockSPSD(double*         mat_J,
 
             const auto S_kl_00 = sd_pair_data[kl];
 
-            const auto b0 = j % 3;
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -1727,7 +1747,6 @@ computeCoulombFockSPSD(double*         mat_J,
 
             gpu::computeBoysFunction(F3_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
@@ -1863,8 +1882,20 @@ computeCoulombFockSPPP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+    uint32_t i, j, b0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < sp_prim_pair_count_local)
     {
@@ -1883,20 +1914,20 @@ computeCoulombFockSPPP(double*         mat_J,
         r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
         r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = sp_pair_data_local[ij];
+
+        b0 = j % 3;
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -1921,28 +1952,23 @@ computeCoulombFockSPPP(double*         mat_J,
 
             const auto S_kl_00 = pp_pair_data[kl];
 
-            const auto b0 = j % 3;
             const auto c0 = k % 3;
             const auto d0 = l % 3;
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
             // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -1950,7 +1976,6 @@ computeCoulombFockSPPP(double*         mat_J,
 
             gpu::computeBoysFunction(F3_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
@@ -2092,28 +2117,8 @@ computeCoulombFockSPPD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < sp_prim_pair_count_local)
-    {
-        i = sp_first_inds_local[ij];
-        j = sp_second_inds_local[ij];
-
-        a_i = s_prim_info[i + s_prim_count * 0];
-
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
-
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
-
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
-
-        S_ij_00 = sp_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+    uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -2133,6 +2138,38 @@ computeCoulombFockSPPD(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < sp_prim_pair_count_local)
+    {
+        i = sp_first_inds_local[ij];
+        j = sp_second_inds_local[ij];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+
+        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
+        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
+        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = sp_pair_data_local[ij];
+
+        b0 = j % 3;
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+
+    }
 
     for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -2157,29 +2194,23 @@ computeCoulombFockSPPD(double*         mat_J,
 
             const auto S_kl_00 = pd_pair_data[kl];
 
-            const auto b0 = j % 3;
             const auto c0 = k % 3;
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -2187,7 +2218,6 @@ computeCoulombFockSPPD(double*         mat_J,
 
             gpu::computeBoysFunction(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -2379,8 +2409,20 @@ computeCoulombFockPPSS(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+    uint32_t i, j, a0, b0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < pp_prim_pair_count_local)
     {
@@ -2399,20 +2441,22 @@ computeCoulombFockPPSS(double*         mat_J,
         r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
         r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = pp_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = j % 3;
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -2437,35 +2481,25 @@ computeCoulombFockPPSS(double*         mat_J,
 
             const auto S_kl_00 = ss_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = j % 3;
-
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
             // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
-            // auto inv_S2 = 1.0 / S2;
+            const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F2_t[3];
 
             gpu::computeBoysFunction(F2_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -2573,8 +2607,20 @@ computeCoulombFockPPSP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+    uint32_t i, j, a0, b0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < pp_prim_pair_count_local)
     {
@@ -2593,20 +2639,22 @@ computeCoulombFockPPSP(double*         mat_J,
         r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
         r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = pp_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = j % 3;
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (sp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -2631,28 +2679,22 @@ computeCoulombFockPPSP(double*         mat_J,
 
             const auto S_kl_00 = sp_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = j % 3;
             const auto d0 = l % 3;
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
             // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -2660,8 +2702,6 @@ computeCoulombFockPPSP(double*         mat_J,
 
             gpu::computeBoysFunction(F3_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
@@ -2801,28 +2841,8 @@ computeCoulombFockSDSS(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < sd_prim_pair_count_local)
-    {
-        i = sd_first_inds_local[ij];
-        j = sd_second_inds_local[ij];
-
-        a_i = s_prim_info[i + s_prim_count * 0];
-
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S_ij_00 = sd_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+    uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -2842,6 +2862,40 @@ computeCoulombFockSDSS(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < sd_prim_pair_count_local)
+    {
+        i = sd_first_inds_local[ij];
+        j = sd_second_inds_local[ij];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = sd_pair_data_local[ij];
+
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
+    }
 
     for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -2866,35 +2920,24 @@ computeCoulombFockSDSS(double*         mat_J,
 
             const auto S_kl_00 = ss_pair_data[kl];
 
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
-
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
-            // auto inv_S2 = 1.0 / S2;
+            const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F2_t[3];
 
             gpu::computeBoysFunction(F2_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -3003,28 +3046,8 @@ computeCoulombFockSDSP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < sd_prim_pair_count_local)
-    {
-        i = sd_first_inds_local[ij];
-        j = sd_second_inds_local[ij];
-
-        a_i = s_prim_info[i + s_prim_count * 0];
-
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S_ij_00 = sd_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+    uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -3044,6 +3067,40 @@ computeCoulombFockSDSP(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < sd_prim_pair_count_local)
+    {
+        i = sd_first_inds_local[ij];
+        j = sd_second_inds_local[ij];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = sd_pair_data_local[ij];
+
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
+    }
 
     for (uint32_t m = 0; m < (sp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -3068,28 +3125,21 @@ computeCoulombFockSDSP(double*         mat_J,
 
             const auto S_kl_00 = sp_pair_data[kl];
 
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto d0 = l % 3;
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -3097,8 +3147,6 @@ computeCoulombFockSDSP(double*         mat_J,
 
             gpu::computeBoysFunction(F3_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
@@ -3236,28 +3284,8 @@ computeCoulombFockPDSS(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < pd_prim_pair_count_local)
-    {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
-
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
-
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S_ij_00 = pd_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -3277,6 +3305,42 @@ computeCoulombFockPDSS(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < pd_prim_pair_count_local)
+    {
+        i = pd_first_inds_local[ij];
+        j = pd_second_inds_local[ij];
+
+        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+
+        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
+        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
+        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = pd_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
+    }
 
     for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -3301,37 +3365,24 @@ computeCoulombFockPDSS(double*         mat_J,
 
             const auto S_kl_00 = ss_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
-
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
-            // auto inv_S2 = 1.0 / S2;
+            const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F3_t[4];
 
             gpu::computeBoysFunction(F3_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -3464,28 +3515,8 @@ computeCoulombFockPDSP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < pd_prim_pair_count_local)
-    {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
-
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
-
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S_ij_00 = pd_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -3505,6 +3536,42 @@ computeCoulombFockPDSP(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < pd_prim_pair_count_local)
+    {
+        i = pd_first_inds_local[ij];
+        j = pd_second_inds_local[ij];
+
+        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+
+        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
+        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
+        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = pd_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
+    }
 
     for (uint32_t m = 0; m < (sp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -3529,29 +3596,21 @@ computeCoulombFockPDSP(double*         mat_J,
 
             const auto S_kl_00 = sp_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto d0 = l % 3;
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -3559,9 +3618,6 @@ computeCoulombFockPDSP(double*         mat_J,
 
             gpu::computeBoysFunction(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
@@ -3754,28 +3810,8 @@ computeCoulombFockDDSS(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S_ij_00 = dd_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -3795,6 +3831,44 @@ computeCoulombFockDDSS(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < dd_prim_pair_count_local)
+    {
+        i = dd_first_inds_local[ij];
+        j = dd_second_inds_local[ij];
+
+        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
+    }
 
     for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -3819,39 +3893,24 @@ computeCoulombFockDDSS(double*         mat_J,
 
             const auto S_kl_00 = ss_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
-
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
-            // auto inv_S2 = 1.0 / S2;
+            const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F4_t[5];
 
             gpu::computeBoysFunction(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -4029,8 +4088,27 @@ computeCoulombFockDDPD0(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -4049,26 +4127,26 @@ computeCoulombFockDDPD0(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -4093,43 +4171,31 @@ computeCoulombFockDDPD0(double*         mat_J,
 
             const auto S_kl_00 = pd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = k % 3;
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F7_t[2];
 
             gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -4263,6 +4329,7 @@ computeCoulombFockDDPD0(double*         mat_J,
 
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * pd_mat_D[kl] * 2.0;
+
         }
         else
         {
@@ -4293,7 +4360,6 @@ computeCoulombFockDDPD0(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD1(double*         mat_J,
                        const double*   p_prim_info,
@@ -4328,8 +4394,27 @@ computeCoulombFockDDPD1(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -4348,26 +4433,26 @@ computeCoulombFockDDPD1(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -4392,43 +4477,31 @@ computeCoulombFockDDPD1(double*         mat_J,
 
             const auto S_kl_00 = pd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = k % 3;
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F7_t[3];
 
             gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -4670,6 +4743,7 @@ computeCoulombFockDDPD1(double*         mat_J,
 
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * pd_mat_D[kl] * 2.0;
+
         }
         else
         {
@@ -4700,7 +4774,6 @@ computeCoulombFockDDPD1(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD2(double*         mat_J,
                        const double*   p_prim_info,
@@ -4735,8 +4808,27 @@ computeCoulombFockDDPD2(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -4755,26 +4847,26 @@ computeCoulombFockDDPD2(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -4799,43 +4891,31 @@ computeCoulombFockDDPD2(double*         mat_J,
 
             const auto S_kl_00 = pd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = k % 3;
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F7_t[3];
 
             gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-
-            // auto PA_0 = (a_j * inv_S1) * rij[a0];
-            // auto PA_1 = (a_j * inv_S1) * rij[a1];
-            // auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            // auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -4854,6 +4934,7 @@ computeCoulombFockDDPD2(double*         mat_J,
 
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * pd_mat_D[kl] * 2.0;
+
         }
         else
         {
@@ -4884,7 +4965,6 @@ computeCoulombFockDDPD2(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD3(double*         mat_J,
                        const double*   p_prim_info,
@@ -4919,8 +4999,27 @@ computeCoulombFockDDPD3(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -4939,26 +5038,26 @@ computeCoulombFockDDPD3(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -4983,43 +5082,31 @@ computeCoulombFockDDPD3(double*         mat_J,
 
             const auto S_kl_00 = pd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = k % 3;
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F7_t[3];
 
             gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -5230,6 +5317,7 @@ computeCoulombFockDDPD3(double*         mat_J,
 
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * pd_mat_D[kl] * 2.0;
+
         }
         else
         {
@@ -5260,7 +5348,6 @@ computeCoulombFockDDPD3(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD4(double*         mat_J,
                        const double*   p_prim_info,
@@ -5295,8 +5382,27 @@ computeCoulombFockDDPD4(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -5315,26 +5421,26 @@ computeCoulombFockDDPD4(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -5359,43 +5465,31 @@ computeCoulombFockDDPD4(double*         mat_J,
 
             const auto S_kl_00 = pd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = k % 3;
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F7_t[4];
 
             gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -5764,6 +5858,7 @@ computeCoulombFockDDPD4(double*         mat_J,
 
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * pd_mat_D[kl] * 2.0;
+
         }
         else
         {
@@ -5794,7 +5889,6 @@ computeCoulombFockDDPD4(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD5(double*         mat_J,
                        const double*   p_prim_info,
@@ -5829,8 +5923,27 @@ computeCoulombFockDDPD5(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -5849,26 +5962,26 @@ computeCoulombFockDDPD5(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -5893,43 +6006,31 @@ computeCoulombFockDDPD5(double*         mat_J,
 
             const auto S_kl_00 = pd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = k % 3;
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F7_t[5];
 
             gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -6156,6 +6257,7 @@ computeCoulombFockDDPD5(double*         mat_J,
 
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * pd_mat_D[kl] * 2.0;
+
         }
         else
         {
@@ -6186,7 +6288,6 @@ computeCoulombFockDDPD5(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD6(double*         mat_J,
                        const double*   p_prim_info,
@@ -6221,8 +6322,27 @@ computeCoulombFockDDPD6(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -6241,26 +6361,26 @@ computeCoulombFockDDPD6(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -6285,43 +6405,31 @@ computeCoulombFockDDPD6(double*         mat_J,
 
             const auto S_kl_00 = pd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = k % 3;
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F7_t[5];
 
             gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -6390,6 +6498,7 @@ computeCoulombFockDDPD6(double*         mat_J,
 
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * pd_mat_D[kl] * 2.0;
+
         }
         else
         {
@@ -6420,7 +6529,6 @@ computeCoulombFockDDPD6(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD7(double*         mat_J,
                        const double*   p_prim_info,
@@ -6455,8 +6563,27 @@ computeCoulombFockDDPD7(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -6475,26 +6602,26 @@ computeCoulombFockDDPD7(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -6519,43 +6646,31 @@ computeCoulombFockDDPD7(double*         mat_J,
 
             const auto S_kl_00 = pd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = k % 3;
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F7_t[5];
 
             gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -6639,6 +6754,7 @@ computeCoulombFockDDPD7(double*         mat_J,
 
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * pd_mat_D[kl] * 2.0;
+
         }
         else
         {
@@ -6669,7 +6785,6 @@ computeCoulombFockDDPD7(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD8(double*         mat_J,
                        const double*   p_prim_info,
@@ -6704,8 +6819,27 @@ computeCoulombFockDDPD8(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -6724,26 +6858,26 @@ computeCoulombFockDDPD8(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -6768,43 +6902,31 @@ computeCoulombFockDDPD8(double*         mat_J,
 
             const auto S_kl_00 = pd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = k % 3;
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            // double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            // auto inv_S1 = 1.0 / S1;
-            // auto inv_S2 = 1.0 / S2;
+            const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F7_t[5];
 
             gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-
-            // auto PA_0 = (a_j * inv_S1) * rij[a0];
-            // auto PA_1 = (a_j * inv_S1) * rij[a1];
-            // auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            // auto PB_1 = (-a_i * inv_S1) * rij[b1];
             // auto QC_0 = (a_l * inv_S2) * rkl[c0];
             // auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             // auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -6829,6 +6951,7 @@ computeCoulombFockDDPD8(double*         mat_J,
 
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * pd_mat_D[kl] * 2.0;
+
         }
         else
         {
@@ -6859,7 +6982,6 @@ computeCoulombFockDDPD8(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD9(double*         mat_J,
                        const double*   p_prim_info,
@@ -6894,8 +7016,27 @@ computeCoulombFockDDPD9(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -6914,26 +7055,26 @@ computeCoulombFockDDPD9(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -6958,43 +7099,31 @@ computeCoulombFockDDPD9(double*         mat_J,
 
             const auto S_kl_00 = pd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = k % 3;
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F7_t[8];
 
             gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 7, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -7224,6 +7353,7 @@ computeCoulombFockDDPD9(double*         mat_J,
 
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * pd_mat_D[kl] * 2.0;
+
         }
         else
         {
@@ -7287,8 +7417,27 @@ computeCoulombFockDDDD0(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -7307,26 +7456,26 @@ computeCoulombFockDDDD0(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -7351,44 +7500,32 @@ computeCoulombFockDDDD0(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[2];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -7555,6 +7692,7 @@ computeCoulombFockDDDD0(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -7585,7 +7723,6 @@ computeCoulombFockDDDD0(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD1(double*         mat_J,
                        const double*   d_prim_info,
@@ -7618,8 +7755,27 @@ computeCoulombFockDDDD1(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -7638,26 +7794,26 @@ computeCoulombFockDDDD1(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -7682,44 +7838,32 @@ computeCoulombFockDDDD1(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[2];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -7807,6 +7951,7 @@ computeCoulombFockDDDD1(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -7837,7 +7982,6 @@ computeCoulombFockDDDD1(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD2(double*         mat_J,
                        const double*   d_prim_info,
@@ -7870,8 +8014,27 @@ computeCoulombFockDDDD2(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -7890,26 +8053,26 @@ computeCoulombFockDDDD2(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -7934,44 +8097,32 @@ computeCoulombFockDDDD2(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[2];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -8002,6 +8153,7 @@ computeCoulombFockDDDD2(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -8032,7 +8184,6 @@ computeCoulombFockDDDD2(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD3(double*         mat_J,
                        const double*   d_prim_info,
@@ -8065,8 +8216,27 @@ computeCoulombFockDDDD3(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -8085,26 +8255,26 @@ computeCoulombFockDDDD3(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -8129,44 +8299,32 @@ computeCoulombFockDDDD3(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[2];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -8239,6 +8397,7 @@ computeCoulombFockDDDD3(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -8269,7 +8428,6 @@ computeCoulombFockDDDD3(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD4(double*         mat_J,
                        const double*   d_prim_info,
@@ -8302,8 +8460,27 @@ computeCoulombFockDDDD4(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -8322,26 +8499,26 @@ computeCoulombFockDDDD4(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -8366,44 +8543,32 @@ computeCoulombFockDDDD4(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[2];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -8491,6 +8656,7 @@ computeCoulombFockDDDD4(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -8521,7 +8687,6 @@ computeCoulombFockDDDD4(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD5(double*         mat_J,
                        const double*   d_prim_info,
@@ -8554,8 +8719,27 @@ computeCoulombFockDDDD5(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -8574,26 +8758,26 @@ computeCoulombFockDDDD5(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -8618,44 +8802,32 @@ computeCoulombFockDDDD5(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[3];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -8934,6 +9106,7 @@ computeCoulombFockDDDD5(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -8964,7 +9137,6 @@ computeCoulombFockDDDD5(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD6(double*         mat_J,
                        const double*   d_prim_info,
@@ -8997,8 +9169,27 @@ computeCoulombFockDDDD6(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -9017,26 +9208,26 @@ computeCoulombFockDDDD6(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -9061,44 +9252,32 @@ computeCoulombFockDDDD6(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[3];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -9311,6 +9490,7 @@ computeCoulombFockDDDD6(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -9341,7 +9521,6 @@ computeCoulombFockDDDD6(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD7(double*         mat_J,
                        const double*   d_prim_info,
@@ -9374,8 +9553,27 @@ computeCoulombFockDDDD7(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -9394,26 +9592,26 @@ computeCoulombFockDDDD7(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -9438,44 +9636,32 @@ computeCoulombFockDDDD7(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[3];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -9591,6 +9777,7 @@ computeCoulombFockDDDD7(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -9621,7 +9808,6 @@ computeCoulombFockDDDD7(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD8(double*         mat_J,
                        const double*   d_prim_info,
@@ -9654,8 +9840,27 @@ computeCoulombFockDDDD8(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -9674,26 +9879,26 @@ computeCoulombFockDDDD8(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -9718,44 +9923,32 @@ computeCoulombFockDDDD8(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[3];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -9839,6 +10032,7 @@ computeCoulombFockDDDD8(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -9869,7 +10063,6 @@ computeCoulombFockDDDD8(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD9(double*         mat_J,
                        const double*   d_prim_info,
@@ -9902,8 +10095,27 @@ computeCoulombFockDDDD9(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -9922,26 +10134,26 @@ computeCoulombFockDDDD9(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -9966,44 +10178,32 @@ computeCoulombFockDDDD9(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[4];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -10249,6 +10449,7 @@ computeCoulombFockDDDD9(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -10279,7 +10480,6 @@ computeCoulombFockDDDD9(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD10(double*         mat_J,
                        const double*   d_prim_info,
@@ -10312,8 +10512,27 @@ computeCoulombFockDDDD10(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -10332,26 +10551,26 @@ computeCoulombFockDDDD10(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -10376,44 +10595,32 @@ computeCoulombFockDDDD10(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[4];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -10731,6 +10938,7 @@ computeCoulombFockDDDD10(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -10761,7 +10969,6 @@ computeCoulombFockDDDD10(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD11(double*         mat_J,
                        const double*   d_prim_info,
@@ -10794,8 +11001,27 @@ computeCoulombFockDDDD11(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -10814,26 +11040,26 @@ computeCoulombFockDDDD11(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -10858,44 +11084,32 @@ computeCoulombFockDDDD11(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[4];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -11080,6 +11294,7 @@ computeCoulombFockDDDD11(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -11110,7 +11325,6 @@ computeCoulombFockDDDD11(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD12(double*         mat_J,
                        const double*   d_prim_info,
@@ -11143,8 +11357,27 @@ computeCoulombFockDDDD12(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -11163,26 +11396,26 @@ computeCoulombFockDDDD12(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -11207,44 +11440,32 @@ computeCoulombFockDDDD12(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[5];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -11815,6 +12036,7 @@ computeCoulombFockDDDD12(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -11845,7 +12067,6 @@ computeCoulombFockDDDD12(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD13(double*         mat_J,
                        const double*   d_prim_info,
@@ -11878,8 +12099,27 @@ computeCoulombFockDDDD13(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -11898,26 +12138,26 @@ computeCoulombFockDDDD13(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -11942,44 +12182,32 @@ computeCoulombFockDDDD13(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[5];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -12027,6 +12255,7 @@ computeCoulombFockDDDD13(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -12057,7 +12286,6 @@ computeCoulombFockDDDD13(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD14(double*         mat_J,
                        const double*   d_prim_info,
@@ -12090,8 +12318,27 @@ computeCoulombFockDDDD14(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -12110,26 +12357,26 @@ computeCoulombFockDDDD14(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -12154,44 +12401,32 @@ computeCoulombFockDDDD14(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[5];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -12276,6 +12511,7 @@ computeCoulombFockDDDD14(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -12306,7 +12542,6 @@ computeCoulombFockDDDD14(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD15(double*         mat_J,
                        const double*   d_prim_info,
@@ -12339,8 +12574,27 @@ computeCoulombFockDDDD15(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -12359,26 +12613,26 @@ computeCoulombFockDDDD15(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -12403,44 +12657,32 @@ computeCoulombFockDDDD15(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
-            // auto inv_S2 = 1.0 / S2;
+            const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[5];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             // auto QC_0 = (a_l * inv_S2) * rkl[c0];
             // auto QC_1 = (a_l * inv_S2) * rkl[c1];
             // auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -12462,6 +12704,7 @@ computeCoulombFockDDDD15(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -12492,7 +12735,6 @@ computeCoulombFockDDDD15(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD16(double*         mat_J,
                        const double*   d_prim_info,
@@ -12525,8 +12767,27 @@ computeCoulombFockDDDD16(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -12545,26 +12806,26 @@ computeCoulombFockDDDD16(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -12589,44 +12850,32 @@ computeCoulombFockDDDD16(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[5];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -12709,6 +12958,7 @@ computeCoulombFockDDDD16(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -12739,7 +12989,6 @@ computeCoulombFockDDDD16(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD17(double*         mat_J,
                        const double*   d_prim_info,
@@ -12772,8 +13021,27 @@ computeCoulombFockDDDD17(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -12792,26 +13060,26 @@ computeCoulombFockDDDD17(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -12836,44 +13104,32 @@ computeCoulombFockDDDD17(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[6];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -12968,6 +13224,7 @@ computeCoulombFockDDDD17(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -12998,7 +13255,6 @@ computeCoulombFockDDDD17(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD18(double*         mat_J,
                        const double*   d_prim_info,
@@ -13031,8 +13287,27 @@ computeCoulombFockDDDD18(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -13051,26 +13326,26 @@ computeCoulombFockDDDD18(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -13095,44 +13370,32 @@ computeCoulombFockDDDD18(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[6];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -13447,6 +13710,7 @@ computeCoulombFockDDDD18(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -13477,7 +13741,6 @@ computeCoulombFockDDDD18(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD19(double*         mat_J,
                        const double*   d_prim_info,
@@ -13510,8 +13773,27 @@ computeCoulombFockDDDD19(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -13530,26 +13812,26 @@ computeCoulombFockDDDD19(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -13574,44 +13856,32 @@ computeCoulombFockDDDD19(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[6];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -13673,6 +13943,7 @@ computeCoulombFockDDDD19(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -13703,7 +13974,6 @@ computeCoulombFockDDDD19(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD20(double*         mat_J,
                        const double*   d_prim_info,
@@ -13736,8 +14006,27 @@ computeCoulombFockDDDD20(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -13756,26 +14045,26 @@ computeCoulombFockDDDD20(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -13800,44 +14089,32 @@ computeCoulombFockDDDD20(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[6];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -13916,6 +14193,7 @@ computeCoulombFockDDDD20(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -13946,7 +14224,6 @@ computeCoulombFockDDDD20(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD21(double*         mat_J,
                        const double*   d_prim_info,
@@ -13979,8 +14256,27 @@ computeCoulombFockDDDD21(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -13999,26 +14295,26 @@ computeCoulombFockDDDD21(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -14043,44 +14339,32 @@ computeCoulombFockDDDD21(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[7];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -14179,6 +14463,7 @@ computeCoulombFockDDDD21(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -14209,7 +14494,6 @@ computeCoulombFockDDDD21(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD22(double*         mat_J,
                        const double*   d_prim_info,
@@ -14242,8 +14526,27 @@ computeCoulombFockDDDD22(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -14262,26 +14565,26 @@ computeCoulombFockDDDD22(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -14306,44 +14609,32 @@ computeCoulombFockDDDD22(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[7];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -14396,6 +14687,7 @@ computeCoulombFockDDDD22(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -14426,7 +14718,6 @@ computeCoulombFockDDDD22(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD23(double*         mat_J,
                        const double*   d_prim_info,
@@ -14459,8 +14750,27 @@ computeCoulombFockDDDD23(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -14479,26 +14789,26 @@ computeCoulombFockDDDD23(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -14523,44 +14833,32 @@ computeCoulombFockDDDD23(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F8_t[9];
 
             gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 8, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -14740,6 +15038,7 @@ computeCoulombFockDDDD23(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -14804,28 +15103,8 @@ computeCoulombFockDDPP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S_ij_00 = dd_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -14845,6 +15124,44 @@ computeCoulombFockDDPP(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < dd_prim_pair_count_local)
+    {
+        i = dd_first_inds_local[ij];
+        j = dd_second_inds_local[ij];
+
+        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
+    }
 
     for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -14869,31 +15186,22 @@ computeCoulombFockDDPP(double*         mat_J,
 
             const auto S_kl_00 = pp_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = k % 3;
             const auto d0 = l % 3;
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -14901,10 +15209,6 @@ computeCoulombFockDDPP(double*         mat_J,
 
             gpu::computeBoysFunction(F6_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
@@ -15493,28 +15797,8 @@ computeCoulombFockDDSD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S_ij_00 = dd_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -15534,6 +15818,44 @@ computeCoulombFockDDSD(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < dd_prim_pair_count_local)
+    {
+        i = dd_first_inds_local[ij];
+        j = dd_second_inds_local[ij];
+
+        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
+    }
 
     for (uint32_t m = 0; m < (sd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -15558,31 +15880,22 @@ computeCoulombFockDDSD(double*         mat_J,
 
             const auto S_kl_00 = sd_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -15590,10 +15903,6 @@ computeCoulombFockDDSD(double*         mat_J,
 
             gpu::computeBoysFunction(F6_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
@@ -16182,28 +16491,8 @@ computeCoulombFockDDSP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < dd_prim_pair_count_local)
-    {
-        i = dd_first_inds_local[ij];
-        j = dd_second_inds_local[ij];
-
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S_ij_00 = dd_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -16223,6 +16512,44 @@ computeCoulombFockDDSP(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < dd_prim_pair_count_local)
+    {
+        i = dd_first_inds_local[ij];
+        j = dd_second_inds_local[ij];
+
+        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PA_1 = (a_j * inv_S1) * rij[a1];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
+    }
 
     for (uint32_t m = 0; m < (sp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
@@ -16247,30 +16574,21 @@ computeCoulombFockDDSP(double*         mat_J,
 
             const auto S_kl_00 = sp_pair_data[kl];
 
-            const auto a0 = d_cart_inds[i % 6][0];
-            const auto a1 = d_cart_inds[i % 6][1];
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto d0 = l % 3;
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -16278,10 +16596,6 @@ computeCoulombFockDDSP(double*         mat_J,
 
             gpu::computeBoysFunction(F5_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PA_1 = (a_j * inv_S1) * rij[a1];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
@@ -16574,8 +16888,27 @@ computeCoulombFockPDDD0(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    uint32_t i, j, a0, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < pd_prim_pair_count_local)
     {
@@ -16594,26 +16927,24 @@ computeCoulombFockPDDD0(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = pd_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -16638,42 +16969,32 @@ computeCoulombFockPDDD0(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F7_t[2];
 
             gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -16880,6 +17201,7 @@ computeCoulombFockPDDD0(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -16910,7 +17232,6 @@ computeCoulombFockPDDD0(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDDD1(double*         mat_J,
                        const double*   p_prim_info,
@@ -16945,8 +17266,27 @@ computeCoulombFockPDDD1(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    uint32_t i, j, a0, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < pd_prim_pair_count_local)
     {
@@ -16965,26 +17305,24 @@ computeCoulombFockPDDD1(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = pd_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -17009,42 +17347,32 @@ computeCoulombFockPDDD1(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F7_t[3];
 
             gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -17267,6 +17595,7 @@ computeCoulombFockPDDD1(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -17297,7 +17626,6 @@ computeCoulombFockPDDD1(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDDD2(double*         mat_J,
                        const double*   p_prim_info,
@@ -17332,8 +17660,27 @@ computeCoulombFockPDDD2(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    uint32_t i, j, a0, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < pd_prim_pair_count_local)
     {
@@ -17352,26 +17699,24 @@ computeCoulombFockPDDD2(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = pd_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -17396,42 +17741,32 @@ computeCoulombFockPDDD2(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F7_t[4];
 
             gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -17848,6 +18183,7 @@ computeCoulombFockPDDD2(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -17878,7 +18214,6 @@ computeCoulombFockPDDD2(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDDD3(double*         mat_J,
                        const double*   p_prim_info,
@@ -17913,8 +18248,27 @@ computeCoulombFockPDDD3(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    uint32_t i, j, a0, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < pd_prim_pair_count_local)
     {
@@ -17933,26 +18287,24 @@ computeCoulombFockPDDD3(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = pd_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -17977,42 +18329,32 @@ computeCoulombFockPDDD3(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F7_t[4];
 
             gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -18170,6 +18512,7 @@ computeCoulombFockPDDD3(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -18200,7 +18543,6 @@ computeCoulombFockPDDD3(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDDD4(double*         mat_J,
                        const double*   p_prim_info,
@@ -18235,8 +18577,27 @@ computeCoulombFockPDDD4(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    uint32_t i, j, a0, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < pd_prim_pair_count_local)
     {
@@ -18255,26 +18616,24 @@ computeCoulombFockPDDD4(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = pd_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -18299,42 +18658,32 @@ computeCoulombFockPDDD4(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F7_t[5];
 
             gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -18669,6 +19018,7 @@ computeCoulombFockPDDD4(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -18699,7 +19049,6 @@ computeCoulombFockPDDD4(double*         mat_J,
         mat_J[ij] += J_ij;
     }
 }
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDDD5(double*         mat_J,
                        const double*   p_prim_info,
@@ -18734,8 +19083,27 @@ computeCoulombFockPDDD5(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    uint32_t i, j, a0, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < pd_prim_pair_count_local)
     {
@@ -18754,26 +19122,24 @@ computeCoulombFockPDDD5(double*         mat_J,
         r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
         r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = pd_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -18798,42 +19164,32 @@ computeCoulombFockPDDD5(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
+            
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
             double F7_t[8];
 
             gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 7, boys_func_table, boys_func_ft);
-
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -19079,6 +19435,7 @@ computeCoulombFockPDDD5(double*         mat_J,
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
             ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
         }
         else
         {
@@ -19143,28 +19500,8 @@ computeCoulombFockPDPD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < pd_prim_pair_count_local)
-    {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
-
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
-
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S_ij_00 = pd_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -19184,6 +19521,42 @@ computeCoulombFockPDPD(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < pd_prim_pair_count_local)
+    {
+        i = pd_first_inds_local[ij];
+        j = pd_second_inds_local[ij];
+
+        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+
+        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
+        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
+        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = pd_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
+    }
 
     for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -19208,31 +19581,23 @@ computeCoulombFockPDPD(double*         mat_J,
 
             const auto S_kl_00 = pd_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = k % 3;
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -19240,9 +19605,6 @@ computeCoulombFockPDPD(double*         mat_J,
 
             gpu::computeBoysFunction(F6_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -19857,28 +20219,8 @@ computeCoulombFockPDPP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < pd_prim_pair_count_local)
-    {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
-
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
-
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S_ij_00 = pd_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -19898,6 +20240,42 @@ computeCoulombFockPDPP(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < pd_prim_pair_count_local)
+    {
+        i = pd_first_inds_local[ij];
+        j = pd_second_inds_local[ij];
+
+        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+
+        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
+        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
+        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = pd_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
+    }
 
     for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -19922,30 +20300,22 @@ computeCoulombFockPDPP(double*         mat_J,
 
             const auto S_kl_00 = pp_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = k % 3;
             const auto d0 = l % 3;
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -19953,9 +20323,6 @@ computeCoulombFockPDPP(double*         mat_J,
 
             gpu::computeBoysFunction(F5_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
@@ -20286,28 +20653,8 @@ computeCoulombFockPDSD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < pd_prim_pair_count_local)
-    {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
-
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
-
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S_ij_00 = pd_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -20327,6 +20674,42 @@ computeCoulombFockPDSD(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < pd_prim_pair_count_local)
+    {
+        i = pd_first_inds_local[ij];
+        j = pd_second_inds_local[ij];
+
+        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+
+        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
+        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
+        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = pd_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
+    }
 
     for (uint32_t m = 0; m < (sd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -20351,30 +20734,22 @@ computeCoulombFockPDSD(double*         mat_J,
 
             const auto S_kl_00 = sd_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -20382,9 +20757,6 @@ computeCoulombFockPDSD(double*         mat_J,
 
             gpu::computeBoysFunction(F5_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
@@ -20711,28 +21083,8 @@ computeCoulombFockSDDD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < sd_prim_pair_count_local)
-    {
-        i = sd_first_inds_local[ij];
-        j = sd_second_inds_local[ij];
-
-        a_i = s_prim_info[i + s_prim_count * 0];
-
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S_ij_00 = sd_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+    uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -20752,6 +21104,40 @@ computeCoulombFockSDDD(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < sd_prim_pair_count_local)
+    {
+        i = sd_first_inds_local[ij];
+        j = sd_second_inds_local[ij];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = sd_pair_data_local[ij];
+
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
+    }
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -20776,31 +21162,24 @@ computeCoulombFockSDDD(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -20808,8 +21187,6 @@ computeCoulombFockSDDD(double*         mat_J,
 
             gpu::computeBoysFunction(F6_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -21398,28 +21775,8 @@ computeCoulombFockSDPD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < sd_prim_pair_count_local)
-    {
-        i = sd_first_inds_local[ij];
-        j = sd_second_inds_local[ij];
-
-        a_i = s_prim_info[i + s_prim_count * 0];
-
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S_ij_00 = sd_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+    uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -21439,6 +21796,40 @@ computeCoulombFockSDPD(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < sd_prim_pair_count_local)
+    {
+        i = sd_first_inds_local[ij];
+        j = sd_second_inds_local[ij];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = sd_pair_data_local[ij];
+
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
+    }
 
     for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -21463,30 +21854,23 @@ computeCoulombFockSDPD(double*         mat_J,
 
             const auto S_kl_00 = pd_pair_data[kl];
 
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = k % 3;
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -21494,8 +21878,6 @@ computeCoulombFockSDPD(double*         mat_J,
 
             gpu::computeBoysFunction(F5_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -21822,28 +22204,8 @@ computeCoulombFockSDPP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < sd_prim_pair_count_local)
-    {
-        i = sd_first_inds_local[ij];
-        j = sd_second_inds_local[ij];
-
-        a_i = s_prim_info[i + s_prim_count * 0];
-
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S_ij_00 = sd_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+    uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -21863,6 +22225,40 @@ computeCoulombFockSDPP(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < sd_prim_pair_count_local)
+    {
+        i = sd_first_inds_local[ij];
+        j = sd_second_inds_local[ij];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = sd_pair_data_local[ij];
+
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
+    }
 
     for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -21887,29 +22283,22 @@ computeCoulombFockSDPP(double*         mat_J,
 
             const auto S_kl_00 = pp_pair_data[kl];
 
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto c0 = k % 3;
             const auto d0 = l % 3;
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -21917,8 +22306,6 @@ computeCoulombFockSDPP(double*         mat_J,
 
             gpu::computeBoysFunction(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
@@ -22128,28 +22515,8 @@ computeCoulombFockSDSD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < sd_prim_pair_count_local)
-    {
-        i = sd_first_inds_local[ij];
-        j = sd_second_inds_local[ij];
-
-        a_i = s_prim_info[i + s_prim_count * 0];
-
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
-
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-        S_ij_00 = sd_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+    uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -22169,6 +22536,40 @@ computeCoulombFockSDSD(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < sd_prim_pair_count_local)
+    {
+        i = sd_first_inds_local[ij];
+        j = sd_second_inds_local[ij];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = sd_pair_data_local[ij];
+
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_1 = (-a_i * inv_S1) * rij[b1];
+
+    }
 
     for (uint32_t m = 0; m < (sd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -22193,29 +22594,22 @@ computeCoulombFockSDSD(double*         mat_J,
 
             const auto S_kl_00 = sd_pair_data[kl];
 
-            const auto b0 = d_cart_inds[j % 6][0];
-            const auto b1 = d_cart_inds[j % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -22223,8 +22617,6 @@ computeCoulombFockSDSD(double*         mat_J,
 
             gpu::computeBoysFunction(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
-            const auto PB_1 = (-a_i * inv_S1) * rij[b1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
@@ -22430,28 +22822,8 @@ computeCoulombFockPPDD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < pp_prim_pair_count_local)
-    {
-        i = pp_first_inds_local[ij];
-        j = pp_second_inds_local[ij];
-
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
-
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
-
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
-
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
-
-        S_ij_00 = pp_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+    uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -22471,6 +22843,40 @@ computeCoulombFockPPDD(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < pp_prim_pair_count_local)
+    {
+        i = pp_first_inds_local[ij];
+        j = pp_second_inds_local[ij];
+
+        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+
+        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
+        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
+        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+
+        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+
+        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
+        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
+        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = pp_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = j % 3;
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+
+    }
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -22495,31 +22901,24 @@ computeCoulombFockPPDD(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = j % 3;
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -22527,8 +22926,6 @@ computeCoulombFockPPDD(double*         mat_J,
 
             gpu::computeBoysFunction(F6_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
@@ -23119,28 +23516,8 @@ computeCoulombFockPPPD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < pp_prim_pair_count_local)
-    {
-        i = pp_first_inds_local[ij];
-        j = pp_second_inds_local[ij];
-
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
-
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
-
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
-
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
-
-        S_ij_00 = pp_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+    uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -23160,6 +23537,40 @@ computeCoulombFockPPPD(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < pp_prim_pair_count_local)
+    {
+        i = pp_first_inds_local[ij];
+        j = pp_second_inds_local[ij];
+
+        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+
+        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
+        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
+        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+
+        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+
+        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
+        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
+        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = pp_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = j % 3;
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+
+    }
 
     for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -23184,30 +23595,23 @@ computeCoulombFockPPPD(double*         mat_J,
 
             const auto S_kl_00 = pd_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = j % 3;
             const auto c0 = k % 3;
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -23215,8 +23619,6 @@ computeCoulombFockPPPD(double*         mat_J,
 
             gpu::computeBoysFunction(F5_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
@@ -23542,8 +23944,20 @@ computeCoulombFockPPPP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+    uint32_t i, j, a0, b0;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
 
     if (ij < pp_prim_pair_count_local)
     {
@@ -23562,20 +23976,22 @@ computeCoulombFockPPPP(double*         mat_J,
         r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
         r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
 
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
         S_ij_00 = pp_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = j % 3;
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+
     }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-        skip_thread_block = 0;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
-    }
-
-    __syncthreads();
 
     for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -23600,29 +24016,23 @@ computeCoulombFockPPPP(double*         mat_J,
 
             const auto S_kl_00 = pp_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = j % 3;
             const auto c0 = k % 3;
             const auto d0 = l % 3;
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
             // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -23630,8 +24040,6 @@ computeCoulombFockPPPP(double*         mat_J,
 
             gpu::computeBoysFunction(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
 
@@ -23847,28 +24255,8 @@ computeCoulombFockPPSD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < pp_prim_pair_count_local)
-    {
-        i = pp_first_inds_local[ij];
-        j = pp_second_inds_local[ij];
-
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
-
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
-
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
-
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
-
-        S_ij_00 = pp_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+    uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -23888,6 +24276,40 @@ computeCoulombFockPPSD(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < pp_prim_pair_count_local)
+    {
+        i = pp_first_inds_local[ij];
+        j = pp_second_inds_local[ij];
+
+        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+
+        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
+        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
+        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+
+        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+
+        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
+        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
+        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = pp_pair_data_local[ij];
+
+        a0 = i % 3;
+        b0 = j % 3;
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PA_0 = (a_j * inv_S1) * rij[a0];
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+
+    }
 
     for (uint32_t m = 0; m < (sd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -23912,29 +24334,22 @@ computeCoulombFockPPSD(double*         mat_J,
 
             const auto S_kl_00 = sd_pair_data[kl];
 
-            const auto a0 = i % 3;
-            const auto b0 = j % 3;
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -23942,8 +24357,6 @@ computeCoulombFockPPSD(double*         mat_J,
 
             gpu::computeBoysFunction(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto PA_0 = (a_j * inv_S1) * rij[a0];
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
             const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
@@ -24157,28 +24570,8 @@ computeCoulombFockSPDD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00;
-    uint32_t i, j;
-
-    if (ij < sp_prim_pair_count_local)
-    {
-        i = sp_first_inds_local[ij];
-        j = sp_second_inds_local[ij];
-
-        a_i = s_prim_info[i + s_prim_count * 0];
-
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
-
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
-
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
-
-        S_ij_00 = sp_pair_data_local[ij];
-    }
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+    uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -24198,6 +24591,38 @@ computeCoulombFockSPDD(double*         mat_J,
     }
 
     __syncthreads();
+
+    if (ij < sp_prim_pair_count_local)
+    {
+        i = sp_first_inds_local[ij];
+        j = sp_second_inds_local[ij];
+
+        a_i = s_prim_info[i + s_prim_count * 0];
+
+        r_i[0] = s_prim_info[i + s_prim_count * 2];
+        r_i[1] = s_prim_info[i + s_prim_count * 3];
+        r_i[2] = s_prim_info[i + s_prim_count * 4];
+
+        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+
+        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
+        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
+        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = sp_pair_data_local[ij];
+
+        b0 = j % 3;
+
+        rij[0] = r_j[0] - r_i[0];
+        rij[1] = r_j[1] - r_i[1];
+        rij[2] = r_j[2] - r_i[2];
+
+        PB_0 = (-a_i * inv_S1) * rij[b0];
+
+    }
 
     for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
@@ -24222,30 +24647,24 @@ computeCoulombFockSPDD(double*         mat_J,
 
             const auto S_kl_00 = dd_pair_data[kl];
 
-            const auto b0 = j % 3;
             const auto c0 = d_cart_inds[k % 6][0];
             const auto c1 = d_cart_inds[k % 6][1];
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rij[3] = {r_j[0] - r_i[0], r_j[1] - r_i[1], r_j[2] - r_i[2]};
             const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) / (a_k + a_l) - (a_i * r_i[0] + a_j * r_j[0]) / (a_i + a_j),
-                                  (a_k * r_k[1] + a_l * r_l[1]) / (a_k + a_l) - (a_i * r_i[1] + a_j * r_j[1]) / (a_i + a_j),
-                                  (a_k * r_k[2] + a_l * r_l[2]) / (a_k + a_l) - (a_i * r_i[2] + a_j * r_j[2]) / (a_i + a_j)};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S1 = a_i + a_j;
             const auto S2 = a_k + a_l;
 
-            const auto inv_S1 = 1.0 / S1;
             const auto inv_S2 = 1.0 / S2;
             const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
             const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
@@ -24253,7 +24672,6 @@ computeCoulombFockSPDD(double*         mat_J,
 
             gpu::computeBoysFunction(F5_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-            const auto PB_0 = (-a_i * inv_S1) * rij[b0];
             const auto QC_0 = (a_l * inv_S2) * rkl[c0];
             const auto QC_1 = (a_l * inv_S2) * rkl[c1];
             const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
