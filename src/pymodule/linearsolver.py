@@ -634,6 +634,7 @@ class LinearSolver:
         if self.rank == mpi_master():
             batch_str = f'Processing {n_total} Fock builds...'
             self.ostream.print_info(batch_str)
+            self.ostream.flush()
 
         for batch_ind in range(num_batches):
 
