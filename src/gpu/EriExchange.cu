@@ -170,6 +170,7 @@ computeExchangeFockSSSS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -219,7 +220,7 @@ computeExchangeFockSSSS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ss[displ_k + l];
 
-                    // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+                    //const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -385,6 +386,7 @@ computeExchangeFockSSSP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -616,7 +618,8 @@ computeExchangeFockSPSS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -674,7 +677,7 @@ computeExchangeFockSPSS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ss[displ_k + l];
 
-                    // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+                    //const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -852,7 +855,8 @@ computeExchangeFockSPSP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -1113,6 +1117,7 @@ computeExchangeFockSSPS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -1352,6 +1357,7 @@ computeExchangeFockSSPP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -1611,7 +1617,8 @@ computeExchangeFockSPPS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -1876,7 +1883,8 @@ computeExchangeFockSPPP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -2171,7 +2179,8 @@ computeExchangeFockPSPS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -2436,7 +2445,8 @@ computeExchangeFockPSPP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -2736,7 +2746,8 @@ computeExchangeFockPPPS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -3029,7 +3040,8 @@ computeExchangeFockPPPP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -3410,6 +3422,7 @@ computeExchangeFockSSSD(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -3673,7 +3686,8 @@ computeExchangeFockSDSS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -3733,7 +3747,7 @@ computeExchangeFockSDSS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ss[displ_k + l];
 
-                    // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+                    //const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -3944,7 +3958,8 @@ computeExchangeFockSPSD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -4249,7 +4264,8 @@ computeExchangeFockSDSP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -4546,7 +4562,8 @@ computeExchangeFockSDSD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -4927,6 +4944,7 @@ computeExchangeFockSSPD(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -5221,7 +5239,8 @@ computeExchangeFockSDPS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -5530,7 +5549,8 @@ computeExchangeFockSPPD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -5895,7 +5915,8 @@ computeExchangeFockSDPP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -6277,7 +6298,8 @@ computeExchangeFockSDPD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -6776,6 +6798,7 @@ computeExchangeFockSSDS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -7046,6 +7069,7 @@ computeExchangeFockSSDP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -7341,7 +7365,8 @@ computeExchangeFockSPDS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -7651,7 +7676,8 @@ computeExchangeFockSPDP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -8016,6 +8042,7 @@ computeExchangeFockSSDD(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -8356,7 +8383,8 @@ computeExchangeFockSDDS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -8740,7 +8768,8 @@ computeExchangeFockSPDD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -9207,7 +9236,8 @@ computeExchangeFockSDDP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -9707,7 +9737,8 @@ computeExchangeFockSDDD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -10470,7 +10501,8 @@ computeExchangeFockPSPD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -10836,7 +10868,8 @@ computeExchangeFockPDPS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -11200,7 +11233,8 @@ computeExchangeFockPPPD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -11701,7 +11735,8 @@ computeExchangeFockPDPP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -12206,7 +12241,8 @@ computeExchangeFockPSDS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -12516,7 +12552,8 @@ computeExchangeFockPSDP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -12883,7 +12920,8 @@ computeExchangeFockPPDS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -13269,7 +13307,8 @@ computeExchangeFockPSDD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -13737,7 +13776,8 @@ computeExchangeFockPDDS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -14238,7 +14278,8 @@ computeExchangeFockPPDP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -14740,7 +14781,8 @@ computeExchangeFockPPDD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -15504,7 +15546,8 @@ computeExchangeFockPDDP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -16296,7 +16339,8 @@ computeExchangeFockPDDD0(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -16752,7 +16796,8 @@ computeExchangeFockPDDD1(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -17257,7 +17302,8 @@ computeExchangeFockPDDD2(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -17863,7 +17909,8 @@ computeExchangeFockPDDD3(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -18200,7 +18247,8 @@ computeExchangeFockPDDD4(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -18511,7 +18559,8 @@ computeExchangeFockPDDD5(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -18970,7 +19019,8 @@ computeExchangeFockPDDD6(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;//, rij[3], PA_0, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        //double rij[3], PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -19248,7 +19298,8 @@ computeExchangeFockPDDD7(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -19529,7 +19580,8 @@ computeExchangeFockPDDD8(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -19805,7 +19857,8 @@ computeExchangeFockPDDD9(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -20286,7 +20339,8 @@ computeExchangeFockDSDS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -20671,7 +20725,8 @@ computeExchangeFockDSDP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -21175,7 +21230,8 @@ computeExchangeFockDPDS(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -21676,7 +21732,8 @@ computeExchangeFockDSDD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -22440,7 +22497,8 @@ computeExchangeFockDDDS0(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -23036,7 +23094,8 @@ computeExchangeFockDDDS1(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -23692,7 +23751,8 @@ computeExchangeFockDPDD0(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -24148,7 +24208,8 @@ computeExchangeFockDPDD1(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -24653,7 +24714,8 @@ computeExchangeFockDPDD2(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -25037,7 +25099,8 @@ computeExchangeFockDPDD3(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -25505,7 +25568,8 @@ computeExchangeFockDPDD4(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -25842,7 +25906,8 @@ computeExchangeFockDPDD5(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -26153,7 +26218,8 @@ computeExchangeFockDPDD6(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -26642,7 +26708,8 @@ computeExchangeFockDPDD7(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -26951,7 +27018,8 @@ computeExchangeFockDPDD8(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -27438,7 +27506,8 @@ computeExchangeFockDDDP0(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -27808,7 +27877,8 @@ computeExchangeFockDDDP1(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -28287,7 +28357,8 @@ computeExchangeFockDDDP2(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -28783,7 +28854,8 @@ computeExchangeFockDDDP3(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -29236,7 +29308,8 @@ computeExchangeFockDDDP4(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -29599,7 +29672,8 @@ computeExchangeFockDDDP5(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -30035,7 +30109,8 @@ computeExchangeFockDDDP6(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -30387,7 +30462,8 @@ computeExchangeFockDDDP7(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -30712,7 +30788,8 @@ computeExchangeFockDDDP8(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -31178,7 +31255,8 @@ computeExchangeFockDDDD0(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -31598,7 +31676,8 @@ computeExchangeFockDDDD1(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -32063,7 +32142,8 @@ computeExchangeFockDDDD2(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -32398,7 +32478,8 @@ computeExchangeFockDDDD3(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -32681,7 +32762,8 @@ computeExchangeFockDDDD4(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -32974,7 +33056,8 @@ computeExchangeFockDDDD5(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -33276,7 +33359,8 @@ computeExchangeFockDDDD6(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;//, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        //double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -33526,7 +33610,8 @@ computeExchangeFockDDDD7(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -33995,7 +34080,8 @@ computeExchangeFockDDDD8(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -34329,7 +34415,8 @@ computeExchangeFockDDDD9(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -34639,7 +34726,8 @@ computeExchangeFockDDDD10(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -34966,7 +35054,8 @@ computeExchangeFockDDDD11(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -35334,7 +35423,8 @@ computeExchangeFockDDDD12(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -35690,7 +35780,8 @@ computeExchangeFockDDDD13(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;//, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        //double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -35993,7 +36084,8 @@ computeExchangeFockDDDD14(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -36364,7 +36456,8 @@ computeExchangeFockDDDD15(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -36679,7 +36772,8 @@ computeExchangeFockDDDD16(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -36972,7 +37066,8 @@ computeExchangeFockDDDD17(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -37295,7 +37390,8 @@ computeExchangeFockDDDD18(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -38063,7 +38159,8 @@ computeExchangeFockDDDD19(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -38342,7 +38439,8 @@ computeExchangeFockDDDD20(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -38621,7 +38719,8 @@ computeExchangeFockDDDD21(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;//, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        //double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -38900,7 +38999,8 @@ computeExchangeFockDDDD22(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -38965,7 +39065,7 @@ computeExchangeFockDDDD22(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+                    //const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -38998,10 +39098,10 @@ computeExchangeFockDDDD22(double*         mat_K,
                         F8_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    // auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    // auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    // auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    // auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    //const auto QC_0 = (a_l * inv_S2) * rkl[c0];
+                    //const auto QC_1 = (a_l * inv_S2) * rkl[c1];
+                    //const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    //const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
                             F8_t[4] * (
@@ -39153,7 +39253,8 @@ computeExchangeFockDDDD23(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -39504,7 +39605,8 @@ computeExchangeFockDDDD24(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -40098,7 +40200,8 @@ computeExchangeFockDDDD25(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;//, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        //double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -40378,7 +40481,8 @@ computeExchangeFockDDDD26(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -40443,7 +40547,7 @@ computeExchangeFockDDDD26(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+                    //const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -40477,10 +40581,10 @@ computeExchangeFockDDDD26(double*         mat_K,
                         F8_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    // auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    // auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    // auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    // auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    //const auto QC_0 = (a_l * inv_S2) * rkl[c0];
+                    //const auto QC_1 = (a_l * inv_S2) * rkl[c1];
+                    //const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    //const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
                             F8_t[5] * (
@@ -40635,7 +40739,8 @@ computeExchangeFockDDDD27(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -40946,7 +41051,8 @@ computeExchangeFockDDDD28(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -41493,7 +41599,8 @@ computeExchangeFockDPDP(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -42277,7 +42384,8 @@ computeExchangeFockPDPD(double*         mat_K,
         // to avoid memory hazard
         __syncthreads();
 
-        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+        double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
+        double rij[3], PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))

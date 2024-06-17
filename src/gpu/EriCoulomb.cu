@@ -124,6 +124,7 @@ computeCoulombFockSSSS(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    
     uint32_t i, j;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -280,6 +281,7 @@ computeCoulombFockSSSP(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    
     uint32_t i, j;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -450,6 +452,7 @@ computeCoulombFockSSSD(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    
     uint32_t i, j;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -648,6 +651,7 @@ computeCoulombFockSSPP(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    
     uint32_t i, j;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -845,6 +849,7 @@ computeCoulombFockSSPD(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    
     uint32_t i, j;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -1069,6 +1074,7 @@ computeCoulombFockSSDD(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    
     uint32_t i, j;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -1339,7 +1345,8 @@ computeCoulombFockSPSS(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PB_0;
     uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -1512,7 +1519,8 @@ computeCoulombFockSPSP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PB_0;
     uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -1712,7 +1720,8 @@ computeCoulombFockSPSD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PB_0;
     uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -1947,7 +1956,8 @@ computeCoulombFockSPPP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PB_0;
     uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -2182,7 +2192,8 @@ computeCoulombFockSPPD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PB_0;
     uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -2474,7 +2485,8 @@ computeCoulombFockPPSS(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0;
     uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -2672,7 +2684,8 @@ computeCoulombFockPPSP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0;
     uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -2906,7 +2919,8 @@ computeCoulombFockSDSS(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PB_0, PB_1;
     uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -3111,7 +3125,8 @@ computeCoulombFockSDSP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PB_0, PB_1;
     uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -3349,7 +3364,8 @@ computeCoulombFockPDSS(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -3580,7 +3596,8 @@ computeCoulombFockPDSP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -3875,7 +3892,8 @@ computeCoulombFockDDSS(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -4153,7 +4171,8 @@ computeCoulombFockDDPD0(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -4459,7 +4478,8 @@ computeCoulombFockDDPD1(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -4873,7 +4893,8 @@ computeCoulombFockDDPD2(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;//, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    //double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -5064,7 +5085,8 @@ computeCoulombFockDDPD3(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -5447,7 +5469,8 @@ computeCoulombFockDDPD4(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -5810,7 +5833,8 @@ computeCoulombFockDDPD5(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -6083,7 +6107,8 @@ computeCoulombFockDDPD6(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -6309,7 +6334,8 @@ computeCoulombFockDDPD7(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -6531,7 +6557,8 @@ computeCoulombFockDDPD8(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -6930,7 +6957,8 @@ computeCoulombFockDDPD9(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -7171,7 +7199,8 @@ computeCoulombFockDDPD10(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -7427,7 +7456,8 @@ computeCoulombFockDDPD11(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;//, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    //double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -7514,7 +7544,7 @@ computeCoulombFockDDPD11(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+            //const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -7535,9 +7565,9 @@ computeCoulombFockDDPD11(double*         mat_J,
             double F7_t[5];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-            // auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            // auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            // auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            //const auto QC_0 = (a_l * inv_S2) * rkl[c0];
+            //const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+            //const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -7624,7 +7654,8 @@ computeCoulombFockDDPD12(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -8025,7 +8056,8 @@ computeCoulombFockDDDD0(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -8363,7 +8395,8 @@ computeCoulombFockDDDD1(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -8622,7 +8655,8 @@ computeCoulombFockDDDD2(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -8824,7 +8858,8 @@ computeCoulombFockDDDD3(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -9068,7 +9103,8 @@ computeCoulombFockDDDD4(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -9327,7 +9363,8 @@ computeCoulombFockDDDD5(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -9777,7 +9814,8 @@ computeCoulombFockDDDD6(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -10161,7 +10199,8 @@ computeCoulombFockDDDD7(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -10380,7 +10419,8 @@ computeCoulombFockDDDD8(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -10577,7 +10617,8 @@ computeCoulombFockDDDD9(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -10812,7 +10853,8 @@ computeCoulombFockDDDD10(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -11067,7 +11109,8 @@ computeCoulombFockDDDD11(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -11484,7 +11527,8 @@ computeCoulombFockDDDD12(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -11781,7 +11825,8 @@ computeCoulombFockDDDD13(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;//, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    //double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -12025,7 +12070,8 @@ computeCoulombFockDDDD14(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -12337,7 +12383,8 @@ computeCoulombFockDDDD15(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -12556,7 +12603,8 @@ computeCoulombFockDDDD16(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -12775,7 +12823,8 @@ computeCoulombFockDDDD17(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;//, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    //double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -12972,7 +13021,8 @@ computeCoulombFockDDDD18(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -13239,7 +13289,8 @@ computeCoulombFockDDDD19(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -13981,7 +14032,8 @@ computeCoulombFockDDDD20(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -14200,7 +14252,8 @@ computeCoulombFockDDDD21(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -14419,7 +14472,8 @@ computeCoulombFockDDDD22(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;//, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    //double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -14638,7 +14692,8 @@ computeCoulombFockDDDD23(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -14726,7 +14781,7 @@ computeCoulombFockDDDD23(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+            //const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -14747,10 +14802,10 @@ computeCoulombFockDDDD23(double*         mat_J,
             double F8_t[5];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-            // auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            // auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            // auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            // auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            //const auto QC_0 = (a_l * inv_S2) * rkl[c0];
+            //const auto QC_1 = (a_l * inv_S2) * rkl[c1];
+            //const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+            //const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -14831,7 +14886,8 @@ computeCoulombFockDDDD24(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -15085,7 +15141,8 @@ computeCoulombFockDDDD25(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -15351,7 +15408,8 @@ computeCoulombFockDDDD26(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -15837,7 +15895,8 @@ computeCoulombFockDDDD27(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;//, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    //double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -16056,7 +16115,8 @@ computeCoulombFockDDDD28(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -16144,7 +16204,7 @@ computeCoulombFockDDDD28(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            // double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
+            //const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -16165,10 +16225,10 @@ computeCoulombFockDDDD28(double*         mat_J,
             double F8_t[6];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
-            // auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            // auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            // auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            // auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            //const auto QC_0 = (a_l * inv_S2) * rkl[c0];
+            //const auto QC_1 = (a_l * inv_S2) * rkl[c1];
+            //const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+            //const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -16252,7 +16312,8 @@ computeCoulombFockDDDD29(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -16502,7 +16563,8 @@ computeCoulombFockDDDD30(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -16772,7 +16834,8 @@ computeCoulombFockDDDD31(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -16996,7 +17059,8 @@ computeCoulombFockDDDD32(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -17350,7 +17414,8 @@ computeCoulombFockDDPP0(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -17883,7 +17948,8 @@ computeCoulombFockDDPP1(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -18472,7 +18538,8 @@ computeCoulombFockDDSD0(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -19012,7 +19079,8 @@ computeCoulombFockDDSD1(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -19592,7 +19660,8 @@ computeCoulombFockDDSP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PA_1, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -19989,7 +20058,8 @@ computeCoulombFockPDDD0(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -20367,7 +20437,8 @@ computeCoulombFockPDDD1(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -20761,7 +20832,8 @@ computeCoulombFockPDDD2(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -21108,7 +21180,8 @@ computeCoulombFockPDDD3(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -21531,7 +21604,8 @@ computeCoulombFockPDDD4(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -21788,7 +21862,8 @@ computeCoulombFockPDDD5(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -22042,7 +22117,8 @@ computeCoulombFockPDDD6(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -22397,7 +22473,8 @@ computeCoulombFockPDDD7(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -22669,7 +22746,8 @@ computeCoulombFockPDDD8(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -22912,7 +22990,8 @@ computeCoulombFockPDDD9(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -23330,7 +23409,8 @@ computeCoulombFockPDPD0(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -23868,7 +23948,8 @@ computeCoulombFockPDPD1(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -24463,7 +24544,8 @@ computeCoulombFockPDPP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -24897,7 +24979,8 @@ computeCoulombFockPDSD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -25328,7 +25411,8 @@ computeCoulombFockSDDD0(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PB_0, PB_1;
     uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -25874,7 +25958,8 @@ computeCoulombFockSDDD1(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PB_0, PB_1;
     uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -26447,7 +26532,8 @@ computeCoulombFockSDPD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PB_0, PB_1;
     uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -26876,7 +26962,8 @@ computeCoulombFockSDPP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PB_0, PB_1;
     uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -27187,7 +27274,8 @@ computeCoulombFockSDSD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0, PB_1;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PB_0, PB_1;
     uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -27495,7 +27583,8 @@ computeCoulombFockPPDD0(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0;
     uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -28033,7 +28122,8 @@ computeCoulombFockPPDD1(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0;
     uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -28616,7 +28706,8 @@ computeCoulombFockPPPD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0;
     uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -29044,7 +29135,8 @@ computeCoulombFockPPPP(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0;
     uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -29355,7 +29447,8 @@ computeCoulombFockPPSD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PA_0, PB_0;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PA_0, PB_0;
     uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -29670,7 +29763,8 @@ computeCoulombFockSPDD(double*         mat_J,
 
     double J_ij = 0.0;
 
-    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, rij[3], PB_0;
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double rij[3], PB_0;
     uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
