@@ -220,8 +220,6 @@ computeExchangeFockSSSS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ss[displ_k + l];
 
-                    //const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -438,8 +436,6 @@ computeExchangeFockSSSP(double*         mat_K,
 
                     const auto d0 = l_prim % 3;
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -469,7 +465,7 @@ computeExchangeFockSSSP(double*         mat_K,
                         F1_t[1] *= d2;
                     }
 
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -619,7 +615,7 @@ computeExchangeFockSPSS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0;
+        double PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -643,11 +639,7 @@ computeExchangeFockSPSS(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -676,8 +668,6 @@ computeExchangeFockSPSS(double*         mat_K,
                                            s_prim_info[l_prim + s_prim_count * 4]};
 
                     const auto S_kl_00 = pair_data_K_ss[displ_k + l];
-
-                    //const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -856,7 +846,7 @@ computeExchangeFockSPSP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0;
+        double PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -880,11 +870,7 @@ computeExchangeFockSPSP(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -916,8 +902,6 @@ computeExchangeFockSPSP(double*         mat_K,
 
                     const auto d0 = l_prim % 3;
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -948,7 +932,7 @@ computeExchangeFockSPSP(double*         mat_K,
                         F2_t[2] *= d2 * d2;
                     }
 
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -1167,8 +1151,6 @@ computeExchangeFockSSPS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ps[displ_k + l];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -1198,7 +1180,7 @@ computeExchangeFockSSPS(double*         mat_K,
                         F1_t[1] *= d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -1409,8 +1391,6 @@ computeExchangeFockSSPP(double*         mat_K,
 
                     const auto d0 = l_prim % 3;
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -1441,8 +1421,8 @@ computeExchangeFockSSPP(double*         mat_K,
                         F2_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -1618,7 +1598,7 @@ computeExchangeFockSPPS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0;
+        double PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -1642,11 +1622,7 @@ computeExchangeFockSPPS(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -1675,8 +1651,6 @@ computeExchangeFockSPPS(double*         mat_K,
                                            s_prim_info[l_prim + s_prim_count * 4]};
 
                     const auto S_kl_00 = pair_data_K_ps[displ_k + l];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -1708,7 +1682,7 @@ computeExchangeFockSPPS(double*         mat_K,
                         F2_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -1884,7 +1858,7 @@ computeExchangeFockSPPP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0;
+        double PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -1908,11 +1882,7 @@ computeExchangeFockSPPP(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -1943,8 +1913,6 @@ computeExchangeFockSPPP(double*         mat_K,
                     const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
                     const auto d0 = l_prim % 3;
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -1977,8 +1945,8 @@ computeExchangeFockSPPP(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -2180,7 +2148,7 @@ computeExchangeFockPSPS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0;
+        double PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -2202,11 +2170,7 @@ computeExchangeFockPSPS(double*         mat_K,
 
             S_ij_00 = pair_data_K_ps[displ_i + j];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
 
         }
 
@@ -2235,8 +2199,6 @@ computeExchangeFockPSPS(double*         mat_K,
                                            s_prim_info[l_prim + s_prim_count * 4]};
 
                     const auto S_kl_00 = pair_data_K_ps[displ_k + l];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -2268,7 +2230,7 @@ computeExchangeFockPSPS(double*         mat_K,
                         F2_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -2446,7 +2408,7 @@ computeExchangeFockPSPP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0;
+        double PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -2468,11 +2430,7 @@ computeExchangeFockPSPP(double*         mat_K,
 
             S_ij_00 = pair_data_K_ps[displ_i + j];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
 
         }
 
@@ -2503,8 +2461,6 @@ computeExchangeFockPSPP(double*         mat_K,
                     const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
                     const auto d0 = l_prim % 3;
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -2537,8 +2493,8 @@ computeExchangeFockPSPP(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -2747,7 +2703,7 @@ computeExchangeFockPPPS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0;
+        double PA_0, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -2771,12 +2727,8 @@ computeExchangeFockPPPS(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -2805,8 +2757,6 @@ computeExchangeFockPPPS(double*         mat_K,
                                            s_prim_info[l_prim + s_prim_count * 4]};
 
                     const auto S_kl_00 = pair_data_K_ps[displ_k + l];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -2839,7 +2789,7 @@ computeExchangeFockPPPS(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -3041,7 +2991,7 @@ computeExchangeFockPPPP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0;
+        double PA_0, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -3065,12 +3015,8 @@ computeExchangeFockPPPP(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -3101,8 +3047,6 @@ computeExchangeFockPPPP(double*         mat_K,
                     const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
                     const auto d0 = l_prim % 3;
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
                     // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -3136,8 +3080,8 @@ computeExchangeFockPPPP(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -3475,8 +3419,6 @@ computeExchangeFockSSSD(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -3506,8 +3448,8 @@ computeExchangeFockSSSD(double*         mat_K,
                         F2_t[2] *= d2 * d2;
                     }
 
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -3687,7 +3629,7 @@ computeExchangeFockSDSS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0, PB_1;
+        double PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -3712,12 +3654,8 @@ computeExchangeFockSDSS(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -3746,8 +3684,6 @@ computeExchangeFockSDSS(double*         mat_K,
                                            s_prim_info[l_prim + s_prim_count * 4]};
 
                     const auto S_kl_00 = pair_data_K_ss[displ_k + l];
-
-                    //const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -3959,7 +3895,7 @@ computeExchangeFockSPSD(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0;
+        double PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -3983,11 +3919,7 @@ computeExchangeFockSPSD(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -4020,8 +3952,6 @@ computeExchangeFockSPSD(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -4052,8 +3982,8 @@ computeExchangeFockSPSD(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -4265,7 +4195,7 @@ computeExchangeFockSDSP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0, PB_1;
+        double PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -4290,12 +4220,8 @@ computeExchangeFockSDSP(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -4327,8 +4253,6 @@ computeExchangeFockSDSP(double*         mat_K,
 
                     const auto d0 = l_prim % 3;
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -4359,7 +4283,7 @@ computeExchangeFockSDSP(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -4563,7 +4487,7 @@ computeExchangeFockSDSD(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0, PB_1;
+        double PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_ss) && (j < count_i))
@@ -4588,12 +4512,8 @@ computeExchangeFockSDSD(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -4626,8 +4546,6 @@ computeExchangeFockSDSD(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -4659,8 +4577,8 @@ computeExchangeFockSDSD(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -4997,8 +4915,6 @@ computeExchangeFockSSPD(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -5029,9 +4945,9 @@ computeExchangeFockSSPD(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -5240,7 +5156,7 @@ computeExchangeFockSDPS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0, PB_1;
+        double PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -5265,12 +5181,8 @@ computeExchangeFockSDPS(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -5299,8 +5211,6 @@ computeExchangeFockSDPS(double*         mat_K,
                                            s_prim_info[l_prim + s_prim_count * 4]};
 
                     const auto S_kl_00 = pair_data_K_ps[displ_k + l];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -5332,7 +5242,7 @@ computeExchangeFockSDPS(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -5550,7 +5460,7 @@ computeExchangeFockSPPD(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0;
+        double PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -5574,11 +5484,7 @@ computeExchangeFockSPPD(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -5611,8 +5517,6 @@ computeExchangeFockSPPD(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -5644,9 +5548,9 @@ computeExchangeFockSPPD(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -5916,7 +5820,7 @@ computeExchangeFockSDPP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0, PB_1;
+        double PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -5941,12 +5845,8 @@ computeExchangeFockSDPP(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -5977,8 +5877,6 @@ computeExchangeFockSDPP(double*         mat_K,
                     const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
                     const auto d0 = l_prim % 3;
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -6011,8 +5909,8 @@ computeExchangeFockSDPP(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -6299,7 +6197,7 @@ computeExchangeFockSDPD(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0, PB_1;
+        double PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sp) && (j < count_i))
@@ -6324,12 +6222,8 @@ computeExchangeFockSDPD(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -6361,8 +6255,6 @@ computeExchangeFockSDPD(double*         mat_K,
 
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -6396,9 +6288,9 @@ computeExchangeFockSDPD(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -6848,8 +6740,6 @@ computeExchangeFockSSDS(double*         mat_K,
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -6879,8 +6769,8 @@ computeExchangeFockSSDS(double*         mat_K,
                         F2_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -7121,8 +7011,6 @@ computeExchangeFockSSDP(double*         mat_K,
 
                     const auto d0 = l_prim % 3;
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -7153,9 +7041,9 @@ computeExchangeFockSSDP(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -7366,7 +7254,7 @@ computeExchangeFockSPDS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0;
+        double PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -7390,11 +7278,7 @@ computeExchangeFockSPDS(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -7423,8 +7307,6 @@ computeExchangeFockSPDS(double*         mat_K,
                                            s_prim_info[l_prim + s_prim_count * 4]};
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -7456,8 +7338,8 @@ computeExchangeFockSPDS(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -7677,7 +7559,7 @@ computeExchangeFockSPDP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0;
+        double PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -7701,11 +7583,7 @@ computeExchangeFockSPDP(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -7736,8 +7614,6 @@ computeExchangeFockSPDP(double*         mat_K,
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
                     const auto d0 = l_prim % 3;
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -7770,9 +7646,9 @@ computeExchangeFockSPDP(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -8095,8 +7971,6 @@ computeExchangeFockSSDD(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -8128,10 +8002,10 @@ computeExchangeFockSSDD(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -8384,7 +8258,7 @@ computeExchangeFockSDDS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0, PB_1;
+        double PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -8409,12 +8283,8 @@ computeExchangeFockSDDS(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -8443,8 +8313,6 @@ computeExchangeFockSDDS(double*         mat_K,
                                            s_prim_info[l_prim + s_prim_count * 4]};
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -8477,8 +8345,8 @@ computeExchangeFockSDDS(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -8769,7 +8637,7 @@ computeExchangeFockSPDD(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0;
+        double PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -8793,11 +8661,7 @@ computeExchangeFockSPDD(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -8829,8 +8693,6 @@ computeExchangeFockSPDD(double*         mat_K,
 
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -8864,10 +8726,10 @@ computeExchangeFockSPDD(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -9237,7 +9099,7 @@ computeExchangeFockSDDP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0, PB_1;
+        double PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -9262,12 +9124,8 @@ computeExchangeFockSDDP(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -9298,8 +9156,6 @@ computeExchangeFockSDDP(double*         mat_K,
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
                     const auto d0 = l_prim % 3;
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -9333,9 +9189,9 @@ computeExchangeFockSDDP(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -9738,7 +9594,7 @@ computeExchangeFockSDDD(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PB_0, PB_1;
+        double PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_sd) && (j < count_i))
@@ -9763,12 +9619,8 @@ computeExchangeFockSDDD(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -9800,8 +9652,6 @@ computeExchangeFockSDDD(double*         mat_K,
 
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -9836,10 +9686,10 @@ computeExchangeFockSDDD(double*         mat_K,
                         F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -10502,7 +10352,7 @@ computeExchangeFockPSPD(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0;
+        double PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -10524,11 +10374,7 @@ computeExchangeFockPSPD(double*         mat_K,
 
             S_ij_00 = pair_data_K_ps[displ_i + j];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
 
         }
 
@@ -10561,8 +10407,6 @@ computeExchangeFockPSPD(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -10594,9 +10438,9 @@ computeExchangeFockPSPD(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -10869,7 +10713,7 @@ computeExchangeFockPDPS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0, PB_1;
+        double PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -10894,13 +10738,9 @@ computeExchangeFockPDPS(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -10929,8 +10769,6 @@ computeExchangeFockPDPS(double*         mat_K,
                                            s_prim_info[l_prim + s_prim_count * 4]};
 
                     const auto S_kl_00 = pair_data_K_ps[displ_k + l];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -10963,7 +10801,7 @@ computeExchangeFockPDPS(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -11234,7 +11072,7 @@ computeExchangeFockPPPD(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0;
+        double PA_0, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -11258,12 +11096,8 @@ computeExchangeFockPPPD(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -11295,8 +11129,6 @@ computeExchangeFockPPPD(double*         mat_K,
 
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -11330,9 +11162,9 @@ computeExchangeFockPPPD(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -11736,7 +11568,7 @@ computeExchangeFockPDPP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0, PB_1;
+        double PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -11761,13 +11593,9 @@ computeExchangeFockPDPP(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -11798,8 +11626,6 @@ computeExchangeFockPDPP(double*         mat_K,
                     const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
                     const auto d0 = l_prim % 3;
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -11833,8 +11659,8 @@ computeExchangeFockPDPP(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -12242,7 +12068,7 @@ computeExchangeFockPSDS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0;
+        double PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -12264,11 +12090,7 @@ computeExchangeFockPSDS(double*         mat_K,
 
             S_ij_00 = pair_data_K_ps[displ_i + j];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
 
         }
 
@@ -12297,8 +12119,6 @@ computeExchangeFockPSDS(double*         mat_K,
                                            s_prim_info[l_prim + s_prim_count * 4]};
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -12330,8 +12150,8 @@ computeExchangeFockPSDS(double*         mat_K,
                         F3_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -12553,7 +12373,7 @@ computeExchangeFockPSDP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0;
+        double PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -12575,11 +12395,7 @@ computeExchangeFockPSDP(double*         mat_K,
 
             S_ij_00 = pair_data_K_ps[displ_i + j];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
 
         }
 
@@ -12610,8 +12426,6 @@ computeExchangeFockPSDP(double*         mat_K,
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
                     const auto d0 = l_prim % 3;
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -12644,9 +12458,9 @@ computeExchangeFockPSDP(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -12921,7 +12735,7 @@ computeExchangeFockPPDS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0;
+        double PA_0, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -12945,12 +12759,8 @@ computeExchangeFockPPDS(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -12979,8 +12789,6 @@ computeExchangeFockPPDS(double*         mat_K,
                                            s_prim_info[l_prim + s_prim_count * 4]};
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -13013,8 +12821,8 @@ computeExchangeFockPPDS(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -13308,7 +13116,7 @@ computeExchangeFockPSDD(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0;
+        double PA_0;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -13330,11 +13138,7 @@ computeExchangeFockPSDD(double*         mat_K,
 
             S_ij_00 = pair_data_K_ps[displ_i + j];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
 
         }
 
@@ -13366,8 +13170,6 @@ computeExchangeFockPSDD(double*         mat_K,
 
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -13401,10 +13203,10 @@ computeExchangeFockPSDD(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -13777,7 +13579,7 @@ computeExchangeFockPDDS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0, PB_1;
+        double PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -13802,13 +13604,9 @@ computeExchangeFockPDDS(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -13837,8 +13635,6 @@ computeExchangeFockPDDS(double*         mat_K,
                                            s_prim_info[l_prim + s_prim_count * 4]};
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -13872,8 +13668,8 @@ computeExchangeFockPDDS(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -14279,7 +14075,7 @@ computeExchangeFockPPDP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0;
+        double PA_0, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -14303,12 +14099,8 @@ computeExchangeFockPPDP(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -14339,8 +14131,6 @@ computeExchangeFockPPDP(double*         mat_K,
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
                     const auto d0 = l_prim % 3;
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -14374,9 +14164,9 @@ computeExchangeFockPPDP(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -14782,7 +14572,7 @@ computeExchangeFockPPDD(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0;
+        double PA_0, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -14806,12 +14596,8 @@ computeExchangeFockPPDD(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -14843,8 +14629,6 @@ computeExchangeFockPPDD(double*         mat_K,
 
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -14879,10 +14663,10 @@ computeExchangeFockPPDD(double*         mat_K,
                         F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -15547,7 +15331,7 @@ computeExchangeFockPDDP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0, PB_1;
+        double PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -15572,13 +15356,9 @@ computeExchangeFockPDDP(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -15609,8 +15389,6 @@ computeExchangeFockPDDP(double*         mat_K,
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
                     const auto d0 = l_prim % 3;
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -15645,9 +15423,9 @@ computeExchangeFockPDDP(double*         mat_K,
                         F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -16340,7 +16118,7 @@ computeExchangeFockPDDD0(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0, PB_1;
+        double PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -16365,13 +16143,9 @@ computeExchangeFockPDDD0(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -16404,8 +16178,6 @@ computeExchangeFockPDDD0(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -16434,12 +16206,13 @@ computeExchangeFockPDDD0(double*         mat_K,
                         F7_t[1] *= d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[0] * (
 
                                 0.125 * inv_S1 * inv_S2 * inv_S2 * (
@@ -16797,7 +16570,7 @@ computeExchangeFockPDDD1(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0, PB_1;
+        double PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -16822,13 +16595,9 @@ computeExchangeFockPDDD1(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -16861,8 +16630,6 @@ computeExchangeFockPDDD1(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -16892,12 +16659,13 @@ computeExchangeFockPDDD1(double*         mat_K,
                         F7_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[1] * (
 
                                 + 0.5 * S2 * inv_S1 * inv_S4 * (
@@ -17303,7 +17071,7 @@ computeExchangeFockPDDD2(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0, PB_1;
+        double PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -17328,13 +17096,9 @@ computeExchangeFockPDDD2(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -17367,8 +17131,6 @@ computeExchangeFockPDDD2(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -17399,12 +17161,13 @@ computeExchangeFockPDDD2(double*         mat_K,
                         F7_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[2] * (
 
                                 + 0.5 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * (
@@ -17910,7 +17673,7 @@ computeExchangeFockPDDD3(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0, PB_1;
+        double PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -17935,13 +17698,9 @@ computeExchangeFockPDDD3(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -17974,8 +17733,6 @@ computeExchangeFockPDDD3(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -18006,12 +17763,13 @@ computeExchangeFockPDDD3(double*         mat_K,
                         F7_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[3] * (
 
                                 + 0.5 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * (
@@ -18248,7 +18006,7 @@ computeExchangeFockPDDD4(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0, PB_1;
+        double PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -18273,13 +18031,9 @@ computeExchangeFockPDDD4(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -18312,8 +18066,6 @@ computeExchangeFockPDDD4(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -18344,12 +18096,13 @@ computeExchangeFockPDDD4(double*         mat_K,
                         F7_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[3] * (
 
                                 + S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * (
@@ -18560,7 +18313,7 @@ computeExchangeFockPDDD5(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0, PB_1;
+        double PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -18585,13 +18338,9 @@ computeExchangeFockPDDD5(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -18624,8 +18373,6 @@ computeExchangeFockPDDD5(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -18657,12 +18404,13 @@ computeExchangeFockPDDD5(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[3] * (
 
                                 + S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
@@ -19020,7 +18768,7 @@ computeExchangeFockPDDD6(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        //double rij[3], PA_0, PB_0, PB_1;
+        //double PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -19045,13 +18793,9 @@ computeExchangeFockPDDD6(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            //rij[0] = r_j[0] - r_i[0];
-            //rij[1] = r_j[1] - r_i[1];
-            //rij[2] = r_j[2] - r_i[2];
-
-            //PA_0 = (a_j * inv_S1) * rij[a0];
-            //PB_0 = (-a_i * inv_S1) * rij[b0];
-            //PB_1 = (-a_i * inv_S1) * rij[b1];
+            //PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            //PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            //PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -19084,8 +18828,6 @@ computeExchangeFockPDDD6(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -19117,12 +18859,13 @@ computeExchangeFockPDDD6(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[4] * (
 
                                 + (-0.5) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -19299,7 +19042,7 @@ computeExchangeFockPDDD7(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0, PB_1;
+        double PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -19324,13 +19067,9 @@ computeExchangeFockPDDD7(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -19363,8 +19102,6 @@ computeExchangeFockPDDD7(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -19396,12 +19133,13 @@ computeExchangeFockPDDD7(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[4] * (
 
                                 + S1 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -19581,7 +19319,7 @@ computeExchangeFockPDDD8(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0, PB_1;
+        double PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -19606,13 +19344,9 @@ computeExchangeFockPDDD8(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -19645,8 +19379,6 @@ computeExchangeFockPDDD8(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -19678,12 +19410,13 @@ computeExchangeFockPDDD8(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[4] * (
 
                                 + S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -19858,7 +19591,7 @@ computeExchangeFockPDDD9(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0, PB_1;
+        double PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
@@ -19883,13 +19616,9 @@ computeExchangeFockPDDD9(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -19921,8 +19650,6 @@ computeExchangeFockPDDD9(double*         mat_K,
 
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -19958,12 +19685,13 @@ computeExchangeFockPDDD9(double*         mat_K,
                         F7_t[7] *= d2 * d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[4] * (
 
                                 + S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -20340,7 +20068,7 @@ computeExchangeFockDSDS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1;
+        double PA_0, PA_1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -20362,12 +20090,8 @@ computeExchangeFockDSDS(double*         mat_K,
 
             S_ij_00 = pair_data_K_ds[displ_i + j];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
 
         }
 
@@ -20396,8 +20120,6 @@ computeExchangeFockDSDS(double*         mat_K,
                                            s_prim_info[l_prim + s_prim_count * 4]};
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -20430,8 +20152,8 @@ computeExchangeFockDSDS(double*         mat_K,
                         F4_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -20726,7 +20448,7 @@ computeExchangeFockDSDP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1;
+        double PA_0, PA_1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -20748,12 +20470,8 @@ computeExchangeFockDSDP(double*         mat_K,
 
             S_ij_00 = pair_data_K_ds[displ_i + j];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
 
         }
 
@@ -20784,8 +20502,6 @@ computeExchangeFockDSDP(double*         mat_K,
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
                     const auto d0 = l_prim % 3;
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -20819,9 +20535,9 @@ computeExchangeFockDSDP(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -21231,7 +20947,7 @@ computeExchangeFockDPDS(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0;
+        double PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -21255,13 +20971,9 @@ computeExchangeFockDPDS(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -21290,8 +21002,6 @@ computeExchangeFockDPDS(double*         mat_K,
                                            s_prim_info[l_prim + s_prim_count * 4]};
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -21325,8 +21035,8 @@ computeExchangeFockDPDS(double*         mat_K,
                         F5_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -21733,7 +21443,7 @@ computeExchangeFockDSDD(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1;
+        double PA_0, PA_1;
         uint32_t j_prim, j_cgto;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -21755,12 +21465,8 @@ computeExchangeFockDSDD(double*         mat_K,
 
             S_ij_00 = pair_data_K_ds[displ_i + j];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
 
         }
 
@@ -21792,8 +21498,6 @@ computeExchangeFockDSDD(double*         mat_K,
 
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -21828,10 +21532,10 @@ computeExchangeFockDSDD(double*         mat_K,
                         F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -22498,7 +22202,7 @@ computeExchangeFockDDDS0(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -22523,14 +22227,10 @@ computeExchangeFockDDDS0(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -22559,8 +22259,6 @@ computeExchangeFockDDDS0(double*         mat_K,
                                            s_prim_info[l_prim + s_prim_count * 4]};
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -22591,10 +22289,11 @@ computeExchangeFockDDDS0(double*         mat_K,
                         F6_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F6_t[0] * (
 
                                 0.25 * inv_S1 * inv_S1 * (
@@ -23095,7 +22794,7 @@ computeExchangeFockDDDS1(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -23120,14 +22819,10 @@ computeExchangeFockDDDS1(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -23156,8 +22851,6 @@ computeExchangeFockDDDS1(double*         mat_K,
                                            s_prim_info[l_prim + s_prim_count * 4]};
 
                     const auto S_kl_00 = pair_data_K_ds[displ_k + l];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -23192,10 +22885,11 @@ computeExchangeFockDDDS1(double*         mat_K,
                         F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F6_t[2] * (
 
                                 + S1 * S2 * inv_S4 * inv_S4 * (
@@ -23752,7 +23446,7 @@ computeExchangeFockDPDD0(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0;
+        double PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -23776,13 +23470,9 @@ computeExchangeFockDPDD0(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -23815,8 +23505,6 @@ computeExchangeFockDPDD0(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -23845,12 +23533,13 @@ computeExchangeFockDPDD0(double*         mat_K,
                         F7_t[1] *= d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[0] * (
 
                                 0.125 * inv_S1 * inv_S2 * inv_S2 * (
@@ -24209,7 +23898,7 @@ computeExchangeFockDPDD1(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0;
+        double PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -24233,13 +23922,9 @@ computeExchangeFockDPDD1(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -24272,8 +23957,6 @@ computeExchangeFockDPDD1(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -24303,12 +23986,13 @@ computeExchangeFockDPDD1(double*         mat_K,
                         F7_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[1] * (
 
                                 + 0.5 * S2 * inv_S1 * inv_S4 * (
@@ -24715,7 +24399,7 @@ computeExchangeFockDPDD2(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0;
+        double PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -24739,13 +24423,9 @@ computeExchangeFockDPDD2(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -24778,8 +24458,6 @@ computeExchangeFockDPDD2(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -24809,12 +24487,13 @@ computeExchangeFockDPDD2(double*         mat_K,
                         F7_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[2] * (
 
                                 + 0.5 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * (
@@ -25100,7 +24779,7 @@ computeExchangeFockDPDD3(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0;
+        double PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -25124,13 +24803,9 @@ computeExchangeFockDPDD3(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -25163,8 +24838,6 @@ computeExchangeFockDPDD3(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -25195,12 +24868,13 @@ computeExchangeFockDPDD3(double*         mat_K,
                         F7_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[3] * (
 
                                 0.125 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * (
@@ -25569,7 +25243,7 @@ computeExchangeFockDPDD4(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0;
+        double PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -25593,13 +25267,9 @@ computeExchangeFockDPDD4(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -25632,8 +25302,6 @@ computeExchangeFockDPDD4(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -25664,12 +25332,13 @@ computeExchangeFockDPDD4(double*         mat_K,
                         F7_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[3] * (
 
                                 + 0.5 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * (
@@ -25907,7 +25576,7 @@ computeExchangeFockDPDD5(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0;
+        double PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -25931,13 +25600,9 @@ computeExchangeFockDPDD5(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -25970,8 +25635,6 @@ computeExchangeFockDPDD5(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -26002,12 +25665,13 @@ computeExchangeFockDPDD5(double*         mat_K,
                         F7_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[3] * (
 
                                 + S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * (
@@ -26219,7 +25883,7 @@ computeExchangeFockDPDD6(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0;
+        double PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -26243,13 +25907,9 @@ computeExchangeFockDPDD6(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -26282,8 +25942,6 @@ computeExchangeFockDPDD6(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -26315,12 +25973,13 @@ computeExchangeFockDPDD6(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[3] * (
 
                                 + S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
@@ -26709,7 +26368,7 @@ computeExchangeFockDPDD7(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0;
+        double PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -26733,13 +26392,9 @@ computeExchangeFockDPDD7(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -26772,8 +26427,6 @@ computeExchangeFockDPDD7(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -26805,12 +26458,13 @@ computeExchangeFockDPDD7(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[4] * (
 
                                 + S1 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -27019,7 +26673,7 @@ computeExchangeFockDPDD8(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0;
+        double PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -27043,13 +26697,9 @@ computeExchangeFockDPDD8(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -27081,8 +26731,6 @@ computeExchangeFockDPDD8(double*         mat_K,
 
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -27118,12 +26766,13 @@ computeExchangeFockDPDD8(double*         mat_K,
                         F7_t[7] *= d2 * d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[4] * (
 
                                 + S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -27507,7 +27156,7 @@ computeExchangeFockDDDP0(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -27532,14 +27181,10 @@ computeExchangeFockDDDP0(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -27571,8 +27216,6 @@ computeExchangeFockDDDP0(double*         mat_K,
 
                     const auto d0 = l_prim % 3;
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -27601,11 +27244,12 @@ computeExchangeFockDDDP0(double*         mat_K,
                         F7_t[1] *= d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[0] * (
 
                                 0.125 * inv_S1 * inv_S1 * inv_S2 * (
@@ -27878,7 +27522,7 @@ computeExchangeFockDDDP1(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -27903,14 +27547,10 @@ computeExchangeFockDDDP1(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -27942,8 +27582,6 @@ computeExchangeFockDDDP1(double*         mat_K,
 
                     const auto d0 = l_prim % 3;
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -27973,11 +27611,12 @@ computeExchangeFockDDDP1(double*         mat_K,
                         F7_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[1] * (
 
                                 + 0.25 * inv_S1 * inv_S4 * (
@@ -28358,7 +27997,7 @@ computeExchangeFockDDDP2(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -28383,14 +28022,10 @@ computeExchangeFockDDDP2(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -28422,8 +28057,6 @@ computeExchangeFockDDDP2(double*         mat_K,
 
                     const auto d0 = l_prim % 3;
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -28453,11 +28086,12 @@ computeExchangeFockDDDP2(double*         mat_K,
                         F7_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[2] * (
 
                                 + 0.25 * S2 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * (
@@ -28855,7 +28489,7 @@ computeExchangeFockDDDP3(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -28880,14 +28514,10 @@ computeExchangeFockDDDP3(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -28919,8 +28549,6 @@ computeExchangeFockDDDP3(double*         mat_K,
 
                     const auto d0 = l_prim % 3;
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -28951,11 +28579,12 @@ computeExchangeFockDDDP3(double*         mat_K,
                         F7_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[3] * (
 
                                 (-0.125) * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
@@ -29309,7 +28938,7 @@ computeExchangeFockDDDP4(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -29334,14 +28963,10 @@ computeExchangeFockDDDP4(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -29373,8 +28998,6 @@ computeExchangeFockDDDP4(double*         mat_K,
 
                     const auto d0 = l_prim % 3;
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -29405,11 +29028,12 @@ computeExchangeFockDDDP4(double*         mat_K,
                         F7_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[3] * (
 
                                 + 0.5 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * (
@@ -29673,7 +29297,7 @@ computeExchangeFockDDDP5(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -29698,14 +29322,10 @@ computeExchangeFockDDDP5(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -29736,8 +29356,6 @@ computeExchangeFockDDDP5(double*         mat_K,
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
                     const auto d0 = l_prim % 3;
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -29770,11 +29388,12 @@ computeExchangeFockDDDP5(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[3] * (
 
                                 + S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
@@ -30110,7 +29729,7 @@ computeExchangeFockDDDP6(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -30135,14 +29754,10 @@ computeExchangeFockDDDP6(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -30173,8 +29788,6 @@ computeExchangeFockDDDP6(double*         mat_K,
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
                     const auto d0 = l_prim % 3;
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -30207,11 +29820,12 @@ computeExchangeFockDDDP6(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[4] * (
 
                                 + 0.5 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -30463,7 +30077,7 @@ computeExchangeFockDDDP7(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -30488,14 +30102,10 @@ computeExchangeFockDDDP7(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -30526,8 +30136,6 @@ computeExchangeFockDDDP7(double*         mat_K,
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
                     const auto d0 = l_prim % 3;
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -30560,11 +30168,12 @@ computeExchangeFockDDDP7(double*         mat_K,
                         F7_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[4] * (
 
                                 + S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -30789,7 +30398,7 @@ computeExchangeFockDDDP8(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -30814,14 +30423,10 @@ computeExchangeFockDDDP8(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -30852,8 +30457,6 @@ computeExchangeFockDDDP8(double*         mat_K,
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
                     const auto d0 = l_prim % 3;
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -30889,11 +30492,12 @@ computeExchangeFockDDDP8(double*         mat_K,
                         F7_t[7] *= d2 * d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F7_t[5] * (
 
                                 (-0.25) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -31256,7 +30860,7 @@ computeExchangeFockDDDD0(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -31281,14 +30885,10 @@ computeExchangeFockDDDD0(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -31321,8 +30921,6 @@ computeExchangeFockDDDD0(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -31351,12 +30949,13 @@ computeExchangeFockDDDD0(double*         mat_K,
                         F8_t[1] *= d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[0] * (
 
                                 0.125 * inv_S1 * inv_S1 * inv_S2 * (
@@ -31677,7 +31276,7 @@ computeExchangeFockDDDD1(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -31702,14 +31301,10 @@ computeExchangeFockDDDD1(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -31742,8 +31337,6 @@ computeExchangeFockDDDD1(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -31772,12 +31365,13 @@ computeExchangeFockDDDD1(double*         mat_K,
                         F8_t[1] *= d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[1] * (
 
                                 + 0.125 * inv_S1 * inv_S2 * inv_S4 * (
@@ -32143,7 +31737,7 @@ computeExchangeFockDDDD2(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -32168,14 +31762,10 @@ computeExchangeFockDDDD2(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -32208,8 +31798,6 @@ computeExchangeFockDDDD2(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -32239,12 +31827,13 @@ computeExchangeFockDDDD2(double*         mat_K,
                         F8_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[1] * (
 
                                 + 0.5 * inv_S4 * (
@@ -32479,7 +32068,7 @@ computeExchangeFockDDDD3(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -32504,14 +32093,10 @@ computeExchangeFockDDDD3(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -32544,8 +32129,6 @@ computeExchangeFockDDDD3(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -32575,12 +32158,13 @@ computeExchangeFockDDDD3(double*         mat_K,
                         F8_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[2] * (
 
                                 + 0.125 * inv_S1 * inv_S4 * inv_S4 * (
@@ -32763,7 +32347,7 @@ computeExchangeFockDDDD4(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -32788,14 +32372,10 @@ computeExchangeFockDDDD4(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -32828,8 +32408,6 @@ computeExchangeFockDDDD4(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -32859,12 +32437,13 @@ computeExchangeFockDDDD4(double*         mat_K,
                         F8_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[2] * (
 
                                 + 0.125 * inv_S2 * inv_S4 * inv_S4 * (
@@ -33057,7 +32636,7 @@ computeExchangeFockDDDD5(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -33082,14 +32661,10 @@ computeExchangeFockDDDD5(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -33122,8 +32697,6 @@ computeExchangeFockDDDD5(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -33153,12 +32726,13 @@ computeExchangeFockDDDD5(double*         mat_K,
                         F8_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[2] * (
 
                                 + 0.25 * S1 * inv_S2 * inv_S4 * inv_S4 * (
@@ -33360,7 +32934,7 @@ computeExchangeFockDDDD6(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        //double rij[3], PA_0, PA_1, PB_0, PB_1;
+        //double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -33385,14 +32959,10 @@ computeExchangeFockDDDD6(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            //rij[0] = r_j[0] - r_i[0];
-            //rij[1] = r_j[1] - r_i[1];
-            //rij[2] = r_j[2] - r_i[2];
-
-            //PA_0 = (a_j * inv_S1) * rij[a0];
-            //PA_1 = (a_j * inv_S1) * rij[a1];
-            //PB_0 = (-a_i * inv_S1) * rij[b0];
-            //PB_1 = (-a_i * inv_S1) * rij[b1];
+            //PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            //PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            //PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            //PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -33425,8 +32995,6 @@ computeExchangeFockDDDD6(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -33456,12 +33024,13 @@ computeExchangeFockDDDD6(double*         mat_K,
                         F8_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[2] * (
 
                                 + 0.25 * S2 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * (
@@ -33611,7 +33180,7 @@ computeExchangeFockDDDD7(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -33636,14 +33205,10 @@ computeExchangeFockDDDD7(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -33676,8 +33241,6 @@ computeExchangeFockDDDD7(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -33707,12 +33270,13 @@ computeExchangeFockDDDD7(double*         mat_K,
                         F8_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[2] * (
 
                                 + 0.25 * S2 * inv_S1 * inv_S4 * inv_S4 * (
@@ -34081,7 +33645,7 @@ computeExchangeFockDDDD8(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -34106,14 +33670,10 @@ computeExchangeFockDDDD8(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -34146,8 +33706,6 @@ computeExchangeFockDDDD8(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -34177,12 +33735,13 @@ computeExchangeFockDDDD8(double*         mat_K,
                         F8_t[2] *= d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[2] * (
 
                                 + 0.5 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * (
@@ -34416,7 +33975,7 @@ computeExchangeFockDDDD9(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -34441,14 +34000,10 @@ computeExchangeFockDDDD9(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -34481,8 +34036,6 @@ computeExchangeFockDDDD9(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -34513,12 +34066,13 @@ computeExchangeFockDDDD9(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[2] * (
 
                                 + S2 * S2 * inv_S4 * inv_S4 * (
@@ -34727,7 +34281,7 @@ computeExchangeFockDDDD10(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -34752,14 +34306,10 @@ computeExchangeFockDDDD10(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -34792,8 +34342,6 @@ computeExchangeFockDDDD10(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -34824,12 +34372,13 @@ computeExchangeFockDDDD10(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[3] * (
 
                                 + 0.125 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * (
@@ -35055,7 +34604,7 @@ computeExchangeFockDDDD11(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -35080,14 +34629,10 @@ computeExchangeFockDDDD11(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -35120,8 +34665,6 @@ computeExchangeFockDDDD11(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -35152,12 +34695,13 @@ computeExchangeFockDDDD11(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[3] * (
 
                                 + 0.125 * inv_S4 * inv_S4 * inv_S4 * (
@@ -35424,7 +34968,7 @@ computeExchangeFockDDDD12(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -35449,14 +34993,10 @@ computeExchangeFockDDDD12(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -35489,8 +35029,6 @@ computeExchangeFockDDDD12(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -35521,12 +35059,13 @@ computeExchangeFockDDDD12(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[3] * (
 
                                 + 0.25 * S1 * inv_S4 * inv_S4 * inv_S4 * (
@@ -35781,7 +35320,7 @@ computeExchangeFockDDDD13(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        //double rij[3], PA_0, PA_1, PB_0, PB_1;
+        //double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -35806,14 +35345,10 @@ computeExchangeFockDDDD13(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            //rij[0] = r_j[0] - r_i[0];
-            //rij[1] = r_j[1] - r_i[1];
-            //rij[2] = r_j[2] - r_i[2];
-
-            //PA_0 = (a_j * inv_S1) * rij[a0];
-            //PA_1 = (a_j * inv_S1) * rij[a1];
-            //PB_0 = (-a_i * inv_S1) * rij[b0];
-            //PB_1 = (-a_i * inv_S1) * rij[b1];
+            //PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            //PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            //PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            //PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -35846,8 +35381,6 @@ computeExchangeFockDDDD13(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -35878,12 +35411,13 @@ computeExchangeFockDDDD13(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[3] * (
 
                                 + (-0.25) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
@@ -36085,7 +35619,7 @@ computeExchangeFockDDDD14(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -36110,14 +35644,10 @@ computeExchangeFockDDDD14(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -36150,8 +35680,6 @@ computeExchangeFockDDDD14(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -36182,12 +35710,13 @@ computeExchangeFockDDDD14(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[3] * (
 
                                 + 0.25 * S2 * inv_S4 * inv_S4 * inv_S4 * (
@@ -36457,7 +35986,7 @@ computeExchangeFockDDDD15(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -36482,14 +36011,10 @@ computeExchangeFockDDDD15(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -36522,8 +36047,6 @@ computeExchangeFockDDDD15(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -36554,12 +36077,13 @@ computeExchangeFockDDDD15(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[3] * (
 
                                 + 0.5 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * (
@@ -36773,7 +36297,7 @@ computeExchangeFockDDDD16(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -36798,14 +36322,10 @@ computeExchangeFockDDDD16(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -36838,8 +36358,6 @@ computeExchangeFockDDDD16(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -36870,12 +36388,13 @@ computeExchangeFockDDDD16(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[3] * (
 
                                 + (-0.5) * S2 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
@@ -37067,7 +36586,7 @@ computeExchangeFockDDDD17(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -37092,14 +36611,10 @@ computeExchangeFockDDDD17(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -37132,8 +36647,6 @@ computeExchangeFockDDDD17(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -37164,12 +36677,13 @@ computeExchangeFockDDDD17(double*         mat_K,
                         F8_t[3] *= d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[3] * (
 
                                 + S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * (
@@ -37391,7 +36905,7 @@ computeExchangeFockDDDD18(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -37416,14 +36930,10 @@ computeExchangeFockDDDD18(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -37456,8 +36966,6 @@ computeExchangeFockDDDD18(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -37489,12 +36997,13 @@ computeExchangeFockDDDD18(double*         mat_K,
                         F8_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[3] * (
 
                                 + S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
@@ -38160,7 +37669,7 @@ computeExchangeFockDDDD19(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -38185,14 +37694,10 @@ computeExchangeFockDDDD19(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -38225,8 +37730,6 @@ computeExchangeFockDDDD19(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -38258,12 +37761,13 @@ computeExchangeFockDDDD19(double*         mat_K,
                         F8_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[4] * (
 
                                 + 0.5 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -38440,7 +37944,7 @@ computeExchangeFockDDDD20(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -38465,14 +37969,10 @@ computeExchangeFockDDDD20(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -38505,8 +38005,6 @@ computeExchangeFockDDDD20(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -38538,12 +38036,13 @@ computeExchangeFockDDDD20(double*         mat_K,
                         F8_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[4] * (
 
                                 + 0.5 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -38720,7 +38219,7 @@ computeExchangeFockDDDD21(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        //double rij[3], PA_0, PA_1, PB_0, PB_1;
+        //double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -38745,14 +38244,10 @@ computeExchangeFockDDDD21(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            //rij[0] = r_j[0] - r_i[0];
-            //rij[1] = r_j[1] - r_i[1];
-            //rij[2] = r_j[2] - r_i[2];
-
-            //PA_0 = (a_j * inv_S1) * rij[a0];
-            //PA_1 = (a_j * inv_S1) * rij[a1];
-            //PB_0 = (-a_i * inv_S1) * rij[b0];
-            //PB_1 = (-a_i * inv_S1) * rij[b1];
+            //PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            //PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            //PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            //PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -38785,8 +38280,6 @@ computeExchangeFockDDDD21(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -38818,12 +38311,13 @@ computeExchangeFockDDDD21(double*         mat_K,
                         F8_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[4] * (
 
                                 + 0.5 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -39000,7 +38494,7 @@ computeExchangeFockDDDD22(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -39025,14 +38519,10 @@ computeExchangeFockDDDD22(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -39065,8 +38555,6 @@ computeExchangeFockDDDD22(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    //const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -39098,12 +38586,13 @@ computeExchangeFockDDDD22(double*         mat_K,
                         F8_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    //const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    //const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    //const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    //const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    //const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    //const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    //const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    //const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[4] * (
 
                                 + S1 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -39254,7 +38743,7 @@ computeExchangeFockDDDD23(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -39279,14 +38768,10 @@ computeExchangeFockDDDD23(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -39319,8 +38804,6 @@ computeExchangeFockDDDD23(double*         mat_K,
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
                     const auto S2 = a_k + a_l;
@@ -39352,12 +38835,13 @@ computeExchangeFockDDDD23(double*         mat_K,
                         F8_t[4] *= d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[4] * (
 
                                 + S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -39606,7 +39090,7 @@ computeExchangeFockDDDD24(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -39631,14 +39115,10 @@ computeExchangeFockDDDD24(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -39670,8 +39150,6 @@ computeExchangeFockDDDD24(double*         mat_K,
 
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -39705,12 +39183,13 @@ computeExchangeFockDDDD24(double*         mat_K,
                         F8_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[4] * (
 
                                 + 0.0625 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -40201,7 +39680,7 @@ computeExchangeFockDDDD25(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        //double rij[3], PA_0, PA_1, PB_0, PB_1;
+        //double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -40226,14 +39705,10 @@ computeExchangeFockDDDD25(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            //rij[0] = r_j[0] - r_i[0];
-            //rij[1] = r_j[1] - r_i[1];
-            //rij[2] = r_j[2] - r_i[2];
-
-            //PA_0 = (a_j * inv_S1) * rij[a0];
-            //PA_1 = (a_j * inv_S1) * rij[a1];
-            //PB_0 = (-a_i * inv_S1) * rij[b0];
-            //PB_1 = (-a_i * inv_S1) * rij[b1];
+            //PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            //PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            //PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            //PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -40265,8 +39740,6 @@ computeExchangeFockDDDD25(double*         mat_K,
 
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -40300,12 +39773,13 @@ computeExchangeFockDDDD25(double*         mat_K,
                         F8_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[5] * (
 
                                 + (-0.5) * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -40482,7 +39956,7 @@ computeExchangeFockDDDD26(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -40507,14 +39981,10 @@ computeExchangeFockDDDD26(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -40546,8 +40016,6 @@ computeExchangeFockDDDD26(double*         mat_K,
 
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
-
-                    //const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -40581,12 +40049,13 @@ computeExchangeFockDDDD26(double*         mat_K,
                         F8_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    //const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    //const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    //const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    //const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    //const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    //const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    //const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    //const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[5] * (
 
                                 + S1 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -40740,7 +40209,7 @@ computeExchangeFockDDDD27(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -40765,14 +40234,10 @@ computeExchangeFockDDDD27(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -40804,8 +40269,6 @@ computeExchangeFockDDDD27(double*         mat_K,
 
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -40839,12 +40302,13 @@ computeExchangeFockDDDD27(double*         mat_K,
                         F8_t[5] *= d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[5] * (
 
                                 + S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -41052,7 +40516,7 @@ computeExchangeFockDDDD28(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0, PB_1;
+        double PA_0, PA_1, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -41077,14 +40541,10 @@ computeExchangeFockDDDD28(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -41116,8 +40576,6 @@ computeExchangeFockDDDD28(double*         mat_K,
 
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -41154,12 +40612,13 @@ computeExchangeFockDDDD28(double*         mat_K,
                         F8_t[8] *= d2 * d2 * d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
                             F8_t[5] * (
 
                                 + S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
@@ -41600,7 +41059,7 @@ computeExchangeFockDPDP(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PA_1, PB_0;
+        double PA_0, PA_1, PB_0;
         uint32_t j_prim, j_cgto, b0;
 
         if ((ik < pair_inds_count_for_K_dd) && (j < count_i))
@@ -41624,13 +41083,9 @@ computeExchangeFockDPDP(double*         mat_K,
 
             b0 = j_prim % 3;
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
         }
 
@@ -41661,8 +41116,6 @@ computeExchangeFockDPDP(double*         mat_K,
                     const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
                     const auto d0 = l_prim % 3;
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -41697,9 +41150,9 @@ computeExchangeFockDPDP(double*         mat_K,
                         F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -42385,7 +41838,7 @@ computeExchangeFockPDPD(double*         mat_K,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double rij[3], PA_0, PB_0, PB_1;
+        double PA_0, PB_0, PB_1;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pp) && (j < count_i))
@@ -42410,13 +41863,9 @@ computeExchangeFockPDPD(double*         mat_K,
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
 
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
+            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -42448,8 +41897,6 @@ computeExchangeFockPDPD(double*         mat_K,
 
                     const auto d0 = d_cart_inds[l_prim % 6][0];
                     const auto d1 = d_cart_inds[l_prim % 6][1];
-
-                    const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
 
                     // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -42484,9 +41931,9 @@ computeExchangeFockPDPD(double*         mat_K,
                         F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
                     }
 
-                    const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                    const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-                    const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+                    const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+                    const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+                    const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
                     const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 

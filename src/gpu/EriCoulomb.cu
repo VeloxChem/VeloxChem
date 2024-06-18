@@ -341,7 +341,6 @@ computeCoulombFockSSSP(double*         mat_J,
 
             const auto d0 = l % 3;
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -362,7 +361,7 @@ computeCoulombFockSSSP(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F1_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -524,7 +523,6 @@ computeCoulombFockSSSD(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto S2 = a_k + a_l;
@@ -544,8 +542,8 @@ computeCoulombFockSSSD(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F2_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -716,7 +714,6 @@ computeCoulombFockSSPP(double*         mat_J,
             const auto c0 = k % 3;
             const auto d0 = l % 3;
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -737,8 +734,8 @@ computeCoulombFockSSPP(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F2_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -922,7 +919,6 @@ computeCoulombFockSSPD(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto S2 = a_k + a_l;
@@ -942,9 +938,9 @@ computeCoulombFockSSPD(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F3_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -1148,7 +1144,6 @@ computeCoulombFockSSDD(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto S2 = a_k + a_l;
@@ -1168,10 +1163,10 @@ computeCoulombFockSSDD(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -1346,7 +1341,7 @@ computeCoulombFockSPSS(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PB_0;
+    double PB_0;
     uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -1381,11 +1376,7 @@ computeCoulombFockSPSS(double*         mat_J,
 
         b0 = j % 3;
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
     }
 
@@ -1520,7 +1511,7 @@ computeCoulombFockSPSP(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PB_0;
+    double PB_0;
     uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -1559,11 +1550,7 @@ computeCoulombFockSPSP(double*         mat_J,
 
         b0 = j % 3;
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
     }
 
@@ -1592,7 +1579,6 @@ computeCoulombFockSPSP(double*         mat_J,
 
             const auto d0 = l % 3;
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -1613,7 +1599,7 @@ computeCoulombFockSPSP(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F2_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -1721,7 +1707,7 @@ computeCoulombFockSPSD(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PB_0;
+    double PB_0;
     uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -1767,11 +1753,7 @@ computeCoulombFockSPSD(double*         mat_J,
 
         b0 = j % 3;
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
     }
 
@@ -1801,7 +1783,6 @@ computeCoulombFockSPSD(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto S2 = a_k + a_l;
@@ -1821,8 +1802,8 @@ computeCoulombFockSPSD(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F3_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -1957,7 +1938,7 @@ computeCoulombFockSPPP(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PB_0;
+    double PB_0;
     uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -1996,11 +1977,7 @@ computeCoulombFockSPPP(double*         mat_J,
 
         b0 = j % 3;
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
     }
 
@@ -2030,7 +2007,6 @@ computeCoulombFockSPPP(double*         mat_J,
             const auto c0 = k % 3;
             const auto d0 = l % 3;
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -2051,8 +2027,8 @@ computeCoulombFockSPPP(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F3_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -2193,7 +2169,7 @@ computeCoulombFockSPPD(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PB_0;
+    double PB_0;
     uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -2239,11 +2215,7 @@ computeCoulombFockSPPD(double*         mat_J,
 
         b0 = j % 3;
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
     }
 
@@ -2274,7 +2246,6 @@ computeCoulombFockSPPD(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto S2 = a_k + a_l;
@@ -2294,9 +2265,9 @@ computeCoulombFockSPPD(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -2486,7 +2457,7 @@ computeCoulombFockPPSS(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0;
+    double PA_0, PB_0;
     uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -2526,12 +2497,8 @@ computeCoulombFockPPSS(double*         mat_J,
         a0 = i % 3;
         b0 = j % 3;
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
     }
 
@@ -2685,7 +2652,7 @@ computeCoulombFockPPSP(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0;
+    double PA_0, PB_0;
     uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -2725,12 +2692,8 @@ computeCoulombFockPPSP(double*         mat_J,
         a0 = i % 3;
         b0 = j % 3;
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
     }
 
@@ -2759,7 +2722,6 @@ computeCoulombFockPPSP(double*         mat_J,
 
             const auto d0 = l % 3;
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -2780,7 +2742,7 @@ computeCoulombFockPPSP(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F3_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -2920,7 +2882,7 @@ computeCoulombFockSDSS(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PB_0, PB_1;
+    double PB_0, PB_1;
     uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -2967,12 +2929,8 @@ computeCoulombFockSDSS(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -3126,7 +3084,7 @@ computeCoulombFockSDSP(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PB_0, PB_1;
+    double PB_0, PB_1;
     uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -3173,12 +3131,8 @@ computeCoulombFockSDSP(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -3207,7 +3161,6 @@ computeCoulombFockSDSP(double*         mat_J,
 
             const auto d0 = l % 3;
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto S2 = a_k + a_l;
@@ -3227,7 +3180,7 @@ computeCoulombFockSDSP(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F3_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -3365,7 +3318,7 @@ computeCoulombFockPDSS(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0, PB_1;
+    double PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -3413,13 +3366,9 @@ computeCoulombFockPDSS(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -3597,7 +3546,7 @@ computeCoulombFockPDSP(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0, PB_1;
+    double PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -3645,13 +3594,9 @@ computeCoulombFockPDSP(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -3680,7 +3625,6 @@ computeCoulombFockPDSP(double*         mat_J,
 
             const auto d0 = l % 3;
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto S2 = a_k + a_l;
@@ -3700,7 +3644,7 @@ computeCoulombFockPDSP(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -3893,7 +3837,7 @@ computeCoulombFockDDSS(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -3942,14 +3886,10 @@ computeCoulombFockDDSS(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -4172,7 +4112,7 @@ computeCoulombFockDDPD0(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -4221,14 +4161,10 @@ computeCoulombFockDDPD0(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -4259,8 +4195,6 @@ computeCoulombFockDDPD0(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -4280,9 +4214,9 @@ computeCoulombFockDDPD0(double*         mat_J,
             double F7_t[2];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -4479,7 +4413,7 @@ computeCoulombFockDDPD1(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -4528,14 +4462,10 @@ computeCoulombFockDDPD1(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -4566,8 +4496,6 @@ computeCoulombFockDDPD1(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -4587,9 +4515,9 @@ computeCoulombFockDDPD1(double*         mat_J,
             double F7_t[3];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -4894,7 +4822,7 @@ computeCoulombFockDDPD2(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    //double rij[3], PA_0, PA_1, PB_0, PB_1;
+    //double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -4943,14 +4871,10 @@ computeCoulombFockDDPD2(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        //rij[0] = r_j[0] - r_i[0];
-        //rij[1] = r_j[1] - r_i[1];
-        //rij[2] = r_j[2] - r_i[2];
-
-        //PA_0 = (a_j * inv_S1) * rij[a0];
-        //PA_1 = (a_j * inv_S1) * rij[a1];
-        //PB_0 = (-a_i * inv_S1) * rij[b0];
-        //PB_1 = (-a_i * inv_S1) * rij[b1];
+        //PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        //PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        //PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        //PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -4981,8 +4905,6 @@ computeCoulombFockDDPD2(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -5002,9 +4924,9 @@ computeCoulombFockDDPD2(double*         mat_J,
             double F7_t[3];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -5086,7 +5008,7 @@ computeCoulombFockDDPD3(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -5135,14 +5057,10 @@ computeCoulombFockDDPD3(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -5173,8 +5091,6 @@ computeCoulombFockDDPD3(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -5194,9 +5110,9 @@ computeCoulombFockDDPD3(double*         mat_J,
             double F7_t[3];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -5470,7 +5386,7 @@ computeCoulombFockDDPD4(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -5519,14 +5435,10 @@ computeCoulombFockDDPD4(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -5557,8 +5469,6 @@ computeCoulombFockDDPD4(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -5578,9 +5488,9 @@ computeCoulombFockDDPD4(double*         mat_J,
             double F7_t[4];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -5834,7 +5744,7 @@ computeCoulombFockDDPD5(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -5883,14 +5793,10 @@ computeCoulombFockDDPD5(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -5921,8 +5827,6 @@ computeCoulombFockDDPD5(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -5942,9 +5846,9 @@ computeCoulombFockDDPD5(double*         mat_J,
             double F7_t[4];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -6108,7 +6012,7 @@ computeCoulombFockDDPD6(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -6157,14 +6061,10 @@ computeCoulombFockDDPD6(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -6195,8 +6095,6 @@ computeCoulombFockDDPD6(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -6216,9 +6114,9 @@ computeCoulombFockDDPD6(double*         mat_J,
             double F7_t[4];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -6335,7 +6233,7 @@ computeCoulombFockDDPD7(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -6384,14 +6282,10 @@ computeCoulombFockDDPD7(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -6422,8 +6316,6 @@ computeCoulombFockDDPD7(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -6443,9 +6335,9 @@ computeCoulombFockDDPD7(double*         mat_J,
             double F7_t[4];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -6558,7 +6450,7 @@ computeCoulombFockDDPD8(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -6607,14 +6499,10 @@ computeCoulombFockDDPD8(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -6645,8 +6533,6 @@ computeCoulombFockDDPD8(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -6666,9 +6552,9 @@ computeCoulombFockDDPD8(double*         mat_J,
             double F7_t[5];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -6958,7 +6844,7 @@ computeCoulombFockDDPD9(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -7007,14 +6893,10 @@ computeCoulombFockDDPD9(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -7045,8 +6927,6 @@ computeCoulombFockDDPD9(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -7066,9 +6946,9 @@ computeCoulombFockDDPD9(double*         mat_J,
             double F7_t[5];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -7200,7 +7080,7 @@ computeCoulombFockDDPD10(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -7249,14 +7129,10 @@ computeCoulombFockDDPD10(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -7287,8 +7163,6 @@ computeCoulombFockDDPD10(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -7308,9 +7182,9 @@ computeCoulombFockDDPD10(double*         mat_J,
             double F7_t[5];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -7457,7 +7331,7 @@ computeCoulombFockDDPD11(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    //double rij[3], PA_0, PA_1, PB_0, PB_1;
+    //double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -7506,14 +7380,10 @@ computeCoulombFockDDPD11(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        //rij[0] = r_j[0] - r_i[0];
-        //rij[1] = r_j[1] - r_i[1];
-        //rij[2] = r_j[2] - r_i[2];
-
-        //PA_0 = (a_j * inv_S1) * rij[a0];
-        //PA_1 = (a_j * inv_S1) * rij[a1];
-        //PB_0 = (-a_i * inv_S1) * rij[b0];
-        //PB_1 = (-a_i * inv_S1) * rij[b1];
+        //PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        //PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        //PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        //PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -7544,8 +7414,6 @@ computeCoulombFockDDPD11(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            //const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -7565,9 +7433,9 @@ computeCoulombFockDDPD11(double*         mat_J,
             double F7_t[5];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-            //const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            //const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            //const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            //const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            //const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            //const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -7655,7 +7523,7 @@ computeCoulombFockDDPD12(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -7704,14 +7572,10 @@ computeCoulombFockDDPD12(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -7742,8 +7606,6 @@ computeCoulombFockDDPD12(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -7763,9 +7625,9 @@ computeCoulombFockDDPD12(double*         mat_J,
             double F7_t[8];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 7, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -8057,7 +7919,7 @@ computeCoulombFockDDDD0(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -8106,14 +7968,10 @@ computeCoulombFockDDDD0(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -8145,8 +8003,6 @@ computeCoulombFockDDDD0(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -8166,10 +8022,10 @@ computeCoulombFockDDDD0(double*         mat_J,
             double F8_t[2];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -8396,7 +8252,7 @@ computeCoulombFockDDDD1(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -8445,14 +8301,10 @@ computeCoulombFockDDDD1(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -8484,8 +8336,6 @@ computeCoulombFockDDDD1(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -8505,10 +8355,10 @@ computeCoulombFockDDDD1(double*         mat_J,
             double F8_t[2];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -8656,7 +8506,7 @@ computeCoulombFockDDDD2(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -8705,14 +8555,10 @@ computeCoulombFockDDDD2(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -8744,8 +8590,6 @@ computeCoulombFockDDDD2(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -8765,10 +8609,10 @@ computeCoulombFockDDDD2(double*         mat_J,
             double F8_t[2];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -8859,7 +8703,7 @@ computeCoulombFockDDDD3(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -8908,14 +8752,10 @@ computeCoulombFockDDDD3(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -8947,8 +8787,6 @@ computeCoulombFockDDDD3(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -8968,10 +8806,10 @@ computeCoulombFockDDDD3(double*         mat_J,
             double F8_t[2];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -9104,7 +8942,7 @@ computeCoulombFockDDDD4(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -9153,14 +8991,10 @@ computeCoulombFockDDDD4(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -9192,8 +9026,6 @@ computeCoulombFockDDDD4(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -9213,10 +9045,10 @@ computeCoulombFockDDDD4(double*         mat_J,
             double F8_t[2];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -9364,7 +9196,7 @@ computeCoulombFockDDDD5(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -9413,14 +9245,10 @@ computeCoulombFockDDDD5(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -9452,8 +9280,6 @@ computeCoulombFockDDDD5(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -9473,10 +9299,10 @@ computeCoulombFockDDDD5(double*         mat_J,
             double F8_t[3];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -9815,7 +9641,7 @@ computeCoulombFockDDDD6(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -9864,14 +9690,10 @@ computeCoulombFockDDDD6(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -9903,8 +9725,6 @@ computeCoulombFockDDDD6(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -9924,10 +9744,10 @@ computeCoulombFockDDDD6(double*         mat_J,
             double F8_t[3];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -10200,7 +10020,7 @@ computeCoulombFockDDDD7(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -10249,14 +10069,10 @@ computeCoulombFockDDDD7(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -10288,8 +10104,6 @@ computeCoulombFockDDDD7(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -10309,10 +10123,10 @@ computeCoulombFockDDDD7(double*         mat_J,
             double F8_t[3];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -10420,7 +10234,7 @@ computeCoulombFockDDDD8(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -10469,14 +10283,10 @@ computeCoulombFockDDDD8(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -10508,8 +10318,6 @@ computeCoulombFockDDDD8(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -10529,10 +10337,10 @@ computeCoulombFockDDDD8(double*         mat_J,
             double F8_t[3];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -10618,7 +10426,7 @@ computeCoulombFockDDDD9(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -10667,14 +10475,10 @@ computeCoulombFockDDDD9(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -10706,8 +10510,6 @@ computeCoulombFockDDDD9(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -10727,10 +10529,10 @@ computeCoulombFockDDDD9(double*         mat_J,
             double F8_t[3];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -10854,7 +10656,7 @@ computeCoulombFockDDDD10(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -10903,14 +10705,10 @@ computeCoulombFockDDDD10(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -10942,8 +10740,6 @@ computeCoulombFockDDDD10(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -10963,10 +10759,10 @@ computeCoulombFockDDDD10(double*         mat_J,
             double F8_t[3];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -11110,7 +10906,7 @@ computeCoulombFockDDDD11(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -11159,14 +10955,10 @@ computeCoulombFockDDDD11(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -11198,8 +10990,6 @@ computeCoulombFockDDDD11(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -11219,10 +11009,10 @@ computeCoulombFockDDDD11(double*         mat_J,
             double F8_t[4];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -11528,7 +11318,7 @@ computeCoulombFockDDDD12(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -11577,14 +11367,10 @@ computeCoulombFockDDDD12(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -11616,8 +11402,6 @@ computeCoulombFockDDDD12(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -11637,10 +11421,10 @@ computeCoulombFockDDDD12(double*         mat_J,
             double F8_t[4];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -11826,7 +11610,7 @@ computeCoulombFockDDDD13(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    //double rij[3], PA_0, PA_1, PB_0, PB_1;
+    //double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -11875,14 +11659,10 @@ computeCoulombFockDDDD13(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        //rij[0] = r_j[0] - r_i[0];
-        //rij[1] = r_j[1] - r_i[1];
-        //rij[2] = r_j[2] - r_i[2];
-
-        //PA_0 = (a_j * inv_S1) * rij[a0];
-        //PA_1 = (a_j * inv_S1) * rij[a1];
-        //PB_0 = (-a_i * inv_S1) * rij[b0];
-        //PB_1 = (-a_i * inv_S1) * rij[b1];
+        //PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        //PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        //PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        //PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -11914,8 +11694,6 @@ computeCoulombFockDDDD13(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -11935,10 +11713,10 @@ computeCoulombFockDDDD13(double*         mat_J,
             double F8_t[4];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -12071,7 +11849,7 @@ computeCoulombFockDDDD14(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -12120,14 +11898,10 @@ computeCoulombFockDDDD14(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -12159,8 +11933,6 @@ computeCoulombFockDDDD14(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -12180,10 +11952,10 @@ computeCoulombFockDDDD14(double*         mat_J,
             double F8_t[4];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -12384,7 +12156,7 @@ computeCoulombFockDDDD15(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -12433,14 +12205,10 @@ computeCoulombFockDDDD15(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -12472,8 +12240,6 @@ computeCoulombFockDDDD15(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -12493,10 +12259,10 @@ computeCoulombFockDDDD15(double*         mat_J,
             double F8_t[4];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -12604,7 +12370,7 @@ computeCoulombFockDDDD16(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -12653,14 +12419,10 @@ computeCoulombFockDDDD16(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -12692,8 +12454,6 @@ computeCoulombFockDDDD16(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -12713,10 +12473,10 @@ computeCoulombFockDDDD16(double*         mat_J,
             double F8_t[4];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -12824,7 +12584,7 @@ computeCoulombFockDDDD17(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    //double rij[3], PA_0, PA_1, PB_0, PB_1;
+    //double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -12873,14 +12633,10 @@ computeCoulombFockDDDD17(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        //rij[0] = r_j[0] - r_i[0];
-        //rij[1] = r_j[1] - r_i[1];
-        //rij[2] = r_j[2] - r_i[2];
-
-        //PA_0 = (a_j * inv_S1) * rij[a0];
-        //PA_1 = (a_j * inv_S1) * rij[a1];
-        //PB_0 = (-a_i * inv_S1) * rij[b0];
-        //PB_1 = (-a_i * inv_S1) * rij[b1];
+        //PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        //PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        //PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        //PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -12912,8 +12668,6 @@ computeCoulombFockDDDD17(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -12933,10 +12687,10 @@ computeCoulombFockDDDD17(double*         mat_J,
             double F8_t[4];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -13022,7 +12776,7 @@ computeCoulombFockDDDD18(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -13071,14 +12825,10 @@ computeCoulombFockDDDD18(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -13110,8 +12860,6 @@ computeCoulombFockDDDD18(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -13131,10 +12879,10 @@ computeCoulombFockDDDD18(double*         mat_J,
             double F8_t[4];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -13290,7 +13038,7 @@ computeCoulombFockDDDD19(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -13339,14 +13087,10 @@ computeCoulombFockDDDD19(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -13378,8 +13122,6 @@ computeCoulombFockDDDD19(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -13399,10 +13141,10 @@ computeCoulombFockDDDD19(double*         mat_J,
             double F8_t[5];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -14033,7 +13775,7 @@ computeCoulombFockDDDD20(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -14082,14 +13824,10 @@ computeCoulombFockDDDD20(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -14121,8 +13859,6 @@ computeCoulombFockDDDD20(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -14142,10 +13878,10 @@ computeCoulombFockDDDD20(double*         mat_J,
             double F8_t[5];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -14253,7 +13989,7 @@ computeCoulombFockDDDD21(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -14302,14 +14038,10 @@ computeCoulombFockDDDD21(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -14341,8 +14073,6 @@ computeCoulombFockDDDD21(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -14362,10 +14092,10 @@ computeCoulombFockDDDD21(double*         mat_J,
             double F8_t[5];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -14473,7 +14203,7 @@ computeCoulombFockDDDD22(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    //double rij[3], PA_0, PA_1, PB_0, PB_1;
+    //double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -14522,14 +14252,10 @@ computeCoulombFockDDDD22(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        //rij[0] = r_j[0] - r_i[0];
-        //rij[1] = r_j[1] - r_i[1];
-        //rij[2] = r_j[2] - r_i[2];
-
-        //PA_0 = (a_j * inv_S1) * rij[a0];
-        //PA_1 = (a_j * inv_S1) * rij[a1];
-        //PB_0 = (-a_i * inv_S1) * rij[b0];
-        //PB_1 = (-a_i * inv_S1) * rij[b1];
+        //PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        //PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        //PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        //PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -14561,8 +14287,6 @@ computeCoulombFockDDDD22(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -14582,10 +14306,10 @@ computeCoulombFockDDDD22(double*         mat_J,
             double F8_t[5];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -14693,7 +14417,7 @@ computeCoulombFockDDDD23(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -14742,14 +14466,10 @@ computeCoulombFockDDDD23(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -14781,8 +14501,6 @@ computeCoulombFockDDDD23(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            //const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -14802,10 +14520,10 @@ computeCoulombFockDDDD23(double*         mat_J,
             double F8_t[5];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-            //const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            //const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            //const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            //const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            //const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            //const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            //const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            //const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -14887,7 +14605,7 @@ computeCoulombFockDDDD24(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -14936,14 +14654,10 @@ computeCoulombFockDDDD24(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -14975,8 +14689,6 @@ computeCoulombFockDDDD24(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -14996,10 +14708,10 @@ computeCoulombFockDDDD24(double*         mat_J,
             double F8_t[5];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -15142,7 +14854,7 @@ computeCoulombFockDDDD25(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -15191,14 +14903,10 @@ computeCoulombFockDDDD25(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -15230,8 +14938,6 @@ computeCoulombFockDDDD25(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -15251,10 +14957,10 @@ computeCoulombFockDDDD25(double*         mat_J,
             double F8_t[6];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -15409,7 +15115,7 @@ computeCoulombFockDDDD26(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -15458,14 +15164,10 @@ computeCoulombFockDDDD26(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -15497,8 +15199,6 @@ computeCoulombFockDDDD26(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -15518,10 +15218,10 @@ computeCoulombFockDDDD26(double*         mat_J,
             double F8_t[6];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -15896,7 +15596,7 @@ computeCoulombFockDDDD27(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    //double rij[3], PA_0, PA_1, PB_0, PB_1;
+    //double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -15945,14 +15645,10 @@ computeCoulombFockDDDD27(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        //rij[0] = r_j[0] - r_i[0];
-        //rij[1] = r_j[1] - r_i[1];
-        //rij[2] = r_j[2] - r_i[2];
-
-        //PA_0 = (a_j * inv_S1) * rij[a0];
-        //PA_1 = (a_j * inv_S1) * rij[a1];
-        //PB_0 = (-a_i * inv_S1) * rij[b0];
-        //PB_1 = (-a_i * inv_S1) * rij[b1];
+        //PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        //PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        //PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        //PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -15984,8 +15680,6 @@ computeCoulombFockDDDD27(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -16005,10 +15699,10 @@ computeCoulombFockDDDD27(double*         mat_J,
             double F8_t[6];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -16116,7 +15810,7 @@ computeCoulombFockDDDD28(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -16165,14 +15859,10 @@ computeCoulombFockDDDD28(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -16204,8 +15894,6 @@ computeCoulombFockDDDD28(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            //const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -16225,10 +15913,10 @@ computeCoulombFockDDDD28(double*         mat_J,
             double F8_t[6];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
-            //const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            //const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            //const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            //const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            //const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            //const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            //const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            //const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -16313,7 +16001,7 @@ computeCoulombFockDDDD29(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -16362,14 +16050,10 @@ computeCoulombFockDDDD29(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -16401,8 +16085,6 @@ computeCoulombFockDDDD29(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -16422,10 +16104,10 @@ computeCoulombFockDDDD29(double*         mat_J,
             double F8_t[6];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -16564,7 +16246,7 @@ computeCoulombFockDDDD30(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -16613,14 +16295,10 @@ computeCoulombFockDDDD30(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -16652,8 +16330,6 @@ computeCoulombFockDDDD30(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -16673,10 +16349,10 @@ computeCoulombFockDDDD30(double*         mat_J,
             double F8_t[7];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -16835,7 +16511,7 @@ computeCoulombFockDDDD31(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -16884,14 +16560,10 @@ computeCoulombFockDDDD31(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -16923,8 +16595,6 @@ computeCoulombFockDDDD31(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -16944,10 +16614,10 @@ computeCoulombFockDDDD31(double*         mat_J,
             double F8_t[7];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -17060,7 +16730,7 @@ computeCoulombFockDDDD32(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -17109,14 +16779,10 @@ computeCoulombFockDDDD32(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -17148,8 +16814,6 @@ computeCoulombFockDDDD32(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -17169,10 +16833,10 @@ computeCoulombFockDDDD32(double*         mat_J,
             double F8_t[9];
 
             gpu::computeBoysFunctionEriJ(F8_t, S1 * S2 * inv_S4 * r2_PQ, 8, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -17405,1125 +17069,6 @@ computeCoulombFockDDPP0(double*         mat_J,
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   sum_J_ij[TILE_DIM_LARGE];
-    __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
-
-    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    __shared__ double rij[3], PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
-
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double J_ij = 0.0;
-
-    if (ij < dd_prim_pair_count_local)
-    {
-        if ((threadIdx.y == 0) && (threadIdx.x == 0))
-        {
-            d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-            d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-            d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-            d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-            d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-            d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-            delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-            delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-            delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
-
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-            S1 = a_i + a_j;
-            inv_S1 = 1.0 / S1;
-
-            S_ij_00 = dd_pair_data_local[ij];
-
-            a0 = d_cart_inds[i % 6][0];
-            a1 = d_cart_inds[i % 6][1];
-            b0 = d_cart_inds[j % 6][0];
-            b1 = d_cart_inds[j % 6][1];
-
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
-
-        }
-
-        __syncthreads();
-
-        for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
-        {
-            const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
-
-            if (kl < pp_prim_pair_count)
-            {
-                if (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold)
-                {
-                    break;
-                }
-
-                const auto k = pp_first_inds[kl];
-                const auto l = pp_second_inds[kl];
-
-                const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
-
-                const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                                       p_prim_info[k / 3 + p_prim_count * 3],
-                                       p_prim_info[k / 3 + p_prim_count * 4]};
-
-                const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
-
-                const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
-                                       p_prim_info[l / 3 + p_prim_count * 3],
-                                       p_prim_info[l / 3 + p_prim_count * 4]};
-
-                const auto S_kl_00 = pp_pair_data[kl];
-
-                const auto c0 = k % 3;
-                const auto d0 = l % 3;
-
-                const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-                
-                // J. Chem. Phys. 84, 3963-3974 (1986)
-
-                const auto S2 = a_k + a_l;
-
-                const auto inv_S2 = 1.0 / S2;
-                const auto inv_S4 = 1.0 / (S1 + S2);
-
-                const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
-                                      (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
-                                      (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
-
-                const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-                const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
-
-                double F6_t[3];
-
-                gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-                const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-
-                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
-                        F6_t[0] * (
-
-                            0.25 * inv_S1 * inv_S1 * (
-                                (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (QD_0 * QC_0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[0] * (
-
-                            + 0.25 * inv_S1 * inv_S2 * (
-                                delta[b0][b1] * delta[c0][d0] * (PA_0 * PA_1)
-                                + delta[a1][b1] * delta[c0][d0] * (PB_0 * PA_0)
-                                + delta[a1][b0] * delta[c0][d0] * (PB_1 * PA_0)
-                                + delta[a0][b1] * delta[c0][d0] * (PB_0 * PA_1)
-                                + delta[a0][b0] * delta[c0][d0] * (PB_1 * PA_1)
-                                + delta[a0][a1] * delta[c0][d0] * (PB_0 * PB_1)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[0] * (
-
-                            + 0.5 * inv_S1 * (
-                                delta[b0][b1] * (PA_0 * PA_1 * QD_0 * QC_0)
-                                + delta[a1][b1] * (PB_0 * PA_0 * QD_0 * QC_0)
-                                + delta[a1][b0] * (PB_1 * PA_0 * QD_0 * QC_0)
-                                + delta[a0][b1] * (PB_0 * PA_1 * QD_0 * QC_0)
-                                + delta[a0][b0] * (PB_1 * PA_1 * QD_0 * QC_0)
-                                + delta[a0][a1] * (PB_0 * PB_1 * QD_0 * QC_0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[0] * (
-
-                            + 0.5 * inv_S2 * (
-                                delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PA_1)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[0] * (
-
-                            + (
-                                
-                                + PB_0 * PB_1 * PA_0 * PA_1 * QD_0 * QC_0
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[0] * (
-
-                            + 0.125 * inv_S1 * inv_S1 * inv_S2 * (
-                                (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0])
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[1] * (
-
-                            (-0.25) * inv_S1 * inv_S1 * inv_S4 * (
-                                (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0])
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[1] * (
-
-                            + (-0.125) * inv_S1 * inv_S2 * inv_S4 * (
-                                (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0])
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[1] * (
-
-                            + (-0.5) * S2 * inv_S1 * inv_S1 * inv_S4 * (
-                                (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (QD_0 * QC_0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[1] * (
-
-                            + 0.25 * inv_S1 * inv_S4 * (
-                                delta[b0][b1] * delta[c0][d0] * (PA_0 * PA_1 * (-1.0) + PA_0 * PQ[a1] + PA_1 * PQ[a0])
-                                + delta[a1][b1] * delta[c0][d0] * (PB_0 * PA_0 * (-1.0) + PB_0 * PQ[a0] + PA_0 * PQ[b0])
-                                + delta[a1][b0] * delta[c0][d0] * (PB_1 * PA_0 * (-1.0) + PB_1 * PQ[a0] + PA_0 * PQ[b1])
-                                + (delta[a1][b0] * delta[b1][d0] + delta[a1][b1] * delta[b0][d0] + delta[a1][d0] * delta[b0][b1]) * (PA_0 * QC_0)
-                                + (delta[a1][b0] * delta[b1][c0] + delta[a1][b1] * delta[b0][c0] + delta[a1][c0] * delta[b0][b1]) * (PA_0 * QD_0)
-                                + delta[a0][b1] * delta[c0][d0] * (PB_0 * PA_1 * (-1.0) + PB_0 * PQ[a1] + PA_1 * PQ[b0])
-                                + delta[a0][b0] * delta[c0][d0] * (PB_1 * PA_1 * (-1.0) + PB_1 * PQ[a1] + PA_1 * PQ[b1])
-                                + (delta[a0][b0] * delta[b1][d0] + delta[a0][b1] * delta[b0][d0] + delta[a0][d0] * delta[b0][b1]) * (PA_1 * QC_0)
-                                + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (PA_1 * QD_0)
-                                + delta[a0][a1] * delta[c0][d0] * (PB_0 * PB_1 * (-1.0) + PB_0 * PQ[b1] + PB_1 * PQ[b0])
-                                + (delta[a0][a1] * delta[b1][d0] + delta[a0][b1] * delta[a1][d0] + delta[a0][d0] * delta[a1][b1]) * (PB_0 * QC_0)
-                                + (delta[a0][a1] * delta[b0][d0] + delta[a0][b0] * delta[a1][d0] + delta[a0][d0] * delta[a1][b0]) * (PB_1 * QC_0)
-                                + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * QD_0 * (-1.0) + PQ[d0] * QC_0 * (-1.0))
-                                + (delta[a0][a1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] + delta[a0][c0] * delta[a1][b1]) * (PB_0 * QD_0)
-                                + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PB_1 * QD_0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[1] * (
-
-                            + (-0.25) * inv_S2 * inv_S4 * (
-                                delta[b0][b1] * delta[c0][d0] * (PA_0 * PA_1)
-                                + delta[a1][b1] * delta[c0][d0] * (PB_0 * PA_0)
-                                + delta[a1][b0] * delta[c0][d0] * (PB_1 * PA_0)
-                                + delta[a0][b1] * delta[c0][d0] * (PB_0 * PA_1)
-                                + delta[a0][b0] * delta[c0][d0] * (PB_1 * PA_1)
-                                + delta[a0][a1] * delta[c0][d0] * (PB_0 * PB_1)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[1] * (
-
-                            + (-0.5) * S1 * inv_S2 * inv_S4 * (
-                                delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PA_1)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[1] * (
-
-                            + 0.5 * S2 * inv_S1 * inv_S4 * (
-                                delta[b0][b1] * (PA_0 * PA_1 * QD_0 * QC_0 * (-1.0) + PA_0 * PQ[a1] * QD_0 * QC_0 + PA_1 * PQ[a0] * QD_0 * QC_0)
-                                + delta[a1][b1] * (PB_0 * PA_0 * QD_0 * QC_0 * (-1.0) + PB_0 * PQ[a0] * QD_0 * QC_0 + PA_0 * PQ[b0] * QD_0 * QC_0)
-                                + delta[a1][b0] * (PB_1 * PA_0 * QD_0 * QC_0 * (-1.0) + PB_1 * PQ[a0] * QD_0 * QC_0 + PA_0 * PQ[b1] * QD_0 * QC_0)
-                                + delta[a0][b1] * (PB_0 * PA_1 * QD_0 * QC_0 * (-1.0) + PB_0 * PQ[a1] * QD_0 * QC_0 + PA_1 * PQ[b0] * QD_0 * QC_0)
-                                + delta[a0][b0] * (PB_1 * PA_1 * QD_0 * QC_0 * (-1.0) + PB_1 * PQ[a1] * QD_0 * QC_0 + PA_1 * PQ[b1] * QD_0 * QC_0)
-                                + delta[a0][a1] * (PB_0 * PB_1 * QD_0 * QC_0 * (-1.0) + PB_0 * PQ[b1] * QD_0 * QC_0 + PB_1 * PQ[b0] * QD_0 * QC_0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[1] * (
-
-                            + 0.5 * inv_S4 * (
-                                delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PQ[a1] + PB_0 * PB_1 * PA_1 * PQ[a0] + PB_0 * PA_0 * PA_1 * PQ[b1] + PB_1 * PA_0 * PA_1 * PQ[b0])
-                                + delta[b1][d0] * (PB_0 * PA_0 * PA_1 * QC_0)
-                                + delta[b1][c0] * (PB_0 * PA_0 * PA_1 * QD_0)
-                                + delta[b0][d0] * (PB_1 * PA_0 * PA_1 * QC_0)
-                                + delta[b0][c0] * (PB_1 * PA_0 * PA_1 * QD_0)
-                                + delta[b0][b1] * (PA_0 * PA_1 * PQ[c0] * QD_0 * (-1.0) + PA_0 * PA_1 * PQ[d0] * QC_0 * (-1.0))
-                                + delta[a1][d0] * (PB_0 * PB_1 * PA_0 * QC_0)
-                                + delta[a1][c0] * (PB_0 * PB_1 * PA_0 * QD_0)
-                                + delta[a1][b1] * (PB_0 * PA_0 * PQ[c0] * QD_0 * (-1.0) + PB_0 * PA_0 * PQ[d0] * QC_0 * (-1.0))
-                                + delta[a1][b0] * (PB_1 * PA_0 * PQ[c0] * QD_0 * (-1.0) + PB_1 * PA_0 * PQ[d0] * QC_0 * (-1.0))
-                                + delta[a0][d0] * (PB_0 * PB_1 * PA_1 * QC_0)
-                                + delta[a0][c0] * (PB_0 * PB_1 * PA_1 * QD_0)
-                                + delta[a0][b1] * (PB_0 * PA_1 * PQ[c0] * QD_0 * (-1.0) + PB_0 * PA_1 * PQ[d0] * QC_0 * (-1.0))
-                                + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * QD_0 * (-1.0) + PB_1 * PA_1 * PQ[d0] * QC_0 * (-1.0))
-                                + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * QD_0 * (-1.0) + PB_0 * PB_1 * PQ[d0] * QC_0 * (-1.0))
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[1] * (
-
-                            + S1 * inv_S4 * (
-                                
-                                + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * QD_0 * (-1.0)
-                                + PB_0 * PB_1 * PA_0 * PA_1 * PQ[d0] * QC_0 * (-1.0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[1] * (
-
-                            + S2 * inv_S4 * (
-                                
-                                + PB_0 * PB_1 * PA_0 * PQ[a1] * QD_0 * QC_0
-                                + PB_0 * PB_1 * PA_1 * PQ[a0] * QD_0 * QC_0
-                                + PB_0 * PA_0 * PA_1 * PQ[b1] * QD_0 * QC_0
-                                + PB_1 * PA_0 * PA_1 * PQ[b0] * QD_0 * QC_0
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[2] * (
-
-                            0.25 * S2 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * (
-                                (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (QD_0 * QC_0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[2] * (
-
-                            + 0.25 * S2 * inv_S1 * inv_S4 * inv_S4 * (
-                                delta[b0][b1] * delta[c0][d0] * (PA_0 * PQ[a1] * (-1.0) + PA_1 * PQ[a0] * (-1.0) + PQ[a0] * PQ[a1])
-                                + delta[a1][b1] * delta[c0][d0] * (PB_0 * PQ[a0] * (-1.0) + PA_0 * PQ[b0] * (-1.0) + PQ[a0] * PQ[b0])
-                                + delta[a1][b0] * delta[c0][d0] * (PB_1 * PQ[a0] * (-1.0) + PA_0 * PQ[b1] * (-1.0) + PQ[a0] * PQ[b1])
-                                + (delta[a1][b0] * delta[b1][d0] + delta[a1][b1] * delta[b0][d0] + delta[a1][d0] * delta[b0][b1]) * (PA_0 * QC_0 * (-1.0) + PQ[a0] * QC_0)
-                                + (delta[a1][b0] * delta[b1][c0] + delta[a1][b1] * delta[b0][c0] + delta[a1][c0] * delta[b0][b1]) * (PA_0 * QD_0 * (-1.0) + PQ[a0] * QD_0)
-                                + delta[a0][b1] * delta[c0][d0] * (PB_0 * PQ[a1] * (-1.0) + PA_1 * PQ[b0] * (-1.0) + PQ[a1] * PQ[b0])
-                                + delta[a0][b0] * delta[c0][d0] * (PB_1 * PQ[a1] * (-1.0) + PA_1 * PQ[b1] * (-1.0) + PQ[a1] * PQ[b1])
-                                + (delta[a0][b0] * delta[b1][d0] + delta[a0][b1] * delta[b0][d0] + delta[a0][d0] * delta[b0][b1]) * (PA_1 * QC_0 * (-1.0) + PQ[a1] * QC_0)
-                                + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (PA_1 * QD_0 * (-1.0) + PQ[a1] * QD_0)
-                                + delta[a0][a1] * delta[c0][d0] * (PB_0 * PQ[b1] * (-1.0) + PB_1 * PQ[b0] * (-1.0) + PQ[b0] * PQ[b1])
-                                + (delta[a0][a1] * delta[b1][d0] + delta[a0][b1] * delta[a1][d0] + delta[a0][d0] * delta[a1][b1]) * (PB_0 * QC_0 * (-1.0) + PQ[b0] * QC_0)
-                                + (delta[a0][a1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] + delta[a0][c0] * delta[a1][b1]) * (PB_0 * QD_0 * (-1.0) + PQ[b0] * QD_0)
-                                + (delta[a0][a1] * delta[b0][d0] + delta[a0][b0] * delta[a1][d0] + delta[a0][d0] * delta[a1][b0]) * (PB_1 * QC_0 * (-1.0) + PQ[b1] * QC_0)
-                                + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PB_1 * QD_0 * (-1.0) + PQ[b1] * QD_0)
-                                + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * QD_0 * 2.0 + PQ[d0] * QC_0 * 2.0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[2] * (
-
-                            + 0.25 * inv_S4 * inv_S4 * (
-                                delta[b0][b1] * delta[c0][d0] * (PA_0 * PQ[a1] * (-1.0) + PA_1 * PQ[a0] * (-1.0) + PA_0 * PA_1)
-                                + (delta[b0][c0] * delta[b1][d0] + delta[b0][d0] * delta[b1][c0]) * (PA_0 * PA_1)
-                                + delta[a1][b1] * delta[c0][d0] * (PB_0 * PQ[a0] * (-1.0) + PA_0 * PQ[b0] * (-1.0) + PB_0 * PA_0)
-                                + (delta[a1][c0] * delta[b1][d0] + delta[a1][d0] * delta[b1][c0]) * (PB_0 * PA_0)
-                                + delta[a1][b0] * delta[c0][d0] * (PB_1 * PQ[a0] * (-1.0) + PA_0 * PQ[b1] * (-1.0) + PB_1 * PA_0)
-                                + (delta[a1][c0] * delta[b0][d0] + delta[a1][d0] * delta[b0][c0]) * (PB_1 * PA_0)
-                                + (delta[a1][b0] * delta[b1][d0] + delta[a1][b1] * delta[b0][d0] + delta[a1][d0] * delta[b0][b1]) * (PA_0 * PQ[c0] * (-1.0))
-                                + (delta[a1][b0] * delta[b1][c0] + delta[a1][b1] * delta[b0][c0] + delta[a1][c0] * delta[b0][b1]) * (PA_0 * PQ[d0] * (-1.0))
-                                + delta[a0][b1] * delta[c0][d0] * (PB_0 * PQ[a1] * (-1.0) + PA_1 * PQ[b0] * (-1.0) + PB_0 * PA_1)
-                                + (delta[a0][c0] * delta[b1][d0] + delta[a0][d0] * delta[b1][c0]) * (PB_0 * PA_1)
-                                + delta[a0][b0] * delta[c0][d0] * (PB_1 * PQ[a1] * (-1.0) + PA_1 * PQ[b1] * (-1.0) + PB_1 * PA_1)
-                                + (delta[a0][c0] * delta[b0][d0] + delta[a0][d0] * delta[b0][c0]) * (PB_1 * PA_1)
-                                + (delta[a0][b0] * delta[b1][d0] + delta[a0][b1] * delta[b0][d0] + delta[a0][d0] * delta[b0][b1]) * (PA_1 * PQ[c0] * (-1.0))
-                                + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (PA_1 * PQ[d0] * (-1.0))
-                                + delta[a0][a1] * delta[c0][d0] * (PB_0 * PQ[b1] * (-1.0) + PB_1 * PQ[b0] * (-1.0) + PB_0 * PB_1)
-                                + (delta[a0][a1] * delta[b1][d0] + delta[a0][b1] * delta[a1][d0] + delta[a0][d0] * delta[a1][b1]) * (PB_0 * PQ[c0] * (-1.0))
-                                + (delta[a0][a1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] + delta[a0][c0] * delta[a1][b1]) * (PB_0 * PQ[d0] * (-1.0))
-                                + (delta[a0][a1] * delta[b0][d0] + delta[a0][b0] * delta[a1][d0] + delta[a0][d0] * delta[a1][b0]) * (PB_1 * PQ[c0] * (-1.0))
-                                + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PB_1 * PQ[d0] * (-1.0))
-                                + (delta[a0][c0] * delta[a1][d0] + delta[a0][d0] * delta[a1][c0]) * (PB_0 * PB_1)
-                                + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[d0])
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[2] * (
-
-                            + 0.5 * S1 * inv_S4 * inv_S4 * (
-                                delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PQ[a1] * (-1.0) + PB_0 * PB_1 * PA_1 * PQ[a0] * (-1.0) + PB_0 * PA_0 * PA_1 * PQ[b1] * (-1.0) + PB_1 * PA_0 * PA_1 * PQ[b0] * (-1.0))
-                                + delta[b1][d0] * (PB_0 * PA_0 * PA_1 * PQ[c0] * (-1.0))
-                                + delta[b1][c0] * (PB_0 * PA_0 * PA_1 * PQ[d0] * (-1.0))
-                                + delta[b0][d0] * (PB_1 * PA_0 * PA_1 * PQ[c0] * (-1.0))
-                                + delta[b0][c0] * (PB_1 * PA_0 * PA_1 * PQ[d0] * (-1.0))
-                                + delta[b0][b1] * (PA_0 * PA_1 * PQ[c0] * PQ[d0])
-                                + delta[a1][d0] * (PB_0 * PB_1 * PA_0 * PQ[c0] * (-1.0))
-                                + delta[a1][c0] * (PB_0 * PB_1 * PA_0 * PQ[d0] * (-1.0))
-                                + delta[a1][b1] * (PB_0 * PA_0 * PQ[c0] * PQ[d0])
-                                + delta[a1][b0] * (PB_1 * PA_0 * PQ[c0] * PQ[d0])
-                                + delta[a0][d0] * (PB_0 * PB_1 * PA_1 * PQ[c0] * (-1.0))
-                                + delta[a0][c0] * (PB_0 * PB_1 * PA_1 * PQ[d0] * (-1.0))
-                                + delta[a0][b1] * (PB_0 * PA_1 * PQ[c0] * PQ[d0])
-                                + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * PQ[d0])
-                                + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * PQ[d0])
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[2] * (
-
-                            + 0.5 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * (
-                                delta[b0][b1] * (PA_0 * PQ[a1] * QD_0 * QC_0 * (-1.0) + PA_1 * PQ[a0] * QD_0 * QC_0 * (-1.0) + PQ[a0] * PQ[a1] * QD_0 * QC_0)
-                                + delta[a1][b1] * (PB_0 * PQ[a0] * QD_0 * QC_0 * (-1.0) + PA_0 * PQ[b0] * QD_0 * QC_0 * (-1.0) + PQ[a0] * PQ[b0] * QD_0 * QC_0)
-                                + delta[a1][b0] * (PB_1 * PQ[a0] * QD_0 * QC_0 * (-1.0) + PA_0 * PQ[b1] * QD_0 * QC_0 * (-1.0) + PQ[a0] * PQ[b1] * QD_0 * QC_0)
-                                + delta[a0][b1] * (PB_0 * PQ[a1] * QD_0 * QC_0 * (-1.0) + PA_1 * PQ[b0] * QD_0 * QC_0 * (-1.0) + PQ[a1] * PQ[b0] * QD_0 * QC_0)
-                                + delta[a0][b0] * (PB_1 * PQ[a1] * QD_0 * QC_0 * (-1.0) + PA_1 * PQ[b1] * QD_0 * QC_0 * (-1.0) + PQ[a1] * PQ[b1] * QD_0 * QC_0)
-                                + delta[a0][a1] * (PB_0 * PQ[b1] * QD_0 * QC_0 * (-1.0) + PB_1 * PQ[b0] * QD_0 * QC_0 * (-1.0) + PQ[b0] * PQ[b1] * QD_0 * QC_0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[2] * (
-
-                            + 0.5 * S2 * inv_S4 * inv_S4 * (
-                                delta[c0][d0] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] + PB_0 * PA_0 * PQ[a1] * PQ[b1] + PB_0 * PA_1 * PQ[a0] * PQ[b1] + PB_1 * PA_0 * PQ[a1] * PQ[b0] + PB_1 * PA_1 * PQ[a0] * PQ[b0] + PA_0 * PA_1 * PQ[b0] * PQ[b1])
-                                + delta[b1][d0] * (PB_0 * PA_0 * PQ[a1] * QC_0 + PB_0 * PA_1 * PQ[a0] * QC_0 + PA_0 * PA_1 * PQ[b0] * QC_0)
-                                + delta[b1][c0] * (PB_0 * PA_0 * PQ[a1] * QD_0 + PB_0 * PA_1 * PQ[a0] * QD_0 + PA_0 * PA_1 * PQ[b0] * QD_0)
-                                + delta[b0][d0] * (PB_1 * PA_0 * PQ[a1] * QC_0 + PB_1 * PA_1 * PQ[a0] * QC_0 + PA_0 * PA_1 * PQ[b1] * QC_0)
-                                + delta[b0][c0] * (PB_1 * PA_0 * PQ[a1] * QD_0 + PB_1 * PA_1 * PQ[a0] * QD_0 + PA_0 * PA_1 * PQ[b1] * QD_0)
-                                + delta[b0][b1] * (PA_0 * PQ[a1] * PQ[c0] * QD_0 * (-1.0) + PA_0 * PQ[a1] * PQ[d0] * QC_0 * (-1.0) + PA_1 * PQ[a0] * PQ[c0] * QD_0 * (-1.0) + PA_1 * PQ[a0] * PQ[d0] * QC_0 * (-1.0) + PA_0 * PA_1 * PQ[c0] * QD_0 + PA_0 * PA_1 * PQ[d0] * QC_0)
-                                + delta[a1][d0] * (PB_0 * PB_1 * PQ[a0] * QC_0 + PB_0 * PA_0 * PQ[b1] * QC_0 + PB_1 * PA_0 * PQ[b0] * QC_0)
-                                + delta[a1][c0] * (PB_0 * PB_1 * PQ[a0] * QD_0 + PB_0 * PA_0 * PQ[b1] * QD_0 + PB_1 * PA_0 * PQ[b0] * QD_0)
-                                + delta[a1][b1] * (PB_0 * PQ[a0] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PQ[a0] * PQ[d0] * QC_0 * (-1.0) + PA_0 * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PA_0 * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PA_0 * PQ[c0] * QD_0 + PB_0 * PA_0 * PQ[d0] * QC_0)
-                                + delta[a1][b0] * (PB_1 * PQ[a0] * PQ[c0] * QD_0 * (-1.0) + PB_1 * PQ[a0] * PQ[d0] * QC_0 * (-1.0) + PA_0 * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PA_0 * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PA_0 * PQ[c0] * QD_0 + PB_1 * PA_0 * PQ[d0] * QC_0)
-                                + delta[a0][d0] * (PB_0 * PB_1 * PQ[a1] * QC_0 + PB_0 * PA_1 * PQ[b1] * QC_0 + PB_1 * PA_1 * PQ[b0] * QC_0)
-                                + delta[a0][c0] * (PB_0 * PB_1 * PQ[a1] * QD_0 + PB_0 * PA_1 * PQ[b1] * QD_0 + PB_1 * PA_1 * PQ[b0] * QD_0)
-                                + delta[a0][b1] * (PB_0 * PQ[a1] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PQ[a1] * PQ[d0] * QC_0 * (-1.0) + PA_1 * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PA_1 * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PA_1 * PQ[c0] * QD_0 + PB_0 * PA_1 * PQ[d0] * QC_0)
-                                + delta[a0][b0] * (PB_1 * PQ[a1] * PQ[c0] * QD_0 * (-1.0) + PB_1 * PQ[a1] * PQ[d0] * QC_0 * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PA_1 * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PA_1 * PQ[c0] * QD_0 + PB_1 * PA_1 * PQ[d0] * QC_0)
-                                + delta[a0][a1] * (PB_0 * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PB_1 * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PB_1 * PQ[c0] * QD_0 + PB_0 * PB_1 * PQ[d0] * QC_0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[2] * (
-
-                            + S1 * S1 * inv_S4 * inv_S4 * (
-                                
-                                + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * PQ[d0]
-                            )
-
-                        )
-
-                        );
-
-                // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-                //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-                J_ij += eri_ijkl * pp_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
-
-            }
-
-        }
-
-        __syncthreads();
-
-        if (threadIdx.y < TILE_DIM_LARGE)
-        {
-            sum_J_ij[threadIdx.y] = J_ij;
-        }
-
-        __syncthreads();
-
-        if (threadIdx.y == 0)
-        {
-            J_ij = 0.0;
-
-            for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
-            {
-                J_ij += sum_J_ij[n];
-            }
-
-            mat_J[ij] += J_ij;
-
-        }
-
-    }
-}
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDPP1(double*         mat_J,
-                       const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   pp_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   pp_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* pp_first_inds,
-                       const uint32_t* pp_second_inds,
-                       const double*   pp_pair_data,
-                       const uint32_t  pp_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold)
-
-{
-    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
-
-    __shared__ double   sum_J_ij[TILE_DIM_LARGE];
-    __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
-
-    __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    __shared__ double rij[3], PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
-
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double J_ij = 0.0;
-
-    if (ij < dd_prim_pair_count_local)
-    {
-        if ((threadIdx.y == 0) && (threadIdx.x == 0))
-        {
-            d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-            d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-            d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-            d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-            d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-            d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-            delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-            delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-            delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
-
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
-
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
-
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
-
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
-
-            S1 = a_i + a_j;
-            inv_S1 = 1.0 / S1;
-
-            S_ij_00 = dd_pair_data_local[ij];
-
-            a0 = d_cart_inds[i % 6][0];
-            a1 = d_cart_inds[i % 6][1];
-            b0 = d_cart_inds[j % 6][0];
-            b1 = d_cart_inds[j % 6][1];
-
-            rij[0] = r_j[0] - r_i[0];
-            rij[1] = r_j[1] - r_i[1];
-            rij[2] = r_j[2] - r_i[2];
-
-            PA_0 = (a_j * inv_S1) * rij[a0];
-            PA_1 = (a_j * inv_S1) * rij[a1];
-            PB_0 = (-a_i * inv_S1) * rij[b0];
-            PB_1 = (-a_i * inv_S1) * rij[b1];
-
-        }
-
-        __syncthreads();
-
-        for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
-        {
-            const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
-
-            if (kl < pp_prim_pair_count)
-            {
-                if (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold)
-                {
-                    break;
-                }
-
-                const auto k = pp_first_inds[kl];
-                const auto l = pp_second_inds[kl];
-
-                const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
-
-                const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                                       p_prim_info[k / 3 + p_prim_count * 3],
-                                       p_prim_info[k / 3 + p_prim_count * 4]};
-
-                const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
-
-                const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
-                                       p_prim_info[l / 3 + p_prim_count * 3],
-                                       p_prim_info[l / 3 + p_prim_count * 4]};
-
-                const auto S_kl_00 = pp_pair_data[kl];
-
-                const auto c0 = k % 3;
-                const auto d0 = l % 3;
-
-                const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
-                
-                // J. Chem. Phys. 84, 3963-3974 (1986)
-
-                const auto S2 = a_k + a_l;
-
-                const auto inv_S2 = 1.0 / S2;
-                const auto inv_S4 = 1.0 / (S1 + S2);
-
-                const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
-                                      (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
-                                      (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
-
-                const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-                const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
-
-                double F6_t[7];
-
-                gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
-                const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-                const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-
-                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
-                        F6_t[2] * (
-
-                            + S1 * S2 * inv_S4 * inv_S4 * (
-                                
-                                + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * QD_0 * (-1.0)
-                                + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[d0] * QC_0 * (-1.0)
-                                + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c0] * QD_0 * (-1.0)
-                                + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[d0] * QC_0 * (-1.0)
-                                + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] * QD_0 * (-1.0)
-                                + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[d0] * QC_0 * (-1.0)
-                                + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * QD_0 * (-1.0)
-                                + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[d0] * QC_0 * (-1.0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[2] * (
-
-                            + S2 * S2 * inv_S4 * inv_S4 * (
-                                
-                                + PB_0 * PB_1 * PQ[a0] * PQ[a1] * QD_0 * QC_0
-                                + PB_0 * PA_0 * PQ[a1] * PQ[b1] * QD_0 * QC_0
-                                + PB_0 * PA_1 * PQ[a0] * PQ[b1] * QD_0 * QC_0
-                                + PB_1 * PA_0 * PQ[a1] * PQ[b0] * QD_0 * QC_0
-                                + PB_1 * PA_1 * PQ[a0] * PQ[b0] * QD_0 * QC_0
-                                + PA_0 * PA_1 * PQ[b0] * PQ[b1] * QD_0 * QC_0
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[2] * (
-
-                            + 0.125 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * (
-                                (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0])
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[2] * (
-
-                            + 0.125 * inv_S1 * inv_S4 * inv_S4 * (
-                                (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0]) * 2.0
-                                + (delta[a0][a1] * delta[b0][c0] * delta[b1][d0] + delta[a0][a1] * delta[b0][d0] * delta[b1][c0] + delta[a0][b0] * delta[a1][c0] * delta[b1][d0] + delta[a0][b0] * delta[a1][d0] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] * delta[b0][d0] + delta[a0][b1] * delta[a1][d0] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][d0] + delta[a0][c0] * delta[a1][b1] * delta[b0][d0] + delta[a0][c0] * delta[a1][d0] * delta[b0][b1] + delta[a0][d0] * delta[a1][b0] * delta[b1][c0] + delta[a0][d0] * delta[a1][b1] * delta[b0][c0] + delta[a0][d0] * delta[a1][c0] * delta[b0][b1])
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[3] * (
-
-                            (-0.125) * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
-                                (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][a1] * delta[b0][c0] * delta[b1][d0] + delta[a0][a1] * delta[b0][d0] * delta[b1][c0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][c0] * delta[b1][d0] + delta[a0][b0] * delta[a1][d0] * delta[b1][c0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0] + delta[a0][b1] * delta[a1][c0] * delta[b0][d0] + delta[a0][b1] * delta[a1][d0] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][d0] + delta[a0][c0] * delta[a1][b1] * delta[b0][d0] + delta[a0][c0] * delta[a1][d0] * delta[b0][b1] + delta[a0][d0] * delta[a1][b0] * delta[b1][c0] + delta[a0][d0] * delta[a1][b1] * delta[b0][c0] + delta[a0][d0] * delta[a1][c0] * delta[b0][b1])
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[3] * (
-
-                            + (-0.25) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
-                                delta[b0][b1] * delta[c0][d0] * (PQ[a0] * PQ[a1])
-                                + delta[a1][b1] * delta[c0][d0] * (PQ[a0] * PQ[b0])
-                                + delta[a1][b0] * delta[c0][d0] * (PQ[a0] * PQ[b1])
-                                + (delta[a1][b0] * delta[b1][d0] + delta[a1][b1] * delta[b0][d0] + delta[a1][d0] * delta[b0][b1]) * (PQ[a0] * QC_0)
-                                + (delta[a1][b0] * delta[b1][c0] + delta[a1][b1] * delta[b0][c0] + delta[a1][c0] * delta[b0][b1]) * (PQ[a0] * QD_0)
-                                + delta[a0][b1] * delta[c0][d0] * (PQ[a1] * PQ[b0])
-                                + delta[a0][b0] * delta[c0][d0] * (PQ[a1] * PQ[b1])
-                                + (delta[a0][b0] * delta[b1][d0] + delta[a0][b1] * delta[b0][d0] + delta[a0][d0] * delta[b0][b1]) * (PQ[a1] * QC_0)
-                                + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (PQ[a1] * QD_0)
-                                + delta[a0][a1] * delta[c0][d0] * (PQ[b0] * PQ[b1])
-                                + (delta[a0][a1] * delta[b1][d0] + delta[a0][b1] * delta[a1][d0] + delta[a0][d0] * delta[a1][b1]) * (PQ[b0] * QC_0)
-                                + (delta[a0][a1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] + delta[a0][c0] * delta[a1][b1]) * (PQ[b0] * QD_0)
-                                + (delta[a0][a1] * delta[b0][d0] + delta[a0][b0] * delta[a1][d0] + delta[a0][d0] * delta[a1][b0]) * (PQ[b1] * QC_0)
-                                + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[b1] * QD_0)
-                                + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * QD_0 + PQ[d0] * QC_0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[3] * (
-
-                            + 0.25 * S2 * inv_S4 * inv_S4 * inv_S4 * (
-                                delta[b0][b1] * delta[c0][d0] * (PQ[a0] * PQ[a1] * (-1.0) + PA_0 * PQ[a1] + PA_1 * PQ[a0])
-                                + (delta[b0][c0] * delta[b1][d0] + delta[b0][d0] * delta[b1][c0]) * (PA_0 * PQ[a1] + PA_1 * PQ[a0])
-                                + delta[a1][b1] * delta[c0][d0] * (PQ[a0] * PQ[b0] * (-1.0) + PB_0 * PQ[a0] + PA_0 * PQ[b0])
-                                + (delta[a1][c0] * delta[b1][d0] + delta[a1][d0] * delta[b1][c0]) * (PB_0 * PQ[a0] + PA_0 * PQ[b0])
-                                + delta[a1][b0] * delta[c0][d0] * (PQ[a0] * PQ[b1] * (-1.0) + PB_1 * PQ[a0] + PA_0 * PQ[b1])
-                                + (delta[a1][c0] * delta[b0][d0] + delta[a1][d0] * delta[b0][c0]) * (PB_1 * PQ[a0] + PA_0 * PQ[b1])
-                                + (delta[a1][b0] * delta[b1][d0] + delta[a1][b1] * delta[b0][d0] + delta[a1][d0] * delta[b0][b1]) * (PQ[a0] * PQ[c0] * (-1.0) + PA_0 * PQ[c0])
-                                + (delta[a1][b0] * delta[b1][c0] + delta[a1][b1] * delta[b0][c0] + delta[a1][c0] * delta[b0][b1]) * (PQ[a0] * PQ[d0] * (-1.0) + PA_0 * PQ[d0])
-                                + delta[a0][b1] * delta[c0][d0] * (PQ[a1] * PQ[b0] * (-1.0) + PB_0 * PQ[a1] + PA_1 * PQ[b0])
-                                + (delta[a0][c0] * delta[b1][d0] + delta[a0][d0] * delta[b1][c0]) * (PB_0 * PQ[a1] + PA_1 * PQ[b0])
-                                + delta[a0][b0] * delta[c0][d0] * (PQ[a1] * PQ[b1] * (-1.0) + PB_1 * PQ[a1] + PA_1 * PQ[b1])
-                                + (delta[a0][c0] * delta[b0][d0] + delta[a0][d0] * delta[b0][c0]) * (PB_1 * PQ[a1] + PA_1 * PQ[b1])
-                                + (delta[a0][b0] * delta[b1][d0] + delta[a0][b1] * delta[b0][d0] + delta[a0][d0] * delta[b0][b1]) * (PQ[a1] * PQ[c0] * (-1.0) + PA_1 * PQ[c0])
-                                + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (PQ[a1] * PQ[d0] * (-1.0) + PA_1 * PQ[d0])
-                                + delta[a0][a1] * delta[c0][d0] * (PQ[b0] * PQ[b1] * (-1.0) + PB_0 * PQ[b1] + PB_1 * PQ[b0])
-                                + (delta[a0][a1] * delta[b1][d0] + delta[a0][b1] * delta[a1][d0] + delta[a0][d0] * delta[a1][b1]) * (PQ[b0] * PQ[c0] * (-1.0) + PB_0 * PQ[c0])
-                                + (delta[a0][a1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] + delta[a0][c0] * delta[a1][b1]) * (PQ[b0] * PQ[d0] * (-1.0) + PB_0 * PQ[d0])
-                                + (delta[a0][a1] * delta[b0][d0] + delta[a0][b0] * delta[a1][d0] + delta[a0][d0] * delta[a1][b0]) * (PQ[b1] * PQ[c0] * (-1.0) + PB_1 * PQ[c0])
-                                + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[b1] * PQ[d0] * (-1.0) + PB_1 * PQ[d0])
-                                + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[d0] * (-2.0))
-                                + (delta[a0][c0] * delta[a1][d0] + delta[a0][d0] * delta[a1][c0]) * (PB_0 * PQ[b1] + PB_1 * PQ[b0])
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[3] * (
-
-                            + 0.5 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
-                                delta[c0][d0] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[b1] * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[b1] * (-1.0) + PB_1 * PA_0 * PQ[a1] * PQ[b0] * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[b0] * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[b1] * (-1.0))
-                                + delta[b1][d0] * (PB_0 * PA_0 * PQ[a1] * PQ[c0] * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[c0] * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[c0] * (-1.0))
-                                + delta[b1][c0] * (PB_0 * PA_0 * PQ[a1] * PQ[d0] * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[d0] * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[d0] * (-1.0))
-                                + delta[b0][d0] * (PB_1 * PA_0 * PQ[a1] * PQ[c0] * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[c0] * (-1.0) + PA_0 * PA_1 * PQ[b1] * PQ[c0] * (-1.0))
-                                + delta[b0][c0] * (PB_1 * PA_0 * PQ[a1] * PQ[d0] * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[d0] * (-1.0) + PA_0 * PA_1 * PQ[b1] * PQ[d0] * (-1.0))
-                                + delta[b0][b1] * (PA_0 * PA_1 * PQ[c0] * PQ[d0] * (-1.0) + PA_0 * PQ[a1] * PQ[c0] * PQ[d0] + PA_1 * PQ[a0] * PQ[c0] * PQ[d0])
-                                + delta[a1][d0] * (PB_0 * PB_1 * PQ[a0] * PQ[c0] * (-1.0) + PB_0 * PA_0 * PQ[b1] * PQ[c0] * (-1.0) + PB_1 * PA_0 * PQ[b0] * PQ[c0] * (-1.0))
-                                + delta[a1][c0] * (PB_0 * PB_1 * PQ[a0] * PQ[d0] * (-1.0) + PB_0 * PA_0 * PQ[b1] * PQ[d0] * (-1.0) + PB_1 * PA_0 * PQ[b0] * PQ[d0] * (-1.0))
-                                + delta[a1][b1] * (PB_0 * PA_0 * PQ[c0] * PQ[d0] * (-1.0) + PB_0 * PQ[a0] * PQ[c0] * PQ[d0] + PA_0 * PQ[b0] * PQ[c0] * PQ[d0])
-                                + delta[a1][b0] * (PB_1 * PA_0 * PQ[c0] * PQ[d0] * (-1.0) + PB_1 * PQ[a0] * PQ[c0] * PQ[d0] + PA_0 * PQ[b1] * PQ[c0] * PQ[d0])
-                                + delta[a0][d0] * (PB_0 * PB_1 * PQ[a1] * PQ[c0] * (-1.0) + PB_0 * PA_1 * PQ[b1] * PQ[c0] * (-1.0) + PB_1 * PA_1 * PQ[b0] * PQ[c0] * (-1.0))
-                                + delta[a0][c0] * (PB_0 * PB_1 * PQ[a1] * PQ[d0] * (-1.0) + PB_0 * PA_1 * PQ[b1] * PQ[d0] * (-1.0) + PB_1 * PA_1 * PQ[b0] * PQ[d0] * (-1.0))
-                                + delta[a0][b1] * (PB_0 * PA_1 * PQ[c0] * PQ[d0] * (-1.0) + PB_0 * PQ[a1] * PQ[c0] * PQ[d0] + PA_1 * PQ[b0] * PQ[c0] * PQ[d0])
-                                + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * PQ[d0] * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * PQ[d0] + PA_1 * PQ[b1] * PQ[c0] * PQ[d0])
-                                + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * PQ[d0] * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * PQ[d0] + PB_1 * PQ[b0] * PQ[c0] * PQ[d0])
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[3] * (
-
-                            + (-0.5) * S2 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
-                                delta[b0][b1] * (PQ[a0] * PQ[a1] * QD_0 * QC_0)
-                                + delta[a1][b1] * (PQ[a0] * PQ[b0] * QD_0 * QC_0)
-                                + delta[a1][b0] * (PQ[a0] * PQ[b1] * QD_0 * QC_0)
-                                + delta[a0][b1] * (PQ[a1] * PQ[b0] * QD_0 * QC_0)
-                                + delta[a0][b0] * (PQ[a1] * PQ[b1] * QD_0 * QC_0)
-                                + delta[a0][a1] * (PQ[b0] * PQ[b1] * QD_0 * QC_0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[3] * (
-
-                            + 0.5 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
-                                delta[c0][d0] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] + PA_1 * PQ[a0] * PQ[b0] * PQ[b1])
-                                + delta[b1][d0] * (PB_0 * PQ[a0] * PQ[a1] * QC_0 + PA_0 * PQ[a1] * PQ[b0] * QC_0 + PA_1 * PQ[a0] * PQ[b0] * QC_0)
-                                + delta[b1][c0] * (PB_0 * PQ[a0] * PQ[a1] * QD_0 + PA_0 * PQ[a1] * PQ[b0] * QD_0 + PA_1 * PQ[a0] * PQ[b0] * QD_0)
-                                + delta[b0][d0] * (PB_1 * PQ[a0] * PQ[a1] * QC_0 + PA_0 * PQ[a1] * PQ[b1] * QC_0 + PA_1 * PQ[a0] * PQ[b1] * QC_0)
-                                + delta[b0][c0] * (PB_1 * PQ[a0] * PQ[a1] * QD_0 + PA_0 * PQ[a1] * PQ[b1] * QD_0 + PA_1 * PQ[a0] * PQ[b1] * QD_0)
-                                + delta[b0][b1] * (PQ[a0] * PQ[a1] * PQ[c0] * QD_0 * (-1.0) + PQ[a0] * PQ[a1] * PQ[d0] * QC_0 * (-1.0) + PA_0 * PQ[a1] * PQ[c0] * QD_0 + PA_0 * PQ[a1] * PQ[d0] * QC_0 + PA_1 * PQ[a0] * PQ[c0] * QD_0 + PA_1 * PQ[a0] * PQ[d0] * QC_0)
-                                + delta[a1][d0] * (PB_0 * PQ[a0] * PQ[b1] * QC_0 + PB_1 * PQ[a0] * PQ[b0] * QC_0 + PA_0 * PQ[b0] * PQ[b1] * QC_0)
-                                + delta[a1][c0] * (PB_0 * PQ[a0] * PQ[b1] * QD_0 + PB_1 * PQ[a0] * PQ[b0] * QD_0 + PA_0 * PQ[b0] * PQ[b1] * QD_0)
-                                + delta[a1][b1] * (PQ[a0] * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PQ[a0] * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PQ[a0] * PQ[c0] * QD_0 + PB_0 * PQ[a0] * PQ[d0] * QC_0 + PA_0 * PQ[b0] * PQ[c0] * QD_0 + PA_0 * PQ[b0] * PQ[d0] * QC_0)
-                                + delta[a1][b0] * (PQ[a0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PQ[a0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PQ[a0] * PQ[c0] * QD_0 + PB_1 * PQ[a0] * PQ[d0] * QC_0 + PA_0 * PQ[b1] * PQ[c0] * QD_0 + PA_0 * PQ[b1] * PQ[d0] * QC_0)
-                                + delta[a0][d0] * (PB_0 * PQ[a1] * PQ[b1] * QC_0 + PB_1 * PQ[a1] * PQ[b0] * QC_0 + PA_1 * PQ[b0] * PQ[b1] * QC_0)
-                                + delta[a0][c0] * (PB_0 * PQ[a1] * PQ[b1] * QD_0 + PB_1 * PQ[a1] * PQ[b0] * QD_0 + PA_1 * PQ[b0] * PQ[b1] * QD_0)
-                                + delta[a0][b1] * (PQ[a1] * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PQ[a1] * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PQ[a1] * PQ[c0] * QD_0 + PB_0 * PQ[a1] * PQ[d0] * QC_0 + PA_1 * PQ[b0] * PQ[c0] * QD_0 + PA_1 * PQ[b0] * PQ[d0] * QC_0)
-                                + delta[a0][b0] * (PQ[a1] * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PQ[a1] * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * QD_0 + PB_1 * PQ[a1] * PQ[d0] * QC_0 + PA_1 * PQ[b1] * PQ[c0] * QD_0 + PA_1 * PQ[b1] * PQ[d0] * QC_0)
-                                + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * QD_0 + PB_0 * PQ[b1] * PQ[d0] * QC_0 + PB_1 * PQ[b0] * PQ[c0] * QD_0 + PB_1 * PQ[b0] * PQ[d0] * QC_0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[3] * (
-
-                            + S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
-                                
-                                + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * PQ[d0]
-                                + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c0] * PQ[d0]
-                                + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] * PQ[d0]
-                                + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[d0]
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[3] * (
-
-                            + S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
-                                
-                                + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * QD_0 * (-1.0)
-                                + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[d0] * QC_0 * (-1.0)
-                                + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c0] * QD_0 * (-1.0)
-                                + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[d0] * QC_0 * (-1.0)
-                                + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0)
-                                + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0)
-                                + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * QD_0 * (-1.0)
-                                + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[d0] * QC_0 * (-1.0)
-                                + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * QD_0 * (-1.0)
-                                + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[d0] * QC_0 * (-1.0)
-                                + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0)
-                                + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[3] * (
-
-                            + S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
-                                
-                                + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * QD_0 * QC_0
-                                + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * QD_0 * QC_0
-                                + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * QD_0 * QC_0
-                                + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * QD_0 * QC_0
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[4] * (
-
-                            0.5 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
-                                delta[c0][d0] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * (-1.0) + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * (-1.0))
-                                + delta[b1][d0] * (PB_0 * PQ[a0] * PQ[a1] * PQ[c0] * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * (-1.0))
-                                + delta[b1][c0] * (PB_0 * PQ[a0] * PQ[a1] * PQ[d0] * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[d0] * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[d0] * (-1.0))
-                                + delta[b0][d0] * (PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * (-1.0) + PA_0 * PQ[a1] * PQ[b1] * PQ[c0] * (-1.0) + PA_1 * PQ[a0] * PQ[b1] * PQ[c0] * (-1.0))
-                                + delta[b0][c0] * (PB_1 * PQ[a0] * PQ[a1] * PQ[d0] * (-1.0) + PA_0 * PQ[a1] * PQ[b1] * PQ[d0] * (-1.0) + PA_1 * PQ[a0] * PQ[b1] * PQ[d0] * (-1.0))
-                                + delta[b0][b1] * (PA_0 * PQ[a1] * PQ[c0] * PQ[d0] * (-1.0) + PA_1 * PQ[a0] * PQ[c0] * PQ[d0] * (-1.0) + PQ[a0] * PQ[a1] * PQ[c0] * PQ[d0])
-                                + delta[a1][d0] * (PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * (-1.0) + PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * (-1.0))
-                                + delta[a1][c0] * (PB_0 * PQ[a0] * PQ[b1] * PQ[d0] * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * PQ[d0] * (-1.0) + PA_0 * PQ[b0] * PQ[b1] * PQ[d0] * (-1.0))
-                                + delta[a1][b1] * (PB_0 * PQ[a0] * PQ[c0] * PQ[d0] * (-1.0) + PA_0 * PQ[b0] * PQ[c0] * PQ[d0] * (-1.0) + PQ[a0] * PQ[b0] * PQ[c0] * PQ[d0])
-                                + delta[a1][b0] * (PB_1 * PQ[a0] * PQ[c0] * PQ[d0] * (-1.0) + PA_0 * PQ[b1] * PQ[c0] * PQ[d0] * (-1.0) + PQ[a0] * PQ[b1] * PQ[c0] * PQ[d0])
-                                + delta[a0][d0] * (PB_0 * PQ[a1] * PQ[b1] * PQ[c0] * (-1.0) + PB_1 * PQ[a1] * PQ[b0] * PQ[c0] * (-1.0) + PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * (-1.0))
-                                + delta[a0][c0] * (PB_0 * PQ[a1] * PQ[b1] * PQ[d0] * (-1.0) + PB_1 * PQ[a1] * PQ[b0] * PQ[d0] * (-1.0) + PA_1 * PQ[b0] * PQ[b1] * PQ[d0] * (-1.0))
-                                + delta[a0][b1] * (PB_0 * PQ[a1] * PQ[c0] * PQ[d0] * (-1.0) + PA_1 * PQ[b0] * PQ[c0] * PQ[d0] * (-1.0) + PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0])
-                                + delta[a0][b0] * (PB_1 * PQ[a1] * PQ[c0] * PQ[d0] * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * PQ[d0] * (-1.0) + PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0])
-                                + delta[a0][a1] * (PB_0 * PQ[b1] * PQ[c0] * PQ[d0] * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * PQ[d0] * (-1.0) + PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0])
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[4] * (
-
-                            + 0.5 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
-                                delta[b1][d0] * (PQ[a0] * PQ[a1] * PQ[b0] * QC_0)
-                                + delta[b0][d0] * (PQ[a0] * PQ[a1] * PQ[b1] * QC_0)
-                                + delta[b0][b1] * (PQ[a0] * PQ[a1] * PQ[c0] * QD_0 + PQ[a0] * PQ[a1] * PQ[d0] * QC_0)
-                                + delta[a1][d0] * (PQ[a0] * PQ[b0] * PQ[b1] * QC_0)
-                                + delta[a1][b1] * (PQ[a0] * PQ[b0] * PQ[c0] * QD_0 + PQ[a0] * PQ[b0] * PQ[d0] * QC_0)
-                                + delta[a1][b0] * (PQ[a0] * PQ[b1] * PQ[c0] * QD_0 + PQ[a0] * PQ[b1] * PQ[d0] * QC_0)
-                                + delta[a0][d0] * (PQ[a1] * PQ[b0] * PQ[b1] * QC_0)
-                                + delta[a0][b1] * (PQ[a1] * PQ[b0] * PQ[c0] * QD_0 + PQ[a1] * PQ[b0] * PQ[d0] * QC_0)
-                                + delta[a0][b0] * (PQ[a1] * PQ[b1] * PQ[c0] * QD_0 + PQ[a1] * PQ[b1] * PQ[d0] * QC_0)
-                                + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * QD_0 + PQ[b0] * PQ[b1] * PQ[d0] * QC_0)
-                                + delta[c0][d0] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1])
-                                + delta[b1][c0] * (PQ[a0] * PQ[a1] * PQ[b0] * QD_0)
-                                + delta[b0][c0] * (PQ[a0] * PQ[a1] * PQ[b1] * QD_0)
-                                + delta[a1][c0] * (PQ[a0] * PQ[b0] * PQ[b1] * QD_0)
-                                + delta[a0][c0] * (PQ[a1] * PQ[b0] * PQ[b1] * QD_0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[4] * (
-
-                            + S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
-                                
-                                + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[d0]
-                                + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0]
-                                + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c0] * PQ[d0]
-                                + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0]
-                                + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[d0]
-                                + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0]
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[4] * (
-
-                            + S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
-                                
-                                + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * QD_0 * (-1.0)
-                                + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[d0] * QC_0 * (-1.0)
-                                + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * QD_0 * (-1.0)
-                                + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[d0] * QC_0 * (-1.0)
-                                + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0)
-                                + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0)
-                                + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0)
-                                + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0)
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[4] * (
-
-                            + S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
-                                
-                                + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * QD_0 * QC_0
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[4] * (
-
-                            + 0.25 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
-                                (delta[b0][b1] * delta[c0][d0] + delta[b0][c0] * delta[b1][d0] + delta[b0][d0] * delta[b1][c0]) * (PQ[a0] * PQ[a1])
-                                + (delta[a1][b1] * delta[c0][d0] + delta[a1][c0] * delta[b1][d0] + delta[a1][d0] * delta[b1][c0]) * (PQ[a0] * PQ[b0])
-                                + (delta[a1][b0] * delta[c0][d0] + delta[a1][c0] * delta[b0][d0] + delta[a1][d0] * delta[b0][c0]) * (PQ[a0] * PQ[b1])
-                                + (delta[a1][b0] * delta[b1][d0] + delta[a1][b1] * delta[b0][d0] + delta[a1][d0] * delta[b0][b1]) * (PQ[a0] * PQ[c0])
-                                + (delta[a1][b0] * delta[b1][c0] + delta[a1][b1] * delta[b0][c0] + delta[a1][c0] * delta[b0][b1]) * (PQ[a0] * PQ[d0])
-                                + (delta[a0][b1] * delta[c0][d0] + delta[a0][c0] * delta[b1][d0] + delta[a0][d0] * delta[b1][c0]) * (PQ[a1] * PQ[b0])
-                                + (delta[a0][b0] * delta[c0][d0] + delta[a0][c0] * delta[b0][d0] + delta[a0][d0] * delta[b0][c0]) * (PQ[a1] * PQ[b1])
-                                + (delta[a0][b0] * delta[b1][d0] + delta[a0][b1] * delta[b0][d0] + delta[a0][d0] * delta[b0][b1]) * (PQ[a1] * PQ[c0])
-                                + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (PQ[a1] * PQ[d0])
-                                + (delta[a0][a1] * delta[c0][d0] + delta[a0][c0] * delta[a1][d0] + delta[a0][d0] * delta[a1][c0]) * (PQ[b0] * PQ[b1])
-                                + (delta[a0][a1] * delta[b1][d0] + delta[a0][b1] * delta[a1][d0] + delta[a0][d0] * delta[a1][b1]) * (PQ[b0] * PQ[c0])
-                                + (delta[a0][a1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] + delta[a0][c0] * delta[a1][b1]) * (PQ[b0] * PQ[d0])
-                                + (delta[a0][a1] * delta[b0][d0] + delta[a0][b0] * delta[a1][d0] + delta[a0][d0] * delta[a1][b0]) * (PQ[b1] * PQ[c0])
-                                + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[b1] * PQ[d0])
-                                + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[d0])
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[5] * (
-
-                            (-0.5) * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
-                                delta[c0][d0] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1])
-                                + delta[b1][d0] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0])
-                                + delta[b1][c0] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[d0])
-                                + delta[b0][d0] * (PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0])
-                                + delta[b0][c0] * (PQ[a0] * PQ[a1] * PQ[b1] * PQ[d0])
-                                + delta[b0][b1] * (PQ[a0] * PQ[a1] * PQ[c0] * PQ[d0])
-                                + delta[a1][d0] * (PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0])
-                                + delta[a1][c0] * (PQ[a0] * PQ[b0] * PQ[b1] * PQ[d0])
-                                + delta[a1][b1] * (PQ[a0] * PQ[b0] * PQ[c0] * PQ[d0])
-                                + delta[a1][b0] * (PQ[a0] * PQ[b1] * PQ[c0] * PQ[d0])
-                                + delta[a0][d0] * (PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0])
-                                + delta[a0][c0] * (PQ[a1] * PQ[b0] * PQ[b1] * PQ[d0])
-                                + delta[a0][b1] * (PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0])
-                                + delta[a0][b0] * (PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0])
-                                + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0])
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[5] * (
-
-                            + S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
-                                
-                                + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0]
-                                + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0]
-                                + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0]
-                                + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0]
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[5] * (
-
-                            + (-1.0) * S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
-                                PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0
-                                + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0
-                            )
-
-                        )
-
-                        +
-
-                        F6_t[6] * (
-
-                            S1 * S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
-                                PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0]
-                            )
-
-                        )
-
-                        );
-
-                // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-                //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-                J_ij += eri_ijkl * pp_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
-
-            }
-
-        }
-
-        __syncthreads();
-
-        if (threadIdx.y < TILE_DIM_LARGE)
-        {
-            sum_J_ij[threadIdx.y] = J_ij;
-        }
-
-        __syncthreads();
-
-        if (threadIdx.y == 0)
-        {
-            J_ij = 0.0;
-
-            for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
-            {
-                J_ij += sum_J_ij[n];
-            }
-
-            mat_J[ij] += J_ij;
-        }
-
-    }
-}
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDSD0(double*         mat_J,
-                       const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   sd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   sd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* sd_first_inds,
-                       const uint32_t* sd_second_inds,
-                       const double*   sd_pair_data,
-                       const uint32_t  sd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold)
-
-{
-    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
-    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
-
     __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
     __shared__ uint32_t skip_thread_block;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -18534,7 +17079,7 @@ computeCoulombFockDDSD0(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -18583,14 +17128,1122 @@ computeCoulombFockDDSD0(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+    }
+
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((kl < pp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > eri_threshold))
+        {
+            const auto k = pp_first_inds[kl];
+            const auto l = pp_second_inds[kl];
+
+            const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+
+            const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
+                                   p_prim_info[k / 3 + p_prim_count * 3],
+                                   p_prim_info[k / 3 + p_prim_count * 4]};
+
+            const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+
+            const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
+                                   p_prim_info[l / 3 + p_prim_count * 3],
+                                   p_prim_info[l / 3 + p_prim_count * 4]};
+
+            const auto S_kl_00 = pp_pair_data[kl];
+
+            const auto c0 = k % 3;
+            const auto d0 = l % 3;
+
+            
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
+
+            double F6_t[3];
+
+            gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    F6_t[0] * (
+
+                        0.25 * inv_S1 * inv_S1 * (
+                            (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (QD_0 * QC_0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[0] * (
+
+                        + 0.25 * inv_S1 * inv_S2 * (
+                            delta[b0][b1] * delta[c0][d0] * (PA_0 * PA_1)
+                            + delta[a1][b1] * delta[c0][d0] * (PB_0 * PA_0)
+                            + delta[a1][b0] * delta[c0][d0] * (PB_1 * PA_0)
+                            + delta[a0][b1] * delta[c0][d0] * (PB_0 * PA_1)
+                            + delta[a0][b0] * delta[c0][d0] * (PB_1 * PA_1)
+                            + delta[a0][a1] * delta[c0][d0] * (PB_0 * PB_1)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[0] * (
+
+                        + 0.5 * inv_S1 * (
+                            delta[b0][b1] * (PA_0 * PA_1 * QD_0 * QC_0)
+                            + delta[a1][b1] * (PB_0 * PA_0 * QD_0 * QC_0)
+                            + delta[a1][b0] * (PB_1 * PA_0 * QD_0 * QC_0)
+                            + delta[a0][b1] * (PB_0 * PA_1 * QD_0 * QC_0)
+                            + delta[a0][b0] * (PB_1 * PA_1 * QD_0 * QC_0)
+                            + delta[a0][a1] * (PB_0 * PB_1 * QD_0 * QC_0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[0] * (
+
+                        + 0.5 * inv_S2 * (
+                            delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PA_1)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[0] * (
+
+                        + (
+                            
+                            + PB_0 * PB_1 * PA_0 * PA_1 * QD_0 * QC_0
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[0] * (
+
+                        + 0.125 * inv_S1 * inv_S1 * inv_S2 * (
+                            (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0])
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[1] * (
+
+                        (-0.25) * inv_S1 * inv_S1 * inv_S4 * (
+                            (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0])
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[1] * (
+
+                        + (-0.125) * inv_S1 * inv_S2 * inv_S4 * (
+                            (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0])
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[1] * (
+
+                        + (-0.5) * S2 * inv_S1 * inv_S1 * inv_S4 * (
+                            (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (QD_0 * QC_0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[1] * (
+
+                        + 0.25 * inv_S1 * inv_S4 * (
+                            delta[b0][b1] * delta[c0][d0] * (PA_0 * PA_1 * (-1.0) + PA_0 * PQ[a1] + PA_1 * PQ[a0])
+                            + delta[a1][b1] * delta[c0][d0] * (PB_0 * PA_0 * (-1.0) + PB_0 * PQ[a0] + PA_0 * PQ[b0])
+                            + delta[a1][b0] * delta[c0][d0] * (PB_1 * PA_0 * (-1.0) + PB_1 * PQ[a0] + PA_0 * PQ[b1])
+                            + (delta[a1][b0] * delta[b1][d0] + delta[a1][b1] * delta[b0][d0] + delta[a1][d0] * delta[b0][b1]) * (PA_0 * QC_0)
+                            + (delta[a1][b0] * delta[b1][c0] + delta[a1][b1] * delta[b0][c0] + delta[a1][c0] * delta[b0][b1]) * (PA_0 * QD_0)
+                            + delta[a0][b1] * delta[c0][d0] * (PB_0 * PA_1 * (-1.0) + PB_0 * PQ[a1] + PA_1 * PQ[b0])
+                            + delta[a0][b0] * delta[c0][d0] * (PB_1 * PA_1 * (-1.0) + PB_1 * PQ[a1] + PA_1 * PQ[b1])
+                            + (delta[a0][b0] * delta[b1][d0] + delta[a0][b1] * delta[b0][d0] + delta[a0][d0] * delta[b0][b1]) * (PA_1 * QC_0)
+                            + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (PA_1 * QD_0)
+                            + delta[a0][a1] * delta[c0][d0] * (PB_0 * PB_1 * (-1.0) + PB_0 * PQ[b1] + PB_1 * PQ[b0])
+                            + (delta[a0][a1] * delta[b1][d0] + delta[a0][b1] * delta[a1][d0] + delta[a0][d0] * delta[a1][b1]) * (PB_0 * QC_0)
+                            + (delta[a0][a1] * delta[b0][d0] + delta[a0][b0] * delta[a1][d0] + delta[a0][d0] * delta[a1][b0]) * (PB_1 * QC_0)
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * QD_0 * (-1.0) + PQ[d0] * QC_0 * (-1.0))
+                            + (delta[a0][a1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] + delta[a0][c0] * delta[a1][b1]) * (PB_0 * QD_0)
+                            + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PB_1 * QD_0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[1] * (
+
+                        + (-0.25) * inv_S2 * inv_S4 * (
+                            delta[b0][b1] * delta[c0][d0] * (PA_0 * PA_1)
+                            + delta[a1][b1] * delta[c0][d0] * (PB_0 * PA_0)
+                            + delta[a1][b0] * delta[c0][d0] * (PB_1 * PA_0)
+                            + delta[a0][b1] * delta[c0][d0] * (PB_0 * PA_1)
+                            + delta[a0][b0] * delta[c0][d0] * (PB_1 * PA_1)
+                            + delta[a0][a1] * delta[c0][d0] * (PB_0 * PB_1)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[1] * (
+
+                        + (-0.5) * S1 * inv_S2 * inv_S4 * (
+                            delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PA_1)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[1] * (
+
+                        + 0.5 * S2 * inv_S1 * inv_S4 * (
+                            delta[b0][b1] * (PA_0 * PA_1 * QD_0 * QC_0 * (-1.0) + PA_0 * PQ[a1] * QD_0 * QC_0 + PA_1 * PQ[a0] * QD_0 * QC_0)
+                            + delta[a1][b1] * (PB_0 * PA_0 * QD_0 * QC_0 * (-1.0) + PB_0 * PQ[a0] * QD_0 * QC_0 + PA_0 * PQ[b0] * QD_0 * QC_0)
+                            + delta[a1][b0] * (PB_1 * PA_0 * QD_0 * QC_0 * (-1.0) + PB_1 * PQ[a0] * QD_0 * QC_0 + PA_0 * PQ[b1] * QD_0 * QC_0)
+                            + delta[a0][b1] * (PB_0 * PA_1 * QD_0 * QC_0 * (-1.0) + PB_0 * PQ[a1] * QD_0 * QC_0 + PA_1 * PQ[b0] * QD_0 * QC_0)
+                            + delta[a0][b0] * (PB_1 * PA_1 * QD_0 * QC_0 * (-1.0) + PB_1 * PQ[a1] * QD_0 * QC_0 + PA_1 * PQ[b1] * QD_0 * QC_0)
+                            + delta[a0][a1] * (PB_0 * PB_1 * QD_0 * QC_0 * (-1.0) + PB_0 * PQ[b1] * QD_0 * QC_0 + PB_1 * PQ[b0] * QD_0 * QC_0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[1] * (
+
+                        + 0.5 * inv_S4 * (
+                            delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PQ[a1] + PB_0 * PB_1 * PA_1 * PQ[a0] + PB_0 * PA_0 * PA_1 * PQ[b1] + PB_1 * PA_0 * PA_1 * PQ[b0])
+                            + delta[b1][d0] * (PB_0 * PA_0 * PA_1 * QC_0)
+                            + delta[b1][c0] * (PB_0 * PA_0 * PA_1 * QD_0)
+                            + delta[b0][d0] * (PB_1 * PA_0 * PA_1 * QC_0)
+                            + delta[b0][c0] * (PB_1 * PA_0 * PA_1 * QD_0)
+                            + delta[b0][b1] * (PA_0 * PA_1 * PQ[c0] * QD_0 * (-1.0) + PA_0 * PA_1 * PQ[d0] * QC_0 * (-1.0))
+                            + delta[a1][d0] * (PB_0 * PB_1 * PA_0 * QC_0)
+                            + delta[a1][c0] * (PB_0 * PB_1 * PA_0 * QD_0)
+                            + delta[a1][b1] * (PB_0 * PA_0 * PQ[c0] * QD_0 * (-1.0) + PB_0 * PA_0 * PQ[d0] * QC_0 * (-1.0))
+                            + delta[a1][b0] * (PB_1 * PA_0 * PQ[c0] * QD_0 * (-1.0) + PB_1 * PA_0 * PQ[d0] * QC_0 * (-1.0))
+                            + delta[a0][d0] * (PB_0 * PB_1 * PA_1 * QC_0)
+                            + delta[a0][c0] * (PB_0 * PB_1 * PA_1 * QD_0)
+                            + delta[a0][b1] * (PB_0 * PA_1 * PQ[c0] * QD_0 * (-1.0) + PB_0 * PA_1 * PQ[d0] * QC_0 * (-1.0))
+                            + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * QD_0 * (-1.0) + PB_1 * PA_1 * PQ[d0] * QC_0 * (-1.0))
+                            + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * QD_0 * (-1.0) + PB_0 * PB_1 * PQ[d0] * QC_0 * (-1.0))
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[1] * (
+
+                        + S1 * inv_S4 * (
+                            
+                            + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * QD_0 * (-1.0)
+                            + PB_0 * PB_1 * PA_0 * PA_1 * PQ[d0] * QC_0 * (-1.0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[1] * (
+
+                        + S2 * inv_S4 * (
+                            
+                            + PB_0 * PB_1 * PA_0 * PQ[a1] * QD_0 * QC_0
+                            + PB_0 * PB_1 * PA_1 * PQ[a0] * QD_0 * QC_0
+                            + PB_0 * PA_0 * PA_1 * PQ[b1] * QD_0 * QC_0
+                            + PB_1 * PA_0 * PA_1 * PQ[b0] * QD_0 * QC_0
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[2] * (
+
+                        0.25 * S2 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * (
+                            (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (QD_0 * QC_0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[2] * (
+
+                        + 0.25 * S2 * inv_S1 * inv_S4 * inv_S4 * (
+                            delta[b0][b1] * delta[c0][d0] * (PA_0 * PQ[a1] * (-1.0) + PA_1 * PQ[a0] * (-1.0) + PQ[a0] * PQ[a1])
+                            + delta[a1][b1] * delta[c0][d0] * (PB_0 * PQ[a0] * (-1.0) + PA_0 * PQ[b0] * (-1.0) + PQ[a0] * PQ[b0])
+                            + delta[a1][b0] * delta[c0][d0] * (PB_1 * PQ[a0] * (-1.0) + PA_0 * PQ[b1] * (-1.0) + PQ[a0] * PQ[b1])
+                            + (delta[a1][b0] * delta[b1][d0] + delta[a1][b1] * delta[b0][d0] + delta[a1][d0] * delta[b0][b1]) * (PA_0 * QC_0 * (-1.0) + PQ[a0] * QC_0)
+                            + (delta[a1][b0] * delta[b1][c0] + delta[a1][b1] * delta[b0][c0] + delta[a1][c0] * delta[b0][b1]) * (PA_0 * QD_0 * (-1.0) + PQ[a0] * QD_0)
+                            + delta[a0][b1] * delta[c0][d0] * (PB_0 * PQ[a1] * (-1.0) + PA_1 * PQ[b0] * (-1.0) + PQ[a1] * PQ[b0])
+                            + delta[a0][b0] * delta[c0][d0] * (PB_1 * PQ[a1] * (-1.0) + PA_1 * PQ[b1] * (-1.0) + PQ[a1] * PQ[b1])
+                            + (delta[a0][b0] * delta[b1][d0] + delta[a0][b1] * delta[b0][d0] + delta[a0][d0] * delta[b0][b1]) * (PA_1 * QC_0 * (-1.0) + PQ[a1] * QC_0)
+                            + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (PA_1 * QD_0 * (-1.0) + PQ[a1] * QD_0)
+                            + delta[a0][a1] * delta[c0][d0] * (PB_0 * PQ[b1] * (-1.0) + PB_1 * PQ[b0] * (-1.0) + PQ[b0] * PQ[b1])
+                            + (delta[a0][a1] * delta[b1][d0] + delta[a0][b1] * delta[a1][d0] + delta[a0][d0] * delta[a1][b1]) * (PB_0 * QC_0 * (-1.0) + PQ[b0] * QC_0)
+                            + (delta[a0][a1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] + delta[a0][c0] * delta[a1][b1]) * (PB_0 * QD_0 * (-1.0) + PQ[b0] * QD_0)
+                            + (delta[a0][a1] * delta[b0][d0] + delta[a0][b0] * delta[a1][d0] + delta[a0][d0] * delta[a1][b0]) * (PB_1 * QC_0 * (-1.0) + PQ[b1] * QC_0)
+                            + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PB_1 * QD_0 * (-1.0) + PQ[b1] * QD_0)
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * QD_0 * 2.0 + PQ[d0] * QC_0 * 2.0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[2] * (
+
+                        + 0.25 * inv_S4 * inv_S4 * (
+                            delta[b0][b1] * delta[c0][d0] * (PA_0 * PQ[a1] * (-1.0) + PA_1 * PQ[a0] * (-1.0) + PA_0 * PA_1)
+                            + (delta[b0][c0] * delta[b1][d0] + delta[b0][d0] * delta[b1][c0]) * (PA_0 * PA_1)
+                            + delta[a1][b1] * delta[c0][d0] * (PB_0 * PQ[a0] * (-1.0) + PA_0 * PQ[b0] * (-1.0) + PB_0 * PA_0)
+                            + (delta[a1][c0] * delta[b1][d0] + delta[a1][d0] * delta[b1][c0]) * (PB_0 * PA_0)
+                            + delta[a1][b0] * delta[c0][d0] * (PB_1 * PQ[a0] * (-1.0) + PA_0 * PQ[b1] * (-1.0) + PB_1 * PA_0)
+                            + (delta[a1][c0] * delta[b0][d0] + delta[a1][d0] * delta[b0][c0]) * (PB_1 * PA_0)
+                            + (delta[a1][b0] * delta[b1][d0] + delta[a1][b1] * delta[b0][d0] + delta[a1][d0] * delta[b0][b1]) * (PA_0 * PQ[c0] * (-1.0))
+                            + (delta[a1][b0] * delta[b1][c0] + delta[a1][b1] * delta[b0][c0] + delta[a1][c0] * delta[b0][b1]) * (PA_0 * PQ[d0] * (-1.0))
+                            + delta[a0][b1] * delta[c0][d0] * (PB_0 * PQ[a1] * (-1.0) + PA_1 * PQ[b0] * (-1.0) + PB_0 * PA_1)
+                            + (delta[a0][c0] * delta[b1][d0] + delta[a0][d0] * delta[b1][c0]) * (PB_0 * PA_1)
+                            + delta[a0][b0] * delta[c0][d0] * (PB_1 * PQ[a1] * (-1.0) + PA_1 * PQ[b1] * (-1.0) + PB_1 * PA_1)
+                            + (delta[a0][c0] * delta[b0][d0] + delta[a0][d0] * delta[b0][c0]) * (PB_1 * PA_1)
+                            + (delta[a0][b0] * delta[b1][d0] + delta[a0][b1] * delta[b0][d0] + delta[a0][d0] * delta[b0][b1]) * (PA_1 * PQ[c0] * (-1.0))
+                            + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (PA_1 * PQ[d0] * (-1.0))
+                            + delta[a0][a1] * delta[c0][d0] * (PB_0 * PQ[b1] * (-1.0) + PB_1 * PQ[b0] * (-1.0) + PB_0 * PB_1)
+                            + (delta[a0][a1] * delta[b1][d0] + delta[a0][b1] * delta[a1][d0] + delta[a0][d0] * delta[a1][b1]) * (PB_0 * PQ[c0] * (-1.0))
+                            + (delta[a0][a1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] + delta[a0][c0] * delta[a1][b1]) * (PB_0 * PQ[d0] * (-1.0))
+                            + (delta[a0][a1] * delta[b0][d0] + delta[a0][b0] * delta[a1][d0] + delta[a0][d0] * delta[a1][b0]) * (PB_1 * PQ[c0] * (-1.0))
+                            + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PB_1 * PQ[d0] * (-1.0))
+                            + (delta[a0][c0] * delta[a1][d0] + delta[a0][d0] * delta[a1][c0]) * (PB_0 * PB_1)
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[d0])
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[2] * (
+
+                        + 0.5 * S1 * inv_S4 * inv_S4 * (
+                            delta[c0][d0] * (PB_0 * PB_1 * PA_0 * PQ[a1] * (-1.0) + PB_0 * PB_1 * PA_1 * PQ[a0] * (-1.0) + PB_0 * PA_0 * PA_1 * PQ[b1] * (-1.0) + PB_1 * PA_0 * PA_1 * PQ[b0] * (-1.0))
+                            + delta[b1][d0] * (PB_0 * PA_0 * PA_1 * PQ[c0] * (-1.0))
+                            + delta[b1][c0] * (PB_0 * PA_0 * PA_1 * PQ[d0] * (-1.0))
+                            + delta[b0][d0] * (PB_1 * PA_0 * PA_1 * PQ[c0] * (-1.0))
+                            + delta[b0][c0] * (PB_1 * PA_0 * PA_1 * PQ[d0] * (-1.0))
+                            + delta[b0][b1] * (PA_0 * PA_1 * PQ[c0] * PQ[d0])
+                            + delta[a1][d0] * (PB_0 * PB_1 * PA_0 * PQ[c0] * (-1.0))
+                            + delta[a1][c0] * (PB_0 * PB_1 * PA_0 * PQ[d0] * (-1.0))
+                            + delta[a1][b1] * (PB_0 * PA_0 * PQ[c0] * PQ[d0])
+                            + delta[a1][b0] * (PB_1 * PA_0 * PQ[c0] * PQ[d0])
+                            + delta[a0][d0] * (PB_0 * PB_1 * PA_1 * PQ[c0] * (-1.0))
+                            + delta[a0][c0] * (PB_0 * PB_1 * PA_1 * PQ[d0] * (-1.0))
+                            + delta[a0][b1] * (PB_0 * PA_1 * PQ[c0] * PQ[d0])
+                            + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * PQ[d0])
+                            + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * PQ[d0])
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[2] * (
+
+                        + 0.5 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * (
+                            delta[b0][b1] * (PA_0 * PQ[a1] * QD_0 * QC_0 * (-1.0) + PA_1 * PQ[a0] * QD_0 * QC_0 * (-1.0) + PQ[a0] * PQ[a1] * QD_0 * QC_0)
+                            + delta[a1][b1] * (PB_0 * PQ[a0] * QD_0 * QC_0 * (-1.0) + PA_0 * PQ[b0] * QD_0 * QC_0 * (-1.0) + PQ[a0] * PQ[b0] * QD_0 * QC_0)
+                            + delta[a1][b0] * (PB_1 * PQ[a0] * QD_0 * QC_0 * (-1.0) + PA_0 * PQ[b1] * QD_0 * QC_0 * (-1.0) + PQ[a0] * PQ[b1] * QD_0 * QC_0)
+                            + delta[a0][b1] * (PB_0 * PQ[a1] * QD_0 * QC_0 * (-1.0) + PA_1 * PQ[b0] * QD_0 * QC_0 * (-1.0) + PQ[a1] * PQ[b0] * QD_0 * QC_0)
+                            + delta[a0][b0] * (PB_1 * PQ[a1] * QD_0 * QC_0 * (-1.0) + PA_1 * PQ[b1] * QD_0 * QC_0 * (-1.0) + PQ[a1] * PQ[b1] * QD_0 * QC_0)
+                            + delta[a0][a1] * (PB_0 * PQ[b1] * QD_0 * QC_0 * (-1.0) + PB_1 * PQ[b0] * QD_0 * QC_0 * (-1.0) + PQ[b0] * PQ[b1] * QD_0 * QC_0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[2] * (
+
+                        + 0.5 * S2 * inv_S4 * inv_S4 * (
+                            delta[c0][d0] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] + PB_0 * PA_0 * PQ[a1] * PQ[b1] + PB_0 * PA_1 * PQ[a0] * PQ[b1] + PB_1 * PA_0 * PQ[a1] * PQ[b0] + PB_1 * PA_1 * PQ[a0] * PQ[b0] + PA_0 * PA_1 * PQ[b0] * PQ[b1])
+                            + delta[b1][d0] * (PB_0 * PA_0 * PQ[a1] * QC_0 + PB_0 * PA_1 * PQ[a0] * QC_0 + PA_0 * PA_1 * PQ[b0] * QC_0)
+                            + delta[b1][c0] * (PB_0 * PA_0 * PQ[a1] * QD_0 + PB_0 * PA_1 * PQ[a0] * QD_0 + PA_0 * PA_1 * PQ[b0] * QD_0)
+                            + delta[b0][d0] * (PB_1 * PA_0 * PQ[a1] * QC_0 + PB_1 * PA_1 * PQ[a0] * QC_0 + PA_0 * PA_1 * PQ[b1] * QC_0)
+                            + delta[b0][c0] * (PB_1 * PA_0 * PQ[a1] * QD_0 + PB_1 * PA_1 * PQ[a0] * QD_0 + PA_0 * PA_1 * PQ[b1] * QD_0)
+                            + delta[b0][b1] * (PA_0 * PQ[a1] * PQ[c0] * QD_0 * (-1.0) + PA_0 * PQ[a1] * PQ[d0] * QC_0 * (-1.0) + PA_1 * PQ[a0] * PQ[c0] * QD_0 * (-1.0) + PA_1 * PQ[a0] * PQ[d0] * QC_0 * (-1.0) + PA_0 * PA_1 * PQ[c0] * QD_0 + PA_0 * PA_1 * PQ[d0] * QC_0)
+                            + delta[a1][d0] * (PB_0 * PB_1 * PQ[a0] * QC_0 + PB_0 * PA_0 * PQ[b1] * QC_0 + PB_1 * PA_0 * PQ[b0] * QC_0)
+                            + delta[a1][c0] * (PB_0 * PB_1 * PQ[a0] * QD_0 + PB_0 * PA_0 * PQ[b1] * QD_0 + PB_1 * PA_0 * PQ[b0] * QD_0)
+                            + delta[a1][b1] * (PB_0 * PQ[a0] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PQ[a0] * PQ[d0] * QC_0 * (-1.0) + PA_0 * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PA_0 * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PA_0 * PQ[c0] * QD_0 + PB_0 * PA_0 * PQ[d0] * QC_0)
+                            + delta[a1][b0] * (PB_1 * PQ[a0] * PQ[c0] * QD_0 * (-1.0) + PB_1 * PQ[a0] * PQ[d0] * QC_0 * (-1.0) + PA_0 * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PA_0 * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PA_0 * PQ[c0] * QD_0 + PB_1 * PA_0 * PQ[d0] * QC_0)
+                            + delta[a0][d0] * (PB_0 * PB_1 * PQ[a1] * QC_0 + PB_0 * PA_1 * PQ[b1] * QC_0 + PB_1 * PA_1 * PQ[b0] * QC_0)
+                            + delta[a0][c0] * (PB_0 * PB_1 * PQ[a1] * QD_0 + PB_0 * PA_1 * PQ[b1] * QD_0 + PB_1 * PA_1 * PQ[b0] * QD_0)
+                            + delta[a0][b1] * (PB_0 * PQ[a1] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PQ[a1] * PQ[d0] * QC_0 * (-1.0) + PA_1 * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PA_1 * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PA_1 * PQ[c0] * QD_0 + PB_0 * PA_1 * PQ[d0] * QC_0)
+                            + delta[a0][b0] * (PB_1 * PQ[a1] * PQ[c0] * QD_0 * (-1.0) + PB_1 * PQ[a1] * PQ[d0] * QC_0 * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PA_1 * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PA_1 * PQ[c0] * QD_0 + PB_1 * PA_1 * PQ[d0] * QC_0)
+                            + delta[a0][a1] * (PB_0 * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PB_0 * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PB_1 * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PB_1 * PQ[c0] * QD_0 + PB_0 * PB_1 * PQ[d0] * QC_0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[2] * (
+
+                        + S1 * S1 * inv_S4 * inv_S4 * (
+                            
+                            + PB_0 * PB_1 * PA_0 * PA_1 * PQ[c0] * PQ[d0]
+                        )
+
+                    )
+
+                    );
+
+            // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
+            //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
+            ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * pp_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
+        }
+        else
+        {
+            ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+            // indicator for early exit for thread block (ERIs[0][0] has the largest upper bound)
+            if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 1;
+        }
+
+        __syncthreads();
+
+        // early exit for thread block
+        if (skip_thread_block == 1) break;
+
+        if (threadIdx.y == 0)
+        {
+            for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+            {
+                J_ij += ERIs[n][threadIdx.x];
+            }
+        }
+
+        __syncthreads();
+    }
+
+    if ((threadIdx.y == 0) && (ij < dd_prim_pair_count_local))
+    {
+        mat_J[ij] += J_ij;
+    }
+}
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombFockDDPP1(double*         mat_J,
+                       const double*   p_prim_info,
+                       const uint32_t  p_prim_count,
+                       const double*   d_prim_info,
+                       const uint32_t  d_prim_count,
+                       const double*   pp_mat_D,
+                       const double*   dd_mat_Q_local,
+                       const double*   pp_mat_Q,
+                       const uint32_t* dd_first_inds_local,
+                       const uint32_t* dd_second_inds_local,
+                       const double*   dd_pair_data_local,
+                       const uint32_t  dd_prim_pair_count_local,
+                       const uint32_t* pp_first_inds,
+                       const uint32_t* pp_second_inds,
+                       const double*   pp_pair_data,
+                       const uint32_t  pp_prim_pair_count,
+                       const double*   boys_func_table,
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
+
+{
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
+    __shared__ uint32_t skip_thread_block;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    double J_ij = 0.0;
+
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
+
+    if (ij < dd_prim_pair_count_local)
+    {
+        i = dd_first_inds_local[ij];
+        j = dd_second_inds_local[ij];
+
+        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+
+    }
+
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    {
+        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+
+        if ((kl < pp_prim_pair_count) && (ij < dd_prim_pair_count_local) && (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > eri_threshold))
+        {
+            const auto k = pp_first_inds[kl];
+            const auto l = pp_second_inds[kl];
+
+            const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+
+            const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
+                                   p_prim_info[k / 3 + p_prim_count * 3],
+                                   p_prim_info[k / 3 + p_prim_count * 4]};
+
+            const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+
+            const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
+                                   p_prim_info[l / 3 + p_prim_count * 3],
+                                   p_prim_info[l / 3 + p_prim_count * 4]};
+
+            const auto S_kl_00 = pp_pair_data[kl];
+
+            const auto c0 = k % 3;
+            const auto d0 = l % 3;
+
+            
+            // J. Chem. Phys. 84, 3963-3974 (1986)
+
+            const auto S2 = a_k + a_l;
+
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
+
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+
+            const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
+
+            double F6_t[7];
+
+            gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    F6_t[2] * (
+
+                        + S1 * S2 * inv_S4 * inv_S4 * (
+                            
+                            + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * QD_0 * (-1.0)
+                            + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[d0] * QC_0 * (-1.0)
+                            + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c0] * QD_0 * (-1.0)
+                            + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[d0] * QC_0 * (-1.0)
+                            + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] * QD_0 * (-1.0)
+                            + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[d0] * QC_0 * (-1.0)
+                            + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * QD_0 * (-1.0)
+                            + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[d0] * QC_0 * (-1.0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[2] * (
+
+                        + S2 * S2 * inv_S4 * inv_S4 * (
+                            
+                            + PB_0 * PB_1 * PQ[a0] * PQ[a1] * QD_0 * QC_0
+                            + PB_0 * PA_0 * PQ[a1] * PQ[b1] * QD_0 * QC_0
+                            + PB_0 * PA_1 * PQ[a0] * PQ[b1] * QD_0 * QC_0
+                            + PB_1 * PA_0 * PQ[a1] * PQ[b0] * QD_0 * QC_0
+                            + PB_1 * PA_1 * PQ[a0] * PQ[b0] * QD_0 * QC_0
+                            + PA_0 * PA_1 * PQ[b0] * PQ[b1] * QD_0 * QC_0
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[2] * (
+
+                        + 0.125 * S2 * inv_S1 * inv_S1 * inv_S4 * inv_S4 * (
+                            (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0])
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[2] * (
+
+                        + 0.125 * inv_S1 * inv_S4 * inv_S4 * (
+                            (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0]) * 2.0
+                            + (delta[a0][a1] * delta[b0][c0] * delta[b1][d0] + delta[a0][a1] * delta[b0][d0] * delta[b1][c0] + delta[a0][b0] * delta[a1][c0] * delta[b1][d0] + delta[a0][b0] * delta[a1][d0] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] * delta[b0][d0] + delta[a0][b1] * delta[a1][d0] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][d0] + delta[a0][c0] * delta[a1][b1] * delta[b0][d0] + delta[a0][c0] * delta[a1][d0] * delta[b0][b1] + delta[a0][d0] * delta[a1][b0] * delta[b1][c0] + delta[a0][d0] * delta[a1][b1] * delta[b0][c0] + delta[a0][d0] * delta[a1][c0] * delta[b0][b1])
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[3] * (
+
+                        (-0.125) * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
+                            (delta[a0][a1] * delta[b0][b1] * delta[c0][d0] + delta[a0][a1] * delta[b0][c0] * delta[b1][d0] + delta[a0][a1] * delta[b0][d0] * delta[b1][c0] + delta[a0][b0] * delta[a1][b1] * delta[c0][d0] + delta[a0][b0] * delta[a1][c0] * delta[b1][d0] + delta[a0][b0] * delta[a1][d0] * delta[b1][c0] + delta[a0][b1] * delta[a1][b0] * delta[c0][d0] + delta[a0][b1] * delta[a1][c0] * delta[b0][d0] + delta[a0][b1] * delta[a1][d0] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][d0] + delta[a0][c0] * delta[a1][b1] * delta[b0][d0] + delta[a0][c0] * delta[a1][d0] * delta[b0][b1] + delta[a0][d0] * delta[a1][b0] * delta[b1][c0] + delta[a0][d0] * delta[a1][b1] * delta[b0][c0] + delta[a0][d0] * delta[a1][c0] * delta[b0][b1])
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[3] * (
+
+                        + (-0.25) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
+                            delta[b0][b1] * delta[c0][d0] * (PQ[a0] * PQ[a1])
+                            + delta[a1][b1] * delta[c0][d0] * (PQ[a0] * PQ[b0])
+                            + delta[a1][b0] * delta[c0][d0] * (PQ[a0] * PQ[b1])
+                            + (delta[a1][b0] * delta[b1][d0] + delta[a1][b1] * delta[b0][d0] + delta[a1][d0] * delta[b0][b1]) * (PQ[a0] * QC_0)
+                            + (delta[a1][b0] * delta[b1][c0] + delta[a1][b1] * delta[b0][c0] + delta[a1][c0] * delta[b0][b1]) * (PQ[a0] * QD_0)
+                            + delta[a0][b1] * delta[c0][d0] * (PQ[a1] * PQ[b0])
+                            + delta[a0][b0] * delta[c0][d0] * (PQ[a1] * PQ[b1])
+                            + (delta[a0][b0] * delta[b1][d0] + delta[a0][b1] * delta[b0][d0] + delta[a0][d0] * delta[b0][b1]) * (PQ[a1] * QC_0)
+                            + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (PQ[a1] * QD_0)
+                            + delta[a0][a1] * delta[c0][d0] * (PQ[b0] * PQ[b1])
+                            + (delta[a0][a1] * delta[b1][d0] + delta[a0][b1] * delta[a1][d0] + delta[a0][d0] * delta[a1][b1]) * (PQ[b0] * QC_0)
+                            + (delta[a0][a1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] + delta[a0][c0] * delta[a1][b1]) * (PQ[b0] * QD_0)
+                            + (delta[a0][a1] * delta[b0][d0] + delta[a0][b0] * delta[a1][d0] + delta[a0][d0] * delta[a1][b0]) * (PQ[b1] * QC_0)
+                            + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[b1] * QD_0)
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * QD_0 + PQ[d0] * QC_0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[3] * (
+
+                        + 0.25 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                            delta[b0][b1] * delta[c0][d0] * (PQ[a0] * PQ[a1] * (-1.0) + PA_0 * PQ[a1] + PA_1 * PQ[a0])
+                            + (delta[b0][c0] * delta[b1][d0] + delta[b0][d0] * delta[b1][c0]) * (PA_0 * PQ[a1] + PA_1 * PQ[a0])
+                            + delta[a1][b1] * delta[c0][d0] * (PQ[a0] * PQ[b0] * (-1.0) + PB_0 * PQ[a0] + PA_0 * PQ[b0])
+                            + (delta[a1][c0] * delta[b1][d0] + delta[a1][d0] * delta[b1][c0]) * (PB_0 * PQ[a0] + PA_0 * PQ[b0])
+                            + delta[a1][b0] * delta[c0][d0] * (PQ[a0] * PQ[b1] * (-1.0) + PB_1 * PQ[a0] + PA_0 * PQ[b1])
+                            + (delta[a1][c0] * delta[b0][d0] + delta[a1][d0] * delta[b0][c0]) * (PB_1 * PQ[a0] + PA_0 * PQ[b1])
+                            + (delta[a1][b0] * delta[b1][d0] + delta[a1][b1] * delta[b0][d0] + delta[a1][d0] * delta[b0][b1]) * (PQ[a0] * PQ[c0] * (-1.0) + PA_0 * PQ[c0])
+                            + (delta[a1][b0] * delta[b1][c0] + delta[a1][b1] * delta[b0][c0] + delta[a1][c0] * delta[b0][b1]) * (PQ[a0] * PQ[d0] * (-1.0) + PA_0 * PQ[d0])
+                            + delta[a0][b1] * delta[c0][d0] * (PQ[a1] * PQ[b0] * (-1.0) + PB_0 * PQ[a1] + PA_1 * PQ[b0])
+                            + (delta[a0][c0] * delta[b1][d0] + delta[a0][d0] * delta[b1][c0]) * (PB_0 * PQ[a1] + PA_1 * PQ[b0])
+                            + delta[a0][b0] * delta[c0][d0] * (PQ[a1] * PQ[b1] * (-1.0) + PB_1 * PQ[a1] + PA_1 * PQ[b1])
+                            + (delta[a0][c0] * delta[b0][d0] + delta[a0][d0] * delta[b0][c0]) * (PB_1 * PQ[a1] + PA_1 * PQ[b1])
+                            + (delta[a0][b0] * delta[b1][d0] + delta[a0][b1] * delta[b0][d0] + delta[a0][d0] * delta[b0][b1]) * (PQ[a1] * PQ[c0] * (-1.0) + PA_1 * PQ[c0])
+                            + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (PQ[a1] * PQ[d0] * (-1.0) + PA_1 * PQ[d0])
+                            + delta[a0][a1] * delta[c0][d0] * (PQ[b0] * PQ[b1] * (-1.0) + PB_0 * PQ[b1] + PB_1 * PQ[b0])
+                            + (delta[a0][a1] * delta[b1][d0] + delta[a0][b1] * delta[a1][d0] + delta[a0][d0] * delta[a1][b1]) * (PQ[b0] * PQ[c0] * (-1.0) + PB_0 * PQ[c0])
+                            + (delta[a0][a1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] + delta[a0][c0] * delta[a1][b1]) * (PQ[b0] * PQ[d0] * (-1.0) + PB_0 * PQ[d0])
+                            + (delta[a0][a1] * delta[b0][d0] + delta[a0][b0] * delta[a1][d0] + delta[a0][d0] * delta[a1][b0]) * (PQ[b1] * PQ[c0] * (-1.0) + PB_1 * PQ[c0])
+                            + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[b1] * PQ[d0] * (-1.0) + PB_1 * PQ[d0])
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[d0] * (-2.0))
+                            + (delta[a0][c0] * delta[a1][d0] + delta[a0][d0] * delta[a1][c0]) * (PB_0 * PQ[b1] + PB_1 * PQ[b0])
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[3] * (
+
+                        + 0.5 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                            delta[c0][d0] * (PB_0 * PB_1 * PQ[a0] * PQ[a1] * (-1.0) + PB_0 * PA_0 * PQ[a1] * PQ[b1] * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[b1] * (-1.0) + PB_1 * PA_0 * PQ[a1] * PQ[b0] * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[b0] * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[b1] * (-1.0))
+                            + delta[b1][d0] * (PB_0 * PA_0 * PQ[a1] * PQ[c0] * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[c0] * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[c0] * (-1.0))
+                            + delta[b1][c0] * (PB_0 * PA_0 * PQ[a1] * PQ[d0] * (-1.0) + PB_0 * PA_1 * PQ[a0] * PQ[d0] * (-1.0) + PA_0 * PA_1 * PQ[b0] * PQ[d0] * (-1.0))
+                            + delta[b0][d0] * (PB_1 * PA_0 * PQ[a1] * PQ[c0] * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[c0] * (-1.0) + PA_0 * PA_1 * PQ[b1] * PQ[c0] * (-1.0))
+                            + delta[b0][c0] * (PB_1 * PA_0 * PQ[a1] * PQ[d0] * (-1.0) + PB_1 * PA_1 * PQ[a0] * PQ[d0] * (-1.0) + PA_0 * PA_1 * PQ[b1] * PQ[d0] * (-1.0))
+                            + delta[b0][b1] * (PA_0 * PA_1 * PQ[c0] * PQ[d0] * (-1.0) + PA_0 * PQ[a1] * PQ[c0] * PQ[d0] + PA_1 * PQ[a0] * PQ[c0] * PQ[d0])
+                            + delta[a1][d0] * (PB_0 * PB_1 * PQ[a0] * PQ[c0] * (-1.0) + PB_0 * PA_0 * PQ[b1] * PQ[c0] * (-1.0) + PB_1 * PA_0 * PQ[b0] * PQ[c0] * (-1.0))
+                            + delta[a1][c0] * (PB_0 * PB_1 * PQ[a0] * PQ[d0] * (-1.0) + PB_0 * PA_0 * PQ[b1] * PQ[d0] * (-1.0) + PB_1 * PA_0 * PQ[b0] * PQ[d0] * (-1.0))
+                            + delta[a1][b1] * (PB_0 * PA_0 * PQ[c0] * PQ[d0] * (-1.0) + PB_0 * PQ[a0] * PQ[c0] * PQ[d0] + PA_0 * PQ[b0] * PQ[c0] * PQ[d0])
+                            + delta[a1][b0] * (PB_1 * PA_0 * PQ[c0] * PQ[d0] * (-1.0) + PB_1 * PQ[a0] * PQ[c0] * PQ[d0] + PA_0 * PQ[b1] * PQ[c0] * PQ[d0])
+                            + delta[a0][d0] * (PB_0 * PB_1 * PQ[a1] * PQ[c0] * (-1.0) + PB_0 * PA_1 * PQ[b1] * PQ[c0] * (-1.0) + PB_1 * PA_1 * PQ[b0] * PQ[c0] * (-1.0))
+                            + delta[a0][c0] * (PB_0 * PB_1 * PQ[a1] * PQ[d0] * (-1.0) + PB_0 * PA_1 * PQ[b1] * PQ[d0] * (-1.0) + PB_1 * PA_1 * PQ[b0] * PQ[d0] * (-1.0))
+                            + delta[a0][b1] * (PB_0 * PA_1 * PQ[c0] * PQ[d0] * (-1.0) + PB_0 * PQ[a1] * PQ[c0] * PQ[d0] + PA_1 * PQ[b0] * PQ[c0] * PQ[d0])
+                            + delta[a0][b0] * (PB_1 * PA_1 * PQ[c0] * PQ[d0] * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * PQ[d0] + PA_1 * PQ[b1] * PQ[c0] * PQ[d0])
+                            + delta[a0][a1] * (PB_0 * PB_1 * PQ[c0] * PQ[d0] * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * PQ[d0] + PB_1 * PQ[b0] * PQ[c0] * PQ[d0])
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[3] * (
+
+                        + (-0.5) * S2 * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * (
+                            delta[b0][b1] * (PQ[a0] * PQ[a1] * QD_0 * QC_0)
+                            + delta[a1][b1] * (PQ[a0] * PQ[b0] * QD_0 * QC_0)
+                            + delta[a1][b0] * (PQ[a0] * PQ[b1] * QD_0 * QC_0)
+                            + delta[a0][b1] * (PQ[a1] * PQ[b0] * QD_0 * QC_0)
+                            + delta[a0][b0] * (PQ[a1] * PQ[b1] * QD_0 * QC_0)
+                            + delta[a0][a1] * (PQ[b0] * PQ[b1] * QD_0 * QC_0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[3] * (
+
+                        + 0.5 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                            delta[c0][d0] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] + PA_1 * PQ[a0] * PQ[b0] * PQ[b1])
+                            + delta[b1][d0] * (PB_0 * PQ[a0] * PQ[a1] * QC_0 + PA_0 * PQ[a1] * PQ[b0] * QC_0 + PA_1 * PQ[a0] * PQ[b0] * QC_0)
+                            + delta[b1][c0] * (PB_0 * PQ[a0] * PQ[a1] * QD_0 + PA_0 * PQ[a1] * PQ[b0] * QD_0 + PA_1 * PQ[a0] * PQ[b0] * QD_0)
+                            + delta[b0][d0] * (PB_1 * PQ[a0] * PQ[a1] * QC_0 + PA_0 * PQ[a1] * PQ[b1] * QC_0 + PA_1 * PQ[a0] * PQ[b1] * QC_0)
+                            + delta[b0][c0] * (PB_1 * PQ[a0] * PQ[a1] * QD_0 + PA_0 * PQ[a1] * PQ[b1] * QD_0 + PA_1 * PQ[a0] * PQ[b1] * QD_0)
+                            + delta[b0][b1] * (PQ[a0] * PQ[a1] * PQ[c0] * QD_0 * (-1.0) + PQ[a0] * PQ[a1] * PQ[d0] * QC_0 * (-1.0) + PA_0 * PQ[a1] * PQ[c0] * QD_0 + PA_0 * PQ[a1] * PQ[d0] * QC_0 + PA_1 * PQ[a0] * PQ[c0] * QD_0 + PA_1 * PQ[a0] * PQ[d0] * QC_0)
+                            + delta[a1][d0] * (PB_0 * PQ[a0] * PQ[b1] * QC_0 + PB_1 * PQ[a0] * PQ[b0] * QC_0 + PA_0 * PQ[b0] * PQ[b1] * QC_0)
+                            + delta[a1][c0] * (PB_0 * PQ[a0] * PQ[b1] * QD_0 + PB_1 * PQ[a0] * PQ[b0] * QD_0 + PA_0 * PQ[b0] * PQ[b1] * QD_0)
+                            + delta[a1][b1] * (PQ[a0] * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PQ[a0] * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PQ[a0] * PQ[c0] * QD_0 + PB_0 * PQ[a0] * PQ[d0] * QC_0 + PA_0 * PQ[b0] * PQ[c0] * QD_0 + PA_0 * PQ[b0] * PQ[d0] * QC_0)
+                            + delta[a1][b0] * (PQ[a0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PQ[a0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PQ[a0] * PQ[c0] * QD_0 + PB_1 * PQ[a0] * PQ[d0] * QC_0 + PA_0 * PQ[b1] * PQ[c0] * QD_0 + PA_0 * PQ[b1] * PQ[d0] * QC_0)
+                            + delta[a0][d0] * (PB_0 * PQ[a1] * PQ[b1] * QC_0 + PB_1 * PQ[a1] * PQ[b0] * QC_0 + PA_1 * PQ[b0] * PQ[b1] * QC_0)
+                            + delta[a0][c0] * (PB_0 * PQ[a1] * PQ[b1] * QD_0 + PB_1 * PQ[a1] * PQ[b0] * QD_0 + PA_1 * PQ[b0] * PQ[b1] * QD_0)
+                            + delta[a0][b1] * (PQ[a1] * PQ[b0] * PQ[c0] * QD_0 * (-1.0) + PQ[a1] * PQ[b0] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PQ[a1] * PQ[c0] * QD_0 + PB_0 * PQ[a1] * PQ[d0] * QC_0 + PA_1 * PQ[b0] * PQ[c0] * QD_0 + PA_1 * PQ[b0] * PQ[d0] * QC_0)
+                            + delta[a0][b0] * (PQ[a1] * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PQ[a1] * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_1 * PQ[a1] * PQ[c0] * QD_0 + PB_1 * PQ[a1] * PQ[d0] * QC_0 + PA_1 * PQ[b1] * PQ[c0] * QD_0 + PA_1 * PQ[b1] * PQ[d0] * QC_0)
+                            + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0) + PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0) + PB_0 * PQ[b1] * PQ[c0] * QD_0 + PB_0 * PQ[b1] * PQ[d0] * QC_0 + PB_1 * PQ[b0] * PQ[c0] * QD_0 + PB_1 * PQ[b0] * PQ[d0] * QC_0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[3] * (
+
+                        + S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                            
+                            + PB_0 * PB_1 * PA_0 * PQ[a1] * PQ[c0] * PQ[d0]
+                            + PB_0 * PB_1 * PA_1 * PQ[a0] * PQ[c0] * PQ[d0]
+                            + PB_0 * PA_0 * PA_1 * PQ[b1] * PQ[c0] * PQ[d0]
+                            + PB_1 * PA_0 * PA_1 * PQ[b0] * PQ[c0] * PQ[d0]
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[3] * (
+
+                        + S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                            
+                            + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * QD_0 * (-1.0)
+                            + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[d0] * QC_0 * (-1.0)
+                            + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c0] * QD_0 * (-1.0)
+                            + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[d0] * QC_0 * (-1.0)
+                            + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0)
+                            + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0)
+                            + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * QD_0 * (-1.0)
+                            + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[d0] * QC_0 * (-1.0)
+                            + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * QD_0 * (-1.0)
+                            + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[d0] * QC_0 * (-1.0)
+                            + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0)
+                            + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[3] * (
+
+                        + S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * (
+                            
+                            + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * QD_0 * QC_0
+                            + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * QD_0 * QC_0
+                            + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * QD_0 * QC_0
+                            + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * QD_0 * QC_0
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[4] * (
+
+                        0.5 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
+                            delta[c0][d0] * (PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * (-1.0) + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * (-1.0))
+                            + delta[b1][d0] * (PB_0 * PQ[a0] * PQ[a1] * PQ[c0] * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * (-1.0))
+                            + delta[b1][c0] * (PB_0 * PQ[a0] * PQ[a1] * PQ[d0] * (-1.0) + PA_0 * PQ[a1] * PQ[b0] * PQ[d0] * (-1.0) + PA_1 * PQ[a0] * PQ[b0] * PQ[d0] * (-1.0))
+                            + delta[b0][d0] * (PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * (-1.0) + PA_0 * PQ[a1] * PQ[b1] * PQ[c0] * (-1.0) + PA_1 * PQ[a0] * PQ[b1] * PQ[c0] * (-1.0))
+                            + delta[b0][c0] * (PB_1 * PQ[a0] * PQ[a1] * PQ[d0] * (-1.0) + PA_0 * PQ[a1] * PQ[b1] * PQ[d0] * (-1.0) + PA_1 * PQ[a0] * PQ[b1] * PQ[d0] * (-1.0))
+                            + delta[b0][b1] * (PA_0 * PQ[a1] * PQ[c0] * PQ[d0] * (-1.0) + PA_1 * PQ[a0] * PQ[c0] * PQ[d0] * (-1.0) + PQ[a0] * PQ[a1] * PQ[c0] * PQ[d0])
+                            + delta[a1][d0] * (PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * (-1.0) + PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * (-1.0))
+                            + delta[a1][c0] * (PB_0 * PQ[a0] * PQ[b1] * PQ[d0] * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * PQ[d0] * (-1.0) + PA_0 * PQ[b0] * PQ[b1] * PQ[d0] * (-1.0))
+                            + delta[a1][b1] * (PB_0 * PQ[a0] * PQ[c0] * PQ[d0] * (-1.0) + PA_0 * PQ[b0] * PQ[c0] * PQ[d0] * (-1.0) + PQ[a0] * PQ[b0] * PQ[c0] * PQ[d0])
+                            + delta[a1][b0] * (PB_1 * PQ[a0] * PQ[c0] * PQ[d0] * (-1.0) + PA_0 * PQ[b1] * PQ[c0] * PQ[d0] * (-1.0) + PQ[a0] * PQ[b1] * PQ[c0] * PQ[d0])
+                            + delta[a0][d0] * (PB_0 * PQ[a1] * PQ[b1] * PQ[c0] * (-1.0) + PB_1 * PQ[a1] * PQ[b0] * PQ[c0] * (-1.0) + PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * (-1.0))
+                            + delta[a0][c0] * (PB_0 * PQ[a1] * PQ[b1] * PQ[d0] * (-1.0) + PB_1 * PQ[a1] * PQ[b0] * PQ[d0] * (-1.0) + PA_1 * PQ[b0] * PQ[b1] * PQ[d0] * (-1.0))
+                            + delta[a0][b1] * (PB_0 * PQ[a1] * PQ[c0] * PQ[d0] * (-1.0) + PA_1 * PQ[b0] * PQ[c0] * PQ[d0] * (-1.0) + PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0])
+                            + delta[a0][b0] * (PB_1 * PQ[a1] * PQ[c0] * PQ[d0] * (-1.0) + PA_1 * PQ[b1] * PQ[c0] * PQ[d0] * (-1.0) + PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0])
+                            + delta[a0][a1] * (PB_0 * PQ[b1] * PQ[c0] * PQ[d0] * (-1.0) + PB_1 * PQ[b0] * PQ[c0] * PQ[d0] * (-1.0) + PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0])
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[4] * (
+
+                        + 0.5 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
+                            delta[b1][d0] * (PQ[a0] * PQ[a1] * PQ[b0] * QC_0)
+                            + delta[b0][d0] * (PQ[a0] * PQ[a1] * PQ[b1] * QC_0)
+                            + delta[b0][b1] * (PQ[a0] * PQ[a1] * PQ[c0] * QD_0 + PQ[a0] * PQ[a1] * PQ[d0] * QC_0)
+                            + delta[a1][d0] * (PQ[a0] * PQ[b0] * PQ[b1] * QC_0)
+                            + delta[a1][b1] * (PQ[a0] * PQ[b0] * PQ[c0] * QD_0 + PQ[a0] * PQ[b0] * PQ[d0] * QC_0)
+                            + delta[a1][b0] * (PQ[a0] * PQ[b1] * PQ[c0] * QD_0 + PQ[a0] * PQ[b1] * PQ[d0] * QC_0)
+                            + delta[a0][d0] * (PQ[a1] * PQ[b0] * PQ[b1] * QC_0)
+                            + delta[a0][b1] * (PQ[a1] * PQ[b0] * PQ[c0] * QD_0 + PQ[a1] * PQ[b0] * PQ[d0] * QC_0)
+                            + delta[a0][b0] * (PQ[a1] * PQ[b1] * PQ[c0] * QD_0 + PQ[a1] * PQ[b1] * PQ[d0] * QC_0)
+                            + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * QD_0 + PQ[b0] * PQ[b1] * PQ[d0] * QC_0)
+                            + delta[c0][d0] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1])
+                            + delta[b1][c0] * (PQ[a0] * PQ[a1] * PQ[b0] * QD_0)
+                            + delta[b0][c0] * (PQ[a0] * PQ[a1] * PQ[b1] * QD_0)
+                            + delta[a1][c0] * (PQ[a0] * PQ[b0] * PQ[b1] * QD_0)
+                            + delta[a0][c0] * (PQ[a1] * PQ[b0] * PQ[b1] * QD_0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[4] * (
+
+                        + S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
+                            
+                            + PB_0 * PB_1 * PQ[a0] * PQ[a1] * PQ[c0] * PQ[d0]
+                            + PB_0 * PA_0 * PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0]
+                            + PB_0 * PA_1 * PQ[a0] * PQ[b1] * PQ[c0] * PQ[d0]
+                            + PB_1 * PA_0 * PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0]
+                            + PB_1 * PA_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[d0]
+                            + PA_0 * PA_1 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0]
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[4] * (
+
+                        + S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
+                            
+                            + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * QD_0 * (-1.0)
+                            + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[d0] * QC_0 * (-1.0)
+                            + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * QD_0 * (-1.0)
+                            + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[d0] * QC_0 * (-1.0)
+                            + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0)
+                            + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0)
+                            + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0 * (-1.0)
+                            + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * (-1.0)
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[4] * (
+
+                        + S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
+                            
+                            + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * QD_0 * QC_0
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[4] * (
+
+                        + 0.25 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
+                            (delta[b0][b1] * delta[c0][d0] + delta[b0][c0] * delta[b1][d0] + delta[b0][d0] * delta[b1][c0]) * (PQ[a0] * PQ[a1])
+                            + (delta[a1][b1] * delta[c0][d0] + delta[a1][c0] * delta[b1][d0] + delta[a1][d0] * delta[b1][c0]) * (PQ[a0] * PQ[b0])
+                            + (delta[a1][b0] * delta[c0][d0] + delta[a1][c0] * delta[b0][d0] + delta[a1][d0] * delta[b0][c0]) * (PQ[a0] * PQ[b1])
+                            + (delta[a1][b0] * delta[b1][d0] + delta[a1][b1] * delta[b0][d0] + delta[a1][d0] * delta[b0][b1]) * (PQ[a0] * PQ[c0])
+                            + (delta[a1][b0] * delta[b1][c0] + delta[a1][b1] * delta[b0][c0] + delta[a1][c0] * delta[b0][b1]) * (PQ[a0] * PQ[d0])
+                            + (delta[a0][b1] * delta[c0][d0] + delta[a0][c0] * delta[b1][d0] + delta[a0][d0] * delta[b1][c0]) * (PQ[a1] * PQ[b0])
+                            + (delta[a0][b0] * delta[c0][d0] + delta[a0][c0] * delta[b0][d0] + delta[a0][d0] * delta[b0][c0]) * (PQ[a1] * PQ[b1])
+                            + (delta[a0][b0] * delta[b1][d0] + delta[a0][b1] * delta[b0][d0] + delta[a0][d0] * delta[b0][b1]) * (PQ[a1] * PQ[c0])
+                            + (delta[a0][b0] * delta[b1][c0] + delta[a0][b1] * delta[b0][c0] + delta[a0][c0] * delta[b0][b1]) * (PQ[a1] * PQ[d0])
+                            + (delta[a0][a1] * delta[c0][d0] + delta[a0][c0] * delta[a1][d0] + delta[a0][d0] * delta[a1][c0]) * (PQ[b0] * PQ[b1])
+                            + (delta[a0][a1] * delta[b1][d0] + delta[a0][b1] * delta[a1][d0] + delta[a0][d0] * delta[a1][b1]) * (PQ[b0] * PQ[c0])
+                            + (delta[a0][a1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] + delta[a0][c0] * delta[a1][b1]) * (PQ[b0] * PQ[d0])
+                            + (delta[a0][a1] * delta[b0][d0] + delta[a0][b0] * delta[a1][d0] + delta[a0][d0] * delta[a1][b0]) * (PQ[b1] * PQ[c0])
+                            + (delta[a0][a1] * delta[b0][c0] + delta[a0][b0] * delta[a1][c0] + delta[a0][c0] * delta[a1][b0]) * (PQ[b1] * PQ[d0])
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PQ[c0] * PQ[d0])
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[5] * (
+
+                        (-0.5) * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
+                            delta[c0][d0] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1])
+                            + delta[b1][d0] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0])
+                            + delta[b1][c0] * (PQ[a0] * PQ[a1] * PQ[b0] * PQ[d0])
+                            + delta[b0][d0] * (PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0])
+                            + delta[b0][c0] * (PQ[a0] * PQ[a1] * PQ[b1] * PQ[d0])
+                            + delta[b0][b1] * (PQ[a0] * PQ[a1] * PQ[c0] * PQ[d0])
+                            + delta[a1][d0] * (PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0])
+                            + delta[a1][c0] * (PQ[a0] * PQ[b0] * PQ[b1] * PQ[d0])
+                            + delta[a1][b1] * (PQ[a0] * PQ[b0] * PQ[c0] * PQ[d0])
+                            + delta[a1][b0] * (PQ[a0] * PQ[b1] * PQ[c0] * PQ[d0])
+                            + delta[a0][d0] * (PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0])
+                            + delta[a0][c0] * (PQ[a1] * PQ[b0] * PQ[b1] * PQ[d0])
+                            + delta[a0][b1] * (PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0])
+                            + delta[a0][b0] * (PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0])
+                            + delta[a0][a1] * (PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0])
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[5] * (
+
+                        + S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
+                            
+                            + PB_0 * PQ[a0] * PQ[a1] * PQ[b1] * PQ[c0] * PQ[d0]
+                            + PB_1 * PQ[a0] * PQ[a1] * PQ[b0] * PQ[c0] * PQ[d0]
+                            + PA_0 * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0]
+                            + PA_1 * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0]
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[5] * (
+
+                        + (-1.0) * S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
+                            PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * QD_0
+                            + PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0
+                        )
+
+                    )
+
+                    +
+
+                    F6_t[6] * (
+
+                        S1 * S1 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
+                            PQ[a0] * PQ[a1] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0]
+                        )
+
+                    )
+
+                    );
+
+            // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
+            //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
+            ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * pp_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+
+        }
+        else
+        {
+            ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+            // indicator for early exit for thread block (ERIs[0][0] has the largest upper bound)
+            if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 1;
+        }
+
+        __syncthreads();
+
+        // early exit for thread block
+        if (skip_thread_block == 1) break;
+
+        if (threadIdx.y == 0)
+        {
+            for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+            {
+                J_ij += ERIs[n][threadIdx.x];
+            }
+        }
+
+        __syncthreads();
+    }
+
+    if ((threadIdx.y == 0) && (ij < dd_prim_pair_count_local))
+    {
+        mat_J[ij] += J_ij;
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_J)
+computeCoulombFockDDSD0(double*         mat_J,
+                       const double*   s_prim_info,
+                       const uint32_t  s_prim_count,
+                       const double*   d_prim_info,
+                       const uint32_t  d_prim_count,
+                       const double*   sd_mat_D,
+                       const double*   dd_mat_Q_local,
+                       const double*   sd_mat_Q,
+                       const uint32_t* dd_first_inds_local,
+                       const uint32_t* dd_second_inds_local,
+                       const double*   dd_pair_data_local,
+                       const uint32_t  dd_prim_pair_count_local,
+                       const uint32_t* sd_first_inds,
+                       const uint32_t* sd_second_inds,
+                       const double*   sd_pair_data,
+                       const uint32_t  sd_prim_pair_count,
+                       const double*   boys_func_table,
+                       const double*   boys_func_ft,
+                       const double    eri_threshold)
+
+{
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
+
+    __shared__ double   ERIs[TILE_DIM_LARGE + 1][TILE_DIM_SMALL];
+    __shared__ uint32_t skip_thread_block;
+    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ double   delta[3][3];
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    double J_ij = 0.0;
+
+    double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
+    double PA_0, PA_1, PB_0, PB_1;
+    uint32_t i, j, a0, a1, b0, b1;
+
+    if ((threadIdx.y == 0) && (threadIdx.x == 0))
+    {
+        skip_thread_block = 0;
+
+        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
+        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
+        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
+        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
+        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
+        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
+
+        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+    }
+
+    __syncthreads();
+
+    if (ij < dd_prim_pair_count_local)
+    {
+        i = dd_first_inds_local[ij];
+        j = dd_second_inds_local[ij];
+
+        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+
+        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
+        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
+        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+
+        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+
+        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
+        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
+        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+
+        S1 = a_i + a_j;
+        inv_S1 = 1.0 / S1;
+
+        S_ij_00 = dd_pair_data_local[ij];
+
+        a0 = d_cart_inds[i % 6][0];
+        a1 = d_cart_inds[i % 6][1];
+        b0 = d_cart_inds[j % 6][0];
+        b1 = d_cart_inds[j % 6][1];
+
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -18620,8 +18273,6 @@ computeCoulombFockDDSD0(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -18641,8 +18292,8 @@ computeCoulombFockDDSD0(double*         mat_J,
             double F6_t[3];
 
             gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -19075,7 +18726,7 @@ computeCoulombFockDDSD1(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -19124,14 +18775,10 @@ computeCoulombFockDDSD1(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -19161,8 +18808,6 @@ computeCoulombFockDDSD1(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -19182,8 +18827,8 @@ computeCoulombFockDDSD1(double*         mat_J,
             double F6_t[7];
 
             gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -19656,7 +19301,7 @@ computeCoulombFockDDSP(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PA_1, PB_0, PB_1;
+    double PA_0, PA_1, PB_0, PB_1;
     uint32_t i, j, a0, a1, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -19705,14 +19350,10 @@ computeCoulombFockDDSP(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PA_1 = (a_j * inv_S1) * rij[a1];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -19741,7 +19382,6 @@ computeCoulombFockDDSP(double*         mat_J,
 
             const auto d0 = l % 3;
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto S2 = a_k + a_l;
@@ -19761,7 +19401,7 @@ computeCoulombFockDDSP(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F5_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -20054,7 +19694,7 @@ computeCoulombFockPDDD0(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0, PB_1;
+    double PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -20102,13 +19742,9 @@ computeCoulombFockPDDD0(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -20140,8 +19776,6 @@ computeCoulombFockPDDD0(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -20161,10 +19795,10 @@ computeCoulombFockPDDD0(double*         mat_J,
             double F7_t[2];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -20433,7 +20067,7 @@ computeCoulombFockPDDD1(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0, PB_1;
+    double PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -20481,13 +20115,9 @@ computeCoulombFockPDDD1(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -20519,8 +20149,6 @@ computeCoulombFockPDDD1(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -20540,10 +20168,10 @@ computeCoulombFockPDDD1(double*         mat_J,
             double F7_t[3];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -20828,7 +20456,7 @@ computeCoulombFockPDDD2(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0, PB_1;
+    double PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -20876,13 +20504,9 @@ computeCoulombFockPDDD2(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -20914,8 +20538,6 @@ computeCoulombFockPDDD2(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -20935,10 +20557,10 @@ computeCoulombFockPDDD2(double*         mat_J,
             double F7_t[3];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -21176,7 +20798,7 @@ computeCoulombFockPDDD3(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0, PB_1;
+    double PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -21224,13 +20846,9 @@ computeCoulombFockPDDD3(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -21262,8 +20880,6 @@ computeCoulombFockPDDD3(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -21283,10 +20899,10 @@ computeCoulombFockPDDD3(double*         mat_J,
             double F7_t[4];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -21600,7 +21216,7 @@ computeCoulombFockPDDD4(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0, PB_1;
+    double PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -21648,13 +21264,9 @@ computeCoulombFockPDDD4(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -21686,8 +21298,6 @@ computeCoulombFockPDDD4(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -21707,10 +21317,10 @@ computeCoulombFockPDDD4(double*         mat_J,
             double F7_t[4];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -21858,7 +21468,7 @@ computeCoulombFockPDDD5(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0, PB_1;
+    double PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -21906,13 +21516,9 @@ computeCoulombFockPDDD5(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -21944,8 +21550,6 @@ computeCoulombFockPDDD5(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -21965,10 +21569,10 @@ computeCoulombFockPDDD5(double*         mat_J,
             double F7_t[4];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -22113,7 +21717,7 @@ computeCoulombFockPDDD6(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0, PB_1;
+    double PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -22161,13 +21765,9 @@ computeCoulombFockPDDD6(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -22199,8 +21799,6 @@ computeCoulombFockPDDD6(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -22220,10 +21818,10 @@ computeCoulombFockPDDD6(double*         mat_J,
             double F7_t[5];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -22469,7 +22067,7 @@ computeCoulombFockPDDD7(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0, PB_1;
+    double PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -22517,13 +22115,9 @@ computeCoulombFockPDDD7(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -22555,8 +22149,6 @@ computeCoulombFockPDDD7(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -22576,10 +22168,10 @@ computeCoulombFockPDDD7(double*         mat_J,
             double F7_t[5];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -22742,7 +22334,7 @@ computeCoulombFockPDDD8(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0, PB_1;
+    double PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -22790,13 +22382,9 @@ computeCoulombFockPDDD8(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -22828,8 +22416,6 @@ computeCoulombFockPDDD8(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -22849,10 +22435,10 @@ computeCoulombFockPDDD8(double*         mat_J,
             double F7_t[5];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -22986,7 +22572,7 @@ computeCoulombFockPDDD9(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0, PB_1;
+    double PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -23034,13 +22620,9 @@ computeCoulombFockPDDD9(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -23072,8 +22654,6 @@ computeCoulombFockPDDD9(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -23093,10 +22673,10 @@ computeCoulombFockPDDD9(double*         mat_J,
             double F7_t[8];
 
             gpu::computeBoysFunctionEriJ(F7_t, S1 * S2 * inv_S4 * r2_PQ, 7, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -23405,7 +22985,7 @@ computeCoulombFockPDPD0(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0, PB_1;
+    double PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -23453,13 +23033,9 @@ computeCoulombFockPDPD0(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -23490,8 +23066,6 @@ computeCoulombFockPDPD0(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -23511,9 +23085,9 @@ computeCoulombFockPDPD0(double*         mat_J,
             double F6_t[3];
 
             gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -23944,7 +23518,7 @@ computeCoulombFockPDPD1(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0, PB_1;
+    double PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -23992,13 +23566,9 @@ computeCoulombFockPDPD1(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -24029,8 +23599,6 @@ computeCoulombFockPDPD1(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -24050,9 +23618,9 @@ computeCoulombFockPDPD1(double*         mat_J,
             double F6_t[7];
 
             gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -24540,7 +24108,7 @@ computeCoulombFockPDPP(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0, PB_1;
+    double PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -24588,13 +24156,9 @@ computeCoulombFockPDPP(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -24624,7 +24188,6 @@ computeCoulombFockPDPP(double*         mat_J,
             const auto c0 = k % 3;
             const auto d0 = l % 3;
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto S2 = a_k + a_l;
@@ -24644,8 +24207,8 @@ computeCoulombFockPDPP(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F5_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -24975,7 +24538,7 @@ computeCoulombFockPDSD(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0, PB_1;
+    double PA_0, PB_0, PB_1;
     uint32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -25023,13 +24586,9 @@ computeCoulombFockPDSD(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -25059,7 +24618,6 @@ computeCoulombFockPDSD(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto S2 = a_k + a_l;
@@ -25079,8 +24637,8 @@ computeCoulombFockPDSD(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F5_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -25407,7 +24965,7 @@ computeCoulombFockSDDD0(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PB_0, PB_1;
+    double PB_0, PB_1;
     uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -25454,12 +25012,8 @@ computeCoulombFockSDDD0(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -25491,8 +25045,6 @@ computeCoulombFockSDDD0(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -25512,10 +25064,10 @@ computeCoulombFockSDDD0(double*         mat_J,
             double F6_t[3];
 
             gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -25954,7 +25506,7 @@ computeCoulombFockSDDD1(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PB_0, PB_1;
+    double PB_0, PB_1;
     uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -26001,12 +25553,8 @@ computeCoulombFockSDDD1(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -26038,8 +25586,6 @@ computeCoulombFockSDDD1(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -26059,10 +25605,10 @@ computeCoulombFockSDDD1(double*         mat_J,
             double F6_t[7];
 
             gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -26528,7 +26074,7 @@ computeCoulombFockSDPD(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PB_0, PB_1;
+    double PB_0, PB_1;
     uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -26575,12 +26121,8 @@ computeCoulombFockSDPD(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -26611,7 +26153,6 @@ computeCoulombFockSDPD(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto S2 = a_k + a_l;
@@ -26631,9 +26172,9 @@ computeCoulombFockSDPD(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F5_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -26958,7 +26499,7 @@ computeCoulombFockSDPP(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PB_0, PB_1;
+    double PB_0, PB_1;
     uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -27005,12 +26546,8 @@ computeCoulombFockSDPP(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -27040,7 +26577,6 @@ computeCoulombFockSDPP(double*         mat_J,
             const auto c0 = k % 3;
             const auto d0 = l % 3;
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto S2 = a_k + a_l;
@@ -27060,8 +26596,8 @@ computeCoulombFockSDPP(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -27270,7 +26806,7 @@ computeCoulombFockSDSD(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PB_0, PB_1;
+    double PB_0, PB_1;
     uint32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -27317,12 +26853,8 @@ computeCoulombFockSDSD(double*         mat_J,
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PB_0 = (-a_i * inv_S1) * rij[b0];
-        PB_1 = (-a_i * inv_S1) * rij[b1];
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+        PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
     }
 
@@ -27352,7 +26884,6 @@ computeCoulombFockSDSD(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto S2 = a_k + a_l;
@@ -27372,8 +26903,8 @@ computeCoulombFockSDSD(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -27579,7 +27110,7 @@ computeCoulombFockPPDD0(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0;
+    double PA_0, PB_0;
     uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -27626,12 +27157,8 @@ computeCoulombFockPPDD0(double*         mat_J,
         a0 = i % 3;
         b0 = j % 3;
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
     }
 
@@ -27663,8 +27190,6 @@ computeCoulombFockPPDD0(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -27684,10 +27209,10 @@ computeCoulombFockPPDD0(double*         mat_J,
             double F6_t[3];
 
             gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -28118,7 +27643,7 @@ computeCoulombFockPPDD1(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0;
+    double PA_0, PB_0;
     uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -28165,12 +27690,8 @@ computeCoulombFockPPDD1(double*         mat_J,
         a0 = i % 3;
         b0 = j % 3;
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
     }
 
@@ -28202,8 +27723,6 @@ computeCoulombFockPPDD1(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
-
             
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -28223,10 +27742,10 @@ computeCoulombFockPPDD1(double*         mat_J,
             double F6_t[7];
 
             gpu::computeBoysFunctionEriJ(F6_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -28702,7 +28221,7 @@ computeCoulombFockPPPD(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0;
+    double PA_0, PB_0;
     uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -28749,12 +28268,8 @@ computeCoulombFockPPPD(double*         mat_J,
         a0 = i % 3;
         b0 = j % 3;
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
     }
 
@@ -28785,7 +28300,6 @@ computeCoulombFockPPPD(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto S2 = a_k + a_l;
@@ -28805,9 +28319,9 @@ computeCoulombFockPPPD(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F5_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -29131,7 +28645,7 @@ computeCoulombFockPPPP(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0;
+    double PA_0, PB_0;
     uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -29171,12 +28685,8 @@ computeCoulombFockPPPP(double*         mat_J,
         a0 = i % 3;
         b0 = j % 3;
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
     }
 
@@ -29206,7 +28716,6 @@ computeCoulombFockPPPP(double*         mat_J,
             const auto c0 = k % 3;
             const auto d0 = l % 3;
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -29227,8 +28736,8 @@ computeCoulombFockPPPP(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -29443,7 +28952,7 @@ computeCoulombFockPPSD(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PA_0, PB_0;
+    double PA_0, PB_0;
     uint32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -29490,12 +28999,8 @@ computeCoulombFockPPSD(double*         mat_J,
         a0 = i % 3;
         b0 = j % 3;
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PA_0 = (a_j * inv_S1) * rij[a0];
-        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
     }
 
@@ -29525,7 +29030,6 @@ computeCoulombFockPPSD(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto S2 = a_k + a_l;
@@ -29545,8 +29049,8 @@ computeCoulombFockPPSD(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F4_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -29759,7 +29263,7 @@ computeCoulombFockSPDD(double*         mat_J,
     double J_ij = 0.0;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    double rij[3], PB_0;
+    double PB_0;
     uint32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
@@ -29805,11 +29309,7 @@ computeCoulombFockSPDD(double*         mat_J,
 
         b0 = j % 3;
 
-        rij[0] = r_j[0] - r_i[0];
-        rij[1] = r_j[1] - r_i[1];
-        rij[2] = r_j[2] - r_i[2];
-
-        PB_0 = (-a_i * inv_S1) * rij[b0];
+        PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
 
     }
 
@@ -29841,7 +29341,6 @@ computeCoulombFockSPDD(double*         mat_J,
             const auto d0 = d_cart_inds[l % 6][0];
             const auto d1 = d_cart_inds[l % 6][1];
 
-            const double rkl[3] = {r_l[0] - r_k[0], r_l[1] - r_k[1], r_l[2] - r_k[2]};
             // J. Chem. Phys. 84, 3963-3974 (1986)
 
             const auto S2 = a_k + a_l;
@@ -29861,10 +29360,10 @@ computeCoulombFockSPDD(double*         mat_J,
 
             gpu::computeBoysFunctionEriJ(F5_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-            const auto QC_0 = (a_l * inv_S2) * rkl[c0];
-            const auto QC_1 = (a_l * inv_S2) * rkl[c1];
-            const auto QD_0 = (-a_k * inv_S2) * rkl[d0];
-            const auto QD_1 = (-a_k * inv_S2) * rkl[d1];
+            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
