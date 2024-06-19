@@ -58,9 +58,6 @@ class DistributedArray:
         self.rank = comm.Get_rank()
         self.nodes = comm.Get_size()
 
-        # default chunk size
-        self._chunk_size = (128, 128)
-
         self.data = None
 
         if not distribute:
@@ -197,26 +194,6 @@ class DistributedArray:
             return dot_prod
         else:
             return None
-
-    def get_chunk_size(self, shape):
-        """
-        Gets chunk size based on target shape.
-
-        :param shape:
-            The shape of dataset.
-        :return:
-            The chunk size.
-        """
-
-        chunk_x, chunk_y = self._chunk_size
-
-        while chunk_x > 1 and chunk_x > shape[0]:
-            chunk_x //= 2
-
-        while chunk_y > 1 and chunk_y > shape[1]:
-            chunk_y //= 2
-
-        return (chunk_x, chunk_y)
 
     def get_full_vector(self, col=None):
         """
@@ -480,14 +457,8 @@ class DistributedArray:
         displacements = [sum(counts[:p]) for p in range(self.nodes)]
 
         hf = h5py.File(fname, 'a', driver='mpio', comm=self.comm)
-
         shape = (sum(counts), self.shape(1))
-        chunk_size = self.get_chunk_size(shape)
-
-        dset = hf.create_dataset(label,
-                                 shape=shape,
-                                 dtype=self.data.dtype,
-                                 chunks=chunk_size)
+        dset = hf.create_dataset(label, shape=shape, dtype=self.data.dtype)
 
         row_start = displacements[self.rank]
         row_end = row_start + counts[self.rank]
@@ -525,14 +496,8 @@ class DistributedArray:
 
         if self.rank == mpi_master():
             hf = h5py.File(fname, 'a')
-
             shape = (sum(counts), self.shape(1))
-            chunk_size = self.get_chunk_size(shape)
-
-            dset = hf.create_dataset(label,
-                                     shape=shape,
-                                     dtype=self.data.dtype,
-                                     chunks=chunk_size)
+            dset = hf.create_dataset(label, shape=shape, dtype=self.data.dtype)
             hf.close()
         self.comm.barrier()
 
