@@ -404,17 +404,14 @@ class DistributedArray:
 
         if n_total == 0:
             data = np.zeros((counts[rank], 0))
-
         else:
-            for i in range(nodes):
-                if rank == i:
-                    hf = h5py.File(fname, 'r')
-                    dset = hf[label]
-                    row_start = displacements[rank]
-                    row_end = row_start + counts[rank]
-                    data = np.array(dset[row_start:row_end, :])
-                    hf.close()
-                comm.barrier()
+            hf = h5py.File(fname, 'r')
+            dset = hf[label]
+            row_start = displacements[rank]
+            row_end = row_start + counts[rank]
+            data = np.array(dset[row_start:row_end, :])
+            hf.close()
+            comm.barrier()
 
         return cls(data, comm, distribute=False)
 
