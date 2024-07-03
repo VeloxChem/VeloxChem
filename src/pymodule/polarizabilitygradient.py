@@ -54,11 +54,11 @@ class PolarizabilityGradient():
         self.ostream = ostream
 
         self.polgradient = None
-        self.delta_h = 0.001  # for numerical complex gradient
+        self.delta_h = 0.001  # for numerical pol. gradient
 
         self.is_complex = False
-        self.grad_dt = np.float_ # data type for polgrad (real/complex)
-        self.damping = 1000.0 / hartree_in_wavenumber()
+        self.grad_dt = np.float_  # data type for pol. gradient (real/complex)
+        self.damping = 1000.0 / hartree_in_wavenumber()  # inverse life-time parameter
 
         self.numerical = False
         self.do_four_point = False
