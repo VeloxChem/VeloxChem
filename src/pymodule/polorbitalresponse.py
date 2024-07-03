@@ -248,6 +248,7 @@ class PolOrbitalResponse(CphfSolver):
                 dm_oo = np.zeros((dof, dof, nocc, nocc), dtype=np.complex_)
                 dm_vv = np.zeros((dof, dof, nvir, nvir), dtype=np.complex_)
 
+                # TODO separate function
                 # FIXME loop upper triangular only
                 for x in range(dof):
                     for y in range(dof):
@@ -378,6 +379,7 @@ class PolOrbitalResponse(CphfSolver):
             for ifock in range(dof**2, dof**2 + 2 * dof):
                 fock_ao_rhs_real.set_fock_type(fockmat.rgenjk, ifock)
                 fock_ao_rhs_imag.set_fock_type(fockmat.rgenjk, ifock)
+            # TODO separate function
             if self._dft:
                 zero_dm_ao.broadcast(self.rank, self.comm)
                 perturbed_dm_ao_rere.broadcast(self.rank, self.comm)
@@ -427,6 +429,7 @@ class PolOrbitalResponse(CphfSolver):
                 fock_gxc_ao_reim = None  # None if not DFT
                 fock_gxc_ao_imre = None  # None if not DFT
 
+            # TODO separate function
             if self._dft:
                 if not self.xcfun.is_hybrid():
                     for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
@@ -506,6 +509,7 @@ class PolOrbitalResponse(CphfSolver):
                 fock_ao_rhs_x_minus_y = (fock_ao_rhs_x_minus_y_real +
                                          1j * fock_ao_rhs_x_minus_y_imag)
 
+                # TODO separate function
                 # FIXME dimensions when upper triangular only
                 fock_mo_rhs_2dm = np.zeros((dof, dof, nocc, nvir), dtype=np.complex_)
                 # FIXME loop upper triangular only
@@ -623,59 +627,14 @@ class PolOrbitalResponse(CphfSolver):
                 fock_mo_rhs_2dm = 0.25 * fock_mo_rhs_2dm.reshape(
                     dof**2, nocc, nvir)
 
-                ## get the dipole integrals in AO basis
-                #dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-                #dipole_mats = dipole_drv.compute(molecule, basis)
-                #dipole_ints_ao = np.zeros((dof, nao, nao))
-                #k = 0
-                #if 'x' in self.vector_components:
-                #    dipole_ints_ao[k] = dipole_mats.x_to_numpy()
-                #    k += 1
-                #if 'y' in self.vector_components:
-                #    dipole_ints_ao[k] = dipole_mats.y_to_numpy()
-                #    k += 1
-                #if 'z' in self.vector_components:
-                #    dipole_ints_ao[k] = dipole_mats.z_to_numpy()
-
-                ## transform to MO basis (oo and vv blocks only)
-                #dipole_ints_oo = np.array([
-                #    np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
-                #    for x in range(dof)
-                #])
-                #dipole_ints_vv = np.array([
-                #    np.linalg.multi_dot([mo_vir.T, dipole_ints_ao[x], mo_vir])
-                #    for x in range(dof)
-                #])
-
-                ## FIXME dimensions when upper triangular only
-                #rhs_dipole_contrib = np.zeros((dof, dof, nocc, nvir),
-                #                              dtype=np.complex_)
-                ## calculate dipole contributions to the RHS
-                ## FIXME loop upper triangular only
-                #for x in range(dof):
-                #    for y in range(dof):
-                #        rhs_dipole_contrib[x, y] = (
-                #            0.5 * (np.linalg.multi_dot( # xja,yji->xyia
-                #            #[x_minus_y[x].T, dipole_ints_oo[y]]).T
-                #            [dipole_ints_oo[y].T, x_minus_y[x]])  # TEST
-                #            + np.linalg.multi_dot( # yja,xji->xyia
-                #            [dipole_ints_oo[x], x_minus_y[y]]))
-                #            - 0.5 * (np.linalg.multi_dot( # xib,yab->xyia
-                #            [x_minus_y[x], dipole_ints_vv[y]])
-                #            + np.linalg.multi_dot( # yib,xab->xyia
-                #            #[dipole_ints_vv[x], x_minus_y[y].T]).T))
-                #            [x_minus_y[y], dipole_ints_vv[x].T])))  # TEST
-
-                ## FIXME dimensions when upper triangular only
-                #rhs_dipole_contrib = rhs_dipole_contrib.reshape(
-                #    dof**2, nocc, nvir)
-
+                # Calculate dipole contribution
                 rhs_dipole_contrib = self.calculate_rhs_dipole_contrib(
                     molecule, basis, scf_tensors, x_minus_y)
 
                 # sum RHS contributions
                 rhs_mo = fock_mo_rhs_1dm + fock_mo_rhs_2dm + rhs_dipole_contrib
 
+                # TODO separate function
                 # add DFT E[3] contribution to the RHS
                 if self._dft:
                     # FIXME dimensions when upper triangular only
@@ -1106,53 +1065,8 @@ class PolOrbitalResponse(CphfSolver):
                 # FIXME dimensions when upper triangular only
                 fock_mo_rhs_2dm = 0.25 * fock_mo_rhs_2dm.reshape(
                     dof**2, nocc, nvir)
-
-                ## get the dipole integrals in AO basis
-                #dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-                #dipole_mats = dipole_drv.compute(molecule, basis)
-                #dipole_ints_ao = np.zeros((dof, nao, nao))
-                #k = 0
-                #if 'x' in self.vector_components:
-                #    dipole_ints_ao[k] = dipole_mats.x_to_numpy()
-                #    k += 1
-                #if 'y' in self.vector_components:
-                #    dipole_ints_ao[k] = dipole_mats.y_to_numpy()
-                #    k += 1
-                #if 'z' in self.vector_components:
-                #    dipole_ints_ao[k] = dipole_mats.z_to_numpy()
-
-                ## transform to MO basis (oo and vv blocks only)
-                #dipole_ints_oo = np.array([
-                #    np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
-                #    for x in range(dof)
-                #])
-                #dipole_ints_vv = np.array([
-                #    np.linalg.multi_dot([mo_vir.T, dipole_ints_ao[x], mo_vir])
-                #    for x in range(dof)
-                #])
-
-                ## FIXME dimensions when upper triangular only
-                #rhs_dipole_contrib = np.zeros((dof, dof, nocc, nvir))
-                ## calculate dipole contributions to the RHS
-                ## FIXME loop upper triangular only
-                #for x in range(dof):
-                #    for y in range(dof):
-                #        rhs_dipole_contrib[x, y] = (
-                #            0.5 * (np.linalg.multi_dot( # xja,yji->xyia
-                #            #[x_minus_y[x].T, dipole_ints_oo[y]]).T
-                #            [dipole_ints_oo[y].T, x_minus_y[x]])  # TEST
-                #            + np.linalg.multi_dot( # yja,xji->xyia
-                #            [dipole_ints_oo[x], x_minus_y[y]]))
-                #            - 0.5 * (np.linalg.multi_dot( # xib,yab->xyia
-                #            [x_minus_y[x], dipole_ints_vv[y]])
-                #            + np.linalg.multi_dot( # yib,xab->xyia
-                #            #[dipole_ints_vv[x], x_minus_y[y].T]).T))
-                #            [x_minus_y[y], dipole_ints_vv[x].T])))  # TEST
-
-                ## FIXME dimensions when upper triangular only
-                #rhs_dipole_contrib = rhs_dipole_contrib.reshape(
-                #    dof**2, nocc, nvir)
-
+               
+                # Calculate dipole contribution
                 rhs_dipole_contrib = self.calculate_rhs_dipole_contrib(
                     molecule, basis, scf_tensors, x_minus_y)
 
@@ -1208,13 +1122,6 @@ class PolOrbitalResponse(CphfSolver):
             return orbrsp_rhs
         else:
             return {}
-
-    # NOTES:
-    #   - epsilon_dm_ao not returned from cphfsolver,
-    #     to be calculated inside compute_omega
-    #   - fock_ao_rhs and fock_gxc_ao come from cphfsolver dictionary
-    #   - fock_lambda not returned yet, put in dictionary from cphfsolver
-    #     (otherwise needs to be recalculated)
 
     def calculate_rhs_dipole_contrib(self, molecule, basis, scf_tensors,
                                      x_minus_y):
@@ -1297,6 +1204,13 @@ class PolOrbitalResponse(CphfSolver):
                     dof**2, nocc, nvir)
 
         return rhs_dipole_contrib
+
+    # NOTES:
+    #   - epsilon_dm_ao not returned from cphfsolver,
+    #     to be calculated inside compute_omega
+    #   - fock_ao_rhs and fock_gxc_ao come from cphfsolver dictionary
+    #   - fock_lambda not returned yet, put in dictionary from cphfsolver
+    #     (otherwise needs to be recalculated)
 
     def compute_omega(self, molecule, basis, scf_tensors, lr_results):
         """
