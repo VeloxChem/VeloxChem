@@ -1349,16 +1349,19 @@ class PolOrbitalResponse(CphfSolver):
                 for x in range(dof):
                     for y in range(dof):
                         tmp_oo = 0.5 * (np.linalg.multi_dot([ # xjc,yic->xyij
-                            x_minus_y[x], dipole_ints_ov[y].T
-                        ]).T + np.linalg.multi_dot( # yjc,xic->xyij
+                            #x_minus_y[x], dipole_ints_ov[y].T]).T
+                            dipole_ints_ov[y], x_minus_y[x].T])  # TEST
+                            + np.linalg.multi_dot( # yjc,xic->xyij
                             [dipole_ints_ov[x], x_minus_y[y].T]))
                         tmp_ov = 0.5 * (np.linalg.multi_dot([ # xka,yki->xyia
-                            x_minus_y[x].T, dipole_ints_oo[y]
-                        ]).T + np.linalg.multi_dot( # yka,xki->xyia
+                            #x_minus_y[x].T, dipole_ints_oo[y]]).T
+                            dipole_ints_oo[y].T, x_minus_y[x]])  # TEST
+                            + np.linalg.multi_dot( # yka,xki->xyia
                             [dipole_ints_oo[x].T, x_minus_y[y]]))
                         tmp_vv = 0.5 * (np.linalg.multi_dot([ # xkb,yka->xyab
-                            x_minus_y[x].T, dipole_ints_ov[y]
-                        ]).T + np.linalg.multi_dot( # ykb,xka->xyab
+                            #x_minus_y[x].T, dipole_ints_ov[y]]).T
+                            dipole_ints_ov[y].T, x_minus_y[x]])  # TEST
+                            + np.linalg.multi_dot( # ykb,xka->xyab
                             [dipole_ints_ov[x].T, x_minus_y[y]]))
                         dipole_ints_contrib_ao[x, y] = (
                             # mi,xyij,nj->xymn
@@ -1489,14 +1492,18 @@ class PolOrbitalResponse(CphfSolver):
                             [fock_ao_rhs_2_n, x_minus_y_ao[m].T, ovlp.T]))
 
                         Fp2_oo = 0.25 * (np.linalg.multi_dot([
-                            fock_ao_rhs_1_m.T, x_plus_y_ao[n].T, ovlp.T
-                        ]) + np.linalg.multi_dot(
-                            [fock_ao_rhs_1_n.T, x_plus_y_ao[m].T, ovlp.T]))
+                            #fock_ao_rhs_1_m.T, x_plus_y_ao[n].T, ovlp.T])
+                            ovlp, x_plus_y_ao[n], fock_ao_rhs_1_m]).T  # TEST
+                            + np.linalg.multi_dot([
+                            #[fock_ao_rhs_1_n.T, x_plus_y_ao[m].T, ovlp.T]))
+                            ovlp, x_plus_y_ao[m], fock_ao_rhs_1_n]).T)  # TEST
 
                         Fm2_oo = 0.25 * (np.linalg.multi_dot([
-                            fock_ao_rhs_2_m.T, x_minus_y_ao[n].T, ovlp.T
-                        ]) + np.linalg.multi_dot(
-                            [fock_ao_rhs_2_n.T, x_minus_y_ao[m].T, ovlp.T]))
+                            #fock_ao_rhs_2_m.T, x_minus_y_ao[n].T, ovlp.T])
+                            ovlp, x_minus_y_ao[n], fock_ao_rhs_2_m]).T  # TEST
+                            + np.linalg.multi_dot([
+                            #[fock_ao_rhs_2_n.T, x_minus_y_ao[m].T, ovlp.T]))
+                            ovlp, x_minus_y_ao[m], fock_ao_rhs_2_n]).T)  # TEST
                         # We see that:
                         # Fp1_vv = Fp1_ov and Fm1_vv = Fm1_ov
                         # Fp2_vv = Fp2_ov and Fm2_vv = Fm2_ov
@@ -1671,16 +1678,19 @@ class PolOrbitalResponse(CphfSolver):
                 for x in range(dof):
                     for y in range(dof):
                         tmp_oo = 0.5 * (np.linalg.multi_dot([ # xjc,yic->xyij
-                            x_minus_y[x], dipole_ints_ov[y].T
-                        ]).T + np.linalg.multi_dot( # yjc,xic->xyij
+                            #x_minus_y[x], dipole_ints_ov[y].T]).T
+                            dipole_ints_ov[y], x_minus_y[x].T])  # TEST
+                            + np.linalg.multi_dot( # yjc,xic->xyij
                             [dipole_ints_ov[x], x_minus_y[y].T]))
                         tmp_ov = 0.5 * (np.linalg.multi_dot([ # xka,yki->xyia
-                            x_minus_y[x].T, dipole_ints_oo[y]
-                        ]).T + np.linalg.multi_dot( # yka,xki->xyia
+                            #x_minus_y[x].T, dipole_ints_oo[y]]).T
+                            dipole_ints_oo[y].T, x_minus_y[x]])  # TEST
+                            + np.linalg.multi_dot( # yka,xki->xyia
                             [dipole_ints_oo[x].T, x_minus_y[y]]))
                         tmp_vv = 0.5 * (np.linalg.multi_dot([ # xkb,yka->xyab
-                            x_minus_y[x].T, dipole_ints_ov[y]
-                        ]).T + np.linalg.multi_dot( # ykb,xka->xyab
+                            #x_minus_y[x].T, dipole_ints_ov[y]]).T
+                            dipole_ints_ov[y].T, x_minus_y[x]])  # TEST
+                            + np.linalg.multi_dot( # ykb,xka->xyab
                             [dipole_ints_ov[x].T, x_minus_y[y]]))
                         dipole_ints_contrib_ao[x, y] = (
                             # mi,xyij,nj->xymn
@@ -1837,14 +1847,18 @@ class PolOrbitalResponse(CphfSolver):
                             [fock_ao_rhs_2_n, x_minus_y_ao[m].T, ovlp.T]))
 
                         Fp2_oo = 0.25 * (np.linalg.multi_dot([
-                            fock_ao_rhs_1_m.T, x_plus_y_ao[n].T, ovlp.T
-                        ]) + np.linalg.multi_dot(
-                            [fock_ao_rhs_1_n.T, x_plus_y_ao[m].T, ovlp.T]))
+                            #fock_ao_rhs_1_m.T, x_plus_y_ao[n].T, ovlp.T])
+                            ovlp, x_plus_y_ao[n], fock_ao_rhs_1_m]).T  # TEST
+                            + np.linalg.multi_dot([
+                            #[fock_ao_rhs_1_n.T, x_plus_y_ao[m].T, ovlp.T]))
+                            ovlp, x_plus_y_ao[m], fock_ao_rhs_1_n]).T)  # TEST
 
                         Fm2_oo = 0.25 * (np.linalg.multi_dot([
-                            fock_ao_rhs_2_m.T, x_minus_y_ao[n].T, ovlp.T
-                        ]) + np.linalg.multi_dot(
-                            [fock_ao_rhs_2_n.T, x_minus_y_ao[m].T, ovlp.T]))
+                            #fock_ao_rhs_2_m.T, x_minus_y_ao[n].T, ovlp.T])
+                            ovlp, x_minus_y_ao[n], fock_ao_rhs_2_m]).T  # TEST
+                            + np.linalg.multi_dot([
+                            #fock_ao_rhs_2_n.T, x_minus_y_ao[m].T, ovlp.T]))
+                            ovlp, x_minus_y_ao[m], fock_ao_rhs_2_n]).T)  # TEST
                         # We see that:
                         # Fp1_vv = Fp1_ov and Fm1_vv = Fm1_ov
                         # Fp2_vv = Fp2_ov and Fm2_vv = Fm2_ov
