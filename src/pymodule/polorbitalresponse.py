@@ -509,123 +509,127 @@ class PolOrbitalResponse(CphfSolver):
                 fock_ao_rhs_x_minus_y = (fock_ao_rhs_x_minus_y_real +
                                          1j * fock_ao_rhs_x_minus_y_imag)
 
-                # TODO separate function
-                # FIXME dimensions when upper triangular only
-                fock_mo_rhs_2dm = np.zeros((dof, dof, nocc, nvir), dtype=np.complex_)
-                # FIXME loop upper triangular only
-                for x in range(dof):
-                    for y in range(dof):
-                        # xmt,ymc->xytc
-                        tmp = np.linalg.multi_dot(
-                            [fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y]])
-                        # cl,ti,la,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
-                            [mo_occ.T, tmp, ovlp, mo_vir])
-                        # xmt,ymc->xytc
-                        tmp = np.linalg.multi_dot(
-                            [fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y]])
-                        # cl,ti,la,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
-                            [mo_occ.T, tmp, ovlp, mo_vir])
-                        # ymt,xmc->xytc
-                        tmp = np.linalg.multi_dot(
-                            [fock_ao_rhs_x_plus_y[y], x_plus_y_ao[x]])
-                        # cl,ti,la,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
-                            [mo_occ.T, tmp, ovlp, mo_vir])
-                        # ymt,xmc->xytc
-                        tmp = np.linalg.multi_dot(
-                            [fock_ao_rhs_x_minus_y[y], x_minus_y_ao[x]])
-                        # cl,ti,la,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
-                            [mo_occ.T, tmp, ovlp, mo_vir])
-                        # xtm,ymc->xytc
-                        tmp = np.linalg.multi_dot(
-                            [fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y]])
-                        # cl,ti,la,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
-                            [mo_occ.T, tmp, ovlp, mo_vir])
-                        # xtm,ymc->xytc
-                        tmp = np.linalg.multi_dot(
-                            [fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y]])
-                        # cl,ti,la,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
-                            [mo_occ.T, tmp, ovlp, mo_vir])
-                        # ytm,xmc->xytc
-                        tmp = np.linalg.multi_dot(
-                            [fock_ao_rhs_x_plus_y[y].T, x_plus_y_ao[x]])
-                        # cl,ti,la,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
-                            [mo_occ.T, tmp, ovlp, mo_vir])
-                        # ytm,xmc->xytc
-                        tmp = np.linalg.multi_dot(
-                            [fock_ao_rhs_x_minus_y[y].T, x_minus_y_ao[x]])
-                        # cl,ti,la,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
-                            [mo_occ.T, tmp, ovlp, mo_vir])
-                        # xmt,ycm->xyct
-                        tmp = np.linalg.multi_dot(
-                        #    [fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y].T]).T
-                            [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x].T])  # TEST
-                        # cl,li,ta,xyct->xyia
-                        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
-                            [mo_occ.T, ovlp.T, tmp, mo_vir])
-                        # xmt,ycm->xyct
-                        tmp = np.linalg.multi_dot(
-                        #    [fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y].T]).T
-                            [x_minus_y_ao[y], fock_ao_rhs_x_minus_y[x].T])  # TEST
-                        # cl,li,ta,xyct->xyia
-                        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
-                            [mo_occ.T, ovlp.T, tmp, mo_vir])
-                        # ymt,xcm->xyct
-                        tmp = np.linalg.multi_dot(
-                        #    [fock_ao_rhs_x_plus_y[y], x_plus_y_ao[x].T]).T
-                            [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y].T])  # TEST
-                        # cl,li,ta,xyct->xyia
-                        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
-                            [mo_occ.T, ovlp.T, tmp, mo_vir])
-                        # ymt,xcm->xyct
-                        tmp = np.linalg.multi_dot(
-                        #    [fock_ao_rhs_x_minus_y[y], x_minus_y_ao[x].T]).T
-                            [x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y].T])  # TEST
-                        # cl,li,ta,xyct->xyia
-                        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
-                            [mo_occ.T, ovlp.T, tmp, mo_vir])
-                        # xtm,ycm->xytc
-                        tmp = np.linalg.multi_dot(
-                        #    [fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y].T])
-                            [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x]]).T  # TEST
-                        # cl,li,ta,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
-                            #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
-                            [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
-                        # xtm,ymc->xytc
-                        tmp = np.linalg.multi_dot(
-                        #    [fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y].T])
-                            [x_minus_y_ao[y], fock_ao_rhs_x_minus_y[x]]).T  # TEST
-                        # cl,li,ta,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
-                            #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
-                            [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
-                        # ytm,xcm->xytc
-                        tmp = np.linalg.multi_dot(
-                        #    [fock_ao_rhs_x_plus_y[y].T, x_plus_y_ao[x].T])
-                            [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y]]).T  # TEST
-                        # cl,li,ta,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
-                            #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
-                            [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
-                        # ytm,xcm->xytc
-                        tmp = np.linalg.multi_dot(
-                        #    [fock_ao_rhs_x_minus_y[y].T, x_minus_y_ao[x].T])
-                            [x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y]]).T
-                        # cl,li,ta,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
-                            #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
-                            [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
-                # FIXME dimension when only upper triangular
-                fock_mo_rhs_2dm = 0.25 * fock_mo_rhs_2dm.reshape(
-                    dof**2, nocc, nvir)
+                ## FIXME dimensions when upper triangular only
+                #fock_mo_rhs_2dm = np.zeros((dof, dof, nocc, nvir), dtype=np.complex_)
+                ## FIXME loop upper triangular only
+                #for x in range(dof):
+                #    for y in range(dof):
+                #        # xmt,ymc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            [fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y]])
+                #        # cl,ti,la,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                #            [mo_occ.T, tmp, ovlp, mo_vir])
+                #        # xmt,ymc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            [fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y]])
+                #        # cl,ti,la,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                #            [mo_occ.T, tmp, ovlp, mo_vir])
+                #        # ymt,xmc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            [fock_ao_rhs_x_plus_y[y], x_plus_y_ao[x]])
+                #        # cl,ti,la,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                #            [mo_occ.T, tmp, ovlp, mo_vir])
+                #        # ymt,xmc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            [fock_ao_rhs_x_minus_y[y], x_minus_y_ao[x]])
+                #        # cl,ti,la,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                #            [mo_occ.T, tmp, ovlp, mo_vir])
+                #        # xtm,ymc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            [fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y]])
+                #        # cl,ti,la,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                #            [mo_occ.T, tmp, ovlp, mo_vir])
+                #        # xtm,ymc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            [fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y]])
+                #        # cl,ti,la,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                #            [mo_occ.T, tmp, ovlp, mo_vir])
+                #        # ytm,xmc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            [fock_ao_rhs_x_plus_y[y].T, x_plus_y_ao[x]])
+                #        # cl,ti,la,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                #            [mo_occ.T, tmp, ovlp, mo_vir])
+                #        # ytm,xmc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            [fock_ao_rhs_x_minus_y[y].T, x_minus_y_ao[x]])
+                #        # cl,ti,la,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                #            [mo_occ.T, tmp, ovlp, mo_vir])
+                #        # xmt,ycm->xyct
+                #        tmp = np.linalg.multi_dot(
+                #        #    [fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y].T]).T
+                #            [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x].T])  # TEST
+                #        # cl,li,ta,xyct->xyia
+                #        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                #            [mo_occ.T, ovlp.T, tmp, mo_vir])
+                #        # xmt,ycm->xyct
+                #        tmp = np.linalg.multi_dot(
+                #        #    [fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y].T]).T
+                #            [x_minus_y_ao[y], fock_ao_rhs_x_minus_y[x].T])  # TEST
+                #        # cl,li,ta,xyct->xyia
+                #        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                #            [mo_occ.T, ovlp.T, tmp, mo_vir])
+                #        # ymt,xcm->xyct
+                #        tmp = np.linalg.multi_dot(
+                #        #    [fock_ao_rhs_x_plus_y[y], x_plus_y_ao[x].T]).T
+                #            [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y].T])  # TEST
+                #        # cl,li,ta,xyct->xyia
+                #        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                #            [mo_occ.T, ovlp.T, tmp, mo_vir])
+                #        # ymt,xcm->xyct
+                #        tmp = np.linalg.multi_dot(
+                #        #    [fock_ao_rhs_x_minus_y[y], x_minus_y_ao[x].T]).T
+                #            [x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y].T])  # TEST
+                #        # cl,li,ta,xyct->xyia
+                #        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                #            [mo_occ.T, ovlp.T, tmp, mo_vir])
+                #        # xtm,ycm->xytc
+                #        tmp = np.linalg.multi_dot(
+                #        #    [fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y].T])
+                #            [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x]]).T  # TEST
+                #        # cl,li,ta,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                #            #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
+                #            [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
+                #        # xtm,ymc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #        #    [fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y].T])
+                #            [x_minus_y_ao[y], fock_ao_rhs_x_minus_y[x]]).T  # TEST
+                #        # cl,li,ta,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                #            #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
+                #            [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
+                #        # ytm,xcm->xytc
+                #        tmp = np.linalg.multi_dot(
+                #        #    [fock_ao_rhs_x_plus_y[y].T, x_plus_y_ao[x].T])
+                #            [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y]]).T  # TEST
+                #        # cl,li,ta,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                #            #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
+                #            [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
+                #        # ytm,xcm->xytc
+                #        tmp = np.linalg.multi_dot(
+                #        #    [fock_ao_rhs_x_minus_y[y].T, x_minus_y_ao[x].T])
+                #            [x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y]]).T
+                #        # cl,li,ta,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                #            #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
+                #            [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
+                ## FIXME dimension when only upper triangular
+                #fock_mo_rhs_2dm = 0.25 * fock_mo_rhs_2dm.reshape(
+                #    dof**2, nocc, nvir)
+
+                # calculate 2-particle density matrix contribution
+                fock_mo_rhs_2dm = self.calculate_rhs_2dm_contrib(molecule, scf_tensors,
+                    fock_ao_rhs_x_plus_y, fock_ao_rhs_x_minus_y,
+                    x_plus_y_ao, x_minus_y_ao)
 
                 # Calculate dipole contribution
                 rhs_dipole_contrib = self.calculate_rhs_dipole_contrib(
@@ -950,123 +954,128 @@ class PolOrbitalResponse(CphfSolver):
                     fock_ao_rhs_x_minus_y[i] = fock_ao_rhs.alpha_to_numpy(
                         dof**2 + dof + i)
 
-                fock_mo_rhs_2dm = np.zeros((dof, dof, nocc, nvir))
-                # FIXME loop upper triangular only
-                for x in range(dof):
-                    for y in range(dof):
-                        # xmt,ymc->xytc
-                        tmp = np.linalg.multi_dot(
-                            [fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y]])
-                        # cl,ti,la,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
-                            [mo_occ.T, tmp, ovlp, mo_vir])
-                        # xmt,ymc->xytc
-                        tmp = np.linalg.multi_dot(
-                            [fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y]])
-                        # cl,ti,la,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
-                            [mo_occ.T, tmp, ovlp, mo_vir])
-                        # ymt,xmc->xytc
-                        tmp = np.linalg.multi_dot(
-                            [fock_ao_rhs_x_plus_y[y], x_plus_y_ao[x]])
-                        # cl,ti,la,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
-                            [mo_occ.T, tmp, ovlp, mo_vir])
-                        # ymt,xmc->xytc
-                        tmp = np.linalg.multi_dot(
-                            [fock_ao_rhs_x_minus_y[y], x_minus_y_ao[x]])
-                        # cl,ti,la,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
-                            [mo_occ.T, tmp, ovlp, mo_vir])
-                        # xtm,ymc->xytc
-                        tmp = np.linalg.multi_dot(
-                            [fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y]])
-                        # cl,ti,la,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
-                            [mo_occ.T, tmp, ovlp, mo_vir])
-                        # xtm,ymc->xytc
-                        tmp = np.linalg.multi_dot(
-                            [fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y]])
-                        # cl,ti,la,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
-                            [mo_occ.T, tmp, ovlp, mo_vir])
-                        # ytm,xmc->xytc
-                        tmp = np.linalg.multi_dot(
-                            [fock_ao_rhs_x_plus_y[y].T, x_plus_y_ao[x]])
-                        # cl,ti,la,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
-                            [mo_occ.T, tmp, ovlp, mo_vir])
-                        # ytm,xmc->xytc
-                        tmp = np.linalg.multi_dot(
-                            [fock_ao_rhs_x_minus_y[y].T, x_minus_y_ao[x]])
-                        # cl,ti,la,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
-                            [mo_occ.T, tmp, ovlp, mo_vir])
-                        # xmt,ycm->xyct
-                        tmp = np.linalg.multi_dot(
-                            #[fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y].T]).T
-                            [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x].T])  # TEST
-                        # cl,li,ta,xyct->xyia
-                        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
-                            [mo_occ.T, ovlp.T, tmp, mo_vir])
-                        # xmt,ycm->xyct
-                        tmp = np.linalg.multi_dot(
-                            #[fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y].T]).T
-                            [x_minus_y_ao[y], fock_ao_rhs_x_minus_y[x].T])  # TEST
-                        # cl,li,ta,xyct->xyia
-                        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
-                            [mo_occ.T, ovlp.T, tmp, mo_vir])
-                        # ymt,xcm->xyct
-                        tmp = np.linalg.multi_dot(
-                            #[fock_ao_rhs_x_plus_y[y], x_plus_y_ao[x].T]).T
-                            [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y].T])  # TEST
-                        # cl,li,ta,xyct->xyia
-                        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
-                            [mo_occ.T, ovlp.T, tmp, mo_vir])
-                        # ymt,xcm->xyct
-                        tmp = np.linalg.multi_dot(
-                            #[fock_ao_rhs_x_minus_y[y], x_minus_y_ao[x].T]).T
-                            [x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y].T])  # TEST
-                        # cl,li,ta,xyct->xyia
-                        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
-                            [mo_occ.T, ovlp.T, tmp, mo_vir])
-                        # xtm,ycm->xytc
-                        tmp = np.linalg.multi_dot(
-                            #[fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y].T])
-                            [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x]]).T  # TEST
-                        # cl,li,ta,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
-                            #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
-                            [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
-                        # xtm,ymc->xytc
-                        tmp = np.linalg.multi_dot(
-                            #[fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y].T])
-                            [x_minus_y_ao[y], fock_ao_rhs_x_minus_y[x]]).T  # TEST
-                        # cl,li,ta,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
-                            #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
-                            [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
-                        # ytm,xcm->xytc
-                        tmp = np.linalg.multi_dot(
-                            #[fock_ao_rhs_x_plus_y[y].T, x_plus_y_ao[x].T])
-                            [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y]]).T  # TEST
-                        # cl,li,ta,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
-                            #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
-                            [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
-                        # ytm,xcm->xytc
-                        tmp = np.linalg.multi_dot(
-                            #[fock_ao_rhs_x_minus_y[y].T, x_minus_y_ao[x].T])
-                            [x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y]]).T
-                        # cl,li,ta,xytc->xyia
-                        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
-                            #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
-                            [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
-                # FIXME dimensions when upper triangular only
-                fock_mo_rhs_2dm = 0.25 * fock_mo_rhs_2dm.reshape(
-                    dof**2, nocc, nvir)
+                #fock_mo_rhs_2dm = np.zeros((dof, dof, nocc, nvir))
+                ## FIXME loop upper triangular only
+                #for x in range(dof):
+                #    for y in range(dof):
+                #        # xmt,ymc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            [fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y]])
+                #        # cl,ti,la,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                #            [mo_occ.T, tmp, ovlp, mo_vir])
+                #        # xmt,ymc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            [fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y]])
+                #        # cl,ti,la,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                #            [mo_occ.T, tmp, ovlp, mo_vir])
+                #        # ymt,xmc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            [fock_ao_rhs_x_plus_y[y], x_plus_y_ao[x]])
+                #        # cl,ti,la,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                #            [mo_occ.T, tmp, ovlp, mo_vir])
+                #        # ymt,xmc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            [fock_ao_rhs_x_minus_y[y], x_minus_y_ao[x]])
+                #        # cl,ti,la,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                #            [mo_occ.T, tmp, ovlp, mo_vir])
+                #        # xtm,ymc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            [fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y]])
+                #        # cl,ti,la,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                #            [mo_occ.T, tmp, ovlp, mo_vir])
+                #        # xtm,ymc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            [fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y]])
+                #        # cl,ti,la,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                #            [mo_occ.T, tmp, ovlp, mo_vir])
+                #        # ytm,xmc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            [fock_ao_rhs_x_plus_y[y].T, x_plus_y_ao[x]])
+                #        # cl,ti,la,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                #            [mo_occ.T, tmp, ovlp, mo_vir])
+                #        # ytm,xmc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            [fock_ao_rhs_x_minus_y[y].T, x_minus_y_ao[x]])
+                #        # cl,ti,la,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                #            [mo_occ.T, tmp, ovlp, mo_vir])
+                #        # xmt,ycm->xyct
+                #        tmp = np.linalg.multi_dot(
+                #            #[fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y].T]).T
+                #            [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x].T])  # TEST
+                #        # cl,li,ta,xyct->xyia
+                #        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                #            [mo_occ.T, ovlp.T, tmp, mo_vir])
+                #        # xmt,ycm->xyct
+                #        tmp = np.linalg.multi_dot(
+                #            #[fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y].T]).T
+                #            [x_minus_y_ao[y], fock_ao_rhs_x_minus_y[x].T])  # TEST
+                #        # cl,li,ta,xyct->xyia
+                #        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                #            [mo_occ.T, ovlp.T, tmp, mo_vir])
+                #        # ymt,xcm->xyct
+                #        tmp = np.linalg.multi_dot(
+                #            #[fock_ao_rhs_x_plus_y[y], x_plus_y_ao[x].T]).T
+                #            [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y].T])  # TEST
+                #        # cl,li,ta,xyct->xyia
+                #        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                #            [mo_occ.T, ovlp.T, tmp, mo_vir])
+                #        # ymt,xcm->xyct
+                #        tmp = np.linalg.multi_dot(
+                #            #[fock_ao_rhs_x_minus_y[y], x_minus_y_ao[x].T]).T
+                #            [x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y].T])  # TEST
+                #        # cl,li,ta,xyct->xyia
+                #        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                #            [mo_occ.T, ovlp.T, tmp, mo_vir])
+                #        # xtm,ycm->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            #[fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y].T])
+                #            [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x]]).T  # TEST
+                #        # cl,li,ta,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                #            #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
+                #            [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
+                #        # xtm,ymc->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            #[fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y].T])
+                #            [x_minus_y_ao[y], fock_ao_rhs_x_minus_y[x]]).T  # TEST
+                #        # cl,li,ta,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                #            #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
+                #            [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
+                #        # ytm,xcm->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            #[fock_ao_rhs_x_plus_y[y].T, x_plus_y_ao[x].T])
+                #            [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y]]).T  # TEST
+                #        # cl,li,ta,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                #            #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
+                #            [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
+                #        # ytm,xcm->xytc
+                #        tmp = np.linalg.multi_dot(
+                #            #[fock_ao_rhs_x_minus_y[y].T, x_minus_y_ao[x].T])
+                #            [x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y]]).T
+                #        # cl,li,ta,xytc->xyia
+                #        fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                #            #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
+                #            [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
+                ## FIXME dimensions when upper triangular only
+                #fock_mo_rhs_2dm = 0.25 * fock_mo_rhs_2dm.reshape(
+                #    dof**2, nocc, nvir)
                
-                # Calculate dipole contribution
+                # calculate 2-particle density matrix contribution
+                fock_mo_rhs_2dm = self.calculate_rhs_2dm_contrib(molecule, scf_tensors,
+                    fock_ao_rhs_x_plus_y, fock_ao_rhs_x_minus_y,
+                    x_plus_y_ao, x_minus_y_ao)
+
+                # calculate dipole contribution
                 rhs_dipole_contrib = self.calculate_rhs_dipole_contrib(
                     molecule, basis, scf_tensors, x_minus_y)
 
@@ -1123,6 +1132,166 @@ class PolOrbitalResponse(CphfSolver):
         else:
             return {}
 
+    def calculate_rhs_2dm_contrib(self, molecule, scf_tensors, fock_ao_rhs_x_plus_y,
+                                  fock_ao_rhs_x_minus_y, x_plus_y_ao, x_minus_y_ao):
+        """
+        Calculates the 2-particle density matrix contribution to the RHS.
+
+        :param molecule:
+            The molecule.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param fock_ao_rhs_x_plus_y:
+            Fock matrix from unrel. DM and X+Y response vectors in AO basis.
+        :param fock_ao_rhs_x_minus_y:
+            Fock matrix from unrel. DM and X-Y response vectors in AO basis.
+        :param x_plus_y_ao:
+            The X+Y response vectors in AO basis.
+        :param x_minus_y_ao:
+            The X-Y response vectors in AO basis.
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # overlap
+        ovlp = scf_tensors['S']
+
+        # MO coefficients
+        mo = scf_tensors['C']  # only alpha part
+        nocc = molecule.number_of_alpha_electrons()
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+        nvir = mo_vir.shape[1]
+
+        # number of AOs
+        nao = mo.shape[0]
+
+        # determine data type of RHS
+        if self.is_complex:
+            rhs_dt = np.complex_
+        else:
+            rhs_dt = np.float_
+
+        fock_mo_rhs_2dm = np.zeros((dof, dof, nocc, nvir), dtype = rhs_dt)
+
+        # FIXME loop upper triangular only
+        for x in range(dof):
+            for y in range(dof):
+                # xmt,ymc->xytc
+                tmp = np.linalg.multi_dot(
+                    [fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y]])
+                # cl,ti,la,xytc->xyia
+                fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                    [mo_occ.T, tmp, ovlp, mo_vir])
+                # xmt,ymc->xytc
+                tmp = np.linalg.multi_dot(
+                    [fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y]])
+                # cl,ti,la,xytc->xyia
+                fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                    [mo_occ.T, tmp, ovlp, mo_vir])
+                # ymt,xmc->xytc
+                tmp = np.linalg.multi_dot(
+                    [fock_ao_rhs_x_plus_y[y], x_plus_y_ao[x]])
+                # cl,ti,la,xytc->xyia
+                fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                    [mo_occ.T, tmp, ovlp, mo_vir])
+                # ymt,xmc->xytc
+                tmp = np.linalg.multi_dot(
+                    [fock_ao_rhs_x_minus_y[y], x_minus_y_ao[x]])
+                # cl,ti,la,xytc->xyia
+                fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                    [mo_occ.T, tmp, ovlp, mo_vir])
+                # xtm,ymc->xytc
+                tmp = np.linalg.multi_dot(
+                    [fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y]])
+                # cl,ti,la,xytc->xyia
+                fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                    [mo_occ.T, tmp, ovlp, mo_vir])
+                # xtm,ymc->xytc
+                tmp = np.linalg.multi_dot(
+                    [fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y]])
+                # cl,ti,la,xytc->xyia
+                fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                    [mo_occ.T, tmp, ovlp, mo_vir])
+                # ytm,xmc->xytc
+                tmp = np.linalg.multi_dot(
+                    [fock_ao_rhs_x_plus_y[y].T, x_plus_y_ao[x]])
+                # cl,ti,la,xytc->xyia
+                fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                    [mo_occ.T, tmp, ovlp, mo_vir])
+                # ytm,xmc->xytc
+                tmp = np.linalg.multi_dot(
+                    [fock_ao_rhs_x_minus_y[y].T, x_minus_y_ao[x]])
+                # cl,ti,la,xytc->xyia
+                fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                    [mo_occ.T, tmp, ovlp, mo_vir])
+                # xmt,ycm->xyct
+                tmp = np.linalg.multi_dot(
+                    #[fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y].T]).T
+                    [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x].T])  # TEST
+                # cl,li,ta,xyct->xyia
+                fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                    [mo_occ.T, ovlp.T, tmp, mo_vir])
+                # xmt,ycm->xyct
+                tmp = np.linalg.multi_dot(
+                    #[fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y].T]).T
+                    [x_minus_y_ao[y], fock_ao_rhs_x_minus_y[x].T])  # TEST
+                # cl,li,ta,xyct->xyia
+                fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                    [mo_occ.T, ovlp.T, tmp, mo_vir])
+                # ymt,xcm->xyct
+                tmp = np.linalg.multi_dot(
+                    #[fock_ao_rhs_x_plus_y[y], x_plus_y_ao[x].T]).T
+                    [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y].T])  # TEST
+                # cl,li,ta,xyct->xyia
+                fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                    [mo_occ.T, ovlp.T, tmp, mo_vir])
+                # ymt,xcm->xyct
+                tmp = np.linalg.multi_dot(
+                    #[fock_ao_rhs_x_minus_y[y], x_minus_y_ao[x].T]).T
+                    [x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y].T])  # TEST
+                # cl,li,ta,xyct->xyia
+                fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                    [mo_occ.T, ovlp.T, tmp, mo_vir])
+                # xtm,ycm->xytc
+                tmp = np.linalg.multi_dot(
+                    #[fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y].T])
+                    [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x]]).T  # TEST
+                # cl,li,ta,xytc->xyia
+                fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                    #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
+                    [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
+                # xtm,ymc->xytc
+                tmp = np.linalg.multi_dot(
+                    #[fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y].T])
+                    [x_minus_y_ao[y], fock_ao_rhs_x_minus_y[x]]).T  # TEST
+                # cl,li,ta,xytc->xyia
+                fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                    #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
+                    [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
+                # ytm,xcm->xytc
+                tmp = np.linalg.multi_dot(
+                    #[fock_ao_rhs_x_plus_y[y].T, x_plus_y_ao[x].T])
+                    [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y]]).T  # TEST
+                # cl,li,ta,xytc->xyia
+                fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                    #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
+                    [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
+                # ytm,xcm->xytc
+                tmp = np.linalg.multi_dot(
+                    #[fock_ao_rhs_x_minus_y[y].T, x_minus_y_ao[x].T])
+                    [x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y]]).T
+                # cl,li,ta,xytc->xyia
+                fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                    #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
+                    [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
+
+        fock_mo_rhs_2dm = 0.25 * fock_mo_rhs_2dm.reshape(
+            dof**2, nocc, nvir)
+
+        return fock_mo_rhs_2dm
+
     def calculate_rhs_dipole_contrib(self, molecule, basis, scf_tensors,
                                      x_minus_y):
         """
@@ -1151,7 +1320,7 @@ class PolOrbitalResponse(CphfSolver):
         # number of AOs
         nao = mo.shape[0]
 
-        # set data type for RHS
+        # determine data type of RHS
         if self.is_complex:
             rhs_dt = np.complex_
         else:
