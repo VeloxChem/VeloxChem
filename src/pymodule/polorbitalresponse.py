@@ -1301,6 +1301,8 @@ class PolOrbitalResponse(CphfSolver):
             n_freqs = len(self.frequencies)
             # get CPHF results
             all_cphf_ov = self.cphf_results['cphf_ov']
+        else:
+            dof = None
 
         # timings
         loop_start_time = tm.time()
@@ -1326,11 +1328,11 @@ class PolOrbitalResponse(CphfSolver):
                 nvir = mo_vir.shape[1]
                 nao = mo_occ.shape[0]
 
-                mo_energies = scf_tensors['E']
-                eocc = mo_energies[:nocc]
-                evir = mo_energies[nocc:]
-                eo_diag = np.diag(eocc)
-                ev_diag = np.diag(evir)
+                #mo_energies = scf_tensors['E']
+                #eocc = mo_energies[:nocc]
+                #evir = mo_energies[nocc:]
+                #eo_diag = np.diag(eocc)
+                #ev_diag = np.diag(evir)
 
                 # get fock matrices from cphf_results
                 fock_ao_rhs = self.cphf_results[w]['fock_ao_rhs']
@@ -1357,60 +1359,64 @@ class PolOrbitalResponse(CphfSolver):
                 x_plus_y = exc_vec + deexc_vec
                 x_minus_y = exc_vec - deexc_vec
 
-                # get dipole moment integrals
-                dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-                dipole_mats = dipole_drv.compute(molecule, basis)
-                dipole_ints_ao = np.zeros((dof, nao, nao))
-                k = 0
-                if 'x' in self.vector_components:
-                    dipole_ints_ao[k] = dipole_mats.x_to_numpy()
-                    k += 1
-                if 'y' in self.vector_components:
-                    dipole_ints_ao[k] = dipole_mats.y_to_numpy()
-                    k += 1
-                if 'z' in self.vector_components:
-                    dipole_ints_ao[k] = dipole_mats.z_to_numpy()
+                ## get dipole moment integrals
+                #dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+                #dipole_mats = dipole_drv.compute(molecule, basis)
+                #dipole_ints_ao = np.zeros((dof, nao, nao))
+                #k = 0
+                #if 'x' in self.vector_components:
+                #    dipole_ints_ao[k] = dipole_mats.x_to_numpy()
+                #    k += 1
+                #if 'y' in self.vector_components:
+                #    dipole_ints_ao[k] = dipole_mats.y_to_numpy()
+                #    k += 1
+                #if 'z' in self.vector_components:
+                #    dipole_ints_ao[k] = dipole_mats.z_to_numpy()
 
-                # transform to MO basis (oo and ov blocks only)
-                dipole_ints_oo = np.array([
-                    np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
-                    for x in range(dof)
-                ])
-                dipole_ints_ov = np.array([
-                    np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_vir])
-                    for x in range(dof)
-                ])
+                ## transform to MO basis (oo and ov blocks only)
+                #dipole_ints_oo = np.array([
+                #    np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
+                #    for x in range(dof)
+                #])
+                #dipole_ints_ov = np.array([
+                #    np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_vir])
+                #    for x in range(dof)
+                #])
 
-                # calculate the dipole contribution to omega
-                # FIXME dimensions when upper triangular only
-                dipole_ints_contrib_ao = np.zeros((dof, dof, nao, nao))
-                # FIXME loop upper triangular only
-                for x in range(dof):
-                    for y in range(dof):
-                        tmp_oo = 0.5 * (np.linalg.multi_dot([ # xjc,yic->xyij
-                            #x_minus_y[x], dipole_ints_ov[y].T]).T
-                            dipole_ints_ov[y], x_minus_y[x].T])  # TEST
-                            + np.linalg.multi_dot( # yjc,xic->xyij
-                            [dipole_ints_ov[x], x_minus_y[y].T]))
-                        tmp_ov = 0.5 * (np.linalg.multi_dot([ # xka,yki->xyia
-                            #x_minus_y[x].T, dipole_ints_oo[y]]).T
-                            dipole_ints_oo[y].T, x_minus_y[x]])  # TEST
-                            + np.linalg.multi_dot( # yka,xki->xyia
-                            [dipole_ints_oo[x].T, x_minus_y[y]]))
-                        tmp_vv = 0.5 * (np.linalg.multi_dot([ # xkb,yka->xyab
-                            #x_minus_y[x].T, dipole_ints_ov[y]]).T
-                            dipole_ints_ov[y].T, x_minus_y[x]])  # TEST
-                            + np.linalg.multi_dot( # ykb,xka->xyab
-                            [dipole_ints_ov[x].T, x_minus_y[y]]))
-                        dipole_ints_contrib_ao[x, y] = (
-                            # mi,xyij,nj->xymn
-                            np.linalg.multi_dot([mo_occ, tmp_oo, mo_occ.T]) +
-                            # mi,xyia,na->xymn
-                            np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]) +
-                            # mi,xyia,na->xymn
-                            np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]).T +
-                            # ma,xyab,nb->xymn
-                            np.linalg.multi_dot([mo_vir, tmp_vv, mo_vir.T]))
+                ## calculate the dipole contribution to omega
+                ## FIXME dimensions when upper triangular only
+                #dipole_ints_contrib_ao = np.zeros((dof, dof, nao, nao))
+                ## FIXME loop upper triangular only
+                #for x in range(dof):
+                #    for y in range(dof):
+                #        tmp_oo = 0.5 * (np.linalg.multi_dot([ # xjc,yic->xyij
+                #            #x_minus_y[x], dipole_ints_ov[y].T]).T
+                #            dipole_ints_ov[y], x_minus_y[x].T])  # TEST
+                #            + np.linalg.multi_dot( # yjc,xic->xyij
+                #            [dipole_ints_ov[x], x_minus_y[y].T]))
+                #        tmp_ov = 0.5 * (np.linalg.multi_dot([ # xka,yki->xyia
+                #            #x_minus_y[x].T, dipole_ints_oo[y]]).T
+                #            dipole_ints_oo[y].T, x_minus_y[x]])  # TEST
+                #            + np.linalg.multi_dot( # yka,xki->xyia
+                #            [dipole_ints_oo[x].T, x_minus_y[y]]))
+                #        tmp_vv = 0.5 * (np.linalg.multi_dot([ # xkb,yka->xyab
+                #            #x_minus_y[x].T, dipole_ints_ov[y]]).T
+                #            dipole_ints_ov[y].T, x_minus_y[x]])  # TEST
+                #            + np.linalg.multi_dot( # ykb,xka->xyab
+                #            [dipole_ints_ov[x].T, x_minus_y[y]]))
+                #        dipole_ints_contrib_ao[x, y] = (
+                #            # mi,xyij,nj->xymn
+                #            np.linalg.multi_dot([mo_occ, tmp_oo, mo_occ.T]) +
+                #            # mi,xyia,na->xymn
+                #            np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]) +
+                #            # mi,xyia,na->xymn
+                #            np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]).T +
+                #            # ma,xyab,nb->xymn
+                #            np.linalg.multi_dot([mo_vir, tmp_vv, mo_vir.T]))
+
+                # calculate dipole contribution to omega
+                omega_dipole_contrib_ao = self.calculate_omega_dipole_contrib(
+                    molecule, basis, scf_tensors, x_minus_y)
 
                 # calculate the density matrices, alpha block only
                 D_occ = np.matmul(mo_occ, mo_occ.T)
@@ -1427,7 +1433,7 @@ class PolOrbitalResponse(CphfSolver):
                 cphf_ao_list = list([cphf_ao[x] for x in range(dof**2)])
                 ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
             else:
-                dof = None
+                #dof = None
                 ao_density_cphf = AODensityMatrix()
 
             dof = self.comm.bcast(dof, root=mpi_master())
@@ -1452,30 +1458,34 @@ class PolOrbitalResponse(CphfSolver):
                 # FIXME dimensions when upper triangular only
                 omega = np.zeros((dof * dof, nao, nao))
 
-                # construct epsilon density matrix
-                # FIXME dimensions when upper triangular only
-                epsilon_dm_ao = np.zeros((dof, dof, nao, nao))
-                epsilon_cphf_ao = np.zeros((dof, dof, nao, nao))
-                # FIXME loop upper triangular only
-                for x in range(dof):
-                    for y in range(dof):
-                        # mi,ii,xyij,nj->xymn
-                        epsilon_dm_ao[x, y] = -1.0 * np.linalg.multi_dot(
-                            [mo_occ, eo_diag, dm_oo[x, y], mo_occ.T])
-                        # ma,aa,xyab,nb->xymn
-                        epsilon_dm_ao[x, y] -= np.linalg.multi_dot(
-                            [mo_vir, ev_diag, dm_vv[x, y], mo_vir.T])
-                        # mi,ii,xyia,na->xymn
-                        # FIXME dimensions when upper triangular only
-                        epsilon_cphf_ao[x, y] = np.linalg.multi_dot([
-                            mo_occ, eo_diag,
-                            cphf_ov.reshape(dof, dof, nocc, nvir)[x, y],
-                            mo_vir.T
-                        ])
+                # TODO separate function
+                ## construct epsilon density matrix
+                ## FIXME dimensions when upper triangular only
+                #epsilon_dm_ao = np.zeros((dof, dof, nao, nao))
+                #epsilon_cphf_ao = np.zeros((dof, dof, nao, nao))
+                ## FIXME loop upper triangular only
+                #for x in range(dof):
+                #    for y in range(dof):
+                #        # mi,ii,xyij,nj->xymn
+                #        epsilon_dm_ao[x, y] = -1.0 * np.linalg.multi_dot(
+                #            [mo_occ, eo_diag, dm_oo[x, y], mo_occ.T])
+                #        # ma,aa,xyab,nb->xymn
+                #        epsilon_dm_ao[x, y] -= np.linalg.multi_dot(
+                #            [mo_vir, ev_diag, dm_vv[x, y], mo_vir.T])
+                #        # mi,ii,xyia,na->xymn
+                #        # FIXME dimensions when upper triangular only
+                #        epsilon_cphf_ao[x, y] = np.linalg.multi_dot([
+                #            mo_occ, eo_diag,
+                #            cphf_ov.reshape(dof, dof, nocc, nvir)[x, y],
+                #            mo_vir.T
+                #        ])
+                ## symmetrize (OV + VO)
+                #epsilon_dm_ao -= (epsilon_cphf_ao +
+                #                  epsilon_cphf_ao.transpose(0, 1, 3, 2))
 
-                # symmetrize (OV + VO)
-                epsilon_dm_ao -= (epsilon_cphf_ao +
-                                  epsilon_cphf_ao.transpose(0, 1, 3, 2))
+                # construct epsilon density matrix
+                epsilon_dm_ao = self.calculate_epsilon_dm(molecule, scf_tensors,
+                                                          dm_oo, dm_vv, cphf_ov)
 
                 # FIXME loop upper triangular only
                 for m in range(dof):
@@ -1500,6 +1510,7 @@ class PolOrbitalResponse(CphfSolver):
                         fock_ao_rhs_2_n = fock_ao_rhs.alpha_to_numpy(
                             dof**2 + dof + n)  # x_minus_y
 
+                        # TODO separate function
                         Fp1_vv = 0.25 * (np.linalg.multi_dot([
                             fock_ao_rhs_1_m.T, x_plus_y_ao[n], ovlp.T
                         ]) + np.linalg.multi_dot(
@@ -1555,6 +1566,7 @@ class PolOrbitalResponse(CphfSolver):
                         # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2),
                         #        (2,0), (2,1), (2,2) * dof
 
+                        # TODO separate function
                         omega_1pdm_2pdm_contribs = -(np.linalg.multi_dot([
                             D_vir, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir
                         ]) + np.linalg.multi_dot([
@@ -1567,15 +1579,15 @@ class PolOrbitalResponse(CphfSolver):
 
                         omega[m * dof + n] = (epsilon_dm_ao[m, n] +
                                               omega_1pdm_2pdm_contribs +
-                                              dipole_ints_contrib_ao[m, n])
+                                              #dipole_ints_contrib_ao[m, n])
+                                              omega_dipole_contrib_ao[m, n])
 
+                        # TODO separate function
                         if self._dft:
                             factor = -0.5
                             omega[m * dof + n] += factor * np.linalg.multi_dot([
-                                D_occ,
-                                fock_gxc_ao.alpha_to_numpy(2 *
-                                                           (m * dof + n)), D_occ
-                            ])
+                                D_occ, fock_gxc_ao.alpha_to_numpy(2 * (m * dof + n)),
+                                D_occ])
 
                 # save omega multipliers in cphf_results dictionary
                 self.cphf_results[(w)]['omega_ao'] = omega
@@ -1620,6 +1632,8 @@ class PolOrbitalResponse(CphfSolver):
             n_freqs = len(self.frequencies)
             # get CPHF results
             all_cphf_ov = self.cphf_results['cphf_ov']
+        else:
+            dof = None
 
         # timings
         loop_start_time = tm.time()
@@ -1645,11 +1659,11 @@ class PolOrbitalResponse(CphfSolver):
                 nvir = mo_vir.shape[1]
                 nao = mo_occ.shape[0]
 
-                mo_energies = scf_tensors['E']
-                eocc = mo_energies[:nocc]
-                evir = mo_energies[nocc:]
-                eo_diag = np.diag(eocc)
-                ev_diag = np.diag(evir)
+                #mo_energies = scf_tensors['E']
+                #eocc = mo_energies[:nocc]
+                #evir = mo_energies[nocc:]
+                #eo_diag = np.diag(eocc)
+                #ev_diag = np.diag(evir)
 
                 # get fock matrices from cphf_results
                 fock_ao_rhs_real = self.cphf_results[w]['fock_ao_rhs_real']
@@ -1685,61 +1699,65 @@ class PolOrbitalResponse(CphfSolver):
                 x_plus_y = exc_vec + deexc_vec
                 x_minus_y = exc_vec - deexc_vec
 
-                # get dipole moment integrals
-                dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-                dipole_mats = dipole_drv.compute(molecule, basis)
-                dipole_ints_ao = np.zeros((dof, nao, nao))
-                k = 0
-                if 'x' in self.vector_components:
-                    dipole_ints_ao[k] = dipole_mats.x_to_numpy()
-                    k += 1
-                if 'y' in self.vector_components:
-                    dipole_ints_ao[k] = dipole_mats.y_to_numpy()
-                    k += 1
-                if 'z' in self.vector_components:
-                    dipole_ints_ao[k] = dipole_mats.z_to_numpy()
+                ## get dipole moment integrals
+                #dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+                #dipole_mats = dipole_drv.compute(molecule, basis)
+                #dipole_ints_ao = np.zeros((dof, nao, nao))
+                #k = 0
+                #if 'x' in self.vector_components:
+                #    dipole_ints_ao[k] = dipole_mats.x_to_numpy()
+                #    k += 1
+                #if 'y' in self.vector_components:
+                #    dipole_ints_ao[k] = dipole_mats.y_to_numpy()
+                #    k += 1
+                #if 'z' in self.vector_components:
+                #    dipole_ints_ao[k] = dipole_mats.z_to_numpy()
 
-                # transform to MO basis (oo and ov blocks only)
-                dipole_ints_oo = np.array([
-                    np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
-                    for x in range(dof)
-                ])
-                dipole_ints_ov = np.array([
-                    np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_vir])
-                    for x in range(dof)
-                ])
+                ## transform to MO basis (oo and ov blocks only)
+                #dipole_ints_oo = np.array([
+                #    np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
+                #    for x in range(dof)
+                #])
+                #dipole_ints_ov = np.array([
+                #    np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_vir])
+                #    for x in range(dof)
+                #])
+
+                ## calculate dipole contribution to omega
+                ## FIXME dimensions when upper triangular only
+                #dipole_ints_contrib_ao = np.zeros((dof, dof, nao, nao),
+                #                                  dtype=np.complex_)
+                ## FIXME loop upper triangular only
+                #for x in range(dof):
+                #    for y in range(dof):
+                #        tmp_oo = 0.5 * (np.linalg.multi_dot([ # xjc,yic->xyij
+                #            #x_minus_y[x], dipole_ints_ov[y].T]).T
+                #            dipole_ints_ov[y], x_minus_y[x].T])  # TEST
+                #            + np.linalg.multi_dot( # yjc,xic->xyij
+                #            [dipole_ints_ov[x], x_minus_y[y].T]))
+                #        tmp_ov = 0.5 * (np.linalg.multi_dot([ # xka,yki->xyia
+                #            #x_minus_y[x].T, dipole_ints_oo[y]]).T
+                #            dipole_ints_oo[y].T, x_minus_y[x]])  # TEST
+                #            + np.linalg.multi_dot( # yka,xki->xyia
+                #            [dipole_ints_oo[x].T, x_minus_y[y]]))
+                #        tmp_vv = 0.5 * (np.linalg.multi_dot([ # xkb,yka->xyab
+                #            #x_minus_y[x].T, dipole_ints_ov[y]]).T
+                #            dipole_ints_ov[y].T, x_minus_y[x]])  # TEST
+                #            + np.linalg.multi_dot( # ykb,xka->xyab
+                #            [dipole_ints_ov[x].T, x_minus_y[y]]))
+                #        dipole_ints_contrib_ao[x, y] = (
+                #            # mi,xyij,nj->xymn
+                #            np.linalg.multi_dot([mo_occ, tmp_oo, mo_occ.T]) +
+                #            # mi,xyia,na->xymn
+                #            np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]) +
+                #            # mi,xyia,na->xymn
+                #            np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]).T +
+                #            # ma,xyab,nb->xymn
+                #            np.linalg.multi_dot([mo_vir, tmp_vv, mo_vir.T]))
 
                 # calculate dipole contribution to omega
-                # FIXME dimensions when upper triangular only
-                dipole_ints_contrib_ao = np.zeros((dof, dof, nao, nao),
-                                                  dtype=np.complex_)
-                # FIXME loop upper triangular only
-                for x in range(dof):
-                    for y in range(dof):
-                        tmp_oo = 0.5 * (np.linalg.multi_dot([ # xjc,yic->xyij
-                            #x_minus_y[x], dipole_ints_ov[y].T]).T
-                            dipole_ints_ov[y], x_minus_y[x].T])  # TEST
-                            + np.linalg.multi_dot( # yjc,xic->xyij
-                            [dipole_ints_ov[x], x_minus_y[y].T]))
-                        tmp_ov = 0.5 * (np.linalg.multi_dot([ # xka,yki->xyia
-                            #x_minus_y[x].T, dipole_ints_oo[y]]).T
-                            dipole_ints_oo[y].T, x_minus_y[x]])  # TEST
-                            + np.linalg.multi_dot( # yka,xki->xyia
-                            [dipole_ints_oo[x].T, x_minus_y[y]]))
-                        tmp_vv = 0.5 * (np.linalg.multi_dot([ # xkb,yka->xyab
-                            #x_minus_y[x].T, dipole_ints_ov[y]]).T
-                            dipole_ints_ov[y].T, x_minus_y[x]])  # TEST
-                            + np.linalg.multi_dot( # ykb,xka->xyab
-                            [dipole_ints_ov[x].T, x_minus_y[y]]))
-                        dipole_ints_contrib_ao[x, y] = (
-                            # mi,xyij,nj->xymn
-                            np.linalg.multi_dot([mo_occ, tmp_oo, mo_occ.T]) +
-                            # mi,xyia,na->xymn
-                            np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]) +
-                            # mi,xyia,na->xymn
-                            np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]).T +
-                            # ma,xyab,nb->xymn
-                            np.linalg.multi_dot([mo_vir, tmp_vv, mo_vir.T]))
+                omega_dipole_contrib_ao = self.calculate_omega_dipole_contrib(
+                    molecule, basis, scf_tensors, x_minus_y)
 
                 # calculate the density matrices, alpha block only
                 D_occ = np.matmul(mo_occ, mo_occ.T)
@@ -1762,7 +1780,7 @@ class PolOrbitalResponse(CphfSolver):
                 ao_density_cphf_imag = AODensityMatrix(cphf_ao_list_imag,
                                                        denmat.rest)
             else:
-                dof = None
+                #dof = None
                 ao_density_cphf_real = AODensityMatrix()
                 ao_density_cphf_imag = AODensityMatrix()
 
@@ -1794,32 +1812,36 @@ class PolOrbitalResponse(CphfSolver):
                 # FIXME dimensions when upper triangular only
                 omega = np.zeros((dof * dof, nao, nao), dtype=np.complex_)
 
-                # construct epsilon density matrix
-                # FIXME dimensions when upper triangular only
-                epsilon_dm_ao = np.zeros((dof, dof, nao, nao),
-                                         dtype=np.complex_)
-                epsilon_cphf_ao = np.zeros((dof, dof, nao, nao),
-                                           dtype=np.complex_)
-                # FIXME loop upper triangular only
-                for x in range(dof):
-                    for y in range(dof):
-                        # mi,ii,xyij,nj->xymn
-                        epsilon_dm_ao[x, y] = -1.0 * np.linalg.multi_dot(
-                            [mo_occ, eo_diag, dm_oo[x, y], mo_occ.T])
-                        # ma,aa,xyab,nb->xymn
-                        epsilon_dm_ao[x, y] -= np.linalg.multi_dot(
-                            [mo_vir, ev_diag, dm_vv[x, y], mo_vir.T])
-                        # mi,ii,xyia,na->xymn
-                        # FIXME dimensions when upper triangular only
-                        epsilon_cphf_ao[x, y] = np.linalg.multi_dot([
-                            mo_occ, eo_diag,
-                            cphf_ov.reshape(dof, dof, nocc, nvir)[x, y],
-                            mo_vir.T
-                        ])
+                ## construct epsilon density matrix
+                ## FIXME dimensions when upper triangular only
+                #epsilon_dm_ao = np.zeros((dof, dof, nao, nao),
+                #                         dtype=np.complex_)
+                #epsilon_cphf_ao = np.zeros((dof, dof, nao, nao),
+                #                           dtype=np.complex_)
+                ## FIXME loop upper triangular only
+                #for x in range(dof):
+                #    for y in range(dof):
+                #        # mi,ii,xyij,nj->xymn
+                #        epsilon_dm_ao[x, y] = -1.0 * np.linalg.multi_dot(
+                #            [mo_occ, eo_diag, dm_oo[x, y], mo_occ.T])
+                #        # ma,aa,xyab,nb->xymn
+                #        epsilon_dm_ao[x, y] -= np.linalg.multi_dot(
+                #            [mo_vir, ev_diag, dm_vv[x, y], mo_vir.T])
+                #        # mi,ii,xyia,na->xymn
+                #        # FIXME dimensions when upper triangular only
+                #        epsilon_cphf_ao[x, y] = np.linalg.multi_dot([
+                #            mo_occ, eo_diag,
+                #            cphf_ov.reshape(dof, dof, nocc, nvir)[x, y],
+                #            mo_vir.T
+                #        ])
 
-                # symmetrize (OV + VO)
-                epsilon_dm_ao -= (epsilon_cphf_ao +
-                                  epsilon_cphf_ao.transpose(0, 1, 3, 2))
+                ## symmetrize (OV + VO)
+                #epsilon_dm_ao -= (epsilon_cphf_ao +
+                #                  epsilon_cphf_ao.transpose(0, 1, 3, 2))
+
+                # construct epsilon density matrix
+                epsilon_dm_ao = self.calculate_epsilon_dm(molecule, scf_tensors,
+                                                          dm_oo, dm_vv, cphf_ov)
 
                 # FIXME upper triangular only
                 for m in range(dof):
@@ -1927,7 +1949,8 @@ class PolOrbitalResponse(CphfSolver):
 
                         omega[m * dof + n] = (epsilon_dm_ao[m, n] +
                                               omega_1pdm_2pdm_contribs +
-                                              dipole_ints_contrib_ao[m, n])
+                                              #dipole_ints_contrib_ao[m, n])
+                                              omega_dipole_contrib_ao[m, n])
 
                         if self._dft:
                             factor = -0.5
@@ -1953,6 +1976,168 @@ class PolOrbitalResponse(CphfSolver):
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
+
+    def calculate_omega_dipole_contrib(self, molecule, basis, scf_tensors,
+                                     x_minus_y):
+        """
+        Calculates the dipole contribution to the omega multipliers.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param x_minus_y:
+            The X-Y response vectors.
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # MO coefficients
+        mo = scf_tensors['C']  # only alpha part
+        nocc = molecule.number_of_alpha_electrons()
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+        nvir = mo_vir.shape[1]
+
+        # number of AOs
+        nao = mo.shape[0]
+
+        # determine data type of the omega multipliers
+        if self.is_complex:
+            omega_dt = np.complex_
+        else:
+            omega_dt = np.float_
+
+        # get dipole moment integrals
+        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+        dipole_mats = dipole_drv.compute(molecule, basis)
+        dipole_ints_ao = np.zeros((dof, nao, nao))
+        k = 0
+        if 'x' in self.vector_components:
+            dipole_ints_ao[k] = dipole_mats.x_to_numpy()
+            k += 1
+        if 'y' in self.vector_components:
+            dipole_ints_ao[k] = dipole_mats.y_to_numpy()
+            k += 1
+        if 'z' in self.vector_components:
+            dipole_ints_ao[k] = dipole_mats.z_to_numpy()
+
+        # transform to MO basis (oo and ov blocks only)
+        dipole_ints_oo = np.array([
+            np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
+            for x in range(dof)
+        ])
+        dipole_ints_ov = np.array([
+            np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_vir])
+            for x in range(dof)
+        ])
+
+        # calculate the dipole contribution to omega
+        # FIXME dimensions when upper triangular only
+        omega_dipole_contrib = np.zeros((dof, dof, nao, nao), dtype = omega_dt)
+        # FIXME loop upper triangular only
+        for x in range(dof):
+            for y in range(dof):
+                tmp_oo = 0.5 * (np.linalg.multi_dot([ # xjc,yic->xyij
+                    #x_minus_y[x], dipole_ints_ov[y].T]).T
+                    dipole_ints_ov[y], x_minus_y[x].T])  # TEST
+                    + np.linalg.multi_dot( # yjc,xic->xyij
+                    [dipole_ints_ov[x], x_minus_y[y].T]))
+                tmp_ov = 0.5 * (np.linalg.multi_dot([ # xka,yki->xyia
+                    #x_minus_y[x].T, dipole_ints_oo[y]]).T
+                    dipole_ints_oo[y].T, x_minus_y[x]])  # TEST
+                    + np.linalg.multi_dot( # yka,xki->xyia
+                    [dipole_ints_oo[x].T, x_minus_y[y]]))
+                tmp_vv = 0.5 * (np.linalg.multi_dot([ # xkb,yka->xyab
+                    #x_minus_y[x].T, dipole_ints_ov[y]]).T
+                    dipole_ints_ov[y].T, x_minus_y[x]])  # TEST
+                    + np.linalg.multi_dot( # ykb,xka->xyab
+                    [dipole_ints_ov[x].T, x_minus_y[y]]))
+                omega_dipole_contrib[x, y] = (
+                    # mi,xyij,nj->xymn
+                    np.linalg.multi_dot([mo_occ, tmp_oo, mo_occ.T]) +
+                    # mi,xyia,na->xymn
+                    np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]) +
+                    # mi,xyia,na->xymn
+                    np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]).T +
+                    # ma,xyab,nb->xymn
+                    np.linalg.multi_dot([mo_vir, tmp_vv, mo_vir.T]))
+               
+        return omega_dipole_contrib
+
+    def calculate_epsilon_dm(self, molecule, scf_tensors, dm_oo, dm_vv, lambda_ov):
+        """
+        Calculates the epsilon density matrix for the omega multipliers
+
+        :param molecule:
+            The molecule.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param dm_oo:
+            Occ/occ block of the one-particle density matrix.
+        :param dm_vv:
+            Vir/vir block of the one-particle density matrix.
+        :param lambda_ov:
+            The lambda multipliers in MO basis.
+
+        :return epsilon_dm:
+            The epsilon density matrix in AO basis.
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # MO coefficients
+        mo = scf_tensors['C']  # only alpha part
+        nocc = molecule.number_of_alpha_electrons()
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+        nvir = mo_vir.shape[1]
+
+        # number of AOs
+        nao = mo.shape[0]
+
+        # orbital energies
+        mo_energies = scf_tensors['E']
+        eocc = mo_energies[:nocc]
+        evir = mo_energies[nocc:]
+        eo_diag = np.diag(eocc)
+        ev_diag = np.diag(evir)
+
+        # determine data type of the density matrix
+        if self.is_complex:
+            epsilon_dt = np.complex_
+        else:
+            epsilon_dt = np.float_
+
+        # construct epsilon density matrix
+        # FIXME dimensions when upper triangular only
+        epsilon_dm = np.zeros((dof, dof, nao, nao), dtype = epsilon_dt)
+        epsilon_lambda= np.zeros((dof, dof, nao, nao), dtype = epsilon_dt)
+        # FIXME loop upper triangular only
+        for x in range(dof):
+            for y in range(dof):
+                # mi,ii,xyij,nj->xymn
+                epsilon_dm[x, y] = -1.0 * np.linalg.multi_dot(
+                    [mo_occ, eo_diag, dm_oo[x, y], mo_occ.T])
+                # ma,aa,xyab,nb->xymn
+                epsilon_dm[x, y] -= np.linalg.multi_dot(
+                    [mo_vir, ev_diag, dm_vv[x, y], mo_vir.T])
+                # mi,ii,xyia,na->xymn
+                # FIXME dimensions when upper triangular only
+                epsilon_lambda[x, y] = np.linalg.multi_dot([
+                    mo_occ, eo_diag,
+                    lambda_ov.reshape(dof, dof, nocc, nvir)[x, y],
+                    mo_vir.T
+                ])
+        # symmetrize (OV + VO)
+        epsilon_dm -= (epsilon_lambda +
+                          epsilon_lambda.transpose(0, 1, 3, 2))
+
+        return epsilon_dm
 
     def print_cphf_header(self, title):
         self.ostream.print_blank()
