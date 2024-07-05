@@ -257,63 +257,11 @@ class PolOrbitalResponse(CphfSolver):
                 dm_ao_rhs_imag = AODensityMatrix(
                     dm_ao_list_imag + xpmy_ao_list_imag, denmat.rest)
 
-                # TODO separate function
                 if self._dft:
-                    ## construct density matrices for E[3] term:
-                    ## XCIntegrator expects a DM with real and imaginary part
-
-                    #perturbed_dm_ao_list_rere = []
-                    #perturbed_dm_ao_list_imim = []
-                    #perturbed_dm_ao_list_reim = []
-                    #perturbed_dm_ao_list_imre = []
-                    #zero_dm_ao_list = []
-
-                    ## FIXME loop upper triangular only
-                    #for x in range(dof):
-                    #    for y in range(dof):
-                    #        perturbed_dm_ao_list_rere.extend([
-                    #            np.array(x_minus_y_ao[x].real),
-                    #            np.array(0 * x_minus_y_ao[x].real),
-                    #            np.array(x_minus_y_ao[y].real),
-                    #            np.array(0 * x_minus_y_ao[y].real)])
-                    #        perturbed_dm_ao_list_imim.extend([
-                    #            np.array(x_minus_y_ao[x].imag),
-                    #            np.array(0 * x_minus_y_ao[x].imag),
-                    #            np.array(x_minus_y_ao[y].imag),
-                    #            np.array(0 * x_minus_y_ao[y].imag)])
-                    #        # complex cross-terms
-                    #        perturbed_dm_ao_list_reim.extend([
-                    #            np.array(x_minus_y_ao[x].real),
-                    #            np.array(0 * x_minus_y_ao[x].real),
-                    #            np.array(x_minus_y_ao[y].imag),
-                    #            np.array(0 * x_minus_y_ao[y].imag)])
-                    #        perturbed_dm_ao_list_imre.extend([
-                    #            np.array(x_minus_y_ao[x].imag),
-                    #            np.array(0 * x_minus_y_ao[x].imag),
-                    #            np.array(x_minus_y_ao[y].real),
-                    #            np.array(0 * x_minus_y_ao[y].real)])
-
-                    #        zero_dm_ao_list.extend([
-                    #            np.array(0 * x_minus_y_ao[x].real),
-                    #            np.array(0 * x_minus_y_ao[y].real)])
-
-                    #perturbed_dm_ao_rere = AODensityMatrix(perturbed_dm_ao_list_rere,
-                    #                                  denmat.rest)
-                    #perturbed_dm_ao_imim = AODensityMatrix(perturbed_dm_ao_list_imim,
-                    #                                  denmat.rest)
-                    #perturbed_dm_ao_reim = AODensityMatrix(perturbed_dm_ao_list_reim,
-                    #                                  denmat.rest)
-                    #perturbed_dm_ao_imre = AODensityMatrix(perturbed_dm_ao_list_imre,
-                    #                                  denmat.rest)
-
-                    ## corresponds to rho^{omega_b,omega_c} in quadratic response,
-                    ## which is zero for orbital response
-                    #zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
-
+                    ## construct density matrices for E[3] term
                     dm_rere, dm_imim, dm_reim, dm_imre, dm_zero = self.construct_dft_e3_dm(
                         x_minus_y_ao
                     )
-
                     perturbed_dm_ao_rere = dm_rere
                     perturbed_dm_ao_imim = dm_imim
                     perturbed_dm_ao_reim = dm_reim
@@ -324,11 +272,11 @@ class PolOrbitalResponse(CphfSolver):
                 dm_ao_rhs_real = AODensityMatrix()
                 dm_ao_rhs_imag = AODensityMatrix()
                 if self._dft:
-                    zero_dm_ao = AODensityMatrix()
                     perturbed_dm_ao_rere = AODensityMatrix()
                     perturbed_dm_ao_imim = AODensityMatrix()
                     perturbed_dm_ao_reim = AODensityMatrix()
                     perturbed_dm_ao_imre = AODensityMatrix()
+                    zero_dm_ao = AODensityMatrix()
 
             dof = self.comm.bcast(dof, root=mpi_master())
 
@@ -347,7 +295,7 @@ class PolOrbitalResponse(CphfSolver):
             for ifock in range(dof**2, dof**2 + 2 * dof):
                 fock_ao_rhs_real.set_fock_type(fockmat.rgenjk, ifock)
                 fock_ao_rhs_imag.set_fock_type(fockmat.rgenjk, ifock)
-            # TODO separate function
+
             if self._dft:
                 zero_dm_ao.broadcast(self.rank, self.comm)
                 perturbed_dm_ao_rere.broadcast(self.rank, self.comm)
@@ -359,38 +307,51 @@ class PolOrbitalResponse(CphfSolver):
                 fock_gxc_ao_reim = AOFockMatrix(zero_dm_ao)
                 fock_gxc_ao_imre = AOFockMatrix(zero_dm_ao)
 
-                if self.xcfun.is_hybrid():
-                    fact_xc = self.xcfun.get_frac_exact_exchange()
-                    for ifock in range(fock_ao_rhs_real.number_of_fock_matrices()):
-                        fock_ao_rhs_real.set_scale_factor(fact_xc, ifock)
-                        fock_ao_rhs_imag.set_scale_factor(fact_xc, ifock)
-                    for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
-                        fock_gxc_ao_rere.set_scale_factor(fact_xc, ifock)
-                        fock_gxc_ao_imim.set_scale_factor(fact_xc, ifock)
-                        fock_gxc_ao_reim.set_scale_factor(fact_xc, ifock)
-                        fock_gxc_ao_imre.set_scale_factor(fact_xc, ifock)
-                        fock_gxc_ao_rere.set_fock_type(fockmat.rgenjkx, ifock)
-                        fock_gxc_ao_imim.set_fock_type(fockmat.rgenjkx, ifock)
-                        fock_gxc_ao_reim.set_fock_type(fockmat.rgenjkx, ifock)
-                        fock_gxc_ao_imre.set_fock_type(fockmat.rgenjkx, ifock)
-                    for ifock in range(dof**2):
-                        fock_ao_rhs_real.set_fock_type(fockmat.restjkx, ifock)
-                        fock_ao_rhs_imag.set_fock_type(fockmat.restjkx, ifock)
-                    for ifock in range(dof**2, dof**2 + 2 * dof):
-                        fock_ao_rhs_real.set_fock_type(fockmat.rgenjkx, ifock)
-                        fock_ao_rhs_imag.set_fock_type(fockmat.rgenjkx, ifock)
-                else:
-                    for ifock in range(dof**2):
-                        fock_ao_rhs_real.set_fock_type(fockmat.restj, ifock)
-                        fock_ao_rhs_imag.set_fock_type(fockmat.restj, ifock)
-                    for ifock in range(dof**2, dof**2 + 2 * dof):
-                        fock_ao_rhs_real.set_fock_type(fockmat.rgenj, ifock)
-                        fock_ao_rhs_imag.set_fock_type(fockmat.rgenj, ifock)
-                    for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
-                        fock_gxc_ao_rere.set_fock_type(fockmat.rgenj, ifock)
-                        fock_gxc_ao_imim.set_fock_type(fockmat.rgenj, ifock)
-                        fock_gxc_ao_reim.set_fock_type(fockmat.rgenj, ifock)
-                        fock_gxc_ao_imre.set_fock_type(fockmat.rgenj, ifock)
+                #if self.xcfun.is_hybrid():
+                #    fact_xc = self.xcfun.get_frac_exact_exchange()
+                #    for ifock in range(fock_ao_rhs_real.number_of_fock_matrices()):
+                #        fock_ao_rhs_real.set_scale_factor(fact_xc, ifock)
+                #        fock_ao_rhs_imag.set_scale_factor(fact_xc, ifock)
+                #    for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
+                #        fock_gxc_ao_rere.set_scale_factor(fact_xc, ifock)
+                #        fock_gxc_ao_imim.set_scale_factor(fact_xc, ifock)
+                #        fock_gxc_ao_reim.set_scale_factor(fact_xc, ifock)
+                #        fock_gxc_ao_imre.set_scale_factor(fact_xc, ifock)
+                #        fock_gxc_ao_rere.set_fock_type(fockmat.rgenjkx, ifock)
+                #        fock_gxc_ao_imim.set_fock_type(fockmat.rgenjkx, ifock)
+                #        fock_gxc_ao_reim.set_fock_type(fockmat.rgenjkx, ifock)
+                #        fock_gxc_ao_imre.set_fock_type(fockmat.rgenjkx, ifock)
+                #    for ifock in range(dof**2):
+                #        fock_ao_rhs_real.set_fock_type(fockmat.restjkx, ifock)
+                #        fock_ao_rhs_imag.set_fock_type(fockmat.restjkx, ifock)
+                #    for ifock in range(dof**2, dof**2 + 2 * dof):
+                #        fock_ao_rhs_real.set_fock_type(fockmat.rgenjkx, ifock)
+                #        fock_ao_rhs_imag.set_fock_type(fockmat.rgenjkx, ifock)
+                #else:
+                #    for ifock in range(dof**2):
+                #        fock_ao_rhs_real.set_fock_type(fockmat.restj, ifock)
+                #        fock_ao_rhs_imag.set_fock_type(fockmat.restj, ifock)
+                #    for ifock in range(dof**2, dof**2 + 2 * dof):
+                #        fock_ao_rhs_real.set_fock_type(fockmat.rgenj, ifock)
+                #        fock_ao_rhs_imag.set_fock_type(fockmat.rgenj, ifock)
+                #    for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
+                #        fock_gxc_ao_rere.set_fock_type(fockmat.rgenj, ifock)
+                #        fock_gxc_ao_imim.set_fock_type(fockmat.rgenj, ifock)
+                #        fock_gxc_ao_reim.set_fock_type(fockmat.rgenj, ifock)
+                #        fock_gxc_ao_imre.set_fock_type(fockmat.rgenj, ifock)
+
+                fock_re, fock_im, gxc_rere, gxc_imim, gxc_reim, gxc_imre = (
+                    self.set_dft_fmat_factor_and_type_complex(fock_ao_rhs_real, fock_ao_rhs_imag,
+                                                      zero_dm_ao)
+                                                      #fock_gxc_ao_rere, fock_gxc_ao_imim,
+                                                      #fock_gxc_ao_reim, fock_gxc_ao_imre)
+                )
+                fock_ao_rhs_real = fock_re
+                fock_ao_rhs_imag = fock_im
+                fock_gxc_ao_rere = gxc_rere
+                fock_gxc_ao_imim = gxc_imim
+                fock_gxc_ao_reim = gxc_reim
+                fock_gxc_ao_imre = gxc_imre
             else:
                 fock_gxc_ao_rere = None  # None if not DFT
                 fock_gxc_ao_imim = None  # None if not DFT
@@ -449,8 +410,7 @@ class PolOrbitalResponse(CphfSolver):
                 # combine to complex array
                 fock_ao_rhs_1dm = fock_ao_rhs_1dm_real + 1j * fock_ao_rhs_1dm_imag
 
-                # transform to MO basis
-                # mi,xmn,na->xia
+                # transform to MO basis: mi,xmn,na->xia
                 fock_mo_rhs_1dm = np.array([
                     np.linalg.multi_dot([mo_occ.T, fock_ao_rhs_1dm[x], mo_vir])
                     for x in range(dof**2)
@@ -503,7 +463,7 @@ class PolOrbitalResponse(CphfSolver):
                                      ))
 
                     # FIXME dimensions when upper triangular only
-                    # mi,xmn,na->xia
+                    # Transform to MO basis: mi,xmn,na->xia
                     gxc_mo = np.array([
                         np.linalg.multi_dot([mo_occ.T, gxc_ao[x], mo_vir])
                         for x in range(dof**2)
@@ -652,34 +612,9 @@ class PolOrbitalResponse(CphfSolver):
                 dm_ao_rhs = AODensityMatrix(dm_ao_list + xpmy_ao_list,
                                             denmat.rest)
 
-                # TODO separate function
                 if self._dft:
                     # construct density matrices for E[3] term:
-                    # XCIntegrator expects a DM with real and imaginary part,
-                    # so we set the imaginary part to zero.
-
-                    #perturbed_dm_ao_list = []
-                    #zero_dm_ao_list = []
-
-                    ## FIXME loop upper triangular only
-                    #for x in range(dof):
-                    #    for y in range(dof):
-                    #        perturbed_dm_ao_list.extend([
-                    #            x_minus_y_ao[x], 0 * x_minus_y_ao[x],
-                    #            x_minus_y_ao[y], 0 * x_minus_y_ao[y]
-                    #        ])
-                    #        zero_dm_ao_list.extend(
-                    #            [0 * x_minus_y_ao[x], 0 * x_minus_y_ao[y]])
-
-                    #perturbed_dm_ao = AODensityMatrix(perturbed_dm_ao_list,
-                    #                                  denmat.rest)
-
-                    ## corresponds to rho^{omega_b,omega_c} in quadratic response,
-                    ## which is zero for orbital response
-                    #zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
-
                     dm_pert, dm_zero = self.construct_dft_e3_dm(x_minus_y_ao)
-
                     perturbed_dm_ao = dm_pert
                     zero_dm_ao = dm_zero
             else:
@@ -704,30 +639,35 @@ class PolOrbitalResponse(CphfSolver):
             # FIXME dimensions when upper triangular only
             for ifock in range(dof**2, dof**2 + 2 * dof):
                 fock_ao_rhs.set_fock_type(fockmat.rgenjk, ifock)
+
+            # TODO separate function
             if self._dft:
                 perturbed_dm_ao.broadcast(self.rank, self.comm)
                 zero_dm_ao.broadcast(self.rank, self.comm)
                 # Fock matrix for computing the DFT E[3] term g^xc
-                fock_gxc_ao = AOFockMatrix(zero_dm_ao)
+                #fock_gxc_ao = AOFockMatrix(zero_dm_ao)
                 # FIXME loop upper triangular only
-                if self.xcfun.is_hybrid():
-                    fact_xc = self.xcfun.get_frac_exact_exchange()
-                    for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
-                        fock_ao_rhs.set_scale_factor(fact_xc, ifock)
-                    for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                        fock_gxc_ao.set_scale_factor(fact_xc, ifock)
-                        fock_gxc_ao.set_fock_type(fockmat.rgenjkx, ifock)
-                    for ifock in range(dof**2):
-                        fock_ao_rhs.set_fock_type(fockmat.restjkx, ifock)
-                    for ifock in range(dof**2, dof**2 + 2 * dof):
-                        fock_ao_rhs.set_fock_type(fockmat.rgenjkx, ifock)
-                else:
-                    for ifock in range(dof**2):
-                        fock_ao_rhs.set_fock_type(fockmat.restj, ifock)
-                    for ifock in range(dof**2, dof**2 + 2 * dof):
-                        fock_ao_rhs.set_fock_type(fockmat.rgenj, ifock)
-                    for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                        fock_gxc_ao.set_fock_type(fockmat.rgenj, ifock)
+                #if self.xcfun.is_hybrid():
+                #    fact_xc = self.xcfun.get_frac_exact_exchange()
+                #    for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
+                #        fock_ao_rhs.set_scale_factor(fact_xc, ifock)
+                #    for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
+                #        fock_gxc_ao.set_scale_factor(fact_xc, ifock)
+                #        fock_gxc_ao.set_fock_type(fockmat.rgenjkx, ifock)
+                #    for ifock in range(dof**2):
+                #        fock_ao_rhs.set_fock_type(fockmat.restjkx, ifock)
+                #    for ifock in range(dof**2, dof**2 + 2 * dof):
+                #        fock_ao_rhs.set_fock_type(fockmat.rgenjkx, ifock)
+                #else:
+                #    for ifock in range(dof**2):
+                #        fock_ao_rhs.set_fock_type(fockmat.restj, ifock)
+                #    for ifock in range(dof**2, dof**2 + 2 * dof):
+                #        fock_ao_rhs.set_fock_type(fockmat.rgenj, ifock)
+                #    for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
+                #        fock_gxc_ao.set_fock_type(fockmat.rgenj, ifock)
+
+                fock_ao_rhs, fock_gxc_ao = self.set_dft_fmat_factor_and_type_real(
+                    fock_ao_rhs, zero_dm_ao) #fock_gxc_ao)
             else:
                 fock_gxc_ao = None  # None if not DFT
 
@@ -1202,7 +1142,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # sanity check: should not be carried out in parallel
         if self.rank != mpi_master():
-            return None, None
+            return
 
         # XCIntegrator expects a DM with real and imaginary part,
         # so we set the imaginary part to zero.
@@ -1254,7 +1194,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # sanity check: should not be carried out in parallel
         if self.rank != mpi_master():
-            return None, None, None, None, None
+            return
 
         perturbed_dm_ao_list_rere = []
         perturbed_dm_ao_list_imim = []
@@ -1306,6 +1246,118 @@ class PolOrbitalResponse(CphfSolver):
 
         return (perturbed_dm_ao_rere, perturbed_dm_ao_imim,
                perturbed_dm_ao_reim, perturbed_dm_ao_imre, zero_dm_ao)
+
+    def set_dft_fmat_factor_and_type_real(self, fock_ao_rhs, zero_dm_ao):#fock_gxc_ao):
+        """
+        Sets of scale factor and fock type for Fock matrices to compute DFT E[3] term
+        for real RHS.
+
+        :param fock_ao_rhs:
+            The general Fock matrix in AO basis.
+        :param zero_dm_ao:
+            Empty AODensityMatrix in same dimensions as the Fock matrices.
+        :param fock_gxc_ao:
+            Fock matrix for g^xc term in AO basis.
+
+        :return fock_ao_rhs:
+            Input param modified with set scale factor and fock type.
+        :return fock_gxc_ao:
+            Input param modified with set scale factor and fock type.
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # initialize fock g^xc
+        fock_gxc_ao = AOFockMatrix(zero_dm_ao)
+
+        # FIXME loop upper triangular only
+        if self.xcfun.is_hybrid():
+            fact_xc = self.xcfun.get_frac_exact_exchange()
+            for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
+                fock_ao_rhs.set_scale_factor(fact_xc, ifock)
+            for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
+                fock_gxc_ao.set_scale_factor(fact_xc, ifock)
+                fock_gxc_ao.set_fock_type(fockmat.rgenjkx, ifock)
+            for ifock in range(dof**2):
+                fock_ao_rhs.set_fock_type(fockmat.restjkx, ifock)
+            for ifock in range(dof**2, dof**2 + 2 * dof):
+                fock_ao_rhs.set_fock_type(fockmat.rgenjkx, ifock)
+        else:
+            for ifock in range(dof**2):
+                fock_ao_rhs.set_fock_type(fockmat.restj, ifock)
+            for ifock in range(dof**2, dof**2 + 2 * dof):
+                fock_ao_rhs.set_fock_type(fockmat.rgenj, ifock)
+            for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
+                fock_gxc_ao.set_fock_type(fockmat.rgenj, ifock)
+
+        return fock_ao_rhs, fock_gxc_ao
+
+    def set_dft_fmat_factor_and_type_complex(self, fock_ao_rhs_real, fock_ao_rhs_imag,
+                                          zero_dm_ao):
+                                          #fock_gxc_ao_rere, fock_gxc_ao_imim,
+                                          #fock_gxc_ao_reim, fock_gxc_ao_imre):
+        """
+        Sets of scale factor and fock type for Fock matrices to compute DFT E[3] term
+        for complex RHS.
+
+        :param fock_ao_rhs_real/imag:
+            The general Fock matrix in AO basis.
+        :param zero_dm_ao:
+            Empty AODensityMatrix in same dimensions as the Fock matrices.
+        :param fock_gxc_ao:
+            Fock matrix for g^xc term in AO basis.
+
+        :return fock_ao_rhs_real/imag:
+            Input param modified with set scale factor and fock type.
+        :return fock_gxc_ao_rere/imim/reim/imre:
+            Input param modified with set scale factor and fock type.
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # initialize fock g^xc
+        fock_gxc_ao_rere = AOFockMatrix(zero_dm_ao)
+        fock_gxc_ao_imim = AOFockMatrix(zero_dm_ao)
+        fock_gxc_ao_reim = AOFockMatrix(zero_dm_ao)
+        fock_gxc_ao_imre = AOFockMatrix(zero_dm_ao)
+
+        if self.xcfun.is_hybrid():
+            fact_xc = self.xcfun.get_frac_exact_exchange()
+            for ifock in range(fock_ao_rhs_real.number_of_fock_matrices()):
+                fock_ao_rhs_real.set_scale_factor(fact_xc, ifock)
+                fock_ao_rhs_imag.set_scale_factor(fact_xc, ifock)
+            for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
+                fock_gxc_ao_rere.set_scale_factor(fact_xc, ifock)
+                fock_gxc_ao_imim.set_scale_factor(fact_xc, ifock)
+                fock_gxc_ao_reim.set_scale_factor(fact_xc, ifock)
+                fock_gxc_ao_imre.set_scale_factor(fact_xc, ifock)
+                fock_gxc_ao_rere.set_fock_type(fockmat.rgenjkx, ifock)
+                fock_gxc_ao_imim.set_fock_type(fockmat.rgenjkx, ifock)
+                fock_gxc_ao_reim.set_fock_type(fockmat.rgenjkx, ifock)
+                fock_gxc_ao_imre.set_fock_type(fockmat.rgenjkx, ifock)
+            for ifock in range(dof**2):
+                fock_ao_rhs_real.set_fock_type(fockmat.restjkx, ifock)
+                fock_ao_rhs_imag.set_fock_type(fockmat.restjkx, ifock)
+            for ifock in range(dof**2, dof**2 + 2 * dof):
+                fock_ao_rhs_real.set_fock_type(fockmat.rgenjkx, ifock)
+                fock_ao_rhs_imag.set_fock_type(fockmat.rgenjkx, ifock)
+        else:
+            for ifock in range(dof**2):
+                fock_ao_rhs_real.set_fock_type(fockmat.restj, ifock)
+                fock_ao_rhs_imag.set_fock_type(fockmat.restj, ifock)
+            for ifock in range(dof**2, dof**2 + 2 * dof):
+                fock_ao_rhs_real.set_fock_type(fockmat.rgenj, ifock)
+                fock_ao_rhs_imag.set_fock_type(fockmat.rgenj, ifock)
+            for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
+                fock_gxc_ao_rere.set_fock_type(fockmat.rgenj, ifock)
+                fock_gxc_ao_imim.set_fock_type(fockmat.rgenj, ifock)
+                fock_gxc_ao_reim.set_fock_type(fockmat.rgenj, ifock)
+                fock_gxc_ao_imre.set_fock_type(fockmat.rgenj, ifock)
+
+        return (fock_ao_rhs_real, fock_ao_rhs_imag, fock_gxc_ao_rere,
+                fock_gxc_ao_imim, fock_gxc_ao_reim, fock_gxc_ao_imre)
 
     # NOTES:
     #   - epsilon_dm_ao not returned from cphfsolver,
