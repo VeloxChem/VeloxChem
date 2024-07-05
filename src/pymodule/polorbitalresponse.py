@@ -319,33 +319,8 @@ class PolOrbitalResponse(CphfSolver):
                 fock_gxc_ao_reim = None  # None if not DFT
                 fock_gxc_ao_imre = None  # None if not DFT
 
-            # TODO separate function
             if self._dft:
-                #if not self.xcfun.is_hybrid():
-                #    for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
-                #        fock_gxc_ao_rere.scale(2.0, ifock)
-                #        fock_gxc_ao_imim.scale(2.0, ifock)
-                #        fock_gxc_ao_reim.scale(2.0, ifock)
-                #        fock_gxc_ao_imre.scale(2.0, ifock)
-
-                #xc_drv = XCIntegrator(self.comm)
-                #xc_drv.integrate_kxc_fock(fock_gxc_ao_rere, molecule, basis,
-                #                          perturbed_dm_ao_rere, zero_dm_ao,
-                #                          gs_density, molgrid,
-                #                          self.xcfun.get_func_label(), "qrf")
-                #xc_drv.integrate_kxc_fock(fock_gxc_ao_imim, molecule, basis,
-                #                          perturbed_dm_ao_imim, zero_dm_ao,
-                #                          gs_density, molgrid,
-                #                          self.xcfun.get_func_label(), "qrf")
-                #xc_drv.integrate_kxc_fock(fock_gxc_ao_reim, molecule, basis,
-                #                          perturbed_dm_ao_reim, zero_dm_ao,
-                #                          gs_density, molgrid,
-                #                          self.xcfun.get_func_label(), "qrf")
-                #xc_drv.integrate_kxc_fock(fock_gxc_ao_imre, molecule, basis,
-                #                          perturbed_dm_ao_imre, zero_dm_ao,
-                #                          gs_density, molgrid,
-                #                          self.xcfun.get_func_label(), "qrf")
-
+                # collect density matrices in lists
                 perturbed_dm_ao_list = [perturbed_dm_ao_rere,
                                         perturbed_dm_ao_imim,
                                         perturbed_dm_ao_reim,
@@ -631,15 +606,6 @@ class PolOrbitalResponse(CphfSolver):
 
             # TODO separate function
             if self._dft:
-                #if not self.xcfun.is_hybrid():
-                #    for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                #        fock_gxc_ao.scale(2.0, ifock)
-                #xc_drv = XCIntegrator(self.comm)
-                #xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis,
-                #                          perturbed_dm_ao, zero_dm_ao,
-                #                          gs_density, molgrid,
-                #                          self.xcfun.get_func_label(), "qrf")
-
                 fock_gxc_ao = self.integrate_gxc_real(molecule, basis, perturbed_dm_ao,
                                                       zero_dm_ao, gs_density, molgrid,
                                                       fock_gxc_ao)
@@ -1070,20 +1036,6 @@ class PolOrbitalResponse(CphfSolver):
 
         return rhs_dipole_contrib
 
-    #def construct_dft_e3_dm(self, x_minus_y_ao):
-    #    """
-    #    Directs the construction of the density matrices for E[3] term
-    #    for real or complex RHS.
-
-    #    :param x_minus_y_ao:
-    #        the X-Y response vectors in AO basis.
-    #    """
-
-    #    if self.is_complex:
-    #        return self.construct_dft_e3_dm_complex(x_minus_y_ao)
-    #    else:
-    #        return self.construct_dft_e3_dm_real(x_minus_y_ao)
-
     def construct_dft_e3_dm_real(self, x_minus_y_ao):
         """
         Constructs the density matrices for E[3] term
@@ -1256,8 +1208,6 @@ class PolOrbitalResponse(CphfSolver):
 
     def set_dft_fmat_factor_and_type_complex(self, fock_ao_rhs_real, fock_ao_rhs_imag,
                                           zero_dm_ao):
-                                          #fock_gxc_ao_rere, fock_gxc_ao_imim,
-                                          #fock_gxc_ao_reim, fock_gxc_ao_imre):
         """
         Sets of scale factor and fock type for Fock matrices to compute DFT E[3] term
         for complex RHS.
