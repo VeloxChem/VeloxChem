@@ -225,8 +225,7 @@ class PolOrbitalResponse(CphfSolver):
                 x_plus_y = exc_vec + deexc_vec
                 x_minus_y = exc_vec - deexc_vec
 
-                # transform to AO basis
-                # mi,xia,na->xmn
+                # transform to AO basis: mi,xia,na->xmn
                 x_plus_y_ao = np.array([
                     np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T])
                     for x in range(x_plus_y.shape[0])
@@ -302,10 +301,6 @@ class PolOrbitalResponse(CphfSolver):
                 perturbed_dm_ao_reim.broadcast(self.rank, self.comm)
                 perturbed_dm_ao_imre.broadcast(self.rank, self.comm)
                 zero_dm_ao.broadcast(self.rank, self.comm)
-                #fock_gxc_ao_rere = AOFockMatrix(zero_dm_ao)
-                #fock_gxc_ao_imim = AOFockMatrix(zero_dm_ao)
-                #fock_gxc_ao_reim = AOFockMatrix(zero_dm_ao)
-                #fock_gxc_ao_imre = AOFockMatrix(zero_dm_ao)
 
                 # set scaling factors, types, and Fock matrix for DFT g^xc term
                 fock_re, fock_im, gxc_rere, gxc_imim, gxc_reim, gxc_imre = (
@@ -429,7 +424,7 @@ class PolOrbitalResponse(CphfSolver):
                                      ))
 
                     # FIXME dimensions when upper triangular only
-                    # Transform to MO basis: mi,xmn,na->xia
+                    # transform to MO basis: mi,xmn,na->xia
                     gxc_mo = np.array([
                         np.linalg.multi_dot([mo_occ.T, gxc_ao[x], mo_vir])
                         for x in range(dof**2)
@@ -553,8 +548,7 @@ class PolOrbitalResponse(CphfSolver):
                 x_plus_y = exc_vec + deexc_vec
                 x_minus_y = exc_vec - deexc_vec
 
-                # transform to AO basis
-                # mi,xia,na->xmn
+                # transform to AO basis: mi,xia,na->xmn
                 x_plus_y_ao = np.array([
                     np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T])
                     for x in range(dof)
@@ -640,8 +634,7 @@ class PolOrbitalResponse(CphfSolver):
                 for i in range(dof**2):
                     fock_ao_rhs_1dm[i] = fock_ao_rhs.alpha_to_numpy(i)
 
-                # transform to MO basis
-                # mi,xmn,na->xia
+                # transform to MO basis: mi,xmn,na->xia
                 # FIXME dimensions when upper triangular only
                 fock_mo_rhs_1dm = np.array([
                     np.linalg.multi_dot([mo_occ.T, fock_ao_rhs_1dm[x], mo_vir])
@@ -796,7 +789,7 @@ class PolOrbitalResponse(CphfSolver):
                     #+ np.linalg.multi_dot([x_minus_y[x], x_minus_y[y].T]).T)
                     + np.linalg.multi_dot([x_minus_y[y], x_minus_y[x].T]))  # TEST
 
-        # transform AO basis
+        # transform to AO basis: mi,xia,na->xmn
         # FIXME dimensions when upper triangular only
         unrel_dm_ao = np.zeros((dof, dof, nao, nao), dtype = rhs_dt)
         # FIXME loop upper triangular only
@@ -1387,7 +1380,6 @@ class PolOrbitalResponse(CphfSolver):
                 mo = scf_tensors['C']
                 mo_occ = mo[:, :nocc]
                 mo_vir = mo[:, nocc:]
-                #nocc = mo_occ.shape[1]
                 nvir = mo_vir.shape[1]
 
                 # number of atomic orbitals
@@ -1424,10 +1416,9 @@ class PolOrbitalResponse(CphfSolver):
 
                 # calculate the density matrices, alpha block only
                 D_occ = np.matmul(mo_occ, mo_occ.T)
-                #D_vir = np.matmul(mo_vir, mo_vir.T)
 
                 # construct fock_lambda (or fock_cphf)
-                # mi,xia,na->xmn
+                # transform to AO basis: mi,xia,na->xmn
                 # FIXME dimensions when upper triangular only
                 cphf_ao = np.array([
                     np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
@@ -1472,7 +1463,7 @@ class PolOrbitalResponse(CphfSolver):
                         # TODO: move outside for-loop when all Fock matrices can be
                         # extracted into a numpy array at the same time.
 
-                        # Because the excitation vector is not symmetric,
+                        # since the excitation vector is not symmetric,
                         # we need both the matrix (OO block in omega, and probably VO)
                         # and its transpose (VV, OV blocks)
                         # this comes from the transformation of the 2PDM contribution
@@ -1575,12 +1566,10 @@ class PolOrbitalResponse(CphfSolver):
                 self.ostream.print_info('Building omega for w = {:4.3f}'.format(w))
                 self.ostream.flush()
 
-                #ovlp = scf_tensors['S']
                 nocc = molecule.number_of_alpha_electrons()
                 mo = scf_tensors['C']
                 mo_occ = mo[:, :nocc]
                 mo_vir = mo[:, nocc:]
-                #nocc = mo_occ.shape[1]
                 nvir = mo_vir.shape[1]
                 nao = mo_occ.shape[0]
                
@@ -1621,10 +1610,9 @@ class PolOrbitalResponse(CphfSolver):
 
                 # calculate the density matrices, alpha block only
                 D_occ = np.matmul(mo_occ, mo_occ.T)
-                #D_vir = np.matmul(mo_vir, mo_vir.T)
 
                 # construct fock_lambda (or fock_cphf)
-                # mi,xia,na->xmn
+                # trasform to AO basis: mi,xia,na->xmn
                 # FIXME dimensions when upper triangular only
                 cphf_ao = np.array([
                     np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
@@ -1686,7 +1674,6 @@ class PolOrbitalResponse(CphfSolver):
                         # and its transpose (VV, OV blocks)
                         # this comes from the transformation of the 2PDM contribution
                         # from MO to AO basis
-                        # complex
                         # FIXME dimensions when upper triangular only
                         fock_ao_rhs_1_m = (
                             fock_ao_rhs_real.alpha_to_numpy(dof**2 + m) +
@@ -1779,7 +1766,6 @@ class PolOrbitalResponse(CphfSolver):
         nocc = molecule.number_of_alpha_electrons()
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
-        #nvir = mo_vir.shape[1]
 
         # number of AOs
         nao = mo.shape[0]
