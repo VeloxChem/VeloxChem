@@ -297,54 +297,20 @@ class PolOrbitalResponse(CphfSolver):
                 fock_ao_rhs_imag.set_fock_type(fockmat.rgenjk, ifock)
 
             if self._dft:
-                zero_dm_ao.broadcast(self.rank, self.comm)
                 perturbed_dm_ao_rere.broadcast(self.rank, self.comm)
                 perturbed_dm_ao_imim.broadcast(self.rank, self.comm)
                 perturbed_dm_ao_reim.broadcast(self.rank, self.comm)
                 perturbed_dm_ao_imre.broadcast(self.rank, self.comm)
-                fock_gxc_ao_rere = AOFockMatrix(zero_dm_ao)
-                fock_gxc_ao_imim = AOFockMatrix(zero_dm_ao)
-                fock_gxc_ao_reim = AOFockMatrix(zero_dm_ao)
-                fock_gxc_ao_imre = AOFockMatrix(zero_dm_ao)
+                zero_dm_ao.broadcast(self.rank, self.comm)
+                #fock_gxc_ao_rere = AOFockMatrix(zero_dm_ao)
+                #fock_gxc_ao_imim = AOFockMatrix(zero_dm_ao)
+                #fock_gxc_ao_reim = AOFockMatrix(zero_dm_ao)
+                #fock_gxc_ao_imre = AOFockMatrix(zero_dm_ao)
 
-                #if self.xcfun.is_hybrid():
-                #    fact_xc = self.xcfun.get_frac_exact_exchange()
-                #    for ifock in range(fock_ao_rhs_real.number_of_fock_matrices()):
-                #        fock_ao_rhs_real.set_scale_factor(fact_xc, ifock)
-                #        fock_ao_rhs_imag.set_scale_factor(fact_xc, ifock)
-                #    for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
-                #        fock_gxc_ao_rere.set_scale_factor(fact_xc, ifock)
-                #        fock_gxc_ao_imim.set_scale_factor(fact_xc, ifock)
-                #        fock_gxc_ao_reim.set_scale_factor(fact_xc, ifock)
-                #        fock_gxc_ao_imre.set_scale_factor(fact_xc, ifock)
-                #        fock_gxc_ao_rere.set_fock_type(fockmat.rgenjkx, ifock)
-                #        fock_gxc_ao_imim.set_fock_type(fockmat.rgenjkx, ifock)
-                #        fock_gxc_ao_reim.set_fock_type(fockmat.rgenjkx, ifock)
-                #        fock_gxc_ao_imre.set_fock_type(fockmat.rgenjkx, ifock)
-                #    for ifock in range(dof**2):
-                #        fock_ao_rhs_real.set_fock_type(fockmat.restjkx, ifock)
-                #        fock_ao_rhs_imag.set_fock_type(fockmat.restjkx, ifock)
-                #    for ifock in range(dof**2, dof**2 + 2 * dof):
-                #        fock_ao_rhs_real.set_fock_type(fockmat.rgenjkx, ifock)
-                #        fock_ao_rhs_imag.set_fock_type(fockmat.rgenjkx, ifock)
-                #else:
-                #    for ifock in range(dof**2):
-                #        fock_ao_rhs_real.set_fock_type(fockmat.restj, ifock)
-                #        fock_ao_rhs_imag.set_fock_type(fockmat.restj, ifock)
-                #    for ifock in range(dof**2, dof**2 + 2 * dof):
-                #        fock_ao_rhs_real.set_fock_type(fockmat.rgenj, ifock)
-                #        fock_ao_rhs_imag.set_fock_type(fockmat.rgenj, ifock)
-                #    for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
-                #        fock_gxc_ao_rere.set_fock_type(fockmat.rgenj, ifock)
-                #        fock_gxc_ao_imim.set_fock_type(fockmat.rgenj, ifock)
-                #        fock_gxc_ao_reim.set_fock_type(fockmat.rgenj, ifock)
-                #        fock_gxc_ao_imre.set_fock_type(fockmat.rgenj, ifock)
-
+                # set scaling factors, types, and Fock matrix for DFT g^xc term
                 fock_re, fock_im, gxc_rere, gxc_imim, gxc_reim, gxc_imre = (
                     self.set_dft_fmat_factor_and_type_complex(fock_ao_rhs_real, fock_ao_rhs_imag,
                                                       zero_dm_ao)
-                                                      #fock_gxc_ao_rere, fock_gxc_ao_imim,
-                                                      #fock_gxc_ao_reim, fock_gxc_ao_imre)
                 )
                 fock_ao_rhs_real = fock_re
                 fock_ao_rhs_imag = fock_im
@@ -644,28 +610,8 @@ class PolOrbitalResponse(CphfSolver):
             if self._dft:
                 perturbed_dm_ao.broadcast(self.rank, self.comm)
                 zero_dm_ao.broadcast(self.rank, self.comm)
-                # Fock matrix for computing the DFT E[3] term g^xc
-                #fock_gxc_ao = AOFockMatrix(zero_dm_ao)
-                # FIXME loop upper triangular only
-                #if self.xcfun.is_hybrid():
-                #    fact_xc = self.xcfun.get_frac_exact_exchange()
-                #    for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
-                #        fock_ao_rhs.set_scale_factor(fact_xc, ifock)
-                #    for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                #        fock_gxc_ao.set_scale_factor(fact_xc, ifock)
-                #        fock_gxc_ao.set_fock_type(fockmat.rgenjkx, ifock)
-                #    for ifock in range(dof**2):
-                #        fock_ao_rhs.set_fock_type(fockmat.restjkx, ifock)
-                #    for ifock in range(dof**2, dof**2 + 2 * dof):
-                #        fock_ao_rhs.set_fock_type(fockmat.rgenjkx, ifock)
-                #else:
-                #    for ifock in range(dof**2):
-                #        fock_ao_rhs.set_fock_type(fockmat.restj, ifock)
-                #    for ifock in range(dof**2, dof**2 + 2 * dof):
-                #        fock_ao_rhs.set_fock_type(fockmat.rgenj, ifock)
-                #    for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                #        fock_gxc_ao.set_fock_type(fockmat.rgenj, ifock)
 
+                # set scaling factors, types, and Fock matrix for DFT g^xc term
                 fock_ao_rhs, fock_gxc_ao = self.set_dft_fmat_factor_and_type_real(
                     fock_ao_rhs, zero_dm_ao) #fock_gxc_ao)
             else:
@@ -1268,7 +1214,7 @@ class PolOrbitalResponse(CphfSolver):
         # degrees of freedom
         dof = len(self.vector_components)
 
-        # initialize fock g^xc
+        # Fock matrix for computing the DFT E[3] term g^xc
         fock_gxc_ao = AOFockMatrix(zero_dm_ao)
 
         # FIXME loop upper triangular only
@@ -1317,7 +1263,7 @@ class PolOrbitalResponse(CphfSolver):
         # degrees of freedom
         dof = len(self.vector_components)
 
-        # initialize fock g^xc
+        # Fock matrix for computing the DFT E[3] term g^xc
         fock_gxc_ao_rere = AOFockMatrix(zero_dm_ao)
         fock_gxc_ao_imim = AOFockMatrix(zero_dm_ao)
         fock_gxc_ao_reim = AOFockMatrix(zero_dm_ao)
