@@ -258,8 +258,8 @@ class PolOrbitalResponse(CphfSolver):
 
                 if self._dft:
                     ## construct density matrices for E[3] term
-                    dm_rere, dm_imim, dm_reim, dm_imre, dm_zero = self.construct_dft_e3_dm(
-                        x_minus_y_ao
+                    dm_rere, dm_imim, dm_reim, dm_imre, dm_zero = (
+                        self.construct_dft_e3_dm_complex(x_minus_y_ao)
                     )
                     perturbed_dm_ao_rere = dm_rere
                     perturbed_dm_ao_imim = dm_imim
@@ -321,30 +321,49 @@ class PolOrbitalResponse(CphfSolver):
 
             # TODO separate function
             if self._dft:
-                if not self.xcfun.is_hybrid():
-                    for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
-                        fock_gxc_ao_rere.scale(2.0, ifock)
-                        fock_gxc_ao_imim.scale(2.0, ifock)
-                        fock_gxc_ao_reim.scale(2.0, ifock)
-                        fock_gxc_ao_imre.scale(2.0, ifock)
+                #if not self.xcfun.is_hybrid():
+                #    for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
+                #        fock_gxc_ao_rere.scale(2.0, ifock)
+                #        fock_gxc_ao_imim.scale(2.0, ifock)
+                #        fock_gxc_ao_reim.scale(2.0, ifock)
+                #        fock_gxc_ao_imre.scale(2.0, ifock)
 
-                xc_drv = XCIntegrator(self.comm)
-                xc_drv.integrate_kxc_fock(fock_gxc_ao_rere, molecule, basis,
-                                          perturbed_dm_ao_rere, zero_dm_ao,
-                                          gs_density, molgrid,
-                                          self.xcfun.get_func_label(), "qrf")
-                xc_drv.integrate_kxc_fock(fock_gxc_ao_imim, molecule, basis,
-                                          perturbed_dm_ao_imim, zero_dm_ao,
-                                          gs_density, molgrid,
-                                          self.xcfun.get_func_label(), "qrf")
-                xc_drv.integrate_kxc_fock(fock_gxc_ao_reim, molecule, basis,
-                                          perturbed_dm_ao_reim, zero_dm_ao,
-                                          gs_density, molgrid,
-                                          self.xcfun.get_func_label(), "qrf")
-                xc_drv.integrate_kxc_fock(fock_gxc_ao_imre, molecule, basis,
-                                          perturbed_dm_ao_imre, zero_dm_ao,
-                                          gs_density, molgrid,
-                                          self.xcfun.get_func_label(), "qrf")
+                #xc_drv = XCIntegrator(self.comm)
+                #xc_drv.integrate_kxc_fock(fock_gxc_ao_rere, molecule, basis,
+                #                          perturbed_dm_ao_rere, zero_dm_ao,
+                #                          gs_density, molgrid,
+                #                          self.xcfun.get_func_label(), "qrf")
+                #xc_drv.integrate_kxc_fock(fock_gxc_ao_imim, molecule, basis,
+                #                          perturbed_dm_ao_imim, zero_dm_ao,
+                #                          gs_density, molgrid,
+                #                          self.xcfun.get_func_label(), "qrf")
+                #xc_drv.integrate_kxc_fock(fock_gxc_ao_reim, molecule, basis,
+                #                          perturbed_dm_ao_reim, zero_dm_ao,
+                #                          gs_density, molgrid,
+                #                          self.xcfun.get_func_label(), "qrf")
+                #xc_drv.integrate_kxc_fock(fock_gxc_ao_imre, molecule, basis,
+                #                          perturbed_dm_ao_imre, zero_dm_ao,
+                #                          gs_density, molgrid,
+                #                          self.xcfun.get_func_label(), "qrf")
+
+                perturbed_dm_ao_list = [perturbed_dm_ao_rere,
+                                        perturbed_dm_ao_imim,
+                                        perturbed_dm_ao_reim,
+                                        perturbed_dm_ao_imre]
+                fock_gxc_ao_list = [fock_gxc_ao_rere,
+                                    fock_gxc_ao_imim,
+                                    fock_gxc_ao_reim,
+                                    fock_gxc_ao_imre]
+                # integrate
+                gxc_rere, gxc_imim, gxc_reim, gxc_imre = self.integrate_gxc_complex(
+                    molecule, basis, molgrid, gs_density, zero_dm_ao,
+                    perturbed_dm_ao_list, fock_gxc_ao_list
+                )
+
+                fock_gxc_ao_rere = gxc_rere
+                fock_gxc_ao_imim = gxc_imim
+                fock_gxc_ao_reim = gxc_reim
+                fock_gxc_ao_imre = gxc_imre
 
                 fock_gxc_ao_rere.reduce_sum(self.rank, self.nodes, self.comm)
                 fock_gxc_ao_imim.reduce_sum(self.rank, self.nodes, self.comm)
@@ -574,7 +593,7 @@ class PolOrbitalResponse(CphfSolver):
 
                 if self._dft:
                     # construct density matrices for E[3] term:
-                    dm_pert, dm_zero = self.construct_dft_e3_dm(x_minus_y_ao)
+                    dm_pert, dm_zero = self.construct_dft_e3_dm_real(x_minus_y_ao)
                     perturbed_dm_ao = dm_pert
                     zero_dm_ao = dm_zero
             else:
@@ -600,7 +619,6 @@ class PolOrbitalResponse(CphfSolver):
             for ifock in range(dof**2, dof**2 + 2 * dof):
                 fock_ao_rhs.set_fock_type(fockmat.rgenjk, ifock)
 
-            # TODO separate function
             if self._dft:
                 perturbed_dm_ao.broadcast(self.rank, self.comm)
                 zero_dm_ao.broadcast(self.rank, self.comm)
@@ -611,16 +629,20 @@ class PolOrbitalResponse(CphfSolver):
             else:
                 fock_gxc_ao = None  # None if not DFT
 
+            # TODO separate function
             if self._dft:
-                if not self.xcfun.is_hybrid():
-                    for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                        fock_gxc_ao.scale(2.0, ifock)
-                xc_drv = XCIntegrator(self.comm)
-                xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis,
-                                          perturbed_dm_ao, zero_dm_ao,
-                                          gs_density, molgrid,
-                                          self.xcfun.get_func_label(), "qrf")
+                #if not self.xcfun.is_hybrid():
+                #    for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
+                #        fock_gxc_ao.scale(2.0, ifock)
+                #xc_drv = XCIntegrator(self.comm)
+                #xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis,
+                #                          perturbed_dm_ao, zero_dm_ao,
+                #                          gs_density, molgrid,
+                #                          self.xcfun.get_func_label(), "qrf")
 
+                fock_gxc_ao = self.integrate_gxc_real(molecule, basis, perturbed_dm_ao,
+                                                      zero_dm_ao, gs_density, molgrid,
+                                                      fock_gxc_ao)
                 fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)
 
             self._comp_lr_fock(fock_ao_rhs, dm_ao_rhs, molecule, basis,
@@ -1048,19 +1070,19 @@ class PolOrbitalResponse(CphfSolver):
 
         return rhs_dipole_contrib
 
-    def construct_dft_e3_dm(self, x_minus_y_ao):
-        """
-        Directs the construction of the density matrices for E[3] term
-        for real or complex RHS.
+    #def construct_dft_e3_dm(self, x_minus_y_ao):
+    #    """
+    #    Directs the construction of the density matrices for E[3] term
+    #    for real or complex RHS.
 
-        :param x_minus_y_ao:
-            the X-Y response vectors in AO basis.
-        """
+    #    :param x_minus_y_ao:
+    #        the X-Y response vectors in AO basis.
+    #    """
 
-        if self.is_complex:
-            return self.construct_dft_e3_dm_complex(x_minus_y_ao)
-        else:
-            return self.construct_dft_e3_dm_real(x_minus_y_ao)
+    #    if self.is_complex:
+    #        return self.construct_dft_e3_dm_complex(x_minus_y_ao)
+    #    else:
+    #        return self.construct_dft_e3_dm_real(x_minus_y_ao)
 
     def construct_dft_e3_dm_real(self, x_minus_y_ao):
         """
@@ -1297,6 +1319,105 @@ class PolOrbitalResponse(CphfSolver):
 
         return (fock_ao_rhs_real, fock_ao_rhs_imag, fock_gxc_ao_rere,
                 fock_gxc_ao_imim, fock_gxc_ao_reim, fock_gxc_ao_imre)
+
+    def integrate_gxc_real(self, molecule, basis, molgrid, gs_density,
+                           zero_dm_ao, perturbed_dm_ao, fock_gxc_ao):
+        """
+        Drives the integration of the real XC Fock thingything.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param molgrid:
+            The grid level for the DFT calculation.
+        :param gs_density:
+            The ground-state density.
+        :param zero_dm_ao:
+            AODensityMatrix with zeros.
+        :param perturbed_dm_ao:
+            Perturbed density matrix in AO basis.
+        :param fock_gxc_ao:
+            The g^xc Fock matrix in AO basis.
+
+        :return fock_gxc_ao:
+            The g^xc Fock matrix after integration.
+        """
+
+        if not self.xcfun.is_hybrid():
+            for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
+                fock_gxc_ao.scale(2.0, ifock)
+
+        xc_drv = XCIntegrator(self.comm)
+        xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis,
+                                  perturbed_dm_ao, zero_dm_ao,
+                                  gs_density, molgrid,
+                                  self.xcfun.get_func_label(), "qrf")
+        return fock_gxc_ao
+
+    def integrate_gxc_complex(self, molecule, basis, molgrid, gs_density, zero_dm_ao,
+                              perturbed_dm_ao_list, fock_gxc_ao_list):
+        """
+        Drives the integration of the complex XC Fock thingything.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param molegrid:
+            The grid level for the DFT calculation.
+        :param gs_density:
+            The ground-state density.
+        :param zero_dm_ao:
+            AODensityMatrix with zeros.
+        :param perturbed_dm_ao_list:
+            List with the rere/imim/reim/imre parts of the perturbed
+            density matrix in AO basis.
+        :param fock_gxc_ao_list:
+            List with the rere/imim/reim/imre parts of the g^xc Fock matrix in AO basis.
+
+        :return fock_gxc_ao_rere/imim/reim/imre:
+            The g^xc Fock matrix after integration.
+        """
+
+        # unpack perturbed dm list
+        perturbed_dm_ao_rere = perturbed_dm_ao_list[0]
+        perturbed_dm_ao_imim = perturbed_dm_ao_list[1]
+        perturbed_dm_ao_reim = perturbed_dm_ao_list[2]
+        perturbed_dm_ao_imre = perturbed_dm_ao_list[3]
+
+        # unpack XC Fock matrix list
+        fock_gxc_ao_rere = fock_gxc_ao_list[0]
+        fock_gxc_ao_imim = fock_gxc_ao_list[1]
+        fock_gxc_ao_reim = fock_gxc_ao_list[2]
+        fock_gxc_ao_imre = fock_gxc_ao_list[3]
+
+        if not self.xcfun.is_hybrid():
+            for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
+                fock_gxc_ao_rere.scale(2.0, ifock)
+                fock_gxc_ao_imim.scale(2.0, ifock)
+                fock_gxc_ao_reim.scale(2.0, ifock)
+                fock_gxc_ao_imre.scale(2.0, ifock)
+               
+        xc_drv = XCIntegrator(self.comm)
+        xc_drv.integrate_kxc_fock(fock_gxc_ao_rere, molecule, basis,
+                                  perturbed_dm_ao_rere, zero_dm_ao,
+                                  gs_density, molgrid,
+                                  self.xcfun.get_func_label(), "qrf")
+        xc_drv.integrate_kxc_fock(fock_gxc_ao_imim, molecule, basis,
+                                  perturbed_dm_ao_imim, zero_dm_ao,
+                                  gs_density, molgrid,
+                                  self.xcfun.get_func_label(), "qrf")
+        xc_drv.integrate_kxc_fock(fock_gxc_ao_reim, molecule, basis,
+                                  perturbed_dm_ao_reim, zero_dm_ao,
+                                  gs_density, molgrid,
+                                  self.xcfun.get_func_label(), "qrf")
+        xc_drv.integrate_kxc_fock(fock_gxc_ao_imre, molecule, basis,
+                                  perturbed_dm_ao_imre, zero_dm_ao,
+                                  gs_density, molgrid,
+                                  self.xcfun.get_func_label(), "qrf")
+
+        return fock_gxc_ao_rere, fock_gxc_ao_imim, fock_gxc_ao_reim, fock_gxc_ao_imre
 
     # NOTES:
     #   - epsilon_dm_ao not returned from cphfsolver,
