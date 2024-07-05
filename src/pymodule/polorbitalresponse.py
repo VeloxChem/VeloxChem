@@ -1568,13 +1568,7 @@ class PolOrbitalResponse(CphfSolver):
                                               omega_1pdm_2pdm_contrib +
                                               omega_dipole_contrib_ao[m, n])
 
-                        # TODO separate function
                         if self._dft:
-                            #factor = -0.5
-                            #omega[m * dof + n] += factor * np.linalg.multi_dot([
-                            #    D_occ, fock_gxc_ao.alpha_to_numpy(2 * (m * dof + n)),
-                            #    D_occ])
-
                             omega_gxc_contrib = self.calculate_omega_gxc_contrib_real(
                                 scf_tensors, fock_gxc_ao.alpha_to_numpy(2 * (m * dof + n)),
                                 D_occ)
@@ -1795,17 +1789,6 @@ class PolOrbitalResponse(CphfSolver):
                                               omega_dipole_contrib_ao[m, n])
 
                         if self._dft:
-                            #factor = -0.5
-                            #omega[m * dof + n] += factor * (
-                            #        np.linalg.multi_dot([
-                            #            D_occ, fock_gxc_ao_rere.alpha_to_numpy(2 * (m * dof + n)), D_occ])
-                            #        - np.linalg.multi_dot([
-                            #            D_occ, fock_gxc_ao_imim.alpha_to_numpy(2 * (m * dof + n)), D_occ])
-                            #        + 1j * (np.linalg.multi_dot([
-                            #            D_occ, fock_gxc_ao_reim.alpha_to_numpy(2 * (m * dof + n)), D_occ])
-                            #            + np.linalg.multi_dot([
-                            #            D_occ, fock_gxc_ao_imre.alpha_to_numpy(2 * (m * dof + n)), D_occ])))
-
                             fock_gxc_ao_mn_list = [
                                 fock_gxc_ao_rere.alpha_to_numpy(2 * (m * dof + n)),
                                 fock_gxc_ao_imim.alpha_to_numpy(2 * (m * dof + n)),
