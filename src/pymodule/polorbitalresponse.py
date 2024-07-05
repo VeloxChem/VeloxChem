@@ -242,51 +242,6 @@ class PolOrbitalResponse(CphfSolver):
                 xpmy_ao_list_imag = list(np.array(x_plus_y_ao.imag)) + list(
                     np.array(x_minus_y_ao.imag))
 
-                # calculate the symmetrized unrelaxed one-particle density matrix
-                # in MO basis
-                # FIXME dimensions when upper triangular only
-                #dm_oo = np.zeros((dof, dof, nocc, nocc), dtype=np.complex_)
-                #dm_vv = np.zeros((dof, dof, nvir, nvir), dtype=np.complex_)
-
-                ## FIXME loop upper triangular only
-                #for x in range(dof):
-                #    for y in range(dof):
-                #        dm_vv[x, y] = 0.25 * (
-                #            # xib,yia->xyab
-                #            #np.linalg.multi_dot([x_plus_y[x].T, x_plus_y[y]]).T
-                #            np.linalg.multi_dot([x_plus_y[y].T, x_plus_y[x]])  # TEST
-                #            # xib,yia->xyab
-                #            #+ np.linalg.multi_dot([x_minus_y[x].T, x_minus_y[y]]).T
-                #            + np.linalg.multi_dot([x_minus_y[y].T, x_minus_y[x]])  # TEST
-                #            # yib,xia->xyab
-                #            + np.linalg.multi_dot([x_plus_y[x].T, x_plus_y[y]])
-                #            # yib,xia->xyab
-                #            + np.linalg.multi_dot([x_minus_y[x].T, x_minus_y[y]]))
-
-                #        dm_oo[x, y] = -0.25 * (
-                #            # xja,yia->xyij
-                #            np.linalg.multi_dot([x_plus_y[x], x_plus_y[y].T])
-                #            # xja,yia->xyij
-                #            + np.linalg.multi_dot([x_minus_y[x], x_minus_y[y].T])
-                #            # yja,xia->xyij
-                #            #+ np.linalg.multi_dot([x_plus_y[x], x_plus_y[y].T]).T
-                #            + np.linalg.multi_dot([x_plus_y[y], x_plus_y[x].T])  # TEST
-                #            # yja,xia->xyij
-                #            #+ np.linalg.multi_dot([x_minus_y[x], x_minus_y[y].T]).T)
-                #            + np.linalg.multi_dot([x_minus_y[y], x_minus_y[x].T]))  # TEST
-
-                ## transform AO basis and create list
-                ## FIXME dimensions when upper triangular only
-                #unrel_dm_ao = np.zeros((dof, dof, nao, nao), dtype=np.complex_)
-                ## FIXME loop upper triangular only
-                #for x in range(dof):
-                #    for y in range(dof):
-                #        unrel_dm_ao[x, y] = (
-                #                # mi,xyij,nj->xymn
-                #                np.linalg.multi_dot([mo_occ, dm_oo[x, y], mo_occ.T])
-                #                # ma,xyab,nb->xymn
-                #                + np.linalg.multi_dot([mo_vir, dm_vv[x, y], mo_vir.T]))
-
                 # calculate symmetrized unrelaxed one-particle density matrix
                 unrel_dm_ao, dm_oo, dm_vv = self.calculate_unrel_dm(molecule, scf_tensors,
                                                       x_plus_y, x_minus_y)
@@ -304,57 +259,66 @@ class PolOrbitalResponse(CphfSolver):
 
                 # TODO separate function
                 if self._dft:
-                    # construct density matrices for E[3] term:
-                    # XCIntegrator expects a DM with real and imaginary part,
-                    # so we set the imaginary part to zero.
+                    ## construct density matrices for E[3] term:
+                    ## XCIntegrator expects a DM with real and imaginary part
 
-                    perturbed_dm_ao_list_rere = []
-                    perturbed_dm_ao_list_imim = []
-                    perturbed_dm_ao_list_reim = []
-                    perturbed_dm_ao_list_imre = []
-                    zero_dm_ao_list = []
+                    #perturbed_dm_ao_list_rere = []
+                    #perturbed_dm_ao_list_imim = []
+                    #perturbed_dm_ao_list_reim = []
+                    #perturbed_dm_ao_list_imre = []
+                    #zero_dm_ao_list = []
 
-                    # FIXME loop upper triangular only
-                    for x in range(dof):
-                        for y in range(dof):
-                            perturbed_dm_ao_list_rere.extend([
-                                np.array(x_minus_y_ao[x].real),
-                                np.array(0 * x_minus_y_ao[x].real),
-                                np.array(x_minus_y_ao[y].real),
-                                np.array(0 * x_minus_y_ao[y].real)])
-                            perturbed_dm_ao_list_imim.extend([
-                                np.array(x_minus_y_ao[x].imag),
-                                np.array(0 * x_minus_y_ao[x].imag),
-                                np.array(x_minus_y_ao[y].imag),
-                                np.array(0 * x_minus_y_ao[y].imag)])
-                            # complex cross-terms
-                            perturbed_dm_ao_list_reim.extend([
-                                np.array(x_minus_y_ao[x].real),
-                                np.array(0 * x_minus_y_ao[x].real),
-                                np.array(x_minus_y_ao[y].imag),
-                                np.array(0 * x_minus_y_ao[y].imag)])
-                            perturbed_dm_ao_list_imre.extend([
-                                np.array(x_minus_y_ao[x].imag),
-                                np.array(0 * x_minus_y_ao[x].imag),
-                                np.array(x_minus_y_ao[y].real),
-                                np.array(0 * x_minus_y_ao[y].real)])
+                    ## FIXME loop upper triangular only
+                    #for x in range(dof):
+                    #    for y in range(dof):
+                    #        perturbed_dm_ao_list_rere.extend([
+                    #            np.array(x_minus_y_ao[x].real),
+                    #            np.array(0 * x_minus_y_ao[x].real),
+                    #            np.array(x_minus_y_ao[y].real),
+                    #            np.array(0 * x_minus_y_ao[y].real)])
+                    #        perturbed_dm_ao_list_imim.extend([
+                    #            np.array(x_minus_y_ao[x].imag),
+                    #            np.array(0 * x_minus_y_ao[x].imag),
+                    #            np.array(x_minus_y_ao[y].imag),
+                    #            np.array(0 * x_minus_y_ao[y].imag)])
+                    #        # complex cross-terms
+                    #        perturbed_dm_ao_list_reim.extend([
+                    #            np.array(x_minus_y_ao[x].real),
+                    #            np.array(0 * x_minus_y_ao[x].real),
+                    #            np.array(x_minus_y_ao[y].imag),
+                    #            np.array(0 * x_minus_y_ao[y].imag)])
+                    #        perturbed_dm_ao_list_imre.extend([
+                    #            np.array(x_minus_y_ao[x].imag),
+                    #            np.array(0 * x_minus_y_ao[x].imag),
+                    #            np.array(x_minus_y_ao[y].real),
+                    #            np.array(0 * x_minus_y_ao[y].real)])
 
-                            zero_dm_ao_list.extend([
-                                np.array(0 * x_minus_y_ao[x].real),
-                                np.array(0 * x_minus_y_ao[y].real)])
+                    #        zero_dm_ao_list.extend([
+                    #            np.array(0 * x_minus_y_ao[x].real),
+                    #            np.array(0 * x_minus_y_ao[y].real)])
 
-                    perturbed_dm_ao_rere = AODensityMatrix(perturbed_dm_ao_list_rere,
-                                                      denmat.rest)
-                    perturbed_dm_ao_imim = AODensityMatrix(perturbed_dm_ao_list_imim,
-                                                      denmat.rest)
-                    perturbed_dm_ao_reim = AODensityMatrix(perturbed_dm_ao_list_reim,
-                                                      denmat.rest)
-                    perturbed_dm_ao_imre = AODensityMatrix(perturbed_dm_ao_list_imre,
-                                                      denmat.rest)
+                    #perturbed_dm_ao_rere = AODensityMatrix(perturbed_dm_ao_list_rere,
+                    #                                  denmat.rest)
+                    #perturbed_dm_ao_imim = AODensityMatrix(perturbed_dm_ao_list_imim,
+                    #                                  denmat.rest)
+                    #perturbed_dm_ao_reim = AODensityMatrix(perturbed_dm_ao_list_reim,
+                    #                                  denmat.rest)
+                    #perturbed_dm_ao_imre = AODensityMatrix(perturbed_dm_ao_list_imre,
+                    #                                  denmat.rest)
 
-                    # corresponds to rho^{omega_b,omega_c} in quadratic response,
-                    # which is zero for orbital response
-                    zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
+                    ## corresponds to rho^{omega_b,omega_c} in quadratic response,
+                    ## which is zero for orbital response
+                    #zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
+
+                    dm_rere, dm_imim, dm_reim, dm_imre, dm_zero = self.construct_dft_e3_dm(
+                        x_minus_y_ao
+                    )
+
+                    perturbed_dm_ao_rere = dm_rere
+                    perturbed_dm_ao_imim = dm_imim
+                    perturbed_dm_ao_reim = dm_reim
+                    perturbed_dm_ao_imre = dm_imre
+                    zero_dm_ao = dm_zero
             else:
                 dof = None
                 dm_ao_rhs_real = AODensityMatrix()
@@ -677,49 +641,6 @@ class PolOrbitalResponse(CphfSolver):
                 # turn them into a list for AODensityMatrix
                 xpmy_ao_list = list(x_plus_y_ao) + list(x_minus_y_ao)
 
-                ## calculate the symmetrized unrelaxed one-particle density matrix
-                ## in MO basis
-                ## FIXME dimensions when upper triangular only
-                #dm_oo = np.zeros((dof, dof, nocc, nocc))
-                #dm_vv = np.zeros((dof, dof, nvir, nvir))
-                ## FIXME loop upper triangular only
-                #for x in range(dof):
-                #    for y in range(dof):
-                #        dm_vv[x, y] = 0.25 * (
-                #            # xib,yia->xyab
-                #            #np.linalg.multi_dot([x_plus_y[x].T, x_plus_y[y]]).T
-                #            np.linalg.multi_dot([x_plus_y[y].T, x_plus_y[x]])  # TEST
-                #            # xib,yia->xyab
-                #            #+ np.linalg.multi_dot( [x_minus_y[x].T, x_minus_y[y]]).T
-                #            + np.linalg.multi_dot([x_minus_y[y].T, x_minus_y[x]])  # TEST
-                #            # yib,xia->xyab
-                #            + np.linalg.multi_dot([x_plus_y[x].T, x_plus_y[y]])
-                #            # yib,xia->xyab
-                #            + np.linalg.multi_dot([x_minus_y[x].T, x_minus_y[y]]))
-                #        dm_oo[x, y] = -0.25 * (
-                #            # xja,yia->xyij
-                #            np.linalg.multi_dot([x_plus_y[x], x_plus_y[y].T])
-                #            # xja,yia->xyij
-                #            + np.linalg.multi_dot([x_minus_y[x], x_minus_y[y].T])
-                #            # yja,xia->xyij
-                #            #+ np.linalg.multi_dot([x_plus_y[x], x_plus_y[y].T]).T
-                #            + np.linalg.multi_dot([x_plus_y[y], x_plus_y[x].T])  # TEST
-                #            # yja,xia->xyij
-                #            #+ np.linalg.multi_dot([x_minus_y[x], x_minus_y[y].T]).T)
-                #            + np.linalg.multi_dot([x_minus_y[y], x_minus_y[x].T]))  # TEST
-
-                ## transform AO basis and create list
-                ## FIXME dimensions when upper triangular only
-                #unrel_dm_ao = np.zeros((dof, dof, nao, nao))
-                ## FIXME loop upper triangular only
-                #for x in range(dof):
-                #    for y in range(dof):
-                #        unrel_dm_ao[x, y] = (
-                #                # mi,xyij,nj->xymn
-                #                np.linalg.multi_dot([mo_occ, dm_oo[x, y], mo_occ.T])
-                #                # ma,xyab,nb->xymn
-                #                + np.linalg.multi_dot([mo_vir, dm_vv[x, y], mo_vir.T]))
-
                 # calculate symmetrized unrelaxed one-particle density matrix
                 unrel_dm_ao, dm_oo, dm_vv = self.calculate_unrel_dm(molecule, scf_tensors,
                                                       x_plus_y, x_minus_y)
@@ -737,25 +658,30 @@ class PolOrbitalResponse(CphfSolver):
                     # XCIntegrator expects a DM with real and imaginary part,
                     # so we set the imaginary part to zero.
 
-                    perturbed_dm_ao_list = []
-                    zero_dm_ao_list = []
+                    #perturbed_dm_ao_list = []
+                    #zero_dm_ao_list = []
 
-                    # FIXME loop upper triangular only
-                    for x in range(dof):
-                        for y in range(dof):
-                            perturbed_dm_ao_list.extend([
-                                x_minus_y_ao[x], 0 * x_minus_y_ao[x],
-                                x_minus_y_ao[y], 0 * x_minus_y_ao[y]
-                            ])
-                            zero_dm_ao_list.extend(
-                                [0 * x_minus_y_ao[x], 0 * x_minus_y_ao[y]])
+                    ## FIXME loop upper triangular only
+                    #for x in range(dof):
+                    #    for y in range(dof):
+                    #        perturbed_dm_ao_list.extend([
+                    #            x_minus_y_ao[x], 0 * x_minus_y_ao[x],
+                    #            x_minus_y_ao[y], 0 * x_minus_y_ao[y]
+                    #        ])
+                    #        zero_dm_ao_list.extend(
+                    #            [0 * x_minus_y_ao[x], 0 * x_minus_y_ao[y]])
 
-                    perturbed_dm_ao = AODensityMatrix(perturbed_dm_ao_list,
-                                                      denmat.rest)
+                    #perturbed_dm_ao = AODensityMatrix(perturbed_dm_ao_list,
+                    #                                  denmat.rest)
 
-                    # corresponds to rho^{omega_b,omega_c} in quadratic response,
-                    # which is zero for orbital response
-                    zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
+                    ## corresponds to rho^{omega_b,omega_c} in quadratic response,
+                    ## which is zero for orbital response
+                    #zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
+
+                    dm_pert, dm_zero = self.construct_dft_e3_dm(x_minus_y_ao)
+
+                    perturbed_dm_ao = dm_pert
+                    zero_dm_ao = dm_zero
             else:
                 dof = None
                 dm_ao_rhs = AODensityMatrix()
@@ -1243,6 +1169,144 @@ class PolOrbitalResponse(CphfSolver):
 
         return rhs_dipole_contrib
 
+    def construct_dft_e3_dm(self, x_minus_y_ao):
+        """
+        Directs the construction of the density matrices for E[3] term
+        for real or complex RHS.
+
+        :param x_minus_y_ao:
+            the X-Y response vectors in AO basis.
+        """
+
+        if self.is_complex:
+            return self.construct_dft_e3_dm_complex(x_minus_y_ao)
+        else:
+            return self.construct_dft_e3_dm_real(x_minus_y_ao)
+
+    def construct_dft_e3_dm_real(self, x_minus_y_ao):
+        """
+        Constructs the density matrices for E[3] term
+        for the real RHS.
+
+        :param x_minus_y_ao:
+            the X-Y response vectors in AO basis.
+
+        :return perturbed_dm_ao:
+            Perturbed density matrix as an AODensityMatrix.
+        :return zero_dm_ao:
+            Empty matrix same size as perturbed density matrix as an AODensityMatrix.
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # sanity check: should not be carried out in parallel
+        if self.rank != mpi_master():
+            return None, None
+
+        # XCIntegrator expects a DM with real and imaginary part,
+        # so we set the imaginary part to zero.
+
+        perturbed_dm_ao_list = []
+        zero_dm_ao_list = []
+
+        # FIXME loop upper triangular only
+        for x in range(dof):
+            for y in range(dof):
+                perturbed_dm_ao_list.extend([
+                    x_minus_y_ao[x], 0 * x_minus_y_ao[x],
+                    x_minus_y_ao[y], 0 * x_minus_y_ao[y]
+                ])
+                zero_dm_ao_list.extend(
+                    [0 * x_minus_y_ao[x], 0 * x_minus_y_ao[y]])
+
+        perturbed_dm_ao = AODensityMatrix(perturbed_dm_ao_list,
+                                          denmat.rest)
+
+        # corresponds to rho^{omega_b,omega_c} in quadratic response,
+        # which is zero for orbital response
+        zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
+
+        return perturbed_dm_ao, zero_dm_ao
+
+    def construct_dft_e3_dm_complex(self, x_minus_y_ao):
+        """
+        Constructs the density matrices for E[3] term
+        for the complex RHS.
+
+        :param x_minus_y_ao:
+            the X-Y response vectors in AO basis.
+
+        :return perturbed_dm_ao_rere:
+            The perturbed density matrix from Re/Re parts of the X-Y response vectors as an AODensityMatrix.
+        :return perturbed_dm_ao_imim:
+            The perturbed density matrix from Im/Im parts of the X-Y response vectors as an AODensityMatrix.
+        :return perturbed_dm_ao_reim:
+            The perturbed density matrix from Re/Im parts of the X-Y response vectors as an AODensityMatrix.
+        :return perturbed_dm_ao_imre:
+            The perturbed density matrix from Im/Re parts of the X-Y response vectors as an AODensityMatrix.
+        :return zero_dm_ao:
+            Empty matrix same size as perturbed density matrices as an AODensityMatrix.
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # sanity check: should not be carried out in parallel
+        if self.rank != mpi_master():
+            return None, None, None, None, None
+
+        perturbed_dm_ao_list_rere = []
+        perturbed_dm_ao_list_imim = []
+        perturbed_dm_ao_list_reim = []
+        perturbed_dm_ao_list_imre = []
+        zero_dm_ao_list = []
+
+        # FIXME loop upper triangular only
+        for x in range(dof):
+            for y in range(dof):
+                perturbed_dm_ao_list_rere.extend([
+                    np.array(x_minus_y_ao[x].real),
+                    np.array(0 * x_minus_y_ao[x].real),
+                    np.array(x_minus_y_ao[y].real),
+                    np.array(0 * x_minus_y_ao[y].real)])
+                perturbed_dm_ao_list_imim.extend([
+                    np.array(x_minus_y_ao[x].imag),
+                    np.array(0 * x_minus_y_ao[x].imag),
+                    np.array(x_minus_y_ao[y].imag),
+                    np.array(0 * x_minus_y_ao[y].imag)])
+                # complex cross-terms
+                perturbed_dm_ao_list_reim.extend([
+                    np.array(x_minus_y_ao[x].real),
+                    np.array(0 * x_minus_y_ao[x].real),
+                    np.array(x_minus_y_ao[y].imag),
+                    np.array(0 * x_minus_y_ao[y].imag)])
+                perturbed_dm_ao_list_imre.extend([
+                    np.array(x_minus_y_ao[x].imag),
+                    np.array(0 * x_minus_y_ao[x].imag),
+                    np.array(x_minus_y_ao[y].real),
+                    np.array(0 * x_minus_y_ao[y].real)])
+
+                zero_dm_ao_list.extend([
+                    np.array(0 * x_minus_y_ao[x].real),
+                    np.array(0 * x_minus_y_ao[y].real)])
+
+        perturbed_dm_ao_rere = AODensityMatrix(perturbed_dm_ao_list_rere,
+                                          denmat.rest)
+        perturbed_dm_ao_imim = AODensityMatrix(perturbed_dm_ao_list_imim,
+                                          denmat.rest)
+        perturbed_dm_ao_reim = AODensityMatrix(perturbed_dm_ao_list_reim,
+                                          denmat.rest)
+        perturbed_dm_ao_imre = AODensityMatrix(perturbed_dm_ao_list_imre,
+                                          denmat.rest)
+
+        # corresponds to rho^{omega_b,omega_c} in quadratic response,
+        # which is zero for orbital response
+        zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
+
+        return (perturbed_dm_ao_rere, perturbed_dm_ao_imim,
+               perturbed_dm_ao_reim, perturbed_dm_ao_imre, zero_dm_ao)
+
     # NOTES:
     #   - epsilon_dm_ao not returned from cphfsolver,
     #     to be calculated inside compute_omega
@@ -1320,12 +1384,15 @@ class PolOrbitalResponse(CphfSolver):
                 self.ostream.flush()
 
                 #ovlp = scf_tensors['S']
+                # MO coefficients
                 nocc = molecule.number_of_alpha_electrons()
                 mo = scf_tensors['C']
                 mo_occ = mo[:, :nocc]
                 mo_vir = mo[:, nocc:]
                 #nocc = mo_occ.shape[1]
                 nvir = mo_vir.shape[1]
+
+                # number of atomic orbitals
                 nao = mo_occ.shape[0]
 
                 # get fock matrices from cphf_results
@@ -1424,7 +1491,6 @@ class PolOrbitalResponse(CphfSolver):
                         fock_ao_rhs_2_n = fock_ao_rhs.alpha_to_numpy(
                             dof**2 + dof + n)  # x_minus_y
 
-                        # compute the contributions from 2PDM and relaxed 1PDM
                         fmat = (fock_cphf.alpha_to_numpy(m * dof + n) +
                                 fock_cphf.alpha_to_numpy(m * dof + n).T +
                                 fock_ao_rhs.alpha_to_numpy(m * dof + n))
@@ -1432,11 +1498,13 @@ class PolOrbitalResponse(CphfSolver):
                         # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2),
                         #        (2,0), (2,1), (2,2) * dof
 
+                        # calculate the contributions from 2PDM and relaxed 1PDM
                         omega_1pdm_2pdm_contrib = self.calculate_omega_1pdm_2pdm_contrib(
                             molecule, scf_tensors, x_plus_y_ao[m], x_plus_y_ao[n],
                             x_minus_y_ao[m], x_minus_y_ao[n], fock_ao_rhs_1_m,
                             fock_ao_rhs_2_m, fock_ao_rhs_1_n, fock_ao_rhs_2_n, fmat)
 
+                        # sum contributions to omega
                         omega[m * dof + n] = (epsilon_dm_ao[m, n] +
                                               omega_1pdm_2pdm_contrib +
                                               omega_dipole_contrib_ao[m, n])
@@ -1643,7 +1711,6 @@ class PolOrbitalResponse(CphfSolver):
                             fock_ao_rhs_imag.alpha_to_numpy(dof**2 + dof + n)
                         )  # x_minus_y
 
-                        # compute the contributions from 2PDM and relaxed 1PDM
                         fmat = ((fock_cphf_real.alpha_to_numpy(m * dof + n) +
                                  fock_cphf_real.alpha_to_numpy(m * dof + n).T +
                                  fock_ao_rhs_real.alpha_to_numpy(m * dof + n)) +
@@ -1655,11 +1722,13 @@ class PolOrbitalResponse(CphfSolver):
                         # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2),
                         #        (2,0), (2,1), (2,2) * dof
 
+                        # compute the contributions from 2PDM and relaxed 1PDM
                         omega_1pdm_2pdm_contrib = self.calculate_omega_1pdm_2pdm_contrib(
                             molecule, scf_tensors, x_plus_y_ao[m], x_plus_y_ao[n],
                             x_minus_y_ao[m], x_minus_y_ao[n], fock_ao_rhs_1_m,
                             fock_ao_rhs_2_m, fock_ao_rhs_1_n, fock_ao_rhs_2_n, fmat)
 
+                        # sum contributions to omega
                         omega[m * dof + n] = (epsilon_dm_ao[m, n] +
                                               omega_1pdm_2pdm_contrib +
                                               omega_dipole_contrib_ao[m, n])
@@ -1712,7 +1781,7 @@ class PolOrbitalResponse(CphfSolver):
         nocc = molecule.number_of_alpha_electrons()
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
-        nvir = mo_vir.shape[1]
+        #nvir = mo_vir.shape[1]
 
         # number of AOs
         nao = mo.shape[0]
@@ -1747,7 +1816,6 @@ class PolOrbitalResponse(CphfSolver):
             for x in range(dof)
         ])
 
-        # calculate the dipole contribution to omega
         # FIXME dimensions when upper triangular only
         omega_dipole_contrib = np.zeros((dof, dof, nao, nao), dtype = omega_dt)
         # FIXME loop upper triangular only
@@ -1880,15 +1948,11 @@ class PolOrbitalResponse(CphfSolver):
             the omega multipliers.
         """
 
-        # degrees of freedom
-        #dof = len(self.vector_components)
-
         # MO coefficients
         mo = scf_tensors['C']  # only alpha part
         nocc = molecule.number_of_alpha_electrons()
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
-        #nvir = mo_vir.shape[1]
 
         # overlap
         ovlp = scf_tensors['S']
@@ -1897,15 +1961,7 @@ class PolOrbitalResponse(CphfSolver):
         D_occ = np.matmul(mo_occ, mo_occ.T)
         D_vir = np.matmul(mo_vir, mo_vir.T)
 
-        # number of AOs
-        #nao = mo.shape[0]
-
-        # determine data type of omega
-        #if self.is_complex:
-        #    omega_dt = np.complex_
-        #else:
-        #    omega_dt = np.float_
-
+        # contract Fock RHS matrices with response vectors
         Fp1_vv = 0.25 * (np.linalg.multi_dot([
             fock_ao_rhs_1_m.T, x_plus_y_ao_n, ovlp.T
         ]) + np.linalg.multi_dot(
