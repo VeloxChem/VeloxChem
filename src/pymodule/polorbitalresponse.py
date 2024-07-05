@@ -604,11 +604,10 @@ class PolOrbitalResponse(CphfSolver):
             else:
                 fock_gxc_ao = None  # None if not DFT
 
-            # TODO separate function
             if self._dft:
-                fock_gxc_ao = self.integrate_gxc_real(molecule, basis, perturbed_dm_ao,
-                                                      zero_dm_ao, gs_density, molgrid,
-                                                      fock_gxc_ao)
+                fock_gxc_ao = self.integrate_gxc_real(molecule, basis, molgrid,
+                                                      gs_density, zero_dm_ao,
+                                                      perturbed_dm_ao, fock_gxc_ao)
                 fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)
 
             self._comp_lr_fock(fock_ao_rhs, dm_ao_rhs, molecule, basis,
@@ -1571,10 +1570,16 @@ class PolOrbitalResponse(CphfSolver):
 
                         # TODO separate function
                         if self._dft:
-                            factor = -0.5
-                            omega[m * dof + n] += factor * np.linalg.multi_dot([
-                                D_occ, fock_gxc_ao.alpha_to_numpy(2 * (m * dof + n)),
-                                D_occ])
+                            #factor = -0.5
+                            #omega[m * dof + n] += factor * np.linalg.multi_dot([
+                            #    D_occ, fock_gxc_ao.alpha_to_numpy(2 * (m * dof + n)),
+                            #    D_occ])
+
+                            omega_gxc_contrib = self.calculate_omega_gxc_contrib_real(
+                                scf_tensors, fock_gxc_ao.alpha_to_numpy(2 * (m * dof + n)),
+                                D_occ)
+
+                            omega[m * dof + n] += omega_gxc_contrib
 
                 # save omega multipliers in cphf_results dictionary
                 self.cphf_results[(w)]['omega_ao'] = omega
@@ -1790,16 +1795,27 @@ class PolOrbitalResponse(CphfSolver):
                                               omega_dipole_contrib_ao[m, n])
 
                         if self._dft:
-                            factor = -0.5
-                            omega[m * dof + n] += factor * (
-                                    np.linalg.multi_dot([
-                                        D_occ, fock_gxc_ao_rere.alpha_to_numpy(2 * (m * dof + n)), D_occ])
-                                    - np.linalg.multi_dot([
-                                        D_occ, fock_gxc_ao_imim.alpha_to_numpy(2 * (m * dof + n)), D_occ])
-                                    + 1j * (np.linalg.multi_dot([
-                                        D_occ, fock_gxc_ao_reim.alpha_to_numpy(2 * (m * dof + n)), D_occ])
-                                        + np.linalg.multi_dot([
-                                        D_occ, fock_gxc_ao_imre.alpha_to_numpy(2 * (m * dof + n)), D_occ])))
+                            #factor = -0.5
+                            #omega[m * dof + n] += factor * (
+                            #        np.linalg.multi_dot([
+                            #            D_occ, fock_gxc_ao_rere.alpha_to_numpy(2 * (m * dof + n)), D_occ])
+                            #        - np.linalg.multi_dot([
+                            #            D_occ, fock_gxc_ao_imim.alpha_to_numpy(2 * (m * dof + n)), D_occ])
+                            #        + 1j * (np.linalg.multi_dot([
+                            #            D_occ, fock_gxc_ao_reim.alpha_to_numpy(2 * (m * dof + n)), D_occ])
+                            #            + np.linalg.multi_dot([
+                            #            D_occ, fock_gxc_ao_imre.alpha_to_numpy(2 * (m * dof + n)), D_occ])))
+
+                            fock_gxc_ao_mn_list = [
+                                fock_gxc_ao_rere.alpha_to_numpy(2 * (m * dof + n)),
+                                fock_gxc_ao_imim.alpha_to_numpy(2 * (m * dof + n)),
+                                fock_gxc_ao_reim.alpha_to_numpy(2 * (m * dof + n)),
+                                fock_gxc_ao_imre.alpha_to_numpy(2 * (m * dof + n)),
+                            ]
+                            omega_gxc_contrib = self.calculate_omega_gxc_contrib_complex(
+                                fock_gxc_ao_mn_list, D_occ
+                            )
+                            omega[m * dof + n] += omega_gxc_contrib
 
                 # save omega multipliers in cphf_results dictionary
                 self.cphf_results[(w)]['omega_ao'] = omega
@@ -1974,6 +1990,7 @@ class PolOrbitalResponse(CphfSolver):
 
         return epsilon_dm
 
+    # TODO collect inputs in lists?
     def calculate_omega_1pdm_2pdm_contrib(self, molecule, scf_tensors, x_plus_y_ao_m, x_plus_y_ao_n,
                                           x_minus_y_ao_m, x_minus_y_ao_n, fock_ao_rhs_1_m,
                                           fock_ao_rhs_2_m, fock_ao_rhs_1_n, fock_ao_rhs_2_n,
@@ -2075,6 +2092,62 @@ class PolOrbitalResponse(CphfSolver):
         ]) + np.linalg.multi_dot([D_occ, fmat, D_occ]))
 
         return omega_1pdm_2pdm_contrib
+
+    def calculate_omega_gxc_contrib_real(self, scf_tensors, fock_gxc_ao_mn, D_occ):
+        """
+        Calculates the contribution to the real omega multipliers from the
+        DFT E[3] g^xc term.
+
+        :param scf_tensors:
+            The tensors from the SCF calculation.
+        :param fock_gxc_ao_mn:
+            The mn component of the integrated g^xc Fock matrix
+        :param D_occ:
+            The occ/occ MO density matrix.
+
+        :return omega_gxc_contrib:
+            The E[3] g^xc contribution to the omega multipliers.
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        factor = -0.5
+        omega_gxc_contrib = factor * np.linalg.multi_dot([
+            D_occ, fock_gxc_ao_mn, D_occ])
+
+        return omega_gxc_contrib
+
+    def calculate_omega_gxc_contrib_complex(self, fock_gxc_ao_mn_list, D_occ):
+        """
+        Calculates the contribution to the complex omega multipliers from the
+        DFT E[3] g^xc term.
+
+        :param fock_gxc_ao_mn_list:
+            List with the rere/imim/reim/imre parts of the mn component
+            of the integrated g^xc Fock matrix
+        :param D_occ:
+            The occ/occ MO density matrix.
+
+        :return omega_gxc_contrib:
+            The E[3] g^xc contribution to the omega multipliers.
+        """
+
+        # unpack list with Fock matrices
+        fock_gxc_ao_rere_mn = fock_gxc_ao_mn_list[0]
+        fock_gxc_ao_imim_mn = fock_gxc_ao_mn_list[1]
+        fock_gxc_ao_reim_mn = fock_gxc_ao_mn_list[2]
+        fock_gxc_ao_imre_mn = fock_gxc_ao_mn_list[3]
+
+        factor = -0.5
+        omega_gxc_contrib = factor * (
+                np.linalg.multi_dot([D_occ, fock_gxc_ao_rere_mn, D_occ])
+                - np.linalg.multi_dot([D_occ, fock_gxc_ao_imim_mn, D_occ])
+                + 1j * (np.linalg.multi_dot([D_occ, fock_gxc_ao_reim_mn, D_occ])
+                + np.linalg.multi_dot([D_occ, fock_gxc_ao_imre_mn, D_occ]))
+        )
+
+        return omega_gxc_contrib
 
     def print_cphf_header(self, title):
         self.ostream.print_blank()
