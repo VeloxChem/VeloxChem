@@ -1038,7 +1038,7 @@ class ScfHessianDriver(HessianDriver):
                     for x in range(3):
                         for y in range(3):
                             # xmn,ymn->xy
-                            hessian_eri_overlap[i,j] += 2.0 * (np.linalg.multi_dot([
+                            hessian_eri_overlap[i,j,x,y] += 2.0 * (np.linalg.multi_dot([
                                 np_P_P_Six_fock[x].reshape(nao**2), 
                                 P_P_Sjy[y].reshape(nao**2)]))
 
