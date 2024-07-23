@@ -359,18 +359,18 @@ class PolOrbitalResponse(CphfSolver):
             if self.rank == mpi_master():
                 # extract the 1PDM contributions
                 # FIXME dimensions when upper triangular only
-                fock_ao_rhs_1dm = np.zeros((dof**2, nao, nao), dtype=np.complex_)
-                fock_ao_rhs_1dm_real = np.zeros((dof**2, nao, nao))
-                fock_ao_rhs_1dm_imag = np.zeros((dof**2, nao, nao))
+                fock_ao_rhs_1pdm = np.zeros((dof**2, nao, nao), dtype=np.complex_)
+                fock_ao_rhs_1pdm_real = np.zeros((dof**2, nao, nao))
+                fock_ao_rhs_1pdm_imag = np.zeros((dof**2, nao, nao))
                 for i in range(dof**2):
-                    fock_ao_rhs_1dm_real[i] = fock_ao_rhs_real.alpha_to_numpy(i)
-                    fock_ao_rhs_1dm_imag[i] = fock_ao_rhs_imag.alpha_to_numpy(i)
+                    fock_ao_rhs_1pdm_real[i] = fock_ao_rhs_real.alpha_to_numpy(i)
+                    fock_ao_rhs_1pdm_imag[i] = fock_ao_rhs_imag.alpha_to_numpy(i)
                 # combine to complex array
-                fock_ao_rhs_1dm = fock_ao_rhs_1dm_real + 1j * fock_ao_rhs_1dm_imag
+                fock_ao_rhs_1pdm = fock_ao_rhs_1pdm_real + 1j * fock_ao_rhs_1pdm_imag
 
                 # transform to MO basis: mi,xmn,na->xia
-                fock_mo_rhs_1dm = np.array([
-                    np.linalg.multi_dot([mo_occ.T, fock_ao_rhs_1dm[x], mo_vir])
+                fock_mo_rhs_1pdm = np.array([
+                    np.linalg.multi_dot([mo_occ.T, fock_ao_rhs_1pdm[x], mo_vir])
                     for x in range(dof**2)
                 ])
 
@@ -396,7 +396,7 @@ class PolOrbitalResponse(CphfSolver):
                                          1j * fock_ao_rhs_x_minus_y_imag)
                
                 # calculate 2-particle density matrix contribution
-                fock_mo_rhs_2dm = self.calculate_rhs_2dm_contrib(molecule, scf_tensors,
+                fock_mo_rhs_2pdm = self.calculate_rhs_2pdm_contrib(molecule, scf_tensors,
                     x_plus_y_ao, x_minus_y_ao, fock_ao_rhs_x_plus_y, fock_ao_rhs_x_minus_y)
 
                 # Calculate dipole contribution
@@ -404,7 +404,7 @@ class PolOrbitalResponse(CphfSolver):
                     molecule, basis, scf_tensors, x_minus_y)
 
                 # sum RHS contributions
-                rhs_mo = fock_mo_rhs_1dm + fock_mo_rhs_2dm + rhs_dipole_contrib
+                rhs_mo = fock_mo_rhs_1pdm + fock_mo_rhs_2pdm + rhs_dipole_contrib
 
                 # TODO separate function
                 # add DFT E[3] contribution to the RHS
@@ -620,14 +620,14 @@ class PolOrbitalResponse(CphfSolver):
             if self.rank == mpi_master():
                 # extract the 1PDM contributions
                 # FIXME dimensions when upper triangular only
-                fock_ao_rhs_1dm = np.zeros((dof**2, nao, nao))
+                fock_ao_rhs_1pdm = np.zeros((dof**2, nao, nao))
                 for i in range(dof**2):
-                    fock_ao_rhs_1dm[i] = fock_ao_rhs.alpha_to_numpy(i)
+                    fock_ao_rhs_1pdm[i] = fock_ao_rhs.alpha_to_numpy(i)
 
                 # transform to MO basis: mi,xmn,na->xia
                 # FIXME dimensions when upper triangular only
-                fock_mo_rhs_1dm = np.array([
-                    np.linalg.multi_dot([mo_occ.T, fock_ao_rhs_1dm[x], mo_vir])
+                fock_mo_rhs_1pdm = np.array([
+                    np.linalg.multi_dot([mo_occ.T, fock_ao_rhs_1pdm[x], mo_vir])
                     for x in range(dof**2)
                 ])
 
@@ -642,7 +642,7 @@ class PolOrbitalResponse(CphfSolver):
                         dof**2 + dof + i)
 
                 # calculate 2-particle density matrix contribution
-                fock_mo_rhs_2dm = self.calculate_rhs_2dm_contrib(molecule, scf_tensors,
+                fock_mo_rhs_2pdm = self.calculate_rhs_2pdm_contrib(molecule, scf_tensors,
                     x_plus_y_ao, x_minus_y_ao, fock_ao_rhs_x_plus_y, fock_ao_rhs_x_minus_y)
 
                 # calculate dipole contribution
@@ -650,7 +650,7 @@ class PolOrbitalResponse(CphfSolver):
                     molecule, basis, scf_tensors, x_minus_y)
 
                 # sum RHS contributions
-                rhs_mo = fock_mo_rhs_1dm + fock_mo_rhs_2dm + rhs_dipole_contrib
+                rhs_mo = fock_mo_rhs_1pdm + fock_mo_rhs_2pdm + rhs_dipole_contrib
 
                 # add DFT E[3] contribution to the RHS
                 if self._dft:
@@ -793,7 +793,7 @@ class PolOrbitalResponse(CphfSolver):
 
         return unrel_dm_ao, dm_oo, dm_vv
 
-    def calculate_rhs_2dm_contrib(self, molecule, scf_tensors, x_plus_y_ao, x_minus_y_ao,
+    def calculate_rhs_2pdm_contrib(self, molecule, scf_tensors, x_plus_y_ao, x_minus_y_ao,
                                   fock_ao_rhs_x_plus_y, fock_ao_rhs_x_minus_y):
         """
         Calculates the 2-particle density matrix contribution to the RHS.
@@ -811,7 +811,7 @@ class PolOrbitalResponse(CphfSolver):
         :param fock_ao_rhs_x_minus_y:
             Fock matrix from unrel. DM and X-Y response vectors in AO basis.
 
-        :return fock_mo_rhs_2dm:
+        :return fock_mo_rhs_2pdm:
             The Fock 2-particle DM contribution to RHS in MO basis.
         """
 
@@ -837,7 +837,7 @@ class PolOrbitalResponse(CphfSolver):
         else:
             rhs_dt = np.float_
 
-        fock_mo_rhs_2dm = np.zeros((dof, dof, nocc, nvir), dtype = rhs_dt)
+        fock_mo_rhs_2pdm = np.zeros((dof, dof, nocc, nvir), dtype = rhs_dt)
 
         # FIXME loop upper triangular only
         for x in range(dof):
@@ -846,84 +846,84 @@ class PolOrbitalResponse(CphfSolver):
                 tmp = np.linalg.multi_dot(
                     [fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y]])
                 # cl,ti,la,xytc->xyia
-                fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                fock_mo_rhs_2pdm[x, y] += np.linalg.multi_dot(
                     [mo_occ.T, tmp, ovlp, mo_vir])
                 # xmt,ymc->xytc
                 tmp = np.linalg.multi_dot(
                     [fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y]])
                 # cl,ti,la,xytc->xyia
-                fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                fock_mo_rhs_2pdm[x, y] += -1.0 * np.linalg.multi_dot(
                     [mo_occ.T, tmp, ovlp, mo_vir])
                 # ymt,xmc->xytc
                 tmp = np.linalg.multi_dot(
                     [fock_ao_rhs_x_plus_y[y], x_plus_y_ao[x]])
                 # cl,ti,la,xytc->xyia
-                fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                fock_mo_rhs_2pdm[x, y] += np.linalg.multi_dot(
                     [mo_occ.T, tmp, ovlp, mo_vir])
                 # ymt,xmc->xytc
                 tmp = np.linalg.multi_dot(
                     [fock_ao_rhs_x_minus_y[y], x_minus_y_ao[x]])
                 # cl,ti,la,xytc->xyia
-                fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                fock_mo_rhs_2pdm[x, y] += -1.0 * np.linalg.multi_dot(
                     [mo_occ.T, tmp, ovlp, mo_vir])
                 # xtm,ymc->xytc
                 tmp = np.linalg.multi_dot(
                     [fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y]])
                 # cl,ti,la,xytc->xyia
-                fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                fock_mo_rhs_2pdm[x, y] += -1.0 * np.linalg.multi_dot(
                     [mo_occ.T, tmp, ovlp, mo_vir])
                 # xtm,ymc->xytc
                 tmp = np.linalg.multi_dot(
                     [fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y]])
                 # cl,ti,la,xytc->xyia
-                fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                fock_mo_rhs_2pdm[x, y] += -1.0 * np.linalg.multi_dot(
                     [mo_occ.T, tmp, ovlp, mo_vir])
                 # ytm,xmc->xytc
                 tmp = np.linalg.multi_dot(
                     [fock_ao_rhs_x_plus_y[y].T, x_plus_y_ao[x]])
                 # cl,ti,la,xytc->xyia
-                fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                fock_mo_rhs_2pdm[x, y] += -1.0 * np.linalg.multi_dot(
                     [mo_occ.T, tmp, ovlp, mo_vir])
                 # ytm,xmc->xytc
                 tmp = np.linalg.multi_dot(
                     [fock_ao_rhs_x_minus_y[y].T, x_minus_y_ao[x]])
                 # cl,ti,la,xytc->xyia
-                fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                fock_mo_rhs_2pdm[x, y] += -1.0 * np.linalg.multi_dot(
                     [mo_occ.T, tmp, ovlp, mo_vir])
                 # xmt,ycm->xyct
                 tmp = np.linalg.multi_dot(
                     #[fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y].T]).T
                     [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x].T])  # TEST
                 # cl,li,ta,xyct->xyia
-                fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                fock_mo_rhs_2pdm[x, y] += np.linalg.multi_dot(
                     [mo_occ.T, ovlp.T, tmp, mo_vir])
                 # xmt,ycm->xyct
                 tmp = np.linalg.multi_dot(
                     #[fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y].T]).T
                     [x_minus_y_ao[y], fock_ao_rhs_x_minus_y[x].T])  # TEST
                 # cl,li,ta,xyct->xyia
-                fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                fock_mo_rhs_2pdm[x, y] += np.linalg.multi_dot(
                     [mo_occ.T, ovlp.T, tmp, mo_vir])
                 # ymt,xcm->xyct
                 tmp = np.linalg.multi_dot(
                     #[fock_ao_rhs_x_plus_y[y], x_plus_y_ao[x].T]).T
                     [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y].T])  # TEST
                 # cl,li,ta,xyct->xyia
-                fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                fock_mo_rhs_2pdm[x, y] += np.linalg.multi_dot(
                     [mo_occ.T, ovlp.T, tmp, mo_vir])
                 # ymt,xcm->xyct
                 tmp = np.linalg.multi_dot(
                     #[fock_ao_rhs_x_minus_y[y], x_minus_y_ao[x].T]).T
                     [x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y].T])  # TEST
                 # cl,li,ta,xyct->xyia
-                fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                fock_mo_rhs_2pdm[x, y] += np.linalg.multi_dot(
                     [mo_occ.T, ovlp.T, tmp, mo_vir])
                 # xtm,ycm->xytc
                 tmp = np.linalg.multi_dot(
                     #[fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y].T])
                     [x_plus_y_ao[y], fock_ao_rhs_x_plus_y[x]]).T  # TEST
                 # cl,li,ta,xytc->xyia
-                fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                fock_mo_rhs_2pdm[x, y] += -1.0 * np.linalg.multi_dot(
                     #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
                     [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
                 # xtm,ymc->xytc
@@ -931,7 +931,7 @@ class PolOrbitalResponse(CphfSolver):
                     #[fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y].T])
                     [x_minus_y_ao[y], fock_ao_rhs_x_minus_y[x]]).T  # TEST
                 # cl,li,ta,xytc->xyia
-                fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                fock_mo_rhs_2pdm[x, y] += np.linalg.multi_dot(
                     #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
                     [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
                 # ytm,xcm->xytc
@@ -939,7 +939,7 @@ class PolOrbitalResponse(CphfSolver):
                     #[fock_ao_rhs_x_plus_y[y].T, x_plus_y_ao[x].T])
                     [x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y]]).T  # TEST
                 # cl,li,ta,xytc->xyia
-                fock_mo_rhs_2dm[x, y] += -1.0 * np.linalg.multi_dot(
+                fock_mo_rhs_2pdm[x, y] += -1.0 * np.linalg.multi_dot(
                     #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
                     [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
                 # ytm,xcm->xytc
@@ -947,14 +947,14 @@ class PolOrbitalResponse(CphfSolver):
                     #[fock_ao_rhs_x_minus_y[y].T, x_minus_y_ao[x].T])
                     [x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y]]).T
                 # cl,li,ta,xytc->xyia
-                fock_mo_rhs_2dm[x, y] += np.linalg.multi_dot(
+                fock_mo_rhs_2pdm[x, y] += np.linalg.multi_dot(
                     #[mo_occ.T, ovlp.T, tmp.T, mo_vir])
                     [mo_vir.T, tmp, ovlp, mo_occ]).T  # TEST
 
-        fock_mo_rhs_2dm = 0.25 * fock_mo_rhs_2dm.reshape(
+        fock_mo_rhs_2pdm = 0.25 * fock_mo_rhs_2pdm.reshape(
             dof**2, nocc, nvir)
 
-        return fock_mo_rhs_2dm
+        return fock_mo_rhs_2pdm
 
     def calculate_rhs_dipole_contrib(self, molecule, basis, scf_tensors,
                                      x_minus_y):
