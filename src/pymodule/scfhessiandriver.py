@@ -78,13 +78,7 @@ class ScfHessianDriver(HessianDriver):
         - flag: The type of Hessian driver.
         - do_pople_hessian: Evaluate the Hessian the Pople or
                 the Ahlrichs/Furche way.
-#        - numerical: Perform numerical Hessian calculation.
         - numerical_grad: Perform numerical gradient calculation.
-#        - do_four_point: Perform four-point numerical approximation.
-#        - delta_h: Nuclear displacement for finite differences.
-#        - do_print_hessian: Flag for printing the Hessian.
-#        - do_dipole_gradient: The gradient of the dipole moment.
-#        - dipole_gradient: The gradient of the dipole moment.
         - perturbed_density: The perturbed density
     """
 
@@ -95,30 +89,8 @@ class ScfHessianDriver(HessianDriver):
 
         super().__init__(scf_drv.comm, scf_drv.ostream)
 
-        #if comm is None:
-        #    comm = MPI.COMM_WORLD
-
-        #if ostream is None:
-        #    if comm.Get_rank() == mpi_master():
-        #        ostream = OutputStream(sys.stdout)
-        #    else:
-        #        ostream = OutputStream(None)
-
-        ## MPI information
-        #self.comm = comm
-        #self.rank = self.comm.Get_rank()
-        #self.nodes = self.comm.Get_size()
-
-        #self.ostream = ostream
-
         self.flag = 'SCF Hessian Driver'
         self.scf_driver = scf_drv
-
-#        self.hessian = None
-
-#        self.numerical = False
-#        self.do_four_point = False
-#        self.delta_h = 0.001
 
         self.numerical_grad = False
 
@@ -126,42 +98,15 @@ class ScfHessianDriver(HessianDriver):
 
         self.perturbed_density = None
 
-#        self.do_dipole_gradient = False
-#        self.dipole_gradient = None
-
         # flag for printing the Hessian
         self.do_print_hessian = False
 
-#        self._dft = False
-#        self.grid_level = None
-#        self.xcfun = None
-
-        # Timing and profiling
-#        self.timing = False
-#        self.profiling = False
-#        self.memory_profiling = False
-#        self.memory_tracing = False
-
         self._input_keywords['hessian'].update({
-        #self._input_keywords = {
-            #'hessian': {
                 'do_pople_hessian': ('bool', 'whether to compute Pople Hessian'),
                 'numerical_grad': ('bool', 'whether the gradient is numerical'),
-#                'do_dipole_gradient': ('bool', 'whether to compute the dipole gradient'),
-#                'do_print_hessian': ('bool', 'whether to print the Hessian'),
-#                'timing': ('bool', 'whether timing is needed'),
-#                'profiling': ('bool', 'whether profiling is needed'),
-#                'memory_profiling': ('bool', 'whether to profile memory'),
-#                'memory_tracing': ('bool', 'whether to trace memory'),
-            #    },
-#             'method_settings': {
-#                'xcfun': ('str_upper', 'exchange-correlation functional'),
-#                'grid_level': ('int', 'accuracy level of DFT grid'),
-            #    }
             })
 
-    def update_settings(self, method_dict, hess_dict=None, cphf_dict=None):#,
-                        #rsp_dict=None, polgrad_dict=None):
+    def update_settings(self, method_dict, hess_dict=None, cphf_dict=None):
         """
         Updates settings in ScfHessianDriver.
 
@@ -178,31 +123,9 @@ class ScfHessianDriver(HessianDriver):
 
         super().update_settings(method_dict, hess_dict)
 
-        #if method_dict is None:
-        #    method_dict = {}
-        #if hess_dict is None:
-        #    hess_dict = {}
         if cphf_dict is None:
             cphf_dict = {}
 
-        #hess_keywords = {
-        #    key: val[0] for key, val in
-        #    self._input_keywords['hessian'].items()
-        #}
-
-        #parse_input(self, hess_keywords, hess_dict)
-
-        #method_keywords = {
-        #    key: val[0]
-        #    for key, val in self._input_keywords['method_settings'].items()
-        #}
-
-        #parse_input(self, method_keywords, method_dict)
-
-        #dft_sanity_check(self, 'update_settings')
-
-        #self.method_dict = dict(method_dict)
-        #self.hess_dict = dict(hess_dict)
         self.cphf_dict = dict(cphf_dict)
 
     def compute(self, molecule, ao_basis):
@@ -239,10 +162,6 @@ class ScfHessianDriver(HessianDriver):
         # Calculate the gradient of the dipole moment for IR intensities
         if self.do_dipole_gradient and (self.perturbed_density is not None):
             self.compute_dipole_gradient(molecule, ao_basis)
-
-        # Calculate the analytical polarizability gradient for Raman intensities
-        #if self.do_raman:
-        #    self.compute_polarizability_gradient(molecule, ao_basis)
 
         if self.rank == mpi_master():
             # print Hessian
@@ -904,7 +823,6 @@ class ScfHessianDriver(HessianDriver):
 
         # We use comp_lr_fock from CphfSolver to compute the eri
         # and xc contributions
-        #cphf_solver = CphfSolver(self.comm, self.ostream)
         cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
         # ERI information
@@ -1437,8 +1355,6 @@ class ScfHessianDriver(HessianDriver):
 
         self.dipole_gradient = dipole_gradient.reshape(3, 3 * natm)
 
-
-    # TODO can stay here
     def compute_dipole_integral_derivatives(self, molecule, ao_basis):
         """
         Imports the analytical derivatives of dipole integrals.
