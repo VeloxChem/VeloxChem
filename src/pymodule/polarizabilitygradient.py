@@ -245,7 +245,6 @@ class PolarizabilityGradient():
                 dof = len(self.vector_components)
 
                 # Lagrange multipliers
-                # FIXME dimensions upper triangular only
                 omega_ao = orbrsp_results['omega_ao'].reshape(
                     dof, dof, nao, nao)
                 lambda_ao = orbrsp_results['lambda_ao'].reshape(dof, dof, nao, nao)
@@ -474,7 +473,6 @@ class PolarizabilityGradient():
         gradient_start_time = tm.time()
 
         # construct the analytic polarizability gradient
-        # FIXME loop upper triangular only
         for x in range(dof):
             for y in range(dof):
                 for a in range(3):
@@ -805,8 +803,6 @@ class PolarizabilityGradient():
 
         return polgrad_xcgrad
 
-    # TODO rename
-    #def grad_polgrad_xc_contrib_complex(self, molecule, ao_basis, rhow_den_real,
     def calculate_xc_mn_contrib_complex(self, molecule, ao_basis, rhow_den_real,
                                         rhow_den_imag, x_minus_y_den_real_m,
                                         x_minus_y_den_real_n, x_minus_y_den_imag_m,

@@ -505,7 +505,6 @@ class VibrationalAnalysis:
 
         # diagonalizes Hessian and calculates the reduced masses
         # einsum 'ki->i'
-        # TODO is this a good place for reduced masses?
         self.reduced_masses = 1.0 / np.sum(self.normal_modes.T**2, axis=0)
 
         force_constants = (4.0 * np.pi**2 *
