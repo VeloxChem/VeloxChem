@@ -649,7 +649,8 @@ class PolarizabilityGradient():
                 x_minus_y_den_sym_m.broadcast(self.rank, self.comm)
                 x_minus_y_den_sym_n.broadcast(self.rank, self.comm)
 
-                polgrad_xcgrad = self.grad_polgrad_xc_contrib_real(
+                #polgrad_xcgrad = self.grad_polgrad_xc_contrib_real(
+                polgrad_xcgrad = self.calculate_xc_mn_contrib_real(
                     molecule, ao_basis, rhow_den_sym,
                     x_minus_y_den_sym_m, x_minus_y_den_sym_n,
                     gs_density, xcfun_label)
@@ -743,7 +744,8 @@ class PolarizabilityGradient():
                 x_minus_y_den_sym_real_n.broadcast(self.rank, self.comm)
                 x_minus_y_den_sym_imag_n.broadcast(self.rank, self.comm)
 
-                polgrad_xcgrad = self.grad_polgrad_xc_contrib_complex(
+                #polgrad_xcgrad = self.grad_polgrad_xc_contrib_complex(
+                polgrad_xcgrad = self.calculate_xc_mn_contrib_complex(
                     molecule, ao_basis, rhow_den_sym_real,
                     rhow_den_sym_imag, x_minus_y_den_sym_real_m, x_minus_y_den_sym_real_n,
                     x_minus_y_den_sym_imag_m, x_minus_y_den_sym_imag_n, gs_density, xcfun_label)
@@ -753,11 +755,12 @@ class PolarizabilityGradient():
 
         return xc_pol_gradient
 
-    # TODO rename
-    def grad_polgrad_xc_contrib_real(self, molecule, ao_basis, rhow_den, x_minus_y_den_m,
+    #def grad_polgrad_xc_contrib_real(self, molecule, ao_basis, rhow_den, x_minus_y_den_m,
+    def calculate_xc_mn_contrib_real(self, molecule, ao_basis, rhow_den, x_minus_y_den_m,
                                      x_minus_y_den_n, gs_density, xcfun_label):
         """
-        Calculates exchange-correlation contribution to polarizability gradient.
+        Calculates exchange-correlation contribution to the (m,n) component of
+        the real polarizability gradient.
 
         :param molecule:
             The molecule.
@@ -803,12 +806,14 @@ class PolarizabilityGradient():
         return polgrad_xcgrad
 
     # TODO rename
-    def grad_polgrad_xc_contrib_complex(self, molecule, ao_basis, rhow_den_real,
+    #def grad_polgrad_xc_contrib_complex(self, molecule, ao_basis, rhow_den_real,
+    def calculate_xc_mn_contrib_complex(self, molecule, ao_basis, rhow_den_real,
                                         rhow_den_imag, x_minus_y_den_real_m,
                                         x_minus_y_den_real_n, x_minus_y_den_imag_m,
                                         x_minus_y_den_imag_n, gs_density, xcfun_label):
         """
-        Calculates exchange-correlation contribution to polarizability gradient.
+        Calculates exchange-correlation contribution to the (m,n) component of
+        the complex polarizability gradient.
 
         :param molecule:
             The molecule.
