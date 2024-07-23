@@ -257,7 +257,8 @@ class PolOrbitalResponse(CphfSolver):
                     dm_ao_list_imag + xpmy_ao_list_imag, denmat.rest)
 
                 if self._dft:
-                    ## construct density matrices for E[3] term
+                    # construct density matrices for E[3] term
+                    # TODO maybe return as list
                     dm_rere, dm_imim, dm_reim, dm_imre, dm_zero = (
                         self.construct_dft_e3_dm_complex(x_minus_y_ao)
                     )
@@ -303,6 +304,7 @@ class PolOrbitalResponse(CphfSolver):
                 zero_dm_ao.broadcast(self.rank, self.comm)
 
                 # set scaling factors, types, and Fock matrix for DFT g^xc term
+                # TODO maybe return as list
                 fock_re, fock_im, gxc_rere, gxc_imim, gxc_reim, gxc_imre = (
                     self.set_dft_fmat_factor_and_type_complex(fock_ao_rhs_real, fock_ao_rhs_imag,
                                                       zero_dm_ao)
@@ -330,6 +332,7 @@ class PolOrbitalResponse(CphfSolver):
                                     fock_gxc_ao_reim,
                                     fock_gxc_ao_imre]
                 # integrate
+                # TODO consider returning as list
                 gxc_rere, gxc_imim, gxc_reim, gxc_imre = self.integrate_gxc_complex(
                     molecule, basis, molgrid, gs_density, zero_dm_ao,
                     perturbed_dm_ao_list, fock_gxc_ao_list
@@ -1558,14 +1561,14 @@ class PolOrbitalResponse(CphfSolver):
                         #        (2,0), (2,1), (2,2) * dof
 
                         # calculate the contributions from 2PDM and relaxed 1PDM
-                        omega_1pdm_2pdm_contrib = self.calculate_omega_1pdm_2pdm_contrib(
+                        omega_1pdm_2pdm_contrib_mn = self.calculate_omega_1pdm_2pdm_contrib(
                             molecule, scf_tensors, x_plus_y_ao[m], x_plus_y_ao[n],
                             x_minus_y_ao[m], x_minus_y_ao[n], fock_ao_rhs_1_m,
                             fock_ao_rhs_2_m, fock_ao_rhs_1_n, fock_ao_rhs_2_n, fmat)
 
                         # sum contributions to omega
                         omega[m * dof + n] = (epsilon_dm_ao[m, n] +
-                                              omega_1pdm_2pdm_contrib +
+                                              omega_1pdm_2pdm_contrib_mn +
                                               omega_dipole_contrib_ao[m, n])
 
                         if self._dft:
