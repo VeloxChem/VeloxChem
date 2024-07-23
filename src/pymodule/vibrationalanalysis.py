@@ -28,6 +28,7 @@ from contextlib import redirect_stderr
 from io import StringIO
 import numpy as np
 import sys
+import h5py
 
 from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
@@ -67,10 +68,10 @@ class VibrationalAnalysis:
         - reduced_masses: The reduced masses of the normal modes in amu.
         - force_constants: The force constants in mdyn/Angstrom.
         - vib_frequencies: The vibrational frequencies in cm**-1.
-        - normal_modes: The normalized vibrational normal modes in
+        - normal_modes: The non-normalized vibrational normal modes in
                         (non-mass-weighted) Cartesian coordinates.
-        - cart_normal_modes: The non-normalized vibrational modes in
-                        (non-mass-weighted) Cartesian coordinates in 1/sqrt(amu).
+        - normed_normal_modes: The normalized vibrational normal modes in
+                        (non-mass-weighted) Cartesian coordinates.
         - dipole_gradient: The gradient of the dipole moment.
         - ir_intensities: The IR intensities in km/mol.
         - polarizability_gradient: The gradient of the polarizability.
@@ -131,8 +132,8 @@ class VibrationalAnalysis:
         self.force_constants = None
         self.vib_frequencies = None
 
-        self.normal_modes = None  # normalized, not mass-weighted
-        self.cart_normal_modes = None  # neither normalized nor mass-weighted
+        self.normal_modes = None  # not normalized, not mass-weighted
+        self.normed_normal_modes = None  # normalized, not mass-weighted
         self.dipole_gradient = None
         self.ir_intensities = None
         self.polarizability_gradient = None
@@ -157,6 +158,9 @@ class VibrationalAnalysis:
         self.do_print_hessian = False
         self.do_print_polgrad = False
         self.print_depolarization_ratio = False
+
+        # name of output file
+        self.filename = 'results.vib.h5'
 
         # thermodynamics
         self.elec_energy = 0.0
@@ -252,7 +256,6 @@ class VibrationalAnalysis:
 
         if self.rank == mpi_master():
             # get vibrational frequencies and normal modes
-            # TODO what to do about that filename input
             self.frequency_analysis(molecule, filename=None)
 
             # calculate force constants
@@ -272,112 +275,11 @@ class VibrationalAnalysis:
             # print the vibrational properties
             self.print_vibrational_analysis(molecule)
 
+            # create binary file and save vibrational analysis results
+            self.create_hdf5(self.filename)
+
         return
-
-    def print_vibrational_analysis(self, molecule, filename=None, rsp_drv=None):
-        """
-        Prints the results from the vibrational analysis.
-
-        :param molecule:
-            The molecule.
-        :param filename:
-            Filename where thermodynamic properties are saved by geomeTRIC.
-        :param rsp_drv:
-            The response driver (for excited state vibrational analysis).
-        """
-
-        # number of atoms, elements, and coordinates
-        natm = molecule.number_of_atoms()
-        elem = molecule.get_labels()
-        number_of_modes = len(self.vib_frequencies)
-
-        # normalize the normal modes -- as done in geomeTRIC
-        self.normal_modes /= np.linalg.norm(self.normal_modes,
-                                            axis=1)[:, np.newaxis]
-
-        title = 'Vibrational Analysis'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
-
-        width = 52
-        for k in range(number_of_modes):
-
-            # print indices and vibrational frequencies:
-            index_string = '{:22s}{:d}'.format('Vibrational Mode', k + 1)
-            self.ostream.print_header(index_string.ljust(width))
-            self.ostream.print_header('-' * width)
-
-            freq_string = '{:22s}{:20.2f}  {:8s}'.format(
-                'Harmonic frequency:', self.vib_frequencies[k], 'cm**-1')
-            self.ostream.print_header(freq_string.ljust(width))
-
-            mass_string = '{:22s}{:20.4f}  {:8s}'.format(
-                'Reduced mass:', self.reduced_masses[k], 'amu')
-            self.ostream.print_header(mass_string.ljust(width))
-
-            force_cnst_string = '{:22s}{:20.4f}  {:8s}'.format(
-                'Force constant:', self.force_constants[k], 'mdyne/A')
-            self.ostream.print_header(force_cnst_string.ljust(width))
-
-            if self.ir_intensities is not None:
-                ir_intens_string = '{:22s}{:20.4f}  {:8s}'.format(
-                    'IR intensity:', self.ir_intensities[k], 'km/mol')
-                self.ostream.print_header(ir_intens_string.ljust(width))
-
-            if self.raman_intensities is not None:
-                freq_unit = ' a.u.'
-                freqs = list(self.raman_intensities.keys())
-                for freq in freqs:
-                    if freq == 0.0:
-                        this_freq = 'static'
-                    else:
-                        this_freq = str(round(freq,4)) + freq_unit
-                    raman_intens_string = '{:16s} {:12s} {:12.4f}  {:8s}'.format(
-                            'Raman activity:', this_freq, self.raman_intensities[freq][k],
-                            'A**4/amu')
-                    self.ostream.print_header(raman_intens_string.ljust(width))
-
-                if self.print_depolarization_ratio:
-                    raman_parallel_str = '{:22s}{:20.4f}  {:8s}'.format(
-                        'Parallel Raman:', int_pol[k], 'A**4/amu')
-                    self.ostream.print_header(
-                        raman_parallel_str.ljust(width))
-
-                    raman_perpendicular_str = '{:22s}{:20.4f}  {:8s}'.format(
-                        'Perpendicular Raman:', int_depol[k], 'A**4/amu')
-                    self.ostream.print_header(
-                        raman_perpendicular_str.ljust(width))
-
-                    depolarization_str = '{:22s}{:20.4f}'.format(
-                        'Depolarization ratio:', depol_ratio[k])
-                    self.ostream.print_header(
-                        depolarization_str.ljust(width))
-
-            normal_mode_string = '{:22s}'.format('Normal mode:')
-            self.ostream.print_header(normal_mode_string.ljust(width))
-
-            normal_mode_string = '{:16s}{:>12s}{:>12s}{:>12s}'.format(
-                '', 'X', 'Y', 'Z')
-            self.ostream.print_header(normal_mode_string.ljust(width))
-
-            # print normal modes:
-            for atom_index in range(natm):
-                valstr = '{:<8d}'.format(atom_index + 1)
-                valstr += '{:<8s}'.format(elem[atom_index])
-                valstr += '{:12.4f}'.format(
-                    self.normal_modes[k][atom_index * 3 + 0])
-                valstr += '{:12.4f}'.format(
-                    self.normal_modes[k][atom_index * 3 + 1])
-                valstr += '{:12.4f}'.format(
-                    self.normal_modes[k][atom_index * 3 + 2])
-                self.ostream.print_header(valstr.ljust(width))
-
-            self.ostream.print_blank()
-            self.ostream.print_blank()
-
-        self.ostream.flush()
-
+   
     def frequency_analysis(self, molecule, filename=None):
         """
         Runs the frequency analysis from geomeTRIC to obtain vibrational
@@ -620,3 +522,146 @@ class VibrationalAnalysis:
         # save the gradient
         self.polarizability_gradient = polgrad_drv.polgradient
 
+    def print_vibrational_analysis(self, molecule, filename=None, rsp_drv=None):
+        """
+        Prints the results from the vibrational analysis.
+
+        :param molecule:
+            The molecule.
+        :param filename:
+            Filename where thermodynamic properties are saved by geomeTRIC.
+        :param rsp_drv:
+            The response driver (for excited state vibrational analysis).
+        """
+
+        # number of atoms, elements, and coordinates
+        natm = molecule.number_of_atoms()
+        elem = molecule.get_labels()
+        number_of_modes = len(self.vib_frequencies)
+
+        # normalize the normal modes
+        self.normal_modes /= np.linalg.norm(self.normal_modes,
+                                            axis=1)[:, np.newaxis]
+        self.normed_normal_modes = self.normal_modes / np.linalg.norm(self.normal_modes,
+                                            axis=1)[:, np.newaxis]
+
+        title = 'Vibrational Analysis'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
+        width = 52
+        for k in range(number_of_modes):
+
+            # print indices and vibrational frequencies:
+            index_string = '{:22s}{:d}'.format('Vibrational Mode', k + 1)
+            self.ostream.print_header(index_string.ljust(width))
+            self.ostream.print_header('-' * width)
+
+            freq_string = '{:22s}{:20.2f}  {:8s}'.format(
+                'Harmonic frequency:', self.vib_frequencies[k], 'cm**-1')
+            self.ostream.print_header(freq_string.ljust(width))
+
+            mass_string = '{:22s}{:20.4f}  {:8s}'.format(
+                'Reduced mass:', self.reduced_masses[k], 'amu')
+            self.ostream.print_header(mass_string.ljust(width))
+
+            force_cnst_string = '{:22s}{:20.4f}  {:8s}'.format(
+                'Force constant:', self.force_constants[k], 'mdyne/A')
+            self.ostream.print_header(force_cnst_string.ljust(width))
+
+            if self.ir_intensities is not None:
+                ir_intens_string = '{:22s}{:20.4f}  {:8s}'.format(
+                    'IR intensity:', self.ir_intensities[k], 'km/mol')
+                self.ostream.print_header(ir_intens_string.ljust(width))
+
+            if self.raman_intensities is not None:
+                freq_unit = ' a.u.'
+                freqs = list(self.raman_intensities.keys())
+                for freq in freqs:
+                    if freq == 0.0:
+                        this_freq = 'static'
+                    else:
+                        this_freq = str(round(freq,4)) + freq_unit
+                    raman_intens_string = '{:16s} {:12s} {:12.4f}  {:8s}'.format(
+                            'Raman activity:', this_freq, self.raman_intensities[freq][k],
+                            'A**4/amu')
+                    self.ostream.print_header(raman_intens_string.ljust(width))
+
+                if self.print_depolarization_ratio:
+                    raman_parallel_str = '{:22s}{:20.4f}  {:8s}'.format(
+                        'Parallel Raman:', int_pol[k], 'A**4/amu')
+                    self.ostream.print_header(
+                        raman_parallel_str.ljust(width))
+
+                    raman_perpendicular_str = '{:22s}{:20.4f}  {:8s}'.format(
+                        'Perpendicular Raman:', int_depol[k], 'A**4/amu')
+                    self.ostream.print_header(
+                        raman_perpendicular_str.ljust(width))
+
+                    depolarization_str = '{:22s}{:20.4f}'.format(
+                        'Depolarization ratio:', depol_ratio[k])
+                    self.ostream.print_header(
+                        depolarization_str.ljust(width))
+
+            normal_mode_string = '{:22s}'.format('Normal mode:')
+            self.ostream.print_header(normal_mode_string.ljust(width))
+
+            normal_mode_string = '{:16s}{:>12s}{:>12s}{:>12s}'.format(
+                '', 'X', 'Y', 'Z')
+            self.ostream.print_header(normal_mode_string.ljust(width))
+
+            # print normal modes:
+            for atom_index in range(natm):
+                valstr = '{:<8d}'.format(atom_index + 1)
+                valstr += '{:<8s}'.format(elem[atom_index])
+                valstr += '{:12.4f}'.format(
+                    self.normed_normal_modes[k][atom_index * 3 + 0])
+                valstr += '{:12.4f}'.format(
+                    self.normed_normal_modes[k][atom_index * 3 + 1])
+                valstr += '{:12.4f}'.format(
+                    self.normed_normal_modes[k][atom_index * 3 + 2])
+                self.ostream.print_header(valstr.ljust(width))
+
+            self.ostream.print_blank()
+            self.ostream.print_blank()
+
+        self.ostream.flush()
+
+    def create_hdf5(self, fname):
+        """
+        Creates HDF5 file and saves vibrational analysis results.
+
+        :param fname:
+            Name of the output file.
+        """
+
+        valid_file = (fname and isinstance(fname, str))
+
+        if valid_file:
+            hf = h5py.File(fname, 'w')
+
+            hf.create_dataset('normalized_normal_modes',
+                              data = np.array([self.normed_normal_modes]))
+            hf.create_dataset('vib_frequencies',
+                              data = np.array([self.vib_frequencies]))
+            hf.create_dataset('force_constants',
+                              data = np.array([self.force_constants]))
+            hf.create_dataset('reduced_masses',
+                              data = np.array([self.reduced_masses]))
+            if self.do_ir:
+                hf.create_dataset('ir_intensities',
+                              data = np.array([self.ir_intensities]))
+            if self.do_raman:
+                freqs = self.frequencies
+                raman_grp = hf.create_group('raman_activity')
+                for i in range(len(freqs)):
+                    raman_grp.create_dataset(str(freqs[i]),
+                                             data= self.raman_intensities[freqs[i]])
+            if self.do_resonance_raman:
+                freqs = self.frequencies
+                raman_grp = hf.create_group('resonance_raman_activity')
+                for i in range(len(freqs)):
+                    raman_grp.create_dataset(str(freqs[i]),
+                                             data= self.raman_intensities[freqs[i]])
+            hf.close()
