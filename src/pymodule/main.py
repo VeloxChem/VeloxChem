@@ -496,6 +496,8 @@ def main():
                        if 'orbital_response' in task.input_dict else {})
         rsp_dict = (dict(task.input_dict['response'])
                     if 'response' in task.input_dict else {})
+        rsp_dict['filename'] = task.input_dict['filename']
+        vib_dict['filename'] = task.input_dict['filename']
 
         hessian_drv = ScfHessianDriver(scf_drv)
 
