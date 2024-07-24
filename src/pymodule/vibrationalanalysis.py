@@ -29,6 +29,7 @@ from io import StringIO
 import numpy as np
 import sys
 import h5py
+from pathlib import Path
 
 from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
@@ -91,6 +92,8 @@ class VibrationalAnalysis:
         - do_ir: Calculate IR intensities
         - is_scf: Whether the reference state is SCF
         - is_xtb: Whether the reference state is XTB
+        - filename: The filename.
+        - checkpoint_file: The name of checkpoint file.
     """
 
     def __init__(self, hess_drv, comm=None, ostream=None):
@@ -113,6 +116,10 @@ class VibrationalAnalysis:
         self.nodes = self.comm.Get_size()
 
         self.ostream = ostream
+
+        # filenames
+        self.filename = None
+        self.checkpoint_file = None
 
         # Hessian driver etc
         self.hessian_driver = hess_drv
@@ -159,9 +166,6 @@ class VibrationalAnalysis:
         self.do_print_polgrad = False
         self.print_depolarization_ratio = False
 
-        # name of output file
-        self.filename = 'results.vib.h5'
-
         # thermodynamics
         self.elec_energy = 0.0
         self.temperature = 298.15
@@ -182,6 +186,7 @@ class VibrationalAnalysis:
                 'temperature': ('float', 'the temperature'),
                 'pressure': ('float', 'the pressure'),
                 'frequencies': ('seq_range', 'frequencies of external electric field'),
+                'filename': ('str', 'base name of output files'),
                 },
             }
 
@@ -215,6 +220,10 @@ class VibrationalAnalysis:
         }
 
         parse_input(self, vib_keywords, vib_dict)
+
+        if 'filename' in vib_dict:
+            self.filename = vib_dict['filename']
+            self.checkpoint_file = f'{self.filename}.vib.results.h5'
 
         # settings for property modules
         if hess_dict is None:
@@ -276,7 +285,7 @@ class VibrationalAnalysis:
             self.print_vibrational_analysis(molecule)
 
             # create binary file and save vibrational analysis results
-            self.create_hdf5(self.filename)
+            self._write_final_hdf5()
 
         return
    
@@ -628,40 +637,66 @@ class VibrationalAnalysis:
 
         self.ostream.flush()
 
-    def create_hdf5(self, fname):
+    def _write_final_hdf5(self):
         """
-        Creates HDF5 file and saves vibrational analysis results.
+        Writes final HDF5 file that contains results
+        from vibrational analysis
+
+        :param molecule:
+            The molecule.
+        """
+
+        if self.checkpoint_file is None:
+            return
+
+        final_h5_fname = self.checkpoint_file
+
+        self.write_vib_results_to_hdf5(final_h5_fname)
+
+    def write_vib_results_to_hdf5(self, fname):
+        """
+        Writes vibrational analysis results to HDF5 file.
 
         :param fname:
-            Name of the output file.
+            Name of the HDF5 file.
         """
 
-        valid_file = (fname and isinstance(fname, str))
+        valid_checkpoint = (fname and isinstance(fname, str))
 
-        if valid_file:
-            hf = h5py.File(fname, 'w')
+        if not valid_checkpoint:
+            return False
 
-            hf.create_dataset('normalized_normal_modes',
-                              data = np.array([self.normed_normal_modes]))
-            hf.create_dataset('vib_frequencies',
-                              data = np.array([self.vib_frequencies]))
-            hf.create_dataset('force_constants',
-                              data = np.array([self.force_constants]))
-            hf.create_dataset('reduced_masses',
-                              data = np.array([self.reduced_masses]))
-            if self.do_ir:
-                hf.create_dataset('ir_intensities',
-                              data = np.array([self.ir_intensities]))
-            if self.do_raman:
-                freqs = self.frequencies
-                raman_grp = hf.create_group('raman_activity')
-                for i in range(len(freqs)):
-                    raman_grp.create_dataset(str(freqs[i]),
-                                             data= self.raman_intensities[freqs[i]])
-            if self.do_resonance_raman:
-                freqs = self.frequencies
-                raman_grp = hf.create_group('resonance_raman_activity')
-                for i in range(len(freqs)):
-                    raman_grp.create_dataset(str(freqs[i]),
-                                             data= self.raman_intensities[freqs[i]])
-            hf.close()
+        # for some reason, the mpirun cannot truncate existing file
+        # so we check if it exists and deletes if True
+        file_path = Path(fname)
+        if file_path.is_file():
+            file_path.unlink()
+
+        hf = h5py.File(fname, 'w')
+
+        hf.create_dataset('normal_modes',
+                          data = np.array([self.normed_normal_modes]))
+        hf.create_dataset('vib_frequencies',
+                          data = np.array([self.vib_frequencies]))
+        hf.create_dataset('force_constants',
+                          data = np.array([self.force_constants]))
+        hf.create_dataset('reduced_masses',
+                          data = np.array([self.reduced_masses]))
+        if self.do_ir:
+            hf.create_dataset('ir_intensities',
+                          data = np.array([self.ir_intensities]))
+        if self.do_raman:
+            freqs = self.frequencies
+            raman_grp = hf.create_group('raman_activity')
+            for i in range(len(freqs)):
+                raman_grp.create_dataset(str(freqs[i]),
+                                         data= self.raman_intensities[freqs[i]])
+        if self.do_resonance_raman:
+            freqs = self.frequencies
+            raman_grp = hf.create_group('resonance_raman_activity')
+            for i in range(len(freqs)):
+                raman_grp.create_dataset(str(freqs[i]),
+                                         data= self.raman_intensities[freqs[i]])
+        hf.close()
+
+        return True
