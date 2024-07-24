@@ -251,7 +251,7 @@ class VibrationalAnalysis:
         self.compute_hessian(molecule, ao_basis)
 
         # compute the polarizability gradient for Raman intensities
-        if self.do_raman:
+        if self.do_raman or self.do_resonance_raman:
             self.compute_polarizability_gradient(molecule, ao_basis)
 
         if self.rank == mpi_master():
@@ -266,10 +266,10 @@ class VibrationalAnalysis:
                 self.ir_intensities = self.calculate_ir_intensity(self.normal_modes)
 
             # calculate the analytical polarizability gradient for Raman intensities
-            if self.do_raman and self.is_scf:
+            if (self.do_raman or self.do_resonance_raman) and self.is_scf:
                 self.raman_intensities, depol_ratio = self.calculate_raman_activity(
                         self.normal_modes)
-            elif self.do_raman and self.is_xtb:
+            elif (self.do_raman or self.do_resonance_raman) and self.is_xtb:
                 self.ostream.print_info('Raman not available for XTB.')
 
             # print the vibrational properties
@@ -347,7 +347,8 @@ class VibrationalAnalysis:
                 normal_modes.T).reshape(size_x, size_y, size_k)
 
             # calculate rotational invariants
-            alpha_bar = np.zeros((number_of_modes))
+            alpha_bar = np.zeros((number_of_modes),
+                                 dtype=current_polarizability_gradient.dtype)
             gamma_bar_sq = np.zeros((number_of_modes))
             for i in range(3):
                 alpha_bar += raman_transmom[i, i] / 3.0

@@ -131,10 +131,6 @@ class PolarizabilityGradient():
         if self._dft and (self.grid_level is None):
             self.grid_level = get_default_grid_level(self.xcfun) 
 
-        # set data type of pol. gradient for use in compute_analytical()
-        if self.is_complex:
-            self.grad_dt = np.complex_
-
         self.method_dict = dict(method_dict)
         self.orbrsp_dict = dict(orbrsp_dict)
         self.scf_drv = scf_drv
@@ -156,6 +152,10 @@ class PolarizabilityGradient():
 
         if self.rank == mpi_master():
             self.print_header()
+
+        # set data type of pol. gradient for use in compute_analytical()
+        if self.is_complex:
+            self.grad_dt = np.complex_
 
         # sanity check
         dft_sanity_check(self, 'compute')
