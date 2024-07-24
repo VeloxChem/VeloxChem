@@ -143,7 +143,7 @@ class VibrationalAnalysis:
 
         # flag for numerical Hessian and pol. gradient
         self.numerical_hessian = False
-        self.numerical_polgrad = False
+        self.numerical_raman = False
 
         # flag for two-point or four-point approximation
         self.do_four_point_hessian = False
@@ -170,7 +170,7 @@ class VibrationalAnalysis:
         self._input_keywords = {
             'vibrational': {
                 'numerical_hessian': ('bool', 'do numerical hessian'),
-                'numerical_polgrad': ('bool', 'do numerical polarizability gradient'),
+                'numerical_raman': ('bool', 'do numerical polarizability gradient'),
                 'do_four_point_hessian': ('bool', 'do four-point numerical integration'),
                 'do_four_point_polgrad': ('bool', 'do four-point numerical integration'),
                 'do_ir': ('bool', 'whether to calculate IR intensities'),
@@ -495,7 +495,7 @@ class VibrationalAnalysis:
                                     scf_drv = self.scf_driver)
 
         # transfer settings for vibrational task to polgrad driver
-        polgrad_drv.numerical = self.numerical_polgrad
+        polgrad_drv.numerical = self.numerical_raman
         polgrad_drv.do_four_point = self.do_four_point_polgrad
         polgrad_drv.do_print_polgrad = self.do_print_polgrad
 
