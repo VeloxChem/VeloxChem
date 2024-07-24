@@ -283,11 +283,9 @@ class PolarizabilityGradient():
             if self.rank == mpi_master():
                 polgrad_results[w] = pol_gradient.reshape(dof, dof, 3 * natm)
 
-        # TODO is it necessary to  broadcast?
-        polgrad_results = self.comm.bcast(polgrad_results, root=mpi_master())
-        self.polgradient = dict(polgrad_results)
-
         if self.rank == mpi_master():
+            self.polgradient = dict(polgrad_results)
+
             valstr = '** Time spent on constructing the analytical gradient for '
             valstr += '{:d} frequencies: {:.6f} sec **'.format(
                 n_freqs, tm.time() - loop_start_time)
