@@ -91,8 +91,6 @@ class TestPolgrad(unittest.TestCase):
             polgrad_dynamic_reference = polgrad_reference[1]
             hf.close()
 
-            #self.assertTrue(np.max(np.abs(polgrad_static)
-            #                       - np.abs(polgrad_static_reference)) < 1.0e-6)
             self.assertTrue(np.max(np.abs(polgrad_dynamic)
                                    - np.abs(polgrad_dynamic_reference)) < 1.0e-6)
 
