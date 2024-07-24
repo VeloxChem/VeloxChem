@@ -209,9 +209,8 @@ class PolarizabilityGradient():
         """
 
         # get orbital response results
-        if self.rank == mpi_master():
-            all_orbrsp_results = self.compute_orbital_response(
-                molecule, basis, scf_tensors, lr_results)
+        all_orbrsp_results = self.compute_orbital_response(
+            molecule, basis, scf_tensors, lr_results)
 
         # number of frequencies
         n_freqs = len(self.frequencies)
@@ -382,12 +381,13 @@ class PolarizabilityGradient():
         orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
         orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
 
-        valstr = '** Time spent on orbital response for {} frequencies: '.format(
-            len(self.frequencies))
-        valstr += '{:.6f} sec **'.format(tm.time() - orbrsp_start_time)
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-        self.ostream.flush()
+        if self.rank == mpi_master():
+            valstr = '** Time spent on orbital response for {} frequencies: '.format(
+                len(self.frequencies))
+            valstr += '{:.6f} sec **'.format(tm.time() - orbrsp_start_time)
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         return orbrsp_drv.cphf_results
 
