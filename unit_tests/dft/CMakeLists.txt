@@ -1,9 +1,0 @@
-target_sources(utests
-  PRIVATE
-    AOKohnShamMatrixTest.cpp
-    DensityGridTest.cpp
-    GridDriverTest.cpp
-    LebedevLaikovQuadratureTest.cpp
-    M4T2QuadratureTest.cpp
-    MolecularGridTest.cpp
-  )
