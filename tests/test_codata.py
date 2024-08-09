@@ -1,0 +1,26 @@
+import math as mt
+
+from veloxchem import bohr_in_angstrom
+from veloxchem import hartree_in_ev
+
+
+class TestCodata:
+    """
+    Implements tests for src/general/Codata.hpp
+    """
+
+    def test_bohr_in_angstrom(self):
+
+        tol = 1.0e-12
+        assert mt.isclose(bohr_in_angstrom(),
+                          0.529177210903,
+                          rel_tol=tol,
+                          abs_tol=tol)
+
+    def test_hartree_in_ev(self):
+
+        tol = 1.0e-12
+        assert mt.isclose(hartree_in_ev(),
+                          27.211386245988,
+                          rel_tol=tol,
+                          abs_tol=tol)
