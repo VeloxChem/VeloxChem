@@ -1,5 +1,5 @@
-#ifndef OverlapGeom100Func_hpp
-#define OverlapGeom100Func_hpp
+#ifndef OverlapGeom101Func_hpp
+#define OverlapGeom101Func_hpp
 
 #include <array>
 
@@ -230,4 +230,4 @@ compute_geom_101(T&                               distributor,
 
 }  // namespace ovlfunc
 
-#endif /* OverlapGeom100Func_hpp */
+#endif /* OverlapGeom101Func_hpp */

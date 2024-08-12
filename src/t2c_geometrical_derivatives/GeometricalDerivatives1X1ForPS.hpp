@@ -7,9 +7,9 @@ namespace t2cgeom { // t2cgeom namespace
 
 /// @brief Computes [d^(1)/dA^(1)P|R|d^(1)/dB^(1)S]  integrals for arbitrary operator R.
 /// @param pbuffer The primitive integrals buffer.
-/// @param idx_op_geom_101_psThe index of integral in primitive integrals buffer.
-/// @param idx_op_geom_001_ssThe index of integral in primitive integrals buffer.
-/// @param idx_op_geom_001_dsThe index of integral in primitive integrals buffer.
+/// @param idx_op_geom_101_ps The index of integral in primitive integrals buffer.
+/// @param idx_op_sp The index of integral in primitive integrals buffer.
+/// @param idx_op_dp The index of integral in primitive integrals buffer.
 /// @param op_comps The number of operator components.
 /// @param factors The primitive factors buffer.
 /// @param a_exp The exponent on center A.

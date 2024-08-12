@@ -211,7 +211,7 @@ comp_kinetic_energy_geom_10_gd(T& distributor,
 
                 t2cgeom::comp_prim_op_geom_10_gx(pbuffer, 922, 340, 796, 1, 6, a_exp);
 
-                t2cfunc::reduce(cbuffer, pbuffer, 0, ket_width, ket_npgtos);
+                t2cfunc::reduce(cbuffer, pbuffer, 922, ket_width, ket_npgtos);
             }
 
             t2cfunc::transform<4, 2>(sbuffer, cbuffer);

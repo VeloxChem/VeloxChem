@@ -103,9 +103,9 @@ comp_sum_nuclear_potential_geom_10_gg(T& distributor,
 
     // setup Boys function data
 
-    const CBoysFunc<8> bf_table;
+    const CBoysFunc<9> bf_table;
 
-    CSimdArray<double> bf_data(10, ket_npgtos);
+    CSimdArray<double> bf_data(11, ket_npgtos);
 
     // set up ket partitioning
 
@@ -361,7 +361,7 @@ comp_sum_nuclear_potential_geom_10_gg(T& distributor,
 
                     t2cgeom::comp_prim_op_geom_10_gx(pbuffer, 3582, 2067, 3267, 1, 15, a_exp);
 
-                    t2cfunc::reduce(cbuffer, pbuffer, 0, charges[l], ket_width, ket_npgtos);
+                    t2cfunc::reduce(cbuffer, pbuffer, 3582, charges[l], ket_width, ket_npgtos);
                 }
             }
 

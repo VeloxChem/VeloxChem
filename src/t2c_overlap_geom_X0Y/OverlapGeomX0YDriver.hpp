@@ -8,8 +8,7 @@
 #include "MatricesFunc.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
-#include "OverlapGeom100Func.hpp"
-#include "OverlapGeom200Func.hpp"
+#include "OverlapGeom101Func.hpp"
 #include "OpenMPFunc.hpp"
 #include "Point.hpp"
 #include "T2CDistributor.hpp"
@@ -75,7 +74,7 @@ COverlapGeomX0YDriver<N, M>::compute(const CMolecularBasis             &basis,
 {
     // set up operator derivatives matrices
 
-    auto ovl_mats = matfunc::make_matrices(std::array<int, 2>{N, M}, basis, mat_t::symmetric);
+    auto ovl_mats = matfunc::make_matrices(std::array<int, 2>{N, M}, basis, mat_t::general);
 
     ovl_mats.zero();
 

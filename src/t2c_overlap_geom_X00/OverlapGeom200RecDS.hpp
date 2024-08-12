@@ -134,7 +134,7 @@ comp_overlap_geom_20_ds(T& distributor,
 
                 t2cgeom::comp_prim_op_geom_20_dx(pbuffer, 35, 0, 4, 20, 1, 1, a_exp);
 
-                t2cfunc::reduce(cbuffer, pbuffer, 0, ket_width, ket_npgtos);
+                t2cfunc::reduce(cbuffer, pbuffer, 35, ket_width, ket_npgtos);
             }
 
             t2cfunc::transform<2, 0>(sbuffer, cbuffer);

@@ -32,7 +32,7 @@
 
 namespace ovlfunc {
 
-/// @brief Computes overlap integrals for given of pair basis functions blocks.
+/// @brief Computes overlap integral derivatives for given of pair basis functions blocks.
 /// @param distributor The integrals distributor.
 /// @param bra_gto_block The basis functions block on bra side.
 /// @param ket_gto_block The basis functions block on ket side.

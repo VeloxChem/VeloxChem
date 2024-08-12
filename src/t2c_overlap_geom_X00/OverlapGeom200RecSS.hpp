@@ -122,7 +122,7 @@ comp_overlap_geom_20_ss(T& distributor,
 
                 t2cgeom::comp_prim_op_geom_20_sx(pbuffer, 10, 0, 4, 1, 1, a_exp);
 
-                t2cfunc::reduce(cbuffer, pbuffer, 0, ket_width, ket_npgtos);
+                t2cfunc::reduce(cbuffer, pbuffer, 10, ket_width, ket_npgtos);
             }
 
             distributor.distribute(cbuffer, bra_gto_indices, ket_gto_indices, 0, 0, j, ket_range, bra_eq_ket);

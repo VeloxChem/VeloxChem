@@ -15,7 +15,7 @@
 #include "T2CDistributor.hpp"
 
 /// @brief Class  COverlapGeomX00Driver provides methods for computing arbitrary order two-center
-/// overlap derivative integrals derivatives with respect to operator.
+/// overlap integral derivatives with respect bra side.
 template <int N>
 class COverlapGeomX00Driver
 {
@@ -72,7 +72,7 @@ COverlapGeomX00Driver<N>::compute(const CMolecularBasis             &basis,
 {
     // set up operator derivatives matrices
 
-    auto ovl_mats = matfunc::make_matrices(std::array<int, 1>{N}, basis, mat_t::symmetric);
+    auto ovl_mats = matfunc::make_matrices(std::array<int, 1>{N}, basis, mat_t::general);
 
     ovl_mats.zero();
 
@@ -121,6 +121,5 @@ COverlapGeomX00Driver<N>::compute(const CMolecularBasis             &basis,
 
     return ovl_mats;
 }
-
 
 #endif /* OverlapGeomX00Driver_hpp */

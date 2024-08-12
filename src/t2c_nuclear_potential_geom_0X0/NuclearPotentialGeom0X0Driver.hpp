@@ -64,6 +64,15 @@ class CNuclearPotentialGeom0X0Driver
                  const std::vector<TPoint<double>> &coordinates,
                  const CMolecularBasis             &basis,
                  const CMolecule                   &molecule) const -> CMatrices;
+    
+    /// @brief Computes nuclear potential matrix for given set of external charges,  molecule and molecular basis.
+    /// @param basis The molecular basis.
+    /// @param molecule The molecule.
+    /// @param iatom The index of selected atom.
+    /// @return The nuclear potential matrix.
+    auto compute(const CMolecularBasis             &basis,
+                 const CMolecule                   &molecule,
+                 const int                         iatom) const -> CMatrices;
 };
 
 template <int N>
@@ -127,6 +136,31 @@ CNuclearPotentialGeom0X0Driver<N>::compute(const std::vector<double>         &mu
     }
 
     return op_mats;
+}
+
+template <int N>
+auto
+CNuclearPotentialGeom0X0Driver<N>::compute(const CMolecularBasis             &basis,
+                                           const CMolecule                   &molecule,
+                                           const int                         iatom) const -> CMatrices
+{
+    const auto charge = molecule.charges()[iatom];
+    
+    std::vector<double> multipoles;
+    
+    if constexpr (N == 1)
+    {
+        multipoles = std::vector<double>({charge, charge, charge});
+    }
+    
+    if constexpr (N == 2)
+    {
+        multipoles = std::vector<double>({charge, charge, charge, charge, charge, charge});
+    }
+    
+    auto coords = molecule.atom_coordinates(iatom, "au");
+    
+    return compute(multipoles, {coords, }, basis, molecule);
 }
 
 #endif /* NuclearPotentialGeom0X0Driver_hpp */
