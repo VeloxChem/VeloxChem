@@ -142,8 +142,8 @@ comp_prim_nuclear_potential_dp(CSimdArray<double>&       pbuffer,
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
 
-        ta_xx_x_0[i] = ta_0_x_0[i] * fe_0 - ta_0_x_1[i] * fe_0 + ta_x_0_0[i] * fe_0 - ta_x_0_1[i] * fe_0 +
-                       ta_x_x_0[i] * pa_x[i] - ta_x_x_1[i] * pc_x[i];
+        ta_xx_x_0[i] =
+            ta_0_x_0[i] * fe_0 - ta_0_x_1[i] * fe_0 + ta_x_0_0[i] * fe_0 - ta_x_0_1[i] * fe_0 + ta_x_x_0[i] * pa_x[i] - ta_x_x_1[i] * pc_x[i];
 
         ta_xx_y_0[i] = ta_0_y_0[i] * fe_0 - ta_0_y_1[i] * fe_0 + ta_x_y_0[i] * pa_x[i] - ta_x_y_1[i] * pc_x[i];
 
@@ -158,20 +158,8 @@ comp_prim_nuclear_potential_dp(CSimdArray<double>&       pbuffer,
 
     auto ta_xy_z_0 = pbuffer.data(idx_npot_0_dp + 5);
 
-#pragma omp simd aligned(pa_x,          \
-                             pa_y,      \
-                             pc_x,      \
-                             pc_y,      \
-                             ta_x_x_0,  \
-                             ta_x_x_1,  \
-                             ta_xy_x_0, \
-                             ta_xy_y_0, \
-                             ta_xy_z_0, \
-                             ta_y_y_0,  \
-                             ta_y_y_1,  \
-                             ta_y_z_0,  \
-                             ta_y_z_1,  \
-                             b_exps : 64)
+#pragma omp simd aligned( \
+        pa_x, pa_y, pc_x, pc_y, ta_x_x_0, ta_x_x_1, ta_xy_x_0, ta_xy_y_0, ta_xy_z_0, ta_y_y_0, ta_y_y_1, ta_y_z_0, ta_y_z_1, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         ta_xy_x_0[i] = ta_x_x_0[i] * pa_y[i] - ta_x_x_1[i] * pc_y[i];
@@ -189,20 +177,8 @@ comp_prim_nuclear_potential_dp(CSimdArray<double>&       pbuffer,
 
     auto ta_xz_z_0 = pbuffer.data(idx_npot_0_dp + 8);
 
-#pragma omp simd aligned(pa_x,          \
-                             pa_z,      \
-                             pc_x,      \
-                             pc_z,      \
-                             ta_x_x_0,  \
-                             ta_x_x_1,  \
-                             ta_xz_x_0, \
-                             ta_xz_y_0, \
-                             ta_xz_z_0, \
-                             ta_z_y_0,  \
-                             ta_z_y_1,  \
-                             ta_z_z_0,  \
-                             ta_z_z_1,  \
-                             b_exps : 64)
+#pragma omp simd aligned( \
+        pa_x, pa_z, pc_x, pc_z, ta_x_x_0, ta_x_x_1, ta_xz_x_0, ta_xz_y_0, ta_xz_z_0, ta_z_y_0, ta_z_y_1, ta_z_z_0, ta_z_z_1, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         ta_xz_x_0[i] = ta_x_x_0[i] * pa_z[i] - ta_x_x_1[i] * pc_z[i];
@@ -246,8 +222,8 @@ comp_prim_nuclear_potential_dp(CSimdArray<double>&       pbuffer,
 
         ta_yy_x_0[i] = ta_0_x_0[i] * fe_0 - ta_0_x_1[i] * fe_0 + ta_y_x_0[i] * pa_y[i] - ta_y_x_1[i] * pc_y[i];
 
-        ta_yy_y_0[i] = ta_0_y_0[i] * fe_0 - ta_0_y_1[i] * fe_0 + ta_y_0_0[i] * fe_0 - ta_y_0_1[i] * fe_0 +
-                       ta_y_y_0[i] * pa_y[i] - ta_y_y_1[i] * pc_y[i];
+        ta_yy_y_0[i] =
+            ta_0_y_0[i] * fe_0 - ta_0_y_1[i] * fe_0 + ta_y_0_0[i] * fe_0 - ta_y_0_1[i] * fe_0 + ta_y_y_0[i] * pa_y[i] - ta_y_y_1[i] * pc_y[i];
 
         ta_yy_z_0[i] = ta_0_z_0[i] * fe_0 - ta_0_z_1[i] * fe_0 + ta_y_z_0[i] * pa_y[i] - ta_y_z_1[i] * pc_y[i];
     }
@@ -260,20 +236,8 @@ comp_prim_nuclear_potential_dp(CSimdArray<double>&       pbuffer,
 
     auto ta_yz_z_0 = pbuffer.data(idx_npot_0_dp + 14);
 
-#pragma omp simd aligned(pa_y,          \
-                             pa_z,      \
-                             pc_y,      \
-                             pc_z,      \
-                             ta_y_y_0,  \
-                             ta_y_y_1,  \
-                             ta_yz_x_0, \
-                             ta_yz_y_0, \
-                             ta_yz_z_0, \
-                             ta_z_x_0,  \
-                             ta_z_x_1,  \
-                             ta_z_z_0,  \
-                             ta_z_z_1,  \
-                             b_exps : 64)
+#pragma omp simd aligned( \
+        pa_y, pa_z, pc_y, pc_z, ta_y_y_0, ta_y_y_1, ta_yz_x_0, ta_yz_y_0, ta_yz_z_0, ta_z_x_0, ta_z_x_1, ta_z_z_0, ta_z_z_1, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         ta_yz_x_0[i] = ta_z_x_0[i] * pa_y[i] - ta_z_x_1[i] * pc_y[i];
@@ -319,8 +283,8 @@ comp_prim_nuclear_potential_dp(CSimdArray<double>&       pbuffer,
 
         ta_zz_y_0[i] = ta_0_y_0[i] * fe_0 - ta_0_y_1[i] * fe_0 + ta_z_y_0[i] * pa_z[i] - ta_z_y_1[i] * pc_z[i];
 
-        ta_zz_z_0[i] = ta_0_z_0[i] * fe_0 - ta_0_z_1[i] * fe_0 + ta_z_0_0[i] * fe_0 - ta_z_0_1[i] * fe_0 +
-                       ta_z_z_0[i] * pa_z[i] - ta_z_z_1[i] * pc_z[i];
+        ta_zz_z_0[i] =
+            ta_0_z_0[i] * fe_0 - ta_0_z_1[i] * fe_0 + ta_z_0_0[i] * fe_0 - ta_z_0_1[i] * fe_0 + ta_z_z_0[i] * pa_z[i] - ta_z_z_1[i] * pc_z[i];
     }
 }
 

@@ -236,20 +236,15 @@ comp_sum_nuclear_potential_fg(T&                               distributor,
 
                     npotrec::comp_prim_nuclear_potential_pg(pbuffer, 410, 86, 96, 146, 161, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_df(
-                        pbuffer, 455, 66, 76, 176, 194, 230, 260, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_df(pbuffer, 455, 66, 76, 176, 194, 230, 260, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_df(
-                        pbuffer, 515, 76, 86, 194, 212, 260, 290, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_df(pbuffer, 515, 76, 86, 194, 212, 260, 290, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_dg(
-                        pbuffer, 575, 116, 131, 230, 260, 320, 365, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_dg(pbuffer, 575, 116, 131, 230, 260, 320, 365, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_dg(
-                        pbuffer, 665, 131, 146, 260, 290, 365, 410, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_dg(pbuffer, 665, 131, 146, 260, 290, 365, 410, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_fg(
-                        pbuffer, 755, 320, 365, 455, 515, 575, 665, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_fg(pbuffer, 755, 320, 365, 455, 515, 575, 665, factors, 11, 17, a_exp);
 
                     t2cfunc::reduce(cbuffer, pbuffer, 755, charges[l], ket_width, ket_npgtos);
                 }

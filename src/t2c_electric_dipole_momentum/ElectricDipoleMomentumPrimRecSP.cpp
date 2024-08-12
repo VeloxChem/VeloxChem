@@ -1,15 +1,15 @@
 #include "ElectricDipoleMomentumPrimRecSP.hpp"
 
-namespace diprec { // diprec namespace
+namespace diprec {  // diprec namespace
 
 auto
-comp_prim_electric_dipole_momentum_sp(CSimdArray<double>& pbuffer, 
-                                      const size_t idx_dip_sp,
-                                      const size_t idx_ovl_ss,
-                                      const size_t idx_dip_ss,
+comp_prim_electric_dipole_momentum_sp(CSimdArray<double>&       pbuffer,
+                                      const size_t              idx_dip_sp,
+                                      const size_t              idx_ovl_ss,
+                                      const size_t              idx_dip_ss,
                                       const CSimdArray<double>& factors,
-                                      const size_t idx_rpb,
-                                      const double a_exp) -> void
+                                      const size_t              idx_rpb,
+                                      const double              a_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -57,7 +57,23 @@ comp_prim_electric_dipole_momentum_sp(CSimdArray<double>& pbuffer,
 
     auto tr_z_0_z = pbuffer.data(idx_dip_sp + 8);
 
-    #pragma omp simd aligned(pb_x, pb_y, pb_z, tr_x_0_0, tr_x_0_x, tr_x_0_y, tr_x_0_z, tr_y_0_0, tr_y_0_x, tr_y_0_y, tr_y_0_z, tr_z_0_0, tr_z_0_x, tr_z_0_y, tr_z_0_z, ts_0_0, b_exps : 64)
+#pragma omp simd aligned(pb_x,         \
+                             pb_y,     \
+                             pb_z,     \
+                             tr_x_0_0, \
+                             tr_x_0_x, \
+                             tr_x_0_y, \
+                             tr_x_0_z, \
+                             tr_y_0_0, \
+                             tr_y_0_x, \
+                             tr_y_0_y, \
+                             tr_y_0_z, \
+                             tr_z_0_0, \
+                             tr_z_0_x, \
+                             tr_z_0_y, \
+                             tr_z_0_z, \
+                             ts_0_0,   \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -82,5 +98,4 @@ comp_prim_electric_dipole_momentum_sp(CSimdArray<double>& pbuffer,
     }
 }
 
-} // diprec namespace
-
+}  // namespace diprec

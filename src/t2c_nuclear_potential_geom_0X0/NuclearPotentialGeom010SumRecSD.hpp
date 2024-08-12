@@ -168,8 +168,7 @@ comp_sum_nuclear_potential_geom_010_sd(T&                               distribu
 
                     npotrec::comp_prim_nuclear_potential_geom_010_sp(pbuffer, 25, 2, 7, 10, factors, 11, 14);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sd(
-                        pbuffer, 34, 4, 7, 13, 16, 25, factors, 11, 14, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sd(pbuffer, 34, 4, 7, 13, 16, 25, factors, 11, 14, a_exp);
 
                     t2cfunc::reduce(cbuffer, pbuffer, 34, dipoles, 3, l, ket_width, ket_npgtos);
                 }

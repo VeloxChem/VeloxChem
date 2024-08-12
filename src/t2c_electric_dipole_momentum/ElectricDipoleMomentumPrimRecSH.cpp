@@ -1,16 +1,16 @@
 #include "ElectricDipoleMomentumPrimRecSH.hpp"
 
-namespace diprec { // diprec namespace
+namespace diprec {  // diprec namespace
 
 auto
-comp_prim_electric_dipole_momentum_sh(CSimdArray<double>& pbuffer, 
-                                      const size_t idx_dip_sh,
-                                      const size_t idx_dip_sf,
-                                      const size_t idx_ovl_sg,
-                                      const size_t idx_dip_sg,
+comp_prim_electric_dipole_momentum_sh(CSimdArray<double>&       pbuffer,
+                                      const size_t              idx_dip_sh,
+                                      const size_t              idx_dip_sf,
+                                      const size_t              idx_ovl_sg,
+                                      const size_t              idx_dip_sg,
                                       const CSimdArray<double>& factors,
-                                      const size_t idx_rpb,
-                                      const double a_exp) -> void
+                                      const size_t              idx_rpb,
+                                      const double              a_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -282,7 +282,134 @@ comp_prim_electric_dipole_momentum_sh(CSimdArray<double>& pbuffer,
 
     auto tr_z_0_zzzzz = pbuffer.data(idx_dip_sh + 62);
 
-    #pragma omp simd aligned(pb_x, pb_y, pb_z, tr_x_0_xxx, tr_x_0_xxxx, tr_x_0_xxxxx, tr_x_0_xxxxy, tr_x_0_xxxxz, tr_x_0_xxxy, tr_x_0_xxxyy, tr_x_0_xxxyz, tr_x_0_xxxz, tr_x_0_xxxzz, tr_x_0_xxy, tr_x_0_xxyy, tr_x_0_xxyyy, tr_x_0_xxyyz, tr_x_0_xxyzz, tr_x_0_xxz, tr_x_0_xxzz, tr_x_0_xxzzz, tr_x_0_xyyy, tr_x_0_xyyyy, tr_x_0_xyyyz, tr_x_0_xyyzz, tr_x_0_xyzzz, tr_x_0_xzzz, tr_x_0_xzzzz, tr_x_0_yyy, tr_x_0_yyyy, tr_x_0_yyyyy, tr_x_0_yyyyz, tr_x_0_yyyzz, tr_x_0_yyzz, tr_x_0_yyzzz, tr_x_0_yzz, tr_x_0_yzzz, tr_x_0_yzzzz, tr_x_0_zzz, tr_x_0_zzzz, tr_x_0_zzzzz, tr_y_0_xxx, tr_y_0_xxxx, tr_y_0_xxxxx, tr_y_0_xxxxy, tr_y_0_xxxxz, tr_y_0_xxxy, tr_y_0_xxxyy, tr_y_0_xxxyz, tr_y_0_xxxzz, tr_y_0_xxy, tr_y_0_xxyy, tr_y_0_xxyyy, tr_y_0_xxyyz, tr_y_0_xxyzz, tr_y_0_xxzz, tr_y_0_xxzzz, tr_y_0_xyy, tr_y_0_xyyy, tr_y_0_xyyyy, tr_y_0_xyyyz, tr_y_0_xyyzz, tr_y_0_xyzz, tr_y_0_xyzzz, tr_y_0_xzz, tr_y_0_xzzz, tr_y_0_xzzzz, tr_y_0_yyy, tr_y_0_yyyy, tr_y_0_yyyyy, tr_y_0_yyyyz, tr_y_0_yyyz, tr_y_0_yyyzz, tr_y_0_yyz, tr_y_0_yyzz, tr_y_0_yyzzz, tr_y_0_yzz, tr_y_0_yzzz, tr_y_0_yzzzz, tr_y_0_zzz, tr_y_0_zzzz, tr_y_0_zzzzz, tr_z_0_xxx, tr_z_0_xxxx, tr_z_0_xxxxx, tr_z_0_xxxxy, tr_z_0_xxxxz, tr_z_0_xxxyy, tr_z_0_xxxyz, tr_z_0_xxxz, tr_z_0_xxxzz, tr_z_0_xxyy, tr_z_0_xxyyy, tr_z_0_xxyyz, tr_z_0_xxyzz, tr_z_0_xxz, tr_z_0_xxzz, tr_z_0_xxzzz, tr_z_0_xyy, tr_z_0_xyyy, tr_z_0_xyyyy, tr_z_0_xyyyz, tr_z_0_xyyz, tr_z_0_xyyzz, tr_z_0_xyzzz, tr_z_0_xzz, tr_z_0_xzzz, tr_z_0_xzzzz, tr_z_0_yyy, tr_z_0_yyyy, tr_z_0_yyyyy, tr_z_0_yyyyz, tr_z_0_yyyz, tr_z_0_yyyzz, tr_z_0_yyz, tr_z_0_yyzz, tr_z_0_yyzzz, tr_z_0_yzz, tr_z_0_yzzz, tr_z_0_yzzzz, tr_z_0_zzz, tr_z_0_zzzz, tr_z_0_zzzzz, ts_0_xxxx, ts_0_yyyy, ts_0_yyzz, ts_0_zzzz, b_exps : 64)
+#pragma omp simd aligned(pb_x,             \
+                             pb_y,         \
+                             pb_z,         \
+                             tr_x_0_xxx,   \
+                             tr_x_0_xxxx,  \
+                             tr_x_0_xxxxx, \
+                             tr_x_0_xxxxy, \
+                             tr_x_0_xxxxz, \
+                             tr_x_0_xxxy,  \
+                             tr_x_0_xxxyy, \
+                             tr_x_0_xxxyz, \
+                             tr_x_0_xxxz,  \
+                             tr_x_0_xxxzz, \
+                             tr_x_0_xxy,   \
+                             tr_x_0_xxyy,  \
+                             tr_x_0_xxyyy, \
+                             tr_x_0_xxyyz, \
+                             tr_x_0_xxyzz, \
+                             tr_x_0_xxz,   \
+                             tr_x_0_xxzz,  \
+                             tr_x_0_xxzzz, \
+                             tr_x_0_xyyy,  \
+                             tr_x_0_xyyyy, \
+                             tr_x_0_xyyyz, \
+                             tr_x_0_xyyzz, \
+                             tr_x_0_xyzzz, \
+                             tr_x_0_xzzz,  \
+                             tr_x_0_xzzzz, \
+                             tr_x_0_yyy,   \
+                             tr_x_0_yyyy,  \
+                             tr_x_0_yyyyy, \
+                             tr_x_0_yyyyz, \
+                             tr_x_0_yyyzz, \
+                             tr_x_0_yyzz,  \
+                             tr_x_0_yyzzz, \
+                             tr_x_0_yzz,   \
+                             tr_x_0_yzzz,  \
+                             tr_x_0_yzzzz, \
+                             tr_x_0_zzz,   \
+                             tr_x_0_zzzz,  \
+                             tr_x_0_zzzzz, \
+                             tr_y_0_xxx,   \
+                             tr_y_0_xxxx,  \
+                             tr_y_0_xxxxx, \
+                             tr_y_0_xxxxy, \
+                             tr_y_0_xxxxz, \
+                             tr_y_0_xxxy,  \
+                             tr_y_0_xxxyy, \
+                             tr_y_0_xxxyz, \
+                             tr_y_0_xxxzz, \
+                             tr_y_0_xxy,   \
+                             tr_y_0_xxyy,  \
+                             tr_y_0_xxyyy, \
+                             tr_y_0_xxyyz, \
+                             tr_y_0_xxyzz, \
+                             tr_y_0_xxzz,  \
+                             tr_y_0_xxzzz, \
+                             tr_y_0_xyy,   \
+                             tr_y_0_xyyy,  \
+                             tr_y_0_xyyyy, \
+                             tr_y_0_xyyyz, \
+                             tr_y_0_xyyzz, \
+                             tr_y_0_xyzz,  \
+                             tr_y_0_xyzzz, \
+                             tr_y_0_xzz,   \
+                             tr_y_0_xzzz,  \
+                             tr_y_0_xzzzz, \
+                             tr_y_0_yyy,   \
+                             tr_y_0_yyyy,  \
+                             tr_y_0_yyyyy, \
+                             tr_y_0_yyyyz, \
+                             tr_y_0_yyyz,  \
+                             tr_y_0_yyyzz, \
+                             tr_y_0_yyz,   \
+                             tr_y_0_yyzz,  \
+                             tr_y_0_yyzzz, \
+                             tr_y_0_yzz,   \
+                             tr_y_0_yzzz,  \
+                             tr_y_0_yzzzz, \
+                             tr_y_0_zzz,   \
+                             tr_y_0_zzzz,  \
+                             tr_y_0_zzzzz, \
+                             tr_z_0_xxx,   \
+                             tr_z_0_xxxx,  \
+                             tr_z_0_xxxxx, \
+                             tr_z_0_xxxxy, \
+                             tr_z_0_xxxxz, \
+                             tr_z_0_xxxyy, \
+                             tr_z_0_xxxyz, \
+                             tr_z_0_xxxz,  \
+                             tr_z_0_xxxzz, \
+                             tr_z_0_xxyy,  \
+                             tr_z_0_xxyyy, \
+                             tr_z_0_xxyyz, \
+                             tr_z_0_xxyzz, \
+                             tr_z_0_xxz,   \
+                             tr_z_0_xxzz,  \
+                             tr_z_0_xxzzz, \
+                             tr_z_0_xyy,   \
+                             tr_z_0_xyyy,  \
+                             tr_z_0_xyyyy, \
+                             tr_z_0_xyyyz, \
+                             tr_z_0_xyyz,  \
+                             tr_z_0_xyyzz, \
+                             tr_z_0_xyzzz, \
+                             tr_z_0_xzz,   \
+                             tr_z_0_xzzz,  \
+                             tr_z_0_xzzzz, \
+                             tr_z_0_yyy,   \
+                             tr_z_0_yyyy,  \
+                             tr_z_0_yyyyy, \
+                             tr_z_0_yyyyz, \
+                             tr_z_0_yyyz,  \
+                             tr_z_0_yyyzz, \
+                             tr_z_0_yyz,   \
+                             tr_z_0_yyzz,  \
+                             tr_z_0_yyzzz, \
+                             tr_z_0_yzz,   \
+                             tr_z_0_yzzz,  \
+                             tr_z_0_yzzzz, \
+                             tr_z_0_zzz,   \
+                             tr_z_0_zzzz,  \
+                             tr_z_0_zzzzz, \
+                             ts_0_xxxx,    \
+                             ts_0_yyyy,    \
+                             ts_0_yyzz,    \
+                             ts_0_zzzz,    \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -415,5 +542,4 @@ comp_prim_electric_dipole_momentum_sh(CSimdArray<double>& pbuffer,
     }
 }
 
-} // diprec namespace
-
+}  // namespace diprec

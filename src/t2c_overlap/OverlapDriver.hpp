@@ -54,8 +54,7 @@ class COverlapDriver
     /// @param ket_basis the molecular basis on ket side.
     /// @param molecule The molecule.
     /// @return The overlap matrix.
-    auto compute(const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis, const CMolecule &molecule) const
-        -> CMatrix;
+    auto compute(const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis, const CMolecule &molecule) const -> CMatrix;
 };
 
 #endif /* OverlapDriver_hpp */

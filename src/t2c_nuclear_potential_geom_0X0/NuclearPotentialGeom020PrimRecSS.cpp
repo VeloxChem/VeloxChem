@@ -28,7 +28,7 @@ comp_prim_nuclear_potential_geom_020_ss(CSimdArray<double>&       pbuffer,
     // Set up components of auxiliary buffer : SS
 
     auto ta_0_0_1 = pbuffer.data(idx_npot_1_ss);
-    
+
     // Set up components of auxiliary buffer : SS
 
     auto ta_0_0_2 = pbuffer.data(idx_npot_2_ss);
@@ -40,14 +40,15 @@ comp_prim_nuclear_potential_geom_020_ss(CSimdArray<double>&       pbuffer,
     auto ta2_xy_0_0_0 = pbuffer.data(idx_npot_geom_020_0_ss + 1);
 
     auto ta2_xz_0_0_0 = pbuffer.data(idx_npot_geom_020_0_ss + 2);
-    
+
     auto ta2_yy_0_0_0 = pbuffer.data(idx_npot_geom_020_0_ss + 3);
 
     auto ta2_yz_0_0_0 = pbuffer.data(idx_npot_geom_020_0_ss + 4);
-    
+
     auto ta2_zz_0_0_0 = pbuffer.data(idx_npot_geom_020_0_ss + 5);
 
-#pragma omp simd aligned(pc_x, pc_y, pc_z, ta2_xx_0_0_0, ta2_xy_0_0_0, ta2_xz_0_0_0,  ta2_yy_0_0_0, ta2_yz_0_0_0, ta2_zz_0_0_0, ta_0_0_1, ta_0_0_2, b_exps : 64)
+#pragma omp simd aligned( \
+        pc_x, pc_y, pc_z, ta2_xx_0_0_0, ta2_xy_0_0_0, ta2_xz_0_0_0, ta2_yy_0_0_0, ta2_yz_0_0_0, ta2_zz_0_0_0, ta_0_0_1, ta_0_0_2, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fact = 2.0 * (a_exp + b_exps[i]);
@@ -57,11 +58,11 @@ comp_prim_nuclear_potential_geom_020_ss(CSimdArray<double>&       pbuffer,
         ta2_xy_0_0_0[i] = fact * fact * pc_x[i] * pc_y[i] * ta_0_0_2[i];
 
         ta2_xz_0_0_0[i] = fact * fact * pc_x[i] * pc_z[i] * ta_0_0_2[i];
-        
+
         ta2_yy_0_0_0[i] = fact * fact * pc_y[i] * pc_y[i] * ta_0_0_2[i] - fact * ta_0_0_1[i];
 
         ta2_yz_0_0_0[i] = fact * fact * pc_y[i] * pc_z[i] * ta_0_0_2[i];
-        
+
         ta2_zz_0_0_0[i] = fact * fact * pc_z[i] * pc_z[i] * ta_0_0_2[i] - fact * ta_0_0_1[i];
     }
 }

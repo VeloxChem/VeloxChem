@@ -1,19 +1,19 @@
 #include "NuclearPotentialGeom020PrimRecPP.hpp"
 
-namespace npotrec { // npotrec namespace
+namespace npotrec {  // npotrec namespace
 
 auto
-comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer, 
-                                        const size_t idx_npot_geom_020_0_pp,
-                                        const size_t idx_npot_geom_020_0_ss,
-                                        const size_t idx_npot_geom_020_1_ss,
-                                        const size_t idx_npot_geom_010_1_sp,
-                                        const size_t idx_npot_geom_020_0_sp,
-                                        const size_t idx_npot_geom_020_1_sp,
+comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>&       pbuffer,
+                                        const size_t              idx_npot_geom_020_0_pp,
+                                        const size_t              idx_npot_geom_020_0_ss,
+                                        const size_t              idx_npot_geom_020_1_ss,
+                                        const size_t              idx_npot_geom_010_1_sp,
+                                        const size_t              idx_npot_geom_020_0_sp,
+                                        const size_t              idx_npot_geom_020_1_sp,
                                         const CSimdArray<double>& factors,
-                                        const size_t idx_rpa,
-                                        const size_t idx_rpc,
-                                        const double a_exp) -> void
+                                        const size_t              idx_rpa,
+                                        const size_t              idx_rpc,
+                                        const double              a_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -169,12 +169,29 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_xx_x_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 2);
 
-    #pragma omp simd aligned(pa_x, pc_x, ta1_x_0_x_1, ta1_x_0_y_1, ta1_x_0_z_1, ta2_xx_0_0_0, ta2_xx_0_0_1, ta2_xx_0_x_0, ta2_xx_0_x_1, ta2_xx_0_y_0, ta2_xx_0_y_1, ta2_xx_0_z_0, ta2_xx_0_z_1, ta2_xx_x_x_0, ta2_xx_x_y_0, ta2_xx_x_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_x,             \
+                             pc_x,         \
+                             ta1_x_0_x_1,  \
+                             ta1_x_0_y_1,  \
+                             ta1_x_0_z_1,  \
+                             ta2_xx_0_0_0, \
+                             ta2_xx_0_0_1, \
+                             ta2_xx_0_x_0, \
+                             ta2_xx_0_x_1, \
+                             ta2_xx_0_y_0, \
+                             ta2_xx_0_y_1, \
+                             ta2_xx_0_z_0, \
+                             ta2_xx_0_z_1, \
+                             ta2_xx_x_x_0, \
+                             ta2_xx_x_y_0, \
+                             ta2_xx_x_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
 
-        ta2_xx_x_x_0[i] = ta2_xx_0_0_0[i] * fe_0 - ta2_xx_0_0_1[i] * fe_0 + 2.0 * ta1_x_0_x_1[i] + ta2_xx_0_x_0[i] * pa_x[i] - ta2_xx_0_x_1[i] * pc_x[i];
+        ta2_xx_x_x_0[i] =
+            ta2_xx_0_0_0[i] * fe_0 - ta2_xx_0_0_1[i] * fe_0 + 2.0 * ta1_x_0_x_1[i] + ta2_xx_0_x_0[i] * pa_x[i] - ta2_xx_0_x_1[i] * pc_x[i];
 
         ta2_xx_x_y_0[i] = 2.0 * ta1_x_0_y_1[i] + ta2_xx_0_y_0[i] * pa_x[i] - ta2_xx_0_y_1[i] * pc_x[i];
 
@@ -189,7 +206,20 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_xx_y_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 5);
 
-    #pragma omp simd aligned(pa_y, pc_y, ta2_xx_0_0_0, ta2_xx_0_0_1, ta2_xx_0_x_0, ta2_xx_0_x_1, ta2_xx_0_y_0, ta2_xx_0_y_1, ta2_xx_0_z_0, ta2_xx_0_z_1, ta2_xx_y_x_0, ta2_xx_y_y_0, ta2_xx_y_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_y,             \
+                             pc_y,         \
+                             ta2_xx_0_0_0, \
+                             ta2_xx_0_0_1, \
+                             ta2_xx_0_x_0, \
+                             ta2_xx_0_x_1, \
+                             ta2_xx_0_y_0, \
+                             ta2_xx_0_y_1, \
+                             ta2_xx_0_z_0, \
+                             ta2_xx_0_z_1, \
+                             ta2_xx_y_x_0, \
+                             ta2_xx_y_y_0, \
+                             ta2_xx_y_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -209,7 +239,20 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_xx_z_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 8);
 
-    #pragma omp simd aligned(pa_z, pc_z, ta2_xx_0_0_0, ta2_xx_0_0_1, ta2_xx_0_x_0, ta2_xx_0_x_1, ta2_xx_0_y_0, ta2_xx_0_y_1, ta2_xx_0_z_0, ta2_xx_0_z_1, ta2_xx_z_x_0, ta2_xx_z_y_0, ta2_xx_z_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_z,             \
+                             pc_z,         \
+                             ta2_xx_0_0_0, \
+                             ta2_xx_0_0_1, \
+                             ta2_xx_0_x_0, \
+                             ta2_xx_0_x_1, \
+                             ta2_xx_0_y_0, \
+                             ta2_xx_0_y_1, \
+                             ta2_xx_0_z_0, \
+                             ta2_xx_0_z_1, \
+                             ta2_xx_z_x_0, \
+                             ta2_xx_z_y_0, \
+                             ta2_xx_z_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -229,7 +272,23 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_xy_x_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 11);
 
-    #pragma omp simd aligned(pa_x, pc_x, ta1_y_0_x_1, ta1_y_0_y_1, ta1_y_0_z_1, ta2_xy_0_0_0, ta2_xy_0_0_1, ta2_xy_0_x_0, ta2_xy_0_x_1, ta2_xy_0_y_0, ta2_xy_0_y_1, ta2_xy_0_z_0, ta2_xy_0_z_1, ta2_xy_x_x_0, ta2_xy_x_y_0, ta2_xy_x_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_x,             \
+                             pc_x,         \
+                             ta1_y_0_x_1,  \
+                             ta1_y_0_y_1,  \
+                             ta1_y_0_z_1,  \
+                             ta2_xy_0_0_0, \
+                             ta2_xy_0_0_1, \
+                             ta2_xy_0_x_0, \
+                             ta2_xy_0_x_1, \
+                             ta2_xy_0_y_0, \
+                             ta2_xy_0_y_1, \
+                             ta2_xy_0_z_0, \
+                             ta2_xy_0_z_1, \
+                             ta2_xy_x_x_0, \
+                             ta2_xy_x_y_0, \
+                             ta2_xy_x_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -249,7 +308,23 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_xy_y_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 14);
 
-    #pragma omp simd aligned(pa_y, pc_y, ta1_x_0_x_1, ta1_x_0_y_1, ta1_x_0_z_1, ta2_xy_0_0_0, ta2_xy_0_0_1, ta2_xy_0_x_0, ta2_xy_0_x_1, ta2_xy_0_y_0, ta2_xy_0_y_1, ta2_xy_0_z_0, ta2_xy_0_z_1, ta2_xy_y_x_0, ta2_xy_y_y_0, ta2_xy_y_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_y,             \
+                             pc_y,         \
+                             ta1_x_0_x_1,  \
+                             ta1_x_0_y_1,  \
+                             ta1_x_0_z_1,  \
+                             ta2_xy_0_0_0, \
+                             ta2_xy_0_0_1, \
+                             ta2_xy_0_x_0, \
+                             ta2_xy_0_x_1, \
+                             ta2_xy_0_y_0, \
+                             ta2_xy_0_y_1, \
+                             ta2_xy_0_z_0, \
+                             ta2_xy_0_z_1, \
+                             ta2_xy_y_x_0, \
+                             ta2_xy_y_y_0, \
+                             ta2_xy_y_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -269,7 +344,20 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_xy_z_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 17);
 
-    #pragma omp simd aligned(pa_z, pc_z, ta2_xy_0_0_0, ta2_xy_0_0_1, ta2_xy_0_x_0, ta2_xy_0_x_1, ta2_xy_0_y_0, ta2_xy_0_y_1, ta2_xy_0_z_0, ta2_xy_0_z_1, ta2_xy_z_x_0, ta2_xy_z_y_0, ta2_xy_z_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_z,             \
+                             pc_z,         \
+                             ta2_xy_0_0_0, \
+                             ta2_xy_0_0_1, \
+                             ta2_xy_0_x_0, \
+                             ta2_xy_0_x_1, \
+                             ta2_xy_0_y_0, \
+                             ta2_xy_0_y_1, \
+                             ta2_xy_0_z_0, \
+                             ta2_xy_0_z_1, \
+                             ta2_xy_z_x_0, \
+                             ta2_xy_z_y_0, \
+                             ta2_xy_z_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -289,7 +377,23 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_xz_x_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 20);
 
-    #pragma omp simd aligned(pa_x, pc_x, ta1_z_0_x_1, ta1_z_0_y_1, ta1_z_0_z_1, ta2_xz_0_0_0, ta2_xz_0_0_1, ta2_xz_0_x_0, ta2_xz_0_x_1, ta2_xz_0_y_0, ta2_xz_0_y_1, ta2_xz_0_z_0, ta2_xz_0_z_1, ta2_xz_x_x_0, ta2_xz_x_y_0, ta2_xz_x_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_x,             \
+                             pc_x,         \
+                             ta1_z_0_x_1,  \
+                             ta1_z_0_y_1,  \
+                             ta1_z_0_z_1,  \
+                             ta2_xz_0_0_0, \
+                             ta2_xz_0_0_1, \
+                             ta2_xz_0_x_0, \
+                             ta2_xz_0_x_1, \
+                             ta2_xz_0_y_0, \
+                             ta2_xz_0_y_1, \
+                             ta2_xz_0_z_0, \
+                             ta2_xz_0_z_1, \
+                             ta2_xz_x_x_0, \
+                             ta2_xz_x_y_0, \
+                             ta2_xz_x_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -309,7 +413,20 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_xz_y_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 23);
 
-    #pragma omp simd aligned(pa_y, pc_y, ta2_xz_0_0_0, ta2_xz_0_0_1, ta2_xz_0_x_0, ta2_xz_0_x_1, ta2_xz_0_y_0, ta2_xz_0_y_1, ta2_xz_0_z_0, ta2_xz_0_z_1, ta2_xz_y_x_0, ta2_xz_y_y_0, ta2_xz_y_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_y,             \
+                             pc_y,         \
+                             ta2_xz_0_0_0, \
+                             ta2_xz_0_0_1, \
+                             ta2_xz_0_x_0, \
+                             ta2_xz_0_x_1, \
+                             ta2_xz_0_y_0, \
+                             ta2_xz_0_y_1, \
+                             ta2_xz_0_z_0, \
+                             ta2_xz_0_z_1, \
+                             ta2_xz_y_x_0, \
+                             ta2_xz_y_y_0, \
+                             ta2_xz_y_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -329,7 +446,23 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_xz_z_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 26);
 
-    #pragma omp simd aligned(pa_z, pc_z, ta1_x_0_x_1, ta1_x_0_y_1, ta1_x_0_z_1, ta2_xz_0_0_0, ta2_xz_0_0_1, ta2_xz_0_x_0, ta2_xz_0_x_1, ta2_xz_0_y_0, ta2_xz_0_y_1, ta2_xz_0_z_0, ta2_xz_0_z_1, ta2_xz_z_x_0, ta2_xz_z_y_0, ta2_xz_z_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_z,             \
+                             pc_z,         \
+                             ta1_x_0_x_1,  \
+                             ta1_x_0_y_1,  \
+                             ta1_x_0_z_1,  \
+                             ta2_xz_0_0_0, \
+                             ta2_xz_0_0_1, \
+                             ta2_xz_0_x_0, \
+                             ta2_xz_0_x_1, \
+                             ta2_xz_0_y_0, \
+                             ta2_xz_0_y_1, \
+                             ta2_xz_0_z_0, \
+                             ta2_xz_0_z_1, \
+                             ta2_xz_z_x_0, \
+                             ta2_xz_z_y_0, \
+                             ta2_xz_z_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -349,7 +482,20 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_yy_x_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 29);
 
-    #pragma omp simd aligned(pa_x, pc_x, ta2_yy_0_0_0, ta2_yy_0_0_1, ta2_yy_0_x_0, ta2_yy_0_x_1, ta2_yy_0_y_0, ta2_yy_0_y_1, ta2_yy_0_z_0, ta2_yy_0_z_1, ta2_yy_x_x_0, ta2_yy_x_y_0, ta2_yy_x_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_x,             \
+                             pc_x,         \
+                             ta2_yy_0_0_0, \
+                             ta2_yy_0_0_1, \
+                             ta2_yy_0_x_0, \
+                             ta2_yy_0_x_1, \
+                             ta2_yy_0_y_0, \
+                             ta2_yy_0_y_1, \
+                             ta2_yy_0_z_0, \
+                             ta2_yy_0_z_1, \
+                             ta2_yy_x_x_0, \
+                             ta2_yy_x_y_0, \
+                             ta2_yy_x_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -369,14 +515,31 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_yy_y_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 32);
 
-    #pragma omp simd aligned(pa_y, pc_y, ta1_y_0_x_1, ta1_y_0_y_1, ta1_y_0_z_1, ta2_yy_0_0_0, ta2_yy_0_0_1, ta2_yy_0_x_0, ta2_yy_0_x_1, ta2_yy_0_y_0, ta2_yy_0_y_1, ta2_yy_0_z_0, ta2_yy_0_z_1, ta2_yy_y_x_0, ta2_yy_y_y_0, ta2_yy_y_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_y,             \
+                             pc_y,         \
+                             ta1_y_0_x_1,  \
+                             ta1_y_0_y_1,  \
+                             ta1_y_0_z_1,  \
+                             ta2_yy_0_0_0, \
+                             ta2_yy_0_0_1, \
+                             ta2_yy_0_x_0, \
+                             ta2_yy_0_x_1, \
+                             ta2_yy_0_y_0, \
+                             ta2_yy_0_y_1, \
+                             ta2_yy_0_z_0, \
+                             ta2_yy_0_z_1, \
+                             ta2_yy_y_x_0, \
+                             ta2_yy_y_y_0, \
+                             ta2_yy_y_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
 
         ta2_yy_y_x_0[i] = 2.0 * ta1_y_0_x_1[i] + ta2_yy_0_x_0[i] * pa_y[i] - ta2_yy_0_x_1[i] * pc_y[i];
 
-        ta2_yy_y_y_0[i] = ta2_yy_0_0_0[i] * fe_0 - ta2_yy_0_0_1[i] * fe_0 + 2.0 * ta1_y_0_y_1[i] + ta2_yy_0_y_0[i] * pa_y[i] - ta2_yy_0_y_1[i] * pc_y[i];
+        ta2_yy_y_y_0[i] =
+            ta2_yy_0_0_0[i] * fe_0 - ta2_yy_0_0_1[i] * fe_0 + 2.0 * ta1_y_0_y_1[i] + ta2_yy_0_y_0[i] * pa_y[i] - ta2_yy_0_y_1[i] * pc_y[i];
 
         ta2_yy_y_z_0[i] = 2.0 * ta1_y_0_z_1[i] + ta2_yy_0_z_0[i] * pa_y[i] - ta2_yy_0_z_1[i] * pc_y[i];
     }
@@ -389,7 +552,20 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_yy_z_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 35);
 
-    #pragma omp simd aligned(pa_z, pc_z, ta2_yy_0_0_0, ta2_yy_0_0_1, ta2_yy_0_x_0, ta2_yy_0_x_1, ta2_yy_0_y_0, ta2_yy_0_y_1, ta2_yy_0_z_0, ta2_yy_0_z_1, ta2_yy_z_x_0, ta2_yy_z_y_0, ta2_yy_z_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_z,             \
+                             pc_z,         \
+                             ta2_yy_0_0_0, \
+                             ta2_yy_0_0_1, \
+                             ta2_yy_0_x_0, \
+                             ta2_yy_0_x_1, \
+                             ta2_yy_0_y_0, \
+                             ta2_yy_0_y_1, \
+                             ta2_yy_0_z_0, \
+                             ta2_yy_0_z_1, \
+                             ta2_yy_z_x_0, \
+                             ta2_yy_z_y_0, \
+                             ta2_yy_z_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -409,7 +585,20 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_yz_x_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 38);
 
-    #pragma omp simd aligned(pa_x, pc_x, ta2_yz_0_0_0, ta2_yz_0_0_1, ta2_yz_0_x_0, ta2_yz_0_x_1, ta2_yz_0_y_0, ta2_yz_0_y_1, ta2_yz_0_z_0, ta2_yz_0_z_1, ta2_yz_x_x_0, ta2_yz_x_y_0, ta2_yz_x_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_x,             \
+                             pc_x,         \
+                             ta2_yz_0_0_0, \
+                             ta2_yz_0_0_1, \
+                             ta2_yz_0_x_0, \
+                             ta2_yz_0_x_1, \
+                             ta2_yz_0_y_0, \
+                             ta2_yz_0_y_1, \
+                             ta2_yz_0_z_0, \
+                             ta2_yz_0_z_1, \
+                             ta2_yz_x_x_0, \
+                             ta2_yz_x_y_0, \
+                             ta2_yz_x_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -429,7 +618,23 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_yz_y_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 41);
 
-    #pragma omp simd aligned(pa_y, pc_y, ta1_z_0_x_1, ta1_z_0_y_1, ta1_z_0_z_1, ta2_yz_0_0_0, ta2_yz_0_0_1, ta2_yz_0_x_0, ta2_yz_0_x_1, ta2_yz_0_y_0, ta2_yz_0_y_1, ta2_yz_0_z_0, ta2_yz_0_z_1, ta2_yz_y_x_0, ta2_yz_y_y_0, ta2_yz_y_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_y,             \
+                             pc_y,         \
+                             ta1_z_0_x_1,  \
+                             ta1_z_0_y_1,  \
+                             ta1_z_0_z_1,  \
+                             ta2_yz_0_0_0, \
+                             ta2_yz_0_0_1, \
+                             ta2_yz_0_x_0, \
+                             ta2_yz_0_x_1, \
+                             ta2_yz_0_y_0, \
+                             ta2_yz_0_y_1, \
+                             ta2_yz_0_z_0, \
+                             ta2_yz_0_z_1, \
+                             ta2_yz_y_x_0, \
+                             ta2_yz_y_y_0, \
+                             ta2_yz_y_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -449,7 +654,23 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_yz_z_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 44);
 
-    #pragma omp simd aligned(pa_z, pc_z, ta1_y_0_x_1, ta1_y_0_y_1, ta1_y_0_z_1, ta2_yz_0_0_0, ta2_yz_0_0_1, ta2_yz_0_x_0, ta2_yz_0_x_1, ta2_yz_0_y_0, ta2_yz_0_y_1, ta2_yz_0_z_0, ta2_yz_0_z_1, ta2_yz_z_x_0, ta2_yz_z_y_0, ta2_yz_z_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_z,             \
+                             pc_z,         \
+                             ta1_y_0_x_1,  \
+                             ta1_y_0_y_1,  \
+                             ta1_y_0_z_1,  \
+                             ta2_yz_0_0_0, \
+                             ta2_yz_0_0_1, \
+                             ta2_yz_0_x_0, \
+                             ta2_yz_0_x_1, \
+                             ta2_yz_0_y_0, \
+                             ta2_yz_0_y_1, \
+                             ta2_yz_0_z_0, \
+                             ta2_yz_0_z_1, \
+                             ta2_yz_z_x_0, \
+                             ta2_yz_z_y_0, \
+                             ta2_yz_z_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -469,7 +690,20 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_zz_x_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 47);
 
-    #pragma omp simd aligned(pa_x, pc_x, ta2_zz_0_0_0, ta2_zz_0_0_1, ta2_zz_0_x_0, ta2_zz_0_x_1, ta2_zz_0_y_0, ta2_zz_0_y_1, ta2_zz_0_z_0, ta2_zz_0_z_1, ta2_zz_x_x_0, ta2_zz_x_y_0, ta2_zz_x_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_x,             \
+                             pc_x,         \
+                             ta2_zz_0_0_0, \
+                             ta2_zz_0_0_1, \
+                             ta2_zz_0_x_0, \
+                             ta2_zz_0_x_1, \
+                             ta2_zz_0_y_0, \
+                             ta2_zz_0_y_1, \
+                             ta2_zz_0_z_0, \
+                             ta2_zz_0_z_1, \
+                             ta2_zz_x_x_0, \
+                             ta2_zz_x_y_0, \
+                             ta2_zz_x_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -489,7 +723,20 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_zz_y_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 50);
 
-    #pragma omp simd aligned(pa_y, pc_y, ta2_zz_0_0_0, ta2_zz_0_0_1, ta2_zz_0_x_0, ta2_zz_0_x_1, ta2_zz_0_y_0, ta2_zz_0_y_1, ta2_zz_0_z_0, ta2_zz_0_z_1, ta2_zz_y_x_0, ta2_zz_y_y_0, ta2_zz_y_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_y,             \
+                             pc_y,         \
+                             ta2_zz_0_0_0, \
+                             ta2_zz_0_0_1, \
+                             ta2_zz_0_x_0, \
+                             ta2_zz_0_x_1, \
+                             ta2_zz_0_y_0, \
+                             ta2_zz_0_y_1, \
+                             ta2_zz_0_z_0, \
+                             ta2_zz_0_z_1, \
+                             ta2_zz_y_x_0, \
+                             ta2_zz_y_y_0, \
+                             ta2_zz_y_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -509,7 +756,23 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
     auto ta2_zz_z_z_0 = pbuffer.data(idx_npot_geom_020_0_pp + 53);
 
-    #pragma omp simd aligned(pa_z, pc_z, ta1_z_0_x_1, ta1_z_0_y_1, ta1_z_0_z_1, ta2_zz_0_0_0, ta2_zz_0_0_1, ta2_zz_0_x_0, ta2_zz_0_x_1, ta2_zz_0_y_0, ta2_zz_0_y_1, ta2_zz_0_z_0, ta2_zz_0_z_1, ta2_zz_z_x_0, ta2_zz_z_y_0, ta2_zz_z_z_0, b_exps : 64)
+#pragma omp simd aligned(pa_z,             \
+                             pc_z,         \
+                             ta1_z_0_x_1,  \
+                             ta1_z_0_y_1,  \
+                             ta1_z_0_z_1,  \
+                             ta2_zz_0_0_0, \
+                             ta2_zz_0_0_1, \
+                             ta2_zz_0_x_0, \
+                             ta2_zz_0_x_1, \
+                             ta2_zz_0_y_0, \
+                             ta2_zz_0_y_1, \
+                             ta2_zz_0_z_0, \
+                             ta2_zz_0_z_1, \
+                             ta2_zz_z_x_0, \
+                             ta2_zz_z_y_0, \
+                             ta2_zz_z_z_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -518,10 +781,9 @@ comp_prim_nuclear_potential_geom_020_pp(CSimdArray<double>& pbuffer,
 
         ta2_zz_z_y_0[i] = 2.0 * ta1_z_0_y_1[i] + ta2_zz_0_y_0[i] * pa_z[i] - ta2_zz_0_y_1[i] * pc_z[i];
 
-        ta2_zz_z_z_0[i] = ta2_zz_0_0_0[i] * fe_0 - ta2_zz_0_0_1[i] * fe_0 + 2.0 * ta1_z_0_z_1[i] + ta2_zz_0_z_0[i] * pa_z[i] - ta2_zz_0_z_1[i] * pc_z[i];
+        ta2_zz_z_z_0[i] =
+            ta2_zz_0_0_0[i] * fe_0 - ta2_zz_0_0_1[i] * fe_0 + 2.0 * ta1_z_0_z_1[i] + ta2_zz_0_z_0[i] * pa_z[i] - ta2_zz_0_z_1[i] * pc_z[i];
     }
-
 }
 
-} // npotrec namespace
-
+}  // namespace npotrec

@@ -1,21 +1,21 @@
 #ifndef NuclearPotentialGeom020SumRecSS_hpp
 #define NuclearPotentialGeom020SumRecSS_hpp
 
-#include <cstddef>
 #include <array>
+#include <cstddef>
 #include <utility>
 
-#include "GtoBlock.hpp"
-#include "SimdArray.hpp"
-#include "OverlapPrimRecSS.hpp"
-#include "NuclearPotentialPrimRecSS.hpp"
-#include "NuclearPotentialGeom020PrimRecSS.hpp"
-#include "BoysFunc.hpp"
-#include "T2CUtils.hpp"
-#include "T2CTransform.hpp"
 #include "BatchFunc.hpp"
+#include "BoysFunc.hpp"
+#include "GtoBlock.hpp"
+#include "NuclearPotentialGeom020PrimRecSS.hpp"
+#include "NuclearPotentialPrimRecSS.hpp"
+#include "OverlapPrimRecSS.hpp"
+#include "SimdArray.hpp"
+#include "T2CTransform.hpp"
+#include "T2CUtils.hpp"
 
-namespace npotrec { // npotrec namespace
+namespace npotrec {  // npotrec namespace
 
 /// @brief Computes (S|AG(2)|S)  integrals for pair of basis functions blocks.
 /// @param distributor The integrals distributor.
@@ -26,12 +26,12 @@ namespace npotrec { // npotrec namespace
 /// @param bra_eq_ket True if basis functions blocks on bra and ket are the same, False otherwise.
 template <class T>
 auto
-comp_sum_nuclear_potential_geom_020_ss(T& distributor,
-                                       const CGtoBlock& bra_gto_block,
-                                       const CGtoBlock& ket_gto_block,
+comp_sum_nuclear_potential_geom_020_ss(T&                               distributor,
+                                       const CGtoBlock&                 bra_gto_block,
+                                       const CGtoBlock&                 ket_gto_block,
                                        const std::pair<size_t, size_t>& bra_indices,
                                        const std::pair<size_t, size_t>& ket_indices,
-                                       const bool bra_eq_ket) -> void
+                                       const bool                       bra_eq_ket) -> void
 {
     // intialize external coordinate(s)
 
@@ -154,6 +154,6 @@ comp_sum_nuclear_potential_geom_020_ss(T& distributor,
     }
 }
 
-} // npotrec namespace
+}  // namespace npotrec
 
 #endif /* NuclearPotentialGeom020SumRecSS_hpp */

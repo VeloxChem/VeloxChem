@@ -1,16 +1,16 @@
 #include "NuclearPotentialGeom020PrimRecSP.hpp"
 
-namespace npotrec { // npotrec namespace
+namespace npotrec {  // npotrec namespace
 
 auto
-comp_prim_nuclear_potential_geom_020_sp(CSimdArray<double>& pbuffer, 
-                                        const size_t idx_npot_geom_020_0_sp,
-                                        const size_t idx_npot_geom_010_1_ss,
-                                        const size_t idx_npot_geom_020_0_ss,
-                                        const size_t idx_npot_geom_020_1_ss,
+comp_prim_nuclear_potential_geom_020_sp(CSimdArray<double>&       pbuffer,
+                                        const size_t              idx_npot_geom_020_0_sp,
+                                        const size_t              idx_npot_geom_010_1_ss,
+                                        const size_t              idx_npot_geom_020_0_ss,
+                                        const size_t              idx_npot_geom_020_1_ss,
                                         const CSimdArray<double>& factors,
-                                        const size_t idx_rpb,
-                                        const size_t idx_rpc) -> void
+                                        const size_t              idx_rpb,
+                                        const size_t              idx_rpc) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -104,7 +104,45 @@ comp_prim_nuclear_potential_geom_020_sp(CSimdArray<double>& pbuffer,
 
     auto ta2_zz_0_z_0 = pbuffer.data(idx_npot_geom_020_0_sp + 17);
 
-    #pragma omp simd aligned(pb_x, pb_y, pb_z, pc_x, pc_y, pc_z, ta1_x_0_0_1, ta1_y_0_0_1, ta1_z_0_0_1, ta2_xx_0_0_0, ta2_xx_0_0_1, ta2_xx_0_x_0, ta2_xx_0_y_0, ta2_xx_0_z_0, ta2_xy_0_0_0, ta2_xy_0_0_1, ta2_xy_0_x_0, ta2_xy_0_y_0, ta2_xy_0_z_0, ta2_xz_0_0_0, ta2_xz_0_0_1, ta2_xz_0_x_0, ta2_xz_0_y_0, ta2_xz_0_z_0, ta2_yy_0_0_0, ta2_yy_0_0_1, ta2_yy_0_x_0, ta2_yy_0_y_0, ta2_yy_0_z_0, ta2_yz_0_0_0, ta2_yz_0_0_1, ta2_yz_0_x_0, ta2_yz_0_y_0, ta2_yz_0_z_0, ta2_zz_0_0_0, ta2_zz_0_0_1, ta2_zz_0_x_0, ta2_zz_0_y_0, ta2_zz_0_z_0  : 64)
+#pragma omp simd aligned(pb_x,             \
+                             pb_y,         \
+                             pb_z,         \
+                             pc_x,         \
+                             pc_y,         \
+                             pc_z,         \
+                             ta1_x_0_0_1,  \
+                             ta1_y_0_0_1,  \
+                             ta1_z_0_0_1,  \
+                             ta2_xx_0_0_0, \
+                             ta2_xx_0_0_1, \
+                             ta2_xx_0_x_0, \
+                             ta2_xx_0_y_0, \
+                             ta2_xx_0_z_0, \
+                             ta2_xy_0_0_0, \
+                             ta2_xy_0_0_1, \
+                             ta2_xy_0_x_0, \
+                             ta2_xy_0_y_0, \
+                             ta2_xy_0_z_0, \
+                             ta2_xz_0_0_0, \
+                             ta2_xz_0_0_1, \
+                             ta2_xz_0_x_0, \
+                             ta2_xz_0_y_0, \
+                             ta2_xz_0_z_0, \
+                             ta2_yy_0_0_0, \
+                             ta2_yy_0_0_1, \
+                             ta2_yy_0_x_0, \
+                             ta2_yy_0_y_0, \
+                             ta2_yy_0_z_0, \
+                             ta2_yz_0_0_0, \
+                             ta2_yz_0_0_1, \
+                             ta2_yz_0_x_0, \
+                             ta2_yz_0_y_0, \
+                             ta2_yz_0_z_0, \
+                             ta2_zz_0_0_0, \
+                             ta2_zz_0_0_1, \
+                             ta2_zz_0_x_0, \
+                             ta2_zz_0_y_0, \
+                             ta2_zz_0_z_0 : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         ta2_xx_0_x_0[i] = 2.0 * ta1_x_0_0_1[i] + ta2_xx_0_0_0[i] * pb_x[i] - ta2_xx_0_0_1[i] * pc_x[i];
@@ -145,5 +183,4 @@ comp_prim_nuclear_potential_geom_020_sp(CSimdArray<double>& pbuffer,
     }
 }
 
-} // npotrec namespace
-
+}  // namespace npotrec

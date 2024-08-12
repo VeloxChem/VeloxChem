@@ -1,21 +1,21 @@
 #ifndef NuclearPotentialSumErfRecSS_hpp
 #define NuclearPotentialSumErfRecSS_hpp
 
-#include <cstddef>
 #include <array>
-#include <vector>
+#include <cstddef>
 #include <utility>
+#include <vector>
 
-#include "GtoBlock.hpp"
-#include "SimdArray.hpp"
-#include "OverlapPrimRecSS.hpp"
-#include "NuclearPotentialPrimRecSS.hpp"
-#include "BoysFunc.hpp"
-#include "T2CUtils.hpp"
-#include "T2CTransform.hpp"
 #include "BatchFunc.hpp"
+#include "BoysFunc.hpp"
+#include "GtoBlock.hpp"
+#include "NuclearPotentialPrimRecSS.hpp"
+#include "OverlapPrimRecSS.hpp"
+#include "SimdArray.hpp"
+#include "T2CTransform.hpp"
+#include "T2CUtils.hpp"
 
-namespace npotrec { // npotrec namespace
+namespace npotrec {  // npotrec namespace
 
 /// @brief Computes (S|Erf(A)|S)  integrals for pair of basis functions blocks.
 /// @param distributor The integrals distributor.
@@ -27,13 +27,13 @@ namespace npotrec { // npotrec namespace
 /// @param bra_eq_ket True if basis functions blocks on bra and ket are the same, False otherwise.
 template <class T>
 auto
-comp_sum_erf_nuclear_potential_ss(T& distributor,
-                                  const std::vector<double>& omegas,
-                                  const CGtoBlock& bra_gto_block,
-                                  const CGtoBlock& ket_gto_block,
+comp_sum_erf_nuclear_potential_ss(T&                               distributor,
+                                  const std::vector<double>&       omegas,
+                                  const CGtoBlock&                 bra_gto_block,
+                                  const CGtoBlock&                 ket_gto_block,
                                   const std::pair<size_t, size_t>& bra_indices,
                                   const std::pair<size_t, size_t>& ket_indices,
-                                  const bool bra_eq_ket) -> void
+                                  const bool                       bra_eq_ket) -> void
 {
     // intialize external coordinate(s)
 
@@ -152,6 +152,6 @@ comp_sum_erf_nuclear_potential_ss(T& distributor,
     }
 }
 
-} // npotrec namespace
+}  // namespace npotrec
 
 #endif /* NuclearPotentialSumErfRecSS_hpp */

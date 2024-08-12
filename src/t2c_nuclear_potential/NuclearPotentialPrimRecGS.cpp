@@ -168,8 +168,7 @@ comp_prim_nuclear_potential_gs(CSimdArray<double>&       pbuffer,
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
 
-        ta_xxxx_0_0[i] =
-            3.0 * ta_xx_0_0[i] * fe_0 - 3.0 * ta_xx_0_1[i] * fe_0 + ta_xxx_0_0[i] * pa_x[i] - ta_xxx_0_1[i] * pc_x[i];
+        ta_xxxx_0_0[i] = 3.0 * ta_xx_0_0[i] * fe_0 - 3.0 * ta_xx_0_1[i] * fe_0 + ta_xxx_0_0[i] * pa_x[i] - ta_xxx_0_1[i] * pc_x[i];
 
         ta_xxxy_0_0[i] = ta_xxx_0_0[i] * pa_y[i] - ta_xxx_0_1[i] * pc_y[i];
 
@@ -189,8 +188,7 @@ comp_prim_nuclear_potential_gs(CSimdArray<double>&       pbuffer,
 
         ta_xzzz_0_0[i] = ta_zzz_0_0[i] * pa_x[i] - ta_zzz_0_1[i] * pc_x[i];
 
-        ta_yyyy_0_0[i] =
-            3.0 * ta_yy_0_0[i] * fe_0 - 3.0 * ta_yy_0_1[i] * fe_0 + ta_yyy_0_0[i] * pa_y[i] - ta_yyy_0_1[i] * pc_y[i];
+        ta_yyyy_0_0[i] = 3.0 * ta_yy_0_0[i] * fe_0 - 3.0 * ta_yy_0_1[i] * fe_0 + ta_yyy_0_0[i] * pa_y[i] - ta_yyy_0_1[i] * pc_y[i];
 
         ta_yyyz_0_0[i] = ta_yyy_0_0[i] * pa_z[i] - ta_yyy_0_1[i] * pc_z[i];
 
@@ -198,8 +196,7 @@ comp_prim_nuclear_potential_gs(CSimdArray<double>&       pbuffer,
 
         ta_yzzz_0_0[i] = ta_zzz_0_0[i] * pa_y[i] - ta_zzz_0_1[i] * pc_y[i];
 
-        ta_zzzz_0_0[i] =
-            3.0 * ta_zz_0_0[i] * fe_0 - 3.0 * ta_zz_0_1[i] * fe_0 + ta_zzz_0_0[i] * pa_z[i] - ta_zzz_0_1[i] * pc_z[i];
+        ta_zzzz_0_0[i] = 3.0 * ta_zz_0_0[i] * fe_0 - 3.0 * ta_zz_0_1[i] * fe_0 + ta_zzz_0_0[i] * pa_z[i] - ta_zzz_0_1[i] * pc_z[i];
     }
 }
 

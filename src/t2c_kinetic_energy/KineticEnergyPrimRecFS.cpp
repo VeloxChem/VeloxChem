@@ -139,8 +139,7 @@ comp_prim_kinetic_energy_fs(CSimdArray<double>&       pbuffer,
 
         const double fbe_0 = 0.5 / a_exp;
 
-        tk_xxx_0[i] =
-            -4.0 * ts_x_0[i] * fbe_0 * fz_0 + 2.0 * tk_x_0[i] * fe_0 + tk_xx_0[i] * pa_x[i] + 2.0 * ts_xxx_0[i] * fz_0;
+        tk_xxx_0[i] = -4.0 * ts_x_0[i] * fbe_0 * fz_0 + 2.0 * tk_x_0[i] * fe_0 + tk_xx_0[i] * pa_x[i] + 2.0 * ts_xxx_0[i] * fz_0;
 
         tk_xxy_0[i] = tk_xx_0[i] * pa_y[i] + 2.0 * ts_xxy_0[i] * fz_0;
 
@@ -152,15 +151,13 @@ comp_prim_kinetic_energy_fs(CSimdArray<double>&       pbuffer,
 
         tk_xzz_0[i] = tk_zz_0[i] * pa_x[i] + 2.0 * ts_xzz_0[i] * fz_0;
 
-        tk_yyy_0[i] =
-            -4.0 * ts_y_0[i] * fbe_0 * fz_0 + 2.0 * tk_y_0[i] * fe_0 + tk_yy_0[i] * pa_y[i] + 2.0 * ts_yyy_0[i] * fz_0;
+        tk_yyy_0[i] = -4.0 * ts_y_0[i] * fbe_0 * fz_0 + 2.0 * tk_y_0[i] * fe_0 + tk_yy_0[i] * pa_y[i] + 2.0 * ts_yyy_0[i] * fz_0;
 
         tk_yyz_0[i] = tk_yy_0[i] * pa_z[i] + 2.0 * ts_yyz_0[i] * fz_0;
 
         tk_yzz_0[i] = tk_zz_0[i] * pa_y[i] + 2.0 * ts_yzz_0[i] * fz_0;
 
-        tk_zzz_0[i] =
-            -4.0 * ts_z_0[i] * fbe_0 * fz_0 + 2.0 * tk_z_0[i] * fe_0 + tk_zz_0[i] * pa_z[i] + 2.0 * ts_zzz_0[i] * fz_0;
+        tk_zzz_0[i] = -4.0 * ts_z_0[i] * fbe_0 * fz_0 + 2.0 * tk_z_0[i] * fe_0 + tk_zz_0[i] * pa_z[i] + 2.0 * ts_zzz_0[i] * fz_0;
     }
 }
 

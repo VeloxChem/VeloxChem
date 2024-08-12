@@ -51,20 +51,7 @@ comp_prim_overlap_ds(CSimdArray<double>&       pbuffer,
 
     auto ts_zz_0 = pbuffer.data(idx_ovl_ds + 5);
 
-#pragma omp simd aligned(pa_x,        \
-                             pa_y,    \
-                             pa_z,    \
-                             ts_0_0,  \
-                             ts_x_0,  \
-                             ts_xx_0, \
-                             ts_xy_0, \
-                             ts_xz_0, \
-                             ts_y_0,  \
-                             ts_yy_0, \
-                             ts_yz_0, \
-                             ts_z_0,  \
-                             ts_zz_0, \
-                             b_exps : 64)
+#pragma omp simd aligned(pa_x, pa_y, pa_z, ts_0_0, ts_x_0, ts_xx_0, ts_xy_0, ts_xz_0, ts_y_0, ts_yy_0, ts_yz_0, ts_z_0, ts_zz_0, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);

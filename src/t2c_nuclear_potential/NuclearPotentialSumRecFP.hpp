@@ -192,8 +192,7 @@ comp_sum_nuclear_potential_fp(T&                               distributor,
 
                     npotrec::comp_prim_nuclear_potential_dp(pbuffer, 84, 9, 12, 21, 24, 36, 45, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_fp(
-                        pbuffer, 102, 27, 36, 54, 60, 66, 84, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_fp(pbuffer, 102, 27, 36, 54, 60, 66, 84, factors, 11, 17, a_exp);
 
                     t2cfunc::reduce(cbuffer, pbuffer, 102, charges[l], ket_width, ket_npgtos);
                 }

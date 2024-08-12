@@ -239,23 +239,17 @@ comp_sum_nuclear_potential_geom_010_gf(T&                               distribu
 
                     npotrec::comp_prim_nuclear_potential_sd(pbuffer, 138, 5, 6, 45, 48, factors, 14, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sd(
-                        pbuffer, 144, 9, 12, 33, 51, 60, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sd(pbuffer, 144, 9, 12, 33, 51, 60, factors, 14, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sd(
-                        pbuffer, 162, 12, 15, 36, 60, 69, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sd(pbuffer, 162, 12, 15, 36, 60, 69, factors, 14, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sd(
-                        pbuffer, 180, 15, 18, 39, 69, 78, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sd(pbuffer, 180, 15, 18, 39, 69, 78, factors, 14, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sd(
-                        pbuffer, 198, 18, 21, 42, 78, 87, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sd(pbuffer, 198, 18, 21, 42, 78, 87, factors, 14, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sd(
-                        pbuffer, 216, 21, 24, 45, 87, 96, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sd(pbuffer, 216, 21, 24, 45, 87, 96, factors, 14, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sd(
-                        pbuffer, 234, 24, 27, 48, 96, 105, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sd(pbuffer, 234, 24, 27, 48, 96, 105, factors, 14, 17, a_exp);
 
                     npotrec::comp_prim_nuclear_potential_sf(pbuffer, 252, 33, 36, 114, 120, factors, 14, 17, a_exp);
 
@@ -265,20 +259,15 @@ comp_sum_nuclear_potential_geom_010_gf(T&                               distribu
 
                     npotrec::comp_prim_nuclear_potential_sf(pbuffer, 282, 42, 45, 132, 138, factors, 14, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sf(
-                        pbuffer, 292, 51, 60, 114, 144, 162, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sf(pbuffer, 292, 51, 60, 114, 144, 162, factors, 14, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sf(
-                        pbuffer, 322, 60, 69, 120, 162, 180, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sf(pbuffer, 322, 60, 69, 120, 162, 180, factors, 14, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sf(
-                        pbuffer, 352, 69, 78, 126, 180, 198, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sf(pbuffer, 352, 69, 78, 126, 180, 198, factors, 14, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sf(
-                        pbuffer, 382, 78, 87, 132, 198, 216, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sf(pbuffer, 382, 78, 87, 132, 198, 216, factors, 14, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sf(
-                        pbuffer, 412, 87, 96, 138, 216, 234, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sf(pbuffer, 412, 87, 96, 138, 216, 234, factors, 14, 17, a_exp);
 
                     npotrec::comp_prim_nuclear_potential_geom_010_ps(pbuffer, 442, 1, 9, 12, factors, 11, 17);
 
@@ -294,17 +283,13 @@ comp_sum_nuclear_potential_geom_010_gf(T&                               distribu
 
                     npotrec::comp_prim_nuclear_potential_pp(pbuffer, 496, 3, 4, 39, 42, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_pp(
-                        pbuffer, 505, 9, 12, 33, 51, 60, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_pp(pbuffer, 505, 9, 12, 33, 51, 60, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_pp(
-                        pbuffer, 532, 12, 15, 36, 60, 69, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_pp(pbuffer, 532, 12, 15, 36, 60, 69, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_pp(
-                        pbuffer, 559, 15, 18, 39, 69, 78, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_pp(pbuffer, 559, 15, 18, 39, 69, 78, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_pp(
-                        pbuffer, 586, 18, 21, 42, 78, 87, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_pp(pbuffer, 586, 18, 21, 42, 78, 87, factors, 11, 17, a_exp);
 
                     npotrec::comp_prim_nuclear_potential_pd(pbuffer, 613, 33, 36, 114, 120, factors, 11, 17, a_exp);
 
@@ -312,17 +297,13 @@ comp_sum_nuclear_potential_geom_010_gf(T&                               distribu
 
                     npotrec::comp_prim_nuclear_potential_pd(pbuffer, 649, 39, 42, 126, 132, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_pd(
-                        pbuffer, 667, 51, 60, 114, 144, 162, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_pd(pbuffer, 667, 51, 60, 114, 144, 162, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_pd(
-                        pbuffer, 721, 60, 69, 120, 162, 180, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_pd(pbuffer, 721, 60, 69, 120, 162, 180, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_pd(
-                        pbuffer, 775, 69, 78, 126, 180, 198, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_pd(pbuffer, 775, 69, 78, 126, 180, 198, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_pd(
-                        pbuffer, 829, 78, 87, 132, 198, 216, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_pd(pbuffer, 829, 78, 87, 132, 198, 216, factors, 11, 17, a_exp);
 
                     npotrec::comp_prim_nuclear_potential_pf(pbuffer, 883, 114, 120, 252, 262, factors, 11, 17, a_exp);
 
@@ -330,74 +311,51 @@ comp_sum_nuclear_potential_geom_010_gf(T&                               distribu
 
                     npotrec::comp_prim_nuclear_potential_pf(pbuffer, 943, 126, 132, 272, 282, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_pf(
-                        pbuffer, 973, 144, 162, 252, 292, 322, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_pf(pbuffer, 973, 144, 162, 252, 292, 322, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_pf(
-                        pbuffer, 1063, 162, 180, 262, 322, 352, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_pf(pbuffer, 1063, 162, 180, 262, 322, 352, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_pf(
-                        pbuffer, 1153, 180, 198, 272, 352, 382, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_pf(pbuffer, 1153, 180, 198, 272, 352, 382, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_pf(
-                        pbuffer, 1243, 198, 216, 282, 382, 412, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_pf(pbuffer, 1243, 198, 216, 282, 382, 412, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_dp(
-                        pbuffer, 1333, 51, 60, 442, 451, 478, 505, 532, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_dp(pbuffer, 1333, 51, 60, 442, 451, 478, 505, 532, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_dp(
-                        pbuffer, 1387, 60, 69, 451, 460, 487, 532, 559, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_dp(pbuffer, 1387, 60, 69, 451, 460, 487, 532, 559, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_dp(
-                        pbuffer, 1441, 69, 78, 460, 469, 496, 559, 586, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_dp(pbuffer, 1441, 69, 78, 460, 469, 496, 559, 586, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_dd(
-                        pbuffer, 1495, 114, 120, 478, 487, 613, 631, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_dd(pbuffer, 1495, 114, 120, 478, 487, 613, 631, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_dd(
-                        pbuffer, 1531, 120, 126, 487, 496, 631, 649, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_dd(pbuffer, 1531, 120, 126, 487, 496, 631, 649, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_dd(
-                        pbuffer, 1567, 144, 162, 505, 532, 613, 667, 721, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_dd(pbuffer, 1567, 144, 162, 505, 532, 613, 667, 721, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_dd(
-                        pbuffer, 1675, 162, 180, 532, 559, 631, 721, 775, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_dd(pbuffer, 1675, 162, 180, 532, 559, 631, 721, 775, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_dd(
-                        pbuffer, 1783, 180, 198, 559, 586, 649, 775, 829, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_dd(pbuffer, 1783, 180, 198, 559, 586, 649, 775, 829, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_df(
-                        pbuffer, 1891, 252, 262, 613, 631, 883, 913, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_df(pbuffer, 1891, 252, 262, 613, 631, 883, 913, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_df(
-                        pbuffer, 1951, 262, 272, 631, 649, 913, 943, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_df(pbuffer, 1951, 262, 272, 631, 649, 913, 943, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_df(
-                        pbuffer, 2011, 292, 322, 667, 721, 883, 973, 1063, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_df(pbuffer, 2011, 292, 322, 667, 721, 883, 973, 1063, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_df(
-                        pbuffer, 2191, 322, 352, 721, 775, 913, 1063, 1153, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_df(pbuffer, 2191, 322, 352, 721, 775, 913, 1063, 1153, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_df(
-                        pbuffer, 2371, 352, 382, 775, 829, 943, 1153, 1243, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_df(pbuffer, 2371, 352, 382, 775, 829, 943, 1153, 1243, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_fd(
-                        pbuffer, 2551, 667, 721, 1333, 1387, 1495, 1567, 1675, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_fd(pbuffer, 2551, 667, 721, 1333, 1387, 1495, 1567, 1675, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_fd(
-                        pbuffer, 2731, 721, 775, 1387, 1441, 1531, 1675, 1783, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_fd(pbuffer, 2731, 721, 775, 1387, 1441, 1531, 1675, 1783, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_ff(
-                        pbuffer, 2911, 883, 913, 1495, 1531, 1891, 1951, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_ff(pbuffer, 2911, 883, 913, 1495, 1531, 1891, 1951, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_ff(
-                        pbuffer, 3011, 973, 1063, 1567, 1675, 1891, 2011, 2191, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_ff(pbuffer, 3011, 973, 1063, 1567, 1675, 1891, 2011, 2191, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_ff(
-                        pbuffer, 3311, 1063, 1153, 1675, 1783, 1951, 2191, 2371, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_ff(pbuffer, 3311, 1063, 1153, 1675, 1783, 1951, 2191, 2371, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_gf(
-                        pbuffer, 3611, 2011, 2191, 2551, 2731, 2911, 3011, 3311, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_gf(pbuffer, 3611, 2011, 2191, 2551, 2731, 2911, 3011, 3311, factors, 11, 17, a_exp);
 
                     t2cfunc::reduce(cbuffer, pbuffer, 3611, dipoles, 3, l, ket_width, ket_npgtos);
                 }

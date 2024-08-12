@@ -192,25 +192,19 @@ comp_sum_nuclear_potential_geom_010_sg(T&                               distribu
 
                     npotrec::comp_prim_nuclear_potential_sd(pbuffer, 72, 2, 3, 24, 27, factors, 11, 14, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sd(
-                        pbuffer, 78, 6, 9, 21, 30, 39, factors, 11, 14, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sd(pbuffer, 78, 6, 9, 21, 30, 39, factors, 11, 14, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sd(
-                        pbuffer, 96, 9, 12, 24, 39, 48, factors, 11, 14, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sd(pbuffer, 96, 9, 12, 24, 39, 48, factors, 11, 14, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sd(
-                        pbuffer, 114, 12, 15, 27, 48, 57, factors, 11, 14, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sd(pbuffer, 114, 12, 15, 27, 48, 57, factors, 11, 14, a_exp);
 
                     npotrec::comp_prim_nuclear_potential_sf(pbuffer, 132, 21, 24, 66, 72, factors, 11, 14, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sf(
-                        pbuffer, 142, 30, 39, 66, 78, 96, factors, 11, 14, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sf(pbuffer, 142, 30, 39, 66, 78, 96, factors, 11, 14, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sf(
-                        pbuffer, 172, 39, 48, 72, 96, 114, factors, 11, 14, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sf(pbuffer, 172, 39, 48, 72, 96, 114, factors, 11, 14, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_sg(
-                        pbuffer, 202, 78, 96, 132, 142, 172, factors, 11, 14, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_sg(pbuffer, 202, 78, 96, 132, 142, 172, factors, 11, 14, a_exp);
 
                     t2cfunc::reduce(cbuffer, pbuffer, 202, dipoles, 3, l, ket_width, ket_npgtos);
                 }

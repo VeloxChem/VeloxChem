@@ -1,17 +1,16 @@
 #include "ElectricDipoleMomentumPrimRecSS.hpp"
 
-
 namespace diprec {  // diprec namespace
 
 auto
-comp_prim_electric_dipole_momentum_ss(CSimdArray<double>& pbuffer,
-                                      const size_t idx_dip_ss,
-                                      const size_t idx_ovl_ss,
+comp_prim_electric_dipole_momentum_ss(CSimdArray<double>&       pbuffer,
+                                      const size_t              idx_dip_ss,
+                                      const size_t              idx_ovl_ss,
                                       const CSimdArray<double>& factors,
-                                      const size_t idx_rpc) -> void
+                                      const size_t              idx_rpc) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
-    
+
     // Set up R(PC) distances
 
     auto pc_x = factors.data(idx_rpc);

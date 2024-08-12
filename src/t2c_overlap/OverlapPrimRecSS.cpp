@@ -7,11 +7,8 @@
 namespace ovlrec {  // ovlrec namespace
 
 auto
-comp_prim_overlap_ss(CSimdArray<double>& pbuffer,
-                     const size_t        idx_ovl_ss,
-                     CSimdArray<double>& factors,
-                     const double        a_exp,
-                     const double        a_norm) -> void
+comp_prim_overlap_ss(CSimdArray<double>& pbuffer, const size_t idx_ovl_ss, CSimdArray<double>& factors, const double a_exp, const double a_norm)
+    -> void
 {
     const double fpi = mathconst::pi_value();
 

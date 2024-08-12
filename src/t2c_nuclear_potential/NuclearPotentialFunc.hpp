@@ -54,200 +54,175 @@ compute(T&                               distributor,
 
     if ((bra_angmom == 0) && (ket_angmom == 0))
     {
-        npotrec::comp_sum_nuclear_potential_ss(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_ss(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 0) && (ket_angmom == 1))
     {
-        npotrec::comp_sum_nuclear_potential_sp(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_sp(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 0))
     {
-        npotrec::comp_sum_nuclear_potential_ps(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_ps(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 1))
     {
-        npotrec::comp_sum_nuclear_potential_pp(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_pp(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 0) && (ket_angmom == 2))
     {
-        npotrec::comp_sum_nuclear_potential_sd(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_sd(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 0))
     {
-        npotrec::comp_sum_nuclear_potential_ds(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_ds(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 0) && (ket_angmom == 3))
     {
-        npotrec::comp_sum_nuclear_potential_sf(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_sf(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 0))
     {
-        npotrec::comp_sum_nuclear_potential_fs(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_fs(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 2))
     {
-        npotrec::comp_sum_nuclear_potential_pd(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_pd(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 1))
     {
-        npotrec::comp_sum_nuclear_potential_dp(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_dp(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 0) && (ket_angmom == 4))
     {
-        npotrec::comp_sum_nuclear_potential_sg(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_sg(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 4) && (ket_angmom == 0))
     {
-        npotrec::comp_sum_nuclear_potential_gs(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_gs(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 3))
     {
-        npotrec::comp_sum_nuclear_potential_pf(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_pf(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 1))
     {
-        npotrec::comp_sum_nuclear_potential_fp(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_fp(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 2))
     {
-        npotrec::comp_sum_nuclear_potential_dd(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_dd(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 4))
     {
-        npotrec::comp_sum_nuclear_potential_pg(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_pg(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 4) && (ket_angmom == 1))
     {
-        npotrec::comp_sum_nuclear_potential_gp(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_gp(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 3))
     {
-        npotrec::comp_sum_nuclear_potential_df(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_df(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 2))
     {
-        npotrec::comp_sum_nuclear_potential_fd(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_fd(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 4))
     {
-        npotrec::comp_sum_nuclear_potential_dg(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_dg(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 4) && (ket_angmom == 2))
     {
-        npotrec::comp_sum_nuclear_potential_gd(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_gd(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 3))
     {
-        npotrec::comp_sum_nuclear_potential_ff(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_ff(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 4))
     {
-        npotrec::comp_sum_nuclear_potential_fg(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_fg(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 4) && (ket_angmom == 3))
     {
-        npotrec::comp_sum_nuclear_potential_gf(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_gf(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
 
     if ((bra_angmom == 4) && (ket_angmom == 4))
     {
-        npotrec::comp_sum_nuclear_potential_gg(
-            distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+        npotrec::comp_sum_nuclear_potential_gg(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }

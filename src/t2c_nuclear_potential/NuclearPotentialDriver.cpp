@@ -12,13 +12,12 @@
 #include "T2CDistributor.hpp"
 
 auto
-CNuclearPotentialDriver::compute(const CMolecularBasis& basis,
-                                 const CMolecule&       molecule) const -> CMatrix
+CNuclearPotentialDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule) const -> CMatrix
 {
     auto charges = molecule.charges();
-    
+
     auto coordinates = molecule.coordinates("au");
-    
+
     return compute(charges, coordinates, basis, molecule);
 }
 
@@ -75,4 +74,3 @@ CNuclearPotentialDriver::compute(const std::vector<double>&         charges,
 
     return npot_mat;
 }
-

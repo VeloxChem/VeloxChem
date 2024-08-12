@@ -1,18 +1,18 @@
 #include "NuclearPotentialPrimRecIS.hpp"
 
-namespace npotrec { // npotrec namespace
+namespace npotrec {  // npotrec namespace
 
 auto
-comp_prim_nuclear_potential_is(CSimdArray<double>& pbuffer, 
-                               const size_t idx_npot_0_is,
-                               const size_t idx_npot_0_gs,
-                               const size_t idx_npot_1_gs,
-                               const size_t idx_npot_0_hs,
-                               const size_t idx_npot_1_hs,
+comp_prim_nuclear_potential_is(CSimdArray<double>&       pbuffer,
+                               const size_t              idx_npot_0_is,
+                               const size_t              idx_npot_0_gs,
+                               const size_t              idx_npot_1_gs,
+                               const size_t              idx_npot_0_hs,
+                               const size_t              idx_npot_1_hs,
                                const CSimdArray<double>& factors,
-                               const size_t idx_rpa,
-                               const size_t idx_rpc,
-                               const double a_exp) -> void
+                               const size_t              idx_rpa,
+                               const size_t              idx_rpc,
+                               const double              a_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -198,7 +198,89 @@ comp_prim_nuclear_potential_is(CSimdArray<double>& pbuffer,
 
     auto ta_zzzzzz_0_0 = pbuffer.data(idx_npot_0_is + 27);
 
-    #pragma omp simd aligned(pa_x, pa_y, pa_z, pc_x, pc_y, pc_z, ta_xxxx_0_0, ta_xxxx_0_1, ta_xxxxx_0_0, ta_xxxxx_0_1, ta_xxxxxx_0_0, ta_xxxxxy_0_0, ta_xxxxxz_0_0, ta_xxxxyy_0_0, ta_xxxxyz_0_0, ta_xxxxz_0_0, ta_xxxxz_0_1, ta_xxxxzz_0_0, ta_xxxyy_0_0, ta_xxxyy_0_1, ta_xxxyyy_0_0, ta_xxxyyz_0_0, ta_xxxyzz_0_0, ta_xxxzz_0_0, ta_xxxzz_0_1, ta_xxxzzz_0_0, ta_xxyy_0_0, ta_xxyy_0_1, ta_xxyyy_0_0, ta_xxyyy_0_1, ta_xxyyyy_0_0, ta_xxyyyz_0_0, ta_xxyyzz_0_0, ta_xxyzzz_0_0, ta_xxzz_0_0, ta_xxzz_0_1, ta_xxzzz_0_0, ta_xxzzz_0_1, ta_xxzzzz_0_0, ta_xyyy_0_0, ta_xyyy_0_1, ta_xyyyy_0_0, ta_xyyyy_0_1, ta_xyyyyy_0_0, ta_xyyyyz_0_0, ta_xyyyzz_0_0, ta_xyyzz_0_0, ta_xyyzz_0_1, ta_xyyzzz_0_0, ta_xyzzzz_0_0, ta_xzzz_0_0, ta_xzzz_0_1, ta_xzzzz_0_0, ta_xzzzz_0_1, ta_xzzzzz_0_0, ta_yyyy_0_0, ta_yyyy_0_1, ta_yyyyy_0_0, ta_yyyyy_0_1, ta_yyyyyy_0_0, ta_yyyyyz_0_0, ta_yyyyz_0_0, ta_yyyyz_0_1, ta_yyyyzz_0_0, ta_yyyzz_0_0, ta_yyyzz_0_1, ta_yyyzzz_0_0, ta_yyzz_0_0, ta_yyzz_0_1, ta_yyzzz_0_0, ta_yyzzz_0_1, ta_yyzzzz_0_0, ta_yzzz_0_0, ta_yzzz_0_1, ta_yzzzz_0_0, ta_yzzzz_0_1, ta_yzzzzz_0_0, ta_zzzz_0_0, ta_zzzz_0_1, ta_zzzzz_0_0, ta_zzzzz_0_1, ta_zzzzzz_0_0, b_exps : 64)
+#pragma omp simd aligned(pa_x,              \
+                             pa_y,          \
+                             pa_z,          \
+                             pc_x,          \
+                             pc_y,          \
+                             pc_z,          \
+                             ta_xxxx_0_0,   \
+                             ta_xxxx_0_1,   \
+                             ta_xxxxx_0_0,  \
+                             ta_xxxxx_0_1,  \
+                             ta_xxxxxx_0_0, \
+                             ta_xxxxxy_0_0, \
+                             ta_xxxxxz_0_0, \
+                             ta_xxxxyy_0_0, \
+                             ta_xxxxyz_0_0, \
+                             ta_xxxxz_0_0,  \
+                             ta_xxxxz_0_1,  \
+                             ta_xxxxzz_0_0, \
+                             ta_xxxyy_0_0,  \
+                             ta_xxxyy_0_1,  \
+                             ta_xxxyyy_0_0, \
+                             ta_xxxyyz_0_0, \
+                             ta_xxxyzz_0_0, \
+                             ta_xxxzz_0_0,  \
+                             ta_xxxzz_0_1,  \
+                             ta_xxxzzz_0_0, \
+                             ta_xxyy_0_0,   \
+                             ta_xxyy_0_1,   \
+                             ta_xxyyy_0_0,  \
+                             ta_xxyyy_0_1,  \
+                             ta_xxyyyy_0_0, \
+                             ta_xxyyyz_0_0, \
+                             ta_xxyyzz_0_0, \
+                             ta_xxyzzz_0_0, \
+                             ta_xxzz_0_0,   \
+                             ta_xxzz_0_1,   \
+                             ta_xxzzz_0_0,  \
+                             ta_xxzzz_0_1,  \
+                             ta_xxzzzz_0_0, \
+                             ta_xyyy_0_0,   \
+                             ta_xyyy_0_1,   \
+                             ta_xyyyy_0_0,  \
+                             ta_xyyyy_0_1,  \
+                             ta_xyyyyy_0_0, \
+                             ta_xyyyyz_0_0, \
+                             ta_xyyyzz_0_0, \
+                             ta_xyyzz_0_0,  \
+                             ta_xyyzz_0_1,  \
+                             ta_xyyzzz_0_0, \
+                             ta_xyzzzz_0_0, \
+                             ta_xzzz_0_0,   \
+                             ta_xzzz_0_1,   \
+                             ta_xzzzz_0_0,  \
+                             ta_xzzzz_0_1,  \
+                             ta_xzzzzz_0_0, \
+                             ta_yyyy_0_0,   \
+                             ta_yyyy_0_1,   \
+                             ta_yyyyy_0_0,  \
+                             ta_yyyyy_0_1,  \
+                             ta_yyyyyy_0_0, \
+                             ta_yyyyyz_0_0, \
+                             ta_yyyyz_0_0,  \
+                             ta_yyyyz_0_1,  \
+                             ta_yyyyzz_0_0, \
+                             ta_yyyzz_0_0,  \
+                             ta_yyyzz_0_1,  \
+                             ta_yyyzzz_0_0, \
+                             ta_yyzz_0_0,   \
+                             ta_yyzz_0_1,   \
+                             ta_yyzzz_0_0,  \
+                             ta_yyzzz_0_1,  \
+                             ta_yyzzzz_0_0, \
+                             ta_yzzz_0_0,   \
+                             ta_yzzz_0_1,   \
+                             ta_yzzzz_0_0,  \
+                             ta_yzzzz_0_1,  \
+                             ta_yzzzzz_0_0, \
+                             ta_zzzz_0_0,   \
+                             ta_zzzz_0_1,   \
+                             ta_zzzzz_0_0,  \
+                             ta_zzzzz_0_1,  \
+                             ta_zzzzzz_0_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -261,5 +343,4 @@ comp_prim_nuclear_potential_is(CSimdArray<double>& pbuffer,
     }
 }
 
-} // npotrec namespace
-
+}  // namespace npotrec

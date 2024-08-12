@@ -59,9 +59,7 @@ COverlapDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule)
 }
 
 auto
-COverlapDriver::compute(const CMolecularBasis& bra_basis,
-                        const CMolecularBasis& ket_basis,
-                        const CMolecule&       molecule) const -> CMatrix
+COverlapDriver::compute(const CMolecularBasis& bra_basis, const CMolecularBasis& ket_basis, const CMolecule& molecule) const -> CMatrix
 {
     auto ovl_mat = matfunc::make_matrix(bra_basis, ket_basis);
 

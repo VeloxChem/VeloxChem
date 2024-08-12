@@ -1,24 +1,24 @@
 #ifndef ElectricDipoleMomentumRecFS_hpp
 #define ElectricDipoleMomentumRecFS_hpp
 
-#include <cstddef>
 #include <array>
+#include <cstddef>
 #include <utility>
 
-#include "GtoBlock.hpp"
-#include "SimdArray.hpp"
-#include "OverlapPrimRecSS.hpp"
-#include "ElectricDipoleMomentumPrimRecSS.hpp"
-#include "OverlapPrimRecPS.hpp"
-#include "ElectricDipoleMomentumPrimRecPS.hpp"
-#include "OverlapPrimRecDS.hpp"
+#include "BatchFunc.hpp"
 #include "ElectricDipoleMomentumPrimRecDS.hpp"
 #include "ElectricDipoleMomentumPrimRecFS.hpp"
-#include "T2CUtils.hpp"
+#include "ElectricDipoleMomentumPrimRecPS.hpp"
+#include "ElectricDipoleMomentumPrimRecSS.hpp"
+#include "GtoBlock.hpp"
+#include "OverlapPrimRecDS.hpp"
+#include "OverlapPrimRecPS.hpp"
+#include "OverlapPrimRecSS.hpp"
+#include "SimdArray.hpp"
 #include "T2CTransform.hpp"
-#include "BatchFunc.hpp"
+#include "T2CUtils.hpp"
 
-namespace diprec { // diprec namespace
+namespace diprec {  // diprec namespace
 
 /// @brief Computes (F|r|S)  integrals for pair of basis functions blocks.
 /// @param distributor The integrals distributor.
@@ -29,12 +29,12 @@ namespace diprec { // diprec namespace
 /// @param bra_eq_ket True if basis functions blocks on bra and ket are the same, False otherwise.
 template <class T>
 auto
-comp_electric_dipole_momentum_fs(T& distributor,
-                                 const CGtoBlock& bra_gto_block,
-                                 const CGtoBlock& ket_gto_block,
+comp_electric_dipole_momentum_fs(T&                               distributor,
+                                 const CGtoBlock&                 bra_gto_block,
+                                 const CGtoBlock&                 ket_gto_block,
                                  const std::pair<size_t, size_t>& bra_indices,
                                  const std::pair<size_t, size_t>& ket_indices,
-                                 const bool bra_eq_ket) -> void
+                                 const bool                       bra_eq_ket) -> void
 {
     // intialize external coordinate(s)
 
@@ -126,7 +126,7 @@ comp_electric_dipole_momentum_fs(T& distributor,
 
                 t2cfunc::comp_coordinates_p(factors, 8, 2, r_a, a_exp);
 
-                t2cfunc::comp_distances_pa_from_p(factors, 11 , 8, r_a);
+                t2cfunc::comp_distances_pa_from_p(factors, 11, 8, r_a);
 
                 t2cfunc::comp_distances_pc(factors, 14, 8, r_c);
 
@@ -154,6 +154,6 @@ comp_electric_dipole_momentum_fs(T& distributor,
     }
 }
 
-} // diprec namespace
+}  // namespace diprec
 
 #endif /* ElectricDipoleMomentumRecFS_hpp */

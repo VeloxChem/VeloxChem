@@ -1,16 +1,16 @@
 #include "ElectricDipoleMomentumPrimRecPG.hpp"
 
-namespace diprec { // diprec namespace
+namespace diprec {  // diprec namespace
 
 auto
-comp_prim_electric_dipole_momentum_pg(CSimdArray<double>& pbuffer, 
-                                      const size_t idx_dip_pg,
-                                      const size_t idx_dip_sf,
-                                      const size_t idx_ovl_sg,
-                                      const size_t idx_dip_sg,
+comp_prim_electric_dipole_momentum_pg(CSimdArray<double>&       pbuffer,
+                                      const size_t              idx_dip_pg,
+                                      const size_t              idx_dip_sf,
+                                      const size_t              idx_ovl_sg,
+                                      const size_t              idx_dip_sg,
                                       const CSimdArray<double>& factors,
-                                      const size_t idx_rpa,
-                                      const double a_exp) -> void
+                                      const size_t              idx_rpa,
+                                      const double              a_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -244,7 +244,63 @@ comp_prim_electric_dipole_momentum_pg(CSimdArray<double>& pbuffer,
 
     auto tr_x_x_zzzz = pbuffer.data(idx_dip_pg + 14);
 
-    #pragma omp simd aligned(pa_x, tr_x_0_xxx, tr_x_0_xxxx, tr_x_0_xxxy, tr_x_0_xxxz, tr_x_0_xxy, tr_x_0_xxyy, tr_x_0_xxyz, tr_x_0_xxz, tr_x_0_xxzz, tr_x_0_xyy, tr_x_0_xyyy, tr_x_0_xyyz, tr_x_0_xyz, tr_x_0_xyzz, tr_x_0_xzz, tr_x_0_xzzz, tr_x_0_yyy, tr_x_0_yyyy, tr_x_0_yyyz, tr_x_0_yyz, tr_x_0_yyzz, tr_x_0_yzz, tr_x_0_yzzz, tr_x_0_zzz, tr_x_0_zzzz, tr_x_x_xxxx, tr_x_x_xxxy, tr_x_x_xxxz, tr_x_x_xxyy, tr_x_x_xxyz, tr_x_x_xxzz, tr_x_x_xyyy, tr_x_x_xyyz, tr_x_x_xyzz, tr_x_x_xzzz, tr_x_x_yyyy, tr_x_x_yyyz, tr_x_x_yyzz, tr_x_x_yzzz, tr_x_x_zzzz, ts_0_xxxx, ts_0_xxxy, ts_0_xxxz, ts_0_xxyy, ts_0_xxyz, ts_0_xxzz, ts_0_xyyy, ts_0_xyyz, ts_0_xyzz, ts_0_xzzz, ts_0_yyyy, ts_0_yyyz, ts_0_yyzz, ts_0_yzzz, ts_0_zzzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,            \
+                             tr_x_0_xxx,  \
+                             tr_x_0_xxxx, \
+                             tr_x_0_xxxy, \
+                             tr_x_0_xxxz, \
+                             tr_x_0_xxy,  \
+                             tr_x_0_xxyy, \
+                             tr_x_0_xxyz, \
+                             tr_x_0_xxz,  \
+                             tr_x_0_xxzz, \
+                             tr_x_0_xyy,  \
+                             tr_x_0_xyyy, \
+                             tr_x_0_xyyz, \
+                             tr_x_0_xyz,  \
+                             tr_x_0_xyzz, \
+                             tr_x_0_xzz,  \
+                             tr_x_0_xzzz, \
+                             tr_x_0_yyy,  \
+                             tr_x_0_yyyy, \
+                             tr_x_0_yyyz, \
+                             tr_x_0_yyz,  \
+                             tr_x_0_yyzz, \
+                             tr_x_0_yzz,  \
+                             tr_x_0_yzzz, \
+                             tr_x_0_zzz,  \
+                             tr_x_0_zzzz, \
+                             tr_x_x_xxxx, \
+                             tr_x_x_xxxy, \
+                             tr_x_x_xxxz, \
+                             tr_x_x_xxyy, \
+                             tr_x_x_xxyz, \
+                             tr_x_x_xxzz, \
+                             tr_x_x_xyyy, \
+                             tr_x_x_xyyz, \
+                             tr_x_x_xyzz, \
+                             tr_x_x_xzzz, \
+                             tr_x_x_yyyy, \
+                             tr_x_x_yyyz, \
+                             tr_x_x_yyzz, \
+                             tr_x_x_yzzz, \
+                             tr_x_x_zzzz, \
+                             ts_0_xxxx,   \
+                             ts_0_xxxy,   \
+                             ts_0_xxxz,   \
+                             ts_0_xxyy,   \
+                             ts_0_xxyz,   \
+                             ts_0_xxzz,   \
+                             ts_0_xyyy,   \
+                             ts_0_xyyz,   \
+                             ts_0_xyzz,   \
+                             ts_0_xzzz,   \
+                             ts_0_yyyy,   \
+                             ts_0_yyyz,   \
+                             ts_0_yyzz,   \
+                             ts_0_yzzz,   \
+                             ts_0_zzzz,   \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -312,7 +368,48 @@ comp_prim_electric_dipole_momentum_pg(CSimdArray<double>& pbuffer,
 
     auto tr_x_y_zzzz = pbuffer.data(idx_dip_pg + 29);
 
-    #pragma omp simd aligned(pa_y, tr_x_0_xxx, tr_x_0_xxxx, tr_x_0_xxxy, tr_x_0_xxxz, tr_x_0_xxy, tr_x_0_xxyy, tr_x_0_xxyz, tr_x_0_xxz, tr_x_0_xxzz, tr_x_0_xyy, tr_x_0_xyyy, tr_x_0_xyyz, tr_x_0_xyz, tr_x_0_xyzz, tr_x_0_xzz, tr_x_0_xzzz, tr_x_0_yyy, tr_x_0_yyyy, tr_x_0_yyyz, tr_x_0_yyz, tr_x_0_yyzz, tr_x_0_yzz, tr_x_0_yzzz, tr_x_0_zzz, tr_x_0_zzzz, tr_x_y_xxxx, tr_x_y_xxxy, tr_x_y_xxxz, tr_x_y_xxyy, tr_x_y_xxyz, tr_x_y_xxzz, tr_x_y_xyyy, tr_x_y_xyyz, tr_x_y_xyzz, tr_x_y_xzzz, tr_x_y_yyyy, tr_x_y_yyyz, tr_x_y_yyzz, tr_x_y_yzzz, tr_x_y_zzzz, b_exps : 64)
+#pragma omp simd aligned(pa_y,            \
+                             tr_x_0_xxx,  \
+                             tr_x_0_xxxx, \
+                             tr_x_0_xxxy, \
+                             tr_x_0_xxxz, \
+                             tr_x_0_xxy,  \
+                             tr_x_0_xxyy, \
+                             tr_x_0_xxyz, \
+                             tr_x_0_xxz,  \
+                             tr_x_0_xxzz, \
+                             tr_x_0_xyy,  \
+                             tr_x_0_xyyy, \
+                             tr_x_0_xyyz, \
+                             tr_x_0_xyz,  \
+                             tr_x_0_xyzz, \
+                             tr_x_0_xzz,  \
+                             tr_x_0_xzzz, \
+                             tr_x_0_yyy,  \
+                             tr_x_0_yyyy, \
+                             tr_x_0_yyyz, \
+                             tr_x_0_yyz,  \
+                             tr_x_0_yyzz, \
+                             tr_x_0_yzz,  \
+                             tr_x_0_yzzz, \
+                             tr_x_0_zzz,  \
+                             tr_x_0_zzzz, \
+                             tr_x_y_xxxx, \
+                             tr_x_y_xxxy, \
+                             tr_x_y_xxxz, \
+                             tr_x_y_xxyy, \
+                             tr_x_y_xxyz, \
+                             tr_x_y_xxzz, \
+                             tr_x_y_xyyy, \
+                             tr_x_y_xyyz, \
+                             tr_x_y_xyzz, \
+                             tr_x_y_xzzz, \
+                             tr_x_y_yyyy, \
+                             tr_x_y_yyyz, \
+                             tr_x_y_yyzz, \
+                             tr_x_y_yzzz, \
+                             tr_x_y_zzzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -380,7 +477,48 @@ comp_prim_electric_dipole_momentum_pg(CSimdArray<double>& pbuffer,
 
     auto tr_x_z_zzzz = pbuffer.data(idx_dip_pg + 44);
 
-    #pragma omp simd aligned(pa_z, tr_x_0_xxx, tr_x_0_xxxx, tr_x_0_xxxy, tr_x_0_xxxz, tr_x_0_xxy, tr_x_0_xxyy, tr_x_0_xxyz, tr_x_0_xxz, tr_x_0_xxzz, tr_x_0_xyy, tr_x_0_xyyy, tr_x_0_xyyz, tr_x_0_xyz, tr_x_0_xyzz, tr_x_0_xzz, tr_x_0_xzzz, tr_x_0_yyy, tr_x_0_yyyy, tr_x_0_yyyz, tr_x_0_yyz, tr_x_0_yyzz, tr_x_0_yzz, tr_x_0_yzzz, tr_x_0_zzz, tr_x_0_zzzz, tr_x_z_xxxx, tr_x_z_xxxy, tr_x_z_xxxz, tr_x_z_xxyy, tr_x_z_xxyz, tr_x_z_xxzz, tr_x_z_xyyy, tr_x_z_xyyz, tr_x_z_xyzz, tr_x_z_xzzz, tr_x_z_yyyy, tr_x_z_yyyz, tr_x_z_yyzz, tr_x_z_yzzz, tr_x_z_zzzz, b_exps : 64)
+#pragma omp simd aligned(pa_z,            \
+                             tr_x_0_xxx,  \
+                             tr_x_0_xxxx, \
+                             tr_x_0_xxxy, \
+                             tr_x_0_xxxz, \
+                             tr_x_0_xxy,  \
+                             tr_x_0_xxyy, \
+                             tr_x_0_xxyz, \
+                             tr_x_0_xxz,  \
+                             tr_x_0_xxzz, \
+                             tr_x_0_xyy,  \
+                             tr_x_0_xyyy, \
+                             tr_x_0_xyyz, \
+                             tr_x_0_xyz,  \
+                             tr_x_0_xyzz, \
+                             tr_x_0_xzz,  \
+                             tr_x_0_xzzz, \
+                             tr_x_0_yyy,  \
+                             tr_x_0_yyyy, \
+                             tr_x_0_yyyz, \
+                             tr_x_0_yyz,  \
+                             tr_x_0_yyzz, \
+                             tr_x_0_yzz,  \
+                             tr_x_0_yzzz, \
+                             tr_x_0_zzz,  \
+                             tr_x_0_zzzz, \
+                             tr_x_z_xxxx, \
+                             tr_x_z_xxxy, \
+                             tr_x_z_xxxz, \
+                             tr_x_z_xxyy, \
+                             tr_x_z_xxyz, \
+                             tr_x_z_xxzz, \
+                             tr_x_z_xyyy, \
+                             tr_x_z_xyyz, \
+                             tr_x_z_xyzz, \
+                             tr_x_z_xzzz, \
+                             tr_x_z_yyyy, \
+                             tr_x_z_yyyz, \
+                             tr_x_z_yyzz, \
+                             tr_x_z_yzzz, \
+                             tr_x_z_zzzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -448,7 +586,48 @@ comp_prim_electric_dipole_momentum_pg(CSimdArray<double>& pbuffer,
 
     auto tr_y_x_zzzz = pbuffer.data(idx_dip_pg + 59);
 
-    #pragma omp simd aligned(pa_x, tr_y_0_xxx, tr_y_0_xxxx, tr_y_0_xxxy, tr_y_0_xxxz, tr_y_0_xxy, tr_y_0_xxyy, tr_y_0_xxyz, tr_y_0_xxz, tr_y_0_xxzz, tr_y_0_xyy, tr_y_0_xyyy, tr_y_0_xyyz, tr_y_0_xyz, tr_y_0_xyzz, tr_y_0_xzz, tr_y_0_xzzz, tr_y_0_yyy, tr_y_0_yyyy, tr_y_0_yyyz, tr_y_0_yyz, tr_y_0_yyzz, tr_y_0_yzz, tr_y_0_yzzz, tr_y_0_zzz, tr_y_0_zzzz, tr_y_x_xxxx, tr_y_x_xxxy, tr_y_x_xxxz, tr_y_x_xxyy, tr_y_x_xxyz, tr_y_x_xxzz, tr_y_x_xyyy, tr_y_x_xyyz, tr_y_x_xyzz, tr_y_x_xzzz, tr_y_x_yyyy, tr_y_x_yyyz, tr_y_x_yyzz, tr_y_x_yzzz, tr_y_x_zzzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,            \
+                             tr_y_0_xxx,  \
+                             tr_y_0_xxxx, \
+                             tr_y_0_xxxy, \
+                             tr_y_0_xxxz, \
+                             tr_y_0_xxy,  \
+                             tr_y_0_xxyy, \
+                             tr_y_0_xxyz, \
+                             tr_y_0_xxz,  \
+                             tr_y_0_xxzz, \
+                             tr_y_0_xyy,  \
+                             tr_y_0_xyyy, \
+                             tr_y_0_xyyz, \
+                             tr_y_0_xyz,  \
+                             tr_y_0_xyzz, \
+                             tr_y_0_xzz,  \
+                             tr_y_0_xzzz, \
+                             tr_y_0_yyy,  \
+                             tr_y_0_yyyy, \
+                             tr_y_0_yyyz, \
+                             tr_y_0_yyz,  \
+                             tr_y_0_yyzz, \
+                             tr_y_0_yzz,  \
+                             tr_y_0_yzzz, \
+                             tr_y_0_zzz,  \
+                             tr_y_0_zzzz, \
+                             tr_y_x_xxxx, \
+                             tr_y_x_xxxy, \
+                             tr_y_x_xxxz, \
+                             tr_y_x_xxyy, \
+                             tr_y_x_xxyz, \
+                             tr_y_x_xxzz, \
+                             tr_y_x_xyyy, \
+                             tr_y_x_xyyz, \
+                             tr_y_x_xyzz, \
+                             tr_y_x_xzzz, \
+                             tr_y_x_yyyy, \
+                             tr_y_x_yyyz, \
+                             tr_y_x_yyzz, \
+                             tr_y_x_yzzz, \
+                             tr_y_x_zzzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -516,7 +695,63 @@ comp_prim_electric_dipole_momentum_pg(CSimdArray<double>& pbuffer,
 
     auto tr_y_y_zzzz = pbuffer.data(idx_dip_pg + 74);
 
-    #pragma omp simd aligned(pa_y, tr_y_0_xxx, tr_y_0_xxxx, tr_y_0_xxxy, tr_y_0_xxxz, tr_y_0_xxy, tr_y_0_xxyy, tr_y_0_xxyz, tr_y_0_xxz, tr_y_0_xxzz, tr_y_0_xyy, tr_y_0_xyyy, tr_y_0_xyyz, tr_y_0_xyz, tr_y_0_xyzz, tr_y_0_xzz, tr_y_0_xzzz, tr_y_0_yyy, tr_y_0_yyyy, tr_y_0_yyyz, tr_y_0_yyz, tr_y_0_yyzz, tr_y_0_yzz, tr_y_0_yzzz, tr_y_0_zzz, tr_y_0_zzzz, tr_y_y_xxxx, tr_y_y_xxxy, tr_y_y_xxxz, tr_y_y_xxyy, tr_y_y_xxyz, tr_y_y_xxzz, tr_y_y_xyyy, tr_y_y_xyyz, tr_y_y_xyzz, tr_y_y_xzzz, tr_y_y_yyyy, tr_y_y_yyyz, tr_y_y_yyzz, tr_y_y_yzzz, tr_y_y_zzzz, ts_0_xxxx, ts_0_xxxy, ts_0_xxxz, ts_0_xxyy, ts_0_xxyz, ts_0_xxzz, ts_0_xyyy, ts_0_xyyz, ts_0_xyzz, ts_0_xzzz, ts_0_yyyy, ts_0_yyyz, ts_0_yyzz, ts_0_yzzz, ts_0_zzzz, b_exps : 64)
+#pragma omp simd aligned(pa_y,            \
+                             tr_y_0_xxx,  \
+                             tr_y_0_xxxx, \
+                             tr_y_0_xxxy, \
+                             tr_y_0_xxxz, \
+                             tr_y_0_xxy,  \
+                             tr_y_0_xxyy, \
+                             tr_y_0_xxyz, \
+                             tr_y_0_xxz,  \
+                             tr_y_0_xxzz, \
+                             tr_y_0_xyy,  \
+                             tr_y_0_xyyy, \
+                             tr_y_0_xyyz, \
+                             tr_y_0_xyz,  \
+                             tr_y_0_xyzz, \
+                             tr_y_0_xzz,  \
+                             tr_y_0_xzzz, \
+                             tr_y_0_yyy,  \
+                             tr_y_0_yyyy, \
+                             tr_y_0_yyyz, \
+                             tr_y_0_yyz,  \
+                             tr_y_0_yyzz, \
+                             tr_y_0_yzz,  \
+                             tr_y_0_yzzz, \
+                             tr_y_0_zzz,  \
+                             tr_y_0_zzzz, \
+                             tr_y_y_xxxx, \
+                             tr_y_y_xxxy, \
+                             tr_y_y_xxxz, \
+                             tr_y_y_xxyy, \
+                             tr_y_y_xxyz, \
+                             tr_y_y_xxzz, \
+                             tr_y_y_xyyy, \
+                             tr_y_y_xyyz, \
+                             tr_y_y_xyzz, \
+                             tr_y_y_xzzz, \
+                             tr_y_y_yyyy, \
+                             tr_y_y_yyyz, \
+                             tr_y_y_yyzz, \
+                             tr_y_y_yzzz, \
+                             tr_y_y_zzzz, \
+                             ts_0_xxxx,   \
+                             ts_0_xxxy,   \
+                             ts_0_xxxz,   \
+                             ts_0_xxyy,   \
+                             ts_0_xxyz,   \
+                             ts_0_xxzz,   \
+                             ts_0_xyyy,   \
+                             ts_0_xyyz,   \
+                             ts_0_xyzz,   \
+                             ts_0_xzzz,   \
+                             ts_0_yyyy,   \
+                             ts_0_yyyz,   \
+                             ts_0_yyzz,   \
+                             ts_0_yzzz,   \
+                             ts_0_zzzz,   \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -584,7 +819,48 @@ comp_prim_electric_dipole_momentum_pg(CSimdArray<double>& pbuffer,
 
     auto tr_y_z_zzzz = pbuffer.data(idx_dip_pg + 89);
 
-    #pragma omp simd aligned(pa_z, tr_y_0_xxx, tr_y_0_xxxx, tr_y_0_xxxy, tr_y_0_xxxz, tr_y_0_xxy, tr_y_0_xxyy, tr_y_0_xxyz, tr_y_0_xxz, tr_y_0_xxzz, tr_y_0_xyy, tr_y_0_xyyy, tr_y_0_xyyz, tr_y_0_xyz, tr_y_0_xyzz, tr_y_0_xzz, tr_y_0_xzzz, tr_y_0_yyy, tr_y_0_yyyy, tr_y_0_yyyz, tr_y_0_yyz, tr_y_0_yyzz, tr_y_0_yzz, tr_y_0_yzzz, tr_y_0_zzz, tr_y_0_zzzz, tr_y_z_xxxx, tr_y_z_xxxy, tr_y_z_xxxz, tr_y_z_xxyy, tr_y_z_xxyz, tr_y_z_xxzz, tr_y_z_xyyy, tr_y_z_xyyz, tr_y_z_xyzz, tr_y_z_xzzz, tr_y_z_yyyy, tr_y_z_yyyz, tr_y_z_yyzz, tr_y_z_yzzz, tr_y_z_zzzz, b_exps : 64)
+#pragma omp simd aligned(pa_z,            \
+                             tr_y_0_xxx,  \
+                             tr_y_0_xxxx, \
+                             tr_y_0_xxxy, \
+                             tr_y_0_xxxz, \
+                             tr_y_0_xxy,  \
+                             tr_y_0_xxyy, \
+                             tr_y_0_xxyz, \
+                             tr_y_0_xxz,  \
+                             tr_y_0_xxzz, \
+                             tr_y_0_xyy,  \
+                             tr_y_0_xyyy, \
+                             tr_y_0_xyyz, \
+                             tr_y_0_xyz,  \
+                             tr_y_0_xyzz, \
+                             tr_y_0_xzz,  \
+                             tr_y_0_xzzz, \
+                             tr_y_0_yyy,  \
+                             tr_y_0_yyyy, \
+                             tr_y_0_yyyz, \
+                             tr_y_0_yyz,  \
+                             tr_y_0_yyzz, \
+                             tr_y_0_yzz,  \
+                             tr_y_0_yzzz, \
+                             tr_y_0_zzz,  \
+                             tr_y_0_zzzz, \
+                             tr_y_z_xxxx, \
+                             tr_y_z_xxxy, \
+                             tr_y_z_xxxz, \
+                             tr_y_z_xxyy, \
+                             tr_y_z_xxyz, \
+                             tr_y_z_xxzz, \
+                             tr_y_z_xyyy, \
+                             tr_y_z_xyyz, \
+                             tr_y_z_xyzz, \
+                             tr_y_z_xzzz, \
+                             tr_y_z_yyyy, \
+                             tr_y_z_yyyz, \
+                             tr_y_z_yyzz, \
+                             tr_y_z_yzzz, \
+                             tr_y_z_zzzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -652,7 +928,48 @@ comp_prim_electric_dipole_momentum_pg(CSimdArray<double>& pbuffer,
 
     auto tr_z_x_zzzz = pbuffer.data(idx_dip_pg + 104);
 
-    #pragma omp simd aligned(pa_x, tr_z_0_xxx, tr_z_0_xxxx, tr_z_0_xxxy, tr_z_0_xxxz, tr_z_0_xxy, tr_z_0_xxyy, tr_z_0_xxyz, tr_z_0_xxz, tr_z_0_xxzz, tr_z_0_xyy, tr_z_0_xyyy, tr_z_0_xyyz, tr_z_0_xyz, tr_z_0_xyzz, tr_z_0_xzz, tr_z_0_xzzz, tr_z_0_yyy, tr_z_0_yyyy, tr_z_0_yyyz, tr_z_0_yyz, tr_z_0_yyzz, tr_z_0_yzz, tr_z_0_yzzz, tr_z_0_zzz, tr_z_0_zzzz, tr_z_x_xxxx, tr_z_x_xxxy, tr_z_x_xxxz, tr_z_x_xxyy, tr_z_x_xxyz, tr_z_x_xxzz, tr_z_x_xyyy, tr_z_x_xyyz, tr_z_x_xyzz, tr_z_x_xzzz, tr_z_x_yyyy, tr_z_x_yyyz, tr_z_x_yyzz, tr_z_x_yzzz, tr_z_x_zzzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,            \
+                             tr_z_0_xxx,  \
+                             tr_z_0_xxxx, \
+                             tr_z_0_xxxy, \
+                             tr_z_0_xxxz, \
+                             tr_z_0_xxy,  \
+                             tr_z_0_xxyy, \
+                             tr_z_0_xxyz, \
+                             tr_z_0_xxz,  \
+                             tr_z_0_xxzz, \
+                             tr_z_0_xyy,  \
+                             tr_z_0_xyyy, \
+                             tr_z_0_xyyz, \
+                             tr_z_0_xyz,  \
+                             tr_z_0_xyzz, \
+                             tr_z_0_xzz,  \
+                             tr_z_0_xzzz, \
+                             tr_z_0_yyy,  \
+                             tr_z_0_yyyy, \
+                             tr_z_0_yyyz, \
+                             tr_z_0_yyz,  \
+                             tr_z_0_yyzz, \
+                             tr_z_0_yzz,  \
+                             tr_z_0_yzzz, \
+                             tr_z_0_zzz,  \
+                             tr_z_0_zzzz, \
+                             tr_z_x_xxxx, \
+                             tr_z_x_xxxy, \
+                             tr_z_x_xxxz, \
+                             tr_z_x_xxyy, \
+                             tr_z_x_xxyz, \
+                             tr_z_x_xxzz, \
+                             tr_z_x_xyyy, \
+                             tr_z_x_xyyz, \
+                             tr_z_x_xyzz, \
+                             tr_z_x_xzzz, \
+                             tr_z_x_yyyy, \
+                             tr_z_x_yyyz, \
+                             tr_z_x_yyzz, \
+                             tr_z_x_yzzz, \
+                             tr_z_x_zzzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -720,7 +1037,48 @@ comp_prim_electric_dipole_momentum_pg(CSimdArray<double>& pbuffer,
 
     auto tr_z_y_zzzz = pbuffer.data(idx_dip_pg + 119);
 
-    #pragma omp simd aligned(pa_y, tr_z_0_xxx, tr_z_0_xxxx, tr_z_0_xxxy, tr_z_0_xxxz, tr_z_0_xxy, tr_z_0_xxyy, tr_z_0_xxyz, tr_z_0_xxz, tr_z_0_xxzz, tr_z_0_xyy, tr_z_0_xyyy, tr_z_0_xyyz, tr_z_0_xyz, tr_z_0_xyzz, tr_z_0_xzz, tr_z_0_xzzz, tr_z_0_yyy, tr_z_0_yyyy, tr_z_0_yyyz, tr_z_0_yyz, tr_z_0_yyzz, tr_z_0_yzz, tr_z_0_yzzz, tr_z_0_zzz, tr_z_0_zzzz, tr_z_y_xxxx, tr_z_y_xxxy, tr_z_y_xxxz, tr_z_y_xxyy, tr_z_y_xxyz, tr_z_y_xxzz, tr_z_y_xyyy, tr_z_y_xyyz, tr_z_y_xyzz, tr_z_y_xzzz, tr_z_y_yyyy, tr_z_y_yyyz, tr_z_y_yyzz, tr_z_y_yzzz, tr_z_y_zzzz, b_exps : 64)
+#pragma omp simd aligned(pa_y,            \
+                             tr_z_0_xxx,  \
+                             tr_z_0_xxxx, \
+                             tr_z_0_xxxy, \
+                             tr_z_0_xxxz, \
+                             tr_z_0_xxy,  \
+                             tr_z_0_xxyy, \
+                             tr_z_0_xxyz, \
+                             tr_z_0_xxz,  \
+                             tr_z_0_xxzz, \
+                             tr_z_0_xyy,  \
+                             tr_z_0_xyyy, \
+                             tr_z_0_xyyz, \
+                             tr_z_0_xyz,  \
+                             tr_z_0_xyzz, \
+                             tr_z_0_xzz,  \
+                             tr_z_0_xzzz, \
+                             tr_z_0_yyy,  \
+                             tr_z_0_yyyy, \
+                             tr_z_0_yyyz, \
+                             tr_z_0_yyz,  \
+                             tr_z_0_yyzz, \
+                             tr_z_0_yzz,  \
+                             tr_z_0_yzzz, \
+                             tr_z_0_zzz,  \
+                             tr_z_0_zzzz, \
+                             tr_z_y_xxxx, \
+                             tr_z_y_xxxy, \
+                             tr_z_y_xxxz, \
+                             tr_z_y_xxyy, \
+                             tr_z_y_xxyz, \
+                             tr_z_y_xxzz, \
+                             tr_z_y_xyyy, \
+                             tr_z_y_xyyz, \
+                             tr_z_y_xyzz, \
+                             tr_z_y_xzzz, \
+                             tr_z_y_yyyy, \
+                             tr_z_y_yyyz, \
+                             tr_z_y_yyzz, \
+                             tr_z_y_yzzz, \
+                             tr_z_y_zzzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -788,7 +1146,63 @@ comp_prim_electric_dipole_momentum_pg(CSimdArray<double>& pbuffer,
 
     auto tr_z_z_zzzz = pbuffer.data(idx_dip_pg + 134);
 
-    #pragma omp simd aligned(pa_z, tr_z_0_xxx, tr_z_0_xxxx, tr_z_0_xxxy, tr_z_0_xxxz, tr_z_0_xxy, tr_z_0_xxyy, tr_z_0_xxyz, tr_z_0_xxz, tr_z_0_xxzz, tr_z_0_xyy, tr_z_0_xyyy, tr_z_0_xyyz, tr_z_0_xyz, tr_z_0_xyzz, tr_z_0_xzz, tr_z_0_xzzz, tr_z_0_yyy, tr_z_0_yyyy, tr_z_0_yyyz, tr_z_0_yyz, tr_z_0_yyzz, tr_z_0_yzz, tr_z_0_yzzz, tr_z_0_zzz, tr_z_0_zzzz, tr_z_z_xxxx, tr_z_z_xxxy, tr_z_z_xxxz, tr_z_z_xxyy, tr_z_z_xxyz, tr_z_z_xxzz, tr_z_z_xyyy, tr_z_z_xyyz, tr_z_z_xyzz, tr_z_z_xzzz, tr_z_z_yyyy, tr_z_z_yyyz, tr_z_z_yyzz, tr_z_z_yzzz, tr_z_z_zzzz, ts_0_xxxx, ts_0_xxxy, ts_0_xxxz, ts_0_xxyy, ts_0_xxyz, ts_0_xxzz, ts_0_xyyy, ts_0_xyyz, ts_0_xyzz, ts_0_xzzz, ts_0_yyyy, ts_0_yyyz, ts_0_yyzz, ts_0_yzzz, ts_0_zzzz, b_exps : 64)
+#pragma omp simd aligned(pa_z,            \
+                             tr_z_0_xxx,  \
+                             tr_z_0_xxxx, \
+                             tr_z_0_xxxy, \
+                             tr_z_0_xxxz, \
+                             tr_z_0_xxy,  \
+                             tr_z_0_xxyy, \
+                             tr_z_0_xxyz, \
+                             tr_z_0_xxz,  \
+                             tr_z_0_xxzz, \
+                             tr_z_0_xyy,  \
+                             tr_z_0_xyyy, \
+                             tr_z_0_xyyz, \
+                             tr_z_0_xyz,  \
+                             tr_z_0_xyzz, \
+                             tr_z_0_xzz,  \
+                             tr_z_0_xzzz, \
+                             tr_z_0_yyy,  \
+                             tr_z_0_yyyy, \
+                             tr_z_0_yyyz, \
+                             tr_z_0_yyz,  \
+                             tr_z_0_yyzz, \
+                             tr_z_0_yzz,  \
+                             tr_z_0_yzzz, \
+                             tr_z_0_zzz,  \
+                             tr_z_0_zzzz, \
+                             tr_z_z_xxxx, \
+                             tr_z_z_xxxy, \
+                             tr_z_z_xxxz, \
+                             tr_z_z_xxyy, \
+                             tr_z_z_xxyz, \
+                             tr_z_z_xxzz, \
+                             tr_z_z_xyyy, \
+                             tr_z_z_xyyz, \
+                             tr_z_z_xyzz, \
+                             tr_z_z_xzzz, \
+                             tr_z_z_yyyy, \
+                             tr_z_z_yyyz, \
+                             tr_z_z_yyzz, \
+                             tr_z_z_yzzz, \
+                             tr_z_z_zzzz, \
+                             ts_0_xxxx,   \
+                             ts_0_xxxy,   \
+                             ts_0_xxxz,   \
+                             ts_0_xxyy,   \
+                             ts_0_xxyz,   \
+                             ts_0_xxzz,   \
+                             ts_0_xyyy,   \
+                             ts_0_xyyz,   \
+                             ts_0_xyzz,   \
+                             ts_0_xzzz,   \
+                             ts_0_yyyy,   \
+                             ts_0_yyyz,   \
+                             ts_0_yyzz,   \
+                             ts_0_yzzz,   \
+                             ts_0_zzzz,   \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -823,8 +1237,6 @@ comp_prim_electric_dipole_momentum_pg(CSimdArray<double>& pbuffer,
 
         tr_z_z_zzzz[i] = 4.0 * tr_z_0_zzz[i] * fe_0 + ts_0_zzzz[i] * fe_0 + tr_z_0_zzzz[i] * pa_z[i];
     }
-
 }
 
-} // diprec namespace
-
+}  // namespace diprec

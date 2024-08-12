@@ -1,18 +1,18 @@
 #include "KineticEnergyPrimRecIF.hpp"
 
-namespace kinrec { // kinrec namespace
+namespace kinrec {  // kinrec namespace
 
 auto
-comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer, 
-                            const size_t idx_kin_if,
-                            const size_t idx_ovl_gf,
-                            const size_t idx_kin_gf,
-                            const size_t idx_kin_hd,
-                            const size_t idx_kin_hf,
-                            const size_t idx_ovl_if,
+comp_prim_kinetic_energy_if(CSimdArray<double>&       pbuffer,
+                            const size_t              idx_kin_if,
+                            const size_t              idx_ovl_gf,
+                            const size_t              idx_kin_gf,
+                            const size_t              idx_kin_hd,
+                            const size_t              idx_kin_hf,
+                            const size_t              idx_ovl_if,
                             const CSimdArray<double>& factors,
-                            const size_t idx_rpa,
-                            const double a_exp) -> void
+                            const size_t              idx_rpa,
+                            const double              a_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -1424,7 +1424,64 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xxxxxx_zzz = pbuffer.data(idx_kin_if + 9);
 
-    #pragma omp simd aligned(pa_x, tk_xxxx_xxx, tk_xxxx_xxy, tk_xxxx_xxz, tk_xxxx_xyy, tk_xxxx_xyz, tk_xxxx_xzz, tk_xxxx_yyy, tk_xxxx_yyz, tk_xxxx_yzz, tk_xxxx_zzz, tk_xxxxx_xx, tk_xxxxx_xxx, tk_xxxxx_xxy, tk_xxxxx_xxz, tk_xxxxx_xy, tk_xxxxx_xyy, tk_xxxxx_xyz, tk_xxxxx_xz, tk_xxxxx_xzz, tk_xxxxx_yy, tk_xxxxx_yyy, tk_xxxxx_yyz, tk_xxxxx_yz, tk_xxxxx_yzz, tk_xxxxx_zz, tk_xxxxx_zzz, tk_xxxxxx_xxx, tk_xxxxxx_xxy, tk_xxxxxx_xxz, tk_xxxxxx_xyy, tk_xxxxxx_xyz, tk_xxxxxx_xzz, tk_xxxxxx_yyy, tk_xxxxxx_yyz, tk_xxxxxx_yzz, tk_xxxxxx_zzz, ts_xxxx_xxx, ts_xxxx_xxy, ts_xxxx_xxz, ts_xxxx_xyy, ts_xxxx_xyz, ts_xxxx_xzz, ts_xxxx_yyy, ts_xxxx_yyz, ts_xxxx_yzz, ts_xxxx_zzz, ts_xxxxxx_xxx, ts_xxxxxx_xxy, ts_xxxxxx_xxz, ts_xxxxxx_xyy, ts_xxxxxx_xyz, ts_xxxxxx_xzz, ts_xxxxxx_yyy, ts_xxxxxx_yyz, ts_xxxxxx_yzz, ts_xxxxxx_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,              \
+                             tk_xxxx_xxx,   \
+                             tk_xxxx_xxy,   \
+                             tk_xxxx_xxz,   \
+                             tk_xxxx_xyy,   \
+                             tk_xxxx_xyz,   \
+                             tk_xxxx_xzz,   \
+                             tk_xxxx_yyy,   \
+                             tk_xxxx_yyz,   \
+                             tk_xxxx_yzz,   \
+                             tk_xxxx_zzz,   \
+                             tk_xxxxx_xx,   \
+                             tk_xxxxx_xxx,  \
+                             tk_xxxxx_xxy,  \
+                             tk_xxxxx_xxz,  \
+                             tk_xxxxx_xy,   \
+                             tk_xxxxx_xyy,  \
+                             tk_xxxxx_xyz,  \
+                             tk_xxxxx_xz,   \
+                             tk_xxxxx_xzz,  \
+                             tk_xxxxx_yy,   \
+                             tk_xxxxx_yyy,  \
+                             tk_xxxxx_yyz,  \
+                             tk_xxxxx_yz,   \
+                             tk_xxxxx_yzz,  \
+                             tk_xxxxx_zz,   \
+                             tk_xxxxx_zzz,  \
+                             tk_xxxxxx_xxx, \
+                             tk_xxxxxx_xxy, \
+                             tk_xxxxxx_xxz, \
+                             tk_xxxxxx_xyy, \
+                             tk_xxxxxx_xyz, \
+                             tk_xxxxxx_xzz, \
+                             tk_xxxxxx_yyy, \
+                             tk_xxxxxx_yyz, \
+                             tk_xxxxxx_yzz, \
+                             tk_xxxxxx_zzz, \
+                             ts_xxxx_xxx,   \
+                             ts_xxxx_xxy,   \
+                             ts_xxxx_xxz,   \
+                             ts_xxxx_xyy,   \
+                             ts_xxxx_xyz,   \
+                             ts_xxxx_xzz,   \
+                             ts_xxxx_yyy,   \
+                             ts_xxxx_yyz,   \
+                             ts_xxxx_yzz,   \
+                             ts_xxxx_zzz,   \
+                             ts_xxxxxx_xxx, \
+                             ts_xxxxxx_xxy, \
+                             ts_xxxxxx_xxz, \
+                             ts_xxxxxx_xyy, \
+                             ts_xxxxxx_xyz, \
+                             ts_xxxxxx_xzz, \
+                             ts_xxxxxx_yyy, \
+                             ts_xxxxxx_yyz, \
+                             ts_xxxxxx_yzz, \
+                             ts_xxxxxx_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1433,25 +1490,35 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
         const double fbe_0 = 0.5 / a_exp;
 
-        tk_xxxxxx_xxx[i] = -10.0 * ts_xxxx_xxx[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_xxx[i] * fe_0 + 3.0 * tk_xxxxx_xx[i] * fe_0 + tk_xxxxx_xxx[i] * pa_x[i] + 2.0 * ts_xxxxxx_xxx[i] * fz_0;
+        tk_xxxxxx_xxx[i] = -10.0 * ts_xxxx_xxx[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_xxx[i] * fe_0 + 3.0 * tk_xxxxx_xx[i] * fe_0 +
+                           tk_xxxxx_xxx[i] * pa_x[i] + 2.0 * ts_xxxxxx_xxx[i] * fz_0;
 
-        tk_xxxxxx_xxy[i] = -10.0 * ts_xxxx_xxy[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_xxy[i] * fe_0 + 2.0 * tk_xxxxx_xy[i] * fe_0 + tk_xxxxx_xxy[i] * pa_x[i] + 2.0 * ts_xxxxxx_xxy[i] * fz_0;
+        tk_xxxxxx_xxy[i] = -10.0 * ts_xxxx_xxy[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_xxy[i] * fe_0 + 2.0 * tk_xxxxx_xy[i] * fe_0 +
+                           tk_xxxxx_xxy[i] * pa_x[i] + 2.0 * ts_xxxxxx_xxy[i] * fz_0;
 
-        tk_xxxxxx_xxz[i] = -10.0 * ts_xxxx_xxz[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_xxz[i] * fe_0 + 2.0 * tk_xxxxx_xz[i] * fe_0 + tk_xxxxx_xxz[i] * pa_x[i] + 2.0 * ts_xxxxxx_xxz[i] * fz_0;
+        tk_xxxxxx_xxz[i] = -10.0 * ts_xxxx_xxz[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_xxz[i] * fe_0 + 2.0 * tk_xxxxx_xz[i] * fe_0 +
+                           tk_xxxxx_xxz[i] * pa_x[i] + 2.0 * ts_xxxxxx_xxz[i] * fz_0;
 
-        tk_xxxxxx_xyy[i] = -10.0 * ts_xxxx_xyy[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_xyy[i] * fe_0 + tk_xxxxx_yy[i] * fe_0 + tk_xxxxx_xyy[i] * pa_x[i] + 2.0 * ts_xxxxxx_xyy[i] * fz_0;
+        tk_xxxxxx_xyy[i] = -10.0 * ts_xxxx_xyy[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_xyy[i] * fe_0 + tk_xxxxx_yy[i] * fe_0 + tk_xxxxx_xyy[i] * pa_x[i] +
+                           2.0 * ts_xxxxxx_xyy[i] * fz_0;
 
-        tk_xxxxxx_xyz[i] = -10.0 * ts_xxxx_xyz[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_xyz[i] * fe_0 + tk_xxxxx_yz[i] * fe_0 + tk_xxxxx_xyz[i] * pa_x[i] + 2.0 * ts_xxxxxx_xyz[i] * fz_0;
+        tk_xxxxxx_xyz[i] = -10.0 * ts_xxxx_xyz[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_xyz[i] * fe_0 + tk_xxxxx_yz[i] * fe_0 + tk_xxxxx_xyz[i] * pa_x[i] +
+                           2.0 * ts_xxxxxx_xyz[i] * fz_0;
 
-        tk_xxxxxx_xzz[i] = -10.0 * ts_xxxx_xzz[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_xzz[i] * fe_0 + tk_xxxxx_zz[i] * fe_0 + tk_xxxxx_xzz[i] * pa_x[i] + 2.0 * ts_xxxxxx_xzz[i] * fz_0;
+        tk_xxxxxx_xzz[i] = -10.0 * ts_xxxx_xzz[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_xzz[i] * fe_0 + tk_xxxxx_zz[i] * fe_0 + tk_xxxxx_xzz[i] * pa_x[i] +
+                           2.0 * ts_xxxxxx_xzz[i] * fz_0;
 
-        tk_xxxxxx_yyy[i] = -10.0 * ts_xxxx_yyy[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_yyy[i] * fe_0 + tk_xxxxx_yyy[i] * pa_x[i] + 2.0 * ts_xxxxxx_yyy[i] * fz_0;
+        tk_xxxxxx_yyy[i] =
+            -10.0 * ts_xxxx_yyy[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_yyy[i] * fe_0 + tk_xxxxx_yyy[i] * pa_x[i] + 2.0 * ts_xxxxxx_yyy[i] * fz_0;
 
-        tk_xxxxxx_yyz[i] = -10.0 * ts_xxxx_yyz[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_yyz[i] * fe_0 + tk_xxxxx_yyz[i] * pa_x[i] + 2.0 * ts_xxxxxx_yyz[i] * fz_0;
+        tk_xxxxxx_yyz[i] =
+            -10.0 * ts_xxxx_yyz[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_yyz[i] * fe_0 + tk_xxxxx_yyz[i] * pa_x[i] + 2.0 * ts_xxxxxx_yyz[i] * fz_0;
 
-        tk_xxxxxx_yzz[i] = -10.0 * ts_xxxx_yzz[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_yzz[i] * fe_0 + tk_xxxxx_yzz[i] * pa_x[i] + 2.0 * ts_xxxxxx_yzz[i] * fz_0;
+        tk_xxxxxx_yzz[i] =
+            -10.0 * ts_xxxx_yzz[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_yzz[i] * fe_0 + tk_xxxxx_yzz[i] * pa_x[i] + 2.0 * ts_xxxxxx_yzz[i] * fz_0;
 
-        tk_xxxxxx_zzz[i] = -10.0 * ts_xxxx_zzz[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_zzz[i] * fe_0 + tk_xxxxx_zzz[i] * pa_x[i] + 2.0 * ts_xxxxxx_zzz[i] * fz_0;
+        tk_xxxxxx_zzz[i] =
+            -10.0 * ts_xxxx_zzz[i] * fbe_0 * fz_0 + 5.0 * tk_xxxx_zzz[i] * fe_0 + tk_xxxxx_zzz[i] * pa_x[i] + 2.0 * ts_xxxxxx_zzz[i] * fz_0;
     }
 
     // Set up 10-20 components of targeted buffer : IF
@@ -1476,7 +1543,44 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xxxxxy_zzz = pbuffer.data(idx_kin_if + 19);
 
-    #pragma omp simd aligned(pa_y, tk_xxxxx_xx, tk_xxxxx_xxx, tk_xxxxx_xxy, tk_xxxxx_xxz, tk_xxxxx_xy, tk_xxxxx_xyy, tk_xxxxx_xyz, tk_xxxxx_xz, tk_xxxxx_xzz, tk_xxxxx_yy, tk_xxxxx_yyy, tk_xxxxx_yyz, tk_xxxxx_yz, tk_xxxxx_yzz, tk_xxxxx_zz, tk_xxxxx_zzz, tk_xxxxxy_xxx, tk_xxxxxy_xxy, tk_xxxxxy_xxz, tk_xxxxxy_xyy, tk_xxxxxy_xyz, tk_xxxxxy_xzz, tk_xxxxxy_yyy, tk_xxxxxy_yyz, tk_xxxxxy_yzz, tk_xxxxxy_zzz, ts_xxxxxy_xxx, ts_xxxxxy_xxy, ts_xxxxxy_xxz, ts_xxxxxy_xyy, ts_xxxxxy_xyz, ts_xxxxxy_xzz, ts_xxxxxy_yyy, ts_xxxxxy_yyz, ts_xxxxxy_yzz, ts_xxxxxy_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_y,              \
+                             tk_xxxxx_xx,   \
+                             tk_xxxxx_xxx,  \
+                             tk_xxxxx_xxy,  \
+                             tk_xxxxx_xxz,  \
+                             tk_xxxxx_xy,   \
+                             tk_xxxxx_xyy,  \
+                             tk_xxxxx_xyz,  \
+                             tk_xxxxx_xz,   \
+                             tk_xxxxx_xzz,  \
+                             tk_xxxxx_yy,   \
+                             tk_xxxxx_yyy,  \
+                             tk_xxxxx_yyz,  \
+                             tk_xxxxx_yz,   \
+                             tk_xxxxx_yzz,  \
+                             tk_xxxxx_zz,   \
+                             tk_xxxxx_zzz,  \
+                             tk_xxxxxy_xxx, \
+                             tk_xxxxxy_xxy, \
+                             tk_xxxxxy_xxz, \
+                             tk_xxxxxy_xyy, \
+                             tk_xxxxxy_xyz, \
+                             tk_xxxxxy_xzz, \
+                             tk_xxxxxy_yyy, \
+                             tk_xxxxxy_yyz, \
+                             tk_xxxxxy_yzz, \
+                             tk_xxxxxy_zzz, \
+                             ts_xxxxxy_xxx, \
+                             ts_xxxxxy_xxy, \
+                             ts_xxxxxy_xxz, \
+                             ts_xxxxxy_xyy, \
+                             ts_xxxxxy_xyz, \
+                             ts_xxxxxy_xzz, \
+                             ts_xxxxxy_yyy, \
+                             ts_xxxxxy_yyz, \
+                             ts_xxxxxy_yzz, \
+                             ts_xxxxxy_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1526,7 +1630,44 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xxxxxz_zzz = pbuffer.data(idx_kin_if + 29);
 
-    #pragma omp simd aligned(pa_z, tk_xxxxx_xx, tk_xxxxx_xxx, tk_xxxxx_xxy, tk_xxxxx_xxz, tk_xxxxx_xy, tk_xxxxx_xyy, tk_xxxxx_xyz, tk_xxxxx_xz, tk_xxxxx_xzz, tk_xxxxx_yy, tk_xxxxx_yyy, tk_xxxxx_yyz, tk_xxxxx_yz, tk_xxxxx_yzz, tk_xxxxx_zz, tk_xxxxx_zzz, tk_xxxxxz_xxx, tk_xxxxxz_xxy, tk_xxxxxz_xxz, tk_xxxxxz_xyy, tk_xxxxxz_xyz, tk_xxxxxz_xzz, tk_xxxxxz_yyy, tk_xxxxxz_yyz, tk_xxxxxz_yzz, tk_xxxxxz_zzz, ts_xxxxxz_xxx, ts_xxxxxz_xxy, ts_xxxxxz_xxz, ts_xxxxxz_xyy, ts_xxxxxz_xyz, ts_xxxxxz_xzz, ts_xxxxxz_yyy, ts_xxxxxz_yyz, ts_xxxxxz_yzz, ts_xxxxxz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_z,              \
+                             tk_xxxxx_xx,   \
+                             tk_xxxxx_xxx,  \
+                             tk_xxxxx_xxy,  \
+                             tk_xxxxx_xxz,  \
+                             tk_xxxxx_xy,   \
+                             tk_xxxxx_xyy,  \
+                             tk_xxxxx_xyz,  \
+                             tk_xxxxx_xz,   \
+                             tk_xxxxx_xzz,  \
+                             tk_xxxxx_yy,   \
+                             tk_xxxxx_yyy,  \
+                             tk_xxxxx_yyz,  \
+                             tk_xxxxx_yz,   \
+                             tk_xxxxx_yzz,  \
+                             tk_xxxxx_zz,   \
+                             tk_xxxxx_zzz,  \
+                             tk_xxxxxz_xxx, \
+                             tk_xxxxxz_xxy, \
+                             tk_xxxxxz_xxz, \
+                             tk_xxxxxz_xyy, \
+                             tk_xxxxxz_xyz, \
+                             tk_xxxxxz_xzz, \
+                             tk_xxxxxz_yyy, \
+                             tk_xxxxxz_yyz, \
+                             tk_xxxxxz_yzz, \
+                             tk_xxxxxz_zzz, \
+                             ts_xxxxxz_xxx, \
+                             ts_xxxxxz_xxy, \
+                             ts_xxxxxz_xxz, \
+                             ts_xxxxxz_xyy, \
+                             ts_xxxxxz_xyz, \
+                             ts_xxxxxz_xzz, \
+                             ts_xxxxxz_yyy, \
+                             ts_xxxxxz_yyz, \
+                             ts_xxxxxz_yzz, \
+                             ts_xxxxxz_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1576,7 +1717,62 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xxxxyy_zzz = pbuffer.data(idx_kin_if + 39);
 
-    #pragma omp simd aligned(pa_x, pa_y, tk_xxxx_xxx, tk_xxxx_xxz, tk_xxxx_xzz, tk_xxxxy_xxx, tk_xxxxy_xxz, tk_xxxxy_xzz, tk_xxxxyy_xxx, tk_xxxxyy_xxy, tk_xxxxyy_xxz, tk_xxxxyy_xyy, tk_xxxxyy_xyz, tk_xxxxyy_xzz, tk_xxxxyy_yyy, tk_xxxxyy_yyz, tk_xxxxyy_yzz, tk_xxxxyy_zzz, tk_xxxyy_xxy, tk_xxxyy_xy, tk_xxxyy_xyy, tk_xxxyy_xyz, tk_xxxyy_yy, tk_xxxyy_yyy, tk_xxxyy_yyz, tk_xxxyy_yz, tk_xxxyy_yzz, tk_xxxyy_zzz, tk_xxyy_xxy, tk_xxyy_xyy, tk_xxyy_xyz, tk_xxyy_yyy, tk_xxyy_yyz, tk_xxyy_yzz, tk_xxyy_zzz, ts_xxxx_xxx, ts_xxxx_xxz, ts_xxxx_xzz, ts_xxxxyy_xxx, ts_xxxxyy_xxy, ts_xxxxyy_xxz, ts_xxxxyy_xyy, ts_xxxxyy_xyz, ts_xxxxyy_xzz, ts_xxxxyy_yyy, ts_xxxxyy_yyz, ts_xxxxyy_yzz, ts_xxxxyy_zzz, ts_xxyy_xxy, ts_xxyy_xyy, ts_xxyy_xyz, ts_xxyy_yyy, ts_xxyy_yyz, ts_xxyy_yzz, ts_xxyy_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,              \
+                             pa_y,          \
+                             tk_xxxx_xxx,   \
+                             tk_xxxx_xxz,   \
+                             tk_xxxx_xzz,   \
+                             tk_xxxxy_xxx,  \
+                             tk_xxxxy_xxz,  \
+                             tk_xxxxy_xzz,  \
+                             tk_xxxxyy_xxx, \
+                             tk_xxxxyy_xxy, \
+                             tk_xxxxyy_xxz, \
+                             tk_xxxxyy_xyy, \
+                             tk_xxxxyy_xyz, \
+                             tk_xxxxyy_xzz, \
+                             tk_xxxxyy_yyy, \
+                             tk_xxxxyy_yyz, \
+                             tk_xxxxyy_yzz, \
+                             tk_xxxxyy_zzz, \
+                             tk_xxxyy_xxy,  \
+                             tk_xxxyy_xy,   \
+                             tk_xxxyy_xyy,  \
+                             tk_xxxyy_xyz,  \
+                             tk_xxxyy_yy,   \
+                             tk_xxxyy_yyy,  \
+                             tk_xxxyy_yyz,  \
+                             tk_xxxyy_yz,   \
+                             tk_xxxyy_yzz,  \
+                             tk_xxxyy_zzz,  \
+                             tk_xxyy_xxy,   \
+                             tk_xxyy_xyy,   \
+                             tk_xxyy_xyz,   \
+                             tk_xxyy_yyy,   \
+                             tk_xxyy_yyz,   \
+                             tk_xxyy_yzz,   \
+                             tk_xxyy_zzz,   \
+                             ts_xxxx_xxx,   \
+                             ts_xxxx_xxz,   \
+                             ts_xxxx_xzz,   \
+                             ts_xxxxyy_xxx, \
+                             ts_xxxxyy_xxy, \
+                             ts_xxxxyy_xxz, \
+                             ts_xxxxyy_xyy, \
+                             ts_xxxxyy_xyz, \
+                             ts_xxxxyy_xzz, \
+                             ts_xxxxyy_yyy, \
+                             ts_xxxxyy_yyz, \
+                             ts_xxxxyy_yzz, \
+                             ts_xxxxyy_zzz, \
+                             ts_xxyy_xxy,   \
+                             ts_xxyy_xyy,   \
+                             ts_xxyy_xyz,   \
+                             ts_xxyy_yyy,   \
+                             ts_xxyy_yyz,   \
+                             ts_xxyy_yzz,   \
+                             ts_xxyy_zzz,   \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1587,23 +1783,30 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
         tk_xxxxyy_xxx[i] = -2.0 * ts_xxxx_xxx[i] * fbe_0 * fz_0 + tk_xxxx_xxx[i] * fe_0 + tk_xxxxy_xxx[i] * pa_y[i] + 2.0 * ts_xxxxyy_xxx[i] * fz_0;
 
-        tk_xxxxyy_xxy[i] = -6.0 * ts_xxyy_xxy[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_xxy[i] * fe_0 + 2.0 * tk_xxxyy_xy[i] * fe_0 + tk_xxxyy_xxy[i] * pa_x[i] + 2.0 * ts_xxxxyy_xxy[i] * fz_0;
+        tk_xxxxyy_xxy[i] = -6.0 * ts_xxyy_xxy[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_xxy[i] * fe_0 + 2.0 * tk_xxxyy_xy[i] * fe_0 +
+                           tk_xxxyy_xxy[i] * pa_x[i] + 2.0 * ts_xxxxyy_xxy[i] * fz_0;
 
         tk_xxxxyy_xxz[i] = -2.0 * ts_xxxx_xxz[i] * fbe_0 * fz_0 + tk_xxxx_xxz[i] * fe_0 + tk_xxxxy_xxz[i] * pa_y[i] + 2.0 * ts_xxxxyy_xxz[i] * fz_0;
 
-        tk_xxxxyy_xyy[i] = -6.0 * ts_xxyy_xyy[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_xyy[i] * fe_0 + tk_xxxyy_yy[i] * fe_0 + tk_xxxyy_xyy[i] * pa_x[i] + 2.0 * ts_xxxxyy_xyy[i] * fz_0;
+        tk_xxxxyy_xyy[i] = -6.0 * ts_xxyy_xyy[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_xyy[i] * fe_0 + tk_xxxyy_yy[i] * fe_0 + tk_xxxyy_xyy[i] * pa_x[i] +
+                           2.0 * ts_xxxxyy_xyy[i] * fz_0;
 
-        tk_xxxxyy_xyz[i] = -6.0 * ts_xxyy_xyz[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_xyz[i] * fe_0 + tk_xxxyy_yz[i] * fe_0 + tk_xxxyy_xyz[i] * pa_x[i] + 2.0 * ts_xxxxyy_xyz[i] * fz_0;
+        tk_xxxxyy_xyz[i] = -6.0 * ts_xxyy_xyz[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_xyz[i] * fe_0 + tk_xxxyy_yz[i] * fe_0 + tk_xxxyy_xyz[i] * pa_x[i] +
+                           2.0 * ts_xxxxyy_xyz[i] * fz_0;
 
         tk_xxxxyy_xzz[i] = -2.0 * ts_xxxx_xzz[i] * fbe_0 * fz_0 + tk_xxxx_xzz[i] * fe_0 + tk_xxxxy_xzz[i] * pa_y[i] + 2.0 * ts_xxxxyy_xzz[i] * fz_0;
 
-        tk_xxxxyy_yyy[i] = -6.0 * ts_xxyy_yyy[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_yyy[i] * fe_0 + tk_xxxyy_yyy[i] * pa_x[i] + 2.0 * ts_xxxxyy_yyy[i] * fz_0;
+        tk_xxxxyy_yyy[i] =
+            -6.0 * ts_xxyy_yyy[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_yyy[i] * fe_0 + tk_xxxyy_yyy[i] * pa_x[i] + 2.0 * ts_xxxxyy_yyy[i] * fz_0;
 
-        tk_xxxxyy_yyz[i] = -6.0 * ts_xxyy_yyz[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_yyz[i] * fe_0 + tk_xxxyy_yyz[i] * pa_x[i] + 2.0 * ts_xxxxyy_yyz[i] * fz_0;
+        tk_xxxxyy_yyz[i] =
+            -6.0 * ts_xxyy_yyz[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_yyz[i] * fe_0 + tk_xxxyy_yyz[i] * pa_x[i] + 2.0 * ts_xxxxyy_yyz[i] * fz_0;
 
-        tk_xxxxyy_yzz[i] = -6.0 * ts_xxyy_yzz[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_yzz[i] * fe_0 + tk_xxxyy_yzz[i] * pa_x[i] + 2.0 * ts_xxxxyy_yzz[i] * fz_0;
+        tk_xxxxyy_yzz[i] =
+            -6.0 * ts_xxyy_yzz[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_yzz[i] * fe_0 + tk_xxxyy_yzz[i] * pa_x[i] + 2.0 * ts_xxxxyy_yzz[i] * fz_0;
 
-        tk_xxxxyy_zzz[i] = -6.0 * ts_xxyy_zzz[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_zzz[i] * fe_0 + tk_xxxyy_zzz[i] * pa_x[i] + 2.0 * ts_xxxxyy_zzz[i] * fz_0;
+        tk_xxxxyy_zzz[i] =
+            -6.0 * ts_xxyy_zzz[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_zzz[i] * fe_0 + tk_xxxyy_zzz[i] * pa_x[i] + 2.0 * ts_xxxxyy_zzz[i] * fz_0;
     }
 
     // Set up 40-50 components of targeted buffer : IF
@@ -1628,7 +1831,42 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xxxxyz_zzz = pbuffer.data(idx_kin_if + 49);
 
-    #pragma omp simd aligned(pa_y, pa_z, tk_xxxxy_xxy, tk_xxxxy_xyy, tk_xxxxy_yyy, tk_xxxxyz_xxx, tk_xxxxyz_xxy, tk_xxxxyz_xxz, tk_xxxxyz_xyy, tk_xxxxyz_xyz, tk_xxxxyz_xzz, tk_xxxxyz_yyy, tk_xxxxyz_yyz, tk_xxxxyz_yzz, tk_xxxxyz_zzz, tk_xxxxz_xxx, tk_xxxxz_xxz, tk_xxxxz_xyz, tk_xxxxz_xz, tk_xxxxz_xzz, tk_xxxxz_yyz, tk_xxxxz_yz, tk_xxxxz_yzz, tk_xxxxz_zz, tk_xxxxz_zzz, ts_xxxxyz_xxx, ts_xxxxyz_xxy, ts_xxxxyz_xxz, ts_xxxxyz_xyy, ts_xxxxyz_xyz, ts_xxxxyz_xzz, ts_xxxxyz_yyy, ts_xxxxyz_yyz, ts_xxxxyz_yzz, ts_xxxxyz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_y,              \
+                             pa_z,          \
+                             tk_xxxxy_xxy,  \
+                             tk_xxxxy_xyy,  \
+                             tk_xxxxy_yyy,  \
+                             tk_xxxxyz_xxx, \
+                             tk_xxxxyz_xxy, \
+                             tk_xxxxyz_xxz, \
+                             tk_xxxxyz_xyy, \
+                             tk_xxxxyz_xyz, \
+                             tk_xxxxyz_xzz, \
+                             tk_xxxxyz_yyy, \
+                             tk_xxxxyz_yyz, \
+                             tk_xxxxyz_yzz, \
+                             tk_xxxxyz_zzz, \
+                             tk_xxxxz_xxx,  \
+                             tk_xxxxz_xxz,  \
+                             tk_xxxxz_xyz,  \
+                             tk_xxxxz_xz,   \
+                             tk_xxxxz_xzz,  \
+                             tk_xxxxz_yyz,  \
+                             tk_xxxxz_yz,   \
+                             tk_xxxxz_yzz,  \
+                             tk_xxxxz_zz,   \
+                             tk_xxxxz_zzz,  \
+                             ts_xxxxyz_xxx, \
+                             ts_xxxxyz_xxy, \
+                             ts_xxxxyz_xxz, \
+                             ts_xxxxyz_xyy, \
+                             ts_xxxxyz_xyz, \
+                             ts_xxxxyz_xzz, \
+                             ts_xxxxyz_yyy, \
+                             ts_xxxxyz_yyz, \
+                             ts_xxxxyz_yzz, \
+                             ts_xxxxyz_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1678,7 +1916,62 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xxxxzz_zzz = pbuffer.data(idx_kin_if + 59);
 
-    #pragma omp simd aligned(pa_x, pa_z, tk_xxxx_xxx, tk_xxxx_xxy, tk_xxxx_xyy, tk_xxxxz_xxx, tk_xxxxz_xxy, tk_xxxxz_xyy, tk_xxxxzz_xxx, tk_xxxxzz_xxy, tk_xxxxzz_xxz, tk_xxxxzz_xyy, tk_xxxxzz_xyz, tk_xxxxzz_xzz, tk_xxxxzz_yyy, tk_xxxxzz_yyz, tk_xxxxzz_yzz, tk_xxxxzz_zzz, tk_xxxzz_xxz, tk_xxxzz_xyz, tk_xxxzz_xz, tk_xxxzz_xzz, tk_xxxzz_yyy, tk_xxxzz_yyz, tk_xxxzz_yz, tk_xxxzz_yzz, tk_xxxzz_zz, tk_xxxzz_zzz, tk_xxzz_xxz, tk_xxzz_xyz, tk_xxzz_xzz, tk_xxzz_yyy, tk_xxzz_yyz, tk_xxzz_yzz, tk_xxzz_zzz, ts_xxxx_xxx, ts_xxxx_xxy, ts_xxxx_xyy, ts_xxxxzz_xxx, ts_xxxxzz_xxy, ts_xxxxzz_xxz, ts_xxxxzz_xyy, ts_xxxxzz_xyz, ts_xxxxzz_xzz, ts_xxxxzz_yyy, ts_xxxxzz_yyz, ts_xxxxzz_yzz, ts_xxxxzz_zzz, ts_xxzz_xxz, ts_xxzz_xyz, ts_xxzz_xzz, ts_xxzz_yyy, ts_xxzz_yyz, ts_xxzz_yzz, ts_xxzz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,              \
+                             pa_z,          \
+                             tk_xxxx_xxx,   \
+                             tk_xxxx_xxy,   \
+                             tk_xxxx_xyy,   \
+                             tk_xxxxz_xxx,  \
+                             tk_xxxxz_xxy,  \
+                             tk_xxxxz_xyy,  \
+                             tk_xxxxzz_xxx, \
+                             tk_xxxxzz_xxy, \
+                             tk_xxxxzz_xxz, \
+                             tk_xxxxzz_xyy, \
+                             tk_xxxxzz_xyz, \
+                             tk_xxxxzz_xzz, \
+                             tk_xxxxzz_yyy, \
+                             tk_xxxxzz_yyz, \
+                             tk_xxxxzz_yzz, \
+                             tk_xxxxzz_zzz, \
+                             tk_xxxzz_xxz,  \
+                             tk_xxxzz_xyz,  \
+                             tk_xxxzz_xz,   \
+                             tk_xxxzz_xzz,  \
+                             tk_xxxzz_yyy,  \
+                             tk_xxxzz_yyz,  \
+                             tk_xxxzz_yz,   \
+                             tk_xxxzz_yzz,  \
+                             tk_xxxzz_zz,   \
+                             tk_xxxzz_zzz,  \
+                             tk_xxzz_xxz,   \
+                             tk_xxzz_xyz,   \
+                             tk_xxzz_xzz,   \
+                             tk_xxzz_yyy,   \
+                             tk_xxzz_yyz,   \
+                             tk_xxzz_yzz,   \
+                             tk_xxzz_zzz,   \
+                             ts_xxxx_xxx,   \
+                             ts_xxxx_xxy,   \
+                             ts_xxxx_xyy,   \
+                             ts_xxxxzz_xxx, \
+                             ts_xxxxzz_xxy, \
+                             ts_xxxxzz_xxz, \
+                             ts_xxxxzz_xyy, \
+                             ts_xxxxzz_xyz, \
+                             ts_xxxxzz_xzz, \
+                             ts_xxxxzz_yyy, \
+                             ts_xxxxzz_yyz, \
+                             ts_xxxxzz_yzz, \
+                             ts_xxxxzz_zzz, \
+                             ts_xxzz_xxz,   \
+                             ts_xxzz_xyz,   \
+                             ts_xxzz_xzz,   \
+                             ts_xxzz_yyy,   \
+                             ts_xxzz_yyz,   \
+                             ts_xxzz_yzz,   \
+                             ts_xxzz_zzz,   \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1691,21 +1984,28 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
         tk_xxxxzz_xxy[i] = -2.0 * ts_xxxx_xxy[i] * fbe_0 * fz_0 + tk_xxxx_xxy[i] * fe_0 + tk_xxxxz_xxy[i] * pa_z[i] + 2.0 * ts_xxxxzz_xxy[i] * fz_0;
 
-        tk_xxxxzz_xxz[i] = -6.0 * ts_xxzz_xxz[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_xxz[i] * fe_0 + 2.0 * tk_xxxzz_xz[i] * fe_0 + tk_xxxzz_xxz[i] * pa_x[i] + 2.0 * ts_xxxxzz_xxz[i] * fz_0;
+        tk_xxxxzz_xxz[i] = -6.0 * ts_xxzz_xxz[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_xxz[i] * fe_0 + 2.0 * tk_xxxzz_xz[i] * fe_0 +
+                           tk_xxxzz_xxz[i] * pa_x[i] + 2.0 * ts_xxxxzz_xxz[i] * fz_0;
 
         tk_xxxxzz_xyy[i] = -2.0 * ts_xxxx_xyy[i] * fbe_0 * fz_0 + tk_xxxx_xyy[i] * fe_0 + tk_xxxxz_xyy[i] * pa_z[i] + 2.0 * ts_xxxxzz_xyy[i] * fz_0;
 
-        tk_xxxxzz_xyz[i] = -6.0 * ts_xxzz_xyz[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_xyz[i] * fe_0 + tk_xxxzz_yz[i] * fe_0 + tk_xxxzz_xyz[i] * pa_x[i] + 2.0 * ts_xxxxzz_xyz[i] * fz_0;
+        tk_xxxxzz_xyz[i] = -6.0 * ts_xxzz_xyz[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_xyz[i] * fe_0 + tk_xxxzz_yz[i] * fe_0 + tk_xxxzz_xyz[i] * pa_x[i] +
+                           2.0 * ts_xxxxzz_xyz[i] * fz_0;
 
-        tk_xxxxzz_xzz[i] = -6.0 * ts_xxzz_xzz[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_xzz[i] * fe_0 + tk_xxxzz_zz[i] * fe_0 + tk_xxxzz_xzz[i] * pa_x[i] + 2.0 * ts_xxxxzz_xzz[i] * fz_0;
+        tk_xxxxzz_xzz[i] = -6.0 * ts_xxzz_xzz[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_xzz[i] * fe_0 + tk_xxxzz_zz[i] * fe_0 + tk_xxxzz_xzz[i] * pa_x[i] +
+                           2.0 * ts_xxxxzz_xzz[i] * fz_0;
 
-        tk_xxxxzz_yyy[i] = -6.0 * ts_xxzz_yyy[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_yyy[i] * fe_0 + tk_xxxzz_yyy[i] * pa_x[i] + 2.0 * ts_xxxxzz_yyy[i] * fz_0;
+        tk_xxxxzz_yyy[i] =
+            -6.0 * ts_xxzz_yyy[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_yyy[i] * fe_0 + tk_xxxzz_yyy[i] * pa_x[i] + 2.0 * ts_xxxxzz_yyy[i] * fz_0;
 
-        tk_xxxxzz_yyz[i] = -6.0 * ts_xxzz_yyz[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_yyz[i] * fe_0 + tk_xxxzz_yyz[i] * pa_x[i] + 2.0 * ts_xxxxzz_yyz[i] * fz_0;
+        tk_xxxxzz_yyz[i] =
+            -6.0 * ts_xxzz_yyz[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_yyz[i] * fe_0 + tk_xxxzz_yyz[i] * pa_x[i] + 2.0 * ts_xxxxzz_yyz[i] * fz_0;
 
-        tk_xxxxzz_yzz[i] = -6.0 * ts_xxzz_yzz[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_yzz[i] * fe_0 + tk_xxxzz_yzz[i] * pa_x[i] + 2.0 * ts_xxxxzz_yzz[i] * fz_0;
+        tk_xxxxzz_yzz[i] =
+            -6.0 * ts_xxzz_yzz[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_yzz[i] * fe_0 + tk_xxxzz_yzz[i] * pa_x[i] + 2.0 * ts_xxxxzz_yzz[i] * fz_0;
 
-        tk_xxxxzz_zzz[i] = -6.0 * ts_xxzz_zzz[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_zzz[i] * fe_0 + tk_xxxzz_zzz[i] * pa_x[i] + 2.0 * ts_xxxxzz_zzz[i] * fz_0;
+        tk_xxxxzz_zzz[i] =
+            -6.0 * ts_xxzz_zzz[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_zzz[i] * fe_0 + tk_xxxzz_zzz[i] * pa_x[i] + 2.0 * ts_xxxxzz_zzz[i] * fz_0;
     }
 
     // Set up 60-70 components of targeted buffer : IF
@@ -1730,7 +2030,62 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xxxyyy_zzz = pbuffer.data(idx_kin_if + 69);
 
-    #pragma omp simd aligned(pa_x, pa_y, tk_xxxy_xxx, tk_xxxy_xxz, tk_xxxy_xzz, tk_xxxyy_xxx, tk_xxxyy_xxz, tk_xxxyy_xzz, tk_xxxyyy_xxx, tk_xxxyyy_xxy, tk_xxxyyy_xxz, tk_xxxyyy_xyy, tk_xxxyyy_xyz, tk_xxxyyy_xzz, tk_xxxyyy_yyy, tk_xxxyyy_yyz, tk_xxxyyy_yzz, tk_xxxyyy_zzz, tk_xxyyy_xxy, tk_xxyyy_xy, tk_xxyyy_xyy, tk_xxyyy_xyz, tk_xxyyy_yy, tk_xxyyy_yyy, tk_xxyyy_yyz, tk_xxyyy_yz, tk_xxyyy_yzz, tk_xxyyy_zzz, tk_xyyy_xxy, tk_xyyy_xyy, tk_xyyy_xyz, tk_xyyy_yyy, tk_xyyy_yyz, tk_xyyy_yzz, tk_xyyy_zzz, ts_xxxy_xxx, ts_xxxy_xxz, ts_xxxy_xzz, ts_xxxyyy_xxx, ts_xxxyyy_xxy, ts_xxxyyy_xxz, ts_xxxyyy_xyy, ts_xxxyyy_xyz, ts_xxxyyy_xzz, ts_xxxyyy_yyy, ts_xxxyyy_yyz, ts_xxxyyy_yzz, ts_xxxyyy_zzz, ts_xyyy_xxy, ts_xyyy_xyy, ts_xyyy_xyz, ts_xyyy_yyy, ts_xyyy_yyz, ts_xyyy_yzz, ts_xyyy_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,              \
+                             pa_y,          \
+                             tk_xxxy_xxx,   \
+                             tk_xxxy_xxz,   \
+                             tk_xxxy_xzz,   \
+                             tk_xxxyy_xxx,  \
+                             tk_xxxyy_xxz,  \
+                             tk_xxxyy_xzz,  \
+                             tk_xxxyyy_xxx, \
+                             tk_xxxyyy_xxy, \
+                             tk_xxxyyy_xxz, \
+                             tk_xxxyyy_xyy, \
+                             tk_xxxyyy_xyz, \
+                             tk_xxxyyy_xzz, \
+                             tk_xxxyyy_yyy, \
+                             tk_xxxyyy_yyz, \
+                             tk_xxxyyy_yzz, \
+                             tk_xxxyyy_zzz, \
+                             tk_xxyyy_xxy,  \
+                             tk_xxyyy_xy,   \
+                             tk_xxyyy_xyy,  \
+                             tk_xxyyy_xyz,  \
+                             tk_xxyyy_yy,   \
+                             tk_xxyyy_yyy,  \
+                             tk_xxyyy_yyz,  \
+                             tk_xxyyy_yz,   \
+                             tk_xxyyy_yzz,  \
+                             tk_xxyyy_zzz,  \
+                             tk_xyyy_xxy,   \
+                             tk_xyyy_xyy,   \
+                             tk_xyyy_xyz,   \
+                             tk_xyyy_yyy,   \
+                             tk_xyyy_yyz,   \
+                             tk_xyyy_yzz,   \
+                             tk_xyyy_zzz,   \
+                             ts_xxxy_xxx,   \
+                             ts_xxxy_xxz,   \
+                             ts_xxxy_xzz,   \
+                             ts_xxxyyy_xxx, \
+                             ts_xxxyyy_xxy, \
+                             ts_xxxyyy_xxz, \
+                             ts_xxxyyy_xyy, \
+                             ts_xxxyyy_xyz, \
+                             ts_xxxyyy_xzz, \
+                             ts_xxxyyy_yyy, \
+                             ts_xxxyyy_yyz, \
+                             ts_xxxyyy_yzz, \
+                             ts_xxxyyy_zzz, \
+                             ts_xyyy_xxy,   \
+                             ts_xyyy_xyy,   \
+                             ts_xyyy_xyz,   \
+                             ts_xyyy_yyy,   \
+                             ts_xyyy_yyz,   \
+                             ts_xyyy_yzz,   \
+                             ts_xyyy_zzz,   \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1739,25 +2094,35 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
         const double fbe_0 = 0.5 / a_exp;
 
-        tk_xxxyyy_xxx[i] = -4.0 * ts_xxxy_xxx[i] * fbe_0 * fz_0 + 2.0 * tk_xxxy_xxx[i] * fe_0 + tk_xxxyy_xxx[i] * pa_y[i] + 2.0 * ts_xxxyyy_xxx[i] * fz_0;
+        tk_xxxyyy_xxx[i] =
+            -4.0 * ts_xxxy_xxx[i] * fbe_0 * fz_0 + 2.0 * tk_xxxy_xxx[i] * fe_0 + tk_xxxyy_xxx[i] * pa_y[i] + 2.0 * ts_xxxyyy_xxx[i] * fz_0;
 
-        tk_xxxyyy_xxy[i] = -4.0 * ts_xyyy_xxy[i] * fbe_0 * fz_0 + 2.0 * tk_xyyy_xxy[i] * fe_0 + 2.0 * tk_xxyyy_xy[i] * fe_0 + tk_xxyyy_xxy[i] * pa_x[i] + 2.0 * ts_xxxyyy_xxy[i] * fz_0;
+        tk_xxxyyy_xxy[i] = -4.0 * ts_xyyy_xxy[i] * fbe_0 * fz_0 + 2.0 * tk_xyyy_xxy[i] * fe_0 + 2.0 * tk_xxyyy_xy[i] * fe_0 +
+                           tk_xxyyy_xxy[i] * pa_x[i] + 2.0 * ts_xxxyyy_xxy[i] * fz_0;
 
-        tk_xxxyyy_xxz[i] = -4.0 * ts_xxxy_xxz[i] * fbe_0 * fz_0 + 2.0 * tk_xxxy_xxz[i] * fe_0 + tk_xxxyy_xxz[i] * pa_y[i] + 2.0 * ts_xxxyyy_xxz[i] * fz_0;
+        tk_xxxyyy_xxz[i] =
+            -4.0 * ts_xxxy_xxz[i] * fbe_0 * fz_0 + 2.0 * tk_xxxy_xxz[i] * fe_0 + tk_xxxyy_xxz[i] * pa_y[i] + 2.0 * ts_xxxyyy_xxz[i] * fz_0;
 
-        tk_xxxyyy_xyy[i] = -4.0 * ts_xyyy_xyy[i] * fbe_0 * fz_0 + 2.0 * tk_xyyy_xyy[i] * fe_0 + tk_xxyyy_yy[i] * fe_0 + tk_xxyyy_xyy[i] * pa_x[i] + 2.0 * ts_xxxyyy_xyy[i] * fz_0;
+        tk_xxxyyy_xyy[i] = -4.0 * ts_xyyy_xyy[i] * fbe_0 * fz_0 + 2.0 * tk_xyyy_xyy[i] * fe_0 + tk_xxyyy_yy[i] * fe_0 + tk_xxyyy_xyy[i] * pa_x[i] +
+                           2.0 * ts_xxxyyy_xyy[i] * fz_0;
 
-        tk_xxxyyy_xyz[i] = -4.0 * ts_xyyy_xyz[i] * fbe_0 * fz_0 + 2.0 * tk_xyyy_xyz[i] * fe_0 + tk_xxyyy_yz[i] * fe_0 + tk_xxyyy_xyz[i] * pa_x[i] + 2.0 * ts_xxxyyy_xyz[i] * fz_0;
+        tk_xxxyyy_xyz[i] = -4.0 * ts_xyyy_xyz[i] * fbe_0 * fz_0 + 2.0 * tk_xyyy_xyz[i] * fe_0 + tk_xxyyy_yz[i] * fe_0 + tk_xxyyy_xyz[i] * pa_x[i] +
+                           2.0 * ts_xxxyyy_xyz[i] * fz_0;
 
-        tk_xxxyyy_xzz[i] = -4.0 * ts_xxxy_xzz[i] * fbe_0 * fz_0 + 2.0 * tk_xxxy_xzz[i] * fe_0 + tk_xxxyy_xzz[i] * pa_y[i] + 2.0 * ts_xxxyyy_xzz[i] * fz_0;
+        tk_xxxyyy_xzz[i] =
+            -4.0 * ts_xxxy_xzz[i] * fbe_0 * fz_0 + 2.0 * tk_xxxy_xzz[i] * fe_0 + tk_xxxyy_xzz[i] * pa_y[i] + 2.0 * ts_xxxyyy_xzz[i] * fz_0;
 
-        tk_xxxyyy_yyy[i] = -4.0 * ts_xyyy_yyy[i] * fbe_0 * fz_0 + 2.0 * tk_xyyy_yyy[i] * fe_0 + tk_xxyyy_yyy[i] * pa_x[i] + 2.0 * ts_xxxyyy_yyy[i] * fz_0;
+        tk_xxxyyy_yyy[i] =
+            -4.0 * ts_xyyy_yyy[i] * fbe_0 * fz_0 + 2.0 * tk_xyyy_yyy[i] * fe_0 + tk_xxyyy_yyy[i] * pa_x[i] + 2.0 * ts_xxxyyy_yyy[i] * fz_0;
 
-        tk_xxxyyy_yyz[i] = -4.0 * ts_xyyy_yyz[i] * fbe_0 * fz_0 + 2.0 * tk_xyyy_yyz[i] * fe_0 + tk_xxyyy_yyz[i] * pa_x[i] + 2.0 * ts_xxxyyy_yyz[i] * fz_0;
+        tk_xxxyyy_yyz[i] =
+            -4.0 * ts_xyyy_yyz[i] * fbe_0 * fz_0 + 2.0 * tk_xyyy_yyz[i] * fe_0 + tk_xxyyy_yyz[i] * pa_x[i] + 2.0 * ts_xxxyyy_yyz[i] * fz_0;
 
-        tk_xxxyyy_yzz[i] = -4.0 * ts_xyyy_yzz[i] * fbe_0 * fz_0 + 2.0 * tk_xyyy_yzz[i] * fe_0 + tk_xxyyy_yzz[i] * pa_x[i] + 2.0 * ts_xxxyyy_yzz[i] * fz_0;
+        tk_xxxyyy_yzz[i] =
+            -4.0 * ts_xyyy_yzz[i] * fbe_0 * fz_0 + 2.0 * tk_xyyy_yzz[i] * fe_0 + tk_xxyyy_yzz[i] * pa_x[i] + 2.0 * ts_xxxyyy_yzz[i] * fz_0;
 
-        tk_xxxyyy_zzz[i] = -4.0 * ts_xyyy_zzz[i] * fbe_0 * fz_0 + 2.0 * tk_xyyy_zzz[i] * fe_0 + tk_xxyyy_zzz[i] * pa_x[i] + 2.0 * ts_xxxyyy_zzz[i] * fz_0;
+        tk_xxxyyy_zzz[i] =
+            -4.0 * ts_xyyy_zzz[i] * fbe_0 * fz_0 + 2.0 * tk_xyyy_zzz[i] * fe_0 + tk_xxyyy_zzz[i] * pa_x[i] + 2.0 * ts_xxxyyy_zzz[i] * fz_0;
     }
 
     // Set up 70-80 components of targeted buffer : IF
@@ -1782,7 +2147,44 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xxxyyz_zzz = pbuffer.data(idx_kin_if + 79);
 
-    #pragma omp simd aligned(pa_z, tk_xxxyy_xx, tk_xxxyy_xxx, tk_xxxyy_xxy, tk_xxxyy_xxz, tk_xxxyy_xy, tk_xxxyy_xyy, tk_xxxyy_xyz, tk_xxxyy_xz, tk_xxxyy_xzz, tk_xxxyy_yy, tk_xxxyy_yyy, tk_xxxyy_yyz, tk_xxxyy_yz, tk_xxxyy_yzz, tk_xxxyy_zz, tk_xxxyy_zzz, tk_xxxyyz_xxx, tk_xxxyyz_xxy, tk_xxxyyz_xxz, tk_xxxyyz_xyy, tk_xxxyyz_xyz, tk_xxxyyz_xzz, tk_xxxyyz_yyy, tk_xxxyyz_yyz, tk_xxxyyz_yzz, tk_xxxyyz_zzz, ts_xxxyyz_xxx, ts_xxxyyz_xxy, ts_xxxyyz_xxz, ts_xxxyyz_xyy, ts_xxxyyz_xyz, ts_xxxyyz_xzz, ts_xxxyyz_yyy, ts_xxxyyz_yyz, ts_xxxyyz_yzz, ts_xxxyyz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_z,              \
+                             tk_xxxyy_xx,   \
+                             tk_xxxyy_xxx,  \
+                             tk_xxxyy_xxy,  \
+                             tk_xxxyy_xxz,  \
+                             tk_xxxyy_xy,   \
+                             tk_xxxyy_xyy,  \
+                             tk_xxxyy_xyz,  \
+                             tk_xxxyy_xz,   \
+                             tk_xxxyy_xzz,  \
+                             tk_xxxyy_yy,   \
+                             tk_xxxyy_yyy,  \
+                             tk_xxxyy_yyz,  \
+                             tk_xxxyy_yz,   \
+                             tk_xxxyy_yzz,  \
+                             tk_xxxyy_zz,   \
+                             tk_xxxyy_zzz,  \
+                             tk_xxxyyz_xxx, \
+                             tk_xxxyyz_xxy, \
+                             tk_xxxyyz_xxz, \
+                             tk_xxxyyz_xyy, \
+                             tk_xxxyyz_xyz, \
+                             tk_xxxyyz_xzz, \
+                             tk_xxxyyz_yyy, \
+                             tk_xxxyyz_yyz, \
+                             tk_xxxyyz_yzz, \
+                             tk_xxxyyz_zzz, \
+                             ts_xxxyyz_xxx, \
+                             ts_xxxyyz_xxy, \
+                             ts_xxxyyz_xxz, \
+                             ts_xxxyyz_xyy, \
+                             ts_xxxyyz_xyz, \
+                             ts_xxxyyz_xzz, \
+                             ts_xxxyyz_yyy, \
+                             ts_xxxyyz_yyz, \
+                             ts_xxxyyz_yzz, \
+                             ts_xxxyyz_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1832,7 +2234,44 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xxxyzz_zzz = pbuffer.data(idx_kin_if + 89);
 
-    #pragma omp simd aligned(pa_y, tk_xxxyzz_xxx, tk_xxxyzz_xxy, tk_xxxyzz_xxz, tk_xxxyzz_xyy, tk_xxxyzz_xyz, tk_xxxyzz_xzz, tk_xxxyzz_yyy, tk_xxxyzz_yyz, tk_xxxyzz_yzz, tk_xxxyzz_zzz, tk_xxxzz_xx, tk_xxxzz_xxx, tk_xxxzz_xxy, tk_xxxzz_xxz, tk_xxxzz_xy, tk_xxxzz_xyy, tk_xxxzz_xyz, tk_xxxzz_xz, tk_xxxzz_xzz, tk_xxxzz_yy, tk_xxxzz_yyy, tk_xxxzz_yyz, tk_xxxzz_yz, tk_xxxzz_yzz, tk_xxxzz_zz, tk_xxxzz_zzz, ts_xxxyzz_xxx, ts_xxxyzz_xxy, ts_xxxyzz_xxz, ts_xxxyzz_xyy, ts_xxxyzz_xyz, ts_xxxyzz_xzz, ts_xxxyzz_yyy, ts_xxxyzz_yyz, ts_xxxyzz_yzz, ts_xxxyzz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_y,              \
+                             tk_xxxyzz_xxx, \
+                             tk_xxxyzz_xxy, \
+                             tk_xxxyzz_xxz, \
+                             tk_xxxyzz_xyy, \
+                             tk_xxxyzz_xyz, \
+                             tk_xxxyzz_xzz, \
+                             tk_xxxyzz_yyy, \
+                             tk_xxxyzz_yyz, \
+                             tk_xxxyzz_yzz, \
+                             tk_xxxyzz_zzz, \
+                             tk_xxxzz_xx,   \
+                             tk_xxxzz_xxx,  \
+                             tk_xxxzz_xxy,  \
+                             tk_xxxzz_xxz,  \
+                             tk_xxxzz_xy,   \
+                             tk_xxxzz_xyy,  \
+                             tk_xxxzz_xyz,  \
+                             tk_xxxzz_xz,   \
+                             tk_xxxzz_xzz,  \
+                             tk_xxxzz_yy,   \
+                             tk_xxxzz_yyy,  \
+                             tk_xxxzz_yyz,  \
+                             tk_xxxzz_yz,   \
+                             tk_xxxzz_yzz,  \
+                             tk_xxxzz_zz,   \
+                             tk_xxxzz_zzz,  \
+                             ts_xxxyzz_xxx, \
+                             ts_xxxyzz_xxy, \
+                             ts_xxxyzz_xxz, \
+                             ts_xxxyzz_xyy, \
+                             ts_xxxyzz_xyz, \
+                             ts_xxxyzz_xzz, \
+                             ts_xxxyzz_yyy, \
+                             ts_xxxyzz_yyz, \
+                             ts_xxxyzz_yzz, \
+                             ts_xxxyzz_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1882,7 +2321,62 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xxxzzz_zzz = pbuffer.data(idx_kin_if + 99);
 
-    #pragma omp simd aligned(pa_x, pa_z, tk_xxxz_xxx, tk_xxxz_xxy, tk_xxxz_xyy, tk_xxxzz_xxx, tk_xxxzz_xxy, tk_xxxzz_xyy, tk_xxxzzz_xxx, tk_xxxzzz_xxy, tk_xxxzzz_xxz, tk_xxxzzz_xyy, tk_xxxzzz_xyz, tk_xxxzzz_xzz, tk_xxxzzz_yyy, tk_xxxzzz_yyz, tk_xxxzzz_yzz, tk_xxxzzz_zzz, tk_xxzzz_xxz, tk_xxzzz_xyz, tk_xxzzz_xz, tk_xxzzz_xzz, tk_xxzzz_yyy, tk_xxzzz_yyz, tk_xxzzz_yz, tk_xxzzz_yzz, tk_xxzzz_zz, tk_xxzzz_zzz, tk_xzzz_xxz, tk_xzzz_xyz, tk_xzzz_xzz, tk_xzzz_yyy, tk_xzzz_yyz, tk_xzzz_yzz, tk_xzzz_zzz, ts_xxxz_xxx, ts_xxxz_xxy, ts_xxxz_xyy, ts_xxxzzz_xxx, ts_xxxzzz_xxy, ts_xxxzzz_xxz, ts_xxxzzz_xyy, ts_xxxzzz_xyz, ts_xxxzzz_xzz, ts_xxxzzz_yyy, ts_xxxzzz_yyz, ts_xxxzzz_yzz, ts_xxxzzz_zzz, ts_xzzz_xxz, ts_xzzz_xyz, ts_xzzz_xzz, ts_xzzz_yyy, ts_xzzz_yyz, ts_xzzz_yzz, ts_xzzz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,              \
+                             pa_z,          \
+                             tk_xxxz_xxx,   \
+                             tk_xxxz_xxy,   \
+                             tk_xxxz_xyy,   \
+                             tk_xxxzz_xxx,  \
+                             tk_xxxzz_xxy,  \
+                             tk_xxxzz_xyy,  \
+                             tk_xxxzzz_xxx, \
+                             tk_xxxzzz_xxy, \
+                             tk_xxxzzz_xxz, \
+                             tk_xxxzzz_xyy, \
+                             tk_xxxzzz_xyz, \
+                             tk_xxxzzz_xzz, \
+                             tk_xxxzzz_yyy, \
+                             tk_xxxzzz_yyz, \
+                             tk_xxxzzz_yzz, \
+                             tk_xxxzzz_zzz, \
+                             tk_xxzzz_xxz,  \
+                             tk_xxzzz_xyz,  \
+                             tk_xxzzz_xz,   \
+                             tk_xxzzz_xzz,  \
+                             tk_xxzzz_yyy,  \
+                             tk_xxzzz_yyz,  \
+                             tk_xxzzz_yz,   \
+                             tk_xxzzz_yzz,  \
+                             tk_xxzzz_zz,   \
+                             tk_xxzzz_zzz,  \
+                             tk_xzzz_xxz,   \
+                             tk_xzzz_xyz,   \
+                             tk_xzzz_xzz,   \
+                             tk_xzzz_yyy,   \
+                             tk_xzzz_yyz,   \
+                             tk_xzzz_yzz,   \
+                             tk_xzzz_zzz,   \
+                             ts_xxxz_xxx,   \
+                             ts_xxxz_xxy,   \
+                             ts_xxxz_xyy,   \
+                             ts_xxxzzz_xxx, \
+                             ts_xxxzzz_xxy, \
+                             ts_xxxzzz_xxz, \
+                             ts_xxxzzz_xyy, \
+                             ts_xxxzzz_xyz, \
+                             ts_xxxzzz_xzz, \
+                             ts_xxxzzz_yyy, \
+                             ts_xxxzzz_yyz, \
+                             ts_xxxzzz_yzz, \
+                             ts_xxxzzz_zzz, \
+                             ts_xzzz_xxz,   \
+                             ts_xzzz_xyz,   \
+                             ts_xzzz_xzz,   \
+                             ts_xzzz_yyy,   \
+                             ts_xzzz_yyz,   \
+                             ts_xzzz_yzz,   \
+                             ts_xzzz_zzz,   \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1891,25 +2385,35 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
         const double fbe_0 = 0.5 / a_exp;
 
-        tk_xxxzzz_xxx[i] = -4.0 * ts_xxxz_xxx[i] * fbe_0 * fz_0 + 2.0 * tk_xxxz_xxx[i] * fe_0 + tk_xxxzz_xxx[i] * pa_z[i] + 2.0 * ts_xxxzzz_xxx[i] * fz_0;
+        tk_xxxzzz_xxx[i] =
+            -4.0 * ts_xxxz_xxx[i] * fbe_0 * fz_0 + 2.0 * tk_xxxz_xxx[i] * fe_0 + tk_xxxzz_xxx[i] * pa_z[i] + 2.0 * ts_xxxzzz_xxx[i] * fz_0;
 
-        tk_xxxzzz_xxy[i] = -4.0 * ts_xxxz_xxy[i] * fbe_0 * fz_0 + 2.0 * tk_xxxz_xxy[i] * fe_0 + tk_xxxzz_xxy[i] * pa_z[i] + 2.0 * ts_xxxzzz_xxy[i] * fz_0;
+        tk_xxxzzz_xxy[i] =
+            -4.0 * ts_xxxz_xxy[i] * fbe_0 * fz_0 + 2.0 * tk_xxxz_xxy[i] * fe_0 + tk_xxxzz_xxy[i] * pa_z[i] + 2.0 * ts_xxxzzz_xxy[i] * fz_0;
 
-        tk_xxxzzz_xxz[i] = -4.0 * ts_xzzz_xxz[i] * fbe_0 * fz_0 + 2.0 * tk_xzzz_xxz[i] * fe_0 + 2.0 * tk_xxzzz_xz[i] * fe_0 + tk_xxzzz_xxz[i] * pa_x[i] + 2.0 * ts_xxxzzz_xxz[i] * fz_0;
+        tk_xxxzzz_xxz[i] = -4.0 * ts_xzzz_xxz[i] * fbe_0 * fz_0 + 2.0 * tk_xzzz_xxz[i] * fe_0 + 2.0 * tk_xxzzz_xz[i] * fe_0 +
+                           tk_xxzzz_xxz[i] * pa_x[i] + 2.0 * ts_xxxzzz_xxz[i] * fz_0;
 
-        tk_xxxzzz_xyy[i] = -4.0 * ts_xxxz_xyy[i] * fbe_0 * fz_0 + 2.0 * tk_xxxz_xyy[i] * fe_0 + tk_xxxzz_xyy[i] * pa_z[i] + 2.0 * ts_xxxzzz_xyy[i] * fz_0;
+        tk_xxxzzz_xyy[i] =
+            -4.0 * ts_xxxz_xyy[i] * fbe_0 * fz_0 + 2.0 * tk_xxxz_xyy[i] * fe_0 + tk_xxxzz_xyy[i] * pa_z[i] + 2.0 * ts_xxxzzz_xyy[i] * fz_0;
 
-        tk_xxxzzz_xyz[i] = -4.0 * ts_xzzz_xyz[i] * fbe_0 * fz_0 + 2.0 * tk_xzzz_xyz[i] * fe_0 + tk_xxzzz_yz[i] * fe_0 + tk_xxzzz_xyz[i] * pa_x[i] + 2.0 * ts_xxxzzz_xyz[i] * fz_0;
+        tk_xxxzzz_xyz[i] = -4.0 * ts_xzzz_xyz[i] * fbe_0 * fz_0 + 2.0 * tk_xzzz_xyz[i] * fe_0 + tk_xxzzz_yz[i] * fe_0 + tk_xxzzz_xyz[i] * pa_x[i] +
+                           2.0 * ts_xxxzzz_xyz[i] * fz_0;
 
-        tk_xxxzzz_xzz[i] = -4.0 * ts_xzzz_xzz[i] * fbe_0 * fz_0 + 2.0 * tk_xzzz_xzz[i] * fe_0 + tk_xxzzz_zz[i] * fe_0 + tk_xxzzz_xzz[i] * pa_x[i] + 2.0 * ts_xxxzzz_xzz[i] * fz_0;
+        tk_xxxzzz_xzz[i] = -4.0 * ts_xzzz_xzz[i] * fbe_0 * fz_0 + 2.0 * tk_xzzz_xzz[i] * fe_0 + tk_xxzzz_zz[i] * fe_0 + tk_xxzzz_xzz[i] * pa_x[i] +
+                           2.0 * ts_xxxzzz_xzz[i] * fz_0;
 
-        tk_xxxzzz_yyy[i] = -4.0 * ts_xzzz_yyy[i] * fbe_0 * fz_0 + 2.0 * tk_xzzz_yyy[i] * fe_0 + tk_xxzzz_yyy[i] * pa_x[i] + 2.0 * ts_xxxzzz_yyy[i] * fz_0;
+        tk_xxxzzz_yyy[i] =
+            -4.0 * ts_xzzz_yyy[i] * fbe_0 * fz_0 + 2.0 * tk_xzzz_yyy[i] * fe_0 + tk_xxzzz_yyy[i] * pa_x[i] + 2.0 * ts_xxxzzz_yyy[i] * fz_0;
 
-        tk_xxxzzz_yyz[i] = -4.0 * ts_xzzz_yyz[i] * fbe_0 * fz_0 + 2.0 * tk_xzzz_yyz[i] * fe_0 + tk_xxzzz_yyz[i] * pa_x[i] + 2.0 * ts_xxxzzz_yyz[i] * fz_0;
+        tk_xxxzzz_yyz[i] =
+            -4.0 * ts_xzzz_yyz[i] * fbe_0 * fz_0 + 2.0 * tk_xzzz_yyz[i] * fe_0 + tk_xxzzz_yyz[i] * pa_x[i] + 2.0 * ts_xxxzzz_yyz[i] * fz_0;
 
-        tk_xxxzzz_yzz[i] = -4.0 * ts_xzzz_yzz[i] * fbe_0 * fz_0 + 2.0 * tk_xzzz_yzz[i] * fe_0 + tk_xxzzz_yzz[i] * pa_x[i] + 2.0 * ts_xxxzzz_yzz[i] * fz_0;
+        tk_xxxzzz_yzz[i] =
+            -4.0 * ts_xzzz_yzz[i] * fbe_0 * fz_0 + 2.0 * tk_xzzz_yzz[i] * fe_0 + tk_xxzzz_yzz[i] * pa_x[i] + 2.0 * ts_xxxzzz_yzz[i] * fz_0;
 
-        tk_xxxzzz_zzz[i] = -4.0 * ts_xzzz_zzz[i] * fbe_0 * fz_0 + 2.0 * tk_xzzz_zzz[i] * fe_0 + tk_xxzzz_zzz[i] * pa_x[i] + 2.0 * ts_xxxzzz_zzz[i] * fz_0;
+        tk_xxxzzz_zzz[i] =
+            -4.0 * ts_xzzz_zzz[i] * fbe_0 * fz_0 + 2.0 * tk_xzzz_zzz[i] * fe_0 + tk_xxzzz_zzz[i] * pa_x[i] + 2.0 * ts_xxxzzz_zzz[i] * fz_0;
     }
 
     // Set up 100-110 components of targeted buffer : IF
@@ -1934,7 +2438,62 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xxyyyy_zzz = pbuffer.data(idx_kin_if + 109);
 
-    #pragma omp simd aligned(pa_x, pa_y, tk_xxyy_xxx, tk_xxyy_xxz, tk_xxyy_xzz, tk_xxyyy_xxx, tk_xxyyy_xxz, tk_xxyyy_xzz, tk_xxyyyy_xxx, tk_xxyyyy_xxy, tk_xxyyyy_xxz, tk_xxyyyy_xyy, tk_xxyyyy_xyz, tk_xxyyyy_xzz, tk_xxyyyy_yyy, tk_xxyyyy_yyz, tk_xxyyyy_yzz, tk_xxyyyy_zzz, tk_xyyyy_xxy, tk_xyyyy_xy, tk_xyyyy_xyy, tk_xyyyy_xyz, tk_xyyyy_yy, tk_xyyyy_yyy, tk_xyyyy_yyz, tk_xyyyy_yz, tk_xyyyy_yzz, tk_xyyyy_zzz, tk_yyyy_xxy, tk_yyyy_xyy, tk_yyyy_xyz, tk_yyyy_yyy, tk_yyyy_yyz, tk_yyyy_yzz, tk_yyyy_zzz, ts_xxyy_xxx, ts_xxyy_xxz, ts_xxyy_xzz, ts_xxyyyy_xxx, ts_xxyyyy_xxy, ts_xxyyyy_xxz, ts_xxyyyy_xyy, ts_xxyyyy_xyz, ts_xxyyyy_xzz, ts_xxyyyy_yyy, ts_xxyyyy_yyz, ts_xxyyyy_yzz, ts_xxyyyy_zzz, ts_yyyy_xxy, ts_yyyy_xyy, ts_yyyy_xyz, ts_yyyy_yyy, ts_yyyy_yyz, ts_yyyy_yzz, ts_yyyy_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,              \
+                             pa_y,          \
+                             tk_xxyy_xxx,   \
+                             tk_xxyy_xxz,   \
+                             tk_xxyy_xzz,   \
+                             tk_xxyyy_xxx,  \
+                             tk_xxyyy_xxz,  \
+                             tk_xxyyy_xzz,  \
+                             tk_xxyyyy_xxx, \
+                             tk_xxyyyy_xxy, \
+                             tk_xxyyyy_xxz, \
+                             tk_xxyyyy_xyy, \
+                             tk_xxyyyy_xyz, \
+                             tk_xxyyyy_xzz, \
+                             tk_xxyyyy_yyy, \
+                             tk_xxyyyy_yyz, \
+                             tk_xxyyyy_yzz, \
+                             tk_xxyyyy_zzz, \
+                             tk_xyyyy_xxy,  \
+                             tk_xyyyy_xy,   \
+                             tk_xyyyy_xyy,  \
+                             tk_xyyyy_xyz,  \
+                             tk_xyyyy_yy,   \
+                             tk_xyyyy_yyy,  \
+                             tk_xyyyy_yyz,  \
+                             tk_xyyyy_yz,   \
+                             tk_xyyyy_yzz,  \
+                             tk_xyyyy_zzz,  \
+                             tk_yyyy_xxy,   \
+                             tk_yyyy_xyy,   \
+                             tk_yyyy_xyz,   \
+                             tk_yyyy_yyy,   \
+                             tk_yyyy_yyz,   \
+                             tk_yyyy_yzz,   \
+                             tk_yyyy_zzz,   \
+                             ts_xxyy_xxx,   \
+                             ts_xxyy_xxz,   \
+                             ts_xxyy_xzz,   \
+                             ts_xxyyyy_xxx, \
+                             ts_xxyyyy_xxy, \
+                             ts_xxyyyy_xxz, \
+                             ts_xxyyyy_xyy, \
+                             ts_xxyyyy_xyz, \
+                             ts_xxyyyy_xzz, \
+                             ts_xxyyyy_yyy, \
+                             ts_xxyyyy_yyz, \
+                             ts_xxyyyy_yzz, \
+                             ts_xxyyyy_zzz, \
+                             ts_yyyy_xxy,   \
+                             ts_yyyy_xyy,   \
+                             ts_yyyy_xyz,   \
+                             ts_yyyy_yyy,   \
+                             ts_yyyy_yyz,   \
+                             ts_yyyy_yzz,   \
+                             ts_yyyy_zzz,   \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1943,17 +2502,23 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
         const double fbe_0 = 0.5 / a_exp;
 
-        tk_xxyyyy_xxx[i] = -6.0 * ts_xxyy_xxx[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_xxx[i] * fe_0 + tk_xxyyy_xxx[i] * pa_y[i] + 2.0 * ts_xxyyyy_xxx[i] * fz_0;
+        tk_xxyyyy_xxx[i] =
+            -6.0 * ts_xxyy_xxx[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_xxx[i] * fe_0 + tk_xxyyy_xxx[i] * pa_y[i] + 2.0 * ts_xxyyyy_xxx[i] * fz_0;
 
-        tk_xxyyyy_xxy[i] = -2.0 * ts_yyyy_xxy[i] * fbe_0 * fz_0 + tk_yyyy_xxy[i] * fe_0 + 2.0 * tk_xyyyy_xy[i] * fe_0 + tk_xyyyy_xxy[i] * pa_x[i] + 2.0 * ts_xxyyyy_xxy[i] * fz_0;
+        tk_xxyyyy_xxy[i] = -2.0 * ts_yyyy_xxy[i] * fbe_0 * fz_0 + tk_yyyy_xxy[i] * fe_0 + 2.0 * tk_xyyyy_xy[i] * fe_0 + tk_xyyyy_xxy[i] * pa_x[i] +
+                           2.0 * ts_xxyyyy_xxy[i] * fz_0;
 
-        tk_xxyyyy_xxz[i] = -6.0 * ts_xxyy_xxz[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_xxz[i] * fe_0 + tk_xxyyy_xxz[i] * pa_y[i] + 2.0 * ts_xxyyyy_xxz[i] * fz_0;
+        tk_xxyyyy_xxz[i] =
+            -6.0 * ts_xxyy_xxz[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_xxz[i] * fe_0 + tk_xxyyy_xxz[i] * pa_y[i] + 2.0 * ts_xxyyyy_xxz[i] * fz_0;
 
-        tk_xxyyyy_xyy[i] = -2.0 * ts_yyyy_xyy[i] * fbe_0 * fz_0 + tk_yyyy_xyy[i] * fe_0 + tk_xyyyy_yy[i] * fe_0 + tk_xyyyy_xyy[i] * pa_x[i] + 2.0 * ts_xxyyyy_xyy[i] * fz_0;
+        tk_xxyyyy_xyy[i] = -2.0 * ts_yyyy_xyy[i] * fbe_0 * fz_0 + tk_yyyy_xyy[i] * fe_0 + tk_xyyyy_yy[i] * fe_0 + tk_xyyyy_xyy[i] * pa_x[i] +
+                           2.0 * ts_xxyyyy_xyy[i] * fz_0;
 
-        tk_xxyyyy_xyz[i] = -2.0 * ts_yyyy_xyz[i] * fbe_0 * fz_0 + tk_yyyy_xyz[i] * fe_0 + tk_xyyyy_yz[i] * fe_0 + tk_xyyyy_xyz[i] * pa_x[i] + 2.0 * ts_xxyyyy_xyz[i] * fz_0;
+        tk_xxyyyy_xyz[i] = -2.0 * ts_yyyy_xyz[i] * fbe_0 * fz_0 + tk_yyyy_xyz[i] * fe_0 + tk_xyyyy_yz[i] * fe_0 + tk_xyyyy_xyz[i] * pa_x[i] +
+                           2.0 * ts_xxyyyy_xyz[i] * fz_0;
 
-        tk_xxyyyy_xzz[i] = -6.0 * ts_xxyy_xzz[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_xzz[i] * fe_0 + tk_xxyyy_xzz[i] * pa_y[i] + 2.0 * ts_xxyyyy_xzz[i] * fz_0;
+        tk_xxyyyy_xzz[i] =
+            -6.0 * ts_xxyy_xzz[i] * fbe_0 * fz_0 + 3.0 * tk_xxyy_xzz[i] * fe_0 + tk_xxyyy_xzz[i] * pa_y[i] + 2.0 * ts_xxyyyy_xzz[i] * fz_0;
 
         tk_xxyyyy_yyy[i] = -2.0 * ts_yyyy_yyy[i] * fbe_0 * fz_0 + tk_yyyy_yyy[i] * fe_0 + tk_xyyyy_yyy[i] * pa_x[i] + 2.0 * ts_xxyyyy_yyy[i] * fz_0;
 
@@ -1986,7 +2551,44 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xxyyyz_zzz = pbuffer.data(idx_kin_if + 119);
 
-    #pragma omp simd aligned(pa_z, tk_xxyyy_xx, tk_xxyyy_xxx, tk_xxyyy_xxy, tk_xxyyy_xxz, tk_xxyyy_xy, tk_xxyyy_xyy, tk_xxyyy_xyz, tk_xxyyy_xz, tk_xxyyy_xzz, tk_xxyyy_yy, tk_xxyyy_yyy, tk_xxyyy_yyz, tk_xxyyy_yz, tk_xxyyy_yzz, tk_xxyyy_zz, tk_xxyyy_zzz, tk_xxyyyz_xxx, tk_xxyyyz_xxy, tk_xxyyyz_xxz, tk_xxyyyz_xyy, tk_xxyyyz_xyz, tk_xxyyyz_xzz, tk_xxyyyz_yyy, tk_xxyyyz_yyz, tk_xxyyyz_yzz, tk_xxyyyz_zzz, ts_xxyyyz_xxx, ts_xxyyyz_xxy, ts_xxyyyz_xxz, ts_xxyyyz_xyy, ts_xxyyyz_xyz, ts_xxyyyz_xzz, ts_xxyyyz_yyy, ts_xxyyyz_yyz, ts_xxyyyz_yzz, ts_xxyyyz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_z,              \
+                             tk_xxyyy_xx,   \
+                             tk_xxyyy_xxx,  \
+                             tk_xxyyy_xxy,  \
+                             tk_xxyyy_xxz,  \
+                             tk_xxyyy_xy,   \
+                             tk_xxyyy_xyy,  \
+                             tk_xxyyy_xyz,  \
+                             tk_xxyyy_xz,   \
+                             tk_xxyyy_xzz,  \
+                             tk_xxyyy_yy,   \
+                             tk_xxyyy_yyy,  \
+                             tk_xxyyy_yyz,  \
+                             tk_xxyyy_yz,   \
+                             tk_xxyyy_yzz,  \
+                             tk_xxyyy_zz,   \
+                             tk_xxyyy_zzz,  \
+                             tk_xxyyyz_xxx, \
+                             tk_xxyyyz_xxy, \
+                             tk_xxyyyz_xxz, \
+                             tk_xxyyyz_xyy, \
+                             tk_xxyyyz_xyz, \
+                             tk_xxyyyz_xzz, \
+                             tk_xxyyyz_yyy, \
+                             tk_xxyyyz_yyz, \
+                             tk_xxyyyz_yzz, \
+                             tk_xxyyyz_zzz, \
+                             ts_xxyyyz_xxx, \
+                             ts_xxyyyz_xxy, \
+                             ts_xxyyyz_xxz, \
+                             ts_xxyyyz_xyy, \
+                             ts_xxyyyz_xyz, \
+                             ts_xxyyyz_xzz, \
+                             ts_xxyyyz_yyy, \
+                             ts_xxyyyz_yyz, \
+                             ts_xxyyyz_yzz, \
+                             ts_xxyyyz_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2036,7 +2638,61 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xxyyzz_zzz = pbuffer.data(idx_kin_if + 129);
 
-    #pragma omp simd aligned(pa_x, pa_y, pa_z, tk_xxyy_xxy, tk_xxyy_xyy, tk_xxyyz_xxy, tk_xxyyz_xyy, tk_xxyyzz_xxx, tk_xxyyzz_xxy, tk_xxyyzz_xxz, tk_xxyyzz_xyy, tk_xxyyzz_xyz, tk_xxyyzz_xzz, tk_xxyyzz_yyy, tk_xxyyzz_yyz, tk_xxyyzz_yzz, tk_xxyyzz_zzz, tk_xxyzz_xxx, tk_xxyzz_xxz, tk_xxyzz_xzz, tk_xxzz_xxx, tk_xxzz_xxz, tk_xxzz_xzz, tk_xyyzz_xyz, tk_xyyzz_yyy, tk_xyyzz_yyz, tk_xyyzz_yz, tk_xyyzz_yzz, tk_xyyzz_zzz, tk_yyzz_xyz, tk_yyzz_yyy, tk_yyzz_yyz, tk_yyzz_yzz, tk_yyzz_zzz, ts_xxyy_xxy, ts_xxyy_xyy, ts_xxyyzz_xxx, ts_xxyyzz_xxy, ts_xxyyzz_xxz, ts_xxyyzz_xyy, ts_xxyyzz_xyz, ts_xxyyzz_xzz, ts_xxyyzz_yyy, ts_xxyyzz_yyz, ts_xxyyzz_yzz, ts_xxyyzz_zzz, ts_xxzz_xxx, ts_xxzz_xxz, ts_xxzz_xzz, ts_yyzz_xyz, ts_yyzz_yyy, ts_yyzz_yyz, ts_yyzz_yzz, ts_yyzz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,              \
+                             pa_y,          \
+                             pa_z,          \
+                             tk_xxyy_xxy,   \
+                             tk_xxyy_xyy,   \
+                             tk_xxyyz_xxy,  \
+                             tk_xxyyz_xyy,  \
+                             tk_xxyyzz_xxx, \
+                             tk_xxyyzz_xxy, \
+                             tk_xxyyzz_xxz, \
+                             tk_xxyyzz_xyy, \
+                             tk_xxyyzz_xyz, \
+                             tk_xxyyzz_xzz, \
+                             tk_xxyyzz_yyy, \
+                             tk_xxyyzz_yyz, \
+                             tk_xxyyzz_yzz, \
+                             tk_xxyyzz_zzz, \
+                             tk_xxyzz_xxx,  \
+                             tk_xxyzz_xxz,  \
+                             tk_xxyzz_xzz,  \
+                             tk_xxzz_xxx,   \
+                             tk_xxzz_xxz,   \
+                             tk_xxzz_xzz,   \
+                             tk_xyyzz_xyz,  \
+                             tk_xyyzz_yyy,  \
+                             tk_xyyzz_yyz,  \
+                             tk_xyyzz_yz,   \
+                             tk_xyyzz_yzz,  \
+                             tk_xyyzz_zzz,  \
+                             tk_yyzz_xyz,   \
+                             tk_yyzz_yyy,   \
+                             tk_yyzz_yyz,   \
+                             tk_yyzz_yzz,   \
+                             tk_yyzz_zzz,   \
+                             ts_xxyy_xxy,   \
+                             ts_xxyy_xyy,   \
+                             ts_xxyyzz_xxx, \
+                             ts_xxyyzz_xxy, \
+                             ts_xxyyzz_xxz, \
+                             ts_xxyyzz_xyy, \
+                             ts_xxyyzz_xyz, \
+                             ts_xxyyzz_xzz, \
+                             ts_xxyyzz_yyy, \
+                             ts_xxyyzz_yyz, \
+                             ts_xxyyzz_yzz, \
+                             ts_xxyyzz_zzz, \
+                             ts_xxzz_xxx,   \
+                             ts_xxzz_xxz,   \
+                             ts_xxzz_xzz,   \
+                             ts_yyzz_xyz,   \
+                             ts_yyzz_yyy,   \
+                             ts_yyzz_yyz,   \
+                             ts_yyzz_yzz,   \
+                             ts_yyzz_zzz,   \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2053,7 +2709,8 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
         tk_xxyyzz_xyy[i] = -2.0 * ts_xxyy_xyy[i] * fbe_0 * fz_0 + tk_xxyy_xyy[i] * fe_0 + tk_xxyyz_xyy[i] * pa_z[i] + 2.0 * ts_xxyyzz_xyy[i] * fz_0;
 
-        tk_xxyyzz_xyz[i] = -2.0 * ts_yyzz_xyz[i] * fbe_0 * fz_0 + tk_yyzz_xyz[i] * fe_0 + tk_xyyzz_yz[i] * fe_0 + tk_xyyzz_xyz[i] * pa_x[i] + 2.0 * ts_xxyyzz_xyz[i] * fz_0;
+        tk_xxyyzz_xyz[i] = -2.0 * ts_yyzz_xyz[i] * fbe_0 * fz_0 + tk_yyzz_xyz[i] * fe_0 + tk_xyyzz_yz[i] * fe_0 + tk_xyyzz_xyz[i] * pa_x[i] +
+                           2.0 * ts_xxyyzz_xyz[i] * fz_0;
 
         tk_xxyyzz_xzz[i] = -2.0 * ts_xxzz_xzz[i] * fbe_0 * fz_0 + tk_xxzz_xzz[i] * fe_0 + tk_xxyzz_xzz[i] * pa_y[i] + 2.0 * ts_xxyyzz_xzz[i] * fz_0;
 
@@ -2088,7 +2745,44 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xxyzzz_zzz = pbuffer.data(idx_kin_if + 139);
 
-    #pragma omp simd aligned(pa_y, tk_xxyzzz_xxx, tk_xxyzzz_xxy, tk_xxyzzz_xxz, tk_xxyzzz_xyy, tk_xxyzzz_xyz, tk_xxyzzz_xzz, tk_xxyzzz_yyy, tk_xxyzzz_yyz, tk_xxyzzz_yzz, tk_xxyzzz_zzz, tk_xxzzz_xx, tk_xxzzz_xxx, tk_xxzzz_xxy, tk_xxzzz_xxz, tk_xxzzz_xy, tk_xxzzz_xyy, tk_xxzzz_xyz, tk_xxzzz_xz, tk_xxzzz_xzz, tk_xxzzz_yy, tk_xxzzz_yyy, tk_xxzzz_yyz, tk_xxzzz_yz, tk_xxzzz_yzz, tk_xxzzz_zz, tk_xxzzz_zzz, ts_xxyzzz_xxx, ts_xxyzzz_xxy, ts_xxyzzz_xxz, ts_xxyzzz_xyy, ts_xxyzzz_xyz, ts_xxyzzz_xzz, ts_xxyzzz_yyy, ts_xxyzzz_yyz, ts_xxyzzz_yzz, ts_xxyzzz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_y,              \
+                             tk_xxyzzz_xxx, \
+                             tk_xxyzzz_xxy, \
+                             tk_xxyzzz_xxz, \
+                             tk_xxyzzz_xyy, \
+                             tk_xxyzzz_xyz, \
+                             tk_xxyzzz_xzz, \
+                             tk_xxyzzz_yyy, \
+                             tk_xxyzzz_yyz, \
+                             tk_xxyzzz_yzz, \
+                             tk_xxyzzz_zzz, \
+                             tk_xxzzz_xx,   \
+                             tk_xxzzz_xxx,  \
+                             tk_xxzzz_xxy,  \
+                             tk_xxzzz_xxz,  \
+                             tk_xxzzz_xy,   \
+                             tk_xxzzz_xyy,  \
+                             tk_xxzzz_xyz,  \
+                             tk_xxzzz_xz,   \
+                             tk_xxzzz_xzz,  \
+                             tk_xxzzz_yy,   \
+                             tk_xxzzz_yyy,  \
+                             tk_xxzzz_yyz,  \
+                             tk_xxzzz_yz,   \
+                             tk_xxzzz_yzz,  \
+                             tk_xxzzz_zz,   \
+                             tk_xxzzz_zzz,  \
+                             ts_xxyzzz_xxx, \
+                             ts_xxyzzz_xxy, \
+                             ts_xxyzzz_xxz, \
+                             ts_xxyzzz_xyy, \
+                             ts_xxyzzz_xyz, \
+                             ts_xxyzzz_xzz, \
+                             ts_xxyzzz_yyy, \
+                             ts_xxyzzz_yyz, \
+                             ts_xxyzzz_yzz, \
+                             ts_xxyzzz_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2138,7 +2832,62 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xxzzzz_zzz = pbuffer.data(idx_kin_if + 149);
 
-    #pragma omp simd aligned(pa_x, pa_z, tk_xxzz_xxx, tk_xxzz_xxy, tk_xxzz_xyy, tk_xxzzz_xxx, tk_xxzzz_xxy, tk_xxzzz_xyy, tk_xxzzzz_xxx, tk_xxzzzz_xxy, tk_xxzzzz_xxz, tk_xxzzzz_xyy, tk_xxzzzz_xyz, tk_xxzzzz_xzz, tk_xxzzzz_yyy, tk_xxzzzz_yyz, tk_xxzzzz_yzz, tk_xxzzzz_zzz, tk_xzzzz_xxz, tk_xzzzz_xyz, tk_xzzzz_xz, tk_xzzzz_xzz, tk_xzzzz_yyy, tk_xzzzz_yyz, tk_xzzzz_yz, tk_xzzzz_yzz, tk_xzzzz_zz, tk_xzzzz_zzz, tk_zzzz_xxz, tk_zzzz_xyz, tk_zzzz_xzz, tk_zzzz_yyy, tk_zzzz_yyz, tk_zzzz_yzz, tk_zzzz_zzz, ts_xxzz_xxx, ts_xxzz_xxy, ts_xxzz_xyy, ts_xxzzzz_xxx, ts_xxzzzz_xxy, ts_xxzzzz_xxz, ts_xxzzzz_xyy, ts_xxzzzz_xyz, ts_xxzzzz_xzz, ts_xxzzzz_yyy, ts_xxzzzz_yyz, ts_xxzzzz_yzz, ts_xxzzzz_zzz, ts_zzzz_xxz, ts_zzzz_xyz, ts_zzzz_xzz, ts_zzzz_yyy, ts_zzzz_yyz, ts_zzzz_yzz, ts_zzzz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,              \
+                             pa_z,          \
+                             tk_xxzz_xxx,   \
+                             tk_xxzz_xxy,   \
+                             tk_xxzz_xyy,   \
+                             tk_xxzzz_xxx,  \
+                             tk_xxzzz_xxy,  \
+                             tk_xxzzz_xyy,  \
+                             tk_xxzzzz_xxx, \
+                             tk_xxzzzz_xxy, \
+                             tk_xxzzzz_xxz, \
+                             tk_xxzzzz_xyy, \
+                             tk_xxzzzz_xyz, \
+                             tk_xxzzzz_xzz, \
+                             tk_xxzzzz_yyy, \
+                             tk_xxzzzz_yyz, \
+                             tk_xxzzzz_yzz, \
+                             tk_xxzzzz_zzz, \
+                             tk_xzzzz_xxz,  \
+                             tk_xzzzz_xyz,  \
+                             tk_xzzzz_xz,   \
+                             tk_xzzzz_xzz,  \
+                             tk_xzzzz_yyy,  \
+                             tk_xzzzz_yyz,  \
+                             tk_xzzzz_yz,   \
+                             tk_xzzzz_yzz,  \
+                             tk_xzzzz_zz,   \
+                             tk_xzzzz_zzz,  \
+                             tk_zzzz_xxz,   \
+                             tk_zzzz_xyz,   \
+                             tk_zzzz_xzz,   \
+                             tk_zzzz_yyy,   \
+                             tk_zzzz_yyz,   \
+                             tk_zzzz_yzz,   \
+                             tk_zzzz_zzz,   \
+                             ts_xxzz_xxx,   \
+                             ts_xxzz_xxy,   \
+                             ts_xxzz_xyy,   \
+                             ts_xxzzzz_xxx, \
+                             ts_xxzzzz_xxy, \
+                             ts_xxzzzz_xxz, \
+                             ts_xxzzzz_xyy, \
+                             ts_xxzzzz_xyz, \
+                             ts_xxzzzz_xzz, \
+                             ts_xxzzzz_yyy, \
+                             ts_xxzzzz_yyz, \
+                             ts_xxzzzz_yzz, \
+                             ts_xxzzzz_zzz, \
+                             ts_zzzz_xxz,   \
+                             ts_zzzz_xyz,   \
+                             ts_zzzz_xzz,   \
+                             ts_zzzz_yyy,   \
+                             ts_zzzz_yyz,   \
+                             ts_zzzz_yzz,   \
+                             ts_zzzz_zzz,   \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2147,17 +2896,23 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
         const double fbe_0 = 0.5 / a_exp;
 
-        tk_xxzzzz_xxx[i] = -6.0 * ts_xxzz_xxx[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_xxx[i] * fe_0 + tk_xxzzz_xxx[i] * pa_z[i] + 2.0 * ts_xxzzzz_xxx[i] * fz_0;
+        tk_xxzzzz_xxx[i] =
+            -6.0 * ts_xxzz_xxx[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_xxx[i] * fe_0 + tk_xxzzz_xxx[i] * pa_z[i] + 2.0 * ts_xxzzzz_xxx[i] * fz_0;
 
-        tk_xxzzzz_xxy[i] = -6.0 * ts_xxzz_xxy[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_xxy[i] * fe_0 + tk_xxzzz_xxy[i] * pa_z[i] + 2.0 * ts_xxzzzz_xxy[i] * fz_0;
+        tk_xxzzzz_xxy[i] =
+            -6.0 * ts_xxzz_xxy[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_xxy[i] * fe_0 + tk_xxzzz_xxy[i] * pa_z[i] + 2.0 * ts_xxzzzz_xxy[i] * fz_0;
 
-        tk_xxzzzz_xxz[i] = -2.0 * ts_zzzz_xxz[i] * fbe_0 * fz_0 + tk_zzzz_xxz[i] * fe_0 + 2.0 * tk_xzzzz_xz[i] * fe_0 + tk_xzzzz_xxz[i] * pa_x[i] + 2.0 * ts_xxzzzz_xxz[i] * fz_0;
+        tk_xxzzzz_xxz[i] = -2.0 * ts_zzzz_xxz[i] * fbe_0 * fz_0 + tk_zzzz_xxz[i] * fe_0 + 2.0 * tk_xzzzz_xz[i] * fe_0 + tk_xzzzz_xxz[i] * pa_x[i] +
+                           2.0 * ts_xxzzzz_xxz[i] * fz_0;
 
-        tk_xxzzzz_xyy[i] = -6.0 * ts_xxzz_xyy[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_xyy[i] * fe_0 + tk_xxzzz_xyy[i] * pa_z[i] + 2.0 * ts_xxzzzz_xyy[i] * fz_0;
+        tk_xxzzzz_xyy[i] =
+            -6.0 * ts_xxzz_xyy[i] * fbe_0 * fz_0 + 3.0 * tk_xxzz_xyy[i] * fe_0 + tk_xxzzz_xyy[i] * pa_z[i] + 2.0 * ts_xxzzzz_xyy[i] * fz_0;
 
-        tk_xxzzzz_xyz[i] = -2.0 * ts_zzzz_xyz[i] * fbe_0 * fz_0 + tk_zzzz_xyz[i] * fe_0 + tk_xzzzz_yz[i] * fe_0 + tk_xzzzz_xyz[i] * pa_x[i] + 2.0 * ts_xxzzzz_xyz[i] * fz_0;
+        tk_xxzzzz_xyz[i] = -2.0 * ts_zzzz_xyz[i] * fbe_0 * fz_0 + tk_zzzz_xyz[i] * fe_0 + tk_xzzzz_yz[i] * fe_0 + tk_xzzzz_xyz[i] * pa_x[i] +
+                           2.0 * ts_xxzzzz_xyz[i] * fz_0;
 
-        tk_xxzzzz_xzz[i] = -2.0 * ts_zzzz_xzz[i] * fbe_0 * fz_0 + tk_zzzz_xzz[i] * fe_0 + tk_xzzzz_zz[i] * fe_0 + tk_xzzzz_xzz[i] * pa_x[i] + 2.0 * ts_xxzzzz_xzz[i] * fz_0;
+        tk_xxzzzz_xzz[i] = -2.0 * ts_zzzz_xzz[i] * fbe_0 * fz_0 + tk_zzzz_xzz[i] * fe_0 + tk_xzzzz_zz[i] * fe_0 + tk_xzzzz_xzz[i] * pa_x[i] +
+                           2.0 * ts_xxzzzz_xzz[i] * fz_0;
 
         tk_xxzzzz_yyy[i] = -2.0 * ts_zzzz_yyy[i] * fbe_0 * fz_0 + tk_zzzz_yyy[i] * fe_0 + tk_xzzzz_yyy[i] * pa_x[i] + 2.0 * ts_xxzzzz_yyy[i] * fz_0;
 
@@ -2190,7 +2945,44 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xyyyyy_zzz = pbuffer.data(idx_kin_if + 159);
 
-    #pragma omp simd aligned(pa_x, tk_xyyyyy_xxx, tk_xyyyyy_xxy, tk_xyyyyy_xxz, tk_xyyyyy_xyy, tk_xyyyyy_xyz, tk_xyyyyy_xzz, tk_xyyyyy_yyy, tk_xyyyyy_yyz, tk_xyyyyy_yzz, tk_xyyyyy_zzz, tk_yyyyy_xx, tk_yyyyy_xxx, tk_yyyyy_xxy, tk_yyyyy_xxz, tk_yyyyy_xy, tk_yyyyy_xyy, tk_yyyyy_xyz, tk_yyyyy_xz, tk_yyyyy_xzz, tk_yyyyy_yy, tk_yyyyy_yyy, tk_yyyyy_yyz, tk_yyyyy_yz, tk_yyyyy_yzz, tk_yyyyy_zz, tk_yyyyy_zzz, ts_xyyyyy_xxx, ts_xyyyyy_xxy, ts_xyyyyy_xxz, ts_xyyyyy_xyy, ts_xyyyyy_xyz, ts_xyyyyy_xzz, ts_xyyyyy_yyy, ts_xyyyyy_yyz, ts_xyyyyy_yzz, ts_xyyyyy_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,              \
+                             tk_xyyyyy_xxx, \
+                             tk_xyyyyy_xxy, \
+                             tk_xyyyyy_xxz, \
+                             tk_xyyyyy_xyy, \
+                             tk_xyyyyy_xyz, \
+                             tk_xyyyyy_xzz, \
+                             tk_xyyyyy_yyy, \
+                             tk_xyyyyy_yyz, \
+                             tk_xyyyyy_yzz, \
+                             tk_xyyyyy_zzz, \
+                             tk_yyyyy_xx,   \
+                             tk_yyyyy_xxx,  \
+                             tk_yyyyy_xxy,  \
+                             tk_yyyyy_xxz,  \
+                             tk_yyyyy_xy,   \
+                             tk_yyyyy_xyy,  \
+                             tk_yyyyy_xyz,  \
+                             tk_yyyyy_xz,   \
+                             tk_yyyyy_xzz,  \
+                             tk_yyyyy_yy,   \
+                             tk_yyyyy_yyy,  \
+                             tk_yyyyy_yyz,  \
+                             tk_yyyyy_yz,   \
+                             tk_yyyyy_yzz,  \
+                             tk_yyyyy_zz,   \
+                             tk_yyyyy_zzz,  \
+                             ts_xyyyyy_xxx, \
+                             ts_xyyyyy_xxy, \
+                             ts_xyyyyy_xxz, \
+                             ts_xyyyyy_xyy, \
+                             ts_xyyyyy_xyz, \
+                             ts_xyyyyy_xzz, \
+                             ts_xyyyyy_yyy, \
+                             ts_xyyyyy_yyz, \
+                             ts_xyyyyy_yzz, \
+                             ts_xyyyyy_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2240,7 +3032,42 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xyyyyz_zzz = pbuffer.data(idx_kin_if + 169);
 
-    #pragma omp simd aligned(pa_x, pa_z, tk_xyyyy_xxx, tk_xyyyy_xxy, tk_xyyyy_xyy, tk_xyyyyz_xxx, tk_xyyyyz_xxy, tk_xyyyyz_xxz, tk_xyyyyz_xyy, tk_xyyyyz_xyz, tk_xyyyyz_xzz, tk_xyyyyz_yyy, tk_xyyyyz_yyz, tk_xyyyyz_yzz, tk_xyyyyz_zzz, tk_yyyyz_xxz, tk_yyyyz_xyz, tk_yyyyz_xz, tk_yyyyz_xzz, tk_yyyyz_yyy, tk_yyyyz_yyz, tk_yyyyz_yz, tk_yyyyz_yzz, tk_yyyyz_zz, tk_yyyyz_zzz, ts_xyyyyz_xxx, ts_xyyyyz_xxy, ts_xyyyyz_xxz, ts_xyyyyz_xyy, ts_xyyyyz_xyz, ts_xyyyyz_xzz, ts_xyyyyz_yyy, ts_xyyyyz_yyz, ts_xyyyyz_yzz, ts_xyyyyz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,              \
+                             pa_z,          \
+                             tk_xyyyy_xxx,  \
+                             tk_xyyyy_xxy,  \
+                             tk_xyyyy_xyy,  \
+                             tk_xyyyyz_xxx, \
+                             tk_xyyyyz_xxy, \
+                             tk_xyyyyz_xxz, \
+                             tk_xyyyyz_xyy, \
+                             tk_xyyyyz_xyz, \
+                             tk_xyyyyz_xzz, \
+                             tk_xyyyyz_yyy, \
+                             tk_xyyyyz_yyz, \
+                             tk_xyyyyz_yzz, \
+                             tk_xyyyyz_zzz, \
+                             tk_yyyyz_xxz,  \
+                             tk_yyyyz_xyz,  \
+                             tk_yyyyz_xz,   \
+                             tk_yyyyz_xzz,  \
+                             tk_yyyyz_yyy,  \
+                             tk_yyyyz_yyz,  \
+                             tk_yyyyz_yz,   \
+                             tk_yyyyz_yzz,  \
+                             tk_yyyyz_zz,   \
+                             tk_yyyyz_zzz,  \
+                             ts_xyyyyz_xxx, \
+                             ts_xyyyyz_xxy, \
+                             ts_xyyyyz_xxz, \
+                             ts_xyyyyz_xyy, \
+                             ts_xyyyyz_xyz, \
+                             ts_xyyyyz_xzz, \
+                             ts_xyyyyz_yyy, \
+                             ts_xyyyyz_yyz, \
+                             ts_xyyyyz_yzz, \
+                             ts_xyyyyz_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2290,7 +3117,44 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xyyyzz_zzz = pbuffer.data(idx_kin_if + 179);
 
-    #pragma omp simd aligned(pa_x, tk_xyyyzz_xxx, tk_xyyyzz_xxy, tk_xyyyzz_xxz, tk_xyyyzz_xyy, tk_xyyyzz_xyz, tk_xyyyzz_xzz, tk_xyyyzz_yyy, tk_xyyyzz_yyz, tk_xyyyzz_yzz, tk_xyyyzz_zzz, tk_yyyzz_xx, tk_yyyzz_xxx, tk_yyyzz_xxy, tk_yyyzz_xxz, tk_yyyzz_xy, tk_yyyzz_xyy, tk_yyyzz_xyz, tk_yyyzz_xz, tk_yyyzz_xzz, tk_yyyzz_yy, tk_yyyzz_yyy, tk_yyyzz_yyz, tk_yyyzz_yz, tk_yyyzz_yzz, tk_yyyzz_zz, tk_yyyzz_zzz, ts_xyyyzz_xxx, ts_xyyyzz_xxy, ts_xyyyzz_xxz, ts_xyyyzz_xyy, ts_xyyyzz_xyz, ts_xyyyzz_xzz, ts_xyyyzz_yyy, ts_xyyyzz_yyz, ts_xyyyzz_yzz, ts_xyyyzz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,              \
+                             tk_xyyyzz_xxx, \
+                             tk_xyyyzz_xxy, \
+                             tk_xyyyzz_xxz, \
+                             tk_xyyyzz_xyy, \
+                             tk_xyyyzz_xyz, \
+                             tk_xyyyzz_xzz, \
+                             tk_xyyyzz_yyy, \
+                             tk_xyyyzz_yyz, \
+                             tk_xyyyzz_yzz, \
+                             tk_xyyyzz_zzz, \
+                             tk_yyyzz_xx,   \
+                             tk_yyyzz_xxx,  \
+                             tk_yyyzz_xxy,  \
+                             tk_yyyzz_xxz,  \
+                             tk_yyyzz_xy,   \
+                             tk_yyyzz_xyy,  \
+                             tk_yyyzz_xyz,  \
+                             tk_yyyzz_xz,   \
+                             tk_yyyzz_xzz,  \
+                             tk_yyyzz_yy,   \
+                             tk_yyyzz_yyy,  \
+                             tk_yyyzz_yyz,  \
+                             tk_yyyzz_yz,   \
+                             tk_yyyzz_yzz,  \
+                             tk_yyyzz_zz,   \
+                             tk_yyyzz_zzz,  \
+                             ts_xyyyzz_xxx, \
+                             ts_xyyyzz_xxy, \
+                             ts_xyyyzz_xxz, \
+                             ts_xyyyzz_xyy, \
+                             ts_xyyyzz_xyz, \
+                             ts_xyyyzz_xzz, \
+                             ts_xyyyzz_yyy, \
+                             ts_xyyyzz_yyz, \
+                             ts_xyyyzz_yzz, \
+                             ts_xyyyzz_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2340,7 +3204,44 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xyyzzz_zzz = pbuffer.data(idx_kin_if + 189);
 
-    #pragma omp simd aligned(pa_x, tk_xyyzzz_xxx, tk_xyyzzz_xxy, tk_xyyzzz_xxz, tk_xyyzzz_xyy, tk_xyyzzz_xyz, tk_xyyzzz_xzz, tk_xyyzzz_yyy, tk_xyyzzz_yyz, tk_xyyzzz_yzz, tk_xyyzzz_zzz, tk_yyzzz_xx, tk_yyzzz_xxx, tk_yyzzz_xxy, tk_yyzzz_xxz, tk_yyzzz_xy, tk_yyzzz_xyy, tk_yyzzz_xyz, tk_yyzzz_xz, tk_yyzzz_xzz, tk_yyzzz_yy, tk_yyzzz_yyy, tk_yyzzz_yyz, tk_yyzzz_yz, tk_yyzzz_yzz, tk_yyzzz_zz, tk_yyzzz_zzz, ts_xyyzzz_xxx, ts_xyyzzz_xxy, ts_xyyzzz_xxz, ts_xyyzzz_xyy, ts_xyyzzz_xyz, ts_xyyzzz_xzz, ts_xyyzzz_yyy, ts_xyyzzz_yyz, ts_xyyzzz_yzz, ts_xyyzzz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,              \
+                             tk_xyyzzz_xxx, \
+                             tk_xyyzzz_xxy, \
+                             tk_xyyzzz_xxz, \
+                             tk_xyyzzz_xyy, \
+                             tk_xyyzzz_xyz, \
+                             tk_xyyzzz_xzz, \
+                             tk_xyyzzz_yyy, \
+                             tk_xyyzzz_yyz, \
+                             tk_xyyzzz_yzz, \
+                             tk_xyyzzz_zzz, \
+                             tk_yyzzz_xx,   \
+                             tk_yyzzz_xxx,  \
+                             tk_yyzzz_xxy,  \
+                             tk_yyzzz_xxz,  \
+                             tk_yyzzz_xy,   \
+                             tk_yyzzz_xyy,  \
+                             tk_yyzzz_xyz,  \
+                             tk_yyzzz_xz,   \
+                             tk_yyzzz_xzz,  \
+                             tk_yyzzz_yy,   \
+                             tk_yyzzz_yyy,  \
+                             tk_yyzzz_yyz,  \
+                             tk_yyzzz_yz,   \
+                             tk_yyzzz_yzz,  \
+                             tk_yyzzz_zz,   \
+                             tk_yyzzz_zzz,  \
+                             ts_xyyzzz_xxx, \
+                             ts_xyyzzz_xxy, \
+                             ts_xyyzzz_xxz, \
+                             ts_xyyzzz_xyy, \
+                             ts_xyyzzz_xyz, \
+                             ts_xyyzzz_xzz, \
+                             ts_xyyzzz_yyy, \
+                             ts_xyyzzz_yyz, \
+                             ts_xyyzzz_yzz, \
+                             ts_xyyzzz_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2390,7 +3291,42 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xyzzzz_zzz = pbuffer.data(idx_kin_if + 199);
 
-    #pragma omp simd aligned(pa_x, pa_y, tk_xyzzzz_xxx, tk_xyzzzz_xxy, tk_xyzzzz_xxz, tk_xyzzzz_xyy, tk_xyzzzz_xyz, tk_xyzzzz_xzz, tk_xyzzzz_yyy, tk_xyzzzz_yyz, tk_xyzzzz_yzz, tk_xyzzzz_zzz, tk_xzzzz_xxx, tk_xzzzz_xxz, tk_xzzzz_xzz, tk_yzzzz_xxy, tk_yzzzz_xy, tk_yzzzz_xyy, tk_yzzzz_xyz, tk_yzzzz_yy, tk_yzzzz_yyy, tk_yzzzz_yyz, tk_yzzzz_yz, tk_yzzzz_yzz, tk_yzzzz_zzz, ts_xyzzzz_xxx, ts_xyzzzz_xxy, ts_xyzzzz_xxz, ts_xyzzzz_xyy, ts_xyzzzz_xyz, ts_xyzzzz_xzz, ts_xyzzzz_yyy, ts_xyzzzz_yyz, ts_xyzzzz_yzz, ts_xyzzzz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,              \
+                             pa_y,          \
+                             tk_xyzzzz_xxx, \
+                             tk_xyzzzz_xxy, \
+                             tk_xyzzzz_xxz, \
+                             tk_xyzzzz_xyy, \
+                             tk_xyzzzz_xyz, \
+                             tk_xyzzzz_xzz, \
+                             tk_xyzzzz_yyy, \
+                             tk_xyzzzz_yyz, \
+                             tk_xyzzzz_yzz, \
+                             tk_xyzzzz_zzz, \
+                             tk_xzzzz_xxx,  \
+                             tk_xzzzz_xxz,  \
+                             tk_xzzzz_xzz,  \
+                             tk_yzzzz_xxy,  \
+                             tk_yzzzz_xy,   \
+                             tk_yzzzz_xyy,  \
+                             tk_yzzzz_xyz,  \
+                             tk_yzzzz_yy,   \
+                             tk_yzzzz_yyy,  \
+                             tk_yzzzz_yyz,  \
+                             tk_yzzzz_yz,   \
+                             tk_yzzzz_yzz,  \
+                             tk_yzzzz_zzz,  \
+                             ts_xyzzzz_xxx, \
+                             ts_xyzzzz_xxy, \
+                             ts_xyzzzz_xxz, \
+                             ts_xyzzzz_xyy, \
+                             ts_xyzzzz_xyz, \
+                             ts_xyzzzz_xzz, \
+                             ts_xyzzzz_yyy, \
+                             ts_xyzzzz_yyz, \
+                             ts_xyzzzz_yzz, \
+                             ts_xyzzzz_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2440,7 +3376,44 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_xzzzzz_zzz = pbuffer.data(idx_kin_if + 209);
 
-    #pragma omp simd aligned(pa_x, tk_xzzzzz_xxx, tk_xzzzzz_xxy, tk_xzzzzz_xxz, tk_xzzzzz_xyy, tk_xzzzzz_xyz, tk_xzzzzz_xzz, tk_xzzzzz_yyy, tk_xzzzzz_yyz, tk_xzzzzz_yzz, tk_xzzzzz_zzz, tk_zzzzz_xx, tk_zzzzz_xxx, tk_zzzzz_xxy, tk_zzzzz_xxz, tk_zzzzz_xy, tk_zzzzz_xyy, tk_zzzzz_xyz, tk_zzzzz_xz, tk_zzzzz_xzz, tk_zzzzz_yy, tk_zzzzz_yyy, tk_zzzzz_yyz, tk_zzzzz_yz, tk_zzzzz_yzz, tk_zzzzz_zz, tk_zzzzz_zzz, ts_xzzzzz_xxx, ts_xzzzzz_xxy, ts_xzzzzz_xxz, ts_xzzzzz_xyy, ts_xzzzzz_xyz, ts_xzzzzz_xzz, ts_xzzzzz_yyy, ts_xzzzzz_yyz, ts_xzzzzz_yzz, ts_xzzzzz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_x,              \
+                             tk_xzzzzz_xxx, \
+                             tk_xzzzzz_xxy, \
+                             tk_xzzzzz_xxz, \
+                             tk_xzzzzz_xyy, \
+                             tk_xzzzzz_xyz, \
+                             tk_xzzzzz_xzz, \
+                             tk_xzzzzz_yyy, \
+                             tk_xzzzzz_yyz, \
+                             tk_xzzzzz_yzz, \
+                             tk_xzzzzz_zzz, \
+                             tk_zzzzz_xx,   \
+                             tk_zzzzz_xxx,  \
+                             tk_zzzzz_xxy,  \
+                             tk_zzzzz_xxz,  \
+                             tk_zzzzz_xy,   \
+                             tk_zzzzz_xyy,  \
+                             tk_zzzzz_xyz,  \
+                             tk_zzzzz_xz,   \
+                             tk_zzzzz_xzz,  \
+                             tk_zzzzz_yy,   \
+                             tk_zzzzz_yyy,  \
+                             tk_zzzzz_yyz,  \
+                             tk_zzzzz_yz,   \
+                             tk_zzzzz_yzz,  \
+                             tk_zzzzz_zz,   \
+                             tk_zzzzz_zzz,  \
+                             ts_xzzzzz_xxx, \
+                             ts_xzzzzz_xxy, \
+                             ts_xzzzzz_xxz, \
+                             ts_xzzzzz_xyy, \
+                             ts_xzzzzz_xyz, \
+                             ts_xzzzzz_xzz, \
+                             ts_xzzzzz_yyy, \
+                             ts_xzzzzz_yyz, \
+                             ts_xzzzzz_yzz, \
+                             ts_xzzzzz_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2490,7 +3463,64 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_yyyyyy_zzz = pbuffer.data(idx_kin_if + 219);
 
-    #pragma omp simd aligned(pa_y, tk_yyyy_xxx, tk_yyyy_xxy, tk_yyyy_xxz, tk_yyyy_xyy, tk_yyyy_xyz, tk_yyyy_xzz, tk_yyyy_yyy, tk_yyyy_yyz, tk_yyyy_yzz, tk_yyyy_zzz, tk_yyyyy_xx, tk_yyyyy_xxx, tk_yyyyy_xxy, tk_yyyyy_xxz, tk_yyyyy_xy, tk_yyyyy_xyy, tk_yyyyy_xyz, tk_yyyyy_xz, tk_yyyyy_xzz, tk_yyyyy_yy, tk_yyyyy_yyy, tk_yyyyy_yyz, tk_yyyyy_yz, tk_yyyyy_yzz, tk_yyyyy_zz, tk_yyyyy_zzz, tk_yyyyyy_xxx, tk_yyyyyy_xxy, tk_yyyyyy_xxz, tk_yyyyyy_xyy, tk_yyyyyy_xyz, tk_yyyyyy_xzz, tk_yyyyyy_yyy, tk_yyyyyy_yyz, tk_yyyyyy_yzz, tk_yyyyyy_zzz, ts_yyyy_xxx, ts_yyyy_xxy, ts_yyyy_xxz, ts_yyyy_xyy, ts_yyyy_xyz, ts_yyyy_xzz, ts_yyyy_yyy, ts_yyyy_yyz, ts_yyyy_yzz, ts_yyyy_zzz, ts_yyyyyy_xxx, ts_yyyyyy_xxy, ts_yyyyyy_xxz, ts_yyyyyy_xyy, ts_yyyyyy_xyz, ts_yyyyyy_xzz, ts_yyyyyy_yyy, ts_yyyyyy_yyz, ts_yyyyyy_yzz, ts_yyyyyy_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_y,              \
+                             tk_yyyy_xxx,   \
+                             tk_yyyy_xxy,   \
+                             tk_yyyy_xxz,   \
+                             tk_yyyy_xyy,   \
+                             tk_yyyy_xyz,   \
+                             tk_yyyy_xzz,   \
+                             tk_yyyy_yyy,   \
+                             tk_yyyy_yyz,   \
+                             tk_yyyy_yzz,   \
+                             tk_yyyy_zzz,   \
+                             tk_yyyyy_xx,   \
+                             tk_yyyyy_xxx,  \
+                             tk_yyyyy_xxy,  \
+                             tk_yyyyy_xxz,  \
+                             tk_yyyyy_xy,   \
+                             tk_yyyyy_xyy,  \
+                             tk_yyyyy_xyz,  \
+                             tk_yyyyy_xz,   \
+                             tk_yyyyy_xzz,  \
+                             tk_yyyyy_yy,   \
+                             tk_yyyyy_yyy,  \
+                             tk_yyyyy_yyz,  \
+                             tk_yyyyy_yz,   \
+                             tk_yyyyy_yzz,  \
+                             tk_yyyyy_zz,   \
+                             tk_yyyyy_zzz,  \
+                             tk_yyyyyy_xxx, \
+                             tk_yyyyyy_xxy, \
+                             tk_yyyyyy_xxz, \
+                             tk_yyyyyy_xyy, \
+                             tk_yyyyyy_xyz, \
+                             tk_yyyyyy_xzz, \
+                             tk_yyyyyy_yyy, \
+                             tk_yyyyyy_yyz, \
+                             tk_yyyyyy_yzz, \
+                             tk_yyyyyy_zzz, \
+                             ts_yyyy_xxx,   \
+                             ts_yyyy_xxy,   \
+                             ts_yyyy_xxz,   \
+                             ts_yyyy_xyy,   \
+                             ts_yyyy_xyz,   \
+                             ts_yyyy_xzz,   \
+                             ts_yyyy_yyy,   \
+                             ts_yyyy_yyz,   \
+                             ts_yyyy_yzz,   \
+                             ts_yyyy_zzz,   \
+                             ts_yyyyyy_xxx, \
+                             ts_yyyyyy_xxy, \
+                             ts_yyyyyy_xxz, \
+                             ts_yyyyyy_xyy, \
+                             ts_yyyyyy_xyz, \
+                             ts_yyyyyy_xzz, \
+                             ts_yyyyyy_yyy, \
+                             ts_yyyyyy_yyz, \
+                             ts_yyyyyy_yzz, \
+                             ts_yyyyyy_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2499,25 +3529,35 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
         const double fbe_0 = 0.5 / a_exp;
 
-        tk_yyyyyy_xxx[i] = -10.0 * ts_yyyy_xxx[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_xxx[i] * fe_0 + tk_yyyyy_xxx[i] * pa_y[i] + 2.0 * ts_yyyyyy_xxx[i] * fz_0;
+        tk_yyyyyy_xxx[i] =
+            -10.0 * ts_yyyy_xxx[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_xxx[i] * fe_0 + tk_yyyyy_xxx[i] * pa_y[i] + 2.0 * ts_yyyyyy_xxx[i] * fz_0;
 
-        tk_yyyyyy_xxy[i] = -10.0 * ts_yyyy_xxy[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_xxy[i] * fe_0 + tk_yyyyy_xx[i] * fe_0 + tk_yyyyy_xxy[i] * pa_y[i] + 2.0 * ts_yyyyyy_xxy[i] * fz_0;
+        tk_yyyyyy_xxy[i] = -10.0 * ts_yyyy_xxy[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_xxy[i] * fe_0 + tk_yyyyy_xx[i] * fe_0 + tk_yyyyy_xxy[i] * pa_y[i] +
+                           2.0 * ts_yyyyyy_xxy[i] * fz_0;
 
-        tk_yyyyyy_xxz[i] = -10.0 * ts_yyyy_xxz[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_xxz[i] * fe_0 + tk_yyyyy_xxz[i] * pa_y[i] + 2.0 * ts_yyyyyy_xxz[i] * fz_0;
+        tk_yyyyyy_xxz[i] =
+            -10.0 * ts_yyyy_xxz[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_xxz[i] * fe_0 + tk_yyyyy_xxz[i] * pa_y[i] + 2.0 * ts_yyyyyy_xxz[i] * fz_0;
 
-        tk_yyyyyy_xyy[i] = -10.0 * ts_yyyy_xyy[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_xyy[i] * fe_0 + 2.0 * tk_yyyyy_xy[i] * fe_0 + tk_yyyyy_xyy[i] * pa_y[i] + 2.0 * ts_yyyyyy_xyy[i] * fz_0;
+        tk_yyyyyy_xyy[i] = -10.0 * ts_yyyy_xyy[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_xyy[i] * fe_0 + 2.0 * tk_yyyyy_xy[i] * fe_0 +
+                           tk_yyyyy_xyy[i] * pa_y[i] + 2.0 * ts_yyyyyy_xyy[i] * fz_0;
 
-        tk_yyyyyy_xyz[i] = -10.0 * ts_yyyy_xyz[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_xyz[i] * fe_0 + tk_yyyyy_xz[i] * fe_0 + tk_yyyyy_xyz[i] * pa_y[i] + 2.0 * ts_yyyyyy_xyz[i] * fz_0;
+        tk_yyyyyy_xyz[i] = -10.0 * ts_yyyy_xyz[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_xyz[i] * fe_0 + tk_yyyyy_xz[i] * fe_0 + tk_yyyyy_xyz[i] * pa_y[i] +
+                           2.0 * ts_yyyyyy_xyz[i] * fz_0;
 
-        tk_yyyyyy_xzz[i] = -10.0 * ts_yyyy_xzz[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_xzz[i] * fe_0 + tk_yyyyy_xzz[i] * pa_y[i] + 2.0 * ts_yyyyyy_xzz[i] * fz_0;
+        tk_yyyyyy_xzz[i] =
+            -10.0 * ts_yyyy_xzz[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_xzz[i] * fe_0 + tk_yyyyy_xzz[i] * pa_y[i] + 2.0 * ts_yyyyyy_xzz[i] * fz_0;
 
-        tk_yyyyyy_yyy[i] = -10.0 * ts_yyyy_yyy[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_yyy[i] * fe_0 + 3.0 * tk_yyyyy_yy[i] * fe_0 + tk_yyyyy_yyy[i] * pa_y[i] + 2.0 * ts_yyyyyy_yyy[i] * fz_0;
+        tk_yyyyyy_yyy[i] = -10.0 * ts_yyyy_yyy[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_yyy[i] * fe_0 + 3.0 * tk_yyyyy_yy[i] * fe_0 +
+                           tk_yyyyy_yyy[i] * pa_y[i] + 2.0 * ts_yyyyyy_yyy[i] * fz_0;
 
-        tk_yyyyyy_yyz[i] = -10.0 * ts_yyyy_yyz[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_yyz[i] * fe_0 + 2.0 * tk_yyyyy_yz[i] * fe_0 + tk_yyyyy_yyz[i] * pa_y[i] + 2.0 * ts_yyyyyy_yyz[i] * fz_0;
+        tk_yyyyyy_yyz[i] = -10.0 * ts_yyyy_yyz[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_yyz[i] * fe_0 + 2.0 * tk_yyyyy_yz[i] * fe_0 +
+                           tk_yyyyy_yyz[i] * pa_y[i] + 2.0 * ts_yyyyyy_yyz[i] * fz_0;
 
-        tk_yyyyyy_yzz[i] = -10.0 * ts_yyyy_yzz[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_yzz[i] * fe_0 + tk_yyyyy_zz[i] * fe_0 + tk_yyyyy_yzz[i] * pa_y[i] + 2.0 * ts_yyyyyy_yzz[i] * fz_0;
+        tk_yyyyyy_yzz[i] = -10.0 * ts_yyyy_yzz[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_yzz[i] * fe_0 + tk_yyyyy_zz[i] * fe_0 + tk_yyyyy_yzz[i] * pa_y[i] +
+                           2.0 * ts_yyyyyy_yzz[i] * fz_0;
 
-        tk_yyyyyy_zzz[i] = -10.0 * ts_yyyy_zzz[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_zzz[i] * fe_0 + tk_yyyyy_zzz[i] * pa_y[i] + 2.0 * ts_yyyyyy_zzz[i] * fz_0;
+        tk_yyyyyy_zzz[i] =
+            -10.0 * ts_yyyy_zzz[i] * fbe_0 * fz_0 + 5.0 * tk_yyyy_zzz[i] * fe_0 + tk_yyyyy_zzz[i] * pa_y[i] + 2.0 * ts_yyyyyy_zzz[i] * fz_0;
     }
 
     // Set up 220-230 components of targeted buffer : IF
@@ -2542,7 +3582,44 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_yyyyyz_zzz = pbuffer.data(idx_kin_if + 229);
 
-    #pragma omp simd aligned(pa_z, tk_yyyyy_xx, tk_yyyyy_xxx, tk_yyyyy_xxy, tk_yyyyy_xxz, tk_yyyyy_xy, tk_yyyyy_xyy, tk_yyyyy_xyz, tk_yyyyy_xz, tk_yyyyy_xzz, tk_yyyyy_yy, tk_yyyyy_yyy, tk_yyyyy_yyz, tk_yyyyy_yz, tk_yyyyy_yzz, tk_yyyyy_zz, tk_yyyyy_zzz, tk_yyyyyz_xxx, tk_yyyyyz_xxy, tk_yyyyyz_xxz, tk_yyyyyz_xyy, tk_yyyyyz_xyz, tk_yyyyyz_xzz, tk_yyyyyz_yyy, tk_yyyyyz_yyz, tk_yyyyyz_yzz, tk_yyyyyz_zzz, ts_yyyyyz_xxx, ts_yyyyyz_xxy, ts_yyyyyz_xxz, ts_yyyyyz_xyy, ts_yyyyyz_xyz, ts_yyyyyz_xzz, ts_yyyyyz_yyy, ts_yyyyyz_yyz, ts_yyyyyz_yzz, ts_yyyyyz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_z,              \
+                             tk_yyyyy_xx,   \
+                             tk_yyyyy_xxx,  \
+                             tk_yyyyy_xxy,  \
+                             tk_yyyyy_xxz,  \
+                             tk_yyyyy_xy,   \
+                             tk_yyyyy_xyy,  \
+                             tk_yyyyy_xyz,  \
+                             tk_yyyyy_xz,   \
+                             tk_yyyyy_xzz,  \
+                             tk_yyyyy_yy,   \
+                             tk_yyyyy_yyy,  \
+                             tk_yyyyy_yyz,  \
+                             tk_yyyyy_yz,   \
+                             tk_yyyyy_yzz,  \
+                             tk_yyyyy_zz,   \
+                             tk_yyyyy_zzz,  \
+                             tk_yyyyyz_xxx, \
+                             tk_yyyyyz_xxy, \
+                             tk_yyyyyz_xxz, \
+                             tk_yyyyyz_xyy, \
+                             tk_yyyyyz_xyz, \
+                             tk_yyyyyz_xzz, \
+                             tk_yyyyyz_yyy, \
+                             tk_yyyyyz_yyz, \
+                             tk_yyyyyz_yzz, \
+                             tk_yyyyyz_zzz, \
+                             ts_yyyyyz_xxx, \
+                             ts_yyyyyz_xxy, \
+                             ts_yyyyyz_xxz, \
+                             ts_yyyyyz_xyy, \
+                             ts_yyyyyz_xyz, \
+                             ts_yyyyyz_xzz, \
+                             ts_yyyyyz_yyy, \
+                             ts_yyyyyz_yyz, \
+                             ts_yyyyyz_yzz, \
+                             ts_yyyyyz_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2592,7 +3669,62 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_yyyyzz_zzz = pbuffer.data(idx_kin_if + 239);
 
-    #pragma omp simd aligned(pa_y, pa_z, tk_yyyy_xxy, tk_yyyy_xyy, tk_yyyy_yyy, tk_yyyyz_xxy, tk_yyyyz_xyy, tk_yyyyz_yyy, tk_yyyyzz_xxx, tk_yyyyzz_xxy, tk_yyyyzz_xxz, tk_yyyyzz_xyy, tk_yyyyzz_xyz, tk_yyyyzz_xzz, tk_yyyyzz_yyy, tk_yyyyzz_yyz, tk_yyyyzz_yzz, tk_yyyyzz_zzz, tk_yyyzz_xxx, tk_yyyzz_xxz, tk_yyyzz_xyz, tk_yyyzz_xz, tk_yyyzz_xzz, tk_yyyzz_yyz, tk_yyyzz_yz, tk_yyyzz_yzz, tk_yyyzz_zz, tk_yyyzz_zzz, tk_yyzz_xxx, tk_yyzz_xxz, tk_yyzz_xyz, tk_yyzz_xzz, tk_yyzz_yyz, tk_yyzz_yzz, tk_yyzz_zzz, ts_yyyy_xxy, ts_yyyy_xyy, ts_yyyy_yyy, ts_yyyyzz_xxx, ts_yyyyzz_xxy, ts_yyyyzz_xxz, ts_yyyyzz_xyy, ts_yyyyzz_xyz, ts_yyyyzz_xzz, ts_yyyyzz_yyy, ts_yyyyzz_yyz, ts_yyyyzz_yzz, ts_yyyyzz_zzz, ts_yyzz_xxx, ts_yyzz_xxz, ts_yyzz_xyz, ts_yyzz_xzz, ts_yyzz_yyz, ts_yyzz_yzz, ts_yyzz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_y,              \
+                             pa_z,          \
+                             tk_yyyy_xxy,   \
+                             tk_yyyy_xyy,   \
+                             tk_yyyy_yyy,   \
+                             tk_yyyyz_xxy,  \
+                             tk_yyyyz_xyy,  \
+                             tk_yyyyz_yyy,  \
+                             tk_yyyyzz_xxx, \
+                             tk_yyyyzz_xxy, \
+                             tk_yyyyzz_xxz, \
+                             tk_yyyyzz_xyy, \
+                             tk_yyyyzz_xyz, \
+                             tk_yyyyzz_xzz, \
+                             tk_yyyyzz_yyy, \
+                             tk_yyyyzz_yyz, \
+                             tk_yyyyzz_yzz, \
+                             tk_yyyyzz_zzz, \
+                             tk_yyyzz_xxx,  \
+                             tk_yyyzz_xxz,  \
+                             tk_yyyzz_xyz,  \
+                             tk_yyyzz_xz,   \
+                             tk_yyyzz_xzz,  \
+                             tk_yyyzz_yyz,  \
+                             tk_yyyzz_yz,   \
+                             tk_yyyzz_yzz,  \
+                             tk_yyyzz_zz,   \
+                             tk_yyyzz_zzz,  \
+                             tk_yyzz_xxx,   \
+                             tk_yyzz_xxz,   \
+                             tk_yyzz_xyz,   \
+                             tk_yyzz_xzz,   \
+                             tk_yyzz_yyz,   \
+                             tk_yyzz_yzz,   \
+                             tk_yyzz_zzz,   \
+                             ts_yyyy_xxy,   \
+                             ts_yyyy_xyy,   \
+                             ts_yyyy_yyy,   \
+                             ts_yyyyzz_xxx, \
+                             ts_yyyyzz_xxy, \
+                             ts_yyyyzz_xxz, \
+                             ts_yyyyzz_xyy, \
+                             ts_yyyyzz_xyz, \
+                             ts_yyyyzz_xzz, \
+                             ts_yyyyzz_yyy, \
+                             ts_yyyyzz_yyz, \
+                             ts_yyyyzz_yzz, \
+                             ts_yyyyzz_zzz, \
+                             ts_yyzz_xxx,   \
+                             ts_yyzz_xxz,   \
+                             ts_yyzz_xyz,   \
+                             ts_yyzz_xzz,   \
+                             ts_yyzz_yyz,   \
+                             ts_yyzz_yzz,   \
+                             ts_yyzz_zzz,   \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2601,25 +3733,32 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
         const double fbe_0 = 0.5 / a_exp;
 
-        tk_yyyyzz_xxx[i] = -6.0 * ts_yyzz_xxx[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_xxx[i] * fe_0 + tk_yyyzz_xxx[i] * pa_y[i] + 2.0 * ts_yyyyzz_xxx[i] * fz_0;
+        tk_yyyyzz_xxx[i] =
+            -6.0 * ts_yyzz_xxx[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_xxx[i] * fe_0 + tk_yyyzz_xxx[i] * pa_y[i] + 2.0 * ts_yyyyzz_xxx[i] * fz_0;
 
         tk_yyyyzz_xxy[i] = -2.0 * ts_yyyy_xxy[i] * fbe_0 * fz_0 + tk_yyyy_xxy[i] * fe_0 + tk_yyyyz_xxy[i] * pa_z[i] + 2.0 * ts_yyyyzz_xxy[i] * fz_0;
 
-        tk_yyyyzz_xxz[i] = -6.0 * ts_yyzz_xxz[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_xxz[i] * fe_0 + tk_yyyzz_xxz[i] * pa_y[i] + 2.0 * ts_yyyyzz_xxz[i] * fz_0;
+        tk_yyyyzz_xxz[i] =
+            -6.0 * ts_yyzz_xxz[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_xxz[i] * fe_0 + tk_yyyzz_xxz[i] * pa_y[i] + 2.0 * ts_yyyyzz_xxz[i] * fz_0;
 
         tk_yyyyzz_xyy[i] = -2.0 * ts_yyyy_xyy[i] * fbe_0 * fz_0 + tk_yyyy_xyy[i] * fe_0 + tk_yyyyz_xyy[i] * pa_z[i] + 2.0 * ts_yyyyzz_xyy[i] * fz_0;
 
-        tk_yyyyzz_xyz[i] = -6.0 * ts_yyzz_xyz[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_xyz[i] * fe_0 + tk_yyyzz_xz[i] * fe_0 + tk_yyyzz_xyz[i] * pa_y[i] + 2.0 * ts_yyyyzz_xyz[i] * fz_0;
+        tk_yyyyzz_xyz[i] = -6.0 * ts_yyzz_xyz[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_xyz[i] * fe_0 + tk_yyyzz_xz[i] * fe_0 + tk_yyyzz_xyz[i] * pa_y[i] +
+                           2.0 * ts_yyyyzz_xyz[i] * fz_0;
 
-        tk_yyyyzz_xzz[i] = -6.0 * ts_yyzz_xzz[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_xzz[i] * fe_0 + tk_yyyzz_xzz[i] * pa_y[i] + 2.0 * ts_yyyyzz_xzz[i] * fz_0;
+        tk_yyyyzz_xzz[i] =
+            -6.0 * ts_yyzz_xzz[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_xzz[i] * fe_0 + tk_yyyzz_xzz[i] * pa_y[i] + 2.0 * ts_yyyyzz_xzz[i] * fz_0;
 
         tk_yyyyzz_yyy[i] = -2.0 * ts_yyyy_yyy[i] * fbe_0 * fz_0 + tk_yyyy_yyy[i] * fe_0 + tk_yyyyz_yyy[i] * pa_z[i] + 2.0 * ts_yyyyzz_yyy[i] * fz_0;
 
-        tk_yyyyzz_yyz[i] = -6.0 * ts_yyzz_yyz[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_yyz[i] * fe_0 + 2.0 * tk_yyyzz_yz[i] * fe_0 + tk_yyyzz_yyz[i] * pa_y[i] + 2.0 * ts_yyyyzz_yyz[i] * fz_0;
+        tk_yyyyzz_yyz[i] = -6.0 * ts_yyzz_yyz[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_yyz[i] * fe_0 + 2.0 * tk_yyyzz_yz[i] * fe_0 +
+                           tk_yyyzz_yyz[i] * pa_y[i] + 2.0 * ts_yyyyzz_yyz[i] * fz_0;
 
-        tk_yyyyzz_yzz[i] = -6.0 * ts_yyzz_yzz[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_yzz[i] * fe_0 + tk_yyyzz_zz[i] * fe_0 + tk_yyyzz_yzz[i] * pa_y[i] + 2.0 * ts_yyyyzz_yzz[i] * fz_0;
+        tk_yyyyzz_yzz[i] = -6.0 * ts_yyzz_yzz[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_yzz[i] * fe_0 + tk_yyyzz_zz[i] * fe_0 + tk_yyyzz_yzz[i] * pa_y[i] +
+                           2.0 * ts_yyyyzz_yzz[i] * fz_0;
 
-        tk_yyyyzz_zzz[i] = -6.0 * ts_yyzz_zzz[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_zzz[i] * fe_0 + tk_yyyzz_zzz[i] * pa_y[i] + 2.0 * ts_yyyyzz_zzz[i] * fz_0;
+        tk_yyyyzz_zzz[i] =
+            -6.0 * ts_yyzz_zzz[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_zzz[i] * fe_0 + tk_yyyzz_zzz[i] * pa_y[i] + 2.0 * ts_yyyyzz_zzz[i] * fz_0;
     }
 
     // Set up 240-250 components of targeted buffer : IF
@@ -2644,7 +3783,62 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_yyyzzz_zzz = pbuffer.data(idx_kin_if + 249);
 
-    #pragma omp simd aligned(pa_y, pa_z, tk_yyyz_xxy, tk_yyyz_xyy, tk_yyyz_yyy, tk_yyyzz_xxy, tk_yyyzz_xyy, tk_yyyzz_yyy, tk_yyyzzz_xxx, tk_yyyzzz_xxy, tk_yyyzzz_xxz, tk_yyyzzz_xyy, tk_yyyzzz_xyz, tk_yyyzzz_xzz, tk_yyyzzz_yyy, tk_yyyzzz_yyz, tk_yyyzzz_yzz, tk_yyyzzz_zzz, tk_yyzzz_xxx, tk_yyzzz_xxz, tk_yyzzz_xyz, tk_yyzzz_xz, tk_yyzzz_xzz, tk_yyzzz_yyz, tk_yyzzz_yz, tk_yyzzz_yzz, tk_yyzzz_zz, tk_yyzzz_zzz, tk_yzzz_xxx, tk_yzzz_xxz, tk_yzzz_xyz, tk_yzzz_xzz, tk_yzzz_yyz, tk_yzzz_yzz, tk_yzzz_zzz, ts_yyyz_xxy, ts_yyyz_xyy, ts_yyyz_yyy, ts_yyyzzz_xxx, ts_yyyzzz_xxy, ts_yyyzzz_xxz, ts_yyyzzz_xyy, ts_yyyzzz_xyz, ts_yyyzzz_xzz, ts_yyyzzz_yyy, ts_yyyzzz_yyz, ts_yyyzzz_yzz, ts_yyyzzz_zzz, ts_yzzz_xxx, ts_yzzz_xxz, ts_yzzz_xyz, ts_yzzz_xzz, ts_yzzz_yyz, ts_yzzz_yzz, ts_yzzz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_y,              \
+                             pa_z,          \
+                             tk_yyyz_xxy,   \
+                             tk_yyyz_xyy,   \
+                             tk_yyyz_yyy,   \
+                             tk_yyyzz_xxy,  \
+                             tk_yyyzz_xyy,  \
+                             tk_yyyzz_yyy,  \
+                             tk_yyyzzz_xxx, \
+                             tk_yyyzzz_xxy, \
+                             tk_yyyzzz_xxz, \
+                             tk_yyyzzz_xyy, \
+                             tk_yyyzzz_xyz, \
+                             tk_yyyzzz_xzz, \
+                             tk_yyyzzz_yyy, \
+                             tk_yyyzzz_yyz, \
+                             tk_yyyzzz_yzz, \
+                             tk_yyyzzz_zzz, \
+                             tk_yyzzz_xxx,  \
+                             tk_yyzzz_xxz,  \
+                             tk_yyzzz_xyz,  \
+                             tk_yyzzz_xz,   \
+                             tk_yyzzz_xzz,  \
+                             tk_yyzzz_yyz,  \
+                             tk_yyzzz_yz,   \
+                             tk_yyzzz_yzz,  \
+                             tk_yyzzz_zz,   \
+                             tk_yyzzz_zzz,  \
+                             tk_yzzz_xxx,   \
+                             tk_yzzz_xxz,   \
+                             tk_yzzz_xyz,   \
+                             tk_yzzz_xzz,   \
+                             tk_yzzz_yyz,   \
+                             tk_yzzz_yzz,   \
+                             tk_yzzz_zzz,   \
+                             ts_yyyz_xxy,   \
+                             ts_yyyz_xyy,   \
+                             ts_yyyz_yyy,   \
+                             ts_yyyzzz_xxx, \
+                             ts_yyyzzz_xxy, \
+                             ts_yyyzzz_xxz, \
+                             ts_yyyzzz_xyy, \
+                             ts_yyyzzz_xyz, \
+                             ts_yyyzzz_xzz, \
+                             ts_yyyzzz_yyy, \
+                             ts_yyyzzz_yyz, \
+                             ts_yyyzzz_yzz, \
+                             ts_yyyzzz_zzz, \
+                             ts_yzzz_xxx,   \
+                             ts_yzzz_xxz,   \
+                             ts_yzzz_xyz,   \
+                             ts_yzzz_xzz,   \
+                             ts_yzzz_yyz,   \
+                             ts_yzzz_yzz,   \
+                             ts_yzzz_zzz,   \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2653,25 +3847,35 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
         const double fbe_0 = 0.5 / a_exp;
 
-        tk_yyyzzz_xxx[i] = -4.0 * ts_yzzz_xxx[i] * fbe_0 * fz_0 + 2.0 * tk_yzzz_xxx[i] * fe_0 + tk_yyzzz_xxx[i] * pa_y[i] + 2.0 * ts_yyyzzz_xxx[i] * fz_0;
+        tk_yyyzzz_xxx[i] =
+            -4.0 * ts_yzzz_xxx[i] * fbe_0 * fz_0 + 2.0 * tk_yzzz_xxx[i] * fe_0 + tk_yyzzz_xxx[i] * pa_y[i] + 2.0 * ts_yyyzzz_xxx[i] * fz_0;
 
-        tk_yyyzzz_xxy[i] = -4.0 * ts_yyyz_xxy[i] * fbe_0 * fz_0 + 2.0 * tk_yyyz_xxy[i] * fe_0 + tk_yyyzz_xxy[i] * pa_z[i] + 2.0 * ts_yyyzzz_xxy[i] * fz_0;
+        tk_yyyzzz_xxy[i] =
+            -4.0 * ts_yyyz_xxy[i] * fbe_0 * fz_0 + 2.0 * tk_yyyz_xxy[i] * fe_0 + tk_yyyzz_xxy[i] * pa_z[i] + 2.0 * ts_yyyzzz_xxy[i] * fz_0;
 
-        tk_yyyzzz_xxz[i] = -4.0 * ts_yzzz_xxz[i] * fbe_0 * fz_0 + 2.0 * tk_yzzz_xxz[i] * fe_0 + tk_yyzzz_xxz[i] * pa_y[i] + 2.0 * ts_yyyzzz_xxz[i] * fz_0;
+        tk_yyyzzz_xxz[i] =
+            -4.0 * ts_yzzz_xxz[i] * fbe_0 * fz_0 + 2.0 * tk_yzzz_xxz[i] * fe_0 + tk_yyzzz_xxz[i] * pa_y[i] + 2.0 * ts_yyyzzz_xxz[i] * fz_0;
 
-        tk_yyyzzz_xyy[i] = -4.0 * ts_yyyz_xyy[i] * fbe_0 * fz_0 + 2.0 * tk_yyyz_xyy[i] * fe_0 + tk_yyyzz_xyy[i] * pa_z[i] + 2.0 * ts_yyyzzz_xyy[i] * fz_0;
+        tk_yyyzzz_xyy[i] =
+            -4.0 * ts_yyyz_xyy[i] * fbe_0 * fz_0 + 2.0 * tk_yyyz_xyy[i] * fe_0 + tk_yyyzz_xyy[i] * pa_z[i] + 2.0 * ts_yyyzzz_xyy[i] * fz_0;
 
-        tk_yyyzzz_xyz[i] = -4.0 * ts_yzzz_xyz[i] * fbe_0 * fz_0 + 2.0 * tk_yzzz_xyz[i] * fe_0 + tk_yyzzz_xz[i] * fe_0 + tk_yyzzz_xyz[i] * pa_y[i] + 2.0 * ts_yyyzzz_xyz[i] * fz_0;
+        tk_yyyzzz_xyz[i] = -4.0 * ts_yzzz_xyz[i] * fbe_0 * fz_0 + 2.0 * tk_yzzz_xyz[i] * fe_0 + tk_yyzzz_xz[i] * fe_0 + tk_yyzzz_xyz[i] * pa_y[i] +
+                           2.0 * ts_yyyzzz_xyz[i] * fz_0;
 
-        tk_yyyzzz_xzz[i] = -4.0 * ts_yzzz_xzz[i] * fbe_0 * fz_0 + 2.0 * tk_yzzz_xzz[i] * fe_0 + tk_yyzzz_xzz[i] * pa_y[i] + 2.0 * ts_yyyzzz_xzz[i] * fz_0;
+        tk_yyyzzz_xzz[i] =
+            -4.0 * ts_yzzz_xzz[i] * fbe_0 * fz_0 + 2.0 * tk_yzzz_xzz[i] * fe_0 + tk_yyzzz_xzz[i] * pa_y[i] + 2.0 * ts_yyyzzz_xzz[i] * fz_0;
 
-        tk_yyyzzz_yyy[i] = -4.0 * ts_yyyz_yyy[i] * fbe_0 * fz_0 + 2.0 * tk_yyyz_yyy[i] * fe_0 + tk_yyyzz_yyy[i] * pa_z[i] + 2.0 * ts_yyyzzz_yyy[i] * fz_0;
+        tk_yyyzzz_yyy[i] =
+            -4.0 * ts_yyyz_yyy[i] * fbe_0 * fz_0 + 2.0 * tk_yyyz_yyy[i] * fe_0 + tk_yyyzz_yyy[i] * pa_z[i] + 2.0 * ts_yyyzzz_yyy[i] * fz_0;
 
-        tk_yyyzzz_yyz[i] = -4.0 * ts_yzzz_yyz[i] * fbe_0 * fz_0 + 2.0 * tk_yzzz_yyz[i] * fe_0 + 2.0 * tk_yyzzz_yz[i] * fe_0 + tk_yyzzz_yyz[i] * pa_y[i] + 2.0 * ts_yyyzzz_yyz[i] * fz_0;
+        tk_yyyzzz_yyz[i] = -4.0 * ts_yzzz_yyz[i] * fbe_0 * fz_0 + 2.0 * tk_yzzz_yyz[i] * fe_0 + 2.0 * tk_yyzzz_yz[i] * fe_0 +
+                           tk_yyzzz_yyz[i] * pa_y[i] + 2.0 * ts_yyyzzz_yyz[i] * fz_0;
 
-        tk_yyyzzz_yzz[i] = -4.0 * ts_yzzz_yzz[i] * fbe_0 * fz_0 + 2.0 * tk_yzzz_yzz[i] * fe_0 + tk_yyzzz_zz[i] * fe_0 + tk_yyzzz_yzz[i] * pa_y[i] + 2.0 * ts_yyyzzz_yzz[i] * fz_0;
+        tk_yyyzzz_yzz[i] = -4.0 * ts_yzzz_yzz[i] * fbe_0 * fz_0 + 2.0 * tk_yzzz_yzz[i] * fe_0 + tk_yyzzz_zz[i] * fe_0 + tk_yyzzz_yzz[i] * pa_y[i] +
+                           2.0 * ts_yyyzzz_yzz[i] * fz_0;
 
-        tk_yyyzzz_zzz[i] = -4.0 * ts_yzzz_zzz[i] * fbe_0 * fz_0 + 2.0 * tk_yzzz_zzz[i] * fe_0 + tk_yyzzz_zzz[i] * pa_y[i] + 2.0 * ts_yyyzzz_zzz[i] * fz_0;
+        tk_yyyzzz_zzz[i] =
+            -4.0 * ts_yzzz_zzz[i] * fbe_0 * fz_0 + 2.0 * tk_yzzz_zzz[i] * fe_0 + tk_yyzzz_zzz[i] * pa_y[i] + 2.0 * ts_yyyzzz_zzz[i] * fz_0;
     }
 
     // Set up 250-260 components of targeted buffer : IF
@@ -2696,7 +3900,62 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_yyzzzz_zzz = pbuffer.data(idx_kin_if + 259);
 
-    #pragma omp simd aligned(pa_y, pa_z, tk_yyzz_xxy, tk_yyzz_xyy, tk_yyzz_yyy, tk_yyzzz_xxy, tk_yyzzz_xyy, tk_yyzzz_yyy, tk_yyzzzz_xxx, tk_yyzzzz_xxy, tk_yyzzzz_xxz, tk_yyzzzz_xyy, tk_yyzzzz_xyz, tk_yyzzzz_xzz, tk_yyzzzz_yyy, tk_yyzzzz_yyz, tk_yyzzzz_yzz, tk_yyzzzz_zzz, tk_yzzzz_xxx, tk_yzzzz_xxz, tk_yzzzz_xyz, tk_yzzzz_xz, tk_yzzzz_xzz, tk_yzzzz_yyz, tk_yzzzz_yz, tk_yzzzz_yzz, tk_yzzzz_zz, tk_yzzzz_zzz, tk_zzzz_xxx, tk_zzzz_xxz, tk_zzzz_xyz, tk_zzzz_xzz, tk_zzzz_yyz, tk_zzzz_yzz, tk_zzzz_zzz, ts_yyzz_xxy, ts_yyzz_xyy, ts_yyzz_yyy, ts_yyzzzz_xxx, ts_yyzzzz_xxy, ts_yyzzzz_xxz, ts_yyzzzz_xyy, ts_yyzzzz_xyz, ts_yyzzzz_xzz, ts_yyzzzz_yyy, ts_yyzzzz_yyz, ts_yyzzzz_yzz, ts_yyzzzz_zzz, ts_zzzz_xxx, ts_zzzz_xxz, ts_zzzz_xyz, ts_zzzz_xzz, ts_zzzz_yyz, ts_zzzz_yzz, ts_zzzz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_y,              \
+                             pa_z,          \
+                             tk_yyzz_xxy,   \
+                             tk_yyzz_xyy,   \
+                             tk_yyzz_yyy,   \
+                             tk_yyzzz_xxy,  \
+                             tk_yyzzz_xyy,  \
+                             tk_yyzzz_yyy,  \
+                             tk_yyzzzz_xxx, \
+                             tk_yyzzzz_xxy, \
+                             tk_yyzzzz_xxz, \
+                             tk_yyzzzz_xyy, \
+                             tk_yyzzzz_xyz, \
+                             tk_yyzzzz_xzz, \
+                             tk_yyzzzz_yyy, \
+                             tk_yyzzzz_yyz, \
+                             tk_yyzzzz_yzz, \
+                             tk_yyzzzz_zzz, \
+                             tk_yzzzz_xxx,  \
+                             tk_yzzzz_xxz,  \
+                             tk_yzzzz_xyz,  \
+                             tk_yzzzz_xz,   \
+                             tk_yzzzz_xzz,  \
+                             tk_yzzzz_yyz,  \
+                             tk_yzzzz_yz,   \
+                             tk_yzzzz_yzz,  \
+                             tk_yzzzz_zz,   \
+                             tk_yzzzz_zzz,  \
+                             tk_zzzz_xxx,   \
+                             tk_zzzz_xxz,   \
+                             tk_zzzz_xyz,   \
+                             tk_zzzz_xzz,   \
+                             tk_zzzz_yyz,   \
+                             tk_zzzz_yzz,   \
+                             tk_zzzz_zzz,   \
+                             ts_yyzz_xxy,   \
+                             ts_yyzz_xyy,   \
+                             ts_yyzz_yyy,   \
+                             ts_yyzzzz_xxx, \
+                             ts_yyzzzz_xxy, \
+                             ts_yyzzzz_xxz, \
+                             ts_yyzzzz_xyy, \
+                             ts_yyzzzz_xyz, \
+                             ts_yyzzzz_xzz, \
+                             ts_yyzzzz_yyy, \
+                             ts_yyzzzz_yyz, \
+                             ts_yyzzzz_yzz, \
+                             ts_yyzzzz_zzz, \
+                             ts_zzzz_xxx,   \
+                             ts_zzzz_xxz,   \
+                             ts_zzzz_xyz,   \
+                             ts_zzzz_xzz,   \
+                             ts_zzzz_yyz,   \
+                             ts_zzzz_yzz,   \
+                             ts_zzzz_zzz,   \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2707,21 +3966,27 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
         tk_yyzzzz_xxx[i] = -2.0 * ts_zzzz_xxx[i] * fbe_0 * fz_0 + tk_zzzz_xxx[i] * fe_0 + tk_yzzzz_xxx[i] * pa_y[i] + 2.0 * ts_yyzzzz_xxx[i] * fz_0;
 
-        tk_yyzzzz_xxy[i] = -6.0 * ts_yyzz_xxy[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_xxy[i] * fe_0 + tk_yyzzz_xxy[i] * pa_z[i] + 2.0 * ts_yyzzzz_xxy[i] * fz_0;
+        tk_yyzzzz_xxy[i] =
+            -6.0 * ts_yyzz_xxy[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_xxy[i] * fe_0 + tk_yyzzz_xxy[i] * pa_z[i] + 2.0 * ts_yyzzzz_xxy[i] * fz_0;
 
         tk_yyzzzz_xxz[i] = -2.0 * ts_zzzz_xxz[i] * fbe_0 * fz_0 + tk_zzzz_xxz[i] * fe_0 + tk_yzzzz_xxz[i] * pa_y[i] + 2.0 * ts_yyzzzz_xxz[i] * fz_0;
 
-        tk_yyzzzz_xyy[i] = -6.0 * ts_yyzz_xyy[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_xyy[i] * fe_0 + tk_yyzzz_xyy[i] * pa_z[i] + 2.0 * ts_yyzzzz_xyy[i] * fz_0;
+        tk_yyzzzz_xyy[i] =
+            -6.0 * ts_yyzz_xyy[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_xyy[i] * fe_0 + tk_yyzzz_xyy[i] * pa_z[i] + 2.0 * ts_yyzzzz_xyy[i] * fz_0;
 
-        tk_yyzzzz_xyz[i] = -2.0 * ts_zzzz_xyz[i] * fbe_0 * fz_0 + tk_zzzz_xyz[i] * fe_0 + tk_yzzzz_xz[i] * fe_0 + tk_yzzzz_xyz[i] * pa_y[i] + 2.0 * ts_yyzzzz_xyz[i] * fz_0;
+        tk_yyzzzz_xyz[i] = -2.0 * ts_zzzz_xyz[i] * fbe_0 * fz_0 + tk_zzzz_xyz[i] * fe_0 + tk_yzzzz_xz[i] * fe_0 + tk_yzzzz_xyz[i] * pa_y[i] +
+                           2.0 * ts_yyzzzz_xyz[i] * fz_0;
 
         tk_yyzzzz_xzz[i] = -2.0 * ts_zzzz_xzz[i] * fbe_0 * fz_0 + tk_zzzz_xzz[i] * fe_0 + tk_yzzzz_xzz[i] * pa_y[i] + 2.0 * ts_yyzzzz_xzz[i] * fz_0;
 
-        tk_yyzzzz_yyy[i] = -6.0 * ts_yyzz_yyy[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_yyy[i] * fe_0 + tk_yyzzz_yyy[i] * pa_z[i] + 2.0 * ts_yyzzzz_yyy[i] * fz_0;
+        tk_yyzzzz_yyy[i] =
+            -6.0 * ts_yyzz_yyy[i] * fbe_0 * fz_0 + 3.0 * tk_yyzz_yyy[i] * fe_0 + tk_yyzzz_yyy[i] * pa_z[i] + 2.0 * ts_yyzzzz_yyy[i] * fz_0;
 
-        tk_yyzzzz_yyz[i] = -2.0 * ts_zzzz_yyz[i] * fbe_0 * fz_0 + tk_zzzz_yyz[i] * fe_0 + 2.0 * tk_yzzzz_yz[i] * fe_0 + tk_yzzzz_yyz[i] * pa_y[i] + 2.0 * ts_yyzzzz_yyz[i] * fz_0;
+        tk_yyzzzz_yyz[i] = -2.0 * ts_zzzz_yyz[i] * fbe_0 * fz_0 + tk_zzzz_yyz[i] * fe_0 + 2.0 * tk_yzzzz_yz[i] * fe_0 + tk_yzzzz_yyz[i] * pa_y[i] +
+                           2.0 * ts_yyzzzz_yyz[i] * fz_0;
 
-        tk_yyzzzz_yzz[i] = -2.0 * ts_zzzz_yzz[i] * fbe_0 * fz_0 + tk_zzzz_yzz[i] * fe_0 + tk_yzzzz_zz[i] * fe_0 + tk_yzzzz_yzz[i] * pa_y[i] + 2.0 * ts_yyzzzz_yzz[i] * fz_0;
+        tk_yyzzzz_yzz[i] = -2.0 * ts_zzzz_yzz[i] * fbe_0 * fz_0 + tk_zzzz_yzz[i] * fe_0 + tk_yzzzz_zz[i] * fe_0 + tk_yzzzz_yzz[i] * pa_y[i] +
+                           2.0 * ts_yyzzzz_yzz[i] * fz_0;
 
         tk_yyzzzz_zzz[i] = -2.0 * ts_zzzz_zzz[i] * fbe_0 * fz_0 + tk_zzzz_zzz[i] * fe_0 + tk_yzzzz_zzz[i] * pa_y[i] + 2.0 * ts_yyzzzz_zzz[i] * fz_0;
     }
@@ -2748,7 +4013,44 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_yzzzzz_zzz = pbuffer.data(idx_kin_if + 269);
 
-    #pragma omp simd aligned(pa_y, tk_yzzzzz_xxx, tk_yzzzzz_xxy, tk_yzzzzz_xxz, tk_yzzzzz_xyy, tk_yzzzzz_xyz, tk_yzzzzz_xzz, tk_yzzzzz_yyy, tk_yzzzzz_yyz, tk_yzzzzz_yzz, tk_yzzzzz_zzz, tk_zzzzz_xx, tk_zzzzz_xxx, tk_zzzzz_xxy, tk_zzzzz_xxz, tk_zzzzz_xy, tk_zzzzz_xyy, tk_zzzzz_xyz, tk_zzzzz_xz, tk_zzzzz_xzz, tk_zzzzz_yy, tk_zzzzz_yyy, tk_zzzzz_yyz, tk_zzzzz_yz, tk_zzzzz_yzz, tk_zzzzz_zz, tk_zzzzz_zzz, ts_yzzzzz_xxx, ts_yzzzzz_xxy, ts_yzzzzz_xxz, ts_yzzzzz_xyy, ts_yzzzzz_xyz, ts_yzzzzz_xzz, ts_yzzzzz_yyy, ts_yzzzzz_yyz, ts_yzzzzz_yzz, ts_yzzzzz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_y,              \
+                             tk_yzzzzz_xxx, \
+                             tk_yzzzzz_xxy, \
+                             tk_yzzzzz_xxz, \
+                             tk_yzzzzz_xyy, \
+                             tk_yzzzzz_xyz, \
+                             tk_yzzzzz_xzz, \
+                             tk_yzzzzz_yyy, \
+                             tk_yzzzzz_yyz, \
+                             tk_yzzzzz_yzz, \
+                             tk_yzzzzz_zzz, \
+                             tk_zzzzz_xx,   \
+                             tk_zzzzz_xxx,  \
+                             tk_zzzzz_xxy,  \
+                             tk_zzzzz_xxz,  \
+                             tk_zzzzz_xy,   \
+                             tk_zzzzz_xyy,  \
+                             tk_zzzzz_xyz,  \
+                             tk_zzzzz_xz,   \
+                             tk_zzzzz_xzz,  \
+                             tk_zzzzz_yy,   \
+                             tk_zzzzz_yyy,  \
+                             tk_zzzzz_yyz,  \
+                             tk_zzzzz_yz,   \
+                             tk_zzzzz_yzz,  \
+                             tk_zzzzz_zz,   \
+                             tk_zzzzz_zzz,  \
+                             ts_yzzzzz_xxx, \
+                             ts_yzzzzz_xxy, \
+                             ts_yzzzzz_xxz, \
+                             ts_yzzzzz_xyy, \
+                             ts_yzzzzz_xyz, \
+                             ts_yzzzzz_xzz, \
+                             ts_yzzzzz_yyy, \
+                             ts_yzzzzz_yyz, \
+                             ts_yzzzzz_yzz, \
+                             ts_yzzzzz_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2798,7 +4100,64 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
     auto tk_zzzzzz_zzz = pbuffer.data(idx_kin_if + 279);
 
-    #pragma omp simd aligned(pa_z, tk_zzzz_xxx, tk_zzzz_xxy, tk_zzzz_xxz, tk_zzzz_xyy, tk_zzzz_xyz, tk_zzzz_xzz, tk_zzzz_yyy, tk_zzzz_yyz, tk_zzzz_yzz, tk_zzzz_zzz, tk_zzzzz_xx, tk_zzzzz_xxx, tk_zzzzz_xxy, tk_zzzzz_xxz, tk_zzzzz_xy, tk_zzzzz_xyy, tk_zzzzz_xyz, tk_zzzzz_xz, tk_zzzzz_xzz, tk_zzzzz_yy, tk_zzzzz_yyy, tk_zzzzz_yyz, tk_zzzzz_yz, tk_zzzzz_yzz, tk_zzzzz_zz, tk_zzzzz_zzz, tk_zzzzzz_xxx, tk_zzzzzz_xxy, tk_zzzzzz_xxz, tk_zzzzzz_xyy, tk_zzzzzz_xyz, tk_zzzzzz_xzz, tk_zzzzzz_yyy, tk_zzzzzz_yyz, tk_zzzzzz_yzz, tk_zzzzzz_zzz, ts_zzzz_xxx, ts_zzzz_xxy, ts_zzzz_xxz, ts_zzzz_xyy, ts_zzzz_xyz, ts_zzzz_xzz, ts_zzzz_yyy, ts_zzzz_yyz, ts_zzzz_yzz, ts_zzzz_zzz, ts_zzzzzz_xxx, ts_zzzzzz_xxy, ts_zzzzzz_xxz, ts_zzzzzz_xyy, ts_zzzzzz_xyz, ts_zzzzzz_xzz, ts_zzzzzz_yyy, ts_zzzzzz_yyz, ts_zzzzzz_yzz, ts_zzzzzz_zzz, b_exps : 64)
+#pragma omp simd aligned(pa_z,              \
+                             tk_zzzz_xxx,   \
+                             tk_zzzz_xxy,   \
+                             tk_zzzz_xxz,   \
+                             tk_zzzz_xyy,   \
+                             tk_zzzz_xyz,   \
+                             tk_zzzz_xzz,   \
+                             tk_zzzz_yyy,   \
+                             tk_zzzz_yyz,   \
+                             tk_zzzz_yzz,   \
+                             tk_zzzz_zzz,   \
+                             tk_zzzzz_xx,   \
+                             tk_zzzzz_xxx,  \
+                             tk_zzzzz_xxy,  \
+                             tk_zzzzz_xxz,  \
+                             tk_zzzzz_xy,   \
+                             tk_zzzzz_xyy,  \
+                             tk_zzzzz_xyz,  \
+                             tk_zzzzz_xz,   \
+                             tk_zzzzz_xzz,  \
+                             tk_zzzzz_yy,   \
+                             tk_zzzzz_yyy,  \
+                             tk_zzzzz_yyz,  \
+                             tk_zzzzz_yz,   \
+                             tk_zzzzz_yzz,  \
+                             tk_zzzzz_zz,   \
+                             tk_zzzzz_zzz,  \
+                             tk_zzzzzz_xxx, \
+                             tk_zzzzzz_xxy, \
+                             tk_zzzzzz_xxz, \
+                             tk_zzzzzz_xyy, \
+                             tk_zzzzzz_xyz, \
+                             tk_zzzzzz_xzz, \
+                             tk_zzzzzz_yyy, \
+                             tk_zzzzzz_yyz, \
+                             tk_zzzzzz_yzz, \
+                             tk_zzzzzz_zzz, \
+                             ts_zzzz_xxx,   \
+                             ts_zzzz_xxy,   \
+                             ts_zzzz_xxz,   \
+                             ts_zzzz_xyy,   \
+                             ts_zzzz_xyz,   \
+                             ts_zzzz_xzz,   \
+                             ts_zzzz_yyy,   \
+                             ts_zzzz_yyz,   \
+                             ts_zzzz_yzz,   \
+                             ts_zzzz_zzz,   \
+                             ts_zzzzzz_xxx, \
+                             ts_zzzzzz_xxy, \
+                             ts_zzzzzz_xxz, \
+                             ts_zzzzzz_xyy, \
+                             ts_zzzzzz_xyz, \
+                             ts_zzzzzz_xzz, \
+                             ts_zzzzzz_yyy, \
+                             ts_zzzzzz_yyz, \
+                             ts_zzzzzz_yzz, \
+                             ts_zzzzzz_zzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2807,28 +4166,36 @@ comp_prim_kinetic_energy_if(CSimdArray<double>& pbuffer,
 
         const double fbe_0 = 0.5 / a_exp;
 
-        tk_zzzzzz_xxx[i] = -10.0 * ts_zzzz_xxx[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_xxx[i] * fe_0 + tk_zzzzz_xxx[i] * pa_z[i] + 2.0 * ts_zzzzzz_xxx[i] * fz_0;
+        tk_zzzzzz_xxx[i] =
+            -10.0 * ts_zzzz_xxx[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_xxx[i] * fe_0 + tk_zzzzz_xxx[i] * pa_z[i] + 2.0 * ts_zzzzzz_xxx[i] * fz_0;
 
-        tk_zzzzzz_xxy[i] = -10.0 * ts_zzzz_xxy[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_xxy[i] * fe_0 + tk_zzzzz_xxy[i] * pa_z[i] + 2.0 * ts_zzzzzz_xxy[i] * fz_0;
+        tk_zzzzzz_xxy[i] =
+            -10.0 * ts_zzzz_xxy[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_xxy[i] * fe_0 + tk_zzzzz_xxy[i] * pa_z[i] + 2.0 * ts_zzzzzz_xxy[i] * fz_0;
 
-        tk_zzzzzz_xxz[i] = -10.0 * ts_zzzz_xxz[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_xxz[i] * fe_0 + tk_zzzzz_xx[i] * fe_0 + tk_zzzzz_xxz[i] * pa_z[i] + 2.0 * ts_zzzzzz_xxz[i] * fz_0;
+        tk_zzzzzz_xxz[i] = -10.0 * ts_zzzz_xxz[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_xxz[i] * fe_0 + tk_zzzzz_xx[i] * fe_0 + tk_zzzzz_xxz[i] * pa_z[i] +
+                           2.0 * ts_zzzzzz_xxz[i] * fz_0;
 
-        tk_zzzzzz_xyy[i] = -10.0 * ts_zzzz_xyy[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_xyy[i] * fe_0 + tk_zzzzz_xyy[i] * pa_z[i] + 2.0 * ts_zzzzzz_xyy[i] * fz_0;
+        tk_zzzzzz_xyy[i] =
+            -10.0 * ts_zzzz_xyy[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_xyy[i] * fe_0 + tk_zzzzz_xyy[i] * pa_z[i] + 2.0 * ts_zzzzzz_xyy[i] * fz_0;
 
-        tk_zzzzzz_xyz[i] = -10.0 * ts_zzzz_xyz[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_xyz[i] * fe_0 + tk_zzzzz_xy[i] * fe_0 + tk_zzzzz_xyz[i] * pa_z[i] + 2.0 * ts_zzzzzz_xyz[i] * fz_0;
+        tk_zzzzzz_xyz[i] = -10.0 * ts_zzzz_xyz[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_xyz[i] * fe_0 + tk_zzzzz_xy[i] * fe_0 + tk_zzzzz_xyz[i] * pa_z[i] +
+                           2.0 * ts_zzzzzz_xyz[i] * fz_0;
 
-        tk_zzzzzz_xzz[i] = -10.0 * ts_zzzz_xzz[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_xzz[i] * fe_0 + 2.0 * tk_zzzzz_xz[i] * fe_0 + tk_zzzzz_xzz[i] * pa_z[i] + 2.0 * ts_zzzzzz_xzz[i] * fz_0;
+        tk_zzzzzz_xzz[i] = -10.0 * ts_zzzz_xzz[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_xzz[i] * fe_0 + 2.0 * tk_zzzzz_xz[i] * fe_0 +
+                           tk_zzzzz_xzz[i] * pa_z[i] + 2.0 * ts_zzzzzz_xzz[i] * fz_0;
 
-        tk_zzzzzz_yyy[i] = -10.0 * ts_zzzz_yyy[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_yyy[i] * fe_0 + tk_zzzzz_yyy[i] * pa_z[i] + 2.0 * ts_zzzzzz_yyy[i] * fz_0;
+        tk_zzzzzz_yyy[i] =
+            -10.0 * ts_zzzz_yyy[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_yyy[i] * fe_0 + tk_zzzzz_yyy[i] * pa_z[i] + 2.0 * ts_zzzzzz_yyy[i] * fz_0;
 
-        tk_zzzzzz_yyz[i] = -10.0 * ts_zzzz_yyz[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_yyz[i] * fe_0 + tk_zzzzz_yy[i] * fe_0 + tk_zzzzz_yyz[i] * pa_z[i] + 2.0 * ts_zzzzzz_yyz[i] * fz_0;
+        tk_zzzzzz_yyz[i] = -10.0 * ts_zzzz_yyz[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_yyz[i] * fe_0 + tk_zzzzz_yy[i] * fe_0 + tk_zzzzz_yyz[i] * pa_z[i] +
+                           2.0 * ts_zzzzzz_yyz[i] * fz_0;
 
-        tk_zzzzzz_yzz[i] = -10.0 * ts_zzzz_yzz[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_yzz[i] * fe_0 + 2.0 * tk_zzzzz_yz[i] * fe_0 + tk_zzzzz_yzz[i] * pa_z[i] + 2.0 * ts_zzzzzz_yzz[i] * fz_0;
+        tk_zzzzzz_yzz[i] = -10.0 * ts_zzzz_yzz[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_yzz[i] * fe_0 + 2.0 * tk_zzzzz_yz[i] * fe_0 +
+                           tk_zzzzz_yzz[i] * pa_z[i] + 2.0 * ts_zzzzzz_yzz[i] * fz_0;
 
-        tk_zzzzzz_zzz[i] = -10.0 * ts_zzzz_zzz[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_zzz[i] * fe_0 + 3.0 * tk_zzzzz_zz[i] * fe_0 + tk_zzzzz_zzz[i] * pa_z[i] + 2.0 * ts_zzzzzz_zzz[i] * fz_0;
+        tk_zzzzzz_zzz[i] = -10.0 * ts_zzzz_zzz[i] * fbe_0 * fz_0 + 5.0 * tk_zzzz_zzz[i] * fe_0 + 3.0 * tk_zzzzz_zz[i] * fe_0 +
+                           tk_zzzzz_zzz[i] * pa_z[i] + 2.0 * ts_zzzzzz_zzz[i] * fz_0;
     }
-
 }
 
-} // kinrec namespace
-
+}  // namespace kinrec

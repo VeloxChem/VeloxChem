@@ -239,14 +239,14 @@ comp_prim_nuclear_potential_dd(CSimdArray<double>&       pbuffer,
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
 
-        ta_xx_xx_0[i] = ta_0_xx_0[i] * fe_0 - ta_0_xx_1[i] * fe_0 + 2.0 * ta_x_x_0[i] * fe_0 -
-                        2.0 * ta_x_x_1[i] * fe_0 + ta_x_xx_0[i] * pa_x[i] - ta_x_xx_1[i] * pc_x[i];
+        ta_xx_xx_0[i] = ta_0_xx_0[i] * fe_0 - ta_0_xx_1[i] * fe_0 + 2.0 * ta_x_x_0[i] * fe_0 - 2.0 * ta_x_x_1[i] * fe_0 + ta_x_xx_0[i] * pa_x[i] -
+                        ta_x_xx_1[i] * pc_x[i];
 
-        ta_xx_xy_0[i] = ta_0_xy_0[i] * fe_0 - ta_0_xy_1[i] * fe_0 + ta_x_y_0[i] * fe_0 - ta_x_y_1[i] * fe_0 +
-                        ta_x_xy_0[i] * pa_x[i] - ta_x_xy_1[i] * pc_x[i];
+        ta_xx_xy_0[i] =
+            ta_0_xy_0[i] * fe_0 - ta_0_xy_1[i] * fe_0 + ta_x_y_0[i] * fe_0 - ta_x_y_1[i] * fe_0 + ta_x_xy_0[i] * pa_x[i] - ta_x_xy_1[i] * pc_x[i];
 
-        ta_xx_xz_0[i] = ta_0_xz_0[i] * fe_0 - ta_0_xz_1[i] * fe_0 + ta_x_z_0[i] * fe_0 - ta_x_z_1[i] * fe_0 +
-                        ta_x_xz_0[i] * pa_x[i] - ta_x_xz_1[i] * pc_x[i];
+        ta_xx_xz_0[i] =
+            ta_0_xz_0[i] * fe_0 - ta_0_xz_1[i] * fe_0 + ta_x_z_0[i] * fe_0 - ta_x_z_1[i] * fe_0 + ta_x_xz_0[i] * pa_x[i] - ta_x_xz_1[i] * pc_x[i];
 
         ta_xx_yy_0[i] = ta_0_yy_0[i] * fe_0 - ta_0_yy_1[i] * fe_0 + ta_x_yy_0[i] * pa_x[i] - ta_x_yy_1[i] * pc_x[i];
 
@@ -426,16 +426,16 @@ comp_prim_nuclear_potential_dd(CSimdArray<double>&       pbuffer,
 
         ta_yy_xx_0[i] = ta_0_xx_0[i] * fe_0 - ta_0_xx_1[i] * fe_0 + ta_y_xx_0[i] * pa_y[i] - ta_y_xx_1[i] * pc_y[i];
 
-        ta_yy_xy_0[i] = ta_0_xy_0[i] * fe_0 - ta_0_xy_1[i] * fe_0 + ta_y_x_0[i] * fe_0 - ta_y_x_1[i] * fe_0 +
-                        ta_y_xy_0[i] * pa_y[i] - ta_y_xy_1[i] * pc_y[i];
+        ta_yy_xy_0[i] =
+            ta_0_xy_0[i] * fe_0 - ta_0_xy_1[i] * fe_0 + ta_y_x_0[i] * fe_0 - ta_y_x_1[i] * fe_0 + ta_y_xy_0[i] * pa_y[i] - ta_y_xy_1[i] * pc_y[i];
 
         ta_yy_xz_0[i] = ta_0_xz_0[i] * fe_0 - ta_0_xz_1[i] * fe_0 + ta_y_xz_0[i] * pa_y[i] - ta_y_xz_1[i] * pc_y[i];
 
-        ta_yy_yy_0[i] = ta_0_yy_0[i] * fe_0 - ta_0_yy_1[i] * fe_0 + 2.0 * ta_y_y_0[i] * fe_0 -
-                        2.0 * ta_y_y_1[i] * fe_0 + ta_y_yy_0[i] * pa_y[i] - ta_y_yy_1[i] * pc_y[i];
+        ta_yy_yy_0[i] = ta_0_yy_0[i] * fe_0 - ta_0_yy_1[i] * fe_0 + 2.0 * ta_y_y_0[i] * fe_0 - 2.0 * ta_y_y_1[i] * fe_0 + ta_y_yy_0[i] * pa_y[i] -
+                        ta_y_yy_1[i] * pc_y[i];
 
-        ta_yy_yz_0[i] = ta_0_yz_0[i] * fe_0 - ta_0_yz_1[i] * fe_0 + ta_y_z_0[i] * fe_0 - ta_y_z_1[i] * fe_0 +
-                        ta_y_yz_0[i] * pa_y[i] - ta_y_yz_1[i] * pc_y[i];
+        ta_yy_yz_0[i] =
+            ta_0_yz_0[i] * fe_0 - ta_0_yz_1[i] * fe_0 + ta_y_z_0[i] * fe_0 - ta_y_z_1[i] * fe_0 + ta_y_yz_0[i] * pa_y[i] - ta_y_yz_1[i] * pc_y[i];
 
         ta_yy_zz_0[i] = ta_0_zz_0[i] * fe_0 - ta_0_zz_1[i] * fe_0 + ta_y_zz_0[i] * pa_y[i] - ta_y_zz_1[i] * pc_y[i];
     }
@@ -557,16 +557,16 @@ comp_prim_nuclear_potential_dd(CSimdArray<double>&       pbuffer,
 
         ta_zz_xy_0[i] = ta_0_xy_0[i] * fe_0 - ta_0_xy_1[i] * fe_0 + ta_z_xy_0[i] * pa_z[i] - ta_z_xy_1[i] * pc_z[i];
 
-        ta_zz_xz_0[i] = ta_0_xz_0[i] * fe_0 - ta_0_xz_1[i] * fe_0 + ta_z_x_0[i] * fe_0 - ta_z_x_1[i] * fe_0 +
-                        ta_z_xz_0[i] * pa_z[i] - ta_z_xz_1[i] * pc_z[i];
+        ta_zz_xz_0[i] =
+            ta_0_xz_0[i] * fe_0 - ta_0_xz_1[i] * fe_0 + ta_z_x_0[i] * fe_0 - ta_z_x_1[i] * fe_0 + ta_z_xz_0[i] * pa_z[i] - ta_z_xz_1[i] * pc_z[i];
 
         ta_zz_yy_0[i] = ta_0_yy_0[i] * fe_0 - ta_0_yy_1[i] * fe_0 + ta_z_yy_0[i] * pa_z[i] - ta_z_yy_1[i] * pc_z[i];
 
-        ta_zz_yz_0[i] = ta_0_yz_0[i] * fe_0 - ta_0_yz_1[i] * fe_0 + ta_z_y_0[i] * fe_0 - ta_z_y_1[i] * fe_0 +
-                        ta_z_yz_0[i] * pa_z[i] - ta_z_yz_1[i] * pc_z[i];
+        ta_zz_yz_0[i] =
+            ta_0_yz_0[i] * fe_0 - ta_0_yz_1[i] * fe_0 + ta_z_y_0[i] * fe_0 - ta_z_y_1[i] * fe_0 + ta_z_yz_0[i] * pa_z[i] - ta_z_yz_1[i] * pc_z[i];
 
-        ta_zz_zz_0[i] = ta_0_zz_0[i] * fe_0 - ta_0_zz_1[i] * fe_0 + 2.0 * ta_z_z_0[i] * fe_0 -
-                        2.0 * ta_z_z_1[i] * fe_0 + ta_z_zz_0[i] * pa_z[i] - ta_z_zz_1[i] * pc_z[i];
+        ta_zz_zz_0[i] = ta_0_zz_0[i] * fe_0 - ta_0_zz_1[i] * fe_0 + 2.0 * ta_z_z_0[i] * fe_0 - 2.0 * ta_z_z_1[i] * fe_0 + ta_z_zz_0[i] * pa_z[i] -
+                        ta_z_zz_1[i] * pc_z[i];
     }
 }
 

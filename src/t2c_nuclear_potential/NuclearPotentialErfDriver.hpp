@@ -55,10 +55,10 @@ class CNuclearPotentialErfDriver
     /// @return The range separated nuclear potential matrix.
     auto compute(const std::vector<double>         &charges,
                  const std::vector<TPoint<double>> &coordinates,
-                 const std::vector<double>&        omegas,
+                 const std::vector<double>         &omegas,
                  const CMolecularBasis             &basis,
                  const CMolecule                   &molecule) const -> CMatrix;
-    
+
     /// @brief Computes range separated nuclear potential matrix for given set of external charges,  molecule and molecular basis.
     /// @param charges The vector of external charges.
     /// @param coordinates The vector of coordinates of external charges.
@@ -68,10 +68,9 @@ class CNuclearPotentialErfDriver
     /// @return The range separated nuclear potential matrix.
     auto compute(const std::vector<double>         &charges,
                  const std::vector<TPoint<double>> &coordinates,
-                 const double                      omega,
+                 const double                       omega,
                  const CMolecularBasis             &basis,
                  const CMolecule                   &molecule) const -> CMatrix;
 };
-
 
 #endif /* NuclearPotentialErfDriver_hpp */

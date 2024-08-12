@@ -29,7 +29,7 @@ CNuclearPotentialErfDriver::compute(const std::vector<double>&         charges,
     auto ptr_charges = &charges;
 
     auto ptr_coordinates = &coordinates;
-    
+
     auto ptr_omegas = &omegas;
 
     auto ptr_basis = &basis;
@@ -37,7 +37,7 @@ CNuclearPotentialErfDriver::compute(const std::vector<double>&         charges,
     auto ptr_molecule = &molecule;
 
     auto ptr_npot_mat = &npot_mat;
-    
+
     // execute OMP tasks with static scheduling
 
     omp::set_static_scheduler();
@@ -69,13 +69,13 @@ CNuclearPotentialErfDriver::compute(const std::vector<double>&         charges,
 }
 
 auto
-CNuclearPotentialErfDriver::compute(const std::vector<double>         &charges,
-                                    const std::vector<TPoint<double>> &coordinates,
-                                    const double                      omega,
-                                    const CMolecularBasis             &basis,
-                                    const CMolecule                   &molecule) const -> CMatrix
+CNuclearPotentialErfDriver::compute(const std::vector<double>&         charges,
+                                    const std::vector<TPoint<double>>& coordinates,
+                                    const double                       omega,
+                                    const CMolecularBasis&             basis,
+                                    const CMolecule&                   molecule) const -> CMatrix
 {
     auto omegas = std::vector<double>(charges.size(), omega);
-    
+
     return compute(charges, coordinates, omegas, basis, molecule);
 }

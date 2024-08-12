@@ -1,15 +1,15 @@
 #include "OverlapPrimRecSI.hpp"
 
-namespace ovlrec { // ovlrec namespace
+namespace ovlrec {  // ovlrec namespace
 
 auto
-comp_prim_overlap_si(CSimdArray<double>& pbuffer, 
-                     const size_t idx_ovl_si,
-                     const size_t idx_ovl_sg,
-                     const size_t idx_ovl_sh,
+comp_prim_overlap_si(CSimdArray<double>&       pbuffer,
+                     const size_t              idx_ovl_si,
+                     const size_t              idx_ovl_sg,
+                     const size_t              idx_ovl_sh,
                      const CSimdArray<double>& factors,
-                     const size_t idx_rpb,
-                     const double a_exp) -> void
+                     const size_t              idx_rpb,
+                     const double              a_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -135,7 +135,62 @@ comp_prim_overlap_si(CSimdArray<double>& pbuffer,
 
     auto ts_0_zzzzzz = pbuffer.data(idx_ovl_si + 27);
 
-    #pragma omp simd aligned(pb_x, pb_y, pb_z, ts_0_xxxx, ts_0_xxxxx, ts_0_xxxxxx, ts_0_xxxxxy, ts_0_xxxxxz, ts_0_xxxxyy, ts_0_xxxxyz, ts_0_xxxxz, ts_0_xxxxzz, ts_0_xxxyy, ts_0_xxxyyy, ts_0_xxxyyz, ts_0_xxxyzz, ts_0_xxxzz, ts_0_xxxzzz, ts_0_xxyy, ts_0_xxyyy, ts_0_xxyyyy, ts_0_xxyyyz, ts_0_xxyyzz, ts_0_xxyzzz, ts_0_xxzz, ts_0_xxzzz, ts_0_xxzzzz, ts_0_xyyy, ts_0_xyyyy, ts_0_xyyyyy, ts_0_xyyyyz, ts_0_xyyyzz, ts_0_xyyzz, ts_0_xyyzzz, ts_0_xyzzzz, ts_0_xzzz, ts_0_xzzzz, ts_0_xzzzzz, ts_0_yyyy, ts_0_yyyyy, ts_0_yyyyyy, ts_0_yyyyyz, ts_0_yyyyz, ts_0_yyyyzz, ts_0_yyyzz, ts_0_yyyzzz, ts_0_yyzz, ts_0_yyzzz, ts_0_yyzzzz, ts_0_yzzz, ts_0_yzzzz, ts_0_yzzzzz, ts_0_zzzz, ts_0_zzzzz, ts_0_zzzzzz, b_exps : 64)
+#pragma omp simd aligned(pb_x,            \
+                             pb_y,        \
+                             pb_z,        \
+                             ts_0_xxxx,   \
+                             ts_0_xxxxx,  \
+                             ts_0_xxxxxx, \
+                             ts_0_xxxxxy, \
+                             ts_0_xxxxxz, \
+                             ts_0_xxxxyy, \
+                             ts_0_xxxxyz, \
+                             ts_0_xxxxz,  \
+                             ts_0_xxxxzz, \
+                             ts_0_xxxyy,  \
+                             ts_0_xxxyyy, \
+                             ts_0_xxxyyz, \
+                             ts_0_xxxyzz, \
+                             ts_0_xxxzz,  \
+                             ts_0_xxxzzz, \
+                             ts_0_xxyy,   \
+                             ts_0_xxyyy,  \
+                             ts_0_xxyyyy, \
+                             ts_0_xxyyyz, \
+                             ts_0_xxyyzz, \
+                             ts_0_xxyzzz, \
+                             ts_0_xxzz,   \
+                             ts_0_xxzzz,  \
+                             ts_0_xxzzzz, \
+                             ts_0_xyyy,   \
+                             ts_0_xyyyy,  \
+                             ts_0_xyyyyy, \
+                             ts_0_xyyyyz, \
+                             ts_0_xyyyzz, \
+                             ts_0_xyyzz,  \
+                             ts_0_xyyzzz, \
+                             ts_0_xyzzzz, \
+                             ts_0_xzzz,   \
+                             ts_0_xzzzz,  \
+                             ts_0_xzzzzz, \
+                             ts_0_yyyy,   \
+                             ts_0_yyyyy,  \
+                             ts_0_yyyyyy, \
+                             ts_0_yyyyyz, \
+                             ts_0_yyyyz,  \
+                             ts_0_yyyyzz, \
+                             ts_0_yyyzz,  \
+                             ts_0_yyyzzz, \
+                             ts_0_yyzz,   \
+                             ts_0_yyzzz,  \
+                             ts_0_yyzzzz, \
+                             ts_0_yzzz,   \
+                             ts_0_yzzzz,  \
+                             ts_0_yzzzzz, \
+                             ts_0_zzzz,   \
+                             ts_0_zzzzz,  \
+                             ts_0_zzzzzz, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -198,5 +253,4 @@ comp_prim_overlap_si(CSimdArray<double>& pbuffer,
     }
 }
 
-} // ovlrec namespace
-
+}  // namespace ovlrec

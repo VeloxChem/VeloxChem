@@ -3,7 +3,7 @@
 
 #include "SimdArray.hpp"
 
-namespace npotrec { // npotrec namespace
+namespace npotrec {  // npotrec namespace
 
 /// @brief Computes primitive [D|AG(2)|P]  integrals for set of data buffers.
 /// @param pbuffer The primitive integrals buffer.
@@ -19,20 +19,19 @@ namespace npotrec { // npotrec namespace
 /// @param idx_rpa The vector of distances R(PA) = P - A.
 /// @param idx_rpc The vector of distances R(PC) = P - C.
 /// @param a_exp The primitive basis function exponent on center A.
-auto
-comp_prim_nuclear_potential_geom_020_dp(CSimdArray<double>& pbuffer, 
-                                        const size_t idx_npot_geom_020_0_dp,
-                                        const size_t idx_npot_geom_020_0_sp,
-                                        const size_t idx_npot_geom_020_1_sp,
-                                        const size_t idx_npot_geom_020_0_ps,
-                                        const size_t idx_npot_geom_020_1_ps,
-                                        const size_t idx_npot_geom_010_1_pp,
-                                        const size_t idx_npot_geom_020_0_pp,
-                                        const size_t idx_npot_geom_020_1_pp,
-                                        const CSimdArray<double>& factors,
-                                        const size_t idx_rpa,
-                                        const size_t idx_rpc,
-                                        const double a_exp) -> void;
-} // npotrec namespace
+auto comp_prim_nuclear_potential_geom_020_dp(CSimdArray<double>&       pbuffer,
+                                             const size_t              idx_npot_geom_020_0_dp,
+                                             const size_t              idx_npot_geom_020_0_sp,
+                                             const size_t              idx_npot_geom_020_1_sp,
+                                             const size_t              idx_npot_geom_020_0_ps,
+                                             const size_t              idx_npot_geom_020_1_ps,
+                                             const size_t              idx_npot_geom_010_1_pp,
+                                             const size_t              idx_npot_geom_020_0_pp,
+                                             const size_t              idx_npot_geom_020_1_pp,
+                                             const CSimdArray<double>& factors,
+                                             const size_t              idx_rpa,
+                                             const size_t              idx_rpc,
+                                             const double              a_exp) -> void;
+}  // namespace npotrec
 
 #endif /* NuclearPotentialGeom020PrimRecDP */

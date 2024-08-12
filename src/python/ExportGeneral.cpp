@@ -87,21 +87,11 @@ export_general(py::module &m) -> void
           "Gets work tasks for given two vectors of basis function blocks.");
 
     // exposing functions from SphericalMomentum.hpp
-    m.def("spherical_momentum_s_factors",
-          spher_mom::transformation_factors<0>,
-          "Gets transformation factors for S type spherical momentum.");
-    m.def("spherical_momentum_p_factors",
-          spher_mom::transformation_factors<1>,
-          "Gets transformation factors for P type spherical momentum.");
-    m.def("spherical_momentum_d_factors",
-          spher_mom::transformation_factors<2>,
-          "Gets transformation factors for D type spherical momentum.");
-    m.def("spherical_momentum_f_factors",
-          spher_mom::transformation_factors<3>,
-          "Gets transformation factors for F type spherical momentum.");
-    m.def("spherical_momentum_g_factors",
-          spher_mom::transformation_factors<4>,
-          "Gets transformation factors for G type spherical momentum.");
+    m.def("spherical_momentum_s_factors", spher_mom::transformation_factors<0>, "Gets transformation factors for S type spherical momentum.");
+    m.def("spherical_momentum_p_factors", spher_mom::transformation_factors<1>, "Gets transformation factors for P type spherical momentum.");
+    m.def("spherical_momentum_d_factors", spher_mom::transformation_factors<2>, "Gets transformation factors for D type spherical momentum.");
+    m.def("spherical_momentum_f_factors", spher_mom::transformation_factors<3>, "Gets transformation factors for F type spherical momentum.");
+    m.def("spherical_momentum_g_factors", spher_mom::transformation_factors<4>, "Gets transformation factors for G type spherical momentum.");
 
     // TPoint class
     PyClass<TPoint<double>>(m, "Point")

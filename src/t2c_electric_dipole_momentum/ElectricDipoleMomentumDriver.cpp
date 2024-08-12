@@ -7,7 +7,7 @@
 #include "T2CDistributor.hpp"
 
 auto
-CElectricDipoleMomentumDriver::compute(const CMolecularBasis &basis, const CMolecule &molecule, const TPoint<double>& origin) const -> CMatrices
+CElectricDipoleMomentumDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule, const TPoint<double>& origin) const -> CMatrices
 {
     // set up electric dipole matrices
 
@@ -22,7 +22,7 @@ CElectricDipoleMomentumDriver::compute(const CMolecularBasis &basis, const CMole
     auto ptr_molecule = &molecule;
 
     auto ptr_dip_mats = &dip_mats;
-    
+
     auto ptr_origin = &origin;
 
     // execute OMP tasks with static scheduling
@@ -36,7 +36,7 @@ CElectricDipoleMomentumDriver::compute(const CMolecularBasis &basis, const CMole
             const auto gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule);
 
             const auto tasks = omp::make_work_tasks(gto_blocks);
-            
+
             std::ranges::for_each(std::ranges::reverse_view(tasks), [&](const auto& task) {
                 auto bra_gtos    = gto_blocks[task[0]];
                 auto ket_gtos    = gto_blocks[task[1]];
@@ -45,8 +45,8 @@ CElectricDipoleMomentumDriver::compute(const CMolecularBasis &basis, const CMole
                 bool bkequal     = (task[0] == task[1]) && (task[2] == task[4]) && (task[3] == task[5]);
 #pragma omp task firstprivate(bra_gtos, ket_gtos, bra_indices, ket_indices, bkequal)
                 {
-                    const auto coords = std::vector<TPoint<double>>(1, *ptr_origin);
-                    const auto data = std::vector<double>();
+                    const auto                 coords = std::vector<TPoint<double>>(1, *ptr_origin);
+                    const auto                 data   = std::vector<double>();
                     CT2CDistributor<CMatrices> distributor(ptr_dip_mats, coords, data);
                     dipfunc::compute(distributor, bra_gtos, ket_gtos, bra_indices, ket_indices, bkequal);
                 }

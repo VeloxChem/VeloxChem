@@ -3,7 +3,6 @@
 
 #include <array>
 
-#include "GtoBlock.hpp"
 #include "ElectricDipoleMomentumRecDD.hpp"
 #include "ElectricDipoleMomentumRecDF.hpp"
 #include "ElectricDipoleMomentumRecDG.hpp"
@@ -29,6 +28,7 @@
 #include "ElectricDipoleMomentumRecSG.hpp"
 #include "ElectricDipoleMomentumRecSP.hpp"
 #include "ElectricDipoleMomentumRecSS.hpp"
+#include "GtoBlock.hpp"
 
 namespace dipfunc {
 

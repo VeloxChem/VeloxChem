@@ -340,23 +340,20 @@ comp_prim_nuclear_potential_geom_010_pf(CSimdArray<double>&       pbuffer,
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
 
-        ta1_x_x_xxx_0[i] = 3.0 * ta1_x_0_xx_0[i] * fe_0 - 3.0 * ta1_x_0_xx_1[i] * fe_0 + ta_0_xxx_1[i] +
-                           ta1_x_0_xxx_0[i] * pa_x[i] - ta1_x_0_xxx_1[i] * pc_x[i];
+        ta1_x_x_xxx_0[i] =
+            3.0 * ta1_x_0_xx_0[i] * fe_0 - 3.0 * ta1_x_0_xx_1[i] * fe_0 + ta_0_xxx_1[i] + ta1_x_0_xxx_0[i] * pa_x[i] - ta1_x_0_xxx_1[i] * pc_x[i];
 
-        ta1_x_x_xxy_0[i] = 2.0 * ta1_x_0_xy_0[i] * fe_0 - 2.0 * ta1_x_0_xy_1[i] * fe_0 + ta_0_xxy_1[i] +
-                           ta1_x_0_xxy_0[i] * pa_x[i] - ta1_x_0_xxy_1[i] * pc_x[i];
+        ta1_x_x_xxy_0[i] =
+            2.0 * ta1_x_0_xy_0[i] * fe_0 - 2.0 * ta1_x_0_xy_1[i] * fe_0 + ta_0_xxy_1[i] + ta1_x_0_xxy_0[i] * pa_x[i] - ta1_x_0_xxy_1[i] * pc_x[i];
 
-        ta1_x_x_xxz_0[i] = 2.0 * ta1_x_0_xz_0[i] * fe_0 - 2.0 * ta1_x_0_xz_1[i] * fe_0 + ta_0_xxz_1[i] +
-                           ta1_x_0_xxz_0[i] * pa_x[i] - ta1_x_0_xxz_1[i] * pc_x[i];
+        ta1_x_x_xxz_0[i] =
+            2.0 * ta1_x_0_xz_0[i] * fe_0 - 2.0 * ta1_x_0_xz_1[i] * fe_0 + ta_0_xxz_1[i] + ta1_x_0_xxz_0[i] * pa_x[i] - ta1_x_0_xxz_1[i] * pc_x[i];
 
-        ta1_x_x_xyy_0[i] = ta1_x_0_yy_0[i] * fe_0 - ta1_x_0_yy_1[i] * fe_0 + ta_0_xyy_1[i] +
-                           ta1_x_0_xyy_0[i] * pa_x[i] - ta1_x_0_xyy_1[i] * pc_x[i];
+        ta1_x_x_xyy_0[i] = ta1_x_0_yy_0[i] * fe_0 - ta1_x_0_yy_1[i] * fe_0 + ta_0_xyy_1[i] + ta1_x_0_xyy_0[i] * pa_x[i] - ta1_x_0_xyy_1[i] * pc_x[i];
 
-        ta1_x_x_xyz_0[i] = ta1_x_0_yz_0[i] * fe_0 - ta1_x_0_yz_1[i] * fe_0 + ta_0_xyz_1[i] +
-                           ta1_x_0_xyz_0[i] * pa_x[i] - ta1_x_0_xyz_1[i] * pc_x[i];
+        ta1_x_x_xyz_0[i] = ta1_x_0_yz_0[i] * fe_0 - ta1_x_0_yz_1[i] * fe_0 + ta_0_xyz_1[i] + ta1_x_0_xyz_0[i] * pa_x[i] - ta1_x_0_xyz_1[i] * pc_x[i];
 
-        ta1_x_x_xzz_0[i] = ta1_x_0_zz_0[i] * fe_0 - ta1_x_0_zz_1[i] * fe_0 + ta_0_xzz_1[i] +
-                           ta1_x_0_xzz_0[i] * pa_x[i] - ta1_x_0_xzz_1[i] * pc_x[i];
+        ta1_x_x_xzz_0[i] = ta1_x_0_zz_0[i] * fe_0 - ta1_x_0_zz_1[i] * fe_0 + ta_0_xzz_1[i] + ta1_x_0_xzz_0[i] * pa_x[i] - ta1_x_0_xzz_1[i] * pc_x[i];
 
         ta1_x_x_yyy_0[i] = ta_0_yyy_1[i] + ta1_x_0_yyy_0[i] * pa_x[i] - ta1_x_0_yyy_1[i] * pc_x[i];
 
@@ -440,27 +437,21 @@ comp_prim_nuclear_potential_geom_010_pf(CSimdArray<double>&       pbuffer,
 
         ta1_x_y_xxx_0[i] = ta1_x_0_xxx_0[i] * pa_y[i] - ta1_x_0_xxx_1[i] * pc_y[i];
 
-        ta1_x_y_xxy_0[i] =
-            ta1_x_0_xx_0[i] * fe_0 - ta1_x_0_xx_1[i] * fe_0 + ta1_x_0_xxy_0[i] * pa_y[i] - ta1_x_0_xxy_1[i] * pc_y[i];
+        ta1_x_y_xxy_0[i] = ta1_x_0_xx_0[i] * fe_0 - ta1_x_0_xx_1[i] * fe_0 + ta1_x_0_xxy_0[i] * pa_y[i] - ta1_x_0_xxy_1[i] * pc_y[i];
 
         ta1_x_y_xxz_0[i] = ta1_x_0_xxz_0[i] * pa_y[i] - ta1_x_0_xxz_1[i] * pc_y[i];
 
-        ta1_x_y_xyy_0[i] = 2.0 * ta1_x_0_xy_0[i] * fe_0 - 2.0 * ta1_x_0_xy_1[i] * fe_0 + ta1_x_0_xyy_0[i] * pa_y[i] -
-                           ta1_x_0_xyy_1[i] * pc_y[i];
+        ta1_x_y_xyy_0[i] = 2.0 * ta1_x_0_xy_0[i] * fe_0 - 2.0 * ta1_x_0_xy_1[i] * fe_0 + ta1_x_0_xyy_0[i] * pa_y[i] - ta1_x_0_xyy_1[i] * pc_y[i];
 
-        ta1_x_y_xyz_0[i] =
-            ta1_x_0_xz_0[i] * fe_0 - ta1_x_0_xz_1[i] * fe_0 + ta1_x_0_xyz_0[i] * pa_y[i] - ta1_x_0_xyz_1[i] * pc_y[i];
+        ta1_x_y_xyz_0[i] = ta1_x_0_xz_0[i] * fe_0 - ta1_x_0_xz_1[i] * fe_0 + ta1_x_0_xyz_0[i] * pa_y[i] - ta1_x_0_xyz_1[i] * pc_y[i];
 
         ta1_x_y_xzz_0[i] = ta1_x_0_xzz_0[i] * pa_y[i] - ta1_x_0_xzz_1[i] * pc_y[i];
 
-        ta1_x_y_yyy_0[i] = 3.0 * ta1_x_0_yy_0[i] * fe_0 - 3.0 * ta1_x_0_yy_1[i] * fe_0 + ta1_x_0_yyy_0[i] * pa_y[i] -
-                           ta1_x_0_yyy_1[i] * pc_y[i];
+        ta1_x_y_yyy_0[i] = 3.0 * ta1_x_0_yy_0[i] * fe_0 - 3.0 * ta1_x_0_yy_1[i] * fe_0 + ta1_x_0_yyy_0[i] * pa_y[i] - ta1_x_0_yyy_1[i] * pc_y[i];
 
-        ta1_x_y_yyz_0[i] = 2.0 * ta1_x_0_yz_0[i] * fe_0 - 2.0 * ta1_x_0_yz_1[i] * fe_0 + ta1_x_0_yyz_0[i] * pa_y[i] -
-                           ta1_x_0_yyz_1[i] * pc_y[i];
+        ta1_x_y_yyz_0[i] = 2.0 * ta1_x_0_yz_0[i] * fe_0 - 2.0 * ta1_x_0_yz_1[i] * fe_0 + ta1_x_0_yyz_0[i] * pa_y[i] - ta1_x_0_yyz_1[i] * pc_y[i];
 
-        ta1_x_y_yzz_0[i] =
-            ta1_x_0_zz_0[i] * fe_0 - ta1_x_0_zz_1[i] * fe_0 + ta1_x_0_yzz_0[i] * pa_y[i] - ta1_x_0_yzz_1[i] * pc_y[i];
+        ta1_x_y_yzz_0[i] = ta1_x_0_zz_0[i] * fe_0 - ta1_x_0_zz_1[i] * fe_0 + ta1_x_0_yzz_0[i] * pa_y[i] - ta1_x_0_yzz_1[i] * pc_y[i];
 
         ta1_x_y_zzz_0[i] = ta1_x_0_zzz_0[i] * pa_y[i] - ta1_x_0_zzz_1[i] * pc_y[i];
     }
@@ -540,27 +531,21 @@ comp_prim_nuclear_potential_geom_010_pf(CSimdArray<double>&       pbuffer,
 
         ta1_x_z_xxy_0[i] = ta1_x_0_xxy_0[i] * pa_z[i] - ta1_x_0_xxy_1[i] * pc_z[i];
 
-        ta1_x_z_xxz_0[i] =
-            ta1_x_0_xx_0[i] * fe_0 - ta1_x_0_xx_1[i] * fe_0 + ta1_x_0_xxz_0[i] * pa_z[i] - ta1_x_0_xxz_1[i] * pc_z[i];
+        ta1_x_z_xxz_0[i] = ta1_x_0_xx_0[i] * fe_0 - ta1_x_0_xx_1[i] * fe_0 + ta1_x_0_xxz_0[i] * pa_z[i] - ta1_x_0_xxz_1[i] * pc_z[i];
 
         ta1_x_z_xyy_0[i] = ta1_x_0_xyy_0[i] * pa_z[i] - ta1_x_0_xyy_1[i] * pc_z[i];
 
-        ta1_x_z_xyz_0[i] =
-            ta1_x_0_xy_0[i] * fe_0 - ta1_x_0_xy_1[i] * fe_0 + ta1_x_0_xyz_0[i] * pa_z[i] - ta1_x_0_xyz_1[i] * pc_z[i];
+        ta1_x_z_xyz_0[i] = ta1_x_0_xy_0[i] * fe_0 - ta1_x_0_xy_1[i] * fe_0 + ta1_x_0_xyz_0[i] * pa_z[i] - ta1_x_0_xyz_1[i] * pc_z[i];
 
-        ta1_x_z_xzz_0[i] = 2.0 * ta1_x_0_xz_0[i] * fe_0 - 2.0 * ta1_x_0_xz_1[i] * fe_0 + ta1_x_0_xzz_0[i] * pa_z[i] -
-                           ta1_x_0_xzz_1[i] * pc_z[i];
+        ta1_x_z_xzz_0[i] = 2.0 * ta1_x_0_xz_0[i] * fe_0 - 2.0 * ta1_x_0_xz_1[i] * fe_0 + ta1_x_0_xzz_0[i] * pa_z[i] - ta1_x_0_xzz_1[i] * pc_z[i];
 
         ta1_x_z_yyy_0[i] = ta1_x_0_yyy_0[i] * pa_z[i] - ta1_x_0_yyy_1[i] * pc_z[i];
 
-        ta1_x_z_yyz_0[i] =
-            ta1_x_0_yy_0[i] * fe_0 - ta1_x_0_yy_1[i] * fe_0 + ta1_x_0_yyz_0[i] * pa_z[i] - ta1_x_0_yyz_1[i] * pc_z[i];
+        ta1_x_z_yyz_0[i] = ta1_x_0_yy_0[i] * fe_0 - ta1_x_0_yy_1[i] * fe_0 + ta1_x_0_yyz_0[i] * pa_z[i] - ta1_x_0_yyz_1[i] * pc_z[i];
 
-        ta1_x_z_yzz_0[i] = 2.0 * ta1_x_0_yz_0[i] * fe_0 - 2.0 * ta1_x_0_yz_1[i] * fe_0 + ta1_x_0_yzz_0[i] * pa_z[i] -
-                           ta1_x_0_yzz_1[i] * pc_z[i];
+        ta1_x_z_yzz_0[i] = 2.0 * ta1_x_0_yz_0[i] * fe_0 - 2.0 * ta1_x_0_yz_1[i] * fe_0 + ta1_x_0_yzz_0[i] * pa_z[i] - ta1_x_0_yzz_1[i] * pc_z[i];
 
-        ta1_x_z_zzz_0[i] = 3.0 * ta1_x_0_zz_0[i] * fe_0 - 3.0 * ta1_x_0_zz_1[i] * fe_0 + ta1_x_0_zzz_0[i] * pa_z[i] -
-                           ta1_x_0_zzz_1[i] * pc_z[i];
+        ta1_x_z_zzz_0[i] = 3.0 * ta1_x_0_zz_0[i] * fe_0 - 3.0 * ta1_x_0_zz_1[i] * fe_0 + ta1_x_0_zzz_0[i] * pa_z[i] - ta1_x_0_zzz_1[i] * pc_z[i];
     }
 
     // Set up 30-40 components of targeted buffer : PF
@@ -634,23 +619,17 @@ comp_prim_nuclear_potential_geom_010_pf(CSimdArray<double>&       pbuffer,
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
 
-        ta1_y_x_xxx_0[i] = 3.0 * ta1_y_0_xx_0[i] * fe_0 - 3.0 * ta1_y_0_xx_1[i] * fe_0 + ta1_y_0_xxx_0[i] * pa_x[i] -
-                           ta1_y_0_xxx_1[i] * pc_x[i];
+        ta1_y_x_xxx_0[i] = 3.0 * ta1_y_0_xx_0[i] * fe_0 - 3.0 * ta1_y_0_xx_1[i] * fe_0 + ta1_y_0_xxx_0[i] * pa_x[i] - ta1_y_0_xxx_1[i] * pc_x[i];
 
-        ta1_y_x_xxy_0[i] = 2.0 * ta1_y_0_xy_0[i] * fe_0 - 2.0 * ta1_y_0_xy_1[i] * fe_0 + ta1_y_0_xxy_0[i] * pa_x[i] -
-                           ta1_y_0_xxy_1[i] * pc_x[i];
+        ta1_y_x_xxy_0[i] = 2.0 * ta1_y_0_xy_0[i] * fe_0 - 2.0 * ta1_y_0_xy_1[i] * fe_0 + ta1_y_0_xxy_0[i] * pa_x[i] - ta1_y_0_xxy_1[i] * pc_x[i];
 
-        ta1_y_x_xxz_0[i] = 2.0 * ta1_y_0_xz_0[i] * fe_0 - 2.0 * ta1_y_0_xz_1[i] * fe_0 + ta1_y_0_xxz_0[i] * pa_x[i] -
-                           ta1_y_0_xxz_1[i] * pc_x[i];
+        ta1_y_x_xxz_0[i] = 2.0 * ta1_y_0_xz_0[i] * fe_0 - 2.0 * ta1_y_0_xz_1[i] * fe_0 + ta1_y_0_xxz_0[i] * pa_x[i] - ta1_y_0_xxz_1[i] * pc_x[i];
 
-        ta1_y_x_xyy_0[i] =
-            ta1_y_0_yy_0[i] * fe_0 - ta1_y_0_yy_1[i] * fe_0 + ta1_y_0_xyy_0[i] * pa_x[i] - ta1_y_0_xyy_1[i] * pc_x[i];
+        ta1_y_x_xyy_0[i] = ta1_y_0_yy_0[i] * fe_0 - ta1_y_0_yy_1[i] * fe_0 + ta1_y_0_xyy_0[i] * pa_x[i] - ta1_y_0_xyy_1[i] * pc_x[i];
 
-        ta1_y_x_xyz_0[i] =
-            ta1_y_0_yz_0[i] * fe_0 - ta1_y_0_yz_1[i] * fe_0 + ta1_y_0_xyz_0[i] * pa_x[i] - ta1_y_0_xyz_1[i] * pc_x[i];
+        ta1_y_x_xyz_0[i] = ta1_y_0_yz_0[i] * fe_0 - ta1_y_0_yz_1[i] * fe_0 + ta1_y_0_xyz_0[i] * pa_x[i] - ta1_y_0_xyz_1[i] * pc_x[i];
 
-        ta1_y_x_xzz_0[i] =
-            ta1_y_0_zz_0[i] * fe_0 - ta1_y_0_zz_1[i] * fe_0 + ta1_y_0_xzz_0[i] * pa_x[i] - ta1_y_0_xzz_1[i] * pc_x[i];
+        ta1_y_x_xzz_0[i] = ta1_y_0_zz_0[i] * fe_0 - ta1_y_0_zz_1[i] * fe_0 + ta1_y_0_xzz_0[i] * pa_x[i] - ta1_y_0_xzz_1[i] * pc_x[i];
 
         ta1_y_x_yyy_0[i] = ta1_y_0_yyy_0[i] * pa_x[i] - ta1_y_0_yyy_1[i] * pc_x[i];
 
@@ -744,27 +723,24 @@ comp_prim_nuclear_potential_geom_010_pf(CSimdArray<double>&       pbuffer,
 
         ta1_y_y_xxx_0[i] = ta_0_xxx_1[i] + ta1_y_0_xxx_0[i] * pa_y[i] - ta1_y_0_xxx_1[i] * pc_y[i];
 
-        ta1_y_y_xxy_0[i] = ta1_y_0_xx_0[i] * fe_0 - ta1_y_0_xx_1[i] * fe_0 + ta_0_xxy_1[i] +
-                           ta1_y_0_xxy_0[i] * pa_y[i] - ta1_y_0_xxy_1[i] * pc_y[i];
+        ta1_y_y_xxy_0[i] = ta1_y_0_xx_0[i] * fe_0 - ta1_y_0_xx_1[i] * fe_0 + ta_0_xxy_1[i] + ta1_y_0_xxy_0[i] * pa_y[i] - ta1_y_0_xxy_1[i] * pc_y[i];
 
         ta1_y_y_xxz_0[i] = ta_0_xxz_1[i] + ta1_y_0_xxz_0[i] * pa_y[i] - ta1_y_0_xxz_1[i] * pc_y[i];
 
-        ta1_y_y_xyy_0[i] = 2.0 * ta1_y_0_xy_0[i] * fe_0 - 2.0 * ta1_y_0_xy_1[i] * fe_0 + ta_0_xyy_1[i] +
-                           ta1_y_0_xyy_0[i] * pa_y[i] - ta1_y_0_xyy_1[i] * pc_y[i];
+        ta1_y_y_xyy_0[i] =
+            2.0 * ta1_y_0_xy_0[i] * fe_0 - 2.0 * ta1_y_0_xy_1[i] * fe_0 + ta_0_xyy_1[i] + ta1_y_0_xyy_0[i] * pa_y[i] - ta1_y_0_xyy_1[i] * pc_y[i];
 
-        ta1_y_y_xyz_0[i] = ta1_y_0_xz_0[i] * fe_0 - ta1_y_0_xz_1[i] * fe_0 + ta_0_xyz_1[i] +
-                           ta1_y_0_xyz_0[i] * pa_y[i] - ta1_y_0_xyz_1[i] * pc_y[i];
+        ta1_y_y_xyz_0[i] = ta1_y_0_xz_0[i] * fe_0 - ta1_y_0_xz_1[i] * fe_0 + ta_0_xyz_1[i] + ta1_y_0_xyz_0[i] * pa_y[i] - ta1_y_0_xyz_1[i] * pc_y[i];
 
         ta1_y_y_xzz_0[i] = ta_0_xzz_1[i] + ta1_y_0_xzz_0[i] * pa_y[i] - ta1_y_0_xzz_1[i] * pc_y[i];
 
-        ta1_y_y_yyy_0[i] = 3.0 * ta1_y_0_yy_0[i] * fe_0 - 3.0 * ta1_y_0_yy_1[i] * fe_0 + ta_0_yyy_1[i] +
-                           ta1_y_0_yyy_0[i] * pa_y[i] - ta1_y_0_yyy_1[i] * pc_y[i];
+        ta1_y_y_yyy_0[i] =
+            3.0 * ta1_y_0_yy_0[i] * fe_0 - 3.0 * ta1_y_0_yy_1[i] * fe_0 + ta_0_yyy_1[i] + ta1_y_0_yyy_0[i] * pa_y[i] - ta1_y_0_yyy_1[i] * pc_y[i];
 
-        ta1_y_y_yyz_0[i] = 2.0 * ta1_y_0_yz_0[i] * fe_0 - 2.0 * ta1_y_0_yz_1[i] * fe_0 + ta_0_yyz_1[i] +
-                           ta1_y_0_yyz_0[i] * pa_y[i] - ta1_y_0_yyz_1[i] * pc_y[i];
+        ta1_y_y_yyz_0[i] =
+            2.0 * ta1_y_0_yz_0[i] * fe_0 - 2.0 * ta1_y_0_yz_1[i] * fe_0 + ta_0_yyz_1[i] + ta1_y_0_yyz_0[i] * pa_y[i] - ta1_y_0_yyz_1[i] * pc_y[i];
 
-        ta1_y_y_yzz_0[i] = ta1_y_0_zz_0[i] * fe_0 - ta1_y_0_zz_1[i] * fe_0 + ta_0_yzz_1[i] +
-                           ta1_y_0_yzz_0[i] * pa_y[i] - ta1_y_0_yzz_1[i] * pc_y[i];
+        ta1_y_y_yzz_0[i] = ta1_y_0_zz_0[i] * fe_0 - ta1_y_0_zz_1[i] * fe_0 + ta_0_yzz_1[i] + ta1_y_0_yzz_0[i] * pa_y[i] - ta1_y_0_yzz_1[i] * pc_y[i];
 
         ta1_y_y_zzz_0[i] = ta_0_zzz_1[i] + ta1_y_0_zzz_0[i] * pa_y[i] - ta1_y_0_zzz_1[i] * pc_y[i];
     }
@@ -844,27 +820,21 @@ comp_prim_nuclear_potential_geom_010_pf(CSimdArray<double>&       pbuffer,
 
         ta1_y_z_xxy_0[i] = ta1_y_0_xxy_0[i] * pa_z[i] - ta1_y_0_xxy_1[i] * pc_z[i];
 
-        ta1_y_z_xxz_0[i] =
-            ta1_y_0_xx_0[i] * fe_0 - ta1_y_0_xx_1[i] * fe_0 + ta1_y_0_xxz_0[i] * pa_z[i] - ta1_y_0_xxz_1[i] * pc_z[i];
+        ta1_y_z_xxz_0[i] = ta1_y_0_xx_0[i] * fe_0 - ta1_y_0_xx_1[i] * fe_0 + ta1_y_0_xxz_0[i] * pa_z[i] - ta1_y_0_xxz_1[i] * pc_z[i];
 
         ta1_y_z_xyy_0[i] = ta1_y_0_xyy_0[i] * pa_z[i] - ta1_y_0_xyy_1[i] * pc_z[i];
 
-        ta1_y_z_xyz_0[i] =
-            ta1_y_0_xy_0[i] * fe_0 - ta1_y_0_xy_1[i] * fe_0 + ta1_y_0_xyz_0[i] * pa_z[i] - ta1_y_0_xyz_1[i] * pc_z[i];
+        ta1_y_z_xyz_0[i] = ta1_y_0_xy_0[i] * fe_0 - ta1_y_0_xy_1[i] * fe_0 + ta1_y_0_xyz_0[i] * pa_z[i] - ta1_y_0_xyz_1[i] * pc_z[i];
 
-        ta1_y_z_xzz_0[i] = 2.0 * ta1_y_0_xz_0[i] * fe_0 - 2.0 * ta1_y_0_xz_1[i] * fe_0 + ta1_y_0_xzz_0[i] * pa_z[i] -
-                           ta1_y_0_xzz_1[i] * pc_z[i];
+        ta1_y_z_xzz_0[i] = 2.0 * ta1_y_0_xz_0[i] * fe_0 - 2.0 * ta1_y_0_xz_1[i] * fe_0 + ta1_y_0_xzz_0[i] * pa_z[i] - ta1_y_0_xzz_1[i] * pc_z[i];
 
         ta1_y_z_yyy_0[i] = ta1_y_0_yyy_0[i] * pa_z[i] - ta1_y_0_yyy_1[i] * pc_z[i];
 
-        ta1_y_z_yyz_0[i] =
-            ta1_y_0_yy_0[i] * fe_0 - ta1_y_0_yy_1[i] * fe_0 + ta1_y_0_yyz_0[i] * pa_z[i] - ta1_y_0_yyz_1[i] * pc_z[i];
+        ta1_y_z_yyz_0[i] = ta1_y_0_yy_0[i] * fe_0 - ta1_y_0_yy_1[i] * fe_0 + ta1_y_0_yyz_0[i] * pa_z[i] - ta1_y_0_yyz_1[i] * pc_z[i];
 
-        ta1_y_z_yzz_0[i] = 2.0 * ta1_y_0_yz_0[i] * fe_0 - 2.0 * ta1_y_0_yz_1[i] * fe_0 + ta1_y_0_yzz_0[i] * pa_z[i] -
-                           ta1_y_0_yzz_1[i] * pc_z[i];
+        ta1_y_z_yzz_0[i] = 2.0 * ta1_y_0_yz_0[i] * fe_0 - 2.0 * ta1_y_0_yz_1[i] * fe_0 + ta1_y_0_yzz_0[i] * pa_z[i] - ta1_y_0_yzz_1[i] * pc_z[i];
 
-        ta1_y_z_zzz_0[i] = 3.0 * ta1_y_0_zz_0[i] * fe_0 - 3.0 * ta1_y_0_zz_1[i] * fe_0 + ta1_y_0_zzz_0[i] * pa_z[i] -
-                           ta1_y_0_zzz_1[i] * pc_z[i];
+        ta1_y_z_zzz_0[i] = 3.0 * ta1_y_0_zz_0[i] * fe_0 - 3.0 * ta1_y_0_zz_1[i] * fe_0 + ta1_y_0_zzz_0[i] * pa_z[i] - ta1_y_0_zzz_1[i] * pc_z[i];
     }
 
     // Set up 60-70 components of targeted buffer : PF
@@ -938,23 +908,17 @@ comp_prim_nuclear_potential_geom_010_pf(CSimdArray<double>&       pbuffer,
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
 
-        ta1_z_x_xxx_0[i] = 3.0 * ta1_z_0_xx_0[i] * fe_0 - 3.0 * ta1_z_0_xx_1[i] * fe_0 + ta1_z_0_xxx_0[i] * pa_x[i] -
-                           ta1_z_0_xxx_1[i] * pc_x[i];
+        ta1_z_x_xxx_0[i] = 3.0 * ta1_z_0_xx_0[i] * fe_0 - 3.0 * ta1_z_0_xx_1[i] * fe_0 + ta1_z_0_xxx_0[i] * pa_x[i] - ta1_z_0_xxx_1[i] * pc_x[i];
 
-        ta1_z_x_xxy_0[i] = 2.0 * ta1_z_0_xy_0[i] * fe_0 - 2.0 * ta1_z_0_xy_1[i] * fe_0 + ta1_z_0_xxy_0[i] * pa_x[i] -
-                           ta1_z_0_xxy_1[i] * pc_x[i];
+        ta1_z_x_xxy_0[i] = 2.0 * ta1_z_0_xy_0[i] * fe_0 - 2.0 * ta1_z_0_xy_1[i] * fe_0 + ta1_z_0_xxy_0[i] * pa_x[i] - ta1_z_0_xxy_1[i] * pc_x[i];
 
-        ta1_z_x_xxz_0[i] = 2.0 * ta1_z_0_xz_0[i] * fe_0 - 2.0 * ta1_z_0_xz_1[i] * fe_0 + ta1_z_0_xxz_0[i] * pa_x[i] -
-                           ta1_z_0_xxz_1[i] * pc_x[i];
+        ta1_z_x_xxz_0[i] = 2.0 * ta1_z_0_xz_0[i] * fe_0 - 2.0 * ta1_z_0_xz_1[i] * fe_0 + ta1_z_0_xxz_0[i] * pa_x[i] - ta1_z_0_xxz_1[i] * pc_x[i];
 
-        ta1_z_x_xyy_0[i] =
-            ta1_z_0_yy_0[i] * fe_0 - ta1_z_0_yy_1[i] * fe_0 + ta1_z_0_xyy_0[i] * pa_x[i] - ta1_z_0_xyy_1[i] * pc_x[i];
+        ta1_z_x_xyy_0[i] = ta1_z_0_yy_0[i] * fe_0 - ta1_z_0_yy_1[i] * fe_0 + ta1_z_0_xyy_0[i] * pa_x[i] - ta1_z_0_xyy_1[i] * pc_x[i];
 
-        ta1_z_x_xyz_0[i] =
-            ta1_z_0_yz_0[i] * fe_0 - ta1_z_0_yz_1[i] * fe_0 + ta1_z_0_xyz_0[i] * pa_x[i] - ta1_z_0_xyz_1[i] * pc_x[i];
+        ta1_z_x_xyz_0[i] = ta1_z_0_yz_0[i] * fe_0 - ta1_z_0_yz_1[i] * fe_0 + ta1_z_0_xyz_0[i] * pa_x[i] - ta1_z_0_xyz_1[i] * pc_x[i];
 
-        ta1_z_x_xzz_0[i] =
-            ta1_z_0_zz_0[i] * fe_0 - ta1_z_0_zz_1[i] * fe_0 + ta1_z_0_xzz_0[i] * pa_x[i] - ta1_z_0_xzz_1[i] * pc_x[i];
+        ta1_z_x_xzz_0[i] = ta1_z_0_zz_0[i] * fe_0 - ta1_z_0_zz_1[i] * fe_0 + ta1_z_0_xzz_0[i] * pa_x[i] - ta1_z_0_xzz_1[i] * pc_x[i];
 
         ta1_z_x_yyy_0[i] = ta1_z_0_yyy_0[i] * pa_x[i] - ta1_z_0_yyy_1[i] * pc_x[i];
 
@@ -1038,27 +1002,21 @@ comp_prim_nuclear_potential_geom_010_pf(CSimdArray<double>&       pbuffer,
 
         ta1_z_y_xxx_0[i] = ta1_z_0_xxx_0[i] * pa_y[i] - ta1_z_0_xxx_1[i] * pc_y[i];
 
-        ta1_z_y_xxy_0[i] =
-            ta1_z_0_xx_0[i] * fe_0 - ta1_z_0_xx_1[i] * fe_0 + ta1_z_0_xxy_0[i] * pa_y[i] - ta1_z_0_xxy_1[i] * pc_y[i];
+        ta1_z_y_xxy_0[i] = ta1_z_0_xx_0[i] * fe_0 - ta1_z_0_xx_1[i] * fe_0 + ta1_z_0_xxy_0[i] * pa_y[i] - ta1_z_0_xxy_1[i] * pc_y[i];
 
         ta1_z_y_xxz_0[i] = ta1_z_0_xxz_0[i] * pa_y[i] - ta1_z_0_xxz_1[i] * pc_y[i];
 
-        ta1_z_y_xyy_0[i] = 2.0 * ta1_z_0_xy_0[i] * fe_0 - 2.0 * ta1_z_0_xy_1[i] * fe_0 + ta1_z_0_xyy_0[i] * pa_y[i] -
-                           ta1_z_0_xyy_1[i] * pc_y[i];
+        ta1_z_y_xyy_0[i] = 2.0 * ta1_z_0_xy_0[i] * fe_0 - 2.0 * ta1_z_0_xy_1[i] * fe_0 + ta1_z_0_xyy_0[i] * pa_y[i] - ta1_z_0_xyy_1[i] * pc_y[i];
 
-        ta1_z_y_xyz_0[i] =
-            ta1_z_0_xz_0[i] * fe_0 - ta1_z_0_xz_1[i] * fe_0 + ta1_z_0_xyz_0[i] * pa_y[i] - ta1_z_0_xyz_1[i] * pc_y[i];
+        ta1_z_y_xyz_0[i] = ta1_z_0_xz_0[i] * fe_0 - ta1_z_0_xz_1[i] * fe_0 + ta1_z_0_xyz_0[i] * pa_y[i] - ta1_z_0_xyz_1[i] * pc_y[i];
 
         ta1_z_y_xzz_0[i] = ta1_z_0_xzz_0[i] * pa_y[i] - ta1_z_0_xzz_1[i] * pc_y[i];
 
-        ta1_z_y_yyy_0[i] = 3.0 * ta1_z_0_yy_0[i] * fe_0 - 3.0 * ta1_z_0_yy_1[i] * fe_0 + ta1_z_0_yyy_0[i] * pa_y[i] -
-                           ta1_z_0_yyy_1[i] * pc_y[i];
+        ta1_z_y_yyy_0[i] = 3.0 * ta1_z_0_yy_0[i] * fe_0 - 3.0 * ta1_z_0_yy_1[i] * fe_0 + ta1_z_0_yyy_0[i] * pa_y[i] - ta1_z_0_yyy_1[i] * pc_y[i];
 
-        ta1_z_y_yyz_0[i] = 2.0 * ta1_z_0_yz_0[i] * fe_0 - 2.0 * ta1_z_0_yz_1[i] * fe_0 + ta1_z_0_yyz_0[i] * pa_y[i] -
-                           ta1_z_0_yyz_1[i] * pc_y[i];
+        ta1_z_y_yyz_0[i] = 2.0 * ta1_z_0_yz_0[i] * fe_0 - 2.0 * ta1_z_0_yz_1[i] * fe_0 + ta1_z_0_yyz_0[i] * pa_y[i] - ta1_z_0_yyz_1[i] * pc_y[i];
 
-        ta1_z_y_yzz_0[i] =
-            ta1_z_0_zz_0[i] * fe_0 - ta1_z_0_zz_1[i] * fe_0 + ta1_z_0_yzz_0[i] * pa_y[i] - ta1_z_0_yzz_1[i] * pc_y[i];
+        ta1_z_y_yzz_0[i] = ta1_z_0_zz_0[i] * fe_0 - ta1_z_0_zz_1[i] * fe_0 + ta1_z_0_yzz_0[i] * pa_y[i] - ta1_z_0_yzz_1[i] * pc_y[i];
 
         ta1_z_y_zzz_0[i] = ta1_z_0_zzz_0[i] * pa_y[i] - ta1_z_0_zzz_1[i] * pc_y[i];
     }
@@ -1148,27 +1106,24 @@ comp_prim_nuclear_potential_geom_010_pf(CSimdArray<double>&       pbuffer,
 
         ta1_z_z_xxy_0[i] = ta_0_xxy_1[i] + ta1_z_0_xxy_0[i] * pa_z[i] - ta1_z_0_xxy_1[i] * pc_z[i];
 
-        ta1_z_z_xxz_0[i] = ta1_z_0_xx_0[i] * fe_0 - ta1_z_0_xx_1[i] * fe_0 + ta_0_xxz_1[i] +
-                           ta1_z_0_xxz_0[i] * pa_z[i] - ta1_z_0_xxz_1[i] * pc_z[i];
+        ta1_z_z_xxz_0[i] = ta1_z_0_xx_0[i] * fe_0 - ta1_z_0_xx_1[i] * fe_0 + ta_0_xxz_1[i] + ta1_z_0_xxz_0[i] * pa_z[i] - ta1_z_0_xxz_1[i] * pc_z[i];
 
         ta1_z_z_xyy_0[i] = ta_0_xyy_1[i] + ta1_z_0_xyy_0[i] * pa_z[i] - ta1_z_0_xyy_1[i] * pc_z[i];
 
-        ta1_z_z_xyz_0[i] = ta1_z_0_xy_0[i] * fe_0 - ta1_z_0_xy_1[i] * fe_0 + ta_0_xyz_1[i] +
-                           ta1_z_0_xyz_0[i] * pa_z[i] - ta1_z_0_xyz_1[i] * pc_z[i];
+        ta1_z_z_xyz_0[i] = ta1_z_0_xy_0[i] * fe_0 - ta1_z_0_xy_1[i] * fe_0 + ta_0_xyz_1[i] + ta1_z_0_xyz_0[i] * pa_z[i] - ta1_z_0_xyz_1[i] * pc_z[i];
 
-        ta1_z_z_xzz_0[i] = 2.0 * ta1_z_0_xz_0[i] * fe_0 - 2.0 * ta1_z_0_xz_1[i] * fe_0 + ta_0_xzz_1[i] +
-                           ta1_z_0_xzz_0[i] * pa_z[i] - ta1_z_0_xzz_1[i] * pc_z[i];
+        ta1_z_z_xzz_0[i] =
+            2.0 * ta1_z_0_xz_0[i] * fe_0 - 2.0 * ta1_z_0_xz_1[i] * fe_0 + ta_0_xzz_1[i] + ta1_z_0_xzz_0[i] * pa_z[i] - ta1_z_0_xzz_1[i] * pc_z[i];
 
         ta1_z_z_yyy_0[i] = ta_0_yyy_1[i] + ta1_z_0_yyy_0[i] * pa_z[i] - ta1_z_0_yyy_1[i] * pc_z[i];
 
-        ta1_z_z_yyz_0[i] = ta1_z_0_yy_0[i] * fe_0 - ta1_z_0_yy_1[i] * fe_0 + ta_0_yyz_1[i] +
-                           ta1_z_0_yyz_0[i] * pa_z[i] - ta1_z_0_yyz_1[i] * pc_z[i];
+        ta1_z_z_yyz_0[i] = ta1_z_0_yy_0[i] * fe_0 - ta1_z_0_yy_1[i] * fe_0 + ta_0_yyz_1[i] + ta1_z_0_yyz_0[i] * pa_z[i] - ta1_z_0_yyz_1[i] * pc_z[i];
 
-        ta1_z_z_yzz_0[i] = 2.0 * ta1_z_0_yz_0[i] * fe_0 - 2.0 * ta1_z_0_yz_1[i] * fe_0 + ta_0_yzz_1[i] +
-                           ta1_z_0_yzz_0[i] * pa_z[i] - ta1_z_0_yzz_1[i] * pc_z[i];
+        ta1_z_z_yzz_0[i] =
+            2.0 * ta1_z_0_yz_0[i] * fe_0 - 2.0 * ta1_z_0_yz_1[i] * fe_0 + ta_0_yzz_1[i] + ta1_z_0_yzz_0[i] * pa_z[i] - ta1_z_0_yzz_1[i] * pc_z[i];
 
-        ta1_z_z_zzz_0[i] = 3.0 * ta1_z_0_zz_0[i] * fe_0 - 3.0 * ta1_z_0_zz_1[i] * fe_0 + ta_0_zzz_1[i] +
-                           ta1_z_0_zzz_0[i] * pa_z[i] - ta1_z_0_zzz_1[i] * pc_z[i];
+        ta1_z_z_zzz_0[i] =
+            3.0 * ta1_z_0_zz_0[i] * fe_0 - 3.0 * ta1_z_0_zz_1[i] * fe_0 + ta_0_zzz_1[i] + ta1_z_0_zzz_0[i] * pa_z[i] - ta1_z_0_zzz_1[i] * pc_z[i];
     }
 }
 

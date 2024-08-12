@@ -1,19 +1,19 @@
 #include "NuclearPotentialGeom020PrimRecDS.hpp"
 
-namespace npotrec { // npotrec namespace
+namespace npotrec {  // npotrec namespace
 
 auto
-comp_prim_nuclear_potential_geom_020_ds(CSimdArray<double>& pbuffer, 
-                                        const size_t idx_npot_geom_020_0_ds,
-                                        const size_t idx_npot_geom_020_0_ss,
-                                        const size_t idx_npot_geom_020_1_ss,
-                                        const size_t idx_npot_geom_010_1_ps,
-                                        const size_t idx_npot_geom_020_0_ps,
-                                        const size_t idx_npot_geom_020_1_ps,
+comp_prim_nuclear_potential_geom_020_ds(CSimdArray<double>&       pbuffer,
+                                        const size_t              idx_npot_geom_020_0_ds,
+                                        const size_t              idx_npot_geom_020_0_ss,
+                                        const size_t              idx_npot_geom_020_1_ss,
+                                        const size_t              idx_npot_geom_010_1_ps,
+                                        const size_t              idx_npot_geom_020_0_ps,
+                                        const size_t              idx_npot_geom_020_1_ps,
                                         const CSimdArray<double>& factors,
-                                        const size_t idx_rpa,
-                                        const size_t idx_rpc,
-                                        const double a_exp) -> void
+                                        const size_t              idx_rpa,
+                                        const size_t              idx_rpc,
+                                        const double              a_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -235,12 +235,112 @@ comp_prim_nuclear_potential_geom_020_ds(CSimdArray<double>& pbuffer,
 
     auto ta2_zz_zz_0_0 = pbuffer.data(idx_npot_geom_020_0_ds + 35);
 
-    #pragma omp simd aligned(pa_x, pa_y, pa_z, pc_x, pc_y, pc_z, ta1_x_x_0_1, ta1_x_y_0_1, ta1_x_z_0_1, ta1_y_x_0_1, ta1_y_y_0_1, ta1_y_z_0_1, ta1_z_x_0_1, ta1_z_y_0_1, ta1_z_z_0_1, ta2_xx_0_0_0, ta2_xx_0_0_1, ta2_xx_x_0_0, ta2_xx_x_0_1, ta2_xx_xx_0_0, ta2_xx_xy_0_0, ta2_xx_xz_0_0, ta2_xx_y_0_0, ta2_xx_y_0_1, ta2_xx_yy_0_0, ta2_xx_yz_0_0, ta2_xx_z_0_0, ta2_xx_z_0_1, ta2_xx_zz_0_0, ta2_xy_0_0_0, ta2_xy_0_0_1, ta2_xy_x_0_0, ta2_xy_x_0_1, ta2_xy_xx_0_0, ta2_xy_xy_0_0, ta2_xy_xz_0_0, ta2_xy_y_0_0, ta2_xy_y_0_1, ta2_xy_yy_0_0, ta2_xy_yz_0_0, ta2_xy_z_0_0, ta2_xy_z_0_1, ta2_xy_zz_0_0, ta2_xz_0_0_0, ta2_xz_0_0_1, ta2_xz_x_0_0, ta2_xz_x_0_1, ta2_xz_xx_0_0, ta2_xz_xy_0_0, ta2_xz_xz_0_0, ta2_xz_y_0_0, ta2_xz_y_0_1, ta2_xz_yy_0_0, ta2_xz_yz_0_0, ta2_xz_z_0_0, ta2_xz_z_0_1, ta2_xz_zz_0_0, ta2_yy_0_0_0, ta2_yy_0_0_1, ta2_yy_x_0_0, ta2_yy_x_0_1, ta2_yy_xx_0_0, ta2_yy_xy_0_0, ta2_yy_xz_0_0, ta2_yy_y_0_0, ta2_yy_y_0_1, ta2_yy_yy_0_0, ta2_yy_yz_0_0, ta2_yy_z_0_0, ta2_yy_z_0_1, ta2_yy_zz_0_0, ta2_yz_0_0_0, ta2_yz_0_0_1, ta2_yz_x_0_0, ta2_yz_x_0_1, ta2_yz_xx_0_0, ta2_yz_xy_0_0, ta2_yz_xz_0_0, ta2_yz_y_0_0, ta2_yz_y_0_1, ta2_yz_yy_0_0, ta2_yz_yz_0_0, ta2_yz_z_0_0, ta2_yz_z_0_1, ta2_yz_zz_0_0, ta2_zz_0_0_0, ta2_zz_0_0_1, ta2_zz_x_0_0, ta2_zz_x_0_1, ta2_zz_xx_0_0, ta2_zz_xy_0_0, ta2_zz_xz_0_0, ta2_zz_y_0_0, ta2_zz_y_0_1, ta2_zz_yy_0_0, ta2_zz_yz_0_0, ta2_zz_z_0_0, ta2_zz_z_0_1, ta2_zz_zz_0_0, b_exps : 64)
+#pragma omp simd aligned(pa_x,              \
+                             pa_y,          \
+                             pa_z,          \
+                             pc_x,          \
+                             pc_y,          \
+                             pc_z,          \
+                             ta1_x_x_0_1,   \
+                             ta1_x_y_0_1,   \
+                             ta1_x_z_0_1,   \
+                             ta1_y_x_0_1,   \
+                             ta1_y_y_0_1,   \
+                             ta1_y_z_0_1,   \
+                             ta1_z_x_0_1,   \
+                             ta1_z_y_0_1,   \
+                             ta1_z_z_0_1,   \
+                             ta2_xx_0_0_0,  \
+                             ta2_xx_0_0_1,  \
+                             ta2_xx_x_0_0,  \
+                             ta2_xx_x_0_1,  \
+                             ta2_xx_xx_0_0, \
+                             ta2_xx_xy_0_0, \
+                             ta2_xx_xz_0_0, \
+                             ta2_xx_y_0_0,  \
+                             ta2_xx_y_0_1,  \
+                             ta2_xx_yy_0_0, \
+                             ta2_xx_yz_0_0, \
+                             ta2_xx_z_0_0,  \
+                             ta2_xx_z_0_1,  \
+                             ta2_xx_zz_0_0, \
+                             ta2_xy_0_0_0,  \
+                             ta2_xy_0_0_1,  \
+                             ta2_xy_x_0_0,  \
+                             ta2_xy_x_0_1,  \
+                             ta2_xy_xx_0_0, \
+                             ta2_xy_xy_0_0, \
+                             ta2_xy_xz_0_0, \
+                             ta2_xy_y_0_0,  \
+                             ta2_xy_y_0_1,  \
+                             ta2_xy_yy_0_0, \
+                             ta2_xy_yz_0_0, \
+                             ta2_xy_z_0_0,  \
+                             ta2_xy_z_0_1,  \
+                             ta2_xy_zz_0_0, \
+                             ta2_xz_0_0_0,  \
+                             ta2_xz_0_0_1,  \
+                             ta2_xz_x_0_0,  \
+                             ta2_xz_x_0_1,  \
+                             ta2_xz_xx_0_0, \
+                             ta2_xz_xy_0_0, \
+                             ta2_xz_xz_0_0, \
+                             ta2_xz_y_0_0,  \
+                             ta2_xz_y_0_1,  \
+                             ta2_xz_yy_0_0, \
+                             ta2_xz_yz_0_0, \
+                             ta2_xz_z_0_0,  \
+                             ta2_xz_z_0_1,  \
+                             ta2_xz_zz_0_0, \
+                             ta2_yy_0_0_0,  \
+                             ta2_yy_0_0_1,  \
+                             ta2_yy_x_0_0,  \
+                             ta2_yy_x_0_1,  \
+                             ta2_yy_xx_0_0, \
+                             ta2_yy_xy_0_0, \
+                             ta2_yy_xz_0_0, \
+                             ta2_yy_y_0_0,  \
+                             ta2_yy_y_0_1,  \
+                             ta2_yy_yy_0_0, \
+                             ta2_yy_yz_0_0, \
+                             ta2_yy_z_0_0,  \
+                             ta2_yy_z_0_1,  \
+                             ta2_yy_zz_0_0, \
+                             ta2_yz_0_0_0,  \
+                             ta2_yz_0_0_1,  \
+                             ta2_yz_x_0_0,  \
+                             ta2_yz_x_0_1,  \
+                             ta2_yz_xx_0_0, \
+                             ta2_yz_xy_0_0, \
+                             ta2_yz_xz_0_0, \
+                             ta2_yz_y_0_0,  \
+                             ta2_yz_y_0_1,  \
+                             ta2_yz_yy_0_0, \
+                             ta2_yz_yz_0_0, \
+                             ta2_yz_z_0_0,  \
+                             ta2_yz_z_0_1,  \
+                             ta2_yz_zz_0_0, \
+                             ta2_zz_0_0_0,  \
+                             ta2_zz_0_0_1,  \
+                             ta2_zz_x_0_0,  \
+                             ta2_zz_x_0_1,  \
+                             ta2_zz_xx_0_0, \
+                             ta2_zz_xy_0_0, \
+                             ta2_zz_xz_0_0, \
+                             ta2_zz_y_0_0,  \
+                             ta2_zz_y_0_1,  \
+                             ta2_zz_yy_0_0, \
+                             ta2_zz_yz_0_0, \
+                             ta2_zz_z_0_0,  \
+                             ta2_zz_z_0_1,  \
+                             ta2_zz_zz_0_0, \
+                             b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
 
-        ta2_xx_xx_0_0[i] = ta2_xx_0_0_0[i] * fe_0 - ta2_xx_0_0_1[i] * fe_0 + 2.0 * ta1_x_x_0_1[i] + ta2_xx_x_0_0[i] * pa_x[i] - ta2_xx_x_0_1[i] * pc_x[i];
+        ta2_xx_xx_0_0[i] =
+            ta2_xx_0_0_0[i] * fe_0 - ta2_xx_0_0_1[i] * fe_0 + 2.0 * ta1_x_x_0_1[i] + ta2_xx_x_0_0[i] * pa_x[i] - ta2_xx_x_0_1[i] * pc_x[i];
 
         ta2_xx_xy_0_0[i] = ta2_xx_x_0_0[i] * pa_y[i] - ta2_xx_x_0_1[i] * pc_y[i];
 
@@ -282,7 +382,8 @@ comp_prim_nuclear_potential_geom_020_ds(CSimdArray<double>& pbuffer,
 
         ta2_yy_xz_0_0[i] = ta2_yy_z_0_0[i] * pa_x[i] - ta2_yy_z_0_1[i] * pc_x[i];
 
-        ta2_yy_yy_0_0[i] = ta2_yy_0_0_0[i] * fe_0 - ta2_yy_0_0_1[i] * fe_0 + 2.0 * ta1_y_y_0_1[i] + ta2_yy_y_0_0[i] * pa_y[i] - ta2_yy_y_0_1[i] * pc_y[i];
+        ta2_yy_yy_0_0[i] =
+            ta2_yy_0_0_0[i] * fe_0 - ta2_yy_0_0_1[i] * fe_0 + 2.0 * ta1_y_y_0_1[i] + ta2_yy_y_0_0[i] * pa_y[i] - ta2_yy_y_0_1[i] * pc_y[i];
 
         ta2_yy_yz_0_0[i] = ta2_yy_y_0_0[i] * pa_z[i] - ta2_yy_y_0_1[i] * pc_z[i];
 
@@ -310,9 +411,9 @@ comp_prim_nuclear_potential_geom_020_ds(CSimdArray<double>& pbuffer,
 
         ta2_zz_yz_0_0[i] = ta2_zz_z_0_0[i] * pa_y[i] - ta2_zz_z_0_1[i] * pc_y[i];
 
-        ta2_zz_zz_0_0[i] = ta2_zz_0_0_0[i] * fe_0 - ta2_zz_0_0_1[i] * fe_0 + 2.0 * ta1_z_z_0_1[i] + ta2_zz_z_0_0[i] * pa_z[i] - ta2_zz_z_0_1[i] * pc_z[i];
+        ta2_zz_zz_0_0[i] =
+            ta2_zz_0_0_0[i] * fe_0 - ta2_zz_0_0_1[i] * fe_0 + 2.0 * ta1_z_z_0_1[i] + ta2_zz_z_0_0[i] * pa_z[i] - ta2_zz_z_0_1[i] * pc_z[i];
     }
 }
 
-} // npotrec namespace
-
+}  // namespace npotrec

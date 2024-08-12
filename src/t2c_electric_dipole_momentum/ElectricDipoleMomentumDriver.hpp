@@ -49,7 +49,7 @@ class CElectricDipoleMomentumDriver
     /// @param molecule The molecule.
     /// @param origin The origin of electric dipole momentum.
     /// @return The electric dipole momentum matrix.
-    auto compute(const CMolecularBasis &basis, const CMolecule &molecule, const TPoint<double>& origin) const -> CMatrices;
+    auto compute(const CMolecularBasis &basis, const CMolecule &molecule, const TPoint<double> &origin) const -> CMatrices;
 };
 
 #endif /* ElectricDipoleMomentumDriver_hpp */
