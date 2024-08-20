@@ -30,7 +30,18 @@ vpath %.hpp $(VLX_INCLUDES)
 CXXFLAGS += $(MATH_INC)
 
 # Add list of internal libraries
-VLX_LIBS_DIR := ${shell find * -not -path pymodule -type d -print}
+VLX_LIBS_DIR := general
+VLX_LIBS_DIR += math
+VLX_LIBS_DIR += moldata
+VLX_LIBS_DIR += orbdata
+VLX_LIBS_DIR += python
+VLX_LIBS_DIR += t2c_func
+VLX_LIBS_DIR += t2c_geometrical_derivatives
+VLX_LIBS_DIR += t2c_overlap
+VLX_LIBS_DIR += t2c_kinetic_energy
+VLX_LIBS_DIR += t2c_nuclear_potential
+VLX_LIBS_DIR += t2c_electric_dipole_momentum
+VLX_LIBS_DIR += t2c_nuclear_potential_geom_0X0
 
 # Generate all internal libraries related files
 VLX_LIBS = $(foreach d,$(VLX_LIBS_DIR),$(addsuffix .a,$(addprefix $d/,$d)))
