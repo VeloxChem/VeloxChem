@@ -20,8 +20,7 @@ auto make_gto_blocks(const CMolecularBasis &basis, const CMolecule &molecule) ->
 /// @param molecule The molecule.
 /// @param atoms The vector of atoms to select.
 /// @return The vector of basis functions blocks.
-auto make_gto_blocks(const CMolecularBasis &basis, const CMolecule &molecule, const std::vector<int> &atoms)
-    -> std::vector<CGtoBlock>;
+auto make_gto_blocks(const CMolecularBasis &basis, const CMolecule &molecule, const std::vector<int> &atoms) -> std::vector<CGtoBlock>;
 
 }  // namespace gtofunc
 

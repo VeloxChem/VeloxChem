@@ -1,4 +1,5 @@
 VeloxChem.xcodeproj
+VeloxChemLib.xcodeproj
 bin
 build*
 *.d

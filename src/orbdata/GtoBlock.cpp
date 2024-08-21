@@ -47,10 +47,7 @@ CGtoBlock::CGtoBlock(const std::vector<TPoint<double>> &coordinates,
 {
 }
 
-CGtoBlock::CGtoBlock(const CMolecularBasis &basis,
-                     const CMolecule       &molecule,
-                     const int              angular_momentum,
-                     const int              npgtos)
+CGtoBlock::CGtoBlock(const CMolecularBasis &basis, const CMolecule &molecule, const int angular_momentum, const int npgtos)
 
     : _coordinates{}
 
@@ -255,15 +252,12 @@ CGtoBlock::operator==(const CGtoBlock &other) const -> bool
     {
         return false;
     }
-    else if (!std::ranges::equal(_norms, other._norms, [](auto lhs, auto rhs) -> bool {
-                 return mathfunc::equal(lhs, rhs, 1.0e-12, 1.0e-12);
-             }))
+    else if (!std::ranges::equal(_norms, other._norms, [](auto lhs, auto rhs) -> bool { return mathfunc::equal(lhs, rhs, 1.0e-12, 1.0e-12); }))
     {
         return false;
     }
-    else if (!std::ranges::equal(_exponents, other._exponents, [](auto lhs, auto rhs) -> bool {
-                 return mathfunc::equal(lhs, rhs, 1.0e-12, 1.0e-12);
-             }))
+    else if (!std::ranges::equal(
+                 _exponents, other._exponents, [](auto lhs, auto rhs) -> bool { return mathfunc::equal(lhs, rhs, 1.0e-12, 1.0e-12); }))
     {
         return false;
     }
