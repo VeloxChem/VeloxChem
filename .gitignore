@@ -19,7 +19,6 @@ build*
 dummy.*
 .vscode
 *.DS_Store
-Makefile.setup
 /.ccls-cache/
 .DS_Store
 
