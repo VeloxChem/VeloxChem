@@ -18,9 +18,7 @@ CBasisFunction::CBasisFunction()
 {
 }
 
-CBasisFunction::CBasisFunction(const std::vector<double> &exponents,
-                               const std::vector<double> &norms,
-                               const int                  angular_momentum)
+CBasisFunction::CBasisFunction(const std::vector<double> &exponents, const std::vector<double> &norms, const int angular_momentum)
 
     : _exponents(exponents)
 
@@ -86,17 +84,14 @@ CBasisFunction::operator==(const CBasisFunction &other) const -> bool
     {
         return false;
     }
-    else if (!std::ranges::equal(_exponents, other._exponents, [](auto lhs, auto rhs) -> bool {
-                 return mathfunc::equal(lhs, rhs, 1.0e-12, 1.0e-12);
-             }))
+    else if (!std::ranges::equal(
+                 _exponents, other._exponents, [](auto lhs, auto rhs) -> bool { return mathfunc::equal(lhs, rhs, 1.0e-12, 1.0e-12); }))
     {
         return false;
     }
     else
     {
-        return std::ranges::equal(_norms, other._norms, [](auto lhs, auto rhs) -> bool {
-            return mathfunc::equal(lhs, rhs, 1.0e-12, 1.0e-12);
-        });
+        return std::ranges::equal(_norms, other._norms, [](auto lhs, auto rhs) -> bool { return mathfunc::equal(lhs, rhs, 1.0e-12, 1.0e-12); });
     }
 }
 
@@ -180,20 +175,17 @@ CBasisFunction::_rescale() -> void
 {
     constexpr auto fpi = 2.0 / mathconst::pi_value();
 
-    std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
-                          [&](const auto i) { _norms[i] *= std::pow(_exponents[i] * fpi, 0.75); });
+    std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()), [&](const auto i) { _norms[i] *= std::pow(_exponents[i] * fpi, 0.75); });
 
     if (_angular_momentum == 1)
     {
-        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
-                              [&](const auto i) { _norms[i] *= 2.0 * std::sqrt(_exponents[i]); });
+        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()), [&](const auto i) { _norms[i] *= 2.0 * std::sqrt(_exponents[i]); });
     }
     else if (_angular_momentum == 2)
     {
         const double fact = 2.0 / std::sqrt(3.0);
 
-        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
-                              [&](const auto i) { _norms[i] *= fact * _exponents[i]; });
+        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()), [&](const auto i) { _norms[i] *= fact * _exponents[i]; });
     }
     else if (_angular_momentum == 3)
     {
@@ -213,9 +205,8 @@ CBasisFunction::_rescale() -> void
     {
         const double fact = 4.0 / std::sqrt(945.0);
 
-        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()), [&](const auto i) {
-            _norms[i] *= fact * _exponents[i] * _exponents[i] * std::sqrt(_exponents[i]);
-        });
+        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
+                              [&](const auto i) { _norms[i] *= fact * _exponents[i] * _exponents[i] * std::sqrt(_exponents[i]); });
     }
     else if (_angular_momentum == 6)
     {

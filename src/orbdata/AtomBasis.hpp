@@ -20,10 +20,7 @@ class CAtomBasis
     /// @param name The name of atom basis.
     /// @param ecp_label The label of ECP in atom basis.
     /// @param identifier The chemical element identifier.
-    CAtomBasis(const std::vector<CBasisFunction> &functions,
-               const std::string                 &name,
-               const std::string                 &ecp_label,
-               const int                          identifier);
+    CAtomBasis(const std::vector<CBasisFunction> &functions, const std::string &name, const std::string &ecp_label, const int identifier);
 
     /// @brief The default copy constructor.
     /// @param other The atom basis to be copied.

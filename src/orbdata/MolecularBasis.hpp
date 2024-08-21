@@ -113,8 +113,7 @@ class CMolecularBasis
     /// @param atoms The vector of selected atoms.
     /// @param angular_momentum The angular momentum of basis functions.
     /// @return The vector of basis functions.
-    auto basis_functions(const std::vector<int> &atoms, const int angular_momentum) const
-        -> std::vector<CBasisFunction>;
+    auto basis_functions(const std::vector<int> &atoms, const int angular_momentum) const -> std::vector<CBasisFunction>;
 
     /// @brief Gets vector of basis functions with specific angular momentum and
     /// number of primitives in molecular basis for specific atoms.
@@ -122,8 +121,7 @@ class CMolecularBasis
     /// @param angular_momentum The angular momentum of basis functions.
     /// @param npgtos The number of primitive basis functions in basis function.
     /// @return The vector of basis functions.
-    auto basis_functions(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const
-        -> std::vector<CBasisFunction>;
+    auto basis_functions(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const -> std::vector<CBasisFunction>;
 
     /// @brief Gets vector of atomic indices.
     /// @return The vector of atomic indices.
@@ -160,8 +158,7 @@ class CMolecularBasis
     /// @param angular_momentum The angular momentum of basis functions.
     /// @param npgtos The number of primitive basis functions in basis function.
     /// @return The vector of atomic indices.
-    auto atomic_indices(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const
-        -> std::vector<int>;
+    auto atomic_indices(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const -> std::vector<int>;
 
     /// @brief Determines number of basis functions with specific angular
     /// momentum in molecular basis.
@@ -189,8 +186,7 @@ class CMolecularBasis
     /// @param angular_momentum The angular momentum of basis functions.
     /// @param npgtos The number of primitive basis functions in basis function.
     /// @return The number of basis functions.
-    auto number_of_basis_functions(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const
-        -> size_t;
+    auto number_of_basis_functions(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const -> size_t;
 
     /// @brief Determines number of primitive basis functions with specific
     /// angular momentum in molecular basis.
@@ -246,8 +242,7 @@ class CMolecularBasis
     /// @param angular_momentum The angular momentum of basis functions.
     /// @param npgtos The number of primitive basis functions in basis function.
     /// @return The vector of basis function indices.
-    auto index_map(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const
-        -> std::vector<size_t>;
+    auto index_map(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const -> std::vector<size_t>;
 
     /// @brief Gets main atom basis label in molecular basis.
     /// @return The main atom basis label.

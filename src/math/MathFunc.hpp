@@ -23,6 +23,17 @@ equal(const T flhs, const T frhs, const T rtol, const T atol) -> bool
     return std::fabs(flhs - frhs) < std::max(atol, rtol * std::max(std::fabs(flhs), std::fabs(frhs)));
 }
 
+/// @brief Gets upper triangular matrix linearized index (column wise scheme).
+/// @param i The index of row in matrix.
+/// @param j The index of collumn in matrix.
+/// @return The linearized index.
+template<Integral T>
+inline auto
+uplo_index(const T i, const T j) -> T
+{
+    return i + j * (j + 1) / 2;
+}
+
 }  // namespace mathfunc
 
 #endif /* MathFunc_hpp */

@@ -19,10 +19,7 @@ CAtomBasis::CAtomBasis()
 {
 }
 
-CAtomBasis::CAtomBasis(const std::vector<CBasisFunction> &functions,
-                       const std::string                 &name,
-                       const std::string                 &ecp_label,
-                       const int                          identifier)
+CAtomBasis::CAtomBasis(const std::vector<CBasisFunction> &functions, const std::string &name, const std::string &ecp_label, const int identifier)
 
     : _functions(functions)
 
@@ -171,9 +168,7 @@ CAtomBasis::basis_functions(const int angular_momentum) const -> std::vector<CBa
 
     bfs.reserve(_functions.size());
 
-    std::ranges::copy_if(_functions, std::back_inserter(bfs), [=](const auto &bf) {
-        return bf.get_angular_momentum() == angular_momentum;
-    });
+    std::ranges::copy_if(_functions, std::back_inserter(bfs), [=](const auto &bf) { return bf.get_angular_momentum() == angular_momentum; });
 
     return bfs;
 }
@@ -219,9 +214,8 @@ CAtomBasis::need_ecp() const -> bool
 auto
 CAtomBasis::max_angular_momentum() const -> int
 {
-    auto pos = std::ranges::max_element(_functions, [&](const auto &lbf, const auto &rbf) {
-        return lbf.get_angular_momentum() < rbf.get_angular_momentum();
-    });
+    auto pos = std::ranges::max_element(_functions,
+                                        [&](const auto &lbf, const auto &rbf) { return lbf.get_angular_momentum() < rbf.get_angular_momentum(); });
 
     return (pos == _functions.end()) ? -1 : pos->get_angular_momentum();
 }
@@ -229,8 +223,7 @@ CAtomBasis::max_angular_momentum() const -> int
 auto
 CAtomBasis::number_of_basis_functions(const int angular_momentum) const -> size_t
 {
-    return std::ranges::count_if(
-        _functions, [=](const auto &bf) { return bf.get_angular_momentum() == angular_momentum; });
+    return std::ranges::count_if(_functions, [=](const auto &bf) { return bf.get_angular_momentum() == angular_momentum; });
 }
 
 auto

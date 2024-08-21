@@ -84,9 +84,8 @@ CMolecularBasis::operator!=(const CMolecularBasis &other) const -> bool
 auto
 CMolecularBasis::add(const CAtomBasis &basis) -> void
 {
-    auto pos = std::ranges::find_if(_basis_sets, [&](const auto &abas) {
-        return (abas.get_name() == basis.get_name()) && (abas.get_identifier() == basis.get_identifier());
-    });
+    auto pos = std::ranges::find_if(
+        _basis_sets, [&](const auto &abas) { return (abas.get_name() == basis.get_name()) && (abas.get_identifier() == basis.get_identifier()); });
 
     if (pos == _basis_sets.end())
     {
@@ -107,8 +106,7 @@ CMolecularBasis::reduce_to_valence_basis() const -> CMolecularBasis
 
     rbasis_sets.reserve(_basis_sets.size());
 
-    std::ranges::transform(
-        _basis_sets, std::back_inserter(rbasis_sets), [](const auto &abas) { return abas.reduce_to_valence_basis(); });
+    std::ranges::transform(_basis_sets, std::back_inserter(rbasis_sets), [](const auto &abas) { return abas.reduce_to_valence_basis(); });
 
     return CMolecularBasis(rbasis_sets, _indices);
 }
@@ -138,9 +136,8 @@ CMolecularBasis::basis_sets_indices() const -> std::vector<int>
 auto
 CMolecularBasis::max_angular_momentum() const -> int
 {
-    auto pos = std::ranges::max_element(_basis_sets, [&](const auto &lbas, const auto &rbas) {
-        return lbas.max_angular_momentum() < rbas.max_angular_momentum();
-    });
+    auto pos = std::ranges::max_element(
+        _basis_sets, [&](const auto &lbas, const auto &rbas) { return lbas.max_angular_momentum() < rbas.max_angular_momentum(); });
 
     return (pos == _basis_sets.end()) ? -1 : pos->max_angular_momentum();
 }
@@ -208,8 +205,7 @@ CMolecularBasis::basis_functions(const std::vector<int> &atoms) const -> std::ve
 }
 
 auto
-CMolecularBasis::basis_functions(const std::vector<int> &atoms, const int angular_momentum) const
-    -> std::vector<CBasisFunction>
+CMolecularBasis::basis_functions(const std::vector<int> &atoms, const int angular_momentum) const -> std::vector<CBasisFunction>
 {
     std::vector<CBasisFunction> bfs;
 
@@ -222,8 +218,7 @@ CMolecularBasis::basis_functions(const std::vector<int> &atoms, const int angula
 }
 
 auto
-CMolecularBasis::basis_functions(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const
-    -> std::vector<CBasisFunction>
+CMolecularBasis::basis_functions(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const -> std::vector<CBasisFunction>
 {
     std::vector<CBasisFunction> bfs;
 
@@ -306,8 +301,7 @@ CMolecularBasis::atomic_indices(const std::vector<int> &atoms, const int angular
 }
 
 auto
-CMolecularBasis::atomic_indices(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const
-    -> std::vector<int>
+CMolecularBasis::atomic_indices(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const -> std::vector<int>
 {
     std::vector<int> atom_indices;
 
@@ -345,9 +339,7 @@ CMolecularBasis::number_of_basis_functions(const std::vector<int> &atoms, const 
 }
 
 auto
-CMolecularBasis::number_of_basis_functions(const std::vector<int> &atoms,
-                                           const int               angular_momentum,
-                                           const size_t               npgtos) const -> size_t
+CMolecularBasis::number_of_basis_functions(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const -> size_t
 {
     return std::accumulate(atoms.begin(), atoms.end(), size_t{0}, [&](const size_t &sum, const int &i) {
         return sum + _basis_sets[_indices.at(i)].number_of_basis_functions(angular_momentum, npgtos);
@@ -407,9 +399,8 @@ CMolecularBasis::dimensions_of_basis(const int angular_momentum) const -> size_t
 {
     size_t naos = 0;
 
-    std::ranges::for_each(std::views::iota(0, angular_momentum), [&](const int i) {
-        naos += number_of_basis_functions(i) * tensor::number_of_spherical_components(std::array<int, 1>{i});
-    });
+    std::ranges::for_each(std::views::iota(0, angular_momentum),
+                          [&](const int i) { naos += number_of_basis_functions(i) * tensor::number_of_spherical_components(std::array<int, 1>{i}); });
 
     return naos;
 }
@@ -440,16 +431,13 @@ CMolecularBasis::index_map(const int angular_momentum, const size_t npgtos) cons
         offset++;
     };
 
-    std::ranges::for_each(_indices, [&](const int i) {
-        std::ranges::for_each(_basis_sets[i].basis_functions(angular_momentum), bf_index);
-    });
+    std::ranges::for_each(_indices, [&](const int i) { std::ranges::for_each(_basis_sets[i].basis_functions(angular_momentum), bf_index); });
 
     return ao_indices;
 }
 
 auto
-CMolecularBasis::index_map(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const
-    -> std::vector<size_t>
+CMolecularBasis::index_map(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const -> std::vector<size_t>
 {
     std::vector<size_t> ao_indices;
 
@@ -480,8 +468,7 @@ CMolecularBasis::main_basis_label() const -> std::string
 {
     auto mlabels = _labels_frequency_map();
 
-    auto pos =
-        std::ranges::max_element(mlabels, [&](const auto &lhs, const auto rhs) { return lhs.second < rhs.second; });
+    auto pos = std::ranges::max_element(mlabels, [&](const auto &lhs, const auto rhs) { return lhs.second < rhs.second; });
 
     return (pos == mlabels.end()) ? std::string() : pos->first;
 }

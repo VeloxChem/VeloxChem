@@ -45,11 +45,7 @@ class CGtoBlock
     /// @param atoms The vector of atoms to select.
     /// @param angular_momentum The angular momentum of basis functions.
     /// @param npgtos The number of primitive basis functions in basis function.
-    CGtoBlock(const CMolecularBasis  &basis,
-              const CMolecule        &molecule,
-              const std::vector<int> &atoms,
-              const int               angular_momentum,
-              const int               npgtos);
+    CGtoBlock(const CMolecularBasis &basis, const CMolecule &molecule, const std::vector<int> &atoms, const int angular_momentum, const int npgtos);
 
     /// @brief The default copy constructor.
     /// @param other The basis functions block to be copied.
