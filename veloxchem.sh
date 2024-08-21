@@ -1,1 +1,1 @@
-export PYTHONPATH=/Users/rinkevic/VeloxChemProject/VeloxChem/build/python
+export PYTHONPATH=/Users/rinkevic/Development/VeloxChem/build/python

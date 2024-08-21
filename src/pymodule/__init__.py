@@ -8,8 +8,19 @@ from .veloxchemlib import KineticEnergyDriver
 from .veloxchemlib import NuclearPotentialDriver
 from .veloxchemlib import NuclearPotentialErfDriver
 from .veloxchemlib import ElectricDipoleMomentumDriver
+from .veloxchemlib import OverlapGeom100Driver
+from .veloxchemlib import OverlapGeom200Driver
+from .veloxchemlib import OverlapGeom101Driver
+from .veloxchemlib import KineticEnergyGeom100Driver
+from .veloxchemlib import KineticEnergyGeom200Driver
+from .veloxchemlib import KineticEnergyGeom101Driver
 from .veloxchemlib import NuclearPotentialGeom010Driver
 from .veloxchemlib import NuclearPotentialGeom020Driver
+from .veloxchemlib import NuclearPotentialGeom100Driver
+from .veloxchemlib import NuclearPotentialGeom200Driver
+from .veloxchemlib import NuclearPotentialGeom110Driver
+from .veloxchemlib import NuclearPotentialGeom101Driver
+from .veloxchemlib import ElectricDipoleMomentumGeom100Driver
 
 # C++ functions
 from .veloxchemlib import upper_case

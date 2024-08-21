@@ -140,11 +140,13 @@ class CSimdArray
         const auto nelems = _rows * _columns * simd::width<T>();
 
         const auto fact = T{0.0};
+        
+        auto ptr_data = _data;
 
-#pragma omp simd aligned(_data : 64)
+#pragma omp simd aligned(ptr_data : 64)
         for (size_t i = 0; i < nelems; i++)
         {
-            _data[i] = fact;
+            ptr_data[i] = fact;
         }
     }
 
