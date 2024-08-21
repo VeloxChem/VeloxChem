@@ -1,0 +1,13 @@
+if(CMAKE_CXX_COMPILER_ID MATCHES Clang)
+  if(WIN32) # clang-cl
+    set(VLX_CXX_FLAGS "/W3 /EHsc /bigobj")
+    set(CMAKE_CXX_FLAGS_RELEASE "/O2")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "/O2")
+    set(CMAKE_CXX_FLAGS_DEBUG "/Od /W4")
+  else()
+    set(VLX_CXX_FLAGS "-Wall -Wno-padded -Wno-unknown-pragmas -Woverloaded-virtual -Wwrite-strings -fcolor-diagnostics -Wno-c++98-compat")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g3 -DDEBUG -glldb -fno-limit-debug-info")
+    set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -DDEBUG -glldb -fno-limit-debug-info -Weffc++ -Wdeprecated -Wdocumentation")
+  endif()
+endif()

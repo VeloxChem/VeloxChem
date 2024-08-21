@@ -1,0 +1,43 @@
+target_sources(vlxobjs
+  PRIVATE
+    GeometricalDerivatives1X0ForDY.cpp
+    GeometricalDerivatives1X0ForFY.cpp
+    GeometricalDerivatives1X0ForGY.cpp
+    GeometricalDerivatives1X0ForPY.cpp
+    GeometricalDerivatives1X0ForSY.cpp
+    GeometricalDerivatives1X1ForDD.cpp
+    GeometricalDerivatives1X1ForDF.cpp
+    GeometricalDerivatives1X1ForDG.cpp
+    GeometricalDerivatives1X1ForDP.cpp
+    GeometricalDerivatives1X1ForDS.cpp
+    GeometricalDerivatives1X1ForFD.cpp
+    GeometricalDerivatives1X1ForFF.cpp
+    GeometricalDerivatives1X1ForFG.cpp
+    GeometricalDerivatives1X1ForFP.cpp
+    GeometricalDerivatives1X1ForFS.cpp
+    GeometricalDerivatives1X1ForGD.cpp
+    GeometricalDerivatives1X1ForGF.cpp
+    GeometricalDerivatives1X1ForGG.cpp
+    GeometricalDerivatives1X1ForGP.cpp
+    GeometricalDerivatives1X1ForGS.cpp
+    GeometricalDerivatives1X1ForPD.cpp
+    GeometricalDerivatives1X1ForPF.cpp
+    GeometricalDerivatives1X1ForPG.cpp
+    GeometricalDerivatives1X1ForPP.cpp
+    GeometricalDerivatives1X1ForPS.cpp
+    GeometricalDerivatives1X1ForSD.cpp
+    GeometricalDerivatives1X1ForSF.cpp
+    GeometricalDerivatives1X1ForSG.cpp
+    GeometricalDerivatives1X1ForSP.cpp
+    GeometricalDerivatives1X1ForSS.cpp
+    GeometricalDerivatives2X0ForDY.cpp
+    GeometricalDerivatives2X0ForFY.cpp
+    GeometricalDerivatives2X0ForGY.cpp
+    GeometricalDerivatives2X0ForPY.cpp
+    GeometricalDerivatives2X0ForSY.cpp
+  )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )
