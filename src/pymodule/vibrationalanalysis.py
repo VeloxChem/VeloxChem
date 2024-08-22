@@ -87,9 +87,10 @@ class VibrationalAnalysis:
         - elec_energy: The (total) electronic energy.
         - temperature: The temperature (in K) used for thermodynamic analysis.
         - pressure: The pressure (in bar) used for thermodynamic analysis.
+        - do_ir: Calculate IR intensities
         - do_raman: Calculate Raman activity
         - do_resonance_raman: Calculate resonance Raman activity
-        - do_ir: Calculate IR intensities
+        - rr_damping: Damping factor for complex polarizability gradient (resonance Raman)
         - is_scf: Whether the reference state is SCF
         - is_xtb: Whether the reference state is XTB
         - filename: The filename.
@@ -159,6 +160,7 @@ class VibrationalAnalysis:
         self.do_ir = True
         self.do_raman = False
         self.do_resonance_raman = False
+        self.rr_damping = None
         self.frequencies = (0,)
 
         # flag for printing
@@ -180,6 +182,7 @@ class VibrationalAnalysis:
                 'do_ir': ('bool', 'whether to calculate IR intensities'),
                 'do_raman': ('bool', 'whether to calculate Raman activity'),
                 'do_resonance_raman': ('bool', 'whether to calculate resonance Raman activity'),
+                'rr_damping': ('float', 'the damping factor in CPP for resonance Raman'),
                 'do_print_hessian': ('bool', 'whether to print the Hessian'),
                 'do_print_polgrad': ('bool', 'whether to print the pol. gradient'),
                 'print_depolarization_ratio': ('bool', 'whether to print Raman depolarization ratio'),
@@ -499,6 +502,8 @@ class VibrationalAnalysis:
         polgrad_drv = PolarizabilityGradient(self.comm, self.ostream)
         if 'frequencies' not in self.polgrad_dict:
             polgrad_drv.frequencies = self.frequencies
+        if self.rr_damping is not None:
+            polgrad_drv.damping = self.rr_damping
         polgrad_drv.update_settings(self.polgrad_dict,
                                     orbrsp_dict = self.cphf_dict,
                                     method_dict = self.method_dict, 
