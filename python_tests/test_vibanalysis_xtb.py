@@ -11,10 +11,10 @@ from veloxchem.vibrationalanalysis import VibrationalAnalysis
 from .addons import using_xtb
 
 
-class TestXtbHessianDriver:
+class TestXtbVibrationalAnalysisDriver:
 
     @using_xtb
-    def test_xtb_hessian_driver(self):
+    def test_xtb_vibrational_analysis_driver(self):
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water_hessian_xtb.inp')
