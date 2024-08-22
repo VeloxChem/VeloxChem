@@ -9,13 +9,14 @@ from veloxchem.scfhessiandriver import ScfHessianDriver
 from veloxchem.vibrationalanalysis import VibrationalAnalysis
 
 
-class TestScfHessianDriver:
+class TestScfVibrationalAnalysisDriver:
 
-    def test_scf_hessian_driver(self):
+    def test_scf_vibrational_analysis_driver(self):
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water_hessian_scf.inp')
-        h5file = str(here / 'inputs' / 'water_hessian_scf.h5')
+        #h5file = str(here / 'inputs' / 'water_hessian_scf.h5')
+        h5file = str(here / 'inputs' / 'water_vib_scf.h5')
 
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
@@ -56,3 +57,46 @@ class TestScfHessianDriver:
             assert rel_diff_raman < 1.0e-3
 
         task.finish()
+
+    def test_scf_resonance_raman(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'water_hessian_scf.inp')
+        #h5file = str(here / 'inputs' / 'water_hessian_scf.h5')
+        h5file = str(here / 'inputs' / 'water_vib_scf.h5')
+
+        task = MpiTask([inpfile, None])
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        vib_settings = {'do_ir': 'no', 'do_resonance_raman': 'yes', 'numerical_hessian':'yes',
+                        'numerical_raman': 'yes', 'frequencies': (0.0, 0.4), 'rr_damping': 0.05}
+        method_settings = {}
+        scf_hessian_drv = ScfHessianDriver(scf_drv)
+        vibanalysis_drv = VibrationalAnalysis(scf_hessian_drv)
+        vibanalysis_drv.update_settings(method_settings, vib_settings)
+        vibanalysis_drv.ostream.mute()
+        vibanalysis_drv.compute(task.molecule, task.ao_basis)
+
+        if is_mpi_master(task.mpi_comm):
+
+            hf = h5py.File(h5file)
+            ref_frequencies = np.array(hf.get('frequencies'))
+            hf_rr = hf['resonance_raman']
+            ref_raman_intensities = np.array([hf_rr.get('0.0'), hf_rr.get('0.4')])
+            hf.close()
+
+            rel_diff_freq = np.max(
+                np.abs(vibanalysis_drv.vib_frequencies / ref_frequencies - 1.0))
+            rel_diff_raman_static = np.max(
+                np.abs(vibanalysis_drv.raman_intensities[0.0] /
+                       ref_raman_intensities[0] - 1.0))
+            rel_diff_raman_dyn = np.max(
+                np.abs(vibanalysis_drv.raman_intensities[0.4] /
+                       ref_raman_intensities[1] - 1.0))
+
+            assert rel_diff_freq < 1.0e-3
+            assert rel_diff_raman_static < 1.0e-3
+            assert rel_diff_raman_dyn < 1.0e-3
+
