@@ -46,4 +46,4 @@ jobs:
           CC=icx MPICC="mpiicc -cc=icx" python -m pip install mpi4py --no-binary=mpi4py
           echo "=== CMake ==="
           cmake -S.  -Bbuild -GNinja -DCMAKE_CXX_COMPILER=mpiicpc -DCMAKE_CXX_FLAGS="-cxx=icpx" -DVLX_LA_VENDOR=MKL
-          cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib -- -v -d stats
+          cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib -- -d stats
