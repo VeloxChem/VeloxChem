@@ -9,6 +9,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        shell: bash -l {0}
+
     container:
       image: ghcr.io/veloxchem/meta-vlx/vlx-ci_intel:sha-c8613aa
 
@@ -29,7 +33,7 @@ jobs:
           ulimit -s unlimited
           lscpu | egrep 'Thread|Core|Socket|^CPU\('
           echo "=== Intel OneAPI ==="
-          . /opt/intel/oneapi/setvars.sh intel64
+          source /opt/intel/oneapi/setvars.sh
           mpiicc -cc=icx --version
           mpiicpc -cxx=icpx --version
           echo "=== Python ==="
@@ -37,7 +41,7 @@ jobs:
           python -V
           echo "=== Python venv ==="
           python -m venv --clear venv
-          . venv/bin/activate
+          source venv/bin/activate
           which python
           python -V
           echo "=== Python dependencies ==="
