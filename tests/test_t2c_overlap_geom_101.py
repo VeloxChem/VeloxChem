@@ -16,7 +16,7 @@ class TestOverlapGeom101Driver:
             O   0.300   1.400  -2.100
         """
         mol = Molecule.read_str(costr, 'au')
-        bas = MolecularBasis.read(mol, 'STO-3G')
+        bas = MolecularBasis.read(mol, 'def2-QZVP')
 
         return mol, bas
 
@@ -30,14 +30,12 @@ class TestOverlapGeom101Driver:
         
         # load reference overlap hessian for C,C atom
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'co.sto3g.overlap.geom.101.cc.npy')
+        npyfile = str(here / 'data' / 'co.qzvp.overlap.geom.101.cc.npy')
         ref_mat = np.load(npyfile)
         
         # dimension of molecular basis
-        indexes = np.triu_indices(2)
-        basdims = [0, 4, 10]
-        #indexes = np.triu_indices(5)
-        #basdims = [0, 14, 38, 68, 96, 114]
+        indexes = np.triu_indices(5)
+        basdims = [0, 14, 38, 68, 96, 114]
         
         # indices map
         labels = ['X_X', 'X_Y', 'X_Z',
@@ -46,23 +44,24 @@ class TestOverlapGeom101Driver:
         
         for k, label in enumerate(labels):
             fmat = hess_mats.matrix(label)
-            for i, j in zip(indexes[0], indexes[1]):
-                # bra side
-                sbra = basdims[i]
-                ebra = basdims[i + 1]
-                # ket side
-                sket = basdims[j]
-                eket = basdims[j + 1]
-                # load computed submatrix
-                cmat = fmat.submatrix((i, j))
-                # load reference submatrix
-                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-                rmat.set_values(
-                    np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
-                # compare submatrices
-                assert cmat == rmat
+            for i in range(0, 5):
+                for j in range(0, 5):
+                    # bra side
+                    sbra = basdims[i]
+                    ebra = basdims[i + 1]
+                    # ket side
+                    sket = basdims[j]
+                    eket = basdims[j + 1]
+                    # load computed submatrix
+                    cmat = fmat.submatrix((i, j))
+                    # load reference submatrix
+                    rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                    rmat.set_values(
+                        np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
+                    # compare submatrices
+                    assert cmat == rmat
             smat = fmat.full_matrix()
-            fref = SubMatrix([0, 0, 10, 10])
+            fref = SubMatrix([0, 0, 114, 114])
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
             assert smat == fref
         
@@ -76,14 +75,12 @@ class TestOverlapGeom101Driver:
         
         # load reference overlap hessian for C,O atom
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'co.sto3g.overlap.geom.101.co.npy')
+        npyfile = str(here / 'data' / 'co.qzvp.overlap.geom.101.co.npy')
         ref_mat = np.load(npyfile)
         
         # dimension of molecular basis
-        indexes = np.triu_indices(2)
-        basdims = [0, 4, 10]
-        #indexes = np.triu_indices(5)
-        #basdims = [0, 14, 38, 68, 96, 114]
+        indexes = np.triu_indices(5)
+        basdims = [0, 14, 38, 68, 96, 114]
         
         # indices map
         labels = ['X_X', 'X_Y', 'X_Z',
@@ -92,23 +89,24 @@ class TestOverlapGeom101Driver:
         
         for k, label in enumerate(labels):
             fmat = hess_mats.matrix(label)
-            for i, j in zip(indexes[0], indexes[1]):
-                # bra side
-                sbra = basdims[i]
-                ebra = basdims[i + 1]
-                # ket side
-                sket = basdims[j]
-                eket = basdims[j + 1]
-                # load computed submatrix
-                cmat = fmat.submatrix((i, j))
-                # load reference submatrix
-                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-                rmat.set_values(
-                    np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
-                # compare submatrices
-                assert cmat == rmat
+            for i in range(0, 5):
+                for j in range(0, 5):
+                    # bra side
+                    sbra = basdims[i]
+                    ebra = basdims[i + 1]
+                    # ket side
+                    sket = basdims[j]
+                    eket = basdims[j + 1]
+                    # load computed submatrix
+                    cmat = fmat.submatrix((i, j))
+                    # load reference submatrix
+                    rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                    rmat.set_values(
+                        np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
+                    # compare submatrices
+                    assert cmat == rmat
             smat = fmat.full_matrix()
-            fref = SubMatrix([0, 0, 10, 10])
+            fref = SubMatrix([0, 0, 114, 114])
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
             assert smat == fref
         
@@ -122,14 +120,12 @@ class TestOverlapGeom101Driver:
         
         # load reference overlap hessian for O, C atom
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'co.sto3g.overlap.geom.101.oc.npy')
+        npyfile = str(here / 'data' / 'co.qzvp.overlap.geom.101.oc.npy')
         ref_mat = np.load(npyfile)
         
         # dimension of molecular basis
-        indexes = np.triu_indices(2)
-        basdims = [0, 4, 10]
-        #indexes = np.triu_indices(5)
-        #basdims = [0, 14, 38, 68, 96, 114]
+        indexes = np.triu_indices(5)
+        basdims = [0, 14, 38, 68, 96, 114]
         
         # indices map
         labels = ['X_X', 'X_Y', 'X_Z',
@@ -138,23 +134,24 @@ class TestOverlapGeom101Driver:
         
         for k, label in enumerate(labels):
             fmat = hess_mats.matrix(label)
-            for i, j in zip(indexes[0], indexes[1]):
-                # bra side
-                sbra = basdims[i]
-                ebra = basdims[i + 1]
-                # ket side
-                sket = basdims[j]
-                eket = basdims[j + 1]
-                # load computed submatrix
-                cmat = fmat.submatrix((i, j))
-                # load reference submatrix
-                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-                rmat.set_values(
-                    np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
-                # compare submatrices
-                assert cmat == rmat
+            for i in range(0, 5):
+                for j in range(0, 5):
+                    # bra side
+                    sbra = basdims[i]
+                    ebra = basdims[i + 1]
+                    # ket side
+                    sket = basdims[j]
+                    eket = basdims[j + 1]
+                    # load computed submatrix
+                    cmat = fmat.submatrix((i, j))
+                    # load reference submatrix
+                    rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                    rmat.set_values(
+                        np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
+                    # compare submatrices
+                    assert cmat == rmat
             smat = fmat.full_matrix()
-            fref = SubMatrix([0, 0, 10, 10])
+            fref = SubMatrix([0, 0, 114, 114])
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
             assert smat == fref
         
@@ -168,14 +165,12 @@ class TestOverlapGeom101Driver:
         
         # load reference overlap hessian for O, O atom
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'co.sto3g.overlap.geom.101.oo.npy')
+        npyfile = str(here / 'data' / 'co.qzvp.overlap.geom.101.oo.npy')
         ref_mat = np.load(npyfile)
         
         # dimension of molecular basis
-        indexes = np.triu_indices(2)
-        basdims = [0, 4, 10]
-        #indexes = np.triu_indices(5)
-        #basdims = [0, 14, 38, 68, 96, 114]
+        indexes = np.triu_indices(5)
+        basdims = [0, 14, 38, 68, 96, 114]
         
         # indices map
         labels = ['X_X', 'X_Y', 'X_Z',
@@ -184,22 +179,23 @@ class TestOverlapGeom101Driver:
         
         for k, label in enumerate(labels):
             fmat = hess_mats.matrix(label)
-            for i, j in zip(indexes[0], indexes[1]):
-                # bra side
-                sbra = basdims[i]
-                ebra = basdims[i + 1]
-                # ket side
-                sket = basdims[j]
-                eket = basdims[j + 1]
-                # load computed submatrix
-                cmat = fmat.submatrix((i, j))
-                # load reference submatrix
-                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-                rmat.set_values(
-                    np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
-                # compare submatrices
-                assert cmat == rmat
+            for i in range(0, 5):
+                for j in range(0, 5):
+                    # bra side
+                    sbra = basdims[i]
+                    ebra = basdims[i + 1]
+                    # ket side
+                    sket = basdims[j]
+                    eket = basdims[j + 1]
+                    # load computed submatrix
+                    cmat = fmat.submatrix((i, j))
+                    # load reference submatrix
+                    rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                    rmat.set_values(
+                        np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
+                    # compare submatrices
+                    assert cmat == rmat
             smat = fmat.full_matrix()
-            fref = SubMatrix([0, 0, 10, 10])
+            fref = SubMatrix([0, 0, 114, 114])
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
             assert smat == fref

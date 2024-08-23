@@ -3,26 +3,50 @@ target_sources(vlxobjs
     NuclearPotentialGeom010PrimRecDD.cpp
     NuclearPotentialGeom010PrimRecDF.cpp
     NuclearPotentialGeom010PrimRecDG.cpp
+    NuclearPotentialGeom010PrimRecDH.cpp
+    NuclearPotentialGeom010PrimRecDI.cpp
     NuclearPotentialGeom010PrimRecDP.cpp
     NuclearPotentialGeom010PrimRecDS.cpp
     NuclearPotentialGeom010PrimRecFD.cpp
     NuclearPotentialGeom010PrimRecFF.cpp
     NuclearPotentialGeom010PrimRecFG.cpp
+    NuclearPotentialGeom010PrimRecFH.cpp
+    NuclearPotentialGeom010PrimRecFI.cpp
     NuclearPotentialGeom010PrimRecFP.cpp
     NuclearPotentialGeom010PrimRecFS.cpp
     NuclearPotentialGeom010PrimRecGD.cpp
     NuclearPotentialGeom010PrimRecGF.cpp
     NuclearPotentialGeom010PrimRecGG.cpp
+    NuclearPotentialGeom010PrimRecGH.cpp
+    NuclearPotentialGeom010PrimRecGI.cpp
     NuclearPotentialGeom010PrimRecGP.cpp
     NuclearPotentialGeom010PrimRecGS.cpp
+    NuclearPotentialGeom010PrimRecHD.cpp
+    NuclearPotentialGeom010PrimRecHF.cpp
+    NuclearPotentialGeom010PrimRecHG.cpp
+    NuclearPotentialGeom010PrimRecHH.cpp
+    NuclearPotentialGeom010PrimRecHI.cpp
+    NuclearPotentialGeom010PrimRecHP.cpp
+    NuclearPotentialGeom010PrimRecHS.cpp
+    NuclearPotentialGeom010PrimRecID.cpp
+    NuclearPotentialGeom010PrimRecIF.cpp
+    NuclearPotentialGeom010PrimRecIG.cpp
+    NuclearPotentialGeom010PrimRecIH.cpp
+    NuclearPotentialGeom010PrimRecII.cpp
+    NuclearPotentialGeom010PrimRecIP.cpp
+    NuclearPotentialGeom010PrimRecIS.cpp
     NuclearPotentialGeom010PrimRecPD.cpp
     NuclearPotentialGeom010PrimRecPF.cpp
     NuclearPotentialGeom010PrimRecPG.cpp
+    NuclearPotentialGeom010PrimRecPH.cpp
+    NuclearPotentialGeom010PrimRecPI.cpp
     NuclearPotentialGeom010PrimRecPP.cpp
     NuclearPotentialGeom010PrimRecPS.cpp
     NuclearPotentialGeom010PrimRecSD.cpp
     NuclearPotentialGeom010PrimRecSF.cpp
     NuclearPotentialGeom010PrimRecSG.cpp
+    NuclearPotentialGeom010PrimRecSH.cpp
+    NuclearPotentialGeom010PrimRecSI.cpp
     NuclearPotentialGeom010PrimRecSP.cpp
     NuclearPotentialGeom010PrimRecSS.cpp
     NuclearPotentialGeom020PrimRecDD.cpp

@@ -4,6 +4,7 @@ target_sources(vlxobjs
     BasisFunction.cpp
     GtoBlock.cpp
     GtoFunc.cpp
+    GtoPairBlock.cpp
     MolecularBasis.cpp
   )
 
