@@ -1,0 +1,29 @@
+name: ci workflow
+
+on:
+  push:
+    branches:
+      - simd_master_test
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    container:
+      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_intel:sha-c8613aa
+
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v3
+
+      - name: before script
+        run: |
+          uname -a
+          free -m
+          df -h
+          ulimit -a
+          ulimit -s unlimited
+          lscpu | egrep 'Thread|Core|Socket|^CPU\('
+          python -V
+          mpiicc -cc=icx --version
+          mpiicpc -cxx=icpx --version
