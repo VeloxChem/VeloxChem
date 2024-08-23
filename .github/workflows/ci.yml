@@ -1,4 +1,4 @@
-name: ci workflow
+name: VeloxChem CI workflow
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - simd_master_test
 
 jobs:
-  build:
+  vlx_ci:
     runs-on: ubuntu-latest
 
     defaults:
@@ -23,7 +23,7 @@ jobs:
       - name: checkout code
         uses: actions/checkout@v3
 
-      - name: setup env
+      - name: build and test
         run: |
           echo "=== System Info ==="
           uname -a
@@ -48,6 +48,7 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install numpy pybind11[global]
           CC=icx MPICC="mpiicc -cc=icx" python -m pip install mpi4py --no-binary=mpi4py
-          echo "=== CMake ==="
-          cmake -S.  -Bbuild -GNinja -DCMAKE_CXX_COMPILER=mpiicpc -DCMAKE_CXX_FLAGS="-cxx=icpx" -DVLX_LA_VENDOR=MKL
-          cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib -- -d stats
+          CC=gcc CXX=g++ python -m pip install cppe MDAnalysis
+          echo "=== VeloxChem ==="
+          SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpiicpc -DCMAKE_CXX_FLAGS=\"-cxx=icpx\"" \
+            python -m pip install -v .[test,qmmm]
