@@ -1,9 +1,12 @@
-name: VeloxChem CI workflow
+name: build
 
 on:
   push:
     branches:
-      - master_test
+      - master
+  pull_request:
+    branches:
+      - master
 
 jobs:
   vlx_ci:
@@ -66,9 +69,9 @@ jobs:
           echo "GITHUB_RUN_NUMBER  " $GITHUB_RUN_NUMBER
           echo "GITHUB_SHA         " $GITHUB_SHA
 
-      - name: upload artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: veloxchem-artifact
-          path: ${{ env.TARBALL }}
-          retention-days: 1
+      # - name: upload artifact
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: veloxchem-artifact
+      #     path: ${{ env.TARBALL }}
+      #     retention-days: 1

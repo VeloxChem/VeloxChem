@@ -14,9 +14,9 @@ VeloxChem
         :alt: WIREs paper  
         :target: https://onlinelibrary.wiley.com/doi/full/10.1002/wcms.1457 
 
-.. image:: https://img.shields.io/gitlab/pipeline/veloxchem/veloxchem   
-        :alt: GitLab pipeline   
-        :target: https://gitlab.com/veloxchem/veloxchem/builds
+.. image:: https://img.shields.io/github/actions/workflow/status/VeloxChem/VeloxChem/ci.yml
+        :alt: GitHub action
+        :target: https://github.com/VeloxChem/VeloxChem/actions
 
 
 VeloxChem: A Python‐driven density‐functional theory program for spectroscopy simulations in high‐performance computing environments.
