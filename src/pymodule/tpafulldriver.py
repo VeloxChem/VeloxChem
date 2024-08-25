@@ -632,7 +632,8 @@ class TpaFullDriver(TpaDriver):
 
         # Frequencies to compute
         if self.rank == mpi_master():
-            freq = tuple([0.0] + [sum(x) for x in zip(w, w)])
+            # note: use plain addition instead of sum
+            freq = tuple([0.0] + [x[0] + x[1] for x in zip(w, w)])
         else:
             freq = None
         freq = self.comm.bcast(freq, root=mpi_master())
@@ -1874,14 +1875,6 @@ class TpaFullDriver(TpaDriver):
 
         gamma = rsp_results['gamma']
 
-        t4_dict = rsp_results['t4_dict']
-        t3_dict = rsp_results['t3_dict']
-
-        NaX3NyNz = rsp_results['NaX3NyNz']
-        NaA3NxNy = rsp_results['NaA3NxNy']
-        NaX2Nyz = rsp_results['NaX2Nyz']
-        NxA2Nyz = rsp_results['NxA2Nyz']
-
         self.ostream.print_blank()
 
         w_str = 'Isotropic Average of gamma Tensor at Given Frequencies'
@@ -1891,8 +1884,8 @@ class TpaFullDriver(TpaDriver):
 
         freqs = rsp_results['frequencies']
 
-        title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
-            '', 'Frequency', 'Real', 'Imaginary')
+        title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format('', 'Frequency', 'Real',
+                                                        'Imaginary')
         width = len(title)
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_header(('-' * len(title)).ljust(width))

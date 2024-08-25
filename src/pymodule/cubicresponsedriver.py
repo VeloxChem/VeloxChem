@@ -251,8 +251,9 @@ class CubicResponseDriver(NonlinearSolver):
 
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
+        # note: use plain addition instead of sum
         wa = [
-            sum(x) for x in zip(
+            x[0] + x[1] + x[2] for x in zip(
                 self.b_frequencies,
                 self.c_frequencies,
                 self.d_frequencies,
