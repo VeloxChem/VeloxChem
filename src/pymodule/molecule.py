@@ -29,17 +29,14 @@ from io import StringIO
 import numpy as np
 import math
 
-from .veloxchemlib import Molecule
-from .veloxchemlib import ChemicalElement
+from .veloxchemlib import Molecule, ChemicalElement
 from .veloxchemlib import bohr_in_angstrom
-
 from .outputstream import OutputStream
 from .inputparser import print_keywords
+from .errorhandler import assert_msg_critical
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
-
-from .errorhandler import assert_msg_critical
 
 
 @staticmethod
@@ -96,92 +93,84 @@ def _Molecule_read_smiles(smiles_str):
 
     return Molecule.read_xyz_string(xyz)
 
-# GRO and PDB file format methods:
-# Auxiliary element guess method first
+
 @staticmethod
 def _element_guesser(atom_name, residue_name):
-    """ 
-    Guesses the chemical element of an atom based on its name.
-
-    :param atom_name: 
-        The name of the atom.
     """
-    periodic_table = ['H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
-                   'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca',
-                   'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
-                   'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb', 'Sr', 'Y', 'Zr',
-                   'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn',
-                   'Sb', 'Te', 'I', 'Xe', 'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd',
-                   'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb',
-                   'Lu', 'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg',
-                   'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Th',
-                   'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm',
-                   'Md', 'No', 'Lr', 'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt', 'Ds',
-                   'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og']
+    Guesses the chemical element of an atom based on its name. Needed by GRO
+    and PDB file format.
 
-    two_lett_elements = [el for el in periodic_table if len(el) == 2]
+    :param atom_name:
+        The atom name.
+    :param residue_name:
+        The residue name.
+    """
 
-    ion_residues = {'IB+': 'I', 'CA': 'Ca', 'CL': 'Cl', 
-                    'NA': 'Na', 'MG': 'Mg', 'K': 'K', 
-                    'RB': 'Rb', 'CS': 'Cs', 'LI': 'Li', 
-                    'ZN': 'Zn'}
-    
-    protein_residues = ['URE', 'ACE', 'NME', 
-                        'NHE', 'NH2', 'ALA', 
-                        'GLY', 'SER', 'THR', 
-                        'LEU', 'ILE', 'VAL', 
-                        'ASN', 'GLN', 'ARG', 
-                        'HID', 'HIE', 'HIP', 
-                        'TRP', 'PHE', 'TYR', 
-                        'GLU', 'ASP', 'LYS', 
-                        'ORN', 'DAB', 'LYN', 
-                        'PRO', 'HYP', 'CYS', 
-                        'CYM', 'CYX', 'MET', 
-                        'ASH', 'GLH', 'CALA', 
-                        'CGLY', 'CSER', 'CTHR', 
-                        'CLEU', 'CILE', 'CVAL', 
-                        'CASN', 'CGLN', 'CARG', 
-                        'CHID', 'CHIE', 'CHIP', 
-                        'CTRP', 'CPHE', 'CTYR', 
-                        'CGLU', 'CASP', 'CLYS', 
-                        'CPRO', 'CCYS', 'CCYX', 
-                        'CMET', 'NALA', 'NGLY', 
-                        'NSER', 'NTHR', 'NLEU', 
-                        'NILE', 'NVAL', 'NASN', 
-                        'NGLN', 'NARG', 'NHID', 
-                        'NHIE', 'NHIP', 'NTRP', 
-                        'NPHE', 'NTYR', 'NGLU', 
-                        'NASP', 'NLYS', 'NORN', 
-                        'NDAB', 'NPRO', 'NCYS', 
-                        'NCYX', 'NMET']
-    
-    dna_residues = ["DA5", "DA", "DA3", "DAN", 
-                    "DT5", "DT", "DT3", "DTN", 
-                    "DG5", "DG", "DG3", "DGN", 
-                    "DC5", "DC", "DC3", "DCN"]
-    
-    rna_residues = ["RA5", "RA", "RA3", "RAN", 
-                    "RU5", "RU", "RU3", "RUN", 
-                    "RG5", "RG", "RG3", "RGN", 
-                    "RC5", "RC", "RC3", "RCN"]
+    periodic_table = [
+        'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne', 'Na', 'Mg', 'Al',
+        'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn',
+        'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb',
+        'Sr', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In',
+        'Sn', 'Sb', 'Te', 'I', 'Xe', 'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd', 'Pm',
+        'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu', 'Hf', 'Ta',
+        'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi', 'Po', 'At',
+        'Rn', 'Fr', 'Ra', 'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk',
+        'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr', 'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt',
+        'Ds', 'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og'
+    ]
 
-    standard_residues = (protein_residues 
-                         + dna_residues 
-                         + rna_residues)
-    
+    two_letter_elements = [elem for elem in periodic_table if len(elem) == 2]
+
+    ion_residues = {
+        'IB+': 'I',
+        'CA': 'Ca',
+        'CL': 'Cl',
+        'NA': 'Na',
+        'MG': 'Mg',
+        'K': 'K',
+        'RB': 'Rb',
+        'CS': 'Cs',
+        'LI': 'Li',
+        'ZN': 'Zn'
+    }
+
+    protein_residues = [
+        'URE', 'ACE', 'NME', 'NHE', 'NH2', 'ALA', 'GLY', 'SER', 'THR', 'LEU',
+        'ILE', 'VAL', 'ASN', 'GLN', 'ARG', 'HID', 'HIE', 'HIP', 'TRP', 'PHE',
+        'TYR', 'GLU', 'ASP', 'LYS', 'ORN', 'DAB', 'LYN', 'PRO', 'HYP', 'CYS',
+        'CYM', 'CYX', 'MET', 'ASH', 'GLH', 'CALA', 'CGLY', 'CSER', 'CTHR',
+        'CLEU', 'CILE', 'CVAL', 'CASN', 'CGLN', 'CARG', 'CHID', 'CHIE', 'CHIP',
+        'CTRP', 'CPHE', 'CTYR', 'CGLU', 'CASP', 'CLYS', 'CPRO', 'CCYS', 'CCYX',
+        'CMET', 'NALA', 'NGLY', 'NSER', 'NTHR', 'NLEU', 'NILE', 'NVAL', 'NASN',
+        'NGLN', 'NARG', 'NHID', 'NHIE', 'NHIP', 'NTRP', 'NPHE', 'NTYR', 'NGLU',
+        'NASP', 'NLYS', 'NORN', 'NDAB', 'NPRO', 'NCYS', 'NCYX', 'NMET'
+    ]
+
+    dna_residues = [
+        "DA5", "DA", "DA3", "DAN", "DT5", "DT", "DT3", "DTN", "DG5", "DG",
+        "DG3", "DGN", "DC5", "DC", "DC3", "DCN"
+    ]
+
+    rna_residues = [
+        "RA5", "RA", "RA3", "RAN", "RU5", "RU", "RU3", "RUN", "RG5", "RG",
+        "RG3", "RGN", "RC5", "RC", "RC3", "RCN"
+    ]
+
+    standard_residues = (protein_residues + dna_residues + rna_residues)
+
     if residue_name in ion_residues:
         element = ion_residues[atom_name]
         if element not in periodic_table:
             raise NameError(f"Element {element} not in periodic table")
-        
         return element
-    
+
     elif residue_name in standard_residues:
+        # For standard residues, take first letter as element name
         element = atom_name[0]
         if element not in periodic_table:
             raise NameError(f"Element {element} not in periodic table")
         return element
-    
+
     else:
         # Take the first characters not being a digit
         name = ''
@@ -195,16 +184,15 @@ def _element_guesser(atom_name, residue_name):
         name = name.capitalize()
         # Special cases where two character elements are capitalized
         # Sometimes one can find OP instead of O in HETAM residues
-        if str(name) not in two_lett_elements:
+        if str(name) not in two_letter_elements:
             name = name[0]
         if name not in periodic_table:
             raise NameError(f"Element {name} not in periodic table")
-
         return name
+
 
 @staticmethod
 def _Molecule_read_gro_file(grofile):
-
     """
     Reads molecule from file in GRO format.
 
@@ -214,7 +202,7 @@ def _Molecule_read_gro_file(grofile):
     :return:
         The molecule.
     """
-    
+
     with Path(grofile).open('r') as fh:
         grostr = fh.read()
 
@@ -223,7 +211,7 @@ def _Molecule_read_gro_file(grofile):
 
     lines = grostr.strip().splitlines()
 
-    for line in lines[2:-1]:  
+    for line in lines[2:-1]:
         if line:
             # To access the content we will stick to the C format:
             # %5d%-5s%5s%5d%8.3f%8.3f%8.3f
@@ -231,24 +219,18 @@ def _Molecule_read_gro_file(grofile):
             residue_name = line[5:10].strip()
             atom_name = line[10:15].strip()
 
-            try:
-                x = float(line[20:28].strip()) * 10
-                y = float(line[28:36].strip()) * 10
-                z = float(line[36:44].strip()) * 10
-
-            except ValueError as e:
-                print(f"Error converting coordinates: {e}")
-                continue
-            
-            # Append coordinates in angstroms
+            # coordinates in angstroms
+            x = float(line[20:28].strip()) * 10.0
+            y = float(line[28:36].strip()) * 10.0
+            z = float(line[36:44].strip()) * 10.0
             coordinates.append([x, y, z])
 
             # Assign label
             name = _element_guesser(atom_name, residue_name)
-
             labels.append(name)
-            
+
     return Molecule(labels, coordinates, 'angstrom')
+
 
 @staticmethod
 def _Molecule_read_pdb_file(pdbfile):
@@ -275,15 +257,16 @@ def _Molecule_read_pdb_file(pdbfile):
             if line[76:78].strip() == '':
                 atom_name = line[12:15].strip()
                 residue_name = line[17:19].strip()
-
                 # Guess element
                 name = _element_guesser(atom_name, residue_name)
-
             else:
                 name = str(line[76:78]).strip()
-            
+
             labels.append(name)
-            coordinates.append([float(line[30:38]), float(line[38:46]), float(line[46:54])])
+            coordinates.append(
+                [float(line[30:38]),
+                 float(line[38:46]),
+                 float(line[46:54])])
 
     return Molecule(labels, coordinates, 'angstrom')
 
