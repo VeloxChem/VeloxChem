@@ -2,6 +2,11 @@
 Credits
 =======
 
+Project lead
+------------
+
+* Patrick Norman
+
 Development lead
 ----------------
 
@@ -11,13 +16,25 @@ Development lead
 Contributors
 ------------
 
+* Roberto Di Remigio
+* Karan Ahmadazdeh
+* Mickael Delcey
 * Olav Vahtras
 * Manuel Brand
+* Juan de Gracia
+* Iulia E. Brumboiu
 * Nanna H. List
+* Xiaoyu Chen
+* Lukas Lampe
+* Manuel Hodecker
 * Magnus Ringholm
-* Karan Ahmadazdeh
-* Roberto Di Remigio
+* Thomas Fransson
+* Bastiaan van Hoorn
+* Gabriel L. S. Rodrigues
+* Mikael T. Scott
 * Maximilian Scheurer
+* Vanda Le
 * Michael F. Herbst
+* Joe Jordan
 
-These lists were obtained 2020-11-17 by running ``git shortlog -sn``
+The list of contributors was obtained 2024-08-26 by ``git shortlog -sn``
