@@ -146,7 +146,7 @@ class ForceFieldGenerator:
         self.keep_files = True
 
         # UFF parameters
-        self.uff_param = get_uff_parameters()
+        self.uff_parameters = get_uff_parameters()
 
     def update_settings(self, ffg_dict, resp_dict=None):
         """
@@ -504,15 +504,15 @@ class ForceFieldGenerator:
             atomtypeidentifier.connectivity_matrix)
 
         if not resp:
-            # Skip calculations
+            # skip RESP charges calculation
             self.partial_charges = np.zeros(self.molecule.number_of_atoms())
             msg = 'RESP calculation disabled: All partial charges are set to zero.'
             self.ostream.print_info(msg)
             self.ostream.flush()
 
         if self.partial_charges is None:
-            # Default behavior: compute RESP charges
             if scf_result is None:
+                # compute RESP charges from scratch
                 if basis is None:
                     if self.rank == mpi_master():
                         basis = MolecularBasis.read(self.molecule,
@@ -537,8 +537,8 @@ class ForceFieldGenerator:
                 self.partial_charges = self.comm.bcast(self.partial_charges,
                                                        root=mpi_master())
 
-            # Else use the provided SCF result
             else:
+                # compute RESP charges using the provided SCF result
                 if basis is None:
                     error_msg = 'Basis is required for RESP charges.'
                     assert_msg_critical(False, error_msg)
@@ -675,12 +675,12 @@ class ForceFieldGenerator:
                 elif at == 'hw':
                     sigma, epsilon, comment = 0.0, 0.0, 'HW'
                 # Case for atoms in UFF but not in GAFF
-                elif element in self.uff_param:
+                elif element in self.uff_parameters:
                     warnmsg = f'ForceFieldGenerator: atom type {at} is not in GAFF.'
-                    warnmsg += ' Sigma and Epsilon from UFF.'
+                    warnmsg += ' Taking sigma and epsilon from UFF.'
                     self.ostream.print_warning(warnmsg)
-                    sigma = self.uff_param[element]['sigma']
-                    epsilon = self.uff_param[element]['epsilon']
+                    sigma = self.uff_parameters[element]['sigma']
+                    epsilon = self.uff_parameters[element]['epsilon']
                     comment = 'UFF'
                 else:
                     assert_msg_critical(
@@ -1256,7 +1256,7 @@ class ForceFieldGenerator:
         Adds a bond to the topology.
 
         :param bond:
-            The bond to be added. As a tuple of atom indices.
+            The bond to be added. As a tuple of 1-based atom indices.
         :param force_constant:
             The force constant of the bond. Default is 250000.00 kJ/mol/nm^2.
         :param equilibrium:
@@ -1285,7 +1285,7 @@ class ForceFieldGenerator:
         Adds an angle to the topology.
 
         :param angle:
-            The angle to be added. As a tuple of atom indices.
+            The angle to be added. As a tuple of 1-based atom indices.
         :param force_constant:
             The force constant of the angle. Default is 1000.00 kJ/mol/rad^2.
         :param equilibrium:
