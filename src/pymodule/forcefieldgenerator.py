@@ -563,8 +563,8 @@ class ForceFieldGenerator:
         self.partial_charges = np.round(self.partial_charges, 6)
 
         # Removing the tail of the partial charges to ensure the sum is a whole number
-        max_charge = max(abs(self.partial_charges))
-        max_charge_index = np.argmax(self.partial_charges)
+        max_charge_index = np.argmax(np.abs(self.partial_charges))
+        max_charge = self.partial_charges[max_charge_index]
 
         self.partial_charges[max_charge_index] -= sum(
             self.partial_charges) - round(sum(self.partial_charges))
