@@ -21,6 +21,11 @@ VeloxChem
 
 VeloxChem: A Python‐driven density‐functional theory program for spectroscopy simulations in high‐performance computing environments.
 
+Documentation
+-------------
+
+https://veloxchem.org/
+
 License 
 -------
 
