@@ -16,11 +16,11 @@ class TPoint
 {
    public:
     /// @brief The default constructor.
-    TPoint(){};
+    TPoint() {};
 
     /// @brief The constructor with coordinates array.
     /// @param coordinates The coordinates array to create point.
-    TPoint(const std::array<T, 3> &coordinates) : _coordinates(coordinates){};
+    TPoint(const std::array<T, 3> &coordinates) : _coordinates(coordinates) {};
 
     /// @brief The default copy constructor.
     /// @param other The point to be copied.
@@ -49,9 +49,8 @@ class TPoint
     auto
     operator==(const TPoint<T> &other) const -> bool
     {
-        return std::ranges::equal(_coordinates, other._coordinates, [](auto lhs, auto rhs) -> bool {
-            return mathfunc::equal(lhs, rhs, 1.0e-12, 1.0e-12);
-        });
+        return std::ranges::equal(
+            _coordinates, other._coordinates, [](auto lhs, auto rhs) -> bool { return mathfunc::equal(lhs, rhs, 1.0e-12, 1.0e-12); });
     }
 
     /// @brief The non-equality operator.
@@ -84,9 +83,7 @@ class TPoint
     auto
     length_square() const -> T
     {
-        return std::accumulate(_coordinates.begin(), _coordinates.end(), T{0.0}, [](const T &sum, const T &val) {
-            return sum + val * val;
-        });
+        return std::accumulate(_coordinates.begin(), _coordinates.end(), T{0.0}, [](const T &sum, const T &val) { return sum + val * val; });
     }
 
     /// @brief Computes length for vector defined by this point.

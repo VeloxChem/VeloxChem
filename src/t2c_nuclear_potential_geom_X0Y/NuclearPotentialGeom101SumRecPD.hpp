@@ -1,30 +1,32 @@
-#ifndef NuclearPotentialGeom101SumRecSF_hpp
-#define NuclearPotentialGeom101SumRecSF_hpp
+#ifndef NuclearPotentialGeom101SumRecPD_hpp
+#define NuclearPotentialGeom101SumRecPD_hpp
 
-#include <cstddef>
 #include <array>
+#include <cstddef>
 #include <utility>
 
+#include "BatchFunc.hpp"
+#include "BoysFunc.hpp"
+#include "GeometricalDerivatives1X1ForPD.hpp"
 #include "GtoBlock.hpp"
-#include "SimdArray.hpp"
-#include "OverlapPrimRecSS.hpp"
-#include "NuclearPotentialPrimRecSS.hpp"
-#include "NuclearPotentialPrimRecSP.hpp"
+#include "NuclearPotentialPrimRecDF.hpp"
+#include "NuclearPotentialPrimRecDP.hpp"
+#include "NuclearPotentialPrimRecPD.hpp"
+#include "NuclearPotentialPrimRecPF.hpp"
+#include "NuclearPotentialPrimRecPP.hpp"
+#include "NuclearPotentialPrimRecPS.hpp"
 #include "NuclearPotentialPrimRecSD.hpp"
 #include "NuclearPotentialPrimRecSF.hpp"
-#include "NuclearPotentialPrimRecSG.hpp"
-#include "NuclearPotentialPrimRecPD.hpp"
-#include "NuclearPotentialPrimRecPG.hpp"
-#include "GeometricalDerivatives1X1ForSF.hpp"
-
-#include "BoysFunc.hpp"
-#include "T2CUtils.hpp"
+#include "NuclearPotentialPrimRecSP.hpp"
+#include "NuclearPotentialPrimRecSS.hpp"
+#include "OverlapPrimRecSS.hpp"
+#include "SimdArray.hpp"
 #include "T2CTransform.hpp"
-#include "BatchFunc.hpp"
+#include "T2CUtils.hpp"
 
-namespace npotrec { // npotrec namespace
+namespace npotrec {  // npotrec namespace
 
-/// @brief Computes (d^(1)/dA^(1)S|A|d^(1)/dB^(1)F)  integrals for pair of basis functions blocks.
+/// @brief Computes (d^(1)/dA^(1)P|A|d^(1)/dB^(1)D)  integrals for pair of basis functions blocks.
 /// @param distributor The integrals distributor.
 /// @param bra_gto_block The basis functions block on bra side.
 /// @param ket_gto_block The basis functions block on ket side.
@@ -33,12 +35,12 @@ namespace npotrec { // npotrec namespace
 /// @param bra_eq_ket True if basis functions blocks on bra and ket are the same, False otherwise.
 template <class T>
 auto
-comp_sum_nuclear_potential_geom_11_sf(T& distributor,
-                                      const CGtoBlock& bra_gto_block,
-                                      const CGtoBlock& ket_gto_block,
+comp_sum_nuclear_potential_geom_11_pd(T&                               distributor,
+                                      const CGtoBlock&                 bra_gto_block,
+                                      const CGtoBlock&                 ket_gto_block,
                                       const std::pair<size_t, size_t>& bra_indices,
                                       const std::pair<size_t, size_t>& ket_indices,
-                                      const bool bra_eq_ket) -> void
+                                      const bool                       bra_eq_ket) -> void
 {
     // intialize external coordinate(s)
 
@@ -80,13 +82,13 @@ comp_sum_nuclear_potential_geom_11_sf(T& distributor,
 
     // allocate aligned primitive integrals
 
-    CSimdArray<double> pbuffer(259, ket_npgtos);
+    CSimdArray<double> pbuffer(436, ket_npgtos);
 
     // allocate aligned contracted integrals
 
-    CSimdArray<double> cbuffer(90, 1);
+    CSimdArray<double> cbuffer(162, 1);
 
-    CSimdArray<double> sbuffer(63, 1);
+    CSimdArray<double> sbuffer(135, 1);
 
     // setup Boys function data
 
@@ -142,9 +144,9 @@ comp_sum_nuclear_potential_geom_11_sf(T& distributor,
 
                 t2cfunc::comp_coordinates_p(factors, 8, 2, r_a, a_exp);
 
-                t2cfunc::comp_distances_pa_from_p(factors, 11 , 8, r_a);
+                t2cfunc::comp_distances_pa_from_p(factors, 11, 8, r_a);
 
-                t2cfunc::comp_distances_pb_from_p(factors, 14 , 8, 2);
+                t2cfunc::comp_distances_pb_from_p(factors, 14, 8, 2);
 
                 ovlrec::comp_prim_overlap_ss(pbuffer, 0, factors, a_exp, a_norm);
 
@@ -192,27 +194,39 @@ comp_sum_nuclear_potential_geom_11_sf(T& distributor,
 
                     npotrec::comp_prim_nuclear_potential_sf(pbuffer, 66, 13, 16, 34, 40, factors, 14, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_sg(pbuffer, 76, 22, 28, 46, 56, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_ps(pbuffer, 76, 1, 2, factors, 11, 17);
 
-                    npotrec::comp_prim_nuclear_potential_sg(pbuffer, 91, 28, 34, 56, 66, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_ps(pbuffer, 79, 2, 3, factors, 11, 17);
 
-                    npotrec::comp_prim_nuclear_potential_pd(pbuffer, 106, 7, 10, 22, 28, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_pp(pbuffer, 82, 1, 2, 7, 10, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_pg(pbuffer, 124, 46, 56, 76, 91, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_pp(pbuffer, 91, 2, 3, 10, 13, factors, 11, 17, a_exp);
 
-                    t2cgeom::comp_prim_op_geom_11_sf(pbuffer, 169, 106, 124, 1, factors, a_exp);
+                    npotrec::comp_prim_nuclear_potential_pd(pbuffer, 100, 7, 10, 22, 28, factors, 11, 17, a_exp);
 
-                    t2cfunc::reduce(cbuffer, pbuffer, 169, charges[l], ket_width, ket_npgtos);
+                    npotrec::comp_prim_nuclear_potential_pd(pbuffer, 118, 10, 13, 28, 34, factors, 11, 17, a_exp);
+
+                    npotrec::comp_prim_nuclear_potential_pf(pbuffer, 136, 22, 28, 46, 56, factors, 11, 17, a_exp);
+
+                    npotrec::comp_prim_nuclear_potential_pf(pbuffer, 166, 28, 34, 56, 66, factors, 11, 17, a_exp);
+
+                    npotrec::comp_prim_nuclear_potential_dp(pbuffer, 196, 7, 10, 76, 79, 82, 91, factors, 11, 17, a_exp);
+
+                    npotrec::comp_prim_nuclear_potential_df(pbuffer, 214, 46, 56, 100, 118, 136, 166, factors, 11, 17, a_exp);
+
+                    t2cgeom::comp_prim_op_geom_11_pd(pbuffer, 274, 7, 46, 196, 214, 1, factors, a_exp);
+
+                    t2cfunc::reduce(cbuffer, pbuffer, 274, charges[l], ket_width, ket_npgtos);
                 }
             }
 
-            t2cfunc::transform<0, 3>(sbuffer, cbuffer);
+            t2cfunc::transform<1, 2>(sbuffer, cbuffer);
 
-            distributor.distribute(sbuffer, bra_gto_indices, ket_gto_indices, 0, 3, j, ket_range, bra_eq_ket);
+            distributor.distribute(sbuffer, bra_gto_indices, ket_gto_indices, 1, 2, j, ket_range, bra_eq_ket);
         }
     }
 }
 
-} // npotrec namespace
+}  // namespace npotrec
 
-#endif /* NuclearPotentialGeom101SumRecSF_hpp */
+#endif /* NuclearPotentialGeom101SumRecPD_hpp */

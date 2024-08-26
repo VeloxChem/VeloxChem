@@ -19,9 +19,7 @@ class CMolecule
     /// @param identifiers The vector of chemical element identifiers.
     /// @param coordinates The vector of Cartesian coordinates of atoms.
     /// @param unit The unit used to define coordinates of atoms.
-    CMolecule(const std::vector<int>            &identifiers,
-              const std::vector<TPoint<double>> &coordinates,
-              const std::string                 &unit);
+    CMolecule(const std::vector<int> &identifiers, const std::vector<TPoint<double>> &coordinates, const std::string &unit);
 
     /// @brief The constructor with two molecular fragments.
     /// @param molecule_one The first molecule to merge.

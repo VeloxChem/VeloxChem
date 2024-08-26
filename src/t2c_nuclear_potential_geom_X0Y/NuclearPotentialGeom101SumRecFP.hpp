@@ -1,37 +1,36 @@
-#ifndef NuclearPotentialGeom101SumRecDD_hpp
-#define NuclearPotentialGeom101SumRecDD_hpp
+#ifndef NuclearPotentialGeom101SumRecFP_hpp
+#define NuclearPotentialGeom101SumRecFP_hpp
 
-#include <cstddef>
 #include <array>
+#include <cstddef>
 #include <utility>
 
-#include "GtoBlock.hpp"
-#include "SimdArray.hpp"
-#include "OverlapPrimRecSS.hpp"
-#include "NuclearPotentialPrimRecSS.hpp"
-#include "NuclearPotentialPrimRecSP.hpp"
-#include "NuclearPotentialPrimRecSD.hpp"
-#include "NuclearPotentialPrimRecSF.hpp"
-#include "NuclearPotentialPrimRecPS.hpp"
-#include "NuclearPotentialPrimRecPP.hpp"
-#include "NuclearPotentialPrimRecPD.hpp"
-#include "NuclearPotentialPrimRecPF.hpp"
-#include "NuclearPotentialPrimRecDS.hpp"
-#include "NuclearPotentialPrimRecDP.hpp"
-#include "NuclearPotentialPrimRecDD.hpp"
-#include "NuclearPotentialPrimRecDF.hpp"
-#include "NuclearPotentialPrimRecFP.hpp"
-#include "NuclearPotentialPrimRecFF.hpp"
-#include "GeometricalDerivatives1X1ForDD.hpp"
-
-#include "BoysFunc.hpp"
-#include "T2CUtils.hpp"
-#include "T2CTransform.hpp"
 #include "BatchFunc.hpp"
+#include "BoysFunc.hpp"
+#include "GeometricalDerivatives1X1ForFP.hpp"
+#include "GtoBlock.hpp"
+#include "NuclearPotentialPrimRecDD.hpp"
+#include "NuclearPotentialPrimRecDP.hpp"
+#include "NuclearPotentialPrimRecDS.hpp"
+#include "NuclearPotentialPrimRecFD.hpp"
+#include "NuclearPotentialPrimRecFP.hpp"
+#include "NuclearPotentialPrimRecFS.hpp"
+#include "NuclearPotentialPrimRecGD.hpp"
+#include "NuclearPotentialPrimRecGS.hpp"
+#include "NuclearPotentialPrimRecPD.hpp"
+#include "NuclearPotentialPrimRecPP.hpp"
+#include "NuclearPotentialPrimRecPS.hpp"
+#include "NuclearPotentialPrimRecSD.hpp"
+#include "NuclearPotentialPrimRecSP.hpp"
+#include "NuclearPotentialPrimRecSS.hpp"
+#include "OverlapPrimRecSS.hpp"
+#include "SimdArray.hpp"
+#include "T2CTransform.hpp"
+#include "T2CUtils.hpp"
 
-namespace npotrec { // npotrec namespace
+namespace npotrec {  // npotrec namespace
 
-/// @brief Computes (d^(1)/dA^(1)D|A|d^(1)/dB^(1)D)  integrals for pair of basis functions blocks.
+/// @brief Computes (d^(1)/dA^(1)F|A|d^(1)/dB^(1)P)  integrals for pair of basis functions blocks.
 /// @param distributor The integrals distributor.
 /// @param bra_gto_block The basis functions block on bra side.
 /// @param ket_gto_block The basis functions block on ket side.
@@ -40,12 +39,12 @@ namespace npotrec { // npotrec namespace
 /// @param bra_eq_ket True if basis functions blocks on bra and ket are the same, False otherwise.
 template <class T>
 auto
-comp_sum_nuclear_potential_geom_11_dd(T& distributor,
-                                      const CGtoBlock& bra_gto_block,
-                                      const CGtoBlock& ket_gto_block,
+comp_sum_nuclear_potential_geom_11_fp(T&                               distributor,
+                                      const CGtoBlock&                 bra_gto_block,
+                                      const CGtoBlock&                 ket_gto_block,
                                       const std::pair<size_t, size_t>& bra_indices,
                                       const std::pair<size_t, size_t>& ket_indices,
-                                      const bool bra_eq_ket) -> void
+                                      const bool                       bra_eq_ket) -> void
 {
     // intialize external coordinate(s)
 
@@ -87,13 +86,13 @@ comp_sum_nuclear_potential_geom_11_dd(T& distributor,
 
     // allocate aligned primitive integrals
 
-    CSimdArray<double> pbuffer(970, ket_npgtos);
+    CSimdArray<double> pbuffer(931, ket_npgtos);
 
     // allocate aligned contracted integrals
 
-    CSimdArray<double> cbuffer(324, 1);
+    CSimdArray<double> cbuffer(270, 1);
 
-    CSimdArray<double> sbuffer(225, 1);
+    CSimdArray<double> sbuffer(189, 1);
 
     // setup Boys function data
 
@@ -149,9 +148,9 @@ comp_sum_nuclear_potential_geom_11_dd(T& distributor,
 
                 t2cfunc::comp_coordinates_p(factors, 8, 2, r_a, a_exp);
 
-                t2cfunc::comp_distances_pa_from_p(factors, 11 , 8, r_a);
+                t2cfunc::comp_distances_pa_from_p(factors, 11, 8, r_a);
 
-                t2cfunc::comp_distances_pb_from_p(factors, 14 , 8, 2);
+                t2cfunc::comp_distances_pb_from_p(factors, 14, 8, 2);
 
                 ovlrec::comp_prim_overlap_ss(pbuffer, 0, factors, a_exp, a_norm);
 
@@ -199,71 +198,77 @@ comp_sum_nuclear_potential_geom_11_dd(T& distributor,
 
                     npotrec::comp_prim_nuclear_potential_sd(pbuffer, 50, 5, 6, 20, 23, factors, 14, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_sf(pbuffer, 56, 8, 11, 26, 32, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_ps(pbuffer, 56, 1, 2, factors, 11, 17);
 
-                    npotrec::comp_prim_nuclear_potential_sf(pbuffer, 66, 11, 14, 32, 38, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_ps(pbuffer, 59, 2, 3, factors, 11, 17);
 
-                    npotrec::comp_prim_nuclear_potential_sf(pbuffer, 76, 14, 17, 38, 44, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_ps(pbuffer, 62, 3, 4, factors, 11, 17);
 
-                    npotrec::comp_prim_nuclear_potential_sf(pbuffer, 86, 17, 20, 44, 50, factors, 14, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_ps(pbuffer, 65, 4, 5, factors, 11, 17);
 
-                    npotrec::comp_prim_nuclear_potential_ps(pbuffer, 96, 1, 2, factors, 11, 17);
+                    npotrec::comp_prim_nuclear_potential_pp(pbuffer, 68, 1, 2, 8, 11, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_ps(pbuffer, 99, 2, 3, factors, 11, 17);
+                    npotrec::comp_prim_nuclear_potential_pp(pbuffer, 77, 2, 3, 11, 14, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_ps(pbuffer, 102, 3, 4, factors, 11, 17);
+                    npotrec::comp_prim_nuclear_potential_pp(pbuffer, 86, 3, 4, 14, 17, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_pp(pbuffer, 105, 1, 2, 8, 11, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_pp(pbuffer, 95, 4, 5, 17, 20, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_pp(pbuffer, 114, 2, 3, 11, 14, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_pd(pbuffer, 104, 8, 11, 26, 32, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_pp(pbuffer, 123, 3, 4, 14, 17, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_pd(pbuffer, 122, 11, 14, 32, 38, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_pd(pbuffer, 132, 8, 11, 26, 32, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_pd(pbuffer, 140, 14, 17, 38, 44, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_pd(pbuffer, 150, 11, 14, 32, 38, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_pd(pbuffer, 158, 17, 20, 44, 50, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_pd(pbuffer, 168, 14, 17, 38, 44, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_ds(pbuffer, 176, 1, 2, 56, 59, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_pf(pbuffer, 186, 26, 32, 56, 66, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_ds(pbuffer, 182, 2, 3, 59, 62, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_pf(pbuffer, 216, 32, 38, 66, 76, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_ds(pbuffer, 188, 3, 4, 62, 65, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_pf(pbuffer, 246, 38, 44, 76, 86, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_dp(pbuffer, 194, 8, 11, 56, 59, 68, 77, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_ds(pbuffer, 276, 1, 2, 96, 99, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_dp(pbuffer, 212, 11, 14, 59, 62, 77, 86, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_ds(pbuffer, 282, 2, 3, 99, 102, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_dp(pbuffer, 230, 14, 17, 62, 65, 86, 95, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_dp(pbuffer, 288, 8, 11, 96, 99, 105, 114, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_dd(pbuffer, 248, 26, 32, 68, 77, 104, 122, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_dp(pbuffer, 306, 11, 14, 99, 102, 114, 123, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_dd(pbuffer, 284, 32, 38, 77, 86, 122, 140, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_dd(pbuffer, 324, 26, 32, 105, 114, 132, 150, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_dd(pbuffer, 320, 38, 44, 86, 95, 140, 158, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_dd(pbuffer, 360, 32, 38, 114, 123, 150, 168, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_fs(pbuffer, 356, 56, 59, 176, 182, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_df(pbuffer, 396, 56, 66, 132, 150, 186, 216, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_fs(pbuffer, 366, 59, 62, 182, 188, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_df(pbuffer, 456, 66, 76, 150, 168, 216, 246, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_fp(pbuffer, 376, 68, 77, 176, 182, 194, 212, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_fp(pbuffer, 516, 105, 114, 276, 282, 288, 306, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_fp(pbuffer, 406, 77, 86, 182, 188, 212, 230, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_ff(pbuffer, 546, 186, 216, 324, 360, 396, 456, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_fd(pbuffer, 436, 104, 122, 194, 212, 248, 284, factors, 11, 17, a_exp);
 
-                    t2cgeom::comp_prim_op_geom_11_dd(pbuffer, 646, 105, 186, 516, 546, 1, factors, a_exp);
+                    npotrec::comp_prim_nuclear_potential_fd(pbuffer, 496, 122, 140, 212, 230, 284, 320, factors, 11, 17, a_exp);
 
-                    t2cfunc::reduce(cbuffer, pbuffer, 646, charges[l], ket_width, ket_npgtos);
+                    npotrec::comp_prim_nuclear_potential_gs(pbuffer, 556, 176, 182, 356, 366, factors, 11, 17, a_exp);
+
+                    npotrec::comp_prim_nuclear_potential_gd(pbuffer, 571, 248, 284, 376, 406, 436, 496, factors, 11, 17, a_exp);
+
+                    t2cgeom::comp_prim_op_geom_11_fp(pbuffer, 661, 176, 248, 556, 571, 1, factors, a_exp);
+
+                    t2cfunc::reduce(cbuffer, pbuffer, 661, charges[l], ket_width, ket_npgtos);
                 }
             }
 
-            t2cfunc::transform<2, 2>(sbuffer, cbuffer);
+            t2cfunc::transform<3, 1>(sbuffer, cbuffer);
 
-            distributor.distribute(sbuffer, bra_gto_indices, ket_gto_indices, 2, 2, j, ket_range, bra_eq_ket);
+            distributor.distribute(sbuffer, bra_gto_indices, ket_gto_indices, 3, 1, j, ket_range, bra_eq_ket);
         }
     }
 }
 
-} // npotrec namespace
+}  // namespace npotrec
 
-#endif /* NuclearPotentialGeom101SumRecDD_hpp */
+#endif /* NuclearPotentialGeom101SumRecFP_hpp */

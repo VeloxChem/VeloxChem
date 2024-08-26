@@ -1,14 +1,14 @@
 #include "GeometricalDerivatives1X1ForSS.hpp"
 
-namespace t2cgeom { // t2cgeom namespace
+namespace t2cgeom {  // t2cgeom namespace
 
 auto
-comp_prim_op_geom_11_ss(CSimdArray<double>& pbuffer,
-                        const size_t idx_op_geom_101_ss,
-                        const size_t idx_op_pp,
-                        const size_t op_comps,
+comp_prim_op_geom_11_ss(CSimdArray<double>&       pbuffer,
+                        const size_t              idx_op_geom_101_ss,
+                        const size_t              idx_op_pp,
+                        const size_t              op_comps,
                         const CSimdArray<double>& factors,
-                        const double a_exp) -> void
+                        const double              a_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -58,7 +58,25 @@ comp_prim_op_geom_11_ss(CSimdArray<double>& pbuffer,
 
         auto to_z_z_0_0 = pbuffer.data(idx_op_geom_101_ss + 8 * op_comps * 1 + i * 1 + 0);
 
-        #pragma omp simd aligned(to_x_x, to_x_x_0_0, to_x_y, to_x_y_0_0, to_x_z, to_x_z_0_0, to_y_x, to_y_x_0_0, to_y_y, to_y_y_0_0, to_y_z, to_y_z_0_0, to_z_x, to_z_x_0_0, to_z_y, to_z_y_0_0, to_z_z, to_z_z_0_0, b_exps : 64)
+#pragma omp simd aligned(to_x_x,         \
+                             to_x_x_0_0, \
+                             to_x_y,     \
+                             to_x_y_0_0, \
+                             to_x_z,     \
+                             to_x_z_0_0, \
+                             to_y_x,     \
+                             to_y_x_0_0, \
+                             to_y_y,     \
+                             to_y_y_0_0, \
+                             to_y_z,     \
+                             to_y_z_0_0, \
+                             to_z_x,     \
+                             to_z_x_0_0, \
+                             to_z_y,     \
+                             to_z_y_0_0, \
+                             to_z_z,     \
+                             to_z_z_0_0, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -84,8 +102,6 @@ comp_prim_op_geom_11_ss(CSimdArray<double>& pbuffer,
             to_z_z_0_0[k] = 4.0 * to_z_z[k] * tbe_0 * tke_0;
         }
     }
-
 }
 
-} // t2cgeom namespace
-
+}  // namespace t2cgeom

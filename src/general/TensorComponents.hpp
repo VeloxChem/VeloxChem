@@ -15,9 +15,7 @@ template <size_t N>
 auto
 number_of_cartesian_components(const std::array<int, N> &orders) -> int
 {
-    return std::accumulate(orders.begin(), orders.end(), 1, [](const int prod, const int order) {
-        return prod * (order + 1) * (order + 2) / 2;
-    });
+    return std::accumulate(orders.begin(), orders.end(), 1, [](const int prod, const int order) { return prod * (order + 1) * (order + 2) / 2; });
 }
 
 /// @brief Gets compound number of spherical components of canonical tensors array.
@@ -28,8 +26,7 @@ template <size_t N>
 auto
 number_of_spherical_components(const std::array<int, N> &orders) -> int
 {
-    return std::accumulate(
-        orders.begin(), orders.end(), 1, [](const int prod, const int order) { return prod * (2 * order + 1); });
+    return std::accumulate(orders.begin(), orders.end(), 1, [](const int prod, const int order) { return prod * (2 * order + 1); });
 }
 
 }  // namespace tensor

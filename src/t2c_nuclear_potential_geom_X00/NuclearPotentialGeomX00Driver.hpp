@@ -58,27 +58,23 @@ class CNuclearPotentialGeomX00Driver
     /// @param molecule The molecule.
     /// @param iatom The index of atom.
     /// @return The nuclear potential matrix.
-    auto compute(const CMolecularBasis             &basis,
-                 const CMolecule                   &molecule,
-                 const int                         iatom) const -> CMatrices;
+    auto compute(const CMolecularBasis &basis, const CMolecule &molecule, const int iatom) const -> CMatrices;
 };
 
 template <int N>
 auto
-CNuclearPotentialGeomX00Driver<N>::compute(const CMolecularBasis             &basis,
-                                  const CMolecule                   &molecule,
-                                  const int                         iatom) const -> CMatrices
+CNuclearPotentialGeomX00Driver<N>::compute(const CMolecularBasis &basis, const CMolecule &molecule, const int iatom) const -> CMatrices
 {
     // set up operator derivatives matrices
 
     auto npot_mats = matfunc::make_matrices(std::array<int, 1>{N}, basis, mat_t::general);
 
     npot_mats.zero();
-    
-    // atoms charges and coordinates 
-    
+
+    // atoms charges and coordinates
+
     auto charges = molecule.charges();
-    
+
     auto coordinates = molecule.coordinates("au");
 
     // prepare pointers for OMP parallel region
@@ -88,7 +84,7 @@ CNuclearPotentialGeomX00Driver<N>::compute(const CMolecularBasis             &ba
     auto ptr_molecule = &molecule;
 
     auto ptr_npot_mats = &npot_mats;
-    
+
     auto ptr_charges = &charges;
 
     auto ptr_coordinates = &coordinates;
@@ -97,17 +93,21 @@ CNuclearPotentialGeomX00Driver<N>::compute(const CMolecularBasis             &ba
 
     omp::set_static_scheduler();
 
-#pragma omp parallel shared(ptr_basis, ptr_molecule, ptr_npot_mats, ptr_charges, ptr_coordinates,   iatom)
+#pragma omp parallel shared(ptr_basis, ptr_molecule, ptr_npot_mats, ptr_charges, ptr_coordinates, iatom)
     {
 #pragma omp single nowait
         {
-            const auto bra_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule, {iatom, });
-            
+            const auto bra_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis,
+                                                                 *ptr_molecule,
+                                                                 {
+                                                                     iatom,
+                                                                 });
+
             const auto ket_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule);
 
             const auto tasks = omp::make_work_tasks(bra_gto_blocks, ket_gto_blocks);
 
-            std::ranges::for_each(std::ranges::reverse_view(tasks), [&](const auto& task) {
+            std::ranges::for_each(std::ranges::reverse_view(tasks), [&](const auto &task) {
                 auto bra_gtos    = bra_gto_blocks[task[0]];
                 auto ket_gtos    = ket_gto_blocks[task[1]];
                 auto bra_indices = std::pair<size_t, size_t>{task[2], task[3]};

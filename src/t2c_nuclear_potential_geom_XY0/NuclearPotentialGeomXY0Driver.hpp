@@ -57,36 +57,31 @@ class CNuclearPotentialGeomXY0Driver
     /// @param iatom The index of atom.
     /// @param jatom The index of atom.
     /// @return The nuclear potential matrix.
-    auto compute(const CMolecularBasis             &basis,
-                 const CMolecule                   &molecule,
-                 const int                         iatom,
-                 const int                         jatom) const -> CMatrices;
+    auto compute(const CMolecularBasis &basis, const CMolecule &molecule, const int iatom, const int jatom) const -> CMatrices;
 };
 
 template <int N, int M>
 auto
-CNuclearPotentialGeomXY0Driver<N, M>::compute(const CMolecularBasis             &basis,
-                                     const CMolecule                   &molecule,
-                                     const int                         iatom,
-                                     const int                         jatom) const -> CMatrices
+CNuclearPotentialGeomXY0Driver<N, M>::compute(const CMolecularBasis &basis, const CMolecule &molecule, const int iatom, const int jatom) const
+    -> CMatrices
 {
     // set up operator derivatives matrices
 
     auto npot_mats = matfunc::make_matrices(std::array<int, 2>{N, M}, basis, mat_t::general);
 
     npot_mats.zero();
-    
+
     // atoms charges and coordinates
-        
+
     const auto charge = molecule.charges()[jatom];
-    
+
     std::vector<double> multipoles;
-    
+
     if constexpr (M == 1)
     {
         multipoles = std::vector<double>({charge, charge, charge});
     }
-    
+
     auto coordinates = std::vector<TPoint<double>>(1, molecule.atom_coordinates(jatom, "au"));
 
     // prepare pointers for OMP parallel region
@@ -96,7 +91,7 @@ CNuclearPotentialGeomXY0Driver<N, M>::compute(const CMolecularBasis             
     auto ptr_molecule = &molecule;
 
     auto ptr_npot_mats = &npot_mats;
-    
+
     auto ptr_multipoles = &multipoles;
 
     auto ptr_coordinates = &coordinates;
@@ -109,13 +104,17 @@ CNuclearPotentialGeomXY0Driver<N, M>::compute(const CMolecularBasis             
     {
 #pragma omp single nowait
         {
-            const auto bra_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule, {iatom, });
-            
+            const auto bra_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis,
+                                                                 *ptr_molecule,
+                                                                 {
+                                                                     iatom,
+                                                                 });
+
             const auto ket_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule);
 
             const auto tasks = omp::make_work_tasks(bra_gto_blocks, ket_gto_blocks);
 
-            std::ranges::for_each(std::ranges::reverse_view(tasks), [&](const auto& task) {
+            std::ranges::for_each(std::ranges::reverse_view(tasks), [&](const auto &task) {
                 auto bra_gtos    = bra_gto_blocks[task[0]];
                 auto ket_gtos    = ket_gto_blocks[task[1]];
                 auto bra_indices = std::pair<size_t, size_t>{task[2], task[3]};
@@ -134,6 +133,5 @@ CNuclearPotentialGeomXY0Driver<N, M>::compute(const CMolecularBasis             
 
     return npot_mats;
 }
-
 
 #endif /* NuclearPotentialGeomXY0Driver_hpp */

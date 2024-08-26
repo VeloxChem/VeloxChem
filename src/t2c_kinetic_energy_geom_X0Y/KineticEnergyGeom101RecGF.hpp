@@ -1,71 +1,70 @@
 #ifndef KineticEnergyGeom101RecGF_hpp
 #define KineticEnergyGeom101RecGF_hpp
 
-#include <cstddef>
 #include <array>
+#include <cstddef>
 #include <utility>
 
-#include "GtoBlock.hpp"
-#include "SimdArray.hpp"
-#include "OverlapPrimRecSS.hpp"
-#include "KineticEnergyPrimRecSS.hpp"
-#include "OverlapPrimRecSP.hpp"
-#include "KineticEnergyPrimRecSP.hpp"
-#include "OverlapPrimRecSD.hpp"
-#include "KineticEnergyPrimRecSD.hpp"
-#include "OverlapPrimRecSF.hpp"
-#include "KineticEnergyPrimRecSF.hpp"
-#include "OverlapPrimRecSG.hpp"
-#include "KineticEnergyPrimRecSG.hpp"
-#include "OverlapPrimRecPS.hpp"
-#include "KineticEnergyPrimRecPS.hpp"
-#include "OverlapPrimRecPP.hpp"
-#include "KineticEnergyPrimRecPP.hpp"
-#include "OverlapPrimRecPD.hpp"
-#include "KineticEnergyPrimRecPD.hpp"
-#include "OverlapPrimRecPF.hpp"
-#include "KineticEnergyPrimRecPF.hpp"
-#include "OverlapPrimRecPG.hpp"
-#include "KineticEnergyPrimRecPG.hpp"
-#include "OverlapPrimRecDS.hpp"
-#include "KineticEnergyPrimRecDS.hpp"
-#include "OverlapPrimRecDP.hpp"
-#include "KineticEnergyPrimRecDP.hpp"
-#include "OverlapPrimRecDD.hpp"
-#include "KineticEnergyPrimRecDD.hpp"
-#include "OverlapPrimRecDF.hpp"
-#include "KineticEnergyPrimRecDF.hpp"
-#include "OverlapPrimRecDG.hpp"
-#include "KineticEnergyPrimRecDG.hpp"
-#include "OverlapPrimRecFS.hpp"
-#include "KineticEnergyPrimRecFS.hpp"
-#include "OverlapPrimRecFP.hpp"
-#include "KineticEnergyPrimRecFP.hpp"
-#include "OverlapPrimRecFD.hpp"
-#include "KineticEnergyPrimRecFD.hpp"
-#include "OverlapPrimRecFF.hpp"
-#include "KineticEnergyPrimRecFF.hpp"
-#include "OverlapPrimRecFG.hpp"
-#include "KineticEnergyPrimRecFG.hpp"
-#include "OverlapPrimRecGP.hpp"
-#include "KineticEnergyPrimRecGP.hpp"
-#include "OverlapPrimRecGD.hpp"
-#include "KineticEnergyPrimRecGD.hpp"
-#include "OverlapPrimRecGF.hpp"
-#include "KineticEnergyPrimRecGF.hpp"
-#include "OverlapPrimRecGG.hpp"
-#include "KineticEnergyPrimRecGG.hpp"
-#include "OverlapPrimRecHD.hpp"
-#include "KineticEnergyPrimRecHD.hpp"
-#include "OverlapPrimRecHG.hpp"
-#include "KineticEnergyPrimRecHG.hpp"
-#include "GeometricalDerivatives1X1ForGF.hpp"
-
-#include "T2CUtils.hpp"
-#include "T2CTransform.hpp"
 #include "BatchFunc.hpp"
+#include "GeometricalDerivatives1X1ForGF.hpp"
+#include "GtoBlock.hpp"
+#include "KineticEnergyPrimRecDD.hpp"
+#include "KineticEnergyPrimRecDF.hpp"
+#include "KineticEnergyPrimRecDG.hpp"
+#include "KineticEnergyPrimRecDP.hpp"
+#include "KineticEnergyPrimRecDS.hpp"
+#include "KineticEnergyPrimRecFD.hpp"
+#include "KineticEnergyPrimRecFF.hpp"
+#include "KineticEnergyPrimRecFG.hpp"
+#include "KineticEnergyPrimRecFP.hpp"
+#include "KineticEnergyPrimRecFS.hpp"
+#include "KineticEnergyPrimRecGD.hpp"
+#include "KineticEnergyPrimRecGF.hpp"
+#include "KineticEnergyPrimRecGG.hpp"
+#include "KineticEnergyPrimRecGP.hpp"
+#include "KineticEnergyPrimRecHD.hpp"
+#include "KineticEnergyPrimRecHG.hpp"
+#include "KineticEnergyPrimRecPD.hpp"
+#include "KineticEnergyPrimRecPF.hpp"
+#include "KineticEnergyPrimRecPG.hpp"
+#include "KineticEnergyPrimRecPP.hpp"
+#include "KineticEnergyPrimRecPS.hpp"
+#include "KineticEnergyPrimRecSD.hpp"
+#include "KineticEnergyPrimRecSF.hpp"
+#include "KineticEnergyPrimRecSG.hpp"
+#include "KineticEnergyPrimRecSP.hpp"
+#include "KineticEnergyPrimRecSS.hpp"
+#include "OverlapPrimRecDD.hpp"
+#include "OverlapPrimRecDF.hpp"
+#include "OverlapPrimRecDG.hpp"
+#include "OverlapPrimRecDP.hpp"
+#include "OverlapPrimRecDS.hpp"
+#include "OverlapPrimRecFD.hpp"
+#include "OverlapPrimRecFF.hpp"
+#include "OverlapPrimRecFG.hpp"
+#include "OverlapPrimRecFP.hpp"
+#include "OverlapPrimRecFS.hpp"
+#include "OverlapPrimRecGD.hpp"
+#include "OverlapPrimRecGF.hpp"
+#include "OverlapPrimRecGG.hpp"
+#include "OverlapPrimRecGP.hpp"
+#include "OverlapPrimRecHD.hpp"
+#include "OverlapPrimRecHG.hpp"
+#include "OverlapPrimRecPD.hpp"
+#include "OverlapPrimRecPF.hpp"
+#include "OverlapPrimRecPG.hpp"
+#include "OverlapPrimRecPP.hpp"
+#include "OverlapPrimRecPS.hpp"
+#include "OverlapPrimRecSD.hpp"
+#include "OverlapPrimRecSF.hpp"
+#include "OverlapPrimRecSG.hpp"
+#include "OverlapPrimRecSP.hpp"
+#include "OverlapPrimRecSS.hpp"
+#include "SimdArray.hpp"
+#include "T2CTransform.hpp"
+#include "T2CUtils.hpp"
 
-namespace kinrec { // kinrec namespace
+namespace kinrec {  // kinrec namespace
 
 /// @brief Computes (d^(1)/dA^(1)G|T|d^(1)/dB^(1)F)  integrals for pair of basis functions blocks.
 /// @param distributor The integrals distributor.
@@ -76,12 +75,12 @@ namespace kinrec { // kinrec namespace
 /// @param bra_eq_ket True if basis functions blocks on bra and ket are the same, False otherwise.
 template <class T>
 auto
-comp_kinetic_energy_geom_11_gf(T& distributor,
-                               const CGtoBlock& bra_gto_block,
-                               const CGtoBlock& ket_gto_block,
+comp_kinetic_energy_geom_11_gf(T&                               distributor,
+                               const CGtoBlock&                 bra_gto_block,
+                               const CGtoBlock&                 ket_gto_block,
                                const std::pair<size_t, size_t>& bra_indices,
                                const std::pair<size_t, size_t>& ket_indices,
-                               const bool bra_eq_ket) -> void
+                               const bool                       bra_eq_ket) -> void
 {
     // intialize GTOs data on bra side
 
@@ -287,6 +286,6 @@ comp_kinetic_energy_geom_11_gf(T& distributor,
     }
 }
 
-} // kinrec namespace
+}  // namespace kinrec
 
 #endif /* KineticEnergyGeom101RecGF_hpp */

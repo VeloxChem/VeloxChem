@@ -42,8 +42,8 @@ auto make_work_tasks(const std::vector<CGtoBlock>& gto_blocks) -> std::vector<st
 /// @param bra_gto_blocks The vector of basis functions blocks on bra side.
 /// @param ket_gto_blocks The vector of basis functions blocks on ket side.
 /// @return The vector of work tasks.
-auto make_work_tasks(const std::vector<CGtoBlock>& bra_gto_blocks, const std::vector<CGtoBlock>& ket_gto_blocks)
-    -> std::vector<std::array<size_t, 6>>;
+auto make_work_tasks(const std::vector<CGtoBlock>& bra_gto_blocks,
+                     const std::vector<CGtoBlock>& ket_gto_blocks) -> std::vector<std::array<size_t, 6>>;
 
 }  // namespace omp
 

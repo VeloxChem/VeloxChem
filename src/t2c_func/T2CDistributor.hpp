@@ -49,7 +49,7 @@ class CT2CDistributor
                     const int                        ket_angmom,
                     const size_t                     bra_igto,
                     const std::pair<size_t, size_t>& ket_range,
-                    const bool                       diagonal) -> void{};
+                    const bool                       diagonal) -> void {};
 
     /// @brief Gets Cartesian  coordinates of external points.
     /// @return The vector of Cartesian coordinates of external points.
@@ -93,13 +93,7 @@ CT2CDistributor<CMatrix>::distribute(const CSimdArray<double>&        buffer,
     {
         if (diagonal)
         {
-            t2cfunc::distribute(_storage->sub_matrix({bra_angmom, bra_angmom}),
-                                buffer,
-                                size_t{0},
-                                bra_indices,
-                                bra_angmom,
-                                bra_igto,
-                                ket_range);
+            t2cfunc::distribute(_storage->sub_matrix({bra_angmom, bra_angmom}), buffer, size_t{0}, bra_indices, bra_angmom, bra_igto, ket_range);
         }
         else
         {
@@ -151,13 +145,7 @@ CT2CDistributor<CMatrices>::distribute(const CSimdArray<double>&        buffer,
         {
             if (diagonal)
             {
-                t2cfunc::distribute(matrix->sub_matrix({bra_angmom, bra_angmom}),
-                                    buffer,
-                                    buff_off,
-                                    bra_indices,
-                                    bra_angmom,
-                                    bra_igto,
-                                    ket_range);
+                t2cfunc::distribute(matrix->sub_matrix({bra_angmom, bra_angmom}), buffer, buff_off, bra_indices, bra_angmom, bra_igto, ket_range);
             }
             else
             {

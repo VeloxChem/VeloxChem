@@ -34,8 +34,7 @@ make_work_tasks(const std::vector<CGtoBlock>& gto_blocks) -> std::vector<std::ar
                     const auto [k, l]   = bkpair;
                     const auto bindices = batch::batch_range(k, bra_size, bra_bsize);
                     const auto kindices = batch::batch_range(l, bra_size, bra_bsize);
-                    tasks.push_back(
-                        {index.first, index.second, bindices.first, bindices.second, kindices.first, kindices.second});
+                    tasks.push_back({index.first, index.second, bindices.first, bindices.second, kindices.first, kindices.second});
                 });
             }
             else
@@ -44,8 +43,7 @@ make_work_tasks(const std::vector<CGtoBlock>& gto_blocks) -> std::vector<std::ar
                     const auto [k, l]   = bkpair;
                     const auto bindices = batch::batch_range(k, bra_size, bra_bsize);
                     const auto kindices = batch::batch_range(l, ket_size, ket_bsize);
-                    tasks.push_back(
-                        {index.first, index.second, bindices.first, bindices.second, kindices.first, kindices.second});
+                    tasks.push_back({index.first, index.second, bindices.first, bindices.second, kindices.first, kindices.second});
                 });
             }
         });
@@ -55,13 +53,11 @@ make_work_tasks(const std::vector<CGtoBlock>& gto_blocks) -> std::vector<std::ar
 }
 
 auto
-make_work_tasks(const std::vector<CGtoBlock>& bra_gto_blocks, const std::vector<CGtoBlock>& ket_gto_blocks)
-    -> std::vector<std::array<size_t, 6>>
+make_work_tasks(const std::vector<CGtoBlock>& bra_gto_blocks, const std::vector<CGtoBlock>& ket_gto_blocks) -> std::vector<std::array<size_t, 6>>
 {
     auto tasks = std::vector<std::array<size_t, 6>>{};
 
-    if (const auto bra_nblocks = bra_gto_blocks.size(), ket_nblocks = ket_gto_blocks.size();
-        (bra_nblocks > 0) && (ket_nblocks > 0))
+    if (const auto bra_nblocks = bra_gto_blocks.size(), ket_nblocks = ket_gto_blocks.size(); (bra_nblocks > 0) && (ket_nblocks > 0))
     {
         const auto nthreads = omp::get_number_of_threads();
 
@@ -79,8 +75,7 @@ make_work_tasks(const std::vector<CGtoBlock>& bra_gto_blocks, const std::vector<
                 const auto [k, l]   = bkpair;
                 const auto bindices = batch::batch_range(k, bra_size, bra_bsize);
                 const auto kindices = batch::batch_range(l, ket_size, ket_bsize);
-                tasks.push_back(
-                    {index.first, index.second, bindices.first, bindices.second, kindices.first, kindices.second});
+                tasks.push_back({index.first, index.second, bindices.first, bindices.second, kindices.first, kindices.second});
             });
         });
     }

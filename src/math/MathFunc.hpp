@@ -27,7 +27,7 @@ equal(const T flhs, const T frhs, const T rtol, const T atol) -> bool
 /// @param i The index of row in matrix.
 /// @param j The index of collumn in matrix.
 /// @return The linearized index.
-template<Integral T>
+template <Integral T>
 inline auto
 uplo_index(const T i, const T j) -> T
 {

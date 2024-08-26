@@ -1,37 +1,36 @@
 #ifndef NuclearPotentialGeom101SumRecDF_hpp
 #define NuclearPotentialGeom101SumRecDF_hpp
 
-#include <cstddef>
 #include <array>
+#include <cstddef>
 #include <utility>
 
+#include "BatchFunc.hpp"
+#include "BoysFunc.hpp"
+#include "GeometricalDerivatives1X1ForDF.hpp"
 #include "GtoBlock.hpp"
-#include "SimdArray.hpp"
-#include "OverlapPrimRecSS.hpp"
-#include "NuclearPotentialPrimRecSS.hpp"
-#include "NuclearPotentialPrimRecSP.hpp"
-#include "NuclearPotentialPrimRecSD.hpp"
-#include "NuclearPotentialPrimRecSF.hpp"
-#include "NuclearPotentialPrimRecSG.hpp"
-#include "NuclearPotentialPrimRecPS.hpp"
-#include "NuclearPotentialPrimRecPP.hpp"
-#include "NuclearPotentialPrimRecPD.hpp"
-#include "NuclearPotentialPrimRecPF.hpp"
-#include "NuclearPotentialPrimRecPG.hpp"
-#include "NuclearPotentialPrimRecDP.hpp"
 #include "NuclearPotentialPrimRecDD.hpp"
 #include "NuclearPotentialPrimRecDF.hpp"
 #include "NuclearPotentialPrimRecDG.hpp"
+#include "NuclearPotentialPrimRecDP.hpp"
 #include "NuclearPotentialPrimRecFD.hpp"
 #include "NuclearPotentialPrimRecFG.hpp"
-#include "GeometricalDerivatives1X1ForDF.hpp"
-
-#include "BoysFunc.hpp"
-#include "T2CUtils.hpp"
+#include "NuclearPotentialPrimRecPD.hpp"
+#include "NuclearPotentialPrimRecPF.hpp"
+#include "NuclearPotentialPrimRecPG.hpp"
+#include "NuclearPotentialPrimRecPP.hpp"
+#include "NuclearPotentialPrimRecPS.hpp"
+#include "NuclearPotentialPrimRecSD.hpp"
+#include "NuclearPotentialPrimRecSF.hpp"
+#include "NuclearPotentialPrimRecSG.hpp"
+#include "NuclearPotentialPrimRecSP.hpp"
+#include "NuclearPotentialPrimRecSS.hpp"
+#include "OverlapPrimRecSS.hpp"
+#include "SimdArray.hpp"
 #include "T2CTransform.hpp"
-#include "BatchFunc.hpp"
+#include "T2CUtils.hpp"
 
-namespace npotrec { // npotrec namespace
+namespace npotrec {  // npotrec namespace
 
 /// @brief Computes (d^(1)/dA^(1)D|A|d^(1)/dB^(1)F)  integrals for pair of basis functions blocks.
 /// @param distributor The integrals distributor.
@@ -42,12 +41,12 @@ namespace npotrec { // npotrec namespace
 /// @param bra_eq_ket True if basis functions blocks on bra and ket are the same, False otherwise.
 template <class T>
 auto
-comp_sum_nuclear_potential_geom_11_df(T& distributor,
-                                      const CGtoBlock& bra_gto_block,
-                                      const CGtoBlock& ket_gto_block,
+comp_sum_nuclear_potential_geom_11_df(T&                               distributor,
+                                      const CGtoBlock&                 bra_gto_block,
+                                      const CGtoBlock&                 ket_gto_block,
                                       const std::pair<size_t, size_t>& bra_indices,
                                       const std::pair<size_t, size_t>& ket_indices,
-                                      const bool bra_eq_ket) -> void
+                                      const bool                       bra_eq_ket) -> void
 {
     // intialize external coordinate(s)
 
@@ -151,9 +150,9 @@ comp_sum_nuclear_potential_geom_11_df(T& distributor,
 
                 t2cfunc::comp_coordinates_p(factors, 8, 2, r_a, a_exp);
 
-                t2cfunc::comp_distances_pa_from_p(factors, 11 , 8, r_a);
+                t2cfunc::comp_distances_pa_from_p(factors, 11, 8, r_a);
 
-                t2cfunc::comp_distances_pb_from_p(factors, 14 , 8, 2);
+                t2cfunc::comp_distances_pb_from_p(factors, 14, 8, 2);
 
                 ovlrec::comp_prim_overlap_ss(pbuffer, 0, factors, a_exp, a_norm);
 
@@ -288,6 +287,6 @@ comp_sum_nuclear_potential_geom_11_df(T& distributor,
     }
 }
 
-} // npotrec namespace
+}  // namespace npotrec
 
 #endif /* NuclearPotentialGeom101SumRecDF_hpp */

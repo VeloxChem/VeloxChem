@@ -36,9 +36,7 @@ class CMatrix
     /// @param ang_pairs The vector of angular pairs.
     /// @param sub_matrices The vector of submatrices.
     /// @param mat_type The matrix type.
-    CMatrix(const std::vector<std::pair<int, int>> &ang_pairs,
-            const std::vector<CSubMatrix>          &sub_matrices,
-            const mat_t                             mat_type);
+    CMatrix(const std::vector<std::pair<int, int>> &ang_pairs, const std::vector<CSubMatrix> &sub_matrices, const mat_t mat_type);
 
     /// @brief The default copy constructor.
     /// @param other The matrix to be copied.

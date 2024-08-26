@@ -86,9 +86,7 @@ CSubMatrix::operator==(const CSubMatrix &other) const -> bool
     }
     else
     {
-        return std::ranges::equal(_values, other._values, [](auto lhs, auto rhs) -> bool {
-            return mathfunc::equal(lhs, rhs, 1.0e-12, 1.0e-12);
-        });
+        return std::ranges::equal(_values, other._values, [](auto lhs, auto rhs) -> bool { return mathfunc::equal(lhs, rhs, 1.0e-12, 1.0e-12); });
     }
 }
 
@@ -105,8 +103,7 @@ CSubMatrix::operator+(const CSubMatrix &other) const -> CSubMatrix
     {
         auto matrix = CSubMatrix(_dimensions);
 
-        std::ranges::transform(
-            _values, other._values, matrix._values.begin(), [](const double &a, const double &b) { return a + b; });
+        std::ranges::transform(_values, other._values, matrix._values.begin(), [](const double &a, const double &b) { return a + b; });
 
         return matrix;
     }

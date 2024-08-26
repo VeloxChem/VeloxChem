@@ -14,47 +14,46 @@ template <int N>
 class CBoysFunc
 {
    public:
-    
     /// @brief Default contructor of Boys function evaluator.
     CBoysFunc();
-    
+
     /// @brief The default copy constructor.
     /// @param other The Boys function evaluator to be copied.
-    CBoysFunc(const CBoysFunc &other) = delete;
+    CBoysFunc(const CBoysFunc& other) = delete;
 
     /// @brief The default move constructor.
     /// @param other The Boys function evaluator to be moved.
-    CBoysFunc(CBoysFunc &&other) noexcept = delete;
+    CBoysFunc(CBoysFunc&& other) noexcept = delete;
 
     /// @brief The default destructor.
     ~CBoysFunc() {};
-    
+
     /// @brief The default copy assignment operator.
     /// @param other The Boys function evaluator to be copy assigned.
     /// @return The assigned Boys function evaluator.
-    auto operator=(const CBoysFunc &other) -> CBoysFunc & = delete;
+    auto operator=(const CBoysFunc& other) -> CBoysFunc& = delete;
 
     /// @brief The default move assignment operator.
     /// @param other The Boys function evaluator to be move assigned.
     /// @return The assigned Boys function evaluator.
-    auto operator=(CBoysFunc &&other) noexcept -> CBoysFunc & = delete;
+    auto operator=(CBoysFunc&& other) noexcept -> CBoysFunc& = delete;
 
     /// @brief The equality operator.
     /// @param other The Boys function evaluator to be compared.
     /// @return True if Boys function evaluators are equal, False otherwise.
-    auto operator==(const CBoysFunc &other) const -> bool = delete;
+    auto operator==(const CBoysFunc& other) const -> bool = delete;
 
     /// @brief The non-equality operator.
     /// @param other The Boys function evaluator to be compared.
     /// @return True if Boys function evaluators are not equal, False otherwise.
-    auto operator!=(const CBoysFunc &other) const -> bool = delete;
+    auto operator!=(const CBoysFunc& other) const -> bool = delete;
 
     /// @brief Computes Boys function values up to specified order (inclusively) for given vector of arguments.
     /// @param buffer The Boys function data buffer (values, arguments).
     /// @param index_vals The primary row index of values in Boys function data.
     /// @param index_args The primary row index of arguments in Boys function data.
     auto compute(CSimdArray<double>& buffer, const size_t index_vals, const size_t index_args) const -> void;
-   
+
     /// @brief Computes scaled Boys function values up to specified order (inclusively) for given vector of arguments.
     /// @param buffer The Boys function data buffer (values, arguments).
     /// @param index_vals The primary row index of values in Boys function data.
@@ -63,9 +62,14 @@ class CBoysFunc
     /// @param a_exp The primitive basis function exponent on center A.
     /// @param omega THe range separation parameter.
     /// @WARNING Boys function arguments are overwrited during computation.
-    auto compute(CSimdArray<double>& buffer, const size_t index_vals, const size_t index_args, const CSimdArray<double>& factors, const double a_exp, const double omega) const -> void;
-private:
-    
+    auto compute(CSimdArray<double>&       buffer,
+                 const size_t              index_vals,
+                 const size_t              index_args,
+                 const CSimdArray<double>& factors,
+                 const double              a_exp,
+                 const double              omega) const -> void;
+
+   private:
     /// @brief The order of Boys function.
     int _order;
 
@@ -24789,7 +24793,7 @@ CBoysFunc<N>::compute(CSimdArray<double>& buffer, const size_t index_vals, const
 
             buffer.data(index_vals + N)[i] = _table[pnt][0] + _table[pnt][1] * w + _table[pnt][2] * w2 + _table[pnt][3] * w2 * w
 
-                                + _table[pnt][4] * w4 + _table[pnt][5] * w4 * w + _table[pnt][6] * w4 * w2;
+                                             + _table[pnt][4] * w4 + _table[pnt][5] * w4 * w + _table[pnt][6] * w4 * w2;
 
             const double f2a = fa + fa;
 
@@ -24844,45 +24848,50 @@ CBoysFunc<N>::compute(CSimdArray<double>& buffer, const size_t index_vals, const
 
 template <int N>
 auto
-CBoysFunc<N>::compute(CSimdArray<double>& buffer, const size_t index_vals, const size_t index_args, const CSimdArray<double>& factors, const double a_exp, const double omega) const -> void
+CBoysFunc<N>::compute(CSimdArray<double>&       buffer,
+                      const size_t              index_vals,
+                      const size_t              index_args,
+                      const CSimdArray<double>& factors,
+                      const double              a_exp,
+                      const double              omega) const -> void
 {
     // compute Boys function values
-    
+
     compute(buffer, index_vals, index_args);
-    
+
     // set up exponents
 
     auto b_exps = buffer.data(0);
-    
+
     // rescale computed Boys function values
-    
+
     auto bvals = buffer.data(index_vals);
-    
+
     auto facts = buffer.data(index_args);
-    
+
     auto nelems = buffer.number_of_active_elements();
-    
-    #pragma omp simd aligned(bvals, facts, b_exps : 64)
+
+#pragma omp simd aligned(bvals, facts, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double frho = a_exp + b_exps[i];
-        
+
         facts[i] = omega / std::sqrt(omega * omega + frho);
-        
+
         bvals[i] *= facts[i];
     }
-    
+
     for (int i = 1; i <= N; i++)
     {
         auto bvals = buffer.data(index_vals + i);
-        
-        #pragma omp simd aligned(bvals, facts, b_exps : 64)
+
+#pragma omp simd aligned(bvals, facts, b_exps : 64)
         for (size_t j = 0; j < nelems; j++)
         {
             const double frho = a_exp + b_exps[j];
-            
+
             facts[j] *= omega * omega / (omega * omega + frho);
-            
+
             bvals[j] *= facts[j];
         }
     }

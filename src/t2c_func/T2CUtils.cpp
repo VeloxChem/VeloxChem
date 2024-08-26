@@ -9,8 +9,7 @@
 namespace t2cfunc {  // t2cfunc namespace
 
 auto
-comp_distances_ab(CSimdArray<double>& buffer, const size_t index_ab, const size_t index_b, const TPoint<double>& r_a)
-    -> void
+comp_distances_ab(CSimdArray<double>& buffer, const size_t index_ab, const size_t index_b, const TPoint<double>& r_a) -> void
 {
     // set up R(AB) distances
 
@@ -54,11 +53,7 @@ comp_distances_ab(CSimdArray<double>& buffer, const size_t index_ab, const size_
 }
 
 auto
-comp_coordinates_p(CSimdArray<double>&   buffer,
-                   const size_t          index_p,
-                   const size_t          index_b,
-                   const TPoint<double>& r_a,
-                   const double          a_exp) -> void
+comp_coordinates_p(CSimdArray<double>& buffer, const size_t index_p, const size_t index_b, const TPoint<double>& r_a, const double a_exp) -> void
 {
     // Set up exponents
 
@@ -188,8 +183,7 @@ comp_distances_pa(CSimdArray<double>& buffer, const size_t index_pa, const size_
 }
 
 auto
-comp_distances_pb_from_p(CSimdArray<double>& buffer, const size_t index_pb, const size_t index_p, const size_t index_b)
-    -> void
+comp_distances_pb_from_p(CSimdArray<double>& buffer, const size_t index_pb, const size_t index_p, const size_t index_b) -> void
 {
     // set up R(PB) distances
 
@@ -231,10 +225,7 @@ comp_distances_pb_from_p(CSimdArray<double>& buffer, const size_t index_pb, cons
 }
 
 auto
-comp_distances_pa_from_p(CSimdArray<double>&   buffer,
-                         const size_t          index_pa,
-                         const size_t          index_p,
-                         const TPoint<double>& r_a) -> void
+comp_distances_pa_from_p(CSimdArray<double>& buffer, const size_t index_pa, const size_t index_p, const TPoint<double>& r_a) -> void
 {
     // set up R(PA) distances
 
@@ -278,18 +269,13 @@ comp_distances_pa_from_p(CSimdArray<double>&   buffer,
 }
 
 auto
-comp_distances_pc(CSimdArray<double>& buffer, const size_t index_pc, const size_t index_p, const TPoint<double>& r_c)
-    -> void
+comp_distances_pc(CSimdArray<double>& buffer, const size_t index_pc, const size_t index_p, const TPoint<double>& r_c) -> void
 {
     t2cfunc::comp_distances_pa_from_p(buffer, index_pc, index_p, r_c);
 }
 
 void
-comp_boys_args(CSimdArray<double>& bf_data,
-               const size_t        index_args,
-               CSimdArray<double>& buffer,
-               const size_t        index_pc,
-               const double        a_exp)
+comp_boys_args(CSimdArray<double>& bf_data, const size_t index_args, CSimdArray<double>& buffer, const size_t index_pc, const double a_exp)
 {
     // Set up exponents
 
@@ -358,11 +344,7 @@ comp_boys_args(CSimdArray<double>& bf_data,
 }
 
 auto
-reduce(CSimdArray<double>& cbuffer,
-       CSimdArray<double>& pbuffer,
-       const size_t        position,
-       const size_t        ndims,
-       const size_t        nblocks) -> void
+reduce(CSimdArray<double>& cbuffer, CSimdArray<double>& pbuffer, const size_t position, const size_t ndims, const size_t nblocks) -> void
 {
     if (const auto nrows = cbuffer.number_of_rows(); nrows > 0)
     {
@@ -381,12 +363,8 @@ reduce(CSimdArray<double>& cbuffer,
 }
 
 auto
-reduce(CSimdArray<double>& cbuffer,
-       CSimdArray<double>& pbuffer,
-       const size_t        position,
-       const double        factor,
-       const size_t        ndims,
-       const size_t        nblocks) -> void
+reduce(CSimdArray<double>& cbuffer, CSimdArray<double>& pbuffer, const size_t position, const double factor, const size_t ndims, const size_t nblocks)
+    -> void
 {
     if (const auto nrows = cbuffer.number_of_rows(); nrows > 0)
     {
@@ -448,9 +426,8 @@ distribute(CSubMatrix*                      matrix,
 {
     const auto bra_idx = indices[0] * bra_comp + indices[bra_igto + 1];
 
-    std::ranges::for_each(std::views::iota(ket_range.first, ket_range.second), [&](const auto i) {
-        matrix->operator[]({bra_idx, indices[0] * ket_comp + indices[i + 1]}) = buffer[i - ket_range.first];
-    });
+    std::ranges::for_each(std::views::iota(ket_range.first, ket_range.second),
+                          [&](const auto i) { matrix->operator[]({bra_idx, indices[0] * ket_comp + indices[i + 1]}) = buffer[i - ket_range.first]; });
 }
 
 auto
@@ -542,15 +519,7 @@ distribute(CSubMatrix*                      matrix,
 
     std::ranges::for_each(views::rectangular(bra_comps, ket_comps), [&](const auto& index) {
         const auto [i, j] = index;
-        t2cfunc::distribute(matrix,
-                            buffer.data(offset + i * ket_comps + j),
-                            bra_indices,
-                            ket_indices,
-                            i,
-                            j,
-                            bra_igto,
-                            ket_range,
-                            mat_type);
+        t2cfunc::distribute(matrix, buffer.data(offset + i * ket_comps + j), bra_indices, ket_indices, i, j, bra_igto, ket_range, mat_type);
     });
 }
 
@@ -572,15 +541,7 @@ distribute(CSubMatrix*                      matrix,
 
     std::ranges::for_each(views::rectangular(bra_comps, ket_comps), [&](const auto& index) {
         const auto [i, j] = index;
-        t2cfunc::distribute(matrix,
-                            buffer.data(offset + i * ket_comps + j),
-                            bra_indices,
-                            ket_indices,
-                            i,
-                            j,
-                            bra_igto,
-                            ket_range,
-                            ang_order);
+        t2cfunc::distribute(matrix, buffer.data(offset + i * ket_comps + j), bra_indices, ket_indices, i, j, bra_igto, ket_range, ang_order);
     });
 }
 

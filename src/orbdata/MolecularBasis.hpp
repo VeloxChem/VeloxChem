@@ -16,7 +16,8 @@ class CMolecularBasis
     /// @brief The default constructor.
     CMolecularBasis();
 
-    /// @brief The constructor witj vector of unique atom bases and vector of atom bases indices.
+    /// @brief The constructor witj vector of unique atom bases and vector of
+    /// atom bases indices.
     /// @param basis_sets The vector of unique atom bases.
     /// @param indices The vector of atom bases indices.
     CMolecularBasis(const std::vector<CAtomBasis> &basis_sets, const std::vector<int> &indices);

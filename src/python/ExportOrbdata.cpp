@@ -12,6 +12,7 @@
 #include "BasisFunction.hpp"
 #include "GtoBlock.hpp"
 #include "GtoFunc.hpp"
+#include "GtoPairBlock.hpp"
 #include "MolecularBasis.hpp"
 
 namespace py = pybind11;
@@ -244,6 +245,31 @@ export_orbdata(py::module &m)
         .def("__eq__", [](const CGtoBlock &self, const CGtoBlock &other) { return self == other; })
         .def("__copy__", [](const CGtoBlock &self) { return CGtoBlock(self); })
         .def("__deepcopy__", [](const CGtoBlock &self, py::dict) { return CGtoBlock(self); });
+
+    // CGtoPairBlock class
+    PyClass<CGtoPairBlock>(m, "GtoPairBlock")
+        .def(py::init<>())
+        .def(py::init<const CGtoPairBlock &>())
+        .def(py::init<const CGtoBlock &>())
+        .def(py::init<const CGtoBlock &, const CGtoBlock &>())
+        .def("bra_coordinates", &CGtoPairBlock::bra_coordinates, "Gets vector of Cartesian coordinates of center A.")
+        .def("ket_coordinates", &CGtoPairBlock::ket_coordinates, "Gets vector of Cartesian coordinates of center B.")
+        .def("bra_exponents", &CGtoPairBlock::bra_exponents, "Gets vector of basis function exponents of center A.")
+        .def("ket_exponents", &CGtoPairBlock::ket_exponents, "Gets vector of basis function exponents of center B.")
+        .def("normalization_factors", &CGtoPairBlock::normalization_factors, "Gets vector of basis functions normalization factors.")
+        .def("overlap_factors", &CGtoPairBlock::overlap_factors, "Gets vector of basis functions overlap factors.")
+        .def("bra_orbital_indices", &CGtoPairBlock::bra_orbital_indices, "Gets vector of orbital indices of center A.")
+        .def("ket_orbital_indices", &CGtoPairBlock::ket_orbital_indices, "Gets vector of orbital indices of center B.")
+        .def("bra_atomic_indices", &CGtoPairBlock::bra_atomic_indices, "Gets vector of atomic indices of center A.")
+        .def("ket_atomic_indices", &CGtoPairBlock::ket_atomic_indices, "Gets vector of atomic indices of center B.")
+        .def("angular_momentums", &CGtoPairBlock::angular_momentums, "Gets angular momentums of GTOs pair.")
+        .def("number_of_primitive_pairs", &CGtoPairBlock::number_of_primitive_pairs, "Gets number of primitive GTO pairs in GTO pair.")
+        .def("number_of_contracted_pairs",
+             &CGtoPairBlock::number_of_contracted_pairs,
+             "Gets number of contracted GTO pairs in basis function pairs block.")
+        .def("__eq__", [](const CGtoPairBlock &self, const CGtoPairBlock &other) { return self == other; })
+        .def("__copy__", [](const CGtoPairBlock &self) { return CGtoPairBlock(self); })
+        .def("__deepcopy__", [](const CGtoPairBlock &self, py::dict) { return CGtoPairBlock(self); });
 }
 
 }  // namespace vlx_orbdata

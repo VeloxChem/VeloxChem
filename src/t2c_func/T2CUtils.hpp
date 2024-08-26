@@ -16,10 +16,7 @@ namespace t2cfunc {  // t2cfunc namespace
 /// @param index_ab The primary row index of R(AB) distances in SIMD array.
 /// @param index_b  The primary row index of  Cartesian B points coordinates in SIMD array.
 /// @param r_a The Cartesian A point coordinates.
-auto comp_distances_ab(CSimdArray<double>&   buffer,
-                       const size_t          index_ab,
-                       const size_t          index_b,
-                       const TPoint<double>& r_a) -> void;
+auto comp_distances_ab(CSimdArray<double>& buffer, const size_t index_ab, const size_t index_b, const TPoint<double>& r_a) -> void;
 
 /// @brief Computes P center coordinates.
 /// @param buffer The SIMD array containing R(AB) distances and Cartesian A, B coordinates.
@@ -27,57 +24,43 @@ auto comp_distances_ab(CSimdArray<double>&   buffer,
 /// @param index_b  The primary row index of  Cartesian B points coordinates in SIMD array.
 /// @param r_a The Cartesian A point coordinates.
 /// @param a_exp The exponent on A center.
-auto comp_coordinates_p(CSimdArray<double>&   buffer,
-                        const size_t          index_p,
-                        const size_t          index_b,
-                        const TPoint<double>& r_a,
-                        const double          a_exp) -> void;
+auto comp_coordinates_p(CSimdArray<double>& buffer, const size_t index_p, const size_t index_b, const TPoint<double>& r_a, const double a_exp)
+    -> void;
 
 /// @brief Computes R(PB) = P - B distances.
 /// @param buffer The SIMD array containing R(PB) distances.
 /// @param index_pb The primary row index of R(PB) distances in SIMD array.
 /// @param index_ab The primary row index of R(AB) distances in SIMD array.
 /// @param a_exp The exponent on A center.
-auto comp_distances_pb(CSimdArray<double>& buffer, const size_t index_pb, const size_t index_ab, const double a_exp)
-    -> void;
+auto comp_distances_pb(CSimdArray<double>& buffer, const size_t index_pb, const size_t index_ab, const double a_exp) -> void;
 
 /// @brief Computes R(PA) = P - A distances.
 /// @param buffer The SIMD array containing R(PA) distances.
 /// @param index_pa The primary row index of R(PA) distances in SIMD array.
 /// @param index_ab The primary row index of R(AB) distances in SIMD array.
 /// @param a_exp The exponent on A center.
-auto comp_distances_pa(CSimdArray<double>& buffer, const size_t index_pa, const size_t index_ab, const double a_exp)
-    -> void;
+auto comp_distances_pa(CSimdArray<double>& buffer, const size_t index_pa, const size_t index_ab, const double a_exp) -> void;
 
 /// @brief Computes R(PB) = P - B distances.
 /// @param buffer The SIMD array containing R(PB) distances.
 /// @param index_pb The primary row index of R(PB) distances in SIMD array.
 /// @param index_p The primary row index of  Cartesian P points coordinates in SIMD array.
 /// @param index_b  The primary row index of  Cartesian B points coordinates in SIMD array.
-auto comp_distances_pb_from_p(CSimdArray<double>& buffer,
-                              const size_t        index_pb,
-                              const size_t        index_p,
-                              const size_t        index_b) -> void;
+auto comp_distances_pb_from_p(CSimdArray<double>& buffer, const size_t index_pb, const size_t index_p, const size_t index_b) -> void;
 
 /// @brief Computes R(PA) = P - A distances.
 /// @param buffer The SIMD array containing R(PA) distances.
 /// @param index_pa The primary row index of R(PA) distances in SIMD array.
 /// @param index_p The primary row index of  Cartesian P points coordinates in SIMD array.
 /// @param r_a The Cartesian A point coordinates.
-auto comp_distances_pa_from_p(CSimdArray<double>&   buffer,
-                              const size_t          index_pa,
-                              const size_t          index_p,
-                              const TPoint<double>& r_a) -> void;
+auto comp_distances_pa_from_p(CSimdArray<double>& buffer, const size_t index_pa, const size_t index_p, const TPoint<double>& r_a) -> void;
 
 /// @brief Computes R(PC) = P - C distances.
 /// @param buffer The SIMD array containing R(PC) distances.
 /// @param index_pc The primary row index of R(PC) distances in SIMD array.
 /// @param index_p The primary row index of  Cartesian P points coordinates in SIMD array.
 /// @param r_c The Cartesian C point coordinates.
-auto comp_distances_pc(CSimdArray<double>&   buffer,
-                       const size_t          index_pc,
-                       const size_t          index_p,
-                       const TPoint<double>& r_c) -> void;
+auto comp_distances_pc(CSimdArray<double>& buffer, const size_t index_pc, const size_t index_p, const TPoint<double>& r_c) -> void;
 
 /// Computes Boys function arguments.
 /// @param bf_data The Boys function data.
@@ -85,11 +68,7 @@ auto comp_distances_pc(CSimdArray<double>&   buffer,
 /// @param buffer The SIMD array containing R(PC) distances.
 /// @param index_pc The primary row index of R(PC) distances in SIMD array.
 /// @param a_exp The exponent on A center.
-void comp_boys_args(CSimdArray<double>& bf_data,
-                    const size_t        index_args,
-                    CSimdArray<double>& buffer,
-                    const size_t        index_pc,
-                    const double        a_exp);
+void comp_boys_args(CSimdArray<double>& bf_data, const size_t index_args, CSimdArray<double>& buffer, const size_t index_pc, const double a_exp);
 
 /// Computes Boys function arguments.
 /// @param bf_data The Boys function data.
@@ -111,11 +90,7 @@ void comp_boys_args(CSimdArray<double>& bf_data,
 /// @param position The starting position in primitive array.
 /// @param ndims The dimensions of contracted row.
 /// @param nblocks The number of blocks in primitive row.
-auto reduce(CSimdArray<double>& cbuffer,
-            CSimdArray<double>& pbuffer,
-            const size_t        position,
-            const size_t        ndims,
-            const size_t        nblocks) -> void;
+auto reduce(CSimdArray<double>& cbuffer, CSimdArray<double>& pbuffer, const size_t position, const size_t ndims, const size_t nblocks) -> void;
 
 /// @brief Reduces primitive array to contracted array.
 /// @param cbuffer The contracted array.

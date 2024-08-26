@@ -34,9 +34,8 @@ make_matrices(const std::array<int, N>& orders, const CMolecularBasis& basis, co
     std::ranges::for_each(std::views::iota(size_t{1}, N), [&](const auto i) {
         std::vector<std::string> new_labels;
         auto                     clabels = tensor::cartesian_labels(orders[i]);
-        std::ranges::for_each(views::rectangular(labels.size(), clabels.size()), [&](const auto& index) {
-            new_labels.push_back(labels[index.first] + "_" + clabels[index.second]);
-        });
+        std::ranges::for_each(views::rectangular(labels.size(), clabels.size()),
+                              [&](const auto& index) { new_labels.push_back(labels[index.first] + "_" + clabels[index.second]); });
         labels = new_labels;
     });
 
@@ -53,8 +52,7 @@ make_matrices(const std::array<int, N>& orders, const CMolecularBasis& basis, co
 /// @return The matrices.
 template <size_t N>
 auto
-make_matrices(const std::array<int, N>& orders, const CMolecularBasis& bra_basis, const CMolecularBasis& ket_basis)
-    -> CMatrices
+make_matrices(const std::array<int, N>& orders, const CMolecularBasis& bra_basis, const CMolecularBasis& ket_basis) -> CMatrices
 {
     CMatrices matrices;
 
@@ -65,9 +63,8 @@ make_matrices(const std::array<int, N>& orders, const CMolecularBasis& bra_basis
     std::ranges::for_each(std::views::iota(size_t{1}, N), [&](const auto i) {
         std::vector<std::string> new_labels;
         auto                     clabels = tensor::cartesian_labels(orders[i]);
-        std::ranges::for_each(views::rectangular(labels.size(), clabels.size()), [&](const auto& index) {
-            new_labels.push_back(labels[index.first] + "_" + clabels[index.second]);
-        });
+        std::ranges::for_each(views::rectangular(labels.size(), clabels.size()),
+                              [&](const auto& index) { new_labels.push_back(labels[index.first] + "_" + clabels[index.second]); });
         labels = new_labels;
     });
 
