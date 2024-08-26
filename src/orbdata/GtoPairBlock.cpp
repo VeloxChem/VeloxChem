@@ -384,6 +384,66 @@ CGtoPairBlock::CGtoPairBlock(CGtoPairBlock &&other) noexcept
 }
 
 auto
+CGtoPairBlock::operator=(const CGtoPairBlock &other) -> CGtoPairBlock &
+{
+    _bra_coordinates = other._bra_coordinates;
+
+    _ket_coordinates = other._ket_coordinates;
+
+    _bra_exponents = other._bra_exponents;
+
+    _ket_exponents = other._ket_exponents;
+
+    _norms = other._norms;
+
+    _overlaps = other._overlaps;
+
+    _bra_orb_indices = other._bra_orb_indices;
+
+    _ket_orb_indices = other._ket_orb_indices;
+
+    _bra_atm_indices = other._bra_atm_indices;
+
+    _ket_atm_indices = other._ket_atm_indices;
+
+    _angular_momentums = other._angular_momentums;
+
+    _nppairs = other._nppairs;
+
+    return *this;
+}
+
+auto
+CGtoPairBlock::operator=(CGtoPairBlock &&other) noexcept -> CGtoPairBlock &
+{
+    std::swap(_bra_coordinates, other._bra_coordinates);
+
+    std::swap(_ket_coordinates, other._ket_coordinates);
+
+    std::swap(_bra_exponents, other._bra_exponents);
+
+    std::swap(_ket_exponents, other._ket_exponents);
+
+    std::swap(_norms, other._norms);
+
+    std::swap(_overlaps, other._overlaps);
+
+    std::swap(_bra_orb_indices, other._bra_orb_indices);
+
+    std::swap(_ket_orb_indices, other._ket_orb_indices);
+
+    std::swap(_bra_atm_indices, other._bra_atm_indices);
+
+    std::swap(_ket_atm_indices, other._ket_atm_indices);
+
+    std::swap(_angular_momentums, other._angular_momentums);
+
+    std::swap(_nppairs, other._nppairs);
+
+    return *this;
+}
+
+auto
 CGtoPairBlock::operator==(const CGtoPairBlock &other) const -> bool
 {
     if (_angular_momentums != other._angular_momentums)
@@ -436,6 +496,12 @@ CGtoPairBlock::operator==(const CGtoPairBlock &other) const -> bool
     {
         return std::ranges::equal(_ket_coordinates, other._ket_coordinates);
     }
+}
+
+auto
+CGtoPairBlock::operator!=(const CGtoPairBlock &other) const -> bool
+{
+    return !(*this == other);
 }
 
 auto

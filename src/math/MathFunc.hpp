@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <vector>
+#include <ranges>
 
 #include "CustomConstrains.hpp"
 
@@ -32,6 +33,18 @@ inline auto
 uplo_index(const T i, const T j) -> T
 {
     return i + j * (j + 1) / 2;
+}
+
+/// @brief Counts number of elements in vector matching given selector.
+/// @param values  The vector of values.
+/// @param selector  The selector to march vector values.
+/// @return The number of elements in vector matching given selector.
+template <Integral T>
+inline auto
+count_elements_by_values(const std::vector<T>& values,
+                         const T               selector) -> T
+{
+    return static_cast<T>(std::ranges::count(values, selector));
 }
 
 }  // namespace mathfunc

@@ -10,9 +10,11 @@
 
 #include "AtomBasis.hpp"
 #include "BasisFunction.hpp"
+#include "BlockedGtoPairBlock.hpp"
 #include "GtoBlock.hpp"
 #include "GtoFunc.hpp"
 #include "GtoPairBlock.hpp"
+#include "GtoPairBlockFunc.hpp"
 #include "MolecularBasis.hpp"
 
 namespace py = pybind11;
@@ -32,6 +34,9 @@ export_orbdata(py::module &m)
           py::overload_cast<const CMolecularBasis &, const CMolecule &, const std::vector<int> &>(&gtofunc::make_gto_blocks),
           "Creates vector of basis functions blocks for selected atoms in given "
           "basis and molecule.");
+
+    // exposing functions from GtoPairBlockFunc.hpp
+    m.def("make_gto_pair_blocks", &gtofunc::make_gto_pair_blocks, "Creates vector of GTOs pair blocks for given basis and molecule.");
 
     // CBasisFunction class
     PyClass<CBasisFunction>(m, "BasisFunction")
@@ -270,6 +275,18 @@ export_orbdata(py::module &m)
         .def("__eq__", [](const CGtoPairBlock &self, const CGtoPairBlock &other) { return self == other; })
         .def("__copy__", [](const CGtoPairBlock &self) { return CGtoPairBlock(self); })
         .def("__deepcopy__", [](const CGtoPairBlock &self, py::dict) { return CGtoPairBlock(self); });
+
+    // CBlockedGtoPairBlock class
+    PyClass<CBlockedGtoPairBlock>(m, "BlockedGtoPairBlock")
+        .def(py::init<>())
+        .def(py::init<const CBlockedGtoPairBlock &>())
+        .def(py::init<const std::vector<CGtoPairBlock> &, const std::vector<int> &>())
+        .def(py::init<const CGtoPairBlock &, const std::vector<double> &>())
+        .def("gto_pair_block", &CBlockedGtoPairBlock::gto_pair_block, "Gets specific basis function pairs block.")
+        .def("is_empty_gto_pair_block", &CBlockedGtoPairBlock::is_empty_gto_pair_block, "Checks if specific basis function pairs block is empty.")
+        .def("__eq__", [](const CBlockedGtoPairBlock &self, const CBlockedGtoPairBlock &other) { return self == other; })
+        .def("__copy__", [](const CBlockedGtoPairBlock &self) { return CBlockedGtoPairBlock(self); })
+        .def("__deepcopy__", [](const CBlockedGtoPairBlock &self, py::dict) { return CBlockedGtoPairBlock(self); });
 }
 
 }  // namespace vlx_orbdata
