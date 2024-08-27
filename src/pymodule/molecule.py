@@ -30,7 +30,6 @@ import math
 from .veloxchemlib import Molecule
 from .veloxchemlib import ChemicalElement
 from .veloxchemlib import bohr_in_angstrom
-
 from .outputstream import OutputStream
 from .inputparser import print_keywords
 from .errorhandler import assert_msg_critical, safe_arccos

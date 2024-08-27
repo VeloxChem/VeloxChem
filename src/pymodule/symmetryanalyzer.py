@@ -3,6 +3,10 @@ from itertools import permutations
 
 from .veloxchemlib import bohr_in_angstrom
 from .molecule import Molecule
+from .symmetryoperations import (Inversion, Rotation, Reflection,
+                                 ImproperRotation)
+from .symmetryoperations import rotation_matrix
+from .errorhandler import assert_msg_critical
 
 
 class SymmetryAnalyzer:
@@ -37,7 +41,7 @@ class SymmetryAnalyzer:
 
     def __init__(self):
         """
-        Initializes the SymmetryAnalyzer instances.
+        Initializes the SymmetryAnalyzer instance.
         """
 
         # Initializes variables
@@ -48,13 +52,162 @@ class SymmetryAnalyzer:
         self._secondary_axis = [0., 1., 0.]
         self._molecule_type = ''
 
+        # Define all the expected symmetry elements for each point group
+        self._all_symmetry_elements = {
+            "C1": ["E"],
+            "Cs": ["E", "sigma"],
+            "Ci": ["E", "i"],
+            "C2": ["E", "C2"],
+            "C3": ["E", "2C3"],
+            "C4": ["E", "2C4", "C2"],
+            "C5": ["E", "4C5"],
+            "C6": ["E", "2C6", "2C3", "C2"],
+            "C7": ["E", "6C7"],
+            "C8": ["E", "4C8", "2C4", "C2"],
+            "D2": ["E", "3C2"],
+            "D3": ["E", "2C3", "3C2"],
+            "D4": ["E", "2C4", "5C2"],
+            "D5": ["E", "4C5", "5C2"],
+            "D6": ["E", "2C6", "2C3", "7C2"],
+            "D7": ["E", "6C7", "7C2"],
+            "D8": ["E", "4C8", "2C4", "9C2"],
+            "C2v": ["E", "C2", "2sigma_v"],
+            "C3v": ["E", "2C3", "3sigma_v"],
+            "C4v": ["E", "2C4", "C2", "2sigma_v", "2sigma_d"],
+            "C5v": ["E", "4C5", "5sigma_v"],
+            "C6v": ["E", "2C6", "2C3", "C2", "3sigma_v", "3sigma_d"],
+            "C7v": ["E", "6C7", "7sigma_v"],
+            "C8v": ["E", "4C8", "2C4", "C2", "4sigma_v", "4sigma_d"],
+            "D2d": ["E", "3C2", "2S4", "2sigma_d"],
+            "D3d": ["E", "2C3", "3C2", "i", "2S6", "3sigma_d"],
+            "D4d": ["E", "2C4", "5C2", "4S8", "4sigma_d"],
+            "D5d": ["E", "4C5", "5C2", "i", "4S10", "5sigma_d"],
+            "D6d": ["E", "2C6", "2C3", "7C2", "4S12", "2S4", "6sigma_d"],
+            "D7d": ["E", "6C7", "7C2", "i", "6S14", "7sigma_d"],
+            "D8d": ["E", "4C8", "2C4", "9C2", "8S16", "8sigma_d"],
+            "C2h": ["E", "C2", "i", "sigma_h"],
+            "C3h": ["E", "2C3", "sigma_h", "2S3"],
+            "C4h": ["E", "2C4", "C2", "i", "2S4", "sigma_h"],
+            "C5h": ["E", "4C5", "4S5", "sigma_h"],
+            "C6h": ["E", "2C6", "2C3", "C2", "i", "2S3", "2S6", "sigma_h"],
+            "C7h": ["E", "6C5", "6S7", "sigma_h"],
+            "C8h": ["E", "4C8", "2C4", "C2", "i", "2S4", "4S8", "sigma_h"],
+            "D2h": ["E", "3C2", "i", "sigma_h", "sigma_v", "sigma_d"],
+            "D3h": ["E", "2C3", "3C2", "2S3", "sigma_h", "3sigma_v"],
+            "D4h": [
+                "E", "2C4", "5C2", "i", "S4", "sigma_h", "2sigma_v", "2sigma_d"
+            ],
+            "D5h": ["E", "4C5", "5C2", "4S5", "sigma_h", "5sigma_v"],
+            "D6h": [
+                "E", "2C6", "2C3", "7C2", "i", "S3", "2S6", "sigma_h",
+                "3sigma_v", "3sigma_d"
+            ],
+            "D7h": ["E", "6C7", "7C2", "6S7", "sigma_h", "7sigma_v"],
+            "D8h": [
+                "E", "4C8", "2C4", "9C2", "i", "2S4", "4S8", "sigma_h",
+                "4sigma_v", "4sigma_d"
+            ],
+            "S4": ["E", "C2", "2S4"],
+            "S6": ["E", "2C3", "i", "2S6"],
+            "S8": ["E", "2C4", "C2", "4S8"],
+            "S10": ["E", "4C5", "i", "4S10"],
+            "T": ["E", "8C3", "3C2"],
+            "Th": ["E", "8C3", "3C2", "i", "8S6", "3sigma_h"],
+            "Td": ["E", "8C3", "3C2", "6S4", "6sigma_d"],
+            "O": ["E", "6C4", "8C3", "9C2"],
+            "Oh": [
+                "E", "6C4", "8C3", "9C2", "i", "8S6", "6S4", "3sigma_h",
+                "6sigma_d"
+            ],
+            "I": ["E", "24C5", "20C3", "15C2"],
+            "Ih": [
+                "E", "24C5", "20C3", "15C2", "i", "24S10", "20S6", "15sigma"
+            ],
+            "Cinfv": ["E", "Cinf"],
+            "Dinfh": ["E", "Cinf", "i"],
+        }
+
+        # Define all the Abelian groups available for symmetrization for each
+        # point group
+        self._groups_for_symmetrization = {
+            "C1": ["C1"],
+            "Cs": ["Cs", "C1"],
+            "Ci": ["Ci", "C1"],
+            "C2": ["C2", "C1"],
+            "C3": ["C1"],
+            "C4": ["C2", "C1"],
+            "C5": ["C1"],
+            "C6": ["C2", "C1"],
+            "C7": ["C1"],
+            "C8": ["C2", "C1"],
+            "D2": ["D2", "C2", "C1"],
+            "D3": ["C2", "C1"],
+            "D4": ["D2", "C2", "C1"],
+            "D5": ["C2", "C1"],
+            "D6": ["D2", "C2", "C1"],
+            "D7": ["C2", "C1"],
+            "D8": ["D2", "C2", "C1"],
+            "C2v": ["C2v", "C2", "Cs", "C1"],
+            "C3v": ["Cs", "C1"],
+            "C4v": ["C2v", "C2", "Cs", "C1"],
+            "C5v": ["Cs", "C1"],
+            "C6v": ["C2v", "C2", "Cs", "C1"],
+            "C7v": ["Cs", "C1"],
+            "C8v": ["C2v", "C2", "Cs", "C1"],
+            "D2d": ["C2v", "D2", "C2", "Cs", "C1"],
+            "D3d": ["C2h", "C2", "Cs", "Ci", "C1"],
+            "D4d": ["C2v", "D2", "C2", "Cs", "C1"],
+            "D5d": ["C2h", "C2", "Cs", "Ci", "C1"],
+            "D6d": ["C2v", "D2", "C2", "Cs", "C1"],
+            "D7d": ["C2h", "C2", "Cs", "Ci", "C1"],
+            "D8d": ["C2v", "D2", "C2", "Cs", "C1"],
+            "C2h": ["C2h", "C2", "Cs", "Ci", "C1"],
+            "C3h": ["Cs", "C1"],
+            "C4h": ["C2h", "C2", "Cs", "Ci", "C1"],
+            "C5h": ["Cs", "C1"],
+            "C6h": ["C2h", "C2", "Cs", "Ci", "C1"],
+            "C7h": ["Cs", "C1"],
+            "C8h": ["C2h", "C2", "Cs", "Ci", "C1"],
+            "D2h": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
+            "D3h": ["C2v", "C2", "Cs", "C1"],
+            "D4h": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
+            "D5h": ["C2v", "C2", "Cs", "C1"],
+            "D6h": ["D2h", "D2", "C2h", "C2", "Cs", "Ci", "C1"],
+            "D7h": ["C2v", "C2", "Cs", "C1"],
+            "D8h": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
+            "S4": ["C2", "C1"],
+            "S6": ["Ci", "C1"],
+            "S8": ["C2", "C1"],
+            "S10": ["Ci", "C1"],
+            "T": ["D2", "C2", "C1"],
+            "Th": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
+            "Td": ["D2", "C2v", "C2", "Cs", "C1"],
+            "O": ["D2", "C2", "C1"],
+            "Oh": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
+            "I": ["D2", "C2", "C1"],
+            "Ih": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
+            "Cinfv": ["C2v", "C2", "Cs", "C1"],
+            "Dinfh": ["D2h", "D2", "C2h", "C2v", "C2", "Ci", "Cs", "C1"],
+        }
+
+        # Define the available Abelian groups for symmetrization and their generators
+        # C2_p means a C2 axis perpendicular to the first C2 axis
+        self._generators = {
+            "Cs": ["sigma_h"],
+            "Ci": ["i"],
+            "C2": ["C2"],
+            "D2": ["C2", "C2_p"],
+            "C2v": ["C2", "sigma_v"],
+            "C2h": ["C2", "sigma_h"],
+            "D2h": ["C2", "C2_p", "sigma_h"],
+        }
+
     def identify_pointgroup(self, molecule, tolerance='tight'):
         """
         Analyze the symmetry of a given molecule based on its nuclear framework.
 
         :param molecule:
             A VeloxChem molecule object.
-
         :param tolerance:
             A tolerance threshold string available in tolerance_keywords.
             Default: tight
@@ -90,7 +243,7 @@ class SymmetryAnalyzer:
         self._symbols = Molecule.get_labels(molecule)
         self._natoms = len(self._symbols)
         center_of_mass = Molecule.center_of_mass_in_bohr(molecule)
-        self._cent_coord = coordinates - center_of_mass
+        self._centered_coords = coordinates - center_of_mass
 
         # Get the principal momemts amd axes of inertia
         Ivals, Ivecs = molecule.moments_of_inertia(principal_axes=True)
@@ -109,41 +262,46 @@ class SymmetryAnalyzer:
 
         else:
             # Get the degeneracy of the eigenvalues of the inertia tensor
-            eig_degeneracy = get_degeneracy(self._Ivals, self._tolerance_eig)
+            eig_degeneracy = self._get_degeneracy(self._Ivals,
+                                                  self._tolerance_eig)
 
             # Linear groups
             if np.min(abs(self._Ivals)) < self._tolerance_eig:
-                self._linear()
+                self.handle_linear()
                 symmetry_analysis["degeneracy"] = "Molecule is linear."
 
             # Asymmetric group
             elif eig_degeneracy == 1:
-                self._asymmetric()
+                self.handle_asymmetric()
                 symmetry_analysis["degeneracy"] = "Principal moments of inertia"
                 symmetry_analysis["degeneracy"] += " are not degenerated."
 
             # Symmetric group
             elif eig_degeneracy == 2:
-                self._symmetric()
+                self.handle_symmetric()
                 symmetry_analysis["degeneracy"] = "Principal moments of inertia"
                 symmetry_analysis["degeneracy"] += " are doubly degenerated."
 
             # Spherical group
             elif eig_degeneracy == 3:
-                self._spherical()
+                self.handle_spherical()
                 symmetry_analysis["degeneracy"] = "Principal moments of inertia"
                 symmetry_analysis["degeneracy"] += " are triply degenerated."
+
+            else:
+                assert_msg_critical(False,
+                                    'SymmetryAnalyzer: Invalid eig_degeneracy')
 
         # Collect the results
         symmetry_analysis["Point_group"] = self._schoenflies_symbol
 
-        if self._schoenflies_symbol in all_symmetry_elements:
-            symmetry_elements_list = all_symmetry_elements[
+        if self._schoenflies_symbol in self._all_symmetry_elements:
+            symmetry_elements_list = self._all_symmetry_elements[
                 self._schoenflies_symbol]
             symmetry_analysis["Expected_elements"] = symmetry_elements_list
 
-        if self._schoenflies_symbol in groups_for_symmetrization:
-            Groups_for_symm_list = groups_for_symmetrization[
+        if self._schoenflies_symbol in self._groups_for_symmetrization:
+            Groups_for_symm_list = self._groups_for_symmetrization[
                 self._schoenflies_symbol]
             symmetry_analysis["Groups_for_symm"] = Groups_for_symm_list
 
@@ -199,7 +357,6 @@ class SymmetryAnalyzer:
         :param symmetry_data:
             The dictionary containing the different results from the
             pointgroup_symmetrize function.
-
         :param pointgoup_to_symmetrize:
             The chosen point group in which the molecule will be symmetrized.
             Default: C1.
@@ -241,7 +398,7 @@ class SymmetryAnalyzer:
         # Handle C1 and O(3) groups
         if pointgoup_to_symmetrize in ["C1", "O(3)"]:
             symmetrized_coords_in_angstrom = _reorient_molecule(
-                self._cent_coord)
+                self._centered_coords)
 
         # Check that the chosen point group is available for symmetrization
         elif pointgoup_to_symmetrize not in symmetry_data[
@@ -256,8 +413,8 @@ class SymmetryAnalyzer:
                 pointgoup_to_symmetrize)
             reoriented_coords = self._conventional_orientation(
                 self._primary_axis, self._secondary_axis, symmetrized_coords)
-            symmetrized_coords_in_angstrom = reoriented_coords * bohr_in_angstrom(
-            )
+            symmetrized_coords_in_angstrom = (reoriented_coords *
+                                              bohr_in_angstrom())
 
         # Temporary
         symmetrized_data["inequiv_atoms_by_op"] = self._inequivalent_atoms
@@ -271,7 +428,7 @@ class SymmetryAnalyzer:
 
         return new_molecule_string
 
-    def _linear(self):
+    def handle_linear(self):
         """
         Handle linear molecules.
 
@@ -285,7 +442,7 @@ class SymmetryAnalyzer:
 
         idx = np.argmin(self._Ivals)
         principal_axis = self._Ivecs[idx]
-        p_axis = get_perpendicular(principal_axis)
+        p_axis = self._get_perpendicular(principal_axis)
 
         # Detect C2 axis along principal axis (for symmetrization)
         self._check_op(Rotation(principal_axis, order=2), "C2")
@@ -311,7 +468,7 @@ class SymmetryAnalyzer:
         # Set primary axis as z cartesian axis for conventional reorientation
         self._primary_axis = [0., 0., 1.]
 
-    def _asymmetric(self):
+    def handle_asymmetric(self):
         """
         Handle asymmetric top molecules.
         """
@@ -329,7 +486,7 @@ class SymmetryAnalyzer:
                 principal_axis = axis
                 break
 
-        p_axis = get_perpendicular(principal_axis)
+        p_axis = self._get_perpendicular(principal_axis)
         if self._check_op(Rotation(p_axis, order=2), "C2_p"):
             n_axis_c2 += 1
             self._secondary_axis = p_axis
@@ -344,14 +501,14 @@ class SymmetryAnalyzer:
         else:
             self._dihedral(principal_axis)
 
-    def _symmetric(self):
+    def handle_symmetric(self):
         """
-            Handle symmetric molecules.
-            """
+        Handle symmetric molecules.
+        """
 
         # Get the only non-degenareted principal moment fo inertia and set the
         # principal axis along the associated eigenvector
-        idx = get_non_degenerated(self._Ivals, self._tolerance_eig)
+        idx = self._get_non_degenerated(self._Ivals, self._tolerance_eig)
         principal_axis = self._Ivecs[idx]
 
         # Determine the highest possible rotation axis order along the principal axis
@@ -363,7 +520,7 @@ class SymmetryAnalyzer:
 
         # Get the perpendicualar axis to principal axis and check for C2 rotation axis
         # along p_axis by rotating p_axis along the principal axis
-        p_axis = get_perpendicular(principal_axis)
+        p_axis = self._get_perpendicular(principal_axis)
         for angle in np.arange(0, np.pi, 0.1 * np.pi / self._max_order):
             axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
             c2 = Rotation(axis, order=2)
@@ -373,7 +530,7 @@ class SymmetryAnalyzer:
 
         self._cyclic(principal_axis)
 
-    def _spherical(self):
+    def handle_spherical(self):
         """
         Handle spherical groups (I, O, T) in iterative way by increasing
         tolerance if no axis is found.
@@ -387,7 +544,7 @@ class SymmetryAnalyzer:
 
         principal_axis = None
         while principal_axis is None:
-            for axis in get_cubed_sphere_grid_points(self._tolerance_ang):
+            for axis in self._get_cubed_sphere_grid_points(self._tolerance_ang):
                 c5 = Rotation(axis, order=5)
                 c4 = Rotation(axis, order=4)
                 c3 = Rotation(axis, order=3)
@@ -414,7 +571,7 @@ class SymmetryAnalyzer:
         if principal_axis is None:
             self._tolerance_ang *= 1.1
 
-        p_axis_base = get_perpendicular(principal_axis)
+        p_axis_base = self._get_perpendicular(principal_axis)
 
         # I or Ih
         if self._schoenflies_symbol == 'I':
@@ -461,7 +618,7 @@ class SymmetryAnalyzer:
                 self._schoenflies_symbol += 'h'
 
             # Check for any C2 axis (for reorientation)
-            for another_axis in get_cubed_sphere_grid_points(
+            for another_axis in self._get_cubed_sphere_grid_points(
                     self._tolerance_ang):
                 c2 = Rotation(another_axis, order=2)
                 if self._check_op(c2, "C2"):
@@ -472,7 +629,7 @@ class SymmetryAnalyzer:
                     break
 
             # Check for a C2 axis perpendicular to the first one (for reorientation)
-            C2_p_axis = get_perpendicular(another_axis)
+            C2_p_axis = self._get_perpendicular(another_axis)
             for angle in np.arange(0, np.pi + self._tolerance_ang,
                                    0.1 * np.pi / 2):
                 h_axis = np.dot(C2_p_axis, rotation_matrix(another_axis, angle))
@@ -524,7 +681,7 @@ class SymmetryAnalyzer:
                 self._check_op(Reflection(self._main_axis), "sigma_h")
 
             # Check for a C2 axis perpendicular to the first one (for reorientation)
-            C2_p_axis = get_perpendicular(principal_axis)
+            C2_p_axis = self._get_perpendicular(principal_axis)
             for angle in np.arange(0, np.pi + self._tolerance_ang,
                                    0.1 * np.pi / 2):
                 h_axis = np.dot(C2_p_axis,
@@ -569,7 +726,7 @@ class SymmetryAnalyzer:
             self._p_axis = p_axis
 
             # Check for any C2 axis (for reorientation)
-            for another_axis in get_cubed_sphere_grid_points(
+            for another_axis in self._get_cubed_sphere_grid_points(
                     self._tolerance_ang):
                 c2 = Rotation(another_axis, order=2)
                 if self._check_op(c2, "C2"):
@@ -577,7 +734,7 @@ class SymmetryAnalyzer:
                     break
 
             # Check for a C2 axis perpendicular to the first one (for reorientation)
-            C2_p_axis = get_perpendicular(principal_axis)
+            C2_p_axis = self._get_perpendicular(principal_axis)
             for angle in np.arange(0, np.pi + self._tolerance_ang,
                                    0.1 * np.pi / 2):
                 h_axis = np.dot(C2_p_axis,
@@ -611,7 +768,7 @@ class SymmetryAnalyzer:
             if self._check_op(Reflection(vector), "sigma"):
                 self._schoenflies_symbol = 'Cs'
                 self._primary_axis = vector
-                self._secondary_axis = get_perpendicular(vector)
+                self._secondary_axis = self._get_perpendicular(vector)
                 self._set_orientation(vector, self._secondary_axis)
                 break
             else:
@@ -644,7 +801,7 @@ class SymmetryAnalyzer:
             self._schoenflies_symbol += 'h'
             h_symbols = True
 
-        p_axis = get_perpendicular(principal_axis)
+        p_axis = self._get_perpendicular(principal_axis)
         self._secondary_axis = p_axis
 
         # Check for reflexion planes containing the principal axis
@@ -682,7 +839,7 @@ class SymmetryAnalyzer:
         self._primary_axis = principal_axis
 
         # Determine perpendicular axis to principal axis
-        p_axis = get_perpendicular(principal_axis)
+        p_axis = self._get_perpendicular(principal_axis)
 
         if self._max_order == 1:
             # D1 is equivalent to C2
@@ -761,10 +918,11 @@ class SymmetryAnalyzer:
         sym_matrix = operation.get_matrix()
 
         # Define absolte tolerance from the eigenvalue tolerance
-        error_abs_rad = abs_to_rad(self._tolerance_eig, coord=self._cent_coord)
+        error_abs_rad = self._abs_to_rad(self._tolerance_eig,
+                                         coord=self._centered_coords)
 
         # Get COM frame coordinates after the operation
-        op_coordinates = np.matmul(self._cent_coord, sym_matrix)
+        op_coordinates = np.matmul(self._centered_coords, sym_matrix)
 
         # Initialize objects to obtain inequivalent atoms
         mapping = []
@@ -773,10 +931,10 @@ class SymmetryAnalyzer:
         # Check if operation exists
         for idx, op_coord in enumerate(op_coordinates):
             # Calculate the differences in radii and angles
-            difference_rad = radius_diff_in_radiants(op_coord, self._cent_coord,
-                                                     self._tolerance_eig)
-            difference_ang = angle_between_vector_matrix(
-                op_coord, self._cent_coord, self._tolerance_eig)
+            difference_rad = self._radius_diff_in_radiants(
+                op_coord, self._centered_coords, self._tolerance_eig)
+            difference_ang = self._angle_between_vector_matrix(
+                op_coord, self._centered_coords, self._tolerance_eig)
 
             def check_diff(diff, diff2):
                 for idx_2, (d1, d2) in enumerate(zip(diff, diff2)):
@@ -794,7 +952,7 @@ class SymmetryAnalyzer:
             # Save the original atom index, the manipulated atom index, and
             # their associated original coordinates
             manipulated_atom_idx = np.argmin(
-                np.linalg.norm(self._cent_coord - op_coord, axis=1))
+                np.linalg.norm(self._centered_coords - op_coord, axis=1))
             mapping.append((idx, manipulated_atom_idx))
 
             # Check if the original atom is already in the list of inequivalent atoms
@@ -848,14 +1006,14 @@ class SymmetryAnalyzer:
 
         # Loop over the operations to apply and generate the representatives
         # In reverse order to apply rotation in last as it is the main operator
-        for operation in reversed(generators[pointgroup]):
+        for operation in reversed(self._generators[pointgroup]):
             if operation in self._inequivalent_atoms:
                 representative = symmetry_operation[operation]
                 sym_matrix = representative.get_matrix()
 
                 # Retrieve the coordinates for the current set of inequivalent atoms
                 ineq_coords = [
-                    self._cent_coord[index]
+                    self._centered_coords[index]
                     for index in self._inequivalent_atoms[operation]
                 ]
                 ineq_symbols = [
@@ -915,7 +1073,7 @@ class SymmetryAnalyzer:
         orientation = np.array(
             [principal_axis, p_axis,
              np.cross(principal_axis, p_axis)])
-        self._cent_coord = np.dot(self._cent_coord, orientation.T)
+        self._centered_coords = np.dot(self._centered_coords, orientation.T)
 
     def _conventional_orientation(self, main_axis, p_axis, coords):
         """
@@ -955,66 +1113,33 @@ class SymmetryAnalyzer:
 
         return reoriented_coordinates
 
-
-"""
-The followig classes determine the representatives of the symmetry operations.
-"""
-
-
-class Inversion:
-
-    def get_matrix(self):
-
-        return -np.identity(3)
-
-
-class Rotation:
-
-    def __init__(self, axis, order=1):
-
-        self._order = order
-        self._axis = np.array(axis)
-
-    def get_matrix(self):
-
-        return rotation_matrix(self._axis, 2 * np.pi / self._order)
-
-
-class Reflection:
-
-    def __init__(self, axis):
-
-        norm = np.linalg.norm(axis)
-        assert abs(norm) > 1e-8
-        self._axis = np.array(axis) / norm  # normalize axis
-
-    def get_matrix(self):
-
-        return np.identity(3) - 2 * np.outer(self._axis, self._axis)
-
-
-class ImproperRotation:
-
-    def __init__(self, axis, order=1):
-
-        self._order = order
-        self._axis = np.array(axis)
-
-    def get_matrix(self):
-
-        # Build  the rotation matrix
-        rot_matrix = rotation_matrix(self._axis, 2 * np.pi / self._order)
-
-        # Build the reflexion matrix
-        reflection = Reflection(self._axis)
-        refl_matrix = reflection.get_matrix()
-
-        return np.dot(rot_matrix, refl_matrix.T)
-
-
-def get_degeneracy(Ivals, tolerance):
-    """
+    @staticmethod
+    def _get_degeneracy(Ivals, tolerance):
+        """
         Get the degeneracy of the principal inertia moments.
+
+        :param Ivals:
+            The array of eigenvalues.
+        :param tolerance:
+            The tolerance parameter on the eigenvalues.
+
+        :return:
+            The degree of degeneracy.
+        """
+
+        for ev1 in Ivals:
+            single_deg = 0
+            for ev2 in Ivals:
+                if abs(ev1 - ev2) < tolerance:
+                    single_deg += 1
+            if single_deg > 1:
+                return single_deg
+        return 1
+
+    @staticmethod
+    def _get_non_degenerated(Ivals, tolerance):
+        """
+        Get the index of the non-degenerate eigenvalue from the array of eigenvalues.
 
         :param Ivals:
             The array of eigenvalues.
@@ -1023,344 +1148,139 @@ def get_degeneracy(Ivals, tolerance):
             The tolerance parameter on the eigenvalues.
 
         :return:
-            The degree of degeneracy.
+            The index of the non-degenerate eigenvalue.
         """
 
-    for ev1 in Ivals:
-        single_deg = 0
-        for ev2 in Ivals:
-            if abs(ev1 - ev2) < tolerance:
-                single_deg += 1
-        if single_deg > 1:
-            return single_deg
-    return 1
+        for i, ev1 in enumerate(Ivals):
+            single_deg = 0
+            index = 0
+            for ev2 in Ivals:
+                if not abs(ev1 - ev2) < tolerance:
+                    single_deg += 1
+                    index = i
+            if single_deg == 2:
+                return index
 
+        raise Exception("Non-degenerate not found.")
 
-def get_perpendicular(vector, tol=1e-8):
-    """
-    Generate a vector perpendicular to another vector or axis.
+    @staticmethod
+    def _get_cubed_sphere_grid_points(tolerance):
+        """
+        Generate a cubed-grid points grid on the surface of an unitary sphere.
 
-    :param vector:
-        The vector or axis with respect to which the perpendicular axis is determined.
+        :param tolerance:
+            Maximum angle between points (radians).
 
-    :param tol:
-        An additional tolerance parameter to condisder the axis as perpendicular.
+        :return:
+            List of points.
+        """
 
-    :return:
-        An array of coordinates of the perpendicular and normalized vector.
-    """
+        num_points = int(1.0 / tolerance)
 
-    index = np.argmin(np.abs(vector))
-    p_vector = np.identity(3)[index]
-    pp_vector = np.cross(vector, p_vector)
-    pp_vector = pp_vector / np.linalg.norm(pp_vector)
+        if num_points < 1:
+            return [(1, 0, 0)]
 
-    assert np.dot(pp_vector, vector) < tol  # check perpendicular
-    assert abs(np.linalg.norm(pp_vector) - 1) < tol  # check normalized
+        for i in range(-num_points, num_points + 1):
+            x = i * tolerance
+            for j in range(-num_points, num_points + 1):
+                y = j * tolerance
+                for p in permutations([x, y, 1]):
+                    norm = np.linalg.norm([x, y, 1])
+                    yield np.array(p) / norm
 
-    return pp_vector
+    @staticmethod
+    def _get_perpendicular(vector, tol=1e-8):
+        """
+        Generate a vector perpendicular to another vector or axis.
 
+        :param vector:
+            The vector or axis with respect to which the perpendicular axis is
+            determined.
+        :param tol:
+            An additional tolerance parameter to condisder the axis as perpendicular.
 
-def get_non_degenerated(Ivals, tolerance):
-    """
-    Get the index of the non-degenerate eigenvalue from the array of eigenvalues.
+        :return:
+            An array of coordinates of the perpendicular and normalized vector.
+        """
 
-    :param Ivals:
-        The array of eigenvalues.
+        index = np.argmin(np.abs(vector))
+        p_vector = np.identity(3)[index]
+        pp_vector = np.cross(vector, p_vector)
+        pp_vector = pp_vector / np.linalg.norm(pp_vector)
 
-    :param tolerance:
-        The tolerance parameter on the eigenvalues.
+        assert np.dot(pp_vector, vector) < tol  # check perpendicular
+        assert abs(np.linalg.norm(pp_vector) - 1) < tol  # check normalized
 
-    :return:
-        The index of the non-degenerate eigenvalue.
-    """
+        return pp_vector
 
-    for i, ev1 in enumerate(Ivals):
-        single_deg = 0
-        index = 0
-        for ev2 in Ivals:
-            if not abs(ev1 - ev2) < tolerance:
-                single_deg += 1
-                index = i
-        if single_deg == 2:
-            return index
+    @staticmethod
+    def _abs_to_rad(tolerance, coord):
+        """
+        Converts the tolerance from absolute units to radians for an array of
+        coordinates.
 
-    raise Exception("Non-degenerate not found.")
+        :param tolerance:
+            The tolerance defined in absolute units (e.g. the eigenvalue tolerance)
+        :param coord:
+            The array of coordinates (e.g. the molecule coordinates in center of
+            mass frame).
 
+        :return:
+            The equivalent of the tolerance in radians.
+        """
 
-def get_cubed_sphere_grid_points(tolerance):
-    """
-    Generate a cubed-grid points grid on the surface of an unitary sphere.
+        coord = np.array(coord)
 
-    :param tolerance:
-        Maximum angle between points (radians).
+        return tolerance / np.clip(np.linalg.norm(coord, axis=1), tolerance,
+                                   None)
 
-    :return:
-        List of points.
-    """
+    @staticmethod
+    def _angle_between_vector_matrix(vector, coord, tolerance=1e-5):
+        """
+        Calculates the angles between position vectors in the center of mass frame
+        and position vectors from another array.
 
-    num_points = int(1.0 / tolerance)
+        :param vector:
+            The array of coordinates to compares with center of mass frame coordinates
+            (e.g. the coordinates after an operation).
+        :param coord:
+            The reference coordinates (e.g. the center of mass frame coordinates).
 
-    if num_points < 1:
-        return [(1, 0, 0)]
+        :return:
+            An array of angles.
+        """
 
-    for i in range(-num_points, num_points + 1):
-        x = i * tolerance
-        for j in range(-num_points, num_points + 1):
-            y = j * tolerance
-            for p in permutations([x, y, 1]):
-                norm = np.linalg.norm([x, y, 1])
-                yield np.array(p) / norm
+        norm_coor = np.linalg.norm(coord, axis=1)
+        norm_op_coor = np.linalg.norm(vector)
 
+        angles = []
+        for v, n in zip(np.dot(vector, coord.T), norm_coor * norm_op_coor):
+            if n < tolerance:
+                angles.append(0)
+            else:
+                angles.append(np.arccos(np.clip(v / n, -1.0, 1.0)))
 
-def abs_to_rad(tolerance, coord):
-    """
-    Converts the tolerance from absolute units to radians for an array of coordinates.
+        return np.array(angles)
 
-    :param tolerance:
-        The tolerance defined in absolute units (e.g. the eigenvalue tolerance)
-    :param coord:
-        The array of coordinates (e.g. the molecule coordinates in center of
-        mass frame).
+    @staticmethod
+    def _radius_diff_in_radiants(vector, coord, tolerance=1e-5):
+        """
+        Calculates the difference between the radii of the vectors in the coord
+        matrix and another vector.
 
-    :return:
-        The equivalent of the tolerance in radians.
-    """
+        :param vector:
+            The array to evaluate the differences in position vectors.
 
-    coord = np.array(coord)
+        :param coord:
+            The reference array to evaluate the differences.
 
-    return tolerance / np.clip(np.linalg.norm(coord, axis=1), tolerance, None)
+        :return:
+            An array of differences.
+        """
 
+        norm_coor = np.linalg.norm(coord, axis=1)
+        norm_op_coor = np.linalg.norm(vector)
 
-def angle_between_vector_matrix(vector, coord, tolerance=1e-5):
-    """
-    Calculates the angles between position vectors in the center of mass frame
-    and position vectors from another array.
+        average_radii = np.clip((norm_coor + norm_op_coor) / 2, tolerance, None)
 
-    :param vector:
-        The array of coordinates to compares with center of mass frame coordinates
-        (e.g. the coordinates after an operation).
-    :param coord:
-        The reference coordinates (e.g. the center of mass frame coordinates).
-
-    :return:
-        An array of angles.
-    """
-
-    norm_coor = np.linalg.norm(coord, axis=1)
-    norm_op_coor = np.linalg.norm(vector)
-
-    angles = []
-    for v, n in zip(np.dot(vector, coord.T), norm_coor * norm_op_coor):
-        if n < tolerance:
-            angles.append(0)
-        else:
-            angles.append(np.arccos(np.clip(v / n, -1.0, 1.0)))
-
-    return np.array(angles)
-
-
-def radius_diff_in_radiants(vector, coord, tolerance=1e-5):
-    """
-    Calculates the difference between the radii of the vectors in the coord
-    matrix and another vector.
-
-    :param vector:
-        The array to evaluate the differences in position vectors.
-
-    :param coord:
-        The reference array to evaluate the differences.
-
-    :return:
-        An array of differences.
-    """
-
-    norm_coor = np.linalg.norm(coord, axis=1)
-    norm_op_coor = np.linalg.norm(vector)
-
-    average_radii = np.clip((norm_coor + norm_op_coor) / 2, tolerance, None)
-
-    return np.abs(norm_coor - norm_op_coor) / average_radii
-
-
-def rotation_matrix(axis, angle):
-    """
-    Build a rotation matrix to rotate of a given angle around a vector.
-
-    :param axis:
-        The normalized axis or vector around which the rotation is effectuated.
-
-    :param angle:
-        The angle to be rotated in radians.
-
-    :return:
-        The rotation matrix.
-    """
-
-    norm = np.linalg.norm(axis)
-    assert norm > 1e-8
-    axis = np.array(axis) / norm  # normalize axis
-
-    cos_term = 1 - np.cos(angle)
-    rot_matrix = [
-        [
-            axis[0]**2 * cos_term + np.cos(angle),
-            axis[0] * axis[1] * cos_term - axis[2] * np.sin(angle),
-            axis[0] * axis[2] * cos_term + axis[1] * np.sin(angle),
-        ],
-        [
-            axis[1] * axis[0] * cos_term + axis[2] * np.sin(angle),
-            axis[1]**2 * cos_term + np.cos(angle),
-            axis[1] * axis[2] * cos_term - axis[0] * np.sin(angle),
-        ],
-        [
-            axis[2] * axis[0] * cos_term - axis[1] * np.sin(angle),
-            axis[1] * axis[2] * cos_term + axis[0] * np.sin(angle),
-            axis[2]**2 * cos_term + np.cos(angle),
-        ],
-    ]
-
-    return np.array(rot_matrix)
-
-
-all_symmetry_elements = {
-    # Define all the expected symmetry elements for each point group
-    "C1": ["E"],
-    "Cs": ["E", "sigma"],
-    "Ci": ["E", "i"],
-    "C2": ["E", "C2"],
-    "C3": ["E", "2C3"],
-    "C4": ["E", "2C4", "C2"],
-    "C5": ["E", "4C5"],
-    "C6": ["E", "2C6", "2C3", "C2"],
-    "C7": ["E", "6C7"],
-    "C8": ["E", "4C8", "2C4", "C2"],
-    "D2": ["E", "3C2"],
-    "D3": ["E", "2C3", "3C2"],
-    "D4": ["E", "2C4", "5C2"],
-    "D5": ["E", "4C5", "5C2"],
-    "D6": ["E", "2C6", "2C3", "7C2"],
-    "D7": ["E", "6C7", "7C2"],
-    "D8": ["E", "4C8", "2C4", "9C2"],
-    "C2v": ["E", "C2", "2sigma_v"],
-    "C3v": ["E", "2C3", "3sigma_v"],
-    "C4v": ["E", "2C4", "C2", "2sigma_v", "2sigma_d"],
-    "C5v": ["E", "4C5", "5sigma_v"],
-    "C6v": ["E", "2C6", "2C3", "C2", "3sigma_v", "3sigma_d"],
-    "C7v": ["E", "6C7", "7sigma_v"],
-    "C8v": ["E", "4C8", "2C4", "C2", "4sigma_v", "4sigma_d"],
-    "D2d": ["E", "3C2", "2S4", "2sigma_d"],
-    "D3d": ["E", "2C3", "3C2", "i", "2S6", "3sigma_d"],
-    "D4d": ["E", "2C4", "5C2", "4S8", "4sigma_d"],
-    "D5d": ["E", "4C5", "5C2", "i", "4S10", "5sigma_d"],
-    "D6d": ["E", "2C6", "2C3", "7C2", "4S12", "2S4", "6sigma_d"],
-    "D7d": ["E", "6C7", "7C2", "i", "6S14", "7sigma_d"],
-    "D8d": ["E", "4C8", "2C4", "9C2", "8S16", "8sigma_d"],
-    "C2h": ["E", "C2", "i", "sigma_h"],
-    "C3h": ["E", "2C3", "sigma_h", "2S3"],
-    "C4h": ["E", "2C4", "C2", "i", "2S4", "sigma_h"],
-    "C5h": ["E", "4C5", "4S5", "sigma_h"],
-    "C6h": ["E", "2C6", "2C3", "C2", "i", "2S3", "2S6", "sigma_h"],
-    "C7h": ["E", "6C5", "6S7", "sigma_h"],
-    "C8h": ["E", "4C8", "2C4", "C2", "i", "2S4", "4S8", "sigma_h"],
-    "D2h": ["E", "3C2", "i", "sigma_h", "sigma_v", "sigma_d"],
-    "D3h": ["E", "2C3", "3C2", "2S3", "sigma_h", "3sigma_v"],
-    "D4h": ["E", "2C4", "5C2", "i", "S4", "sigma_h", "2sigma_v", "2sigma_d"],
-    "D5h": ["E", "4C5", "5C2", "4S5", "sigma_h", "5sigma_v"],
-    "D6h": [
-        "E", "2C6", "2C3", "7C2", "i", "S3", "2S6", "sigma_h", "3sigma_v",
-        "3sigma_d"
-    ],
-    "D7h": ["E", "6C7", "7C2", "6S7", "sigma_h", "7sigma_v"],
-    "D8h": [
-        "E", "4C8", "2C4", "9C2", "i", "2S4", "4S8", "sigma_h", "4sigma_v",
-        "4sigma_d"
-    ],
-    "S4": ["E", "C2", "2S4"],
-    "S6": ["E", "2C3", "i", "2S6"],
-    "S8": ["E", "2C4", "C2", "4S8"],
-    "S10": ["E", "4C5", "i", "4S10"],
-    "T": ["E", "8C3", "3C2"],
-    "Th": ["E", "8C3", "3C2", "i", "8S6", "3sigma_h"],
-    "Td": ["E", "8C3", "3C2", "6S4", "6sigma_d"],
-    "O": ["E", "6C4", "8C3", "9C2"],
-    "Oh": ["E", "6C4", "8C3", "9C2", "i", "8S6", "6S4", "3sigma_h", "6sigma_d"],
-    "I": ["E", "24C5", "20C3", "15C2"],
-    "Ih": ["E", "24C5", "20C3", "15C2", "i", "24S10", "20S6", "15sigma"],
-    "Cinfv": ["E", "Cinf"],
-    "Dinfh": ["E", "Cinf", "i"]
-}
-
-groups_for_symmetrization = {
-    # Define all the Abelian groups available for symmetrization for each point group
-    "C1": ["C1"],
-    "Cs": ["Cs", "C1"],
-    "Ci": ["Ci", "C1"],
-    "C2": ["C2", "C1"],
-    "C3": ["C1"],
-    "C4": ["C2", "C1"],
-    "C5": ["C1"],
-    "C6": ["C2", "C1"],
-    "C7": ["C1"],
-    "C8": ["C2", "C1"],
-    "D2": ["D2", "C2", "C1"],
-    "D3": ["C2", "C1"],
-    "D4": ["D2", "C2", "C1"],
-    "D5": ["C2", "C1"],
-    "D6": ["D2", "C2", "C1"],
-    "D7": ["C2", "C1"],
-    "D8": ["D2", "C2", "C1"],
-    "C2v": ["C2v", "C2", "Cs", "C1"],
-    "C3v": ["Cs", "C1"],
-    "C4v": ["C2v", "C2", "Cs", "C1"],
-    "C5v": ["Cs", "C1"],
-    "C6v": ["C2v", "C2", "Cs", "C1"],
-    "C7v": ["Cs", "C1"],
-    "C8v": ["C2v", "C2", "Cs", "C1"],
-    "D2d": ["C2v", "D2", "C2", "Cs", "C1"],
-    "D3d": ["C2h", "C2", "Cs", "Ci", "C1"],
-    "D4d": ["C2v", "D2", "C2", "Cs", "C1"],
-    "D5d": ["C2h", "C2", "Cs", "Ci", "C1"],
-    "D6d": ["C2v", "D2", "C2", "Cs", "C1"],
-    "D7d": ["C2h", "C2", "Cs", "Ci", "C1"],
-    "D8d": ["C2v", "D2", "C2", "Cs", "C1"],
-    "C2h": ["C2h", "C2", "Cs", "Ci", "C1"],
-    "C3h": ["Cs", "C1"],
-    "C4h": ["C2h", "C2", "Cs", "Ci", "C1"],
-    "C5h": ["Cs", "C1"],
-    "C6h": ["C2h", "C2", "Cs", "Ci", "C1"],
-    "C7h": ["Cs", "C1"],
-    "C8h": ["C2h", "C2", "Cs", "Ci", "C1"],
-    "D2h": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
-    "D3h": ["C2v", "C2", "Cs", "C1"],
-    "D4h": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
-    "D5h": ["C2v", "C2", "Cs", "C1"],
-    "D6h": ["D2h", "D2", "C2h", "C2", "Cs", "Ci", "C1"],
-    "D7h": ["C2v", "C2", "Cs", "C1"],
-    "D8h": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
-    "S4": ["C2", "C1"],
-    "S6": ["Ci", "C1"],
-    "S8": ["C2", "C1"],
-    "S10": ["Ci", "C1"],
-    "T": ["D2", "C2", "C1"],
-    "Th": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
-    "Td": ["D2", "C2v", "C2", "Cs", "C1"],
-    "O": ["D2", "C2", "C1"],
-    "Oh": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
-    "I": ["D2", "C2", "C1"],
-    "Ih": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
-    "Cinfv": ["C2v", "C2", "Cs", "C1"],
-    "Dinfh": ["D2h", "D2", "C2h", "C2v", "C2", "Ci", "Cs", "C1"]
-}
-
-generators = {
-    # Define the available Abelian groups for symmetrization and their generators
-    # C2_p means a C2 axis perpendicular to the first C2 axis
-    "Cs": ["sigma_h"],
-    "Ci": ["i"],
-    "C2": ["C2"],
-    "D2": ["C2", "C2_p"],
-    "C2v": ["C2", "sigma_v"],
-    "C2h": ["C2", "sigma_h"],
-    "D2h": ["C2", "C2_p", "sigma_h"]
-}
+        return np.abs(norm_coor - norm_op_coor) / average_radii
