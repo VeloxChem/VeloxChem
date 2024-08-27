@@ -105,7 +105,7 @@ class LinearResponseSolver(LinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute(self, molecule, basis, scf_tensors, v_grad=None):
         """
         Performs linear response calculation for a molecule and a basis set.
 
@@ -115,6 +115,9 @@ class LinearResponseSolver(LinearSolver):
             The AO basis set.
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
+        :param v_grad:
+            The gradients on the right-hand side. If not provided, v_grad will
+            be computed for the B operator.
 
         :return:
             A dictionary containing response functions, solutions and a
@@ -131,6 +134,8 @@ class LinearResponseSolver(LinearSolver):
         self._dist_bung = None
         self._dist_e2bger = None
         self._dist_e2bung = None
+
+        self.has_external_rhs = False
 
         # check molecule
         molecule_sanity_check(molecule)
@@ -189,13 +194,19 @@ class LinearResponseSolver(LinearSolver):
         pe_dict = self._init_pe(molecule, basis)
 
         # right-hand side (gradient)
-        b_grad = self.get_prop_grad(self.b_operator, self.b_components,
-                                    molecule, basis, scf_tensors)
         if self.rank == mpi_master():
-            v_grad = {
-                (op, w): v for op, v in zip(self.b_components, b_grad)
-                for w in self.frequencies
-            }
+            self.has_external_rhs = (v_grad is not None)
+        self.has_external_rhs = self.comm.bcast(self.has_external_rhs,
+                                                root=mpi_master())
+
+        if not self.has_external_rhs:
+            b_grad = self.get_prop_grad(self.b_operator, self.b_components,
+                                        molecule, basis, scf_tensors)
+            if self.rank == mpi_master():
+                v_grad = {
+                    (op, w): v for op, v in zip(self.b_components, b_grad)
+                    for w in self.frequencies
+                }
 
         # operators, frequencies and preconditioners
         if self.rank == mpi_master():
@@ -273,7 +284,7 @@ class LinearResponseSolver(LinearSolver):
 
             iter_start_time = tm.time()
 
-            profiler.set_timing_key(f'Iteration {iteration+1}')
+            profiler.set_timing_key(f'Iteration {iteration + 1}')
 
             profiler.start_timer('ReducedSpace')
 
@@ -458,58 +469,68 @@ class LinearResponseSolver(LinearSolver):
         self._dist_e2bung = None
 
         # calculate response functions
-        a_grad = self.get_prop_grad(self.a_operator, self.a_components,
-                                    molecule, basis, scf_tensors)
+        if not self.has_external_rhs:
+            a_grad = self.get_prop_grad(self.a_operator, self.a_components,
+                                        molecule, basis, scf_tensors)
 
-        if self.is_converged:
-            if self.rank == mpi_master():
-                va = {op: v for op, v in zip(self.a_components, a_grad)}
-                rsp_funcs = {}
-
-                # create h5 file for response solutions
-                if (self.save_solutions and self.checkpoint_file is not None):
-                    final_h5_fname = str(
-                        Path(self.checkpoint_file).with_suffix('.solutions.h5'))
-                    create_hdf5(final_h5_fname, molecule, basis,
-                                dft_dict['dft_func_label'],
-                                pe_dict['potfile_text'])
-
-            for bop, w in solutions:
-                x = self.get_full_solution_vector(solutions[(bop, w)])
-
+            if self.is_converged:
                 if self.rank == mpi_master():
-                    for aop in self.a_components:
-                        rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
+                    va = {op: v for op, v in zip(self.a_components, a_grad)}
+                    rsp_funcs = {}
 
-                    # write to h5 file for response solutions
+                    # create h5 file for response solutions
                     if (self.save_solutions and
                             self.checkpoint_file is not None):
-                        solution_keys = [
-                            '{:s}_{:s}_{:.8f}'.format(aop, bop, w)
-                            for aop in self.a_components
-                        ]
-                        write_rsp_solution_with_multiple_keys(
-                            final_h5_fname, solution_keys, x)
+                        final_h5_fname = str(
+                            Path(self.checkpoint_file).with_suffix(
+                                '.solutions.h5'))
+                        create_hdf5(final_h5_fname, molecule, basis,
+                                    dft_dict['dft_func_label'],
+                                    pe_dict['potfile_text'])
 
-            if self.rank == mpi_master():
-                # print information about h5 file for response solutions
-                if (self.save_solutions and self.checkpoint_file is not None):
-                    checkpoint_text = 'Response solution vectors written to file: '
-                    checkpoint_text += final_h5_fname
-                    self.ostream.print_info(checkpoint_text)
-                    self.ostream.print_blank()
+                for bop, w in solutions:
+                    x = self.get_full_solution_vector(solutions[(bop, w)])
 
-                self._print_results(rsp_funcs, self.ostream)
+                    if self.rank == mpi_master():
+                        for aop in self.a_components:
+                            rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
 
-                return {
-                    'a_operator': self.a_operator,
-                    'a_components': self.a_components,
-                    'b_operator': self.b_operator,
-                    'b_components': self.b_components,
-                    'response_functions': rsp_funcs,
-                    'solutions': solutions,
-                }
-            else:
+                        # write to h5 file for response solutions
+                        if (self.save_solutions and
+                                self.checkpoint_file is not None):
+                            solution_keys = [
+                                '{:s}_{:s}_{:.8f}'.format(aop, bop, w)
+                                for aop in self.a_components
+                            ]
+                            write_rsp_solution_with_multiple_keys(
+                                final_h5_fname, solution_keys, x)
+
+                if self.rank == mpi_master():
+                    # print information about h5 file for response solutions
+                    if (self.save_solutions and
+                            self.checkpoint_file is not None):
+                        checkpoint_text = 'Response solution vectors written to file: '
+                        checkpoint_text += final_h5_fname
+                        self.ostream.print_info(checkpoint_text)
+                        self.ostream.print_blank()
+
+                    self._print_results(rsp_funcs, self.ostream)
+
+                    return {
+                        'a_operator': self.a_operator,
+                        'a_components': self.a_components,
+                        'b_operator': self.b_operator,
+                        'b_components': self.b_components,
+                        'response_functions': rsp_funcs,
+                        'solutions': solutions,
+                    }
+                else:
+                    return {'solutions': solutions}
+
+        else:
+            if self.is_converged:
+                # Note: return solution vectors in distributed form
+                # (not full solution vectors)
                 return {'solutions': solutions}
 
         return None

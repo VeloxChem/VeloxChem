@@ -92,6 +92,183 @@ def _Molecule_read_smiles(smiles_str):
 
 
 @staticmethod
+def _element_guesser(atom_name, residue_name):
+    """
+    Guesses the chemical element of an atom based on its name. Needed by GRO
+    and PDB file format.
+
+    :param atom_name:
+        The atom name.
+    :param residue_name:
+        The residue name.
+    """
+
+    periodic_table = [
+        'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne', 'Na', 'Mg', 'Al',
+        'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn',
+        'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb',
+        'Sr', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In',
+        'Sn', 'Sb', 'Te', 'I', 'Xe', 'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd', 'Pm',
+        'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu', 'Hf', 'Ta',
+        'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi', 'Po', 'At',
+        'Rn', 'Fr', 'Ra', 'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk',
+        'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr', 'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt',
+        'Ds', 'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og'
+    ]
+
+    two_letter_elements = [elem for elem in periodic_table if len(elem) == 2]
+
+    ion_residues = {
+        'IB+': 'I',
+        'CA': 'Ca',
+        'CL': 'Cl',
+        'NA': 'Na',
+        'MG': 'Mg',
+        'K': 'K',
+        'RB': 'Rb',
+        'CS': 'Cs',
+        'LI': 'Li',
+        'ZN': 'Zn'
+    }
+
+    protein_residues = [
+        'URE', 'ACE', 'NME', 'NHE', 'NH2', 'ALA', 'GLY', 'SER', 'THR', 'LEU',
+        'ILE', 'VAL', 'ASN', 'GLN', 'ARG', 'HID', 'HIE', 'HIP', 'TRP', 'PHE',
+        'TYR', 'GLU', 'ASP', 'LYS', 'ORN', 'DAB', 'LYN', 'PRO', 'HYP', 'CYS',
+        'CYM', 'CYX', 'MET', 'ASH', 'GLH', 'CALA', 'CGLY', 'CSER', 'CTHR',
+        'CLEU', 'CILE', 'CVAL', 'CASN', 'CGLN', 'CARG', 'CHID', 'CHIE', 'CHIP',
+        'CTRP', 'CPHE', 'CTYR', 'CGLU', 'CASP', 'CLYS', 'CPRO', 'CCYS', 'CCYX',
+        'CMET', 'NALA', 'NGLY', 'NSER', 'NTHR', 'NLEU', 'NILE', 'NVAL', 'NASN',
+        'NGLN', 'NARG', 'NHID', 'NHIE', 'NHIP', 'NTRP', 'NPHE', 'NTYR', 'NGLU',
+        'NASP', 'NLYS', 'NORN', 'NDAB', 'NPRO', 'NCYS', 'NCYX', 'NMET'
+    ]
+
+    dna_residues = [
+        "DA5", "DA", "DA3", "DAN", "DT5", "DT", "DT3", "DTN", "DG5", "DG",
+        "DG3", "DGN", "DC5", "DC", "DC3", "DCN"
+    ]
+
+    rna_residues = [
+        "RA5", "RA", "RA3", "RAN", "RU5", "RU", "RU3", "RUN", "RG5", "RG",
+        "RG3", "RGN", "RC5", "RC", "RC3", "RCN"
+    ]
+
+    standard_residues = (protein_residues + dna_residues + rna_residues)
+
+    if residue_name in ion_residues:
+        element = ion_residues[atom_name]
+        if element not in periodic_table:
+            raise NameError(f"Element {element} not in periodic table")
+        return element
+
+    elif residue_name in standard_residues:
+        # For standard residues, take first letter as element name
+        element = atom_name[0]
+        if element not in periodic_table:
+            raise NameError(f"Element {element} not in periodic table")
+        return element
+
+    else:
+        # Take the first characters not being a digit
+        name = ''
+        for c in atom_name:
+            if not c.isdigit():
+                name += c
+            else:
+                break
+
+        # Check if the guessed name is a valid element
+        name = name.capitalize()
+        # Special cases where two character elements are capitalized
+        # Sometimes one can find OP instead of O in HETAM residues
+        if str(name) not in two_letter_elements:
+            name = name[0]
+        if name not in periodic_table:
+            raise NameError(f"Element {name} not in periodic table")
+        return name
+
+
+@staticmethod
+def _Molecule_read_gro_file(grofile):
+    """
+    Reads molecule from file in GRO format.
+
+    :param grofile:
+        File with molecular structure in GRO format.
+
+    :return:
+        The molecule.
+    """
+
+    with Path(grofile).open('r') as fh:
+        grostr = fh.read()
+
+    coordinates = []
+    labels = []
+
+    lines = grostr.strip().splitlines()
+
+    for line in lines[2:-1]:
+        if line:
+            # To access the content we will stick to the C format:
+            # %5d%-5s%5s%5d%8.3f%8.3f%8.3f
+
+            residue_name = line[5:10].strip()
+            atom_name = line[10:15].strip()
+
+            # coordinates in angstroms
+            x = float(line[20:28].strip()) * 10.0
+            y = float(line[28:36].strip()) * 10.0
+            z = float(line[36:44].strip()) * 10.0
+            coordinates.append([x, y, z])
+
+            # Assign label
+            name = _element_guesser(atom_name, residue_name)
+            labels.append(name)
+
+    return Molecule(labels, coordinates, 'angstrom')
+
+
+@staticmethod
+def _Molecule_read_pdb_file(pdbfile):
+    """
+    Reads molecule from file in PDB format.
+
+    :param pdbfile:
+        File with molecular structure in PDB format.
+
+    :return:
+        The molecule.
+    """
+
+    with Path(pdbfile).open('r') as fh:
+        pdbstr = fh.read()
+
+    coordinates = []
+    labels = []
+
+    lines = pdbstr.strip().splitlines()
+    for line in lines:
+        if line.startswith('ATOM') or line.startswith('HETATM'):
+
+            if line[76:78].strip() == '':
+                atom_name = line[12:15].strip()
+                residue_name = line[17:19].strip()
+                # Guess element
+                name = _element_guesser(atom_name, residue_name)
+            else:
+                name = str(line[76:78]).strip()
+
+            labels.append(name)
+            coordinates.append(
+                [float(line[30:38]),
+                 float(line[38:46]),
+                 float(line[46:54])])
+
+    return Molecule(labels, coordinates, 'angstrom')
+
+
+@staticmethod
 def _Molecule_read_molecule_string(mol_str, units='angstrom'):
     """
     Reads molecule from a string containing Cartesian coordinates.

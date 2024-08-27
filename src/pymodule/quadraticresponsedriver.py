@@ -235,7 +235,8 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         # Storing the dipole integral matrices used for the X[2] and
         # A[2] contractions in MO basis
-        wa = [sum(x) for x in zip(self.b_frequencies, self.c_frequencies)]
+        # note: use plain addition instead of sum
+        wa = [x[0] + x[1] for x in zip(self.b_frequencies, self.c_frequencies)]
 
         freqpairs = [wl for wl in zip(self.b_frequencies, self.c_frequencies)]
 

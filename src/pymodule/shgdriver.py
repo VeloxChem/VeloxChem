@@ -215,7 +215,8 @@ class ShgDriver(NonlinearSolver):
 
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
-        wa = [sum(x) for x in zip(self.frequencies, self.frequencies)]
+        # note: use plain addition instead of sum
+        wa = [x[0] + x[1] for x in zip(self.frequencies, self.frequencies)]
 
         freqpairs = [wl for wl in zip(self.frequencies, self.frequencies)]
 
