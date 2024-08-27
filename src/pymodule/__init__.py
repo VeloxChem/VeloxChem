@@ -127,6 +127,8 @@ from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .numerovdriver import NumerovDriver
+from .mmdriver import MMDriver
+from .mmgradientdriver import MMGradientDriver
 from .symmetryanalyzer import SymmetryAnalyzer
 
 # for backward compatibility

@@ -93,7 +93,7 @@ class SymmetryAnalyzer:
         self._cent_coord = coordinates - center_of_mass
 
         # Get the principal momemts amd axes of inertia
-        Ivals, Ivecs = Molecule.moments_of_inertia(molecule)
+        Ivals, Ivecs = molecule.moments_of_inertia(principal_axes=True)
         self._Ivals = Ivals
         self._Ivecs = Ivecs
 
