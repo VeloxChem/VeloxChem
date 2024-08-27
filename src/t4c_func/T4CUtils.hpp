@@ -2,243 +2,167 @@
 #define T4CUtils_hpp
 
 #include <vector>
+#include <set>
 
 #include "SubMatrix.hpp"
 #include "SimdArray.hpp"
 #include "SphericalMomentum.hpp"
 #include "TensorComponents.hpp"
+#include "CustomConstrains.hpp"
 
 namespace t4cfunc {  // t2cfunc namespace
 
-/// Generates vector of masked local indices for given vector of indices.
-/// - Parameter q_x: the vector of indices to generate masked indices.
-auto masked_indices(const std::vector<int>& indices) -> std::vector<int>;
+/// @brief Generates vector of masked local indices for given vector of indices.
+/// @param indices The vector of indices to generate masked indices.
+/// @return The vector of masked indices.
+template <Integral T>
+inline auto
+masked_indices(const std::vector<T>& indices) -> std::vector<T>
+{
+    std::vector<T> loc_indices;
+        
+    auto unique_indices = std::set<T>(std::next(indices.cbegin()), indices.cend());
+        
+    if (!unique_indices.empty())
+    {
+        loc_indices.push_back(static_cast<T>(unique_indices.size()));
+            
+        for (const auto index : indices)
+        {
+            auto position = T{0};
+                
+            for (const auto unique_index : unique_indices)
+            {
+                if (unique_index == index)
+                {
+                    loc_indices.push_back(position);
+                        
+                    break;
+                }
+                    
+                position++;
+            }
+        }
+    }
+        
+    return loc_indices;
+}
 
-/// Computes Q center coordinates.
-/// - Parameter q_x: the vector of Cartesian X  coordinates of center P.
-/// - Parameter q_y: the vector of Cartesian Y  coordinates of center P.
-/// - Parameter q_z: the vector of Cartesian Z  coordinates of center P.
-/// - Parameter c_x: the vector of Cartesian X  coordinates of center C.
-/// - Parameter c_y: the vector of Cartesian Y coordinates of center C.
-/// - Parameter c_z: the vector of Cartesian Z  coordinates of center C.
-/// - Parameter d_x: the vector of Cartesian X  coordinates of D centers.
-/// - Parameter d_y: the vector of Cartesian Y  coordinates of D centers.
-/// - Parameter d_z: the vector of Cartesian Z coordinates of BDcenters.
-/// - Parameter c_exps: the vector of exponents on C center.
-/// - Parameter d_exps: the vector of exponents on D center.
-/// - Parameter ndims: the dimensions of vectors.
-auto comp_coordinates_q(double*       q_x,
-                        double*       q_y,
-                        double*       q_z,
-                        const double* c_x,
-                        const double* c_y,
-                        const double* c_z,
-                        const double* d_x,
-                        const double* d_y,
-                        const double* d_z,
-                        const double* c_exps,
-                        const double* d_exps,
-                        const int     ndims) -> void;
+/// @brief Computes Cartesian Q center coordinates.
+/// @param buffer The SIMD array containing factors data.
+/// @param index_q The primary row index of Cartesian Q points coordinates in SIMD array.
+/// @param index_c The primary row index of  Cartesian C points coordinates in SIMD array.
+/// @param index_d The primary row index of  Cartesian D points coordinates in SIMD array.
+auto comp_coordinates_q(CSimdArray<double>& buffer,
+                        const size_t        index_q,
+                        const size_t        index_c,
+                        const size_t        index_d) -> void;
 
-/// Computes W center coordinates.
-/// - Parameter w_x: the vector of Cartesian X  coordinates of center W.
-/// - Parameter w_y: the vector of Cartesian Y  coordinates of center W.
-/// - Parameter w_z: the vector of Cartesian Z  coordinates of center W.
-/// - Parameter p_x: the Cartesian X coordinates of center P.
-/// - Parameter p_y: the Cartesian Y coordinates of center P.
-/// - Parameter p_z: the  Cartesian Z coordinates of center P.
-/// - Parameter q_x: the vector of Cartesian X coordinates of D centers.
-/// - Parameter q_y: the vector of Cartesian Y coordinates of D centers.
-/// - Parameter q_z: the vector of Cartesian Z coordinates of D centers.
-/// - Parameter a_exp: the exponent on A center.
-/// - Parameter b_exp: the exponent on B center.
-/// - Parameter c_exps: the vector of exponents on C center.
-/// - Parameter d_exps: the vector of exponents on D center.
-/// - Parameter ndims: the dimensions of vectors.
-auto comp_coordinates_w(double*       w_x,
-                        double*       w_y,
-                        double*       w_z,
-                        const double  p_x,
-                        const double  p_y,
-                        const double  p_z,
-                        const double* q_x,
-                        const double* q_y,
-                        const double* q_z,
-                        const double  a_exp,
-                        const double  b_exp,
-                        const double* c_exps,
-                        const double* d_exps,
-                        const int     ndims) -> void;
+/// @brief Computes Cartesian W center coordinates.
+/// @param buffer The SIMD array containing factors data.
+/// @param index_w The primary row index of Cartesian Q points coordinates in SIMD array.
+/// @param index_q The primary row index of Cartesian Q points coordinates in SIMD array.
+/// @param r_p The Cartesian P point coordinates.
+/// @param a_exp The exponent on A center.
+/// @param b_exp The exponent on B center.
+auto comp_coordinates_w(CSimdArray<double>& buffer,
+                        const size_t        index_w,
+                        const size_t        index_q,
+                        const TPoint<double>& r_p,
+                        const double          a_exp,
+                        const double          b_exp) -> void;
 
-/// Computes R(PQ) = P - Q distances.
-/// - Parameter pq_x: the vector of Cartesian X  distances R(PQ) = P - Q.
-/// - Parameter pq_y: the vector of Cartesian Y  distances R(PQ) = P - Q.
-/// - Parameter pq_z: the vector of Cartesian Z  distances R(PQ) = P - Q.
-/// - Parameter p_x: the Cartesian X  coordinates of center P.
-/// - Parameter p_y: the Cartesian Y  coordinates of center P.
-/// - Parameter p_z: the Cartesian Z  coordinates of center P.
-/// - Parameter q_x: the vector of Cartesian X  coordinate of center Q.
-/// - Parameter q_y: the vector of Cartesian Y coordinate of center Q.
-/// - Parameter q_z: the vector of Cartesian Z  coordinate of center Q.
-/// - Parameter ndims: the dimensions of vectors.
-auto comp_distances_pq(double*       pq_x,
-                       double*       pq_y,
-                       double*       pq_z,
-                       const double  p_x,
-                       const double  p_y,
-                       const double  p_z,
-                       const double* q_x,
-                       const double* q_y,
-                       const double* q_z,
-                       const int     ndims) -> void;
+/// @brief Computes R(PQ) = P - Q distances.
+/// @param buffer The SIMD array containing factors data.
+/// @param index_pq The primary row index of R(PQ) distances in SIMD array.
+/// @param index_q The primary row index of  Cartesian Q points coordinates in SIMD array.
+/// @param r_p The Cartesian P point coordinates.
+auto comp_distances_pq(CSimdArray<double>& buffer,
+                       const size_t        index_pq,
+                       const size_t        index_q,
+                       const TPoint<double>& r_p) -> void;
 
-/// Computes R(WQ) = W - Q distances.
-/// - Parameter wq_x: the vector of Cartesian X  distances R(WQ) = W - Q.
-/// - Parameter wq_y: the vector of Cartesian Y  distances R(WQ) = W - Q.
-/// - Parameter wq_z: the vector of Cartesian Z  distances R(WQ) = W - Q.
-/// - Parameter w_x: the vector of Cartesian X  coordinate of center W.
-/// - Parameter w_y: the vector of Cartesian Y  coordinate of center W.
-/// - Parameter w_z: the vector of Cartesian Z coordinate of center W.
-/// - Parameter q_x: the vector of Cartesian X  coordinate of center Q.
-/// - Parameter q_y: the vector of Cartesian Y coordinate of center Q.
-/// - Parameter q_z: the vector of Cartesian Z  coordinate of center Q.
-/// - Parameter ndims: the dimensions of vectors.
-auto comp_distances_wq(double*       wq_x,
-                       double*       wq_y,
-                       double*       wq_z,
-                       const double* w_x,
-                       const double* w_y,
-                       const double* w_z,
-                       const double* q_x,
-                       const double* q_y,
-                       const double* q_z,
-                       const int     ndims) -> void;
+/// @brief Computes R(WQ) = W - Q distances.
+/// @param buffer The SIMD array containing factors data.
+/// @param index_wq The primary row index of R(WQ) distances in SIMD array.
+/// @param index_w The primary row index of  Cartesian W points coordinates in SIMD array.
+/// @param index_q The primary row index of  Cartesian Q points coordinates in SIMD array.
+auto comp_distances_wq(CSimdArray<double>& buffer,
+                       const size_t        index_wq,
+                       const size_t        index_w,
+                       const size_t        index_q) -> void;
 
-/// Computes R(WP) = W - P distances.
-/// - Parameter wp_x: the vector of Cartesian X  distances R(WP) = W - P.
-/// - Parameter wp_y: the vector of Cartesian Y  distances R(WP) = W - P.
-/// - Parameter wp_z: the vector of Cartesian Z  distances R(WP) = W - P.
-/// - Parameter w_x: the vector of Cartesian X  coordinate of center W.
-/// - Parameter w_y: the vector of Cartesian Y  coordinate of center W.
-/// - Parameter w_z: the vector of Cartesian Z coordinate of center W.
-/// - Parameter p_x: the Cartesian X  coordinate of center P.
-/// - Parameter p_y: the Cartesian Y coordinate of center P.
-/// - Parameter p_z: the Cartesian Z  coordinate of center P.
-/// - Parameter ndims: the dimensions of vectors.
-auto comp_distances_wp(double*       wp_x,
-                       double*       wp_y,
-                       double*       wp_z,
-                       const double* w_x,
-                       const double* w_y,
-                       const double* w_z,
-                       const double  p_x,
-                       const double  p_y,
-                       const double  p_z,
-                       const int     ndims) -> void;
+/// @brief Computes R(WP) = W - P distances.
+/// @param buffer The SIMD array containing factors data.
+/// @param index_wp The primary row index of R(WP) distances in SIMD array.
+/// @param index_w The primary row index of  Cartesian W points coordinates in SIMD array.
+/// @param r_p The Cartesian P point coordinates.
+auto comp_distances_wp(CSimdArray<double>& buffer,
+                       const size_t        index_wp,
+                       const size_t        index_w,
+                       const TPoint<double>& r_p) -> void;
 
-/// Computes R(CD) = C - D distances.
-/// - Parameter cd_x: the vector of Cartesian X  distances R(CD) = C - D.
-/// - Parameter cd_y: the vector of Cartesian Y  distances R(CD) = C - D.
-/// - Parameter cd_z: the vector of Cartesian Z  distances R(CD) = C - D.
-/// - Parameter c_x: the vector of Cartesian X  coordinate of center C.
-/// - Parameter c_y: the vector of Cartesian Y coordinate of center C.
-/// - Parameter c_z: the vector of Cartesian Z  coordinate of center C.
-/// - Parameter d_x: the vector of Cartesian X  coordinate of center D.
-/// - Parameter d_y: the vector of Cartesian Y coordinate of center D.
-/// - Parameter d_z: the vector of Cartesian Z  coordinate of center D.
-/// - Parameter ndims: the dimensions of vectors.
-auto comp_distances_cd(double*       cd_x,
-                       double*       cd_y,
-                       double*       cd_z,
-                       const double* c_x,
-                       const double* c_y,
-                       const double* c_z,
-                       const double* d_x,
-                       const double* d_y,
-                       const double* d_z,
-                       const int     ndims) -> void;
+/// @brief Computes R(CD) = C - D distances.
+/// @param buffer The SIMD array containing factors data.
+/// @param index_cd The primary row index of R(CD) distances in SIMD array.
+/// @param index_c The primary row index of  Cartesian C points coordinates in SIMD array.
+/// @param index_d The primary row index of  Cartesian D points coordinates in SIMD array.
+auto comp_distances_cd(CSimdArray<double>& buffer,
+                       const size_t        index_cd,
+                       const size_t        index_c,
+                       const size_t        index_d) -> void;
 
-/// Computes R(QD) = Q - D distances.
-/// - Parameter qd_x: the vector of Cartesian X  distances R(QD) = Q - D.
-/// - Parameter qd_y: the vector of Cartesian Y  distances R(QD) = Q - D.
-/// - Parameter qd_z: the vector of Cartesian Z  distances R(QD) = Q - D.
-/// - Parameter q_x: the vector of Cartesian X  coordinate of center Q.
-/// - Parameter q_y: the vector of Cartesian Y  coordinate of center Q.
-/// - Parameter q_z: the vector of Cartesian Z coordinate of center Q.
-/// - Parameter d_x: the Cartesian X  coordinate of center D.
-/// - Parameter d_y: the Cartesian Y coordinate of center D.
-/// - Parameter d_z: the Cartesian Z  coordinate of center D.
-/// - Parameter ndims: the dimensions of vectors.
-auto comp_distances_qd(double*       qd_x,
-                       double*       qd_y,
-                       double*       qd_z,
-                       const double* q_x,
-                       const double* q_y,
-                       const double* q_z,
-                       const double* d_x,
-                       const double* d_y,
-                       const double* d_z,
-                       const int     ndims) -> void;
+/// @brief Computes R(QD) = Q - D distances.
+/// @param buffer The SIMD array containing factors data.
+/// @param index_qd The primary row index of R(QD) distances in SIMD array.
+/// @param index_q The primary row index of  Cartesian Q points coordinates in SIMD array.
+/// @param index_d The primary row index of  Cartesian D points coordinates in SIMD array.
+auto comp_distances_qd(CSimdArray<double>& buffer,
+                       const size_t        index_qd,
+                       const size_t        index_q,
+                       const size_t        index_d) -> void;
 
-/// Computes R(QC) = Q - C distances.
-/// - Parameter qc_x: the vector of Cartesian X  distances R(QC) = Q - C.
-/// - Parameter qc_y: the vector of Cartesian Y  distances R(QC) = Q - C.
-/// - Parameter qc_z: the vector of Cartesian Z  distances R(QC) = Q - C.
-/// - Parameter q_x: the vector of Cartesian X  coordinate of center Q.
-/// - Parameter q_y: the vector of Cartesian Y  coordinate of center Q.
-/// - Parameter q_z: the vector of Cartesian Z coordinate of center Q.
-/// - Parameter c_x: the Cartesian X  coordinate of center C.
-/// - Parameter c_y: the Cartesian Y coordinate of center C.
-/// - Parameter c_z: the Cartesian Z  coordinate of center C.
-/// - Parameter ndims: the dimensions of vectors.
-auto comp_distances_qc(double*       qc_x,
-                       double*       qc_y,
-                       double*       qc_z,
-                       const double* q_x,
-                       const double* q_y,
-                       const double* q_z,
-                       const double* c_x,
-                       const double* c_y,
-                       const double* c_z,
-                       const int     ndims) -> void;
+/// @brief Computes R(QC) = Q - C distances.
+/// @param buffer The SIMD array containing factors data.
+/// @param index_qc The primary row index of R(QC) distances in SIMD array.
+/// @param index_q The primary row index of  Cartesian Q points coordinates in SIMD array.
+/// @param index_c The primary row index of  Cartesian C points coordinates in SIMD array.
+auto comp_distances_qc(CSimdArray<double>& buffer,
+                       const size_t        index_qc,
+                       const size_t        index_q,
+                       const size_t        index_c) -> void;
 
-/// Computes Boys function arguments.
-/// - Parameter bf_args: the vector Boys function arguments.
-/// - Parameter pq_x: the vector of Cartesian X  distances R(PQ) = P - Q.
-/// - Parameter pq_y: the vector of Cartesian Y  distances R(PQ) = P - Q.
-/// - Parameter pq_z: the vector of Cartesian Z  distances R(PQ) = P - Q.
-/// - Parameter a_exp: the exponent on A center.
-/// - Parameter b_exp: the exponent on B center.
-/// - Parameter c_exps: the vector of exponents on C center.
-/// - Parameter d_exps: the vector of exponents on D center.
-auto comp_boys_args(CSimdArray<double>& bf_args,
-                    const double*       pq_x,
-                    const double*       pq_y,
-                    const double*       pq_z,
+/// @brief Computes Boys function arguments.
+/// @param bf_data The Boys function data.
+/// @param index_args The primary row index of arguments in Boys function data.
+/// @param buffer The SIMD array containing factors data.
+/// @param index_pq The primary row index of R(PQ) distances in SIMD array.
+/// @param a_exp The exponent on A center.
+/// @param b_exp The exponent on B center.
+auto comp_boys_args(CSimdArray<double>& bf_data,
+                    const size_t index_args,
+                    const CSimdArray<double>& buffer,
+                    const size_t        index_pq,
                     const double        a_exp,
-                    const double        b_exp,
-                    const double*       c_exps,
-                    const double*       d_exps) -> void;
+                    const double        b_exp) -> void;
 
-/// Computes combined overlap factors.
-/// - Parameter fss_abcd: the vector of combined overlap factors.
-/// - Parameter bra_ovl: the overlap on bra side.
-/// - Parameter ket_ovls: the vector of overlaps on ket side.
-/// - Parameter bra_norm: the normalization factor on bra side.
-/// - Parameter ket_norms: the vector of normalization factors on ket side.
-/// - Parameter a_exp: the exponent on A center.
-/// - Parameter b_exp: the exponent on B center.
-/// - Parameter c_exps: the vector of exponents on C center.
-/// - Parameter d_exps: the vector of exponents on D center.
-auto comp_ovl_factors(CSimdArray<double>& fss_abcd,
+/// @brief Computes combined overlap factors.
+/// @param buffer The SIMD array containing factors data.
+/// @param index_ovl The primary row index of combined overlap in SIMD array.
+/// @param index_ket_ovl The primary row index of ket overlap in SIMD array.
+/// @param index_ket_norm The primary row index of ket overlap in SIMD array.
+/// @param bra_ovl The overlap on bra side.
+/// @param bra_norm The normalization factor on bra side.
+/// @param a_exp The exponent on A center.
+/// @param b_exp The exponent on B center.
+auto comp_ovl_factors(const CSimdArray<double>& buffer,
+                      const size_t        index_ovl,
+                      const size_t        index_ket_ovl,
+                      const size_t        index_ket_norm,
                       const double        bra_ovl,
-                      const double*       ket_ovls,
                       const double        bra_norm,
-                      const double*       ket_norms,
                       const double        a_exp,
-                      const double        b_exp,
-                      const double*       c_exps,
-                      const double*       d_exps) -> void;
+                      const double        b_exp) -> void;
 
 /// Updates maximum values .
 /// - Parameter max_values : the vector of maximum values of integral shells.
@@ -283,19 +207,19 @@ template <int N, int M>
 inline auto
 ket_transform(CSimdArray<double>& sbuffer, const CSimdArray<double>& cbuffer, const int a_angmom, const int b_angmom) -> void
 {
-    const auto ndims = sbuffer.number_of_columns();
+    const auto ndims = sbuffer.number_of_active_elements();
 
-    const auto c_spher_comps = tensor::number_of_spherical_components(N);
+    const auto c_spher_comps = tensor::number_of_spherical_components(std::array<int, 1>{N});
 
-    const auto d_spher_comps = tensor::number_of_spherical_components(M);
+    const auto d_spher_comps = tensor::number_of_spherical_components(std::array<int, 1>{M});
     
-    const auto c_cart_comps = tensor::number_of_cartesian_components(N);
+    const auto c_cart_comps = tensor::number_of_cartesian_components(std::array<int, 1>{N});
     
-    const auto d_cart_comps = tensor::number_of_cartesian_components(M);
+    const auto d_cart_comps = tensor::number_of_cartesian_components(std::array<int, 1>{M});
 
-    const auto a_cart_comps = tensor::number_of_cartesian_components(a_angmom);
+    const auto a_cart_comps = tensor::number_of_cartesian_components(std::array<int, 1>{a_angmom});
 
-    const auto b_cart_comps = tensor::number_of_cartesian_components(b_angmom);
+    const auto b_cart_comps = tensor::number_of_cartesian_components(std::array<int, 1>{b_angmom});
 
     for (int i = 0; i < a_cart_comps; i++)
     {
@@ -309,18 +233,18 @@ ket_transform(CSimdArray<double>& sbuffer, const CSimdArray<double>& cbuffer, co
             {
                 for (int l = 0; l < d_spher_comps; l++)
                 {
-                    auto dst_ptr = sbuffer[spher_off + k * d_spher_comps + l];
+                    auto dst_ptr = sbuffer.data(spher_off + k * d_spher_comps + l);
                     
                     for (const auto& [c_idx, cfact] : spher_mom::transformation_factors<N>(k))
                     {
                         for (const auto& [d_idx, dfact] : spher_mom::transformation_factors<M>(l))
                         {
-                            auto src_ptr = cbuffer[cart_off + c_idx * d_cart_comps + d_idx];
+                            auto src_ptr = cbuffer.data(cart_off + c_idx * d_cart_comps + d_idx);
                             
                             const double fact = cfact * dfact;
 
                             #pragma omp simd aligned(dst_ptr, src_ptr : 64)
-                            for (int n = 0; n < ndims; n++)
+                            for (size_t n = 0; n < ndims; n++)
                             {
                                 dst_ptr[n] += fact * src_ptr[n];
                             }
@@ -339,17 +263,17 @@ template <int N, int M>
 inline auto
 bra_transform(CSimdArray<double>& sbuffer, const CSimdArray<double>& cbuffer, const int c_angmom, const int d_angmom) -> void
 {
-    const auto ndims = sbuffer.number_of_columns();
+    const auto ndims = sbuffer.number_of_active_elements();
 
-    const auto c_spher_comps = tensor::number_of_spherical_components(c_angmom);
+    const auto c_spher_comps = tensor::number_of_spherical_components(std::array<int, 1>{c_angmom});
 
-    const auto d_spher_comps = tensor::number_of_spherical_components(d_angmom);
+    const auto d_spher_comps = tensor::number_of_spherical_components(std::array<int, 1>{d_angmom});
 
-    const auto a_spher_comps = tensor::number_of_spherical_components(N);
+    const auto a_spher_comps = tensor::number_of_spherical_components(std::array<int, 1>{N});
 
-    const auto b_spher_comps = tensor::number_of_spherical_components(M);
+    const auto b_spher_comps = tensor::number_of_spherical_components(std::array<int, 1>{M});
     
-    const auto b_cart_comps = tensor::number_of_cartesian_components(M);
+    const auto b_cart_comps = tensor::number_of_cartesian_components(std::array<int, 1>{M});
 
     for (int i = 0; i < c_spher_comps; i++)
     {
@@ -361,18 +285,18 @@ bra_transform(CSimdArray<double>& sbuffer, const CSimdArray<double>& cbuffer, co
             {
                 for (int l = 0; l < b_spher_comps; l++)
                 {
-                    auto dst_ptr = sbuffer[(k * b_spher_comps + l) * c_spher_comps * d_spher_comps + ket_off];
+                    auto dst_ptr = sbuffer.data((k * b_spher_comps + l) * c_spher_comps * d_spher_comps + ket_off);
                     
                     for (const auto& [a_idx, afact] : spher_mom::transformation_factors<N>(k))
                     {
                         for (const auto& [b_idx, bfact] : spher_mom::transformation_factors<M>(l))
                         {
-                            auto src_ptr = cbuffer[(a_idx * b_cart_comps + b_idx) * c_spher_comps * d_spher_comps + ket_off];
+                            auto src_ptr = cbuffer.data((a_idx * b_cart_comps + b_idx) * c_spher_comps * d_spher_comps + ket_off);
                             
                             const double fact = afact * bfact;
 
                             #pragma omp simd aligned(dst_ptr, src_ptr : 64)
-                            for (int n = 0; n < ndims; n++)
+                            for (size_t n = 0; n < ndims; n++)
                             {
                                 dst_ptr[n] += fact * src_ptr[n];
                             }

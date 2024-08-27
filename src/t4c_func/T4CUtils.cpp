@@ -9,56 +9,51 @@
 
 namespace t4cfunc {  // t2cfunc namespace
 
-auto
-masked_indices(const std::vector<int>& indices) -> std::vector<int>
-{
-    std::vector<int> loc_indices;
-    
-    std::set<int> unique_indices(std::next(indices.cbegin()), indices.cend());
-    
-    if (!unique_indices.empty())
-    {
-        loc_indices.push_back(static_cast<int>(unique_indices.size()));
-        
-        for (const auto index : indices)
-        {
-            int position = 0;
-            
-            for (const auto unique_index : unique_indices)
-            {
-                if (unique_index == index)
-                {
-                    loc_indices.push_back(position);
-                    
-                    break;
-                }
-                
-                position++;
-            }
-        }
-    }
-    
-    return loc_indices;
-}
 
 auto
-comp_coordinates_q(double*       q_x,
-                   double*       q_y,
-                   double*       q_z,
-                   const double* c_x,
-                   const double* c_y,
-                   const double* c_z,
-                   const double* d_x,
-                   const double* d_y,
-                   const double* d_z,
-                   const double* c_exps,
-                   const double* d_exps,
-                   const int     ndims) -> void
+comp_coordinates_q(CSimdArray<double>& buffer,
+                   const size_t        index_q,
+                   const size_t        index_c,
+                   const size_t        index_d) -> void
 {
+    // Set up exponents
+
+    auto c_exps = buffer.data(0);
+    
+    auto d_exps = buffer.data(1);
+    
+    // set up Cartesian Q coordinates
+
+    auto q_x = buffer.data(index_q);
+
+    auto q_y = buffer.data(index_q + 1);
+
+    auto q_z = buffer.data(index_q + 2);
+
+    // set up Cartesian C coordinates
+
+    auto c_x = buffer.data(index_c);
+
+    auto c_y = buffer.data(index_c + 1);
+
+    auto c_z = buffer.data(index_c + 2);
+    
+    // set up Cartesian D coordinates
+
+    auto d_x = buffer.data(index_d);
+
+    auto d_y = buffer.data(index_d + 1);
+
+    auto d_z = buffer.data(index_d + 2);
+
+    // compute Cartesian Q coordinates
+
+    const auto nelems = buffer.number_of_active_elements();
+    
 #pragma omp simd aligned(q_x, q_y, q_z, c_x, c_y, c_z, d_x, d_y, d_z, c_exps, d_exps : 64)
-    for (int i = 0; i < ndims; i++)
+    for (size_t i = 0; i < nelems; i++)
     {
-        double fact = 1.0 / (c_exps[i] + d_exps[i]);
+        const double fact = 1.0 / (c_exps[i] + d_exps[i]);
         
         q_x[i] = fact * (c_x[i] * c_exps[i] + d_x[i] * d_exps[i]);
         
@@ -69,29 +64,57 @@ comp_coordinates_q(double*       q_x,
 }
 
 auto
-comp_coordinates_w(double*       w_x,
-                   double*       w_y,
-                   double*       w_z,
-                   const double  p_x,
-                   const double  p_y,
-                   const double  p_z,
-                   const double* q_x,
-                   const double* q_y,
-                   const double* q_z,
-                   const double  a_exp,
-                   const double  b_exp,
-                   const double* c_exps,
-                   const double* d_exps,
-                   const int     ndims) -> void
+comp_coordinates_w(CSimdArray<double>& buffer,
+                   const size_t        index_w,
+                   const size_t        index_q,
+                   const TPoint<double>& r_p,
+                   const double          a_exp,
+                   const double          b_exp) -> void
 {
+    // Set up exponents
+
+    auto c_exps = buffer.data(0);
+    
+    auto d_exps = buffer.data(1);
+    
+    // set up Cartesian W coordinates
+
+    auto w_x = buffer.data(index_w);
+
+    auto w_y = buffer.data(index_w + 1);
+
+    auto w_z = buffer.data(index_w + 2);
+    
+    // set up Cartesian Q coordinates
+
+    auto q_x = buffer.data(index_q);
+
+    auto q_y = buffer.data(index_q + 1);
+
+    auto q_z = buffer.data(index_q + 2);
+    
+    // set up Cartesian P coordinates
+
+    const auto xyz = r_p.coordinates();
+
+    const auto p_x = xyz[0];
+
+    const auto p_y = xyz[1];
+
+    const auto p_z = xyz[2];
+    
+    // compute Cartesian W center coordinates
+    
+    const auto nelems = buffer.number_of_active_elements();
+    
 #pragma omp simd aligned(w_x, w_y, w_z, q_x, q_y, q_z, c_exps, d_exps : 64)
-    for (int i = 0; i < ndims; i++)
+    for (size_t i = 0; i < nelems; i++)
     {
-        double ab_exp = a_exp + b_exp;
+        const double ab_exp = a_exp + b_exp;
         
-        double cd_exp = c_exps[i] + d_exps[i];
+        const double cd_exp = c_exps[i] + d_exps[i];
         
-        double fact = 1.0 / (ab_exp + cd_exp);
+        const double fact = 1.0 / (ab_exp + cd_exp);
         
         w_x[i] = fact * (p_x * ab_exp + q_x[i] * cd_exp);
         
@@ -102,19 +125,43 @@ comp_coordinates_w(double*       w_x,
 }
 
 auto
-comp_distances_pq(double*       pq_x,
-                  double*       pq_y,
-                  double*       pq_z,
-                  const double  p_x,
-                  const double  p_y,
-                  const double  p_z,
-                  const double* q_x,
-                  const double* q_y,
-                  const double* q_z,
-                  const int     ndims) -> void
+comp_distances_pq(CSimdArray<double>& buffer,
+                  const size_t        index_pq,
+                  const size_t        index_q,
+                  const TPoint<double>& r_p) -> void
 {
+    // set up R(PQ) distances
+
+    auto pq_x = buffer.data(index_pq);
+
+    auto pq_y = buffer.data(index_pq + 1);
+
+    auto pq_z = buffer.data(index_pq + 2);
+    
+    // set up Cartesian Q coordinates
+
+    auto q_x = buffer.data(index_q);
+
+    auto q_y = buffer.data(index_q + 1);
+
+    auto q_z = buffer.data(index_q + 2);
+    
+    // set up Cartesian P coordinates
+
+    const auto xyz = r_p.coordinates();
+
+    const auto p_x = xyz[0];
+
+    const auto p_y = xyz[1];
+
+    const auto p_z = xyz[2];
+    
+    // compute R(PQ) distances
+
+    const auto nelems = buffer.number_of_active_elements();
+    
 #pragma omp simd aligned(pq_x, pq_y, pq_z, q_x, q_y, q_z : 64)
-    for (int i = 0; i < ndims; i++)
+    for (size_t i = 0; i < nelems; i++)
     {
         pq_x[i] = p_x - q_x[i];
         
@@ -124,19 +171,41 @@ comp_distances_pq(double*       pq_x,
     }
 }
 
-auto comp_distances_wq(double*       wq_x,
-                       double*       wq_y,
-                       double*       wq_z,
-                       const double* w_x,
-                       const double* w_y,
-                       const double* w_z,
-                       const double* q_x,
-                       const double* q_y,
-                       const double* q_z,
-                       const int     ndims) -> void
+auto comp_distances_wq(CSimdArray<double>& buffer,
+                       const size_t        index_wq,
+                       const size_t        index_w,
+                       const size_t        index_q) -> void
 {
+    // set up R(WQ) distances
+
+    auto wq_x = buffer.data(index_wq);
+
+    auto wq_y = buffer.data(index_wq + 1);
+
+    auto wq_z = buffer.data(index_wq + 2);
+    
+    // set up Cartesian W coordinates
+
+    auto w_x = buffer.data(index_w);
+
+    auto w_y = buffer.data(index_w + 1);
+
+    auto w_z = buffer.data(index_w + 2);
+    
+    // set up Cartesian Q coordinates
+
+    auto q_x = buffer.data(index_q);
+
+    auto q_y = buffer.data(index_q + 1);
+
+    auto q_z = buffer.data(index_q + 2);
+    
+    // compute R(WQ) distances
+
+    const auto nelems = buffer.number_of_active_elements();
+    
 #pragma omp simd aligned(wq_x, wq_y, wq_z, w_x, w_y, w_z, q_x, q_y, q_z : 64)
-    for (int i = 0; i < ndims; i++)
+    for (size_t i = 0; i < nelems; i++)
     {
         wq_x[i] = w_x[i] - q_x[i];
         
@@ -146,19 +215,43 @@ auto comp_distances_wq(double*       wq_x,
     }
 }
 
-auto comp_distances_wp(double*       wp_x,
-                       double*       wp_y,
-                       double*       wp_z,
-                       const double* w_x,
-                       const double* w_y,
-                       const double* w_z,
-                       const double  p_x,
-                       const double  p_y,
-                       const double  p_z,
-                       const int     ndims) -> void
+auto comp_distances_wp(CSimdArray<double>& buffer,
+                       const size_t        index_wp,
+                       const size_t        index_w,
+                       const TPoint<double>& r_p) -> void
 {
+    // set up R(WP) distances
+
+    auto wp_x = buffer.data(index_wp);
+
+    auto wp_y = buffer.data(index_wp + 1);
+
+    auto wp_z = buffer.data(index_wp + 2);
+    
+    // set up Cartesian W coordinates
+
+    auto w_x = buffer.data(index_w);
+
+    auto w_y = buffer.data(index_w + 1);
+
+    auto w_z = buffer.data(index_w + 2);
+    
+    // set up Cartesian P coordinates
+
+    const auto xyz = r_p.coordinates();
+
+    const auto p_x = xyz[0];
+
+    const auto p_y = xyz[1];
+
+    const auto p_z = xyz[2];
+    
+    // compute R(WQ) distances
+
+    const auto nelems = buffer.number_of_active_elements();
+    
 #pragma omp simd aligned(wp_x, wp_y, wp_z, w_x, w_y, w_z : 64)
-    for (int i = 0; i < ndims; i++)
+    for (size_t i = 0; i < nelems; i++)
     {
         wp_x[i] = w_x[i] - p_x;
         
@@ -168,63 +261,41 @@ auto comp_distances_wp(double*       wp_x,
     }
 }
 
-auto comp_distances_qd(double*       qd_x,
-                       double*       qd_y,
-                       double*       qd_z,
-                       const double* q_x,
-                       const double* q_y,
-                       const double* q_z,
-                       const double* d_x,
-                       const double* d_y,
-                       const double* d_z,
-                       const int     ndims) -> void
+auto comp_distances_cd(CSimdArray<double>& buffer,
+                       const size_t        index_cd,
+                       const size_t        index_c,
+                       const size_t        index_d) -> void
 {
-#pragma omp simd aligned(qd_x, qd_y, qd_z, q_x, q_y, q_z, d_x, d_y, d_z : 64)
-    for (int i = 0; i < ndims; i++)
-    {
-        qd_x[i] = q_x[i] - d_x[i];
-        
-        qd_y[i] = q_y[i] - d_y[i];
-        
-        qd_z[i] = q_z[i] - d_z[i];
-    }
-}
+    // set up R(CD) distances
 
-auto comp_distances_qc(double*       qc_x,
-                       double*       qc_y,
-                       double*       qc_z,
-                       const double* q_x,
-                       const double* q_y,
-                       const double* q_z,
-                       const double* c_x,
-                       const double* c_y,
-                       const double* c_z,
-                       const int     ndims) -> void
-{
-#pragma omp simd aligned(qc_x, qc_y, qc_z, q_x, q_y, q_z, c_x, c_y, c_z : 64)
-    for (int i = 0; i < ndims; i++)
-    {
-        qc_x[i] = q_x[i] - c_x[i];
-        
-        qc_y[i] = q_y[i] - c_y[i];
-        
-        qc_z[i] = q_z[i] - c_z[i];
-    }
-}
+    auto cd_x = buffer.data(index_cd);
 
-auto comp_distances_cd(double*       cd_x,
-                       double*       cd_y,
-                       double*       cd_z,
-                       const double* c_x,
-                       const double* c_y,
-                       const double* c_z,
-                       const double* d_x,
-                       const double* d_y,
-                       const double* d_z,
-                       const int     ndims) -> void
-{
+    auto cd_y = buffer.data(index_cd + 1);
+
+    auto cd_z = buffer.data(index_cd + 2);
+    
+    // set up Cartesian C coordinates
+
+    auto c_x = buffer.data(index_c);
+
+    auto c_y = buffer.data(index_c + 1);
+
+    auto c_z = buffer.data(index_c + 2);
+    
+    // set up Cartesian D coordinates
+
+    auto d_x = buffer.data(index_d);
+
+    auto d_y = buffer.data(index_d + 1);
+
+    auto d_z = buffer.data(index_d + 2);
+    
+    // compute R(WQ) distances
+
+    const auto nelems = buffer.number_of_active_elements();
+    
 #pragma omp simd aligned(cd_x, cd_y, cd_z, c_x, c_y, c_z, d_x, d_y, d_z : 64)
-    for (int i = 0; i < ndims; i++)
+    for (size_t i = 0; i < nelems; i++)
     {
         cd_x[i] = c_x[i] - d_x[i];
         
@@ -234,22 +305,127 @@ auto comp_distances_cd(double*       cd_x,
     }
 }
 
-auto
-comp_boys_args(CSimdArray<double>& bf_args,
-               const double*       pq_x,
-               const double*       pq_y,
-               const double*       pq_z,
-               const double        a_exp,
-               const double        b_exp,
-               const double*       c_exps,
-               const double*       d_exps) -> void
+auto comp_distances_qd(CSimdArray<double>& buffer,
+                       const size_t        index_qd,
+                       const size_t        index_q,
+                       const size_t        index_d) -> void
 {
-    const auto ndims = bf_args.number_of_columns();
+    // set up R(QD) distances
 
-    auto bargs = bf_args[0];
+    auto qd_x = buffer.data(index_qd);
 
+    auto qd_y = buffer.data(index_qd + 1);
+
+    auto qd_z = buffer.data(index_qd + 2);
+    
+    // set up Cartesian Q coordinates
+
+    auto q_x = buffer.data(index_q);
+
+    auto q_y = buffer.data(index_q + 1);
+
+    auto q_z = buffer.data(index_q + 2);
+    
+    // set up Cartesian D coordinates
+
+    auto d_x = buffer.data(index_d);
+
+    auto d_y = buffer.data(index_d + 1);
+
+    auto d_z = buffer.data(index_d + 2);
+    
+    // compute R(WQ) distances
+
+    const auto nelems = buffer.number_of_active_elements();
+    
+#pragma omp simd aligned(qd_x, qd_y, qd_z, q_x, q_y, q_z, d_x, d_y, d_z : 64)
+    for (size_t i = 0; i < nelems; i++)
+    {
+        qd_x[i] = q_x[i] - d_x[i];
+        
+        qd_y[i] = q_y[i] - d_y[i];
+        
+        qd_z[i] = q_z[i] - d_z[i];
+    }
+}
+
+auto comp_distances_qc(CSimdArray<double>& buffer,
+                       const size_t        index_qc,
+                       const size_t        index_q,
+                       const size_t        index_c) -> void
+{
+    // set up R(QC) distances
+
+    auto qc_x = buffer.data(index_qc);
+
+    auto qc_y = buffer.data(index_qc + 1);
+
+    auto qc_z = buffer.data(index_qc + 2);
+    
+    // set up Cartesian Q coordinates
+
+    auto q_x = buffer.data(index_q);
+
+    auto q_y = buffer.data(index_q + 1);
+
+    auto q_z = buffer.data(index_q + 2);
+    
+    // set up Cartesian C coordinates
+
+    auto c_x = buffer.data(index_c);
+
+    auto c_y = buffer.data(index_c + 1);
+
+    auto c_z = buffer.data(index_c + 2);
+    
+    // compute R(WQ) distances
+
+    const auto nelems = buffer.number_of_active_elements();
+    
+#pragma omp simd aligned(qc_x, qc_y, qc_z, q_x, q_y, q_z, c_x, c_y, c_z : 64)
+    for (size_t i = 0; i < nelems; i++)
+    {
+        qc_x[i] = q_x[i] - c_x[i];
+        
+        qc_y[i] = q_y[i] - c_y[i];
+        
+        qc_z[i] = q_z[i] - c_z[i];
+    }
+}
+
+
+auto
+comp_boys_args(CSimdArray<double>& bf_data,
+               const size_t index_args,
+               const CSimdArray<double>& buffer,
+               const size_t        index_pq,
+               const double        a_exp,
+               const double        b_exp) -> void
+{
+    // Set up exponents
+
+    auto c_exps = buffer.data(0);
+    
+    auto d_exps = buffer.data(1);
+    
+    // set up R(PQ) distances
+
+    auto pq_x = buffer.data(index_pq);
+
+    auto pq_y = buffer.data(index_pq + 1);
+
+    auto pq_z = buffer.data(index_pq + 2);
+    
+    // set up Boys function arguments
+
+    auto bargs = bf_data.data(index_args);
+    
+    // compute Boys function arguments
+
+    const auto nelems = buffer.number_of_active_elements();
+    
 #pragma omp simd aligned(bargs, pq_x, pq_y, pq_z, c_exps, d_exps : 64)
-    for (int i = 0; i < ndims; i++)
+    for (size_t i = 0; i < nelems; i++)
     {
         double ab_exp = a_exp + b_exp;
         
@@ -260,24 +436,41 @@ comp_boys_args(CSimdArray<double>& bf_args,
 }
 
 auto
-comp_ovl_factors(CSimdArray<double>& fss_abcd,
-                      const double        bra_ovl,
-                      const double*       ket_ovls,
-                      const double        bra_norm,
-                      const double*       ket_norms,
-                      const double        a_exp,
-                      const double        b_exp,
-                      const double*       c_exps,
-                      const double*       d_exps) -> void
+comp_ovl_factors(      CSimdArray<double>& buffer,
+                 const size_t        index_ovl,
+                 const size_t        index_ket_ovl,
+                 const size_t        index_ket_norm,
+                 const double        bra_ovl,
+                 const double        bra_norm,
+                 const double        a_exp,
+                 const double        b_exp) -> void
 {
-    const auto ndims = fss_abcd.number_of_columns();
+    // set up exponents
 
-    auto fss = fss_abcd[0];
+    auto c_exps = buffer.data(0);
+    
+    auto d_exps = buffer.data(1);
+    
+    // set up combined overlap
+
+    auto fss = buffer.data(index_ovl);
+    
+    // set up ket data
+    
+    auto ket_ovls = buffer.data(index_ket_ovl);
+    
+    auto ket_norms = buffer.data(index_ket_norm);
+   
+    // set up inverted pi constant
     
     const auto invfpi = 1.0 / mathconst::pi_value();
     
+    // compute combined overlap factors
+
+    const auto nelems = buffer.number_of_active_elements();
+    
 #pragma omp simd aligned(fss, ket_ovls, ket_norms, c_exps, d_exps : 64)
-    for (int i = 0; i < ndims; i++)
+    for (size_t i = 0; i < nelems; i++)
     {
         double ab_exp = a_exp + b_exp;
         
@@ -294,7 +487,7 @@ update_max_values(      std::vector<double>& max_values,
 {
     for (int i = 0; i < buffer.number_of_rows(); i++)
     {
-        if (max_values[index] < buffer[i][0]) max_values[index] = buffer[i][0];
+        if (const auto val = buffer.data(i)[0]; max_values[index] < val) max_values[index] = val;
     }
 }
 
@@ -302,16 +495,16 @@ auto store_values(     CSimdArray<double>&   buffer,
                   const CSimdArray<double>&  values,
                   const int                  offset) -> void
 {
-    const auto ndims = values.number_of_columns();
+    const auto ndims = buffer.number_of_active_elements();
     
-    for (int i = 0; i < values.number_of_rows(); i++)
+    for (size_t i = 0; i < values.number_of_rows(); i++)
     {
-        auto sdata = values[i];
+        auto sdata = values.data(i);
         
-        auto ddata = buffer[offset + i];
+        auto ddata = buffer.data(offset + i);
         
         #pragma omp simd aligned(sdata, ddata : 64)
-        for (int j = 0; j < ndims; j++)
+        for (size_t j = 0; j < ndims; j++)
         {
             ddata[j] = sdata[j];
         }
@@ -347,8 +540,6 @@ auto accumulate(      CSubMatrix* glob_matrix,
                 for (int l = 0; l < ket_loc_indices[0]; l++)
                 {
                     const auto lg = ket_goff + ket_glob_indices[l + 1];
-                    
-                   // std::cout << "accum : (kg,lg) = (" << kg << "," << lg << ") (l, k) = " << bra_loff + k << " , " << ket_loff + l << std::endl;
                     
                     if (ang_order)
                     {
