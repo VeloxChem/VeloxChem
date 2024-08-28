@@ -267,24 +267,24 @@ class SymmetryAnalyzer:
 
             # Linear groups
             if np.min(abs(self._Ivals)) < self._tolerance_eig:
-                self.handle_linear()
+                self._handle_linear()
                 symmetry_analysis["degeneracy"] = "Molecule is linear."
 
             # Asymmetric group
             elif eig_degeneracy == 1:
-                self.handle_asymmetric()
+                self._handle_asymmetric()
                 symmetry_analysis["degeneracy"] = "Principal moments of inertia"
                 symmetry_analysis["degeneracy"] += " are not degenerated."
 
             # Symmetric group
             elif eig_degeneracy == 2:
-                self.handle_symmetric()
+                self._handle_symmetric()
                 symmetry_analysis["degeneracy"] = "Principal moments of inertia"
                 symmetry_analysis["degeneracy"] += " are doubly degenerated."
 
             # Spherical group
             elif eig_degeneracy == 3:
-                self.handle_spherical()
+                self._handle_spherical()
                 symmetry_analysis["degeneracy"] = "Principal moments of inertia"
                 symmetry_analysis["degeneracy"] += " are triply degenerated."
 
@@ -337,16 +337,6 @@ class SymmetryAnalyzer:
         else:
             print("Point group: {}".format(results_dict["Point_group"]))
 
-    def print_tolerance_keywords(self):
-        """
-        :return:
-            The available tolerance keywords.
-        """
-
-        tolerance_keywords = ["loose", "tight", "very tight"]
-
-        return tolerance_keywords
-
     def symmetrize_pointgroup(self,
                               symmetry_data,
                               pointgoup_to_symmetrize="C1"):
@@ -373,8 +363,8 @@ class SymmetryAnalyzer:
 
         def _reorient_molecule(coords):
             """
-            Store the geometry reoriented in the conventional point group orientation
-            and attibute associated list of atomic labels.
+            Store the geometry reoriented in the conventional point group
+            orientation and attibute associated list of atomic labels.
             The spherical molecules are reoriented with their principal axis as
             z cartesian axis.
 
@@ -428,7 +418,7 @@ class SymmetryAnalyzer:
 
         return new_molecule_string
 
-    def handle_linear(self):
+    def _handle_linear(self):
         """
         Handle linear molecules.
 
@@ -445,19 +435,20 @@ class SymmetryAnalyzer:
         p_axis = self._get_perpendicular(principal_axis)
 
         # Detect C2 axis along principal axis (for symmetrization)
-        self._check_op(Rotation(principal_axis, order=2), "C2")
+        self._check_symmetry_operation(Rotation(principal_axis, order=2), "C2")
 
         # Detect sigma plane along principal axis (for symmetrization)
-        self._check_op(Reflection(p_axis), "sigma_v")
+        self._check_symmetry_operation(Reflection(p_axis), "sigma_v")
 
         # Check for inversion center at center of mass
-        if self._check_op(Inversion(), "i"):
+        if self._check_symmetry_operation(Inversion(), "i"):
             self._schoenflies_symbol = 'Dinfh'
 
             # Detect sigma plane and C2 axis perpendicular to principal axis
             # (for symmetrization)
-            self._check_op(Rotation(p_axis, order=2), "C2")
-            self._check_op(Reflection(principal_axis), "sigma_h")
+            self._check_symmetry_operation(Rotation(p_axis, order=2), "C2")
+            self._check_symmetry_operation(Reflection(principal_axis),
+                                           "sigma_h")
 
         else:
             self._schoenflies_symbol = 'Cinfv'
@@ -468,7 +459,7 @@ class SymmetryAnalyzer:
         # Set primary axis as z cartesian axis for conventional reorientation
         self._primary_axis = [0., 0., 1.]
 
-    def handle_asymmetric(self):
+    def _handle_asymmetric(self):
         """
         Handle asymmetric top molecules.
         """
@@ -481,13 +472,13 @@ class SymmetryAnalyzer:
         principal_axis = [1, 0, 0]
         for axis in np.identity(3):
             c2 = Rotation(axis, order=2)
-            if self._check_op(c2, "C2"):
+            if self._check_symmetry_operation(c2, "C2"):
                 n_axis_c2 += 1
                 principal_axis = axis
                 break
 
         p_axis = self._get_perpendicular(principal_axis)
-        if self._check_op(Rotation(p_axis, order=2), "C2_p"):
+        if self._check_symmetry_operation(Rotation(p_axis, order=2), "C2_p"):
             n_axis_c2 += 1
             self._secondary_axis = p_axis
 
@@ -495,13 +486,13 @@ class SymmetryAnalyzer:
 
         if n_axis_c2 == 0:
             self._max_order = 0
-            self._no_rot_axis()
+            self._handle_no_rotation_axis()
         elif n_axis_c2 == 1:
-            self._cyclic(principal_axis)
+            self._handle_cyclic(principal_axis)
         else:
-            self._dihedral(principal_axis)
+            self._handle_dihedral(principal_axis)
 
-    def handle_symmetric(self):
+    def _handle_symmetric(self):
         """
         Handle symmetric molecules.
         """
@@ -516,7 +507,7 @@ class SymmetryAnalyzer:
 
         # Check for C2 axis along principal axis
         # Imperative for symmetrization in abelian with real characters subgroups
-        self._check_op(Rotation(principal_axis, order=2), "C2")
+        self._check_symmetry_operation(Rotation(principal_axis, order=2), "C2")
 
         # Get the perpendicualar axis to principal axis and check for C2 rotation axis
         # along p_axis by rotating p_axis along the principal axis
@@ -524,13 +515,13 @@ class SymmetryAnalyzer:
         for angle in np.arange(0, np.pi, 0.1 * np.pi / self._max_order):
             axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
             c2 = Rotation(axis, order=2)
-            if self._check_op(c2, "C2_p"):
-                self._dihedral(principal_axis)
+            if self._check_symmetry_operation(c2, "C2_p"):
+                self._handle_dihedral(principal_axis)
                 return
 
-        self._cyclic(principal_axis)
+        self._handle_cyclic(principal_axis)
 
-    def handle_spherical(self):
+    def _handle_spherical(self):
         """
         Handle spherical groups (I, O, T) in iterative way by increasing
         tolerance if no axis is found.
@@ -550,19 +541,19 @@ class SymmetryAnalyzer:
                 c3 = Rotation(axis, order=3)
 
                 # Check for C5 axis
-                if self._check_op(c5, "C5"):
+                if self._check_symmetry_operation(c5, "C5"):
                     self._schoenflies_symbol = "I"
                     principal_axis = axis
                     self._max_order = 5
                     break
                 # Check for C4 axis
-                elif self._check_op(c4, "C4"):
+                elif self._check_symmetry_operation(c4, "C4"):
                     self._schoenflies_symbol = "O"
                     principal_axis = axis
                     self._max_order = 4
                     break
                 # Check for C3 axis
-                elif self._check_op(c3, "C3"):
+                elif self._check_symmetry_operation(c3, "C3"):
                     self._schoenflies_symbol = "T"
                     principal_axis = axis
                     self._max_order = 3
@@ -576,7 +567,7 @@ class SymmetryAnalyzer:
         # I or Ih
         if self._schoenflies_symbol == 'I':
 
-            def _determine_orientation_I(principal_axis):
+            def determine_orientation_I(principal_axis):
                 """
                 Determine the orientation of the molecule within the
                 icosahedral symmetry group.  The angle is derived from
@@ -602,30 +593,31 @@ class SymmetryAnalyzer:
                     c5_axis = np.dot(axis, rot_matrix.T)
                     c5 = Rotation(c5_axis, order=5)
 
-                    if self._check_op(c5, "C5"):
+                    if self._check_symmetry_operation(c5, "C5"):
                         t_axis = np.dot(
                             principal_axis,
                             rotation_matrix(p_axis_base, np.pi / 2).T)
                         return np.dot(t_axis, rot_matrix.T)
 
             # Set orientation
-            p_axis = _determine_orientation_I(principal_axis)
+            p_axis = determine_orientation_I(principal_axis)
             self._main_axis = principal_axis
             self._p_axis = p_axis
 
             # Check for inverison center at center of mass
-            if self._check_op(Inversion(), "i"):
+            if self._check_symmetry_operation(Inversion(), "i"):
                 self._schoenflies_symbol += 'h'
 
             # Check for any C2 axis (for reorientation)
             for another_axis in self._get_cubed_sphere_grid_points(
                     self._tolerance_ang):
                 c2 = Rotation(another_axis, order=2)
-                if self._check_op(c2, "C2"):
+                if self._check_symmetry_operation(c2, "C2"):
                     self._primary_axis = another_axis
 
                     # Check for one reflexion plane (for symmetrization)
-                    self._check_op(Reflection(another_axis), "sigma_h")
+                    self._check_symmetry_operation(Reflection(another_axis),
+                                                   "sigma_h")
                     break
 
             # Check for a C2 axis perpendicular to the first one (for reorientation)
@@ -633,14 +625,14 @@ class SymmetryAnalyzer:
             for angle in np.arange(0, np.pi + self._tolerance_ang,
                                    0.1 * np.pi / 2):
                 h_axis = np.dot(C2_p_axis, rotation_matrix(another_axis, angle))
-                if self._check_op(Rotation(h_axis), "C2_p"):
+                if self._check_symmetry_operation(Rotation(h_axis), "C2_p"):
                     self._secondary_axis = h_axis
                     break
 
         # O or Oh
         if self._schoenflies_symbol == 'O':
 
-            def _determine_orientation_O(principal_axis):
+            def determine_orientation_O(principal_axis):
                 """
                 Determine the orientation of the molecule within the octahedron
                 symmetry group.
@@ -663,22 +655,24 @@ class SymmetryAnalyzer:
                     c4_axis = np.dot(axis, rot_matrix.T)
                     c4 = Rotation(c4_axis, order=4)
 
-                    if self._check_op(c4, "C4"):
+                    if self._check_symmetry_operation(c4, "C4"):
                         return axis
 
             # Set orientation
-            p_axis = _determine_orientation_O(principal_axis)
+            p_axis = determine_orientation_O(principal_axis)
             self._set_orientation(principal_axis, p_axis)
 
             # Check for inverison center at center of mass
-            if self._check_op(Inversion(), "i"):
+            if self._check_symmetry_operation(Inversion(), "i"):
                 self._schoenflies_symbol += 'h'
 
             # Check for any C2 axis (for reorientation)
-            if self._check_op(Rotation(self._main_axis, order=2), "C2"):
+            if self._check_symmetry_operation(
+                    Rotation(self._main_axis, order=2), "C2"):
 
                 # Check for one reflexion plane (for symmetrization)
-                self._check_op(Reflection(self._main_axis), "sigma_h")
+                self._check_symmetry_operation(Reflection(self._main_axis),
+                                               "sigma_h")
 
             # Check for a C2 axis perpendicular to the first one (for reorientation)
             C2_p_axis = self._get_perpendicular(principal_axis)
@@ -686,13 +680,13 @@ class SymmetryAnalyzer:
                                    0.1 * np.pi / 2):
                 h_axis = np.dot(C2_p_axis,
                                 rotation_matrix(principal_axis, angle))
-                if self._check_op(Rotation(h_axis), "C2_p"):
+                if self._check_symmetry_operation(Rotation(h_axis), "C2_p"):
                     break
 
         # T or Td, Th
         if self._schoenflies_symbol == 'T':
 
-            def _determine_orientation_T(principal_axis):
+            def determine_orientation_T(principal_axis):
                 """
                 Determine the orientation of the molecule within the
                 tetrahedron symmetry group.
@@ -715,13 +709,13 @@ class SymmetryAnalyzer:
                     c3_axis = np.dot(axis, rot_matrix.T)
                     c3 = Rotation(c3_axis, order=3)
 
-                    if self._check_op(c3, "C3"):
+                    if self._check_symmetry_operation(c3, "C3"):
                         t_axis = np.dot(
                             principal_axis,
                             rotation_matrix(p_axis_base, np.pi / 2).T)
                         return np.dot(t_axis, rot_matrix.T)
 
-            p_axis = _determine_orientation_T(principal_axis)
+            p_axis = determine_orientation_T(principal_axis)
             self._main_axis = principal_axis
             self._p_axis = p_axis
 
@@ -729,7 +723,7 @@ class SymmetryAnalyzer:
             for another_axis in self._get_cubed_sphere_grid_points(
                     self._tolerance_ang):
                 c2 = Rotation(another_axis, order=2)
-                if self._check_op(c2, "C2"):
+                if self._check_symmetry_operation(c2, "C2"):
                     self._primary_axis = another_axis
                     break
 
@@ -739,21 +733,22 @@ class SymmetryAnalyzer:
                                    0.1 * np.pi / 2):
                 h_axis = np.dot(C2_p_axis,
                                 rotation_matrix(principal_axis, angle))
-                if self._check_op(Rotation(h_axis), "C2_p"):
+                if self._check_symmetry_operation(Rotation(h_axis), "C2_p"):
                     self._p_axis = h_axis
                     break
 
             # Check for inverison center at center of mass
-            if self._check_op(Inversion(), "i"):
+            if self._check_symmetry_operation(Inversion(), "i"):
                 self._schoenflies_symbol += 'h'
                 return
 
             # Check for any reflexion plane
-            if self._check_op(Reflection(self._p_axis), "sigma_v"):
+            if self._check_symmetry_operation(Reflection(self._p_axis),
+                                              "sigma_v"):
                 self._schoenflies_symbol += 'd'
                 return
 
-    def _no_rot_axis(self):
+    def _handle_no_rotation_axis(self):
         """
         Detect point group of molecule with no rotation axis.
 
@@ -765,20 +760,20 @@ class SymmetryAnalyzer:
         self._molecule_type = "asym_top"
 
         for i, vector in enumerate(np.identity(3)):
-            if self._check_op(Reflection(vector), "sigma"):
+            if self._check_symmetry_operation(Reflection(vector), "sigma"):
                 self._schoenflies_symbol = 'Cs'
                 self._primary_axis = vector
                 self._secondary_axis = self._get_perpendicular(vector)
                 self._set_orientation(vector, self._secondary_axis)
                 break
             else:
-                if self._check_op(Inversion(), "i"):
+                if self._check_symmetry_operation(Inversion(), "i"):
                     self._schoenflies_symbol = 'Ci'
                     break
                 else:
                     self._schoenflies_symbol = 'C1'
 
-    def _cyclic(self, principal_axis):
+    def _handle_cyclic(self, principal_axis):
         """
         Detect point group of cylic group molecules.
 
@@ -797,7 +792,8 @@ class SymmetryAnalyzer:
 
         # Check for reflexion planes perpenducular to the principal axis
         h_symbols = False
-        if self._check_op(Reflection(principal_axis), "sigma_h"):
+        if self._check_symmetry_operation(Reflection(principal_axis),
+                                          "sigma_h"):
             self._schoenflies_symbol += 'h'
             h_symbols = True
 
@@ -809,21 +805,22 @@ class SymmetryAnalyzer:
         for angle in np.arange(
                 0, np.pi, 0.1 * np.pi / self._max_order + self._tolerance_ang):
             axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
-            if self._check_op(Reflection(axis), "sigma_v") and not h_symbols:
+            if self._check_symmetry_operation(Reflection(axis),
+                                              "sigma_v") and not h_symbols:
                 v_symbol.add('v')
 
         self._schoenflies_symbol += ''.join(v_symbol)
 
         # Check for inversion center at center of mass
-        self._check_op(Inversion(), "i")
+        self._check_symmetry_operation(Inversion(), "i")
 
         # Check for improper rotational axis along the principal axis.
-        if self._check_op(
+        if self._check_symmetry_operation(
                 ImproperRotation(principal_axis, order=2 * self._max_order),
                 "S{}".format(2 * self._max_order)):
             self._schoenflies_symbol = "S{}".format(2 * self._max_order)
 
-    def _dihedral(self, principal_axis):
+    def _handle_dihedral(self, principal_axis):
         """
         Detect point group of dihedral group molecules.
 
@@ -848,12 +845,12 @@ class SymmetryAnalyzer:
             self._schoenflies_symbol = "D{}".format(self._max_order)
 
         # Check for inversion center at center of mass
-        self._check_op(Inversion(), "i")
+        self._check_symmetry_operation(Inversion(), "i")
 
         # Check for reflexion planes perpenducular to the principal axis
         h_symbols = False
-        if self._check_op(Reflection(principal_axis),
-                          "sigma_h") and not h_symbols:
+        if self._check_symmetry_operation(Reflection(principal_axis),
+                                          "sigma_h") and not h_symbols:
             self._schoenflies_symbol += 'h'
             h_symbols = True
 
@@ -861,8 +858,9 @@ class SymmetryAnalyzer:
         d_symbol = False
         for angle in np.arange(0, np.pi, 0.5 * np.pi / self._max_order):
             axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
-            if self._check_op(Reflection(axis),
-                              "sigma_v") and not h_symbols and not d_symbol:
+            if self._check_symmetry_operation(
+                    Reflection(axis),
+                    "sigma_v") and not h_symbols and not d_symbol:
                 self._schoenflies_symbol += 'd'
                 d_symbol = True
 
@@ -896,17 +894,19 @@ class SymmetryAnalyzer:
 
         for i in range(n_max, 1, -1):
             Cn = Rotation(axis, order=i)
-            if self._check_op(Cn, "C{}".format(i)):
+            if self._check_symmetry_operation(Cn, "C{}".format(i)):
                 return i
         return 1
 
-    def _check_op(self, operation, element_string, tol_factor=1.0):
+    def _check_symmetry_operation(self,
+                                  operation,
+                                  element_string,
+                                  tol_factor=1.0):
         """
         Check if the given symmetry operation exists in the point group of the molecule.
 
         :param operation:
             The matrix representative of the symmetry operation.
-
         :param tol_factor:
             A factor to scale the tolerance value.
 
@@ -978,7 +978,7 @@ class SymmetryAnalyzer:
     def _symmetrize_molecule(self, pointgroup):
         """
         Symmetrize a molecule based on the inequivalent atoms for each
-        orperation.  If atoms are found at the same position within a tolerance
+        orperation. If atoms are found at the same position within a tolerance
         after applying all operation, the average position is calculated and
         saved.
 
@@ -1035,9 +1035,9 @@ class SymmetryAnalyzer:
             if np.any(abs_diff > 1.0):
                 full_symmetrized_coord.append(coord)
                 full_symmetrized_coord.append(op_coordinates[i])
+                # Note: Symbol is the same for both coordinates
                 full_symmetrized_symbols.append(symbol)
-                full_symmetrized_symbols.append(
-                    symbol)  # Symbol is the same for both coordinates
+                full_symmetrized_symbols.append(symbol)
             # If the absolute difference is within the tolerance value,
             # append the symmetrized coordinate and symbol to the respective lists
             else:
@@ -1046,9 +1046,10 @@ class SymmetryAnalyzer:
                 full_symmetrized_symbols.append(symbol)
 
         # Check that the number of generated atoms is the same as the original molecule
-        assert self._natoms == len(
-            full_symmetrized_coord
-        ), "Number of generated atoms does not match initial molecule."
+        assert_msg_critical(
+            self._natoms == len(full_symmetrized_coord),
+            "SymmetryAnalyzer: Number of generated atoms" +
+            " does not match initial molecule.")
 
         # Store the symbols of the inequivalent atoms in the instance variable
         self._symbols_atom_sym = full_symmetrized_symbols
@@ -1066,9 +1067,13 @@ class SymmetryAnalyzer:
             Secondary axis perpendicular to principal (must be unitary).
         """
 
-        assert np.linalg.norm(
-            principal_axis) > 1e-1, "Principal axis is not unitary."
-        assert np.linalg.norm(p_axis) > 1e-1, "p_axis is not unitary."
+        # TODO: double check criteria
+        assert_msg_critical(
+            np.linalg.norm(principal_axis) > 1e-1,
+            "SymmetryAnalyzer: Principal axis is not unitary.")
+        assert_msg_critical(
+            np.linalg.norm(p_axis) > 1e-1,
+            "SymmetryAnalyzer: p_axis is not unitary.")
 
         orientation = np.array(
             [principal_axis, p_axis,
@@ -1208,8 +1213,14 @@ class SymmetryAnalyzer:
         pp_vector = np.cross(vector, p_vector)
         pp_vector = pp_vector / np.linalg.norm(pp_vector)
 
-        assert np.dot(pp_vector, vector) < tol  # check perpendicular
-        assert abs(np.linalg.norm(pp_vector) - 1) < tol  # check normalized
+        # check perpendicular
+        assert_msg_critical(
+            np.dot(pp_vector, vector) < tol,
+            "SymmetryAnalyzer: perpendicular check failed")
+        # check normalization
+        assert_msg_critical(
+            abs(np.linalg.norm(pp_vector) - 1) < tol,
+            "SymmetryAnalyzer: normalization check failed")
 
         return pp_vector
 
