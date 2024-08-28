@@ -224,12 +224,15 @@ class SymmetryAnalyzer:
         # Define the tolerance parameters
         tolerance = tolerance.lower()
 
-        if tolerance == 'loose':
+        if tolerance == 'very loose':
             self._tolerance_eig = 0.8
             self._tolerance_ang = 0.085
-        elif tolerance == 'tight':
+        elif tolerance == 'loose':
             self._tolerance_eig = 0.4
             self._tolerance_ang = 0.070  # about 4 degrees
+        elif tolerance == 'tight':
+            self._tolerance_eig = 0.1
+            self._tolerance_ang = 0.050
         elif tolerance == 'very tight':
             self._tolerance_eig = 0.002
             self._tolerance_ang = 0.035  # about 2 degrees
@@ -337,9 +340,9 @@ class SymmetryAnalyzer:
         else:
             print("Point group: {}".format(results_dict["Point_group"]))
 
-    def symmetrize_pointgroup(self,
-                              symmetry_data,
-                              pointgoup_to_symmetrize="C1"):
+    def _symmetrize_pointgroup(self,
+                               symmetry_data,
+                               pointgoup_to_symmetrize="C1"):
         """
         Symmetrize in chosen available Abelian group with real representation
         and reorient molecules. Only reorient if more than 100 atoms.

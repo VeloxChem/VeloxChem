@@ -804,7 +804,7 @@ def _Molecule_get_distance_matrix_in_angstrom(self):
     return distance_matrix
 
 
-def _Molecule_get_xyz_string(self):
+def _Molecule_get_xyz_string(self, precision=12):
     """
     Returns xyz string of molecule.
 
@@ -820,7 +820,10 @@ def _Molecule_get_xyz_string(self):
 
     for a in range(natoms):
         xa, ya, za = coords_in_angstrom[a]
-        xyz += f'{labels[a]:<6s} {xa:22.12f} {ya:22.12f} {za:22.12f}\n'
+        xyz += f'{labels[a]:<6s}'
+        xyz += f' {xa:{precision + 10}.{precision}f}'
+        xyz += f' {ya:{precision + 10}.{precision}f}'
+        xyz += f' {za:{precision + 10}.{precision}f}\n'
 
     return xyz
 
