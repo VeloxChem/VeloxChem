@@ -1,5 +1,5 @@
 import numpy as np
-from itertools import permutations
+import networkx as nx
 
 from .veloxchemlib import bohr_in_angstrom
 from .molecule import Molecule
@@ -242,10 +242,10 @@ class SymmetryAnalyzer:
         # Read and express geometry in center of mass (COM) frame
         # Geom and COM in bohr because moments of inertia are defined in bohr
         # in Molecule module
-        coordinates = Molecule.get_coordinates_in_bohr(molecule)
-        self._symbols = Molecule.get_labels(molecule)
-        self._natoms = len(self._symbols)
-        center_of_mass = Molecule.center_of_mass_in_bohr(molecule)
+        coordinates = molecule.get_coordinates_in_bohr()
+        self._symbols = molecule.get_labels()
+        self._natoms = molecule.number_of_atoms()
+        center_of_mass = molecule.center_of_mass_in_bohr()
         self._centered_coords = coordinates - center_of_mass
 
         # Get the principal momemts amd axes of inertia
@@ -515,7 +515,8 @@ class SymmetryAnalyzer:
         # Get the perpendicualar axis to principal axis and check for C2 rotation axis
         # along p_axis by rotating p_axis along the principal axis
         p_axis = self._get_perpendicular(principal_axis)
-        for angle in np.arange(0, np.pi, 0.1 * np.pi / self._max_order):
+        for angle in np.arange(0, np.pi + self._tolerance_ang,
+                               0.01 * np.pi / self._max_order):
             axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
             c2 = Rotation(axis, order=2)
             if self._check_symmetry_operation(c2, "C2_p"):
@@ -537,33 +538,40 @@ class SymmetryAnalyzer:
         self._p_axis = [0., 1., 0.]
 
         principal_axis = None
-        while principal_axis is None:
-            for axis in self._get_cubed_sphere_grid_points(self._tolerance_ang):
-                c5 = Rotation(axis, order=5)
-                c4 = Rotation(axis, order=4)
-                c3 = Rotation(axis, order=3)
 
-                # Check for C5 axis
-                if self._check_symmetry_operation(c5, "C5"):
-                    self._schoenflies_symbol = "I"
-                    principal_axis = axis
-                    self._max_order = 5
-                    break
-                # Check for C4 axis
-                elif self._check_symmetry_operation(c4, "C4"):
+        # Check for C5 axis
+        for axis in self._get_mol_grid_points(self._tolerance_ang):
+            c5 = Rotation(axis, order=5)
+            if self._check_symmetry_operation(c5, "C5"):
+                self._schoenflies_symbol = "I"
+                principal_axis = axis
+                self._max_order = 5
+                break
+
+        # Check for C4 axis
+        if principal_axis is None:
+            for axis in self._get_mol_grid_points(self._tolerance_ang):
+                c4 = Rotation(axis, order=4)
+                if self._check_symmetry_operation(c4, "C4"):
                     self._schoenflies_symbol = "O"
                     principal_axis = axis
                     self._max_order = 4
                     break
-                # Check for C3 axis
-                elif self._check_symmetry_operation(c3, "C3"):
+
+        # Check for C3 axis
+        if principal_axis is None:
+            for axis in self._get_mol_grid_points(self._tolerance_ang):
+                c3 = Rotation(axis, order=3)
+                if self._check_symmetry_operation(c3, "C3"):
                     self._schoenflies_symbol = "T"
                     principal_axis = axis
                     self._max_order = 3
+                    break
 
-        # Increase angular tolerance
-        if principal_axis is None:
-            self._tolerance_ang *= 1.1
+        assert_msg_critical(
+            principal_axis is not None,
+            'SymmetryAnalyzer: Could not find principal axis for spherical group'
+        )
 
         p_axis_base = self._get_perpendicular(principal_axis)
 
@@ -612,8 +620,7 @@ class SymmetryAnalyzer:
                 self._schoenflies_symbol += 'h'
 
             # Check for any C2 axis (for reorientation)
-            for another_axis in self._get_cubed_sphere_grid_points(
-                    self._tolerance_ang):
+            for another_axis in self._get_mol_grid_points(self._tolerance_ang):
                 c2 = Rotation(another_axis, order=2)
                 if self._check_symmetry_operation(c2, "C2"):
                     self._primary_axis = another_axis
@@ -626,9 +633,10 @@ class SymmetryAnalyzer:
             # Check for a C2 axis perpendicular to the first one (for reorientation)
             C2_p_axis = self._get_perpendicular(another_axis)
             for angle in np.arange(0, np.pi + self._tolerance_ang,
-                                   0.1 * np.pi / 2):
+                                   0.01 * np.pi / 2):
                 h_axis = np.dot(C2_p_axis, rotation_matrix(another_axis, angle))
-                if self._check_symmetry_operation(Rotation(h_axis), "C2_p"):
+                if self._check_symmetry_operation(Rotation(h_axis, order=2),
+                                                  "C2_p"):
                     self._secondary_axis = h_axis
                     break
 
@@ -680,10 +688,11 @@ class SymmetryAnalyzer:
             # Check for a C2 axis perpendicular to the first one (for reorientation)
             C2_p_axis = self._get_perpendicular(principal_axis)
             for angle in np.arange(0, np.pi + self._tolerance_ang,
-                                   0.1 * np.pi / 2):
+                                   0.01 * np.pi / 2):
                 h_axis = np.dot(C2_p_axis,
                                 rotation_matrix(principal_axis, angle))
-                if self._check_symmetry_operation(Rotation(h_axis), "C2_p"):
+                if self._check_symmetry_operation(Rotation(h_axis, order=2),
+                                                  "C2_p"):
                     break
 
         # T or Td, Th
@@ -723,8 +732,7 @@ class SymmetryAnalyzer:
             self._p_axis = p_axis
 
             # Check for any C2 axis (for reorientation)
-            for another_axis in self._get_cubed_sphere_grid_points(
-                    self._tolerance_ang):
+            for another_axis in self._get_mol_grid_points(self._tolerance_ang):
                 c2 = Rotation(another_axis, order=2)
                 if self._check_symmetry_operation(c2, "C2"):
                     self._primary_axis = another_axis
@@ -733,10 +741,11 @@ class SymmetryAnalyzer:
             # Check for a C2 axis perpendicular to the first one (for reorientation)
             C2_p_axis = self._get_perpendicular(principal_axis)
             for angle in np.arange(0, np.pi + self._tolerance_ang,
-                                   0.1 * np.pi / 2):
+                                   0.01 * np.pi / 2):
                 h_axis = np.dot(C2_p_axis,
                                 rotation_matrix(principal_axis, angle))
-                if self._check_symmetry_operation(Rotation(h_axis), "C2_p"):
+                if self._check_symmetry_operation(Rotation(h_axis, order=2),
+                                                  "C2_p"):
                     self._p_axis = h_axis
                     break
 
@@ -746,10 +755,15 @@ class SymmetryAnalyzer:
                 return
 
             # Check for any reflexion plane
-            if self._check_symmetry_operation(Reflection(self._p_axis),
-                                              "sigma_v"):
-                self._schoenflies_symbol += 'd'
-                return
+            # C2_p_axis = self._get_perpendicular(principal_axis)
+            for angle in np.arange(0, np.pi + self._tolerance_ang,
+                                   0.01 * np.pi / 2):
+                h_axis = np.dot(C2_p_axis,
+                                rotation_matrix(principal_axis, angle))
+                if self._check_symmetry_operation(Reflection(h_axis),
+                                                  "sigma_v"):
+                    self._schoenflies_symbol += 'd'
+                    return
 
     def _handle_no_rotation_axis(self):
         """
@@ -806,7 +820,7 @@ class SymmetryAnalyzer:
         # Check for reflexion planes containing the principal axis
         v_symbol = set()
         for angle in np.arange(
-                0, np.pi, 0.1 * np.pi / self._max_order + self._tolerance_ang):
+                0, np.pi, 0.01 * np.pi / self._max_order + self._tolerance_ang):
             axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
             if self._check_symmetry_operation(Reflection(axis),
                                               "sigma_v") and not h_symbols:
@@ -859,7 +873,8 @@ class SymmetryAnalyzer:
 
         # Check for reflexion planes containing the principal axis
         d_symbol = False
-        for angle in np.arange(0, np.pi, 0.5 * np.pi / self._max_order):
+        for angle in np.arange(0, np.pi + self._tolerance_ang,
+                               0.01 * np.pi / self._max_order):
             axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
             if self._check_symmetry_operation(
                     Reflection(axis),
@@ -920,17 +935,35 @@ class SymmetryAnalyzer:
         # Get representative of the operation
         sym_matrix = operation.get_matrix()
 
+        assert_msg_critical(
+            np.max(np.abs(sym_matrix - np.identity(3))) >= 1e-8,
+            'SymmetryAnalyzer: Identity matrix should not be checked')
+
         # Define absolte tolerance from the eigenvalue tolerance
-        error_abs_rad = self._abs_to_rad(self._tolerance_eig,
-                                         coord=self._centered_coords)
+        # error_abs_rad = self._abs_to_rad(self._tolerance_eig,
+        #                                  coord=self._centered_coords)
 
         # Get COM frame coordinates after the operation
         op_coordinates = np.matmul(self._centered_coords, sym_matrix)
 
         # Initialize objects to obtain inequivalent atoms
-        mapping = []
-        inequivalent_atoms_by_operation = set()
+        # mapping = []
+        # inequivalent_atoms_by_operation = set()
 
+        sym_op_exists = True
+        tol_sq = self._tolerance_eig**2
+        for i in range(self._natoms):
+            min_r2 = None
+            for j in range(self._natoms):
+                if self._symbols[i] == self._symbols[j]:
+                    rvec = op_coordinates[i] - self._centered_coords[j]
+                    r2 = np.sum(rvec**2)
+                    if min_r2 is None or min_r2 > r2:
+                        min_r2 = r2
+            if min_r2 >= tol_sq:
+                sym_op_exists = False
+                break
+        """
         # Check if operation exists
         for idx, op_coord in enumerate(op_coordinates):
             # Calculate the differences in radii and angles
@@ -975,8 +1008,9 @@ class SymmetryAnalyzer:
         ]:
             self._inequivalent_atoms[
                 element_string] = inequivalent_atoms_by_operation
+        """
 
-        return True
+        return sym_op_exists
 
     def _symmetrize_molecule(self, pointgroup):
         """
@@ -1065,23 +1099,25 @@ class SymmetryAnalyzer:
 
         :param principal_axis:
             Principal orientation axis (must be unitary).
-
         :param p_axis:
             Secondary axis perpendicular to principal (must be unitary).
         """
 
-        # TODO: double check criteria
         assert_msg_critical(
-            np.linalg.norm(principal_axis) > 1e-1,
+            abs(np.linalg.norm(principal_axis) - 1.0) < 1e-8,
             "SymmetryAnalyzer: Principal axis is not unitary.")
+
         assert_msg_critical(
-            np.linalg.norm(p_axis) > 1e-1,
+            abs(np.linalg.norm(p_axis) - 1.0) < 1e-8,
             "SymmetryAnalyzer: p_axis is not unitary.")
 
-        orientation = np.array(
-            [principal_axis, p_axis,
-             np.cross(principal_axis, p_axis)])
-        self._centered_coords = np.dot(self._centered_coords, orientation.T)
+        orientation = np.array([
+            principal_axis,
+            p_axis,
+            np.cross(principal_axis, p_axis),
+        ])
+
+        self._centered_coords = np.matmul(self._centered_coords, orientation.T)
 
     def _conventional_orientation(self, main_axis, p_axis, coords):
         """
@@ -1171,10 +1207,9 @@ class SymmetryAnalyzer:
 
         raise Exception("Non-degenerate not found.")
 
-    @staticmethod
-    def _get_cubed_sphere_grid_points(tolerance):
+    def _get_mol_grid_points(self, tolerance):
         """
-        Generate a cubed-grid points grid on the surface of an unitary sphere.
+        Generate a points grid surrounding the molecule
 
         :param tolerance:
             Maximum angle between points (radians).
@@ -1183,18 +1218,62 @@ class SymmetryAnalyzer:
             List of points.
         """
 
-        num_points = int(1.0 / tolerance)
+        centered_mol = Molecule(self._symbols, self._centered_coords, 'au')
+        connectivity_matrix = centered_mol.get_connectivity_matrix()
+        Ivals, Ivecs = centered_mol.moments_of_inertia(principal_axes=True)
 
-        if num_points < 1:
-            return [(1, 0, 0)]
+        points = []
 
-        for i in range(-num_points, num_points + 1):
-            x = i * tolerance
-            for j in range(-num_points, num_points + 1):
-                y = j * tolerance
-                for p in permutations([x, y, 1]):
-                    norm = np.linalg.norm([x, y, 1])
-                    yield np.array(p) / norm
+        # principal axes
+        for i in range(3):
+            vec = np.array(Ivecs[i])
+            norm = np.linalg.norm(vec)
+            if norm > 1e-8:
+                points.append(vec / norm)
+
+        # atoms
+        for i in range(self._natoms):
+            vec = np.array(self._centered_coords[i])
+            norm = np.linalg.norm(vec)
+            if norm > 1e-8:
+                points.append(vec / norm)
+
+        # centers of rings
+        graph = nx.Graph()
+        for i in range(self._natoms):
+            graph.add_node(i)
+            for j in range(i + 1, self._natoms):
+                if connectivity_matrix[i][j] == 1:
+                    graph.add_edge(i, j)
+        cycles = list(nx.simple_cycles(graph, length_bound=8))
+        for cycle in cycles:
+            vec = np.zeros(3)
+            for i in cycle:
+                vec += self._centered_coords[i]
+            vec /= len(cycle)
+            norm = np.linalg.norm(vec)
+            if norm > 1e-8:
+                points.append(vec / norm)
+
+        # find duplicate points
+        duplicate_indices = []
+        for i in range(len(points)):
+            p_i = points[i]
+            for j in range(i + 1, len(points)):
+                if j in duplicate_indices:
+                    continue
+                p_j = points[j]
+                # check if p_i == p_j or p_i == -p_j
+                if abs(abs(np.dot(p_i, p_j)) - 1.0) < 1e-8:
+                    duplicate_indices.append(j)
+
+        # remove duplicate points
+        unique_points = []
+        for i, p in enumerate(points):
+            if i not in duplicate_indices:
+                unique_points.append(p)
+
+        return unique_points
 
     @staticmethod
     def _get_perpendicular(vector, tol=1e-8):

@@ -1,8 +1,53 @@
+from pathlib import Path
+import numpy as np
+
 from veloxchem.molecule import Molecule
 from veloxchem.symmetryanalyzer import SymmetryAnalyzer
 
 
 class TestPointGroup:
+
+    def rotation_matrix(self):
+
+        return np.array([[0.53667456, -0.38518553, -0.75074131],
+                         [0.75403351, 0.6182462, 0.22182223],
+                         [0.37870025, -0.68513046, 0.62223981]])
+
+    def rotation_matrix_2(self):
+
+        return np.array([[0.89061711, -0.44964967, -0.06794363],
+                         [0.36751046, 0.79967259, -0.47482609],
+                         [0.26783805, 0.39791825, 0.87745304]])
+
+    def rotate_molecule(self, mol, rot_mat):
+
+        labels = mol.get_labels()
+        coords = mol.get_coordinates_in_bohr()
+        new_coords = np.matmul(coords, rot_mat.T)
+        return Molecule(labels, new_coords, 'au')
+
+    def gen_mol_Cinfv(self):
+
+        molxyz = """
+        3
+
+        C              1.090000         0.000000         0.000000
+        N              2.250000         0.000000         0.000000
+        H              0.025000         0.000000         0.000000
+        """
+        return Molecule.read_xyz_string(molxyz)
+
+    def gen_mol_Dinfh(self):
+
+        molxyz = """
+        4
+
+        C              1.057900         0.000000         0.000000
+        C              2.258200         0.000000         0.000000
+        H             -0.007800         0.000000         0.000000
+        H              3.324000         0.000000         0.000000
+        """
+        return Molecule.read_xyz_string(molxyz)
 
     def gen_mol_Cs(self):
 
@@ -42,6 +87,18 @@ class TestPointGroup:
         """
         return Molecule.read_xyz_string(molxyz)
 
+    def gen_mol_C3v(self):
+
+        molxyz = """
+        4
+
+        N              0.069986         0.000001        -0.000000
+        H             -0.324140        -0.000000        -0.939686
+        H             -0.324140        -0.813800         0.469849
+        H             -0.324140         0.813800         0.469849
+        """
+        return Molecule.read_xyz_string(molxyz)
+
     def gen_mol_D2h(self):
 
         molxyz = """
@@ -53,6 +110,21 @@ class TestPointGroup:
         H             -0.000000        -0.929999        -1.227710
         H             -0.000000         0.929999         1.227710
         H             -0.000000        -0.929999         1.227710
+        """
+        return Molecule.read_xyz_string(molxyz)
+
+    def gen_mol_D2d(self):
+
+        molxyz = """
+        7
+
+        C             -1.297220        -0.000000         0.000000
+        C             -0.000000        -0.000000         0.000000
+        C              1.297220        -0.000000         0.000000
+        H             -1.857700        -0.000000         0.930000
+        H             -1.857700        -0.000000        -0.930000
+        H              1.857700         0.930000        -0.000000
+        H              1.857700        -0.930000        -0.000000
         """
         return Molecule.read_xyz_string(molxyz)
 
@@ -120,21 +192,45 @@ class TestPointGroup:
         """
         return Molecule.read_xyz_string(molxyz)
 
+    def gen_mol_Ih(self):
+
+        here = Path(__file__).parent
+        xyzfile = here / 'inputs' / 'c60_ih.xyz'
+        return Molecule.read_xyz_file(xyzfile)
+
     def test_pointgroup(self):
 
         sym_analyzer = SymmetryAnalyzer()
 
         pg_mol = {
+            'Cinfv': self.gen_mol_Cinfv(),
+            'Dinfh': self.gen_mol_Dinfh(),
             'Cs': self.gen_mol_Cs(),
             'C2h': self.gen_mol_C2h(),
             'C2v': self.gen_mol_C2v(),
+            'C3v': self.gen_mol_C3v(),
             'D2h': self.gen_mol_D2h(),
+            'D2d': self.gen_mol_D2d(),
             'D3d': self.gen_mol_D3d(),
             'D6h': self.gen_mol_D6h(),
             'Td': self.gen_mol_Td(),
             'Oh': self.gen_mol_Oh(),
+            'Ih': self.gen_mol_Ih(),
         }
 
         for pg, mol in pg_mol.items():
+            # original molecule
+            sym_res = sym_analyzer.identify_pointgroup(mol)
+            assert sym_res['Point_group'] == pg
+
+            # rotated molecule
+            rot_mat = self.rotation_matrix()
+            mol = self.rotate_molecule(mol, rot_mat)
+            sym_res = sym_analyzer.identify_pointgroup(mol)
+            assert sym_res['Point_group'] == pg
+
+            # further rotated molecule
+            rot_mat_2 = self.rotation_matrix_2()
+            mol = self.rotate_molecule(mol, rot_mat_2)
             sym_res = sym_analyzer.identify_pointgroup(mol)
             assert sym_res['Point_group'] == pg
