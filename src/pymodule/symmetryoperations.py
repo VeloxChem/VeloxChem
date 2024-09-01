@@ -12,9 +12,10 @@ class Inversion:
 
 class Rotation:
 
-    def __init__(self, axis, order=1):
+    def __init__(self, axis, order=1, power=1):
 
         self._order = order
+        self._power = power
 
         # normalize axis
         norm = np.linalg.norm(axis)
@@ -23,7 +24,8 @@ class Rotation:
 
     def get_matrix(self):
 
-        return rotation_matrix(self._axis, 2 * np.pi / self._order)
+        return rotation_matrix(self._axis,
+                               (2.0 * np.pi / self._order) * self._power)
 
 
 class Reflection:
@@ -42,9 +44,10 @@ class Reflection:
 
 class ImproperRotation:
 
-    def __init__(self, axis, order=1):
+    def __init__(self, axis, order=1, power=1):
 
         self._order = order
+        self._power = power
 
         # normalize axis
         norm = np.linalg.norm(axis)
@@ -54,7 +57,8 @@ class ImproperRotation:
     def get_matrix(self):
 
         # Build the rotation matrix
-        rot_matrix = rotation_matrix(self._axis, 2 * np.pi / self._order)
+        rot_matrix = rotation_matrix(self._axis,
+                                     (2 * np.pi / self._order) * self._power)
 
         # Build the reflexion matrix
         reflection = Reflection(self._axis)

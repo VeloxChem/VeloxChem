@@ -221,16 +221,16 @@ class TestPointGroup:
         for pg, mol in pg_mol.items():
             # original molecule
             sym_res = sym_analyzer.identify_pointgroup(mol)
-            assert sym_res['Point_group'] == pg
+            assert sym_res['point_group'] == pg
 
             # rotated molecule
             rot_mat = self.rotation_matrix()
             mol = self.rotate_molecule(mol, rot_mat)
             sym_res = sym_analyzer.identify_pointgroup(mol)
-            assert sym_res['Point_group'] == pg
+            assert sym_res['point_group'] == pg
 
             # further rotated molecule
             rot_mat_2 = self.rotation_matrix_2()
             mol = self.rotate_molecule(mol, rot_mat_2)
             sym_res = sym_analyzer.identify_pointgroup(mol)
-            assert sym_res['Point_group'] == pg
+            assert sym_res['point_group'] == pg

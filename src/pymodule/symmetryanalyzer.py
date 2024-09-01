@@ -1,7 +1,7 @@
 import numpy as np
 import networkx as nx
+import re
 
-from .veloxchemlib import bohr_in_angstrom
 from .molecule import Molecule
 from .symmetryoperations import (Inversion, Rotation, Reflection,
                                  ImproperRotation)
@@ -24,13 +24,9 @@ class SymmetryAnalyzer:
         - Spherical molecules have triply degenerated eigenvalues.
     3. Each category is then treated following a typical detection tree.
 
-    The available tolerance parameters are: loose, tight, very tight.
-
     Instance variables
         - schoenflies_symbol: the pointgroup schoenflies symbol.
         - max_order: the maximum proper rotational axis order.
-        - inequivalent_atoms: a dictionary containing the operations names and
-          the associated inequivalent atoms.
         - primary_axis: axis defined as z cartesian axis for reorientation in
           point group convention.
         - secondary_axis: axis perpendicular to primary axis to build
@@ -47,7 +43,6 @@ class SymmetryAnalyzer:
         # Initializes variables
         self._schoenflies_symbol = ''
         self._max_order = 1
-        self._inequivalent_atoms = {}
         self._primary_axis = [1., 0., 0.]
         self._secondary_axis = [0., 1., 0.]
         self._molecule_type = ''
@@ -125,81 +120,6 @@ class SymmetryAnalyzer:
             ],
             "Cinfv": ["E", "Cinf"],
             "Dinfh": ["E", "Cinf", "i"],
-        }
-
-        # Define all the Abelian groups available for symmetrization for each
-        # point group
-        self._groups_for_symmetrization = {
-            "C1": ["C1"],
-            "Cs": ["Cs", "C1"],
-            "Ci": ["Ci", "C1"],
-            "C2": ["C2", "C1"],
-            "C3": ["C1"],
-            "C4": ["C2", "C1"],
-            "C5": ["C1"],
-            "C6": ["C2", "C1"],
-            "C7": ["C1"],
-            "C8": ["C2", "C1"],
-            "D2": ["D2", "C2", "C1"],
-            "D3": ["C2", "C1"],
-            "D4": ["D2", "C2", "C1"],
-            "D5": ["C2", "C1"],
-            "D6": ["D2", "C2", "C1"],
-            "D7": ["C2", "C1"],
-            "D8": ["D2", "C2", "C1"],
-            "C2v": ["C2v", "C2", "Cs", "C1"],
-            "C3v": ["Cs", "C1"],
-            "C4v": ["C2v", "C2", "Cs", "C1"],
-            "C5v": ["Cs", "C1"],
-            "C6v": ["C2v", "C2", "Cs", "C1"],
-            "C7v": ["Cs", "C1"],
-            "C8v": ["C2v", "C2", "Cs", "C1"],
-            "D2d": ["C2v", "D2", "C2", "Cs", "C1"],
-            "D3d": ["C2h", "C2", "Cs", "Ci", "C1"],
-            "D4d": ["C2v", "D2", "C2", "Cs", "C1"],
-            "D5d": ["C2h", "C2", "Cs", "Ci", "C1"],
-            "D6d": ["C2v", "D2", "C2", "Cs", "C1"],
-            "D7d": ["C2h", "C2", "Cs", "Ci", "C1"],
-            "D8d": ["C2v", "D2", "C2", "Cs", "C1"],
-            "C2h": ["C2h", "C2", "Cs", "Ci", "C1"],
-            "C3h": ["Cs", "C1"],
-            "C4h": ["C2h", "C2", "Cs", "Ci", "C1"],
-            "C5h": ["Cs", "C1"],
-            "C6h": ["C2h", "C2", "Cs", "Ci", "C1"],
-            "C7h": ["Cs", "C1"],
-            "C8h": ["C2h", "C2", "Cs", "Ci", "C1"],
-            "D2h": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
-            "D3h": ["C2v", "C2", "Cs", "C1"],
-            "D4h": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
-            "D5h": ["C2v", "C2", "Cs", "C1"],
-            "D6h": ["D2h", "D2", "C2h", "C2", "Cs", "Ci", "C1"],
-            "D7h": ["C2v", "C2", "Cs", "C1"],
-            "D8h": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
-            "S4": ["C2", "C1"],
-            "S6": ["Ci", "C1"],
-            "S8": ["C2", "C1"],
-            "S10": ["Ci", "C1"],
-            "T": ["D2", "C2", "C1"],
-            "Th": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
-            "Td": ["D2", "C2v", "C2", "Cs", "C1"],
-            "O": ["D2", "C2", "C1"],
-            "Oh": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
-            "I": ["D2", "C2", "C1"],
-            "Ih": ["D2h", "D2", "C2h", "C2v", "C2", "Cs", "Ci", "C1"],
-            "Cinfv": ["C2v", "C2", "Cs", "C1"],
-            "Dinfh": ["D2h", "D2", "C2h", "C2v", "C2", "Ci", "Cs", "C1"],
-        }
-
-        # Define the available Abelian groups for symmetrization and their generators
-        # C2_p means a C2 axis perpendicular to the first C2 axis
-        self._generators = {
-            "Cs": ["sigma_h"],
-            "Ci": ["i"],
-            "C2": ["C2"],
-            "D2": ["C2", "C2_p"],
-            "C2v": ["C2", "sigma_v"],
-            "C2h": ["C2", "sigma_h"],
-            "D2h": ["C2", "C2_p", "sigma_h"],
         }
 
     def identify_pointgroup(self, molecule, tolerance='tight'):
@@ -296,17 +216,13 @@ class SymmetryAnalyzer:
                                     'SymmetryAnalyzer: Invalid eig_degeneracy')
 
         # Collect the results
-        symmetry_analysis["Point_group"] = self._schoenflies_symbol
+        symmetry_analysis["point_group"] = self._schoenflies_symbol
 
         if self._schoenflies_symbol in self._all_symmetry_elements:
             symmetry_elements_list = self._all_symmetry_elements[
                 self._schoenflies_symbol]
-            symmetry_analysis["Expected_elements"] = symmetry_elements_list
-
-        if self._schoenflies_symbol in self._groups_for_symmetrization:
-            Groups_for_symm_list = self._groups_for_symmetrization[
-                self._schoenflies_symbol]
-            symmetry_analysis["Groups_for_symm"] = Groups_for_symm_list
+            symmetry_analysis[
+                "expected_symmetry_elements"] = symmetry_elements_list
 
         return symmetry_analysis
 
@@ -322,104 +238,281 @@ class SymmetryAnalyzer:
             The results in a visual friendly output.
         """
 
-        if symmetry_info:
-            print(results_dict["degeneracy"], "\n")
+        print(results_dict["degeneracy"], "\n")
+        print("Point group: {}\n".format(results_dict["point_group"]))
+        if "expected_symmetry_elements" in results_dict:
+            print("All expected symmetry elements: {}".format(
+                results_dict["expected_symmetry_elements"]))
 
-            print("Point group: {}\n".format(results_dict["Point_group"]))
-
-            if "Expected_elements" in results_dict:
-                print("All expected symmetry elements: {}".format(
-                    results_dict["Expected_elements"]))
-
-            if "Groups_for_symm" in results_dict:
-                print("Available Abelian groups for symmetrization: {}".format(
-                    results_dict["Groups_for_symm"]))
-            else:
-                print("No available Abelian groups for symmetrization.")
-
-        else:
-            print("Point group: {}".format(results_dict["Point_group"]))
-
-    def _symmetrize_pointgroup(self,
-                               symmetry_data,
-                               pointgoup_to_symmetrize="C1"):
+    def symmetrize_pointgroup(self, symmetry_data, point_group=None):
         """
-        Symmetrize in chosen available Abelian group with real representation
-        and reorient molecules. Only reorient if more than 100 atoms.
+        Symmetrize and reorient molecule.
 
         :param symmetry_data:
             The dictionary containing the different results from the
             pointgroup_symmetrize function.
-        :param pointgoup_to_symmetrize:
+        :param pointgroup_to_symmetrize:
             The chosen point group in which the molecule will be symmetrized.
-            Default: C1.
 
         :return:
             The symmetrized molecule as a string.
         """
 
-        # Initializes variables
-        self._symbols_atom_sym = []
+        if point_group is None:
+            point_group = symmetry_data['point_group']
 
-        # Temporary
-        symmetrized_data = {}
+        centered_mol = Molecule(self._symbols, self._centered_coords, 'au')
 
-        def _reorient_molecule(coords):
-            """
-            Store the geometry reoriented in the conventional point group
-            orientation and attibute associated list of atomic labels.
-            The spherical molecules are reoriented with their principal axis as
-            z cartesian axis.
+        if self._natoms == 1:
+            return centered_mol
 
-            :param coords:
-                The coordinates to reorient.
-            """
+        # go through symmetry elements
 
-            if self._molecule_type == "spherical":
-                reoriented_coords = self._conventional_orientation(
-                    self._main_axis, self._p_axis, coords)
+        symmetry_elements_list = self._all_symmetry_elements[point_group]
+
+        symmetry_mapping = set()
+        symmetry_operations = []
+
+        mol_grid_points = self._get_mol_grid_points()
+
+        for sym_elem in symmetry_elements_list:
+            if sym_elem == 'E':
+                continue
+
+            m = re.search(r'(\d*)(\D+.*)$', sym_elem)
+            # n_sym_ops = 1
+            # if m.group(1):
+            #     n_sym_ops = int(m.group(1))
+            sym_op_name = m.group(2)
+
+            # find rotation and improper rotation axes
+            if (sym_op_name.startswith('C') or
+                    sym_op_name.startswith('S')) and sym_op_name[1:].isdigit():
+                if sym_op_name.startswith('C'):
+                    m = re.search(r'^C(\d+)$', sym_op_name)
+                elif sym_op_name.startswith('S'):
+                    m = re.search(r'^S(\d+)$', sym_op_name)
+                order = int(m.group(1))
+                assert_msg_critical(
+                    order > 1, 'SymmetryAnalyzer.symmetrize_pointgroup: ' +
+                    'Rotation order must be greater than 1')
+
+                for axis in mol_grid_points:
+                    for power in range(1, order):
+                        if sym_op_name.startswith('C'):
+                            sym_op = Rotation(axis, order=order, power=power)
+                        elif sym_op_name.startswith('S'):
+                            sym_op = ImproperRotation(axis,
+                                                      order=order,
+                                                      power=power)
+                        sym_op_exists = self._check_symmetry_operation(
+                            sym_op, sym_op_name, mapping=True)
+                        if power == 1 and not sym_op_exists:
+                            break
+                        for pair in self._mapping:
+                            symmetry_mapping.add(pair)
+                        symmetry_operations.append(sym_op)
+
+            # find reflection planes
+            elif sym_op_name.startswith('sigma') or sym_op_name == 'Cs':
+                rotation_op_axes = [
+                    np.array(sym_op._axis)
+                    for sym_op in symmetry_operations
+                    if isinstance(sym_op, (Rotation, ImproperRotation))
+                ]
+
+                for axis in mol_grid_points + rotation_op_axes:
+                    sym_op = Reflection(axis)
+                    sym_op_exists = self._check_symmetry_operation(sym_op,
+                                                                   sym_op_name,
+                                                                   mapping=True)
+                    if sym_op_exists:
+                        for pair in self._mapping:
+                            symmetry_mapping.add(pair)
+                        symmetry_operations.append(sym_op)
+
+            # find inversion
+            elif sym_op_name == 'Ci':
+                sym_op = Inversion()
+                sym_op_exists = self._check_symmetry_operation(sym_op,
+                                                               sym_op_name,
+                                                               mapping=True)
+                if sym_op_exists:
+                    for pair in self._mapping:
+                        symmetry_mapping.add(pair)
+                    symmetry_operations.append(sym_op)
+
+        # average rotation axes
+
+        symmetry_axes = []
+        symmetry_indices = []
+        for sym_idx, sym_op in enumerate(symmetry_operations):
+            if isinstance(sym_op, Rotation):
+                symmetry_axes.append(np.array(sym_op._axis))
+                symmetry_indices.append(sym_idx)
+        symmetry_axes = np.array(symmetry_axes)
+
+        tol_sq = self._tolerance_eig**2
+        for i in range(symmetry_axes.shape[0]):
+            sum_axis = np.array(symmetry_axes[i])
+            count_axis = 1
+            sum_r2 = 0.0
+            for sym_op in symmetry_operations:
+                if isinstance(sym_op, Rotation):
+                    op_axes = np.matmul(symmetry_axes, sym_op.get_matrix())
+                    for j in range(op_axes.shape[0]):
+                        # note: scale axis to approx. C-H bond length
+                        rvec = (symmetry_axes[i] - op_axes[j]) * 2.06
+                        r2 = np.sum(rvec**2)
+                        if r2 < tol_sq:
+                            sum_axis += op_axes[j]
+                            count_axis += 1
+                            sum_r2 += r2
+            ave_axis = sum_axis / count_axis
+            sym_idx = symmetry_indices[i]
+            # note: empirical threshold for averaging symmetry axes
+            if sum_r2 < 1e-6:
+                symmetry_operations[sym_idx]._axis = ave_axis
+
+        # update reflection places
+
+        for i in range(len(symmetry_operations)):
+            if not isinstance(symmetry_operations[i], Reflection):
+                continue
+            ax_i = np.array(symmetry_operations[i]._axis)
+            for j in range(len(symmetry_operations)):
+                if not isinstance(symmetry_operations[j], Rotation):
+                    continue
+                ax_j = np.array(symmetry_operations[j]._axis)
+                if abs(np.dot(ax_i, ax_j)) < self._tolerance_ang:
+                    symmetry_operations[i]._axis = np.array(ax_j)
+
+        # update improper rotation axes
+
+        for i in range(len(symmetry_operations)):
+            if not isinstance(symmetry_operations[i], ImproperRotation):
+                continue
+            ax_i = np.array(symmetry_operations[i]._axis)
+            for j in range(len(symmetry_operations)):
+                if not isinstance(symmetry_operations[j], Rotation):
+                    continue
+                ax_j = np.array(symmetry_operations[j]._axis)
+                # note: scale axis to approx. C-H bond length
+                rvec = (ax_i - ax_j) * 2.06
+                r2 = np.sum(rvec**2)
+                if r2 < tol_sq:
+                    symmetry_operations[i]._axis = np.array(ax_j)
+
+        # find unique atoms
+
+        redundant_atoms = set()
+        for i, j in symmetry_mapping:
+            if i < j:
+                redundant_atoms.add(j)
             else:
-                reoriented_coords = self._conventional_orientation(
-                    self._primary_axis, self._secondary_axis, coords)
+                redundant_atoms.add(i)
 
-            symmetrized_coords_in_angstrom = (reoriented_coords *
-                                              bohr_in_angstrom())
-            self._symbols_atom_sym = self._symbols
+        unique_atoms = set()
+        for i in range(self._natoms):
+            if i not in redundant_atoms:
+                unique_atoms.add(i)
 
-            return symmetrized_coords_in_angstrom
+        # align unique atoms to symmetry elements
 
-        # Handle C1 and O(3) groups
-        if pointgoup_to_symmetrize in ["C1", "O(3)"]:
-            symmetrized_coords_in_angstrom = _reorient_molecule(
-                self._centered_coords)
+        tol_sq = self._tolerance_eig**2
 
-        # Check that the chosen point group is available for symmetrization
-        elif pointgoup_to_symmetrize not in symmetry_data[
-                "Groups_for_symm"] or self._natoms > 100:
-            raise KeyError("Point group not available for symmetrization.")
+        atoms = []
+        atom_orig_indices = []
+        for i in unique_atoms:
+            atoms.append(np.array(self._centered_coords[i]))
+            atom_orig_indices.append(i)
 
-        # Symmetrize molecules and reorient
-        # The spherical molecules are reorient with C2 axis along z cartesian
-        # axis (D2x orientation)
-        else:
-            symmetrized_coords = self._symmetrize_molecule(
-                pointgoup_to_symmetrize)
-            reoriented_coords = self._conventional_orientation(
-                self._primary_axis, self._secondary_axis, symmetrized_coords)
-            symmetrized_coords_in_angstrom = (reoriented_coords *
-                                              bohr_in_angstrom())
+        # in case central atom is very close to origin
+        for a in range(len(atoms)):
+            vec_a = np.array(atoms[a])
+            if np.sum(vec_a**2) < tol_sq:
+                for b in range(len(atoms)):
+                    atoms[b] -= vec_a
 
-        # Temporary
-        symmetrized_data["inequiv_atoms_by_op"] = self._inequivalent_atoms
+        for a in range(len(atoms)):
+            vec_a = np.array(atoms[a])
+            vec_a_norm = np.linalg.norm(vec_a)
 
-        new_molecule_string = f'{self._natoms}\n\n'
+            for sym_op in symmetry_operations:
+                if isinstance(sym_op, (Rotation, ImproperRotation)):
+                    axis = sym_op._axis
+                    if np.dot(vec_a, axis) > 0.0:
+                        vec_a_prime = axis * vec_a_norm
+                    else:
+                        vec_a_prime = axis * vec_a_norm * (-1.0)
+                    r2 = np.linalg.norm(vec_a - vec_a_prime)
+                    if r2 < tol_sq:
+                        atoms[a] = np.array(vec_a_prime)
 
-        for a in range(self._natoms):
-            xa, ya, za = symmetrized_coords_in_angstrom[a]
-            new_molecule_string += f'{self._symbols_atom_sym[a]:<6s}'
-            new_molecule_string += f' {xa:22.8f} {ya:22.8f} {za:22.8f}\n'
+                elif isinstance(sym_op, Reflection):
+                    axis = sym_op._axis
+                    if vec_a_norm**2 < self._tolerance_eig:
+                        continue
+                    u_vec_a = vec_a / vec_a_norm
+                    if abs(np.dot(u_vec_a, axis)) < self._tolerance_ang:
+                        y_axis = np.cross(axis, u_vec_a)
+                        y_axis /= np.linalg.norm(y_axis)
+                        u_vec_a = np.cross(y_axis, axis)
+                        vec_a_prime = u_vec_a * vec_a_norm
+                        atoms[a] = np.array(vec_a_prime)
 
-        return new_molecule_string
+        # generate molecule from unique atoms
+
+        for sym_op in symmetry_operations:
+            sym_mat = sym_op.get_matrix()
+            op_coords = np.matmul(np.array(atoms), sym_mat)
+            for idx_i, vec_i in enumerate(op_coords):
+                idx_a = None
+                for a in range(self._natoms):
+                    r2_ia = np.sum((vec_i - self._centered_coords[a])**2)
+                    if r2_ia < tol_sq:
+                        idx_a = a
+                        break
+                if idx_a is not None and idx_a not in atom_orig_indices:
+                    atoms.append(np.array(vec_i))
+                    atom_orig_indices.append(idx_a)
+
+        assert_msg_critical(
+            len(atoms) == self._natoms and
+            len(atom_orig_indices) == self._natoms,
+            'SymmetryAnalyzer.symmetrize_pointgroup: ' +
+            'Inconsistent number of atoms')
+
+        for idx_i, coord_i in zip(atom_orig_indices, atoms):
+            centered_mol.set_atom_coordinates(idx_i, coord_i)
+
+        # reorient molecule
+
+        z_axis = None
+        for sym_op in symmetry_operations:
+            if isinstance(sym_op, Rotation):
+                z_axis = np.array(sym_op._axis)
+                break
+        if z_axis is not None:
+            min_dot, min_idx = None, None
+            for i in range(self._natoms):
+                if np.linalg.norm(atoms[i]) < 1e-8:
+                    continue
+                u_vec_i = atoms[i] / np.linalg.norm(atoms[i])
+                dot = abs(np.dot(z_axis, u_vec_i))
+                if min_dot is None or min_dot > dot:
+                    min_dot = dot
+                    min_idx = i
+            y_axis = np.cross(z_axis, atoms[min_idx])
+            y_axis /= np.linalg.norm(y_axis)
+            x_axis = np.cross(y_axis, z_axis)
+            rot_mat = np.array([x_axis, y_axis, z_axis])
+            rot_coords = np.matmul(centered_mol.get_coordinates_in_bohr(),
+                                   rot_mat.T)
+            for i in range(self._natoms):
+                centered_mol.set_atom_coordinates(i, rot_coords[i])
+
+        return centered_mol
 
     def _handle_linear(self):
         """
@@ -481,9 +574,14 @@ class SymmetryAnalyzer:
                 break
 
         p_axis = self._get_perpendicular(principal_axis)
-        if self._check_symmetry_operation(Rotation(p_axis, order=2), "C2_p"):
-            n_axis_c2 += 1
-            self._secondary_axis = p_axis
+        for angle in np.arange(0, np.pi + self._tolerance_ang,
+                               0.01 * np.pi / 2):
+            axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
+            c2 = Rotation(axis, order=2)
+            if self._check_symmetry_operation(c2, "C2_p"):
+                n_axis_c2 += 1
+                self._secondary_axis = p_axis
+                break
 
         self._max_order = 2
 
@@ -539,8 +637,10 @@ class SymmetryAnalyzer:
 
         principal_axis = None
 
+        mol_grid_points = self._get_mol_grid_points()
+
         # Check for C5 axis
-        for axis in self._get_mol_grid_points(self._tolerance_ang):
+        for axis in mol_grid_points:
             c5 = Rotation(axis, order=5)
             if self._check_symmetry_operation(c5, "C5"):
                 self._schoenflies_symbol = "I"
@@ -550,7 +650,7 @@ class SymmetryAnalyzer:
 
         # Check for C4 axis
         if principal_axis is None:
-            for axis in self._get_mol_grid_points(self._tolerance_ang):
+            for axis in mol_grid_points:
                 c4 = Rotation(axis, order=4)
                 if self._check_symmetry_operation(c4, "C4"):
                     self._schoenflies_symbol = "O"
@@ -560,7 +660,7 @@ class SymmetryAnalyzer:
 
         # Check for C3 axis
         if principal_axis is None:
-            for axis in self._get_mol_grid_points(self._tolerance_ang):
+            for axis in mol_grid_points:
                 c3 = Rotation(axis, order=3)
                 if self._check_symmetry_operation(c3, "C3"):
                     self._schoenflies_symbol = "T"
@@ -620,7 +720,7 @@ class SymmetryAnalyzer:
                 self._schoenflies_symbol += 'h'
 
             # Check for any C2 axis (for reorientation)
-            for another_axis in self._get_mol_grid_points(self._tolerance_ang):
+            for another_axis in self._get_mol_grid_points():
                 c2 = Rotation(another_axis, order=2)
                 if self._check_symmetry_operation(c2, "C2"):
                     self._primary_axis = another_axis
@@ -658,20 +758,23 @@ class SymmetryAnalyzer:
                 r_matrix = rotation_matrix(p_axis_base, np.pi / 2)
                 axis = np.dot(principal_axis, r_matrix.T)
 
-                for angle in np.arange(
-                        0, 2 * np.pi / self._max_order + self._tolerance_ang,
-                        self._tolerance_ang):
+                for angle in np.arange(0, 2 * np.pi + self._tolerance_ang,
+                                       self._tolerance_ang):
                     rot_matrix = rotation_matrix(principal_axis, angle)
 
                     c4_axis = np.dot(axis, rot_matrix.T)
                     c4 = Rotation(c4_axis, order=4)
 
                     if self._check_symmetry_operation(c4, "C4"):
-                        return axis
+                        t_axis = np.dot(
+                            principal_axis,
+                            rotation_matrix(p_axis_base, np.pi / 2).T)
+                        return np.dot(t_axis, rot_matrix.T)
 
             # Set orientation
             p_axis = determine_orientation_O(principal_axis)
-            self._set_orientation(principal_axis, p_axis)
+            self._main_axis = principal_axis
+            self._p_axis = p_axis
 
             # Check for inverison center at center of mass
             if self._check_symmetry_operation(Inversion(), "i"):
@@ -713,9 +816,8 @@ class SymmetryAnalyzer:
                 r_matrix = rotation_matrix(p_axis_base, -np.arccos(-1 / 3))
                 axis = np.dot(principal_axis, r_matrix.T)
 
-                for angle in np.arange(
-                        0, 2 * np.pi / self._max_order + self._tolerance_ang,
-                        self._tolerance_ang):
+                for angle in np.arange(0, 2 * np.pi + self._tolerance_ang,
+                                       self._tolerance_ang):
                     rot_matrix = rotation_matrix(principal_axis, angle)
 
                     c3_axis = np.dot(axis, rot_matrix.T)
@@ -732,7 +834,7 @@ class SymmetryAnalyzer:
             self._p_axis = p_axis
 
             # Check for any C2 axis (for reorientation)
-            for another_axis in self._get_mol_grid_points(self._tolerance_ang):
+            for another_axis in self._get_mol_grid_points():
                 c2 = Rotation(another_axis, order=2)
                 if self._check_symmetry_operation(c2, "C2"):
                     self._primary_axis = another_axis
@@ -919,14 +1021,12 @@ class SymmetryAnalyzer:
     def _check_symmetry_operation(self,
                                   operation,
                                   element_string,
-                                  tol_factor=1.0):
+                                  mapping=False):
         """
         Check if the given symmetry operation exists in the point group of the molecule.
 
         :param operation:
             The matrix representative of the symmetry operation.
-        :param tol_factor:
-            A factor to scale the tolerance value.
 
         :return:
             True if the symmetry operation exists in the point group, False otherwise.
@@ -939,159 +1039,32 @@ class SymmetryAnalyzer:
             np.max(np.abs(sym_matrix - np.identity(3))) >= 1e-8,
             'SymmetryAnalyzer: Identity matrix should not be checked')
 
-        # Define absolte tolerance from the eigenvalue tolerance
-        # error_abs_rad = self._abs_to_rad(self._tolerance_eig,
-        #                                  coord=self._centered_coords)
-
         # Get COM frame coordinates after the operation
         op_coordinates = np.matmul(self._centered_coords, sym_matrix)
 
-        # Initialize objects to obtain inequivalent atoms
-        # mapping = []
-        # inequivalent_atoms_by_operation = set()
+        self._mapping = set()
 
         sym_op_exists = True
         tol_sq = self._tolerance_eig**2
         for i in range(self._natoms):
-            min_r2 = None
+            min_r2, min_idx = None, None
             for j in range(self._natoms):
                 if self._symbols[i] == self._symbols[j]:
                     rvec = op_coordinates[i] - self._centered_coords[j]
                     r2 = np.sum(rvec**2)
                     if min_r2 is None or min_r2 > r2:
                         min_r2 = r2
-            if min_r2 >= tol_sq:
+                        min_idx = j
+            if min_r2 < tol_sq:
+                if self._symbols[i] == self._symbols[min_idx] and i != min_idx:
+                    self._mapping.add(tuple(sorted([i, min_idx])))
+            else:
                 sym_op_exists = False
-                break
-        """
-        # Check if operation exists
-        for idx, op_coord in enumerate(op_coordinates):
-            # Calculate the differences in radii and angles
-            difference_rad = self._radius_diff_in_radiants(
-                op_coord, self._centered_coords, self._tolerance_eig)
-            difference_ang = self._angle_between_vector_matrix(
-                op_coord, self._centered_coords, self._tolerance_eig)
-
-            def check_diff(diff, diff2):
-                for idx_2, (d1, d2) in enumerate(zip(diff, diff2)):
-                    if self._symbols[idx_2] != self._symbols[idx]:
-                        continue
-                    tolerance_total = self._tolerance_ang * tol_factor + error_abs_rad[
-                        idx_2]
-                    if d1 < tolerance_total and d2 < tolerance_total:
-                        return True
-                return False
-
-            if not check_diff(difference_ang, difference_rad):
-                return False
-
-            # Save the original atom index, the manipulated atom index, and
-            # their associated original coordinates
-            manipulated_atom_idx = np.argmin(
-                np.linalg.norm(self._centered_coords - op_coord, axis=1))
-            mapping.append((idx, manipulated_atom_idx))
-
-            # Check if the original atom is already in the list of inequivalent atoms
-            if idx == manipulated_atom_idx:
-                inequivalent_atoms_by_operation.add(idx)
-            elif idx != manipulated_atom_idx:
-                for mapping_tuple in mapping:
-                    if mapping_tuple[0] not in [
-                            indice_tuple[1] for indice_tuple in mapping
-                    ]:
-                        inequivalent_atoms_by_operation.add(mapping_tuple[0])
-
-        # Save string and inequivalent atom indices for detected operations
-        # used in symmetrization
-        if element_string in [
-                "C2", "C2_p", "sigma", "sigma_h", "sigma_v", "sigma", "i"
-        ]:
-            self._inequivalent_atoms[
-                element_string] = inequivalent_atoms_by_operation
-        """
+                if not mapping:
+                    self._mapping = None
+                    break
 
         return sym_op_exists
-
-    def _symmetrize_molecule(self, pointgroup):
-        """
-        Symmetrize a molecule based on the inequivalent atoms for each
-        orperation. If atoms are found at the same position within a tolerance
-        after applying all operation, the average position is calculated and
-        saved.
-
-        :param pointgroup:
-            The chosen point group for symmetrization.
-
-        :return:
-            A array with the coordinates of the symmetrized molecule.
-        """
-
-        # Initialize the list of coordinates for the inequivalent atoms after
-        # symmetrization
-        full_symmetrized_coord = []
-        full_symmetrized_symbols = []
-
-        # Define the possible symmetry operation to apply on the inequivalent
-        # coordinates
-        symmetry_operation = {
-            "i": Inversion(),
-            "C2": Rotation(self._primary_axis, order=2),
-            "C2_p": Rotation(self._secondary_axis, order=2),
-            "sigma_h": Reflection(self._primary_axis),
-            "sigma_v": Reflection(self._secondary_axis)
-        }
-
-        # Loop over the operations to apply and generate the representatives
-        # In reverse order to apply rotation in last as it is the main operator
-        for operation in reversed(self._generators[pointgroup]):
-            if operation in self._inequivalent_atoms:
-                representative = symmetry_operation[operation]
-                sym_matrix = representative.get_matrix()
-
-                # Retrieve the coordinates for the current set of inequivalent atoms
-                ineq_coords = [
-                    self._centered_coords[index]
-                    for index in self._inequivalent_atoms[operation]
-                ]
-                ineq_symbols = [
-                    self._symbols[index]
-                    for index in self._inequivalent_atoms[operation]
-                ]
-
-                # Apply the symmetry operation to the coordinates of the
-                # inequivalent atoms
-                op_coordinates = np.dot(ineq_coords, sym_matrix.T)
-
-        # Loop over each pair of arrays of coordinates and calculate the
-        # absolute difference between the original and generated coordinates
-        for i, (coord, symbol) in enumerate(zip(ineq_coords, ineq_symbols)):
-            abs_diff = np.abs(coord - op_coordinates[i])
-
-            # If the absolute difference is greater than a small tolerance value,
-            # append both coordinates and symbols to the respective lists
-            if np.any(abs_diff > 1.0):
-                full_symmetrized_coord.append(coord)
-                full_symmetrized_coord.append(op_coordinates[i])
-                # Note: Symbol is the same for both coordinates
-                full_symmetrized_symbols.append(symbol)
-                full_symmetrized_symbols.append(symbol)
-            # If the absolute difference is within the tolerance value,
-            # append the symmetrized coordinate and symbol to the respective lists
-            else:
-                average_pos = (coord + op_coordinates[i]) / 2
-                full_symmetrized_coord.append(average_pos)
-                full_symmetrized_symbols.append(symbol)
-
-        # Check that the number of generated atoms is the same as the original molecule
-        assert_msg_critical(
-            self._natoms == len(full_symmetrized_coord),
-            "SymmetryAnalyzer: Number of generated atoms" +
-            " does not match initial molecule.")
-
-        # Store the symbols of the inequivalent atoms in the instance variable
-        self._symbols_atom_sym = full_symmetrized_symbols
-
-        return np.array(full_symmetrized_coord)
 
     def _set_orientation(self, principal_axis, p_axis):
         """
@@ -1118,44 +1091,6 @@ class SymmetryAnalyzer:
         ])
 
         self._centered_coords = np.matmul(self._centered_coords, orientation.T)
-
-    def _conventional_orientation(self, main_axis, p_axis, coords):
-        """
-        Set molecular orientation in point group convention:
-            - a right-handed cartesian,
-            - origin at center of mass,
-            - highest rotational axis asz cartesian axis,
-            - if z in along a sigma plane, x is chosen as perpendicular to the plane,
-            - if z is perpendicular to a sigma plane, x and y are in the plane,
-            - if no rotational axis but a sigma plane, z is set along the plane,
-            - if no rotational axis nor sigma plane, x and y are defined along
-              the two principal inertia axes associated with the two smallest
-              principal moments.
-
-        :param main_axis:
-            The axis to align with the z cartesian axis.
-        :param p_axis:
-            A axis perpendicular to main_axis to align with the x cartesian axis.
-        :param coords:
-            The coordinates to reorient.
-
-        :return:
-            A list of arrays with the cartesian coordinates.
-        """
-
-        if self._molecule_type == "isolated_atom":
-            return
-        elif self._molecule_type == "linear":
-            orientation = np.array([[0., 0., 1.], [0., 1., 0.], [1., 0., 0.]])
-            reoriented_coordinates = np.dot(coords, orientation.T)
-        elif self._molecule_type == "asym_top":
-            reoriented_coordinates = coords
-        else:
-            orientation = np.array(
-                [p_axis, np.cross(main_axis, p_axis), main_axis])
-            reoriented_coordinates = np.dot(coords, orientation.T)
-
-        return reoriented_coordinates
 
     @staticmethod
     def _get_degeneracy(Ivals, tolerance):
@@ -1207,12 +1142,9 @@ class SymmetryAnalyzer:
 
         raise Exception("Non-degenerate not found.")
 
-    def _get_mol_grid_points(self, tolerance):
+    def _get_mol_grid_points(self):
         """
-        Generate a points grid surrounding the molecule
-
-        :param tolerance:
-            Maximum angle between points (radians).
+        Generate points surrounding the molecule.
 
         :return:
             List of points.
@@ -1220,16 +1152,8 @@ class SymmetryAnalyzer:
 
         centered_mol = Molecule(self._symbols, self._centered_coords, 'au')
         connectivity_matrix = centered_mol.get_connectivity_matrix()
-        Ivals, Ivecs = centered_mol.moments_of_inertia(principal_axes=True)
 
         points = []
-
-        # principal axes
-        for i in range(3):
-            vec = np.array(Ivecs[i])
-            norm = np.linalg.norm(vec)
-            if norm > 1e-8:
-                points.append(vec / norm)
 
         # atoms
         for i in range(self._natoms):
@@ -1254,6 +1178,17 @@ class SymmetryAnalyzer:
             norm = np.linalg.norm(vec)
             if norm > 1e-8:
                 points.append(vec / norm)
+
+        # centers of bonds
+        for i in range(self._natoms):
+            for j in range(i + 1, self._natoms):
+                if (connectivity_matrix[i][j] == 1 and
+                        self._symbols[i] == self._symbols[j]):
+                    vec = 0.5 * (self._centered_coords[i] +
+                                 self._centered_coords[j])
+                    norm = np.linalg.norm(vec)
+                    if norm > 1e-8:
+                        points.append(vec / norm)
 
         # find duplicate points
         duplicate_indices = []
@@ -1297,83 +1232,11 @@ class SymmetryAnalyzer:
 
         # check perpendicular
         assert_msg_critical(
-            np.dot(pp_vector, vector) < tol,
+            abs(np.dot(pp_vector, vector)) < tol,
             "SymmetryAnalyzer: perpendicular check failed")
         # check normalization
         assert_msg_critical(
-            abs(np.linalg.norm(pp_vector) - 1) < tol,
+            abs(np.linalg.norm(pp_vector) - 1.0) < tol,
             "SymmetryAnalyzer: normalization check failed")
 
         return pp_vector
-
-    @staticmethod
-    def _abs_to_rad(tolerance, coord):
-        """
-        Converts the tolerance from absolute units to radians for an array of
-        coordinates.
-
-        :param tolerance:
-            The tolerance defined in absolute units (e.g. the eigenvalue tolerance)
-        :param coord:
-            The array of coordinates (e.g. the molecule coordinates in center of
-            mass frame).
-
-        :return:
-            The equivalent of the tolerance in radians.
-        """
-
-        coord = np.array(coord)
-
-        return tolerance / np.clip(np.linalg.norm(coord, axis=1), tolerance,
-                                   None)
-
-    @staticmethod
-    def _angle_between_vector_matrix(vector, coord, tolerance=1e-5):
-        """
-        Calculates the angles between position vectors in the center of mass frame
-        and position vectors from another array.
-
-        :param vector:
-            The array of coordinates to compares with center of mass frame coordinates
-            (e.g. the coordinates after an operation).
-        :param coord:
-            The reference coordinates (e.g. the center of mass frame coordinates).
-
-        :return:
-            An array of angles.
-        """
-
-        norm_coor = np.linalg.norm(coord, axis=1)
-        norm_op_coor = np.linalg.norm(vector)
-
-        angles = []
-        for v, n in zip(np.dot(vector, coord.T), norm_coor * norm_op_coor):
-            if n < tolerance:
-                angles.append(0)
-            else:
-                angles.append(np.arccos(np.clip(v / n, -1.0, 1.0)))
-
-        return np.array(angles)
-
-    @staticmethod
-    def _radius_diff_in_radiants(vector, coord, tolerance=1e-5):
-        """
-        Calculates the difference between the radii of the vectors in the coord
-        matrix and another vector.
-
-        :param vector:
-            The array to evaluate the differences in position vectors.
-
-        :param coord:
-            The reference array to evaluate the differences.
-
-        :return:
-            An array of differences.
-        """
-
-        norm_coor = np.linalg.norm(coord, axis=1)
-        norm_op_coor = np.linalg.norm(vector)
-
-        average_radii = np.clip((norm_coor + norm_op_coor) / 2, tolerance, None)
-
-        return np.abs(norm_coor - norm_op_coor) / average_radii
