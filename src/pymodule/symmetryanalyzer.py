@@ -19,9 +19,9 @@ class SymmetryAnalyzer:
     2. The principal axis and moment are obtained by computing the eigenvalues and
        eigenvectors of the inertia tensor.
         - Linear molecule have one vanishing eigenvalue.
-        - Asymmetric top molecules have non-degenerated eigenvalues.
-        - Symmetric molecules have doubly degenerated eigenvalues.
-        - Spherical molecules have triply degenerated eigenvalues.
+        - Asymmetric top molecules have nondegenerate eigenvalues.
+        - Symmetric molecules have doubly degenerate eigenvalues.
+        - Spherical molecules have triply degenerate eigenvalues.
     3. Each category is then treated following a typical detection tree.
 
     Instance variables
@@ -157,7 +157,8 @@ class SymmetryAnalyzer:
             self._tolerance_eig = 0.002
             self._tolerance_ang = 0.035  # about 2 degrees
         else:
-            raise KeyError("Tolerance criterion not available.")
+            raise KeyError(
+                "SymmetryAnalyzer: Tolerance criterion not available.")
 
         # Read and express geometry in center of mass (COM) frame
         # Geom and COM in bohr because moments of inertia are defined in bohr
@@ -196,20 +197,20 @@ class SymmetryAnalyzer:
             # Asymmetric group
             elif eig_degeneracy == 1:
                 self._handle_asymmetric()
-                symmetry_analysis["degeneracy"] = "Principal moments of inertia"
-                symmetry_analysis["degeneracy"] += " are not degenerated."
+                symmetry_analysis["degeneracy"] = (
+                    "Principal moments of inertia: Nondegenerate")
 
             # Symmetric group
             elif eig_degeneracy == 2:
                 self._handle_symmetric()
-                symmetry_analysis["degeneracy"] = "Principal moments of inertia"
-                symmetry_analysis["degeneracy"] += " are doubly degenerated."
+                symmetry_analysis["degeneracy"] = (
+                    "Principal moments of inertia: Doubly degenerate")
 
             # Spherical group
             elif eig_degeneracy == 3:
                 self._handle_spherical()
-                symmetry_analysis["degeneracy"] = "Principal moments of inertia"
-                symmetry_analysis["degeneracy"] += " are triply degenerated."
+                symmetry_analysis["degeneracy"] = (
+                    "Principal moments of inertia: Triply degenerate")
 
             else:
                 assert_msg_critical(False,
@@ -233,16 +234,19 @@ class SymmetryAnalyzer:
         :param results_dict:
             The dictionary containing the different results from the
             pointgroup_identify function.
-
-        :return:
-            The results in a visual friendly output.
+        :param symmetry_info:
+            The flag for printing more information about symmetry.
         """
 
-        print(results_dict["degeneracy"], "\n")
-        print("Point group: {}\n".format(results_dict["point_group"]))
-        if "expected_symmetry_elements" in results_dict:
-            print("All expected symmetry elements: {}".format(
-                results_dict["expected_symmetry_elements"]))
+        if symmetry_info:
+            print(results_dict['degeneracy'])
+
+        print('Point group: {}'.format(results_dict['point_group']))
+
+        if symmetry_info:
+            if 'expected_symmetry_elements' in results_dict:
+                print('Expected symmetry elements: ' +
+                      ', '.join(results_dict["expected_symmetry_elements"]))
 
     def symmetrize_pointgroup(self, symmetry_data, point_group=None):
         """
@@ -251,11 +255,11 @@ class SymmetryAnalyzer:
         :param symmetry_data:
             The dictionary containing the different results from the
             pointgroup_symmetrize function.
-        :param pointgroup_to_symmetrize:
+        :param point_group:
             The chosen point group in which the molecule will be symmetrized.
 
         :return:
-            The symmetrized molecule as a string.
+            The symmetrized molecule.
         """
 
         if point_group is None:
@@ -600,7 +604,7 @@ class SymmetryAnalyzer:
 
         # Get the only non-degenareted principal moment fo inertia and set the
         # principal axis along the associated eigenvector
-        idx = self._get_non_degenerated(self._Ivals, self._tolerance_eig)
+        idx = self._get_nondegenerate(self._Ivals, self._tolerance_eig)
         principal_axis = self._Ivecs[idx]
 
         # Determine the highest possible rotation axis order along the principal axis
@@ -1116,9 +1120,10 @@ class SymmetryAnalyzer:
         return 1
 
     @staticmethod
-    def _get_non_degenerated(Ivals, tolerance):
+    def _get_nondegenerate(Ivals, tolerance):
         """
-        Get the index of the non-degenerate eigenvalue from the array of eigenvalues.
+        Get the index of the nondegenerate eigenvalue from the array of
+        eigenvalues.
 
         :param Ivals:
             The array of eigenvalues.
@@ -1127,7 +1132,7 @@ class SymmetryAnalyzer:
             The tolerance parameter on the eigenvalues.
 
         :return:
-            The index of the non-degenerate eigenvalue.
+            The index of the nondegenerate eigenvalue.
         """
 
         for i, ev1 in enumerate(Ivals):
@@ -1140,7 +1145,7 @@ class SymmetryAnalyzer:
             if single_deg == 2:
                 return index
 
-        raise Exception("Non-degenerate not found.")
+        assert_msg_critical(False, "SymmetryAnalyzer: Nondegenerate not found.")
 
     def _get_mol_grid_points(self):
         """
