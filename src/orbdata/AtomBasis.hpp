@@ -15,7 +15,8 @@ class CAtomBasis
     /// @brief The default constructor.
     CAtomBasis();
 
-    /// @brief The constructor with vector of basis functions, name of basis set, ECP label, and chemical element identifier.
+    /// @brief The constructor with vector of basis functions, name of basis set,
+    /// ECP label, and chemical element identifier.
     /// @param functions The vector of basis functions.
     /// @param name The name of atom basis.
     /// @param ecp_label The label of ECP in atom basis.

@@ -1,9 +1,9 @@
 #ifndef T4CMatricesDistributor_hpp
 #define T4CMatricesDistributor_hpp
 
-#include <vector>
-#include <string>
 #include <array>
+#include <string>
+#include <vector>
 
 #include "Matrices.hpp"
 #include "SimdArray.hpp"
@@ -14,28 +14,27 @@ class CT4CMatricesDistributor
 {
     /// The Fock matrix associated with distributor.
     CMatrices* _focks;
-    
+
     /// The density matrix associated with distributor.
     const CMatrices* _densities;
-    
+
     /// The vector of standard labels of Fock matrices.
     std::vector<std::string> _labels;
-    
+
     /// The vector of scalling factors for scaling exchange contributions.
     std::vector<double> _exchange_factors;
-    
+
    public:
-    
     /// Creates a Fock matrix distributor.
     /// - Parameter focks : the Fock matrices.
     /// - Parameter densities : the density matrices.
     /// - Parameter label : the vector of standard labels of Fock matrices.
     /// - Parameter exchange_factor : the vector of scaling factors of exchange contributions.
-    CT4CMatricesDistributor(      CMatrices&                focks,
+    CT4CMatricesDistributor(CMatrices&                      focks,
                             const CMatrices&                densities,
                             const std::vector<std::string>& labels,
                             const std::vector<double>&      exchange_factors);
-    
+
     /// Distributes buffer of integrals into Fock matrix.
     /// - Parameter buffer: the integrals buffer.
     /// - Parameter a_indices: the compressed contracted GTOs indexes on center A.
@@ -52,7 +51,7 @@ class CT4CMatricesDistributor
                     const int                 b_angmom,
                     const std::array<int, 2>& bra_range,
                     const std::array<int, 2>& ket_range) -> void;
-    
+
     /// Distributes buffer of integrals into Fock matrix.
     /// - Parameter buffer: the integrals buffer.
     /// - Parameter a_indices: the compressed contracted GTOs indexes on center A.
@@ -78,6 +77,5 @@ class CT4CMatricesDistributor
                     const std::array<int, 2>& bra_range,
                     const std::array<int, 2>& ket_range) -> void;
 };
-
 
 #endif /* T4CMatricesDistributor_hpp */

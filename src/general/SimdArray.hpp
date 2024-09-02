@@ -86,10 +86,14 @@ class CSimdArray
     /// @param other The SIMD array to be compared.
     /// @return True if SIMD arrays are not equal, False otherwise.
     auto operator!=(const CSimdArray &other) const -> bool = delete;
-    
+
     /// @brief Sets active width.
-    /// @param width The active width of SIMD width. 
-    auto set_active_width(const size_t width) -> void { _active_width = width; };
+    /// @param width The active width of SIMD width.
+    auto
+    set_active_width(const size_t width) -> void
+    {
+        _active_width = width;
+    };
 
     /// @brief Gets pointer to SIMD array row.
     /// @param irow The requested row.
@@ -140,7 +144,7 @@ class CSimdArray
         const auto nelems = _rows * _columns * simd::width<T>();
 
         const auto fact = T{0.0};
-        
+
         auto ptr_data = _data;
 
 #pragma omp simd aligned(ptr_data : 64)
@@ -156,10 +160,7 @@ class CSimdArray
     /// @param position The row position of replicated data in SIMD array.
     /// @param nreps  The number of repetitions of source data.
     inline auto
-    replicate(const std::vector<T>     &source,
-              std::pair<size_t, size_t> indices,
-              const size_t              position,
-              const size_t              nreps) -> void
+    replicate(const std::vector<T> &source, std::pair<size_t, size_t> indices, const size_t position, const size_t nreps) -> void
     {
         if (const size_t ndim = indices.second - indices.first; ndim <= simd::width<T>())
         {
@@ -183,10 +184,7 @@ class CSimdArray
     /// @param position The row position of replicated data in SIMD array.
     /// @param nreps  The number of repetitions of source data.
     inline auto
-    replicate_points(const std::vector<TPoint<T>> &source,
-                     std::pair<size_t, size_t>     indices,
-                     const size_t                  position,
-                     const size_t                  nreps) -> void
+    replicate_points(const std::vector<TPoint<T>> &source, std::pair<size_t, size_t> indices, const size_t position, const size_t nreps) -> void
     {
         if (const size_t ndim = indices.second - indices.first; ndim <= simd::width<T>())
         {
@@ -246,10 +244,7 @@ class CSimdArray
     /// @param position The row position of replicated data in SIMD array.
     /// @param nblocks : the number of blocks in source vector.
     inline auto
-    load_points(const std::vector<TPoint<T>> &source,
-                std::pair<size_t, size_t>     indices,
-                const size_t                  position,
-                size_t                        nblocks) -> void
+    load_points(const std::vector<TPoint<T>> &source, std::pair<size_t, size_t> indices, const size_t position, size_t nblocks) -> void
     {
         if (const size_t ndim = indices.second - indices.first; ndim <= simd::width<T>())
         {

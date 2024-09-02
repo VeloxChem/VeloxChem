@@ -4,11 +4,11 @@
 #include <vector>
 
 #include "GtoFunc.hpp"
+#include "KineticEnergyGeom101Func.hpp"
 #include "Matrices.hpp"
 #include "MatricesFunc.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
-#include "KineticEnergyGeom101Func.hpp"
 #include "OpenMPFunc.hpp"
 #include "Point.hpp"
 #include "T2CDistributor.hpp"
@@ -59,18 +59,13 @@ class CKineticEnergyGeomX0YDriver
     /// @param iatom The index of atom.
     /// @param jatom The index of atom.
     /// @return The nuclear potential matrix.
-    auto compute(const CMolecularBasis             &basis,
-                 const CMolecule                   &molecule,
-                 const int                         iatom,
-                 const int                         jatom) const -> CMatrices;
+    auto compute(const CMolecularBasis &basis, const CMolecule &molecule, const int iatom, const int jatom) const -> CMatrices;
 };
 
 template <int N, int M>
 auto
-CKineticEnergyGeomX0YDriver<N, M>::compute(const CMolecularBasis             &basis,
-                                     const CMolecule                   &molecule,
-                                     const int                         iatom,
-                                     const int                         jatom) const -> CMatrices
+CKineticEnergyGeomX0YDriver<N, M>::compute(const CMolecularBasis &basis, const CMolecule &molecule, const int iatom, const int jatom) const
+    -> CMatrices
 {
     // set up operator derivatives matrices
 
@@ -94,13 +89,21 @@ CKineticEnergyGeomX0YDriver<N, M>::compute(const CMolecularBasis             &ba
     {
 #pragma omp single nowait
         {
-            const auto bra_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule, {iatom, });
-            
-            const auto ket_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule, {jatom, });
+            const auto bra_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis,
+                                                                 *ptr_molecule,
+                                                                 {
+                                                                     iatom,
+                                                                 });
+
+            const auto ket_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis,
+                                                                 *ptr_molecule,
+                                                                 {
+                                                                     jatom,
+                                                                 });
 
             const auto tasks = omp::make_work_tasks(bra_gto_blocks, ket_gto_blocks);
 
-            std::ranges::for_each(std::ranges::reverse_view(tasks), [&](const auto& task) {
+            std::ranges::for_each(std::ranges::reverse_view(tasks), [&](const auto &task) {
                 auto bra_gtos    = bra_gto_blocks[task[0]];
                 auto ket_gtos    = ket_gto_blocks[task[1]];
                 auto bra_indices = std::pair<size_t, size_t>{task[2], task[3]};
@@ -119,6 +122,5 @@ CKineticEnergyGeomX0YDriver<N, M>::compute(const CMolecularBasis             &ba
 
     return kin_mats;
 }
-
 
 #endif /* KineticEnergyGeomX0YDriver_hpp */

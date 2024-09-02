@@ -20,14 +20,10 @@ CMatrix::CMatrix(const std::map<std::pair<int, int>, CSubMatrix> &sub_matrices, 
 
     , _mat_type(mat_type)
 {
-    std::ranges::for_each(sub_matrices, [&](const auto &mvalue) {
-        _sub_matrices.insert({mvalue.first, new CSubMatrix(mvalue.second)});
-    });
+    std::ranges::for_each(sub_matrices, [&](const auto &mvalue) { _sub_matrices.insert({mvalue.first, new CSubMatrix(mvalue.second)}); });
 }
 
-CMatrix::CMatrix(const std::vector<std::pair<int, int>> &ang_pairs,
-                 const std::vector<CSubMatrix>          &sub_matrices,
-                 const mat_t                             mat_type)
+CMatrix::CMatrix(const std::vector<std::pair<int, int>> &ang_pairs, const std::vector<CSubMatrix> &sub_matrices, const mat_t mat_type)
 
     : _sub_matrices(std::map<std::pair<int, int>, CSubMatrix *>())
 
@@ -35,9 +31,8 @@ CMatrix::CMatrix(const std::vector<std::pair<int, int>> &ang_pairs,
 {
     if (const auto ndims = ang_pairs.size(); ndims == sub_matrices.size())
     {
-        std::ranges::for_each(std::views::iota(size_t{0}, ndims), [&](const size_t i) {
-            _sub_matrices.insert({ang_pairs[i], new CSubMatrix(sub_matrices[i])});
-        });
+        std::ranges::for_each(std::views::iota(size_t{0}, ndims),
+                              [&](const size_t i) { _sub_matrices.insert({ang_pairs[i], new CSubMatrix(sub_matrices[i])}); });
     }
 }
 
@@ -47,9 +42,7 @@ CMatrix::CMatrix(const CMatrix &other)
 
     , _mat_type(other._mat_type)
 {
-    std::ranges::for_each(other._sub_matrices, [&](const auto &mvalue) {
-        _sub_matrices.insert({mvalue.first, new CSubMatrix(*mvalue.second)});
-    });
+    std::ranges::for_each(other._sub_matrices, [&](const auto &mvalue) { _sub_matrices.insert({mvalue.first, new CSubMatrix(*mvalue.second)}); });
 }
 
 CMatrix::CMatrix(CMatrix &&other) noexcept
@@ -75,9 +68,7 @@ CMatrix::operator=(const CMatrix &other) -> CMatrix &
 
     _mat_type = other._mat_type;
 
-    std::ranges::for_each(other._sub_matrices, [&](const auto &mvalue) {
-        _sub_matrices.insert({mvalue.first, new CSubMatrix(*mvalue.second)});
-    });
+    std::ranges::for_each(other._sub_matrices, [&](const auto &mvalue) { _sub_matrices.insert({mvalue.first, new CSubMatrix(*mvalue.second)}); });
 
     return *this;
 }
@@ -107,8 +98,7 @@ CMatrix::operator==(const CMatrix &other) const -> bool
     {
         auto keys = angular_pairs();
 
-        auto pos = std::ranges::find_if(
-            keys, [&](const auto &key) { return *_sub_matrices.at(key) != *other._sub_matrices.at(key); });
+        auto pos = std::ranges::find_if(keys, [&](const auto &key) { return *_sub_matrices.at(key) != *other._sub_matrices.at(key); });
 
         return keys.end() == pos;
     }
@@ -129,9 +119,8 @@ CMatrix::operator+(const CMatrix &other) const -> CMatrix
 
     if (const auto keys = angular_pairs(); keys == other.angular_pairs())
     {
-        std::ranges::for_each(keys, [&](const auto &key) {
-            mat._sub_matrices.insert({key, new CSubMatrix(*_sub_matrices.at(key) + *other._sub_matrices.at(key))});
-        });
+        std::ranges::for_each(
+            keys, [&](const auto &key) { mat._sub_matrices.insert({key, new CSubMatrix(*_sub_matrices.at(key) + *other._sub_matrices.at(key))}); });
     }
 
     return mat;

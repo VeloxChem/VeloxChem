@@ -39,7 +39,8 @@ class CGtoBlock
     /// @param npgtos The number of primitive basis functions in basis function.
     CGtoBlock(const CMolecularBasis &basis, const CMolecule &molecule, const int angular_momentum, const int npgtos);
 
-    /// @brief The constructor molecular basis and molecule for selected atoms in molecule.
+    /// @brief The constructor molecular basis and molecule for selected atoms in
+    /// molecule.
     /// @param basis The molecular basis.
     /// @param molecule The molecule.
     /// @param atoms The vector of atoms to select.

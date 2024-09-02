@@ -1,17 +1,17 @@
 #include "GeometricalDerivatives1X1ForFG.hpp"
 
-namespace t2cgeom { // t2cgeom namespace
+namespace t2cgeom {  // t2cgeom namespace
 
 auto
-comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
-                        const size_t idx_op_geom_101_fg,
-                        const size_t idx_op_df,
-                        const size_t idx_op_dh,
-                        const size_t idx_op_gf,
-                        const size_t idx_op_gh,
-                        const size_t op_comps,
+comp_prim_op_geom_11_fg(CSimdArray<double>&       pbuffer,
+                        const size_t              idx_op_geom_101_fg,
+                        const size_t              idx_op_df,
+                        const size_t              idx_op_dh,
+                        const size_t              idx_op_gf,
+                        const size_t              idx_op_gh,
+                        const size_t              op_comps,
                         const CSimdArray<double>& factors,
-                        const double a_exp) -> void
+                        const double              a_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -1363,32 +1363,107 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_x_xxx_zzzz = pbuffer.data(idx_op_geom_101_fg + 0 * op_comps * 150 + i * 150 + 14);
 
-        #pragma omp simd aligned(to_x_x_xxx_xxxx, to_x_x_xxx_xxxy, to_x_x_xxx_xxxz, to_x_x_xxx_xxyy, to_x_x_xxx_xxyz, to_x_x_xxx_xxzz, to_x_x_xxx_xyyy, to_x_x_xxx_xyyz, to_x_x_xxx_xyzz, to_x_x_xxx_xzzz, to_x_x_xxx_yyyy, to_x_x_xxx_yyyz, to_x_x_xxx_yyzz, to_x_x_xxx_yzzz, to_x_x_xxx_zzzz, to_xx_xxx, to_xx_xxxxx, to_xx_xxxxy, to_xx_xxxxz, to_xx_xxxyy, to_xx_xxxyz, to_xx_xxxzz, to_xx_xxy, to_xx_xxyyy, to_xx_xxyyz, to_xx_xxyzz, to_xx_xxz, to_xx_xxzzz, to_xx_xyy, to_xx_xyyyy, to_xx_xyyyz, to_xx_xyyzz, to_xx_xyz, to_xx_xyzzz, to_xx_xzz, to_xx_xzzzz, to_xx_yyy, to_xx_yyz, to_xx_yzz, to_xx_zzz, to_xxxx_xxx, to_xxxx_xxxxx, to_xxxx_xxxxy, to_xxxx_xxxxz, to_xxxx_xxxyy, to_xxxx_xxxyz, to_xxxx_xxxzz, to_xxxx_xxy, to_xxxx_xxyyy, to_xxxx_xxyyz, to_xxxx_xxyzz, to_xxxx_xxz, to_xxxx_xxzzz, to_xxxx_xyy, to_xxxx_xyyyy, to_xxxx_xyyyz, to_xxxx_xyyzz, to_xxxx_xyz, to_xxxx_xyzzz, to_xxxx_xzz, to_xxxx_xzzzz, to_xxxx_yyy, to_xxxx_yyz, to_xxxx_yzz, to_xxxx_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_x_xxx_xxxx,     \
+                             to_x_x_xxx_xxxy, \
+                             to_x_x_xxx_xxxz, \
+                             to_x_x_xxx_xxyy, \
+                             to_x_x_xxx_xxyz, \
+                             to_x_x_xxx_xxzz, \
+                             to_x_x_xxx_xyyy, \
+                             to_x_x_xxx_xyyz, \
+                             to_x_x_xxx_xyzz, \
+                             to_x_x_xxx_xzzz, \
+                             to_x_x_xxx_yyyy, \
+                             to_x_x_xxx_yyyz, \
+                             to_x_x_xxx_yyzz, \
+                             to_x_x_xxx_yzzz, \
+                             to_x_x_xxx_zzzz, \
+                             to_xx_xxx,       \
+                             to_xx_xxxxx,     \
+                             to_xx_xxxxy,     \
+                             to_xx_xxxxz,     \
+                             to_xx_xxxyy,     \
+                             to_xx_xxxyz,     \
+                             to_xx_xxxzz,     \
+                             to_xx_xxy,       \
+                             to_xx_xxyyy,     \
+                             to_xx_xxyyz,     \
+                             to_xx_xxyzz,     \
+                             to_xx_xxz,       \
+                             to_xx_xxzzz,     \
+                             to_xx_xyy,       \
+                             to_xx_xyyyy,     \
+                             to_xx_xyyyz,     \
+                             to_xx_xyyzz,     \
+                             to_xx_xyz,       \
+                             to_xx_xyzzz,     \
+                             to_xx_xzz,       \
+                             to_xx_xzzzz,     \
+                             to_xx_yyy,       \
+                             to_xx_yyz,       \
+                             to_xx_yzz,       \
+                             to_xx_zzz,       \
+                             to_xxxx_xxx,     \
+                             to_xxxx_xxxxx,   \
+                             to_xxxx_xxxxy,   \
+                             to_xxxx_xxxxz,   \
+                             to_xxxx_xxxyy,   \
+                             to_xxxx_xxxyz,   \
+                             to_xxxx_xxxzz,   \
+                             to_xxxx_xxy,     \
+                             to_xxxx_xxyyy,   \
+                             to_xxxx_xxyyz,   \
+                             to_xxxx_xxyzz,   \
+                             to_xxxx_xxz,     \
+                             to_xxxx_xxzzz,   \
+                             to_xxxx_xyy,     \
+                             to_xxxx_xyyyy,   \
+                             to_xxxx_xyyyz,   \
+                             to_xxxx_xyyzz,   \
+                             to_xxxx_xyz,     \
+                             to_xxxx_xyzzz,   \
+                             to_xxxx_xzz,     \
+                             to_xxxx_xzzzz,   \
+                             to_xxxx_yyy,     \
+                             to_xxxx_yyz,     \
+                             to_xxxx_yzz,     \
+                             to_xxxx_zzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_x_x_xxx_xxxx[k] = 12.0 * to_xx_xxx[k] - 6.0 * to_xx_xxxxx[k] * tke_0 - 8.0 * to_xxxx_xxx[k] * tbe_0 + 4.0 * to_xxxx_xxxxx[k] * tbe_0 * tke_0;
+            to_x_x_xxx_xxxx[k] =
+                12.0 * to_xx_xxx[k] - 6.0 * to_xx_xxxxx[k] * tke_0 - 8.0 * to_xxxx_xxx[k] * tbe_0 + 4.0 * to_xxxx_xxxxx[k] * tbe_0 * tke_0;
 
-            to_x_x_xxx_xxxy[k] = 9.0 * to_xx_xxy[k] - 6.0 * to_xx_xxxxy[k] * tke_0 - 6.0 * to_xxxx_xxy[k] * tbe_0 + 4.0 * to_xxxx_xxxxy[k] * tbe_0 * tke_0;
+            to_x_x_xxx_xxxy[k] =
+                9.0 * to_xx_xxy[k] - 6.0 * to_xx_xxxxy[k] * tke_0 - 6.0 * to_xxxx_xxy[k] * tbe_0 + 4.0 * to_xxxx_xxxxy[k] * tbe_0 * tke_0;
 
-            to_x_x_xxx_xxxz[k] = 9.0 * to_xx_xxz[k] - 6.0 * to_xx_xxxxz[k] * tke_0 - 6.0 * to_xxxx_xxz[k] * tbe_0 + 4.0 * to_xxxx_xxxxz[k] * tbe_0 * tke_0;
+            to_x_x_xxx_xxxz[k] =
+                9.0 * to_xx_xxz[k] - 6.0 * to_xx_xxxxz[k] * tke_0 - 6.0 * to_xxxx_xxz[k] * tbe_0 + 4.0 * to_xxxx_xxxxz[k] * tbe_0 * tke_0;
 
-            to_x_x_xxx_xxyy[k] = 6.0 * to_xx_xyy[k] - 6.0 * to_xx_xxxyy[k] * tke_0 - 4.0 * to_xxxx_xyy[k] * tbe_0 + 4.0 * to_xxxx_xxxyy[k] * tbe_0 * tke_0;
+            to_x_x_xxx_xxyy[k] =
+                6.0 * to_xx_xyy[k] - 6.0 * to_xx_xxxyy[k] * tke_0 - 4.0 * to_xxxx_xyy[k] * tbe_0 + 4.0 * to_xxxx_xxxyy[k] * tbe_0 * tke_0;
 
-            to_x_x_xxx_xxyz[k] = 6.0 * to_xx_xyz[k] - 6.0 * to_xx_xxxyz[k] * tke_0 - 4.0 * to_xxxx_xyz[k] * tbe_0 + 4.0 * to_xxxx_xxxyz[k] * tbe_0 * tke_0;
+            to_x_x_xxx_xxyz[k] =
+                6.0 * to_xx_xyz[k] - 6.0 * to_xx_xxxyz[k] * tke_0 - 4.0 * to_xxxx_xyz[k] * tbe_0 + 4.0 * to_xxxx_xxxyz[k] * tbe_0 * tke_0;
 
-            to_x_x_xxx_xxzz[k] = 6.0 * to_xx_xzz[k] - 6.0 * to_xx_xxxzz[k] * tke_0 - 4.0 * to_xxxx_xzz[k] * tbe_0 + 4.0 * to_xxxx_xxxzz[k] * tbe_0 * tke_0;
+            to_x_x_xxx_xxzz[k] =
+                6.0 * to_xx_xzz[k] - 6.0 * to_xx_xxxzz[k] * tke_0 - 4.0 * to_xxxx_xzz[k] * tbe_0 + 4.0 * to_xxxx_xxxzz[k] * tbe_0 * tke_0;
 
-            to_x_x_xxx_xyyy[k] = 3.0 * to_xx_yyy[k] - 6.0 * to_xx_xxyyy[k] * tke_0 - 2.0 * to_xxxx_yyy[k] * tbe_0 + 4.0 * to_xxxx_xxyyy[k] * tbe_0 * tke_0;
+            to_x_x_xxx_xyyy[k] =
+                3.0 * to_xx_yyy[k] - 6.0 * to_xx_xxyyy[k] * tke_0 - 2.0 * to_xxxx_yyy[k] * tbe_0 + 4.0 * to_xxxx_xxyyy[k] * tbe_0 * tke_0;
 
-            to_x_x_xxx_xyyz[k] = 3.0 * to_xx_yyz[k] - 6.0 * to_xx_xxyyz[k] * tke_0 - 2.0 * to_xxxx_yyz[k] * tbe_0 + 4.0 * to_xxxx_xxyyz[k] * tbe_0 * tke_0;
+            to_x_x_xxx_xyyz[k] =
+                3.0 * to_xx_yyz[k] - 6.0 * to_xx_xxyyz[k] * tke_0 - 2.0 * to_xxxx_yyz[k] * tbe_0 + 4.0 * to_xxxx_xxyyz[k] * tbe_0 * tke_0;
 
-            to_x_x_xxx_xyzz[k] = 3.0 * to_xx_yzz[k] - 6.0 * to_xx_xxyzz[k] * tke_0 - 2.0 * to_xxxx_yzz[k] * tbe_0 + 4.0 * to_xxxx_xxyzz[k] * tbe_0 * tke_0;
+            to_x_x_xxx_xyzz[k] =
+                3.0 * to_xx_yzz[k] - 6.0 * to_xx_xxyzz[k] * tke_0 - 2.0 * to_xxxx_yzz[k] * tbe_0 + 4.0 * to_xxxx_xxyzz[k] * tbe_0 * tke_0;
 
-            to_x_x_xxx_xzzz[k] = 3.0 * to_xx_zzz[k] - 6.0 * to_xx_xxzzz[k] * tke_0 - 2.0 * to_xxxx_zzz[k] * tbe_0 + 4.0 * to_xxxx_xxzzz[k] * tbe_0 * tke_0;
+            to_x_x_xxx_xzzz[k] =
+                3.0 * to_xx_zzz[k] - 6.0 * to_xx_xxzzz[k] * tke_0 - 2.0 * to_xxxx_zzz[k] * tbe_0 + 4.0 * to_xxxx_xxzzz[k] * tbe_0 * tke_0;
 
             to_x_x_xxx_yyyy[k] = -6.0 * to_xx_xyyyy[k] * tke_0 + 4.0 * to_xxxx_xyyyy[k] * tbe_0 * tke_0;
 
@@ -1433,32 +1508,107 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_x_xxy_zzzz = pbuffer.data(idx_op_geom_101_fg + 0 * op_comps * 150 + i * 150 + 29);
 
-        #pragma omp simd aligned(to_x_x_xxy_xxxx, to_x_x_xxy_xxxy, to_x_x_xxy_xxxz, to_x_x_xxy_xxyy, to_x_x_xxy_xxyz, to_x_x_xxy_xxzz, to_x_x_xxy_xyyy, to_x_x_xxy_xyyz, to_x_x_xxy_xyzz, to_x_x_xxy_xzzz, to_x_x_xxy_yyyy, to_x_x_xxy_yyyz, to_x_x_xxy_yyzz, to_x_x_xxy_yzzz, to_x_x_xxy_zzzz, to_xxxy_xxx, to_xxxy_xxxxx, to_xxxy_xxxxy, to_xxxy_xxxxz, to_xxxy_xxxyy, to_xxxy_xxxyz, to_xxxy_xxxzz, to_xxxy_xxy, to_xxxy_xxyyy, to_xxxy_xxyyz, to_xxxy_xxyzz, to_xxxy_xxz, to_xxxy_xxzzz, to_xxxy_xyy, to_xxxy_xyyyy, to_xxxy_xyyyz, to_xxxy_xyyzz, to_xxxy_xyz, to_xxxy_xyzzz, to_xxxy_xzz, to_xxxy_xzzzz, to_xxxy_yyy, to_xxxy_yyz, to_xxxy_yzz, to_xxxy_zzz, to_xy_xxx, to_xy_xxxxx, to_xy_xxxxy, to_xy_xxxxz, to_xy_xxxyy, to_xy_xxxyz, to_xy_xxxzz, to_xy_xxy, to_xy_xxyyy, to_xy_xxyyz, to_xy_xxyzz, to_xy_xxz, to_xy_xxzzz, to_xy_xyy, to_xy_xyyyy, to_xy_xyyyz, to_xy_xyyzz, to_xy_xyz, to_xy_xyzzz, to_xy_xzz, to_xy_xzzzz, to_xy_yyy, to_xy_yyz, to_xy_yzz, to_xy_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_x_xxy_xxxx,     \
+                             to_x_x_xxy_xxxy, \
+                             to_x_x_xxy_xxxz, \
+                             to_x_x_xxy_xxyy, \
+                             to_x_x_xxy_xxyz, \
+                             to_x_x_xxy_xxzz, \
+                             to_x_x_xxy_xyyy, \
+                             to_x_x_xxy_xyyz, \
+                             to_x_x_xxy_xyzz, \
+                             to_x_x_xxy_xzzz, \
+                             to_x_x_xxy_yyyy, \
+                             to_x_x_xxy_yyyz, \
+                             to_x_x_xxy_yyzz, \
+                             to_x_x_xxy_yzzz, \
+                             to_x_x_xxy_zzzz, \
+                             to_xxxy_xxx,     \
+                             to_xxxy_xxxxx,   \
+                             to_xxxy_xxxxy,   \
+                             to_xxxy_xxxxz,   \
+                             to_xxxy_xxxyy,   \
+                             to_xxxy_xxxyz,   \
+                             to_xxxy_xxxzz,   \
+                             to_xxxy_xxy,     \
+                             to_xxxy_xxyyy,   \
+                             to_xxxy_xxyyz,   \
+                             to_xxxy_xxyzz,   \
+                             to_xxxy_xxz,     \
+                             to_xxxy_xxzzz,   \
+                             to_xxxy_xyy,     \
+                             to_xxxy_xyyyy,   \
+                             to_xxxy_xyyyz,   \
+                             to_xxxy_xyyzz,   \
+                             to_xxxy_xyz,     \
+                             to_xxxy_xyzzz,   \
+                             to_xxxy_xzz,     \
+                             to_xxxy_xzzzz,   \
+                             to_xxxy_yyy,     \
+                             to_xxxy_yyz,     \
+                             to_xxxy_yzz,     \
+                             to_xxxy_zzz,     \
+                             to_xy_xxx,       \
+                             to_xy_xxxxx,     \
+                             to_xy_xxxxy,     \
+                             to_xy_xxxxz,     \
+                             to_xy_xxxyy,     \
+                             to_xy_xxxyz,     \
+                             to_xy_xxxzz,     \
+                             to_xy_xxy,       \
+                             to_xy_xxyyy,     \
+                             to_xy_xxyyz,     \
+                             to_xy_xxyzz,     \
+                             to_xy_xxz,       \
+                             to_xy_xxzzz,     \
+                             to_xy_xyy,       \
+                             to_xy_xyyyy,     \
+                             to_xy_xyyyz,     \
+                             to_xy_xyyzz,     \
+                             to_xy_xyz,       \
+                             to_xy_xyzzz,     \
+                             to_xy_xzz,       \
+                             to_xy_xzzzz,     \
+                             to_xy_yyy,       \
+                             to_xy_yyz,       \
+                             to_xy_yzz,       \
+                             to_xy_zzz,       \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_x_x_xxy_xxxx[k] = 8.0 * to_xy_xxx[k] - 4.0 * to_xy_xxxxx[k] * tke_0 - 8.0 * to_xxxy_xxx[k] * tbe_0 + 4.0 * to_xxxy_xxxxx[k] * tbe_0 * tke_0;
+            to_x_x_xxy_xxxx[k] =
+                8.0 * to_xy_xxx[k] - 4.0 * to_xy_xxxxx[k] * tke_0 - 8.0 * to_xxxy_xxx[k] * tbe_0 + 4.0 * to_xxxy_xxxxx[k] * tbe_0 * tke_0;
 
-            to_x_x_xxy_xxxy[k] = 6.0 * to_xy_xxy[k] - 4.0 * to_xy_xxxxy[k] * tke_0 - 6.0 * to_xxxy_xxy[k] * tbe_0 + 4.0 * to_xxxy_xxxxy[k] * tbe_0 * tke_0;
+            to_x_x_xxy_xxxy[k] =
+                6.0 * to_xy_xxy[k] - 4.0 * to_xy_xxxxy[k] * tke_0 - 6.0 * to_xxxy_xxy[k] * tbe_0 + 4.0 * to_xxxy_xxxxy[k] * tbe_0 * tke_0;
 
-            to_x_x_xxy_xxxz[k] = 6.0 * to_xy_xxz[k] - 4.0 * to_xy_xxxxz[k] * tke_0 - 6.0 * to_xxxy_xxz[k] * tbe_0 + 4.0 * to_xxxy_xxxxz[k] * tbe_0 * tke_0;
+            to_x_x_xxy_xxxz[k] =
+                6.0 * to_xy_xxz[k] - 4.0 * to_xy_xxxxz[k] * tke_0 - 6.0 * to_xxxy_xxz[k] * tbe_0 + 4.0 * to_xxxy_xxxxz[k] * tbe_0 * tke_0;
 
-            to_x_x_xxy_xxyy[k] = 4.0 * to_xy_xyy[k] - 4.0 * to_xy_xxxyy[k] * tke_0 - 4.0 * to_xxxy_xyy[k] * tbe_0 + 4.0 * to_xxxy_xxxyy[k] * tbe_0 * tke_0;
+            to_x_x_xxy_xxyy[k] =
+                4.0 * to_xy_xyy[k] - 4.0 * to_xy_xxxyy[k] * tke_0 - 4.0 * to_xxxy_xyy[k] * tbe_0 + 4.0 * to_xxxy_xxxyy[k] * tbe_0 * tke_0;
 
-            to_x_x_xxy_xxyz[k] = 4.0 * to_xy_xyz[k] - 4.0 * to_xy_xxxyz[k] * tke_0 - 4.0 * to_xxxy_xyz[k] * tbe_0 + 4.0 * to_xxxy_xxxyz[k] * tbe_0 * tke_0;
+            to_x_x_xxy_xxyz[k] =
+                4.0 * to_xy_xyz[k] - 4.0 * to_xy_xxxyz[k] * tke_0 - 4.0 * to_xxxy_xyz[k] * tbe_0 + 4.0 * to_xxxy_xxxyz[k] * tbe_0 * tke_0;
 
-            to_x_x_xxy_xxzz[k] = 4.0 * to_xy_xzz[k] - 4.0 * to_xy_xxxzz[k] * tke_0 - 4.0 * to_xxxy_xzz[k] * tbe_0 + 4.0 * to_xxxy_xxxzz[k] * tbe_0 * tke_0;
+            to_x_x_xxy_xxzz[k] =
+                4.0 * to_xy_xzz[k] - 4.0 * to_xy_xxxzz[k] * tke_0 - 4.0 * to_xxxy_xzz[k] * tbe_0 + 4.0 * to_xxxy_xxxzz[k] * tbe_0 * tke_0;
 
-            to_x_x_xxy_xyyy[k] = 2.0 * to_xy_yyy[k] - 4.0 * to_xy_xxyyy[k] * tke_0 - 2.0 * to_xxxy_yyy[k] * tbe_0 + 4.0 * to_xxxy_xxyyy[k] * tbe_0 * tke_0;
+            to_x_x_xxy_xyyy[k] =
+                2.0 * to_xy_yyy[k] - 4.0 * to_xy_xxyyy[k] * tke_0 - 2.0 * to_xxxy_yyy[k] * tbe_0 + 4.0 * to_xxxy_xxyyy[k] * tbe_0 * tke_0;
 
-            to_x_x_xxy_xyyz[k] = 2.0 * to_xy_yyz[k] - 4.0 * to_xy_xxyyz[k] * tke_0 - 2.0 * to_xxxy_yyz[k] * tbe_0 + 4.0 * to_xxxy_xxyyz[k] * tbe_0 * tke_0;
+            to_x_x_xxy_xyyz[k] =
+                2.0 * to_xy_yyz[k] - 4.0 * to_xy_xxyyz[k] * tke_0 - 2.0 * to_xxxy_yyz[k] * tbe_0 + 4.0 * to_xxxy_xxyyz[k] * tbe_0 * tke_0;
 
-            to_x_x_xxy_xyzz[k] = 2.0 * to_xy_yzz[k] - 4.0 * to_xy_xxyzz[k] * tke_0 - 2.0 * to_xxxy_yzz[k] * tbe_0 + 4.0 * to_xxxy_xxyzz[k] * tbe_0 * tke_0;
+            to_x_x_xxy_xyzz[k] =
+                2.0 * to_xy_yzz[k] - 4.0 * to_xy_xxyzz[k] * tke_0 - 2.0 * to_xxxy_yzz[k] * tbe_0 + 4.0 * to_xxxy_xxyzz[k] * tbe_0 * tke_0;
 
-            to_x_x_xxy_xzzz[k] = 2.0 * to_xy_zzz[k] - 4.0 * to_xy_xxzzz[k] * tke_0 - 2.0 * to_xxxy_zzz[k] * tbe_0 + 4.0 * to_xxxy_xxzzz[k] * tbe_0 * tke_0;
+            to_x_x_xxy_xzzz[k] =
+                2.0 * to_xy_zzz[k] - 4.0 * to_xy_xxzzz[k] * tke_0 - 2.0 * to_xxxy_zzz[k] * tbe_0 + 4.0 * to_xxxy_xxzzz[k] * tbe_0 * tke_0;
 
             to_x_x_xxy_yyyy[k] = -4.0 * to_xy_xyyyy[k] * tke_0 + 4.0 * to_xxxy_xyyyy[k] * tbe_0 * tke_0;
 
@@ -1503,32 +1653,107 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_x_xxz_zzzz = pbuffer.data(idx_op_geom_101_fg + 0 * op_comps * 150 + i * 150 + 44);
 
-        #pragma omp simd aligned(to_x_x_xxz_xxxx, to_x_x_xxz_xxxy, to_x_x_xxz_xxxz, to_x_x_xxz_xxyy, to_x_x_xxz_xxyz, to_x_x_xxz_xxzz, to_x_x_xxz_xyyy, to_x_x_xxz_xyyz, to_x_x_xxz_xyzz, to_x_x_xxz_xzzz, to_x_x_xxz_yyyy, to_x_x_xxz_yyyz, to_x_x_xxz_yyzz, to_x_x_xxz_yzzz, to_x_x_xxz_zzzz, to_xxxz_xxx, to_xxxz_xxxxx, to_xxxz_xxxxy, to_xxxz_xxxxz, to_xxxz_xxxyy, to_xxxz_xxxyz, to_xxxz_xxxzz, to_xxxz_xxy, to_xxxz_xxyyy, to_xxxz_xxyyz, to_xxxz_xxyzz, to_xxxz_xxz, to_xxxz_xxzzz, to_xxxz_xyy, to_xxxz_xyyyy, to_xxxz_xyyyz, to_xxxz_xyyzz, to_xxxz_xyz, to_xxxz_xyzzz, to_xxxz_xzz, to_xxxz_xzzzz, to_xxxz_yyy, to_xxxz_yyz, to_xxxz_yzz, to_xxxz_zzz, to_xz_xxx, to_xz_xxxxx, to_xz_xxxxy, to_xz_xxxxz, to_xz_xxxyy, to_xz_xxxyz, to_xz_xxxzz, to_xz_xxy, to_xz_xxyyy, to_xz_xxyyz, to_xz_xxyzz, to_xz_xxz, to_xz_xxzzz, to_xz_xyy, to_xz_xyyyy, to_xz_xyyyz, to_xz_xyyzz, to_xz_xyz, to_xz_xyzzz, to_xz_xzz, to_xz_xzzzz, to_xz_yyy, to_xz_yyz, to_xz_yzz, to_xz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_x_xxz_xxxx,     \
+                             to_x_x_xxz_xxxy, \
+                             to_x_x_xxz_xxxz, \
+                             to_x_x_xxz_xxyy, \
+                             to_x_x_xxz_xxyz, \
+                             to_x_x_xxz_xxzz, \
+                             to_x_x_xxz_xyyy, \
+                             to_x_x_xxz_xyyz, \
+                             to_x_x_xxz_xyzz, \
+                             to_x_x_xxz_xzzz, \
+                             to_x_x_xxz_yyyy, \
+                             to_x_x_xxz_yyyz, \
+                             to_x_x_xxz_yyzz, \
+                             to_x_x_xxz_yzzz, \
+                             to_x_x_xxz_zzzz, \
+                             to_xxxz_xxx,     \
+                             to_xxxz_xxxxx,   \
+                             to_xxxz_xxxxy,   \
+                             to_xxxz_xxxxz,   \
+                             to_xxxz_xxxyy,   \
+                             to_xxxz_xxxyz,   \
+                             to_xxxz_xxxzz,   \
+                             to_xxxz_xxy,     \
+                             to_xxxz_xxyyy,   \
+                             to_xxxz_xxyyz,   \
+                             to_xxxz_xxyzz,   \
+                             to_xxxz_xxz,     \
+                             to_xxxz_xxzzz,   \
+                             to_xxxz_xyy,     \
+                             to_xxxz_xyyyy,   \
+                             to_xxxz_xyyyz,   \
+                             to_xxxz_xyyzz,   \
+                             to_xxxz_xyz,     \
+                             to_xxxz_xyzzz,   \
+                             to_xxxz_xzz,     \
+                             to_xxxz_xzzzz,   \
+                             to_xxxz_yyy,     \
+                             to_xxxz_yyz,     \
+                             to_xxxz_yzz,     \
+                             to_xxxz_zzz,     \
+                             to_xz_xxx,       \
+                             to_xz_xxxxx,     \
+                             to_xz_xxxxy,     \
+                             to_xz_xxxxz,     \
+                             to_xz_xxxyy,     \
+                             to_xz_xxxyz,     \
+                             to_xz_xxxzz,     \
+                             to_xz_xxy,       \
+                             to_xz_xxyyy,     \
+                             to_xz_xxyyz,     \
+                             to_xz_xxyzz,     \
+                             to_xz_xxz,       \
+                             to_xz_xxzzz,     \
+                             to_xz_xyy,       \
+                             to_xz_xyyyy,     \
+                             to_xz_xyyyz,     \
+                             to_xz_xyyzz,     \
+                             to_xz_xyz,       \
+                             to_xz_xyzzz,     \
+                             to_xz_xzz,       \
+                             to_xz_xzzzz,     \
+                             to_xz_yyy,       \
+                             to_xz_yyz,       \
+                             to_xz_yzz,       \
+                             to_xz_zzz,       \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_x_x_xxz_xxxx[k] = 8.0 * to_xz_xxx[k] - 4.0 * to_xz_xxxxx[k] * tke_0 - 8.0 * to_xxxz_xxx[k] * tbe_0 + 4.0 * to_xxxz_xxxxx[k] * tbe_0 * tke_0;
+            to_x_x_xxz_xxxx[k] =
+                8.0 * to_xz_xxx[k] - 4.0 * to_xz_xxxxx[k] * tke_0 - 8.0 * to_xxxz_xxx[k] * tbe_0 + 4.0 * to_xxxz_xxxxx[k] * tbe_0 * tke_0;
 
-            to_x_x_xxz_xxxy[k] = 6.0 * to_xz_xxy[k] - 4.0 * to_xz_xxxxy[k] * tke_0 - 6.0 * to_xxxz_xxy[k] * tbe_0 + 4.0 * to_xxxz_xxxxy[k] * tbe_0 * tke_0;
+            to_x_x_xxz_xxxy[k] =
+                6.0 * to_xz_xxy[k] - 4.0 * to_xz_xxxxy[k] * tke_0 - 6.0 * to_xxxz_xxy[k] * tbe_0 + 4.0 * to_xxxz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_x_x_xxz_xxxz[k] = 6.0 * to_xz_xxz[k] - 4.0 * to_xz_xxxxz[k] * tke_0 - 6.0 * to_xxxz_xxz[k] * tbe_0 + 4.0 * to_xxxz_xxxxz[k] * tbe_0 * tke_0;
+            to_x_x_xxz_xxxz[k] =
+                6.0 * to_xz_xxz[k] - 4.0 * to_xz_xxxxz[k] * tke_0 - 6.0 * to_xxxz_xxz[k] * tbe_0 + 4.0 * to_xxxz_xxxxz[k] * tbe_0 * tke_0;
 
-            to_x_x_xxz_xxyy[k] = 4.0 * to_xz_xyy[k] - 4.0 * to_xz_xxxyy[k] * tke_0 - 4.0 * to_xxxz_xyy[k] * tbe_0 + 4.0 * to_xxxz_xxxyy[k] * tbe_0 * tke_0;
+            to_x_x_xxz_xxyy[k] =
+                4.0 * to_xz_xyy[k] - 4.0 * to_xz_xxxyy[k] * tke_0 - 4.0 * to_xxxz_xyy[k] * tbe_0 + 4.0 * to_xxxz_xxxyy[k] * tbe_0 * tke_0;
 
-            to_x_x_xxz_xxyz[k] = 4.0 * to_xz_xyz[k] - 4.0 * to_xz_xxxyz[k] * tke_0 - 4.0 * to_xxxz_xyz[k] * tbe_0 + 4.0 * to_xxxz_xxxyz[k] * tbe_0 * tke_0;
+            to_x_x_xxz_xxyz[k] =
+                4.0 * to_xz_xyz[k] - 4.0 * to_xz_xxxyz[k] * tke_0 - 4.0 * to_xxxz_xyz[k] * tbe_0 + 4.0 * to_xxxz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_x_x_xxz_xxzz[k] = 4.0 * to_xz_xzz[k] - 4.0 * to_xz_xxxzz[k] * tke_0 - 4.0 * to_xxxz_xzz[k] * tbe_0 + 4.0 * to_xxxz_xxxzz[k] * tbe_0 * tke_0;
+            to_x_x_xxz_xxzz[k] =
+                4.0 * to_xz_xzz[k] - 4.0 * to_xz_xxxzz[k] * tke_0 - 4.0 * to_xxxz_xzz[k] * tbe_0 + 4.0 * to_xxxz_xxxzz[k] * tbe_0 * tke_0;
 
-            to_x_x_xxz_xyyy[k] = 2.0 * to_xz_yyy[k] - 4.0 * to_xz_xxyyy[k] * tke_0 - 2.0 * to_xxxz_yyy[k] * tbe_0 + 4.0 * to_xxxz_xxyyy[k] * tbe_0 * tke_0;
+            to_x_x_xxz_xyyy[k] =
+                2.0 * to_xz_yyy[k] - 4.0 * to_xz_xxyyy[k] * tke_0 - 2.0 * to_xxxz_yyy[k] * tbe_0 + 4.0 * to_xxxz_xxyyy[k] * tbe_0 * tke_0;
 
-            to_x_x_xxz_xyyz[k] = 2.0 * to_xz_yyz[k] - 4.0 * to_xz_xxyyz[k] * tke_0 - 2.0 * to_xxxz_yyz[k] * tbe_0 + 4.0 * to_xxxz_xxyyz[k] * tbe_0 * tke_0;
+            to_x_x_xxz_xyyz[k] =
+                2.0 * to_xz_yyz[k] - 4.0 * to_xz_xxyyz[k] * tke_0 - 2.0 * to_xxxz_yyz[k] * tbe_0 + 4.0 * to_xxxz_xxyyz[k] * tbe_0 * tke_0;
 
-            to_x_x_xxz_xyzz[k] = 2.0 * to_xz_yzz[k] - 4.0 * to_xz_xxyzz[k] * tke_0 - 2.0 * to_xxxz_yzz[k] * tbe_0 + 4.0 * to_xxxz_xxyzz[k] * tbe_0 * tke_0;
+            to_x_x_xxz_xyzz[k] =
+                2.0 * to_xz_yzz[k] - 4.0 * to_xz_xxyzz[k] * tke_0 - 2.0 * to_xxxz_yzz[k] * tbe_0 + 4.0 * to_xxxz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_x_x_xxz_xzzz[k] = 2.0 * to_xz_zzz[k] - 4.0 * to_xz_xxzzz[k] * tke_0 - 2.0 * to_xxxz_zzz[k] * tbe_0 + 4.0 * to_xxxz_xxzzz[k] * tbe_0 * tke_0;
+            to_x_x_xxz_xzzz[k] =
+                2.0 * to_xz_zzz[k] - 4.0 * to_xz_xxzzz[k] * tke_0 - 2.0 * to_xxxz_zzz[k] * tbe_0 + 4.0 * to_xxxz_xxzzz[k] * tbe_0 * tke_0;
 
             to_x_x_xxz_yyyy[k] = -4.0 * to_xz_xyyyy[k] * tke_0 + 4.0 * to_xxxz_xyyyy[k] * tbe_0 * tke_0;
 
@@ -1573,24 +1798,95 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_x_xyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 0 * op_comps * 150 + i * 150 + 59);
 
-        #pragma omp simd aligned(to_x_x_xyy_xxxx, to_x_x_xyy_xxxy, to_x_x_xyy_xxxz, to_x_x_xyy_xxyy, to_x_x_xyy_xxyz, to_x_x_xyy_xxzz, to_x_x_xyy_xyyy, to_x_x_xyy_xyyz, to_x_x_xyy_xyzz, to_x_x_xyy_xzzz, to_x_x_xyy_yyyy, to_x_x_xyy_yyyz, to_x_x_xyy_yyzz, to_x_x_xyy_yzzz, to_x_x_xyy_zzzz, to_xxyy_xxx, to_xxyy_xxxxx, to_xxyy_xxxxy, to_xxyy_xxxxz, to_xxyy_xxxyy, to_xxyy_xxxyz, to_xxyy_xxxzz, to_xxyy_xxy, to_xxyy_xxyyy, to_xxyy_xxyyz, to_xxyy_xxyzz, to_xxyy_xxz, to_xxyy_xxzzz, to_xxyy_xyy, to_xxyy_xyyyy, to_xxyy_xyyyz, to_xxyy_xyyzz, to_xxyy_xyz, to_xxyy_xyzzz, to_xxyy_xzz, to_xxyy_xzzzz, to_xxyy_yyy, to_xxyy_yyz, to_xxyy_yzz, to_xxyy_zzz, to_yy_xxx, to_yy_xxxxx, to_yy_xxxxy, to_yy_xxxxz, to_yy_xxxyy, to_yy_xxxyz, to_yy_xxxzz, to_yy_xxy, to_yy_xxyyy, to_yy_xxyyz, to_yy_xxyzz, to_yy_xxz, to_yy_xxzzz, to_yy_xyy, to_yy_xyyyy, to_yy_xyyyz, to_yy_xyyzz, to_yy_xyz, to_yy_xyzzz, to_yy_xzz, to_yy_xzzzz, to_yy_yyy, to_yy_yyz, to_yy_yzz, to_yy_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_x_xyy_xxxx,     \
+                             to_x_x_xyy_xxxy, \
+                             to_x_x_xyy_xxxz, \
+                             to_x_x_xyy_xxyy, \
+                             to_x_x_xyy_xxyz, \
+                             to_x_x_xyy_xxzz, \
+                             to_x_x_xyy_xyyy, \
+                             to_x_x_xyy_xyyz, \
+                             to_x_x_xyy_xyzz, \
+                             to_x_x_xyy_xzzz, \
+                             to_x_x_xyy_yyyy, \
+                             to_x_x_xyy_yyyz, \
+                             to_x_x_xyy_yyzz, \
+                             to_x_x_xyy_yzzz, \
+                             to_x_x_xyy_zzzz, \
+                             to_xxyy_xxx,     \
+                             to_xxyy_xxxxx,   \
+                             to_xxyy_xxxxy,   \
+                             to_xxyy_xxxxz,   \
+                             to_xxyy_xxxyy,   \
+                             to_xxyy_xxxyz,   \
+                             to_xxyy_xxxzz,   \
+                             to_xxyy_xxy,     \
+                             to_xxyy_xxyyy,   \
+                             to_xxyy_xxyyz,   \
+                             to_xxyy_xxyzz,   \
+                             to_xxyy_xxz,     \
+                             to_xxyy_xxzzz,   \
+                             to_xxyy_xyy,     \
+                             to_xxyy_xyyyy,   \
+                             to_xxyy_xyyyz,   \
+                             to_xxyy_xyyzz,   \
+                             to_xxyy_xyz,     \
+                             to_xxyy_xyzzz,   \
+                             to_xxyy_xzz,     \
+                             to_xxyy_xzzzz,   \
+                             to_xxyy_yyy,     \
+                             to_xxyy_yyz,     \
+                             to_xxyy_yzz,     \
+                             to_xxyy_zzz,     \
+                             to_yy_xxx,       \
+                             to_yy_xxxxx,     \
+                             to_yy_xxxxy,     \
+                             to_yy_xxxxz,     \
+                             to_yy_xxxyy,     \
+                             to_yy_xxxyz,     \
+                             to_yy_xxxzz,     \
+                             to_yy_xxy,       \
+                             to_yy_xxyyy,     \
+                             to_yy_xxyyz,     \
+                             to_yy_xxyzz,     \
+                             to_yy_xxz,       \
+                             to_yy_xxzzz,     \
+                             to_yy_xyy,       \
+                             to_yy_xyyyy,     \
+                             to_yy_xyyyz,     \
+                             to_yy_xyyzz,     \
+                             to_yy_xyz,       \
+                             to_yy_xyzzz,     \
+                             to_yy_xzz,       \
+                             to_yy_xzzzz,     \
+                             to_yy_yyy,       \
+                             to_yy_yyz,       \
+                             to_yy_yzz,       \
+                             to_yy_zzz,       \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_x_x_xyy_xxxx[k] = 4.0 * to_yy_xxx[k] - 2.0 * to_yy_xxxxx[k] * tke_0 - 8.0 * to_xxyy_xxx[k] * tbe_0 + 4.0 * to_xxyy_xxxxx[k] * tbe_0 * tke_0;
+            to_x_x_xyy_xxxx[k] =
+                4.0 * to_yy_xxx[k] - 2.0 * to_yy_xxxxx[k] * tke_0 - 8.0 * to_xxyy_xxx[k] * tbe_0 + 4.0 * to_xxyy_xxxxx[k] * tbe_0 * tke_0;
 
-            to_x_x_xyy_xxxy[k] = 3.0 * to_yy_xxy[k] - 2.0 * to_yy_xxxxy[k] * tke_0 - 6.0 * to_xxyy_xxy[k] * tbe_0 + 4.0 * to_xxyy_xxxxy[k] * tbe_0 * tke_0;
+            to_x_x_xyy_xxxy[k] =
+                3.0 * to_yy_xxy[k] - 2.0 * to_yy_xxxxy[k] * tke_0 - 6.0 * to_xxyy_xxy[k] * tbe_0 + 4.0 * to_xxyy_xxxxy[k] * tbe_0 * tke_0;
 
-            to_x_x_xyy_xxxz[k] = 3.0 * to_yy_xxz[k] - 2.0 * to_yy_xxxxz[k] * tke_0 - 6.0 * to_xxyy_xxz[k] * tbe_0 + 4.0 * to_xxyy_xxxxz[k] * tbe_0 * tke_0;
+            to_x_x_xyy_xxxz[k] =
+                3.0 * to_yy_xxz[k] - 2.0 * to_yy_xxxxz[k] * tke_0 - 6.0 * to_xxyy_xxz[k] * tbe_0 + 4.0 * to_xxyy_xxxxz[k] * tbe_0 * tke_0;
 
-            to_x_x_xyy_xxyy[k] = 2.0 * to_yy_xyy[k] - 2.0 * to_yy_xxxyy[k] * tke_0 - 4.0 * to_xxyy_xyy[k] * tbe_0 + 4.0 * to_xxyy_xxxyy[k] * tbe_0 * tke_0;
+            to_x_x_xyy_xxyy[k] =
+                2.0 * to_yy_xyy[k] - 2.0 * to_yy_xxxyy[k] * tke_0 - 4.0 * to_xxyy_xyy[k] * tbe_0 + 4.0 * to_xxyy_xxxyy[k] * tbe_0 * tke_0;
 
-            to_x_x_xyy_xxyz[k] = 2.0 * to_yy_xyz[k] - 2.0 * to_yy_xxxyz[k] * tke_0 - 4.0 * to_xxyy_xyz[k] * tbe_0 + 4.0 * to_xxyy_xxxyz[k] * tbe_0 * tke_0;
+            to_x_x_xyy_xxyz[k] =
+                2.0 * to_yy_xyz[k] - 2.0 * to_yy_xxxyz[k] * tke_0 - 4.0 * to_xxyy_xyz[k] * tbe_0 + 4.0 * to_xxyy_xxxyz[k] * tbe_0 * tke_0;
 
-            to_x_x_xyy_xxzz[k] = 2.0 * to_yy_xzz[k] - 2.0 * to_yy_xxxzz[k] * tke_0 - 4.0 * to_xxyy_xzz[k] * tbe_0 + 4.0 * to_xxyy_xxxzz[k] * tbe_0 * tke_0;
+            to_x_x_xyy_xxzz[k] =
+                2.0 * to_yy_xzz[k] - 2.0 * to_yy_xxxzz[k] * tke_0 - 4.0 * to_xxyy_xzz[k] * tbe_0 + 4.0 * to_xxyy_xxxzz[k] * tbe_0 * tke_0;
 
             to_x_x_xyy_xyyy[k] = to_yy_yyy[k] - 2.0 * to_yy_xxyyy[k] * tke_0 - 2.0 * to_xxyy_yyy[k] * tbe_0 + 4.0 * to_xxyy_xxyyy[k] * tbe_0 * tke_0;
 
@@ -1643,24 +1939,95 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_x_xyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 0 * op_comps * 150 + i * 150 + 74);
 
-        #pragma omp simd aligned(to_x_x_xyz_xxxx, to_x_x_xyz_xxxy, to_x_x_xyz_xxxz, to_x_x_xyz_xxyy, to_x_x_xyz_xxyz, to_x_x_xyz_xxzz, to_x_x_xyz_xyyy, to_x_x_xyz_xyyz, to_x_x_xyz_xyzz, to_x_x_xyz_xzzz, to_x_x_xyz_yyyy, to_x_x_xyz_yyyz, to_x_x_xyz_yyzz, to_x_x_xyz_yzzz, to_x_x_xyz_zzzz, to_xxyz_xxx, to_xxyz_xxxxx, to_xxyz_xxxxy, to_xxyz_xxxxz, to_xxyz_xxxyy, to_xxyz_xxxyz, to_xxyz_xxxzz, to_xxyz_xxy, to_xxyz_xxyyy, to_xxyz_xxyyz, to_xxyz_xxyzz, to_xxyz_xxz, to_xxyz_xxzzz, to_xxyz_xyy, to_xxyz_xyyyy, to_xxyz_xyyyz, to_xxyz_xyyzz, to_xxyz_xyz, to_xxyz_xyzzz, to_xxyz_xzz, to_xxyz_xzzzz, to_xxyz_yyy, to_xxyz_yyz, to_xxyz_yzz, to_xxyz_zzz, to_yz_xxx, to_yz_xxxxx, to_yz_xxxxy, to_yz_xxxxz, to_yz_xxxyy, to_yz_xxxyz, to_yz_xxxzz, to_yz_xxy, to_yz_xxyyy, to_yz_xxyyz, to_yz_xxyzz, to_yz_xxz, to_yz_xxzzz, to_yz_xyy, to_yz_xyyyy, to_yz_xyyyz, to_yz_xyyzz, to_yz_xyz, to_yz_xyzzz, to_yz_xzz, to_yz_xzzzz, to_yz_yyy, to_yz_yyz, to_yz_yzz, to_yz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_x_xyz_xxxx,     \
+                             to_x_x_xyz_xxxy, \
+                             to_x_x_xyz_xxxz, \
+                             to_x_x_xyz_xxyy, \
+                             to_x_x_xyz_xxyz, \
+                             to_x_x_xyz_xxzz, \
+                             to_x_x_xyz_xyyy, \
+                             to_x_x_xyz_xyyz, \
+                             to_x_x_xyz_xyzz, \
+                             to_x_x_xyz_xzzz, \
+                             to_x_x_xyz_yyyy, \
+                             to_x_x_xyz_yyyz, \
+                             to_x_x_xyz_yyzz, \
+                             to_x_x_xyz_yzzz, \
+                             to_x_x_xyz_zzzz, \
+                             to_xxyz_xxx,     \
+                             to_xxyz_xxxxx,   \
+                             to_xxyz_xxxxy,   \
+                             to_xxyz_xxxxz,   \
+                             to_xxyz_xxxyy,   \
+                             to_xxyz_xxxyz,   \
+                             to_xxyz_xxxzz,   \
+                             to_xxyz_xxy,     \
+                             to_xxyz_xxyyy,   \
+                             to_xxyz_xxyyz,   \
+                             to_xxyz_xxyzz,   \
+                             to_xxyz_xxz,     \
+                             to_xxyz_xxzzz,   \
+                             to_xxyz_xyy,     \
+                             to_xxyz_xyyyy,   \
+                             to_xxyz_xyyyz,   \
+                             to_xxyz_xyyzz,   \
+                             to_xxyz_xyz,     \
+                             to_xxyz_xyzzz,   \
+                             to_xxyz_xzz,     \
+                             to_xxyz_xzzzz,   \
+                             to_xxyz_yyy,     \
+                             to_xxyz_yyz,     \
+                             to_xxyz_yzz,     \
+                             to_xxyz_zzz,     \
+                             to_yz_xxx,       \
+                             to_yz_xxxxx,     \
+                             to_yz_xxxxy,     \
+                             to_yz_xxxxz,     \
+                             to_yz_xxxyy,     \
+                             to_yz_xxxyz,     \
+                             to_yz_xxxzz,     \
+                             to_yz_xxy,       \
+                             to_yz_xxyyy,     \
+                             to_yz_xxyyz,     \
+                             to_yz_xxyzz,     \
+                             to_yz_xxz,       \
+                             to_yz_xxzzz,     \
+                             to_yz_xyy,       \
+                             to_yz_xyyyy,     \
+                             to_yz_xyyyz,     \
+                             to_yz_xyyzz,     \
+                             to_yz_xyz,       \
+                             to_yz_xyzzz,     \
+                             to_yz_xzz,       \
+                             to_yz_xzzzz,     \
+                             to_yz_yyy,       \
+                             to_yz_yyz,       \
+                             to_yz_yzz,       \
+                             to_yz_zzz,       \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_x_x_xyz_xxxx[k] = 4.0 * to_yz_xxx[k] - 2.0 * to_yz_xxxxx[k] * tke_0 - 8.0 * to_xxyz_xxx[k] * tbe_0 + 4.0 * to_xxyz_xxxxx[k] * tbe_0 * tke_0;
+            to_x_x_xyz_xxxx[k] =
+                4.0 * to_yz_xxx[k] - 2.0 * to_yz_xxxxx[k] * tke_0 - 8.0 * to_xxyz_xxx[k] * tbe_0 + 4.0 * to_xxyz_xxxxx[k] * tbe_0 * tke_0;
 
-            to_x_x_xyz_xxxy[k] = 3.0 * to_yz_xxy[k] - 2.0 * to_yz_xxxxy[k] * tke_0 - 6.0 * to_xxyz_xxy[k] * tbe_0 + 4.0 * to_xxyz_xxxxy[k] * tbe_0 * tke_0;
+            to_x_x_xyz_xxxy[k] =
+                3.0 * to_yz_xxy[k] - 2.0 * to_yz_xxxxy[k] * tke_0 - 6.0 * to_xxyz_xxy[k] * tbe_0 + 4.0 * to_xxyz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_x_x_xyz_xxxz[k] = 3.0 * to_yz_xxz[k] - 2.0 * to_yz_xxxxz[k] * tke_0 - 6.0 * to_xxyz_xxz[k] * tbe_0 + 4.0 * to_xxyz_xxxxz[k] * tbe_0 * tke_0;
+            to_x_x_xyz_xxxz[k] =
+                3.0 * to_yz_xxz[k] - 2.0 * to_yz_xxxxz[k] * tke_0 - 6.0 * to_xxyz_xxz[k] * tbe_0 + 4.0 * to_xxyz_xxxxz[k] * tbe_0 * tke_0;
 
-            to_x_x_xyz_xxyy[k] = 2.0 * to_yz_xyy[k] - 2.0 * to_yz_xxxyy[k] * tke_0 - 4.0 * to_xxyz_xyy[k] * tbe_0 + 4.0 * to_xxyz_xxxyy[k] * tbe_0 * tke_0;
+            to_x_x_xyz_xxyy[k] =
+                2.0 * to_yz_xyy[k] - 2.0 * to_yz_xxxyy[k] * tke_0 - 4.0 * to_xxyz_xyy[k] * tbe_0 + 4.0 * to_xxyz_xxxyy[k] * tbe_0 * tke_0;
 
-            to_x_x_xyz_xxyz[k] = 2.0 * to_yz_xyz[k] - 2.0 * to_yz_xxxyz[k] * tke_0 - 4.0 * to_xxyz_xyz[k] * tbe_0 + 4.0 * to_xxyz_xxxyz[k] * tbe_0 * tke_0;
+            to_x_x_xyz_xxyz[k] =
+                2.0 * to_yz_xyz[k] - 2.0 * to_yz_xxxyz[k] * tke_0 - 4.0 * to_xxyz_xyz[k] * tbe_0 + 4.0 * to_xxyz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_x_x_xyz_xxzz[k] = 2.0 * to_yz_xzz[k] - 2.0 * to_yz_xxxzz[k] * tke_0 - 4.0 * to_xxyz_xzz[k] * tbe_0 + 4.0 * to_xxyz_xxxzz[k] * tbe_0 * tke_0;
+            to_x_x_xyz_xxzz[k] =
+                2.0 * to_yz_xzz[k] - 2.0 * to_yz_xxxzz[k] * tke_0 - 4.0 * to_xxyz_xzz[k] * tbe_0 + 4.0 * to_xxyz_xxxzz[k] * tbe_0 * tke_0;
 
             to_x_x_xyz_xyyy[k] = to_yz_yyy[k] - 2.0 * to_yz_xxyyy[k] * tke_0 - 2.0 * to_xxyz_yyy[k] * tbe_0 + 4.0 * to_xxyz_xxyyy[k] * tbe_0 * tke_0;
 
@@ -1713,24 +2080,95 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_x_xzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 0 * op_comps * 150 + i * 150 + 89);
 
-        #pragma omp simd aligned(to_x_x_xzz_xxxx, to_x_x_xzz_xxxy, to_x_x_xzz_xxxz, to_x_x_xzz_xxyy, to_x_x_xzz_xxyz, to_x_x_xzz_xxzz, to_x_x_xzz_xyyy, to_x_x_xzz_xyyz, to_x_x_xzz_xyzz, to_x_x_xzz_xzzz, to_x_x_xzz_yyyy, to_x_x_xzz_yyyz, to_x_x_xzz_yyzz, to_x_x_xzz_yzzz, to_x_x_xzz_zzzz, to_xxzz_xxx, to_xxzz_xxxxx, to_xxzz_xxxxy, to_xxzz_xxxxz, to_xxzz_xxxyy, to_xxzz_xxxyz, to_xxzz_xxxzz, to_xxzz_xxy, to_xxzz_xxyyy, to_xxzz_xxyyz, to_xxzz_xxyzz, to_xxzz_xxz, to_xxzz_xxzzz, to_xxzz_xyy, to_xxzz_xyyyy, to_xxzz_xyyyz, to_xxzz_xyyzz, to_xxzz_xyz, to_xxzz_xyzzz, to_xxzz_xzz, to_xxzz_xzzzz, to_xxzz_yyy, to_xxzz_yyz, to_xxzz_yzz, to_xxzz_zzz, to_zz_xxx, to_zz_xxxxx, to_zz_xxxxy, to_zz_xxxxz, to_zz_xxxyy, to_zz_xxxyz, to_zz_xxxzz, to_zz_xxy, to_zz_xxyyy, to_zz_xxyyz, to_zz_xxyzz, to_zz_xxz, to_zz_xxzzz, to_zz_xyy, to_zz_xyyyy, to_zz_xyyyz, to_zz_xyyzz, to_zz_xyz, to_zz_xyzzz, to_zz_xzz, to_zz_xzzzz, to_zz_yyy, to_zz_yyz, to_zz_yzz, to_zz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_x_xzz_xxxx,     \
+                             to_x_x_xzz_xxxy, \
+                             to_x_x_xzz_xxxz, \
+                             to_x_x_xzz_xxyy, \
+                             to_x_x_xzz_xxyz, \
+                             to_x_x_xzz_xxzz, \
+                             to_x_x_xzz_xyyy, \
+                             to_x_x_xzz_xyyz, \
+                             to_x_x_xzz_xyzz, \
+                             to_x_x_xzz_xzzz, \
+                             to_x_x_xzz_yyyy, \
+                             to_x_x_xzz_yyyz, \
+                             to_x_x_xzz_yyzz, \
+                             to_x_x_xzz_yzzz, \
+                             to_x_x_xzz_zzzz, \
+                             to_xxzz_xxx,     \
+                             to_xxzz_xxxxx,   \
+                             to_xxzz_xxxxy,   \
+                             to_xxzz_xxxxz,   \
+                             to_xxzz_xxxyy,   \
+                             to_xxzz_xxxyz,   \
+                             to_xxzz_xxxzz,   \
+                             to_xxzz_xxy,     \
+                             to_xxzz_xxyyy,   \
+                             to_xxzz_xxyyz,   \
+                             to_xxzz_xxyzz,   \
+                             to_xxzz_xxz,     \
+                             to_xxzz_xxzzz,   \
+                             to_xxzz_xyy,     \
+                             to_xxzz_xyyyy,   \
+                             to_xxzz_xyyyz,   \
+                             to_xxzz_xyyzz,   \
+                             to_xxzz_xyz,     \
+                             to_xxzz_xyzzz,   \
+                             to_xxzz_xzz,     \
+                             to_xxzz_xzzzz,   \
+                             to_xxzz_yyy,     \
+                             to_xxzz_yyz,     \
+                             to_xxzz_yzz,     \
+                             to_xxzz_zzz,     \
+                             to_zz_xxx,       \
+                             to_zz_xxxxx,     \
+                             to_zz_xxxxy,     \
+                             to_zz_xxxxz,     \
+                             to_zz_xxxyy,     \
+                             to_zz_xxxyz,     \
+                             to_zz_xxxzz,     \
+                             to_zz_xxy,       \
+                             to_zz_xxyyy,     \
+                             to_zz_xxyyz,     \
+                             to_zz_xxyzz,     \
+                             to_zz_xxz,       \
+                             to_zz_xxzzz,     \
+                             to_zz_xyy,       \
+                             to_zz_xyyyy,     \
+                             to_zz_xyyyz,     \
+                             to_zz_xyyzz,     \
+                             to_zz_xyz,       \
+                             to_zz_xyzzz,     \
+                             to_zz_xzz,       \
+                             to_zz_xzzzz,     \
+                             to_zz_yyy,       \
+                             to_zz_yyz,       \
+                             to_zz_yzz,       \
+                             to_zz_zzz,       \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_x_x_xzz_xxxx[k] = 4.0 * to_zz_xxx[k] - 2.0 * to_zz_xxxxx[k] * tke_0 - 8.0 * to_xxzz_xxx[k] * tbe_0 + 4.0 * to_xxzz_xxxxx[k] * tbe_0 * tke_0;
+            to_x_x_xzz_xxxx[k] =
+                4.0 * to_zz_xxx[k] - 2.0 * to_zz_xxxxx[k] * tke_0 - 8.0 * to_xxzz_xxx[k] * tbe_0 + 4.0 * to_xxzz_xxxxx[k] * tbe_0 * tke_0;
 
-            to_x_x_xzz_xxxy[k] = 3.0 * to_zz_xxy[k] - 2.0 * to_zz_xxxxy[k] * tke_0 - 6.0 * to_xxzz_xxy[k] * tbe_0 + 4.0 * to_xxzz_xxxxy[k] * tbe_0 * tke_0;
+            to_x_x_xzz_xxxy[k] =
+                3.0 * to_zz_xxy[k] - 2.0 * to_zz_xxxxy[k] * tke_0 - 6.0 * to_xxzz_xxy[k] * tbe_0 + 4.0 * to_xxzz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_x_x_xzz_xxxz[k] = 3.0 * to_zz_xxz[k] - 2.0 * to_zz_xxxxz[k] * tke_0 - 6.0 * to_xxzz_xxz[k] * tbe_0 + 4.0 * to_xxzz_xxxxz[k] * tbe_0 * tke_0;
+            to_x_x_xzz_xxxz[k] =
+                3.0 * to_zz_xxz[k] - 2.0 * to_zz_xxxxz[k] * tke_0 - 6.0 * to_xxzz_xxz[k] * tbe_0 + 4.0 * to_xxzz_xxxxz[k] * tbe_0 * tke_0;
 
-            to_x_x_xzz_xxyy[k] = 2.0 * to_zz_xyy[k] - 2.0 * to_zz_xxxyy[k] * tke_0 - 4.0 * to_xxzz_xyy[k] * tbe_0 + 4.0 * to_xxzz_xxxyy[k] * tbe_0 * tke_0;
+            to_x_x_xzz_xxyy[k] =
+                2.0 * to_zz_xyy[k] - 2.0 * to_zz_xxxyy[k] * tke_0 - 4.0 * to_xxzz_xyy[k] * tbe_0 + 4.0 * to_xxzz_xxxyy[k] * tbe_0 * tke_0;
 
-            to_x_x_xzz_xxyz[k] = 2.0 * to_zz_xyz[k] - 2.0 * to_zz_xxxyz[k] * tke_0 - 4.0 * to_xxzz_xyz[k] * tbe_0 + 4.0 * to_xxzz_xxxyz[k] * tbe_0 * tke_0;
+            to_x_x_xzz_xxyz[k] =
+                2.0 * to_zz_xyz[k] - 2.0 * to_zz_xxxyz[k] * tke_0 - 4.0 * to_xxzz_xyz[k] * tbe_0 + 4.0 * to_xxzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_x_x_xzz_xxzz[k] = 2.0 * to_zz_xzz[k] - 2.0 * to_zz_xxxzz[k] * tke_0 - 4.0 * to_xxzz_xzz[k] * tbe_0 + 4.0 * to_xxzz_xxxzz[k] * tbe_0 * tke_0;
+            to_x_x_xzz_xxzz[k] =
+                2.0 * to_zz_xzz[k] - 2.0 * to_zz_xxxzz[k] * tke_0 - 4.0 * to_xxzz_xzz[k] * tbe_0 + 4.0 * to_xxzz_xxxzz[k] * tbe_0 * tke_0;
 
             to_x_x_xzz_xyyy[k] = to_zz_yyy[k] - 2.0 * to_zz_xxyyy[k] * tke_0 - 2.0 * to_xxzz_yyy[k] * tbe_0 + 4.0 * to_xxzz_xxyyy[k] * tbe_0 * tke_0;
 
@@ -1783,7 +2221,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_x_yyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 0 * op_comps * 150 + i * 150 + 104);
 
-        #pragma omp simd aligned(to_x_x_yyy_xxxx, to_x_x_yyy_xxxy, to_x_x_yyy_xxxz, to_x_x_yyy_xxyy, to_x_x_yyy_xxyz, to_x_x_yyy_xxzz, to_x_x_yyy_xyyy, to_x_x_yyy_xyyz, to_x_x_yyy_xyzz, to_x_x_yyy_xzzz, to_x_x_yyy_yyyy, to_x_x_yyy_yyyz, to_x_x_yyy_yyzz, to_x_x_yyy_yzzz, to_x_x_yyy_zzzz, to_xyyy_xxx, to_xyyy_xxxxx, to_xyyy_xxxxy, to_xyyy_xxxxz, to_xyyy_xxxyy, to_xyyy_xxxyz, to_xyyy_xxxzz, to_xyyy_xxy, to_xyyy_xxyyy, to_xyyy_xxyyz, to_xyyy_xxyzz, to_xyyy_xxz, to_xyyy_xxzzz, to_xyyy_xyy, to_xyyy_xyyyy, to_xyyy_xyyyz, to_xyyy_xyyzz, to_xyyy_xyz, to_xyyy_xyzzz, to_xyyy_xzz, to_xyyy_xzzzz, to_xyyy_yyy, to_xyyy_yyz, to_xyyy_yzz, to_xyyy_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_x_yyy_xxxx,     \
+                             to_x_x_yyy_xxxy, \
+                             to_x_x_yyy_xxxz, \
+                             to_x_x_yyy_xxyy, \
+                             to_x_x_yyy_xxyz, \
+                             to_x_x_yyy_xxzz, \
+                             to_x_x_yyy_xyyy, \
+                             to_x_x_yyy_xyyz, \
+                             to_x_x_yyy_xyzz, \
+                             to_x_x_yyy_xzzz, \
+                             to_x_x_yyy_yyyy, \
+                             to_x_x_yyy_yyyz, \
+                             to_x_x_yyy_yyzz, \
+                             to_x_x_yyy_yzzz, \
+                             to_x_x_yyy_zzzz, \
+                             to_xyyy_xxx,     \
+                             to_xyyy_xxxxx,   \
+                             to_xyyy_xxxxy,   \
+                             to_xyyy_xxxxz,   \
+                             to_xyyy_xxxyy,   \
+                             to_xyyy_xxxyz,   \
+                             to_xyyy_xxxzz,   \
+                             to_xyyy_xxy,     \
+                             to_xyyy_xxyyy,   \
+                             to_xyyy_xxyyz,   \
+                             to_xyyy_xxyzz,   \
+                             to_xyyy_xxz,     \
+                             to_xyyy_xxzzz,   \
+                             to_xyyy_xyy,     \
+                             to_xyyy_xyyyy,   \
+                             to_xyyy_xyyyz,   \
+                             to_xyyy_xyyzz,   \
+                             to_xyyy_xyz,     \
+                             to_xyyy_xyzzz,   \
+                             to_xyyy_xzz,     \
+                             to_xyyy_xzzzz,   \
+                             to_xyyy_yyy,     \
+                             to_xyyy_yyz,     \
+                             to_xyyy_yzz,     \
+                             to_xyyy_zzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -1853,7 +2331,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_x_yyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 0 * op_comps * 150 + i * 150 + 119);
 
-        #pragma omp simd aligned(to_x_x_yyz_xxxx, to_x_x_yyz_xxxy, to_x_x_yyz_xxxz, to_x_x_yyz_xxyy, to_x_x_yyz_xxyz, to_x_x_yyz_xxzz, to_x_x_yyz_xyyy, to_x_x_yyz_xyyz, to_x_x_yyz_xyzz, to_x_x_yyz_xzzz, to_x_x_yyz_yyyy, to_x_x_yyz_yyyz, to_x_x_yyz_yyzz, to_x_x_yyz_yzzz, to_x_x_yyz_zzzz, to_xyyz_xxx, to_xyyz_xxxxx, to_xyyz_xxxxy, to_xyyz_xxxxz, to_xyyz_xxxyy, to_xyyz_xxxyz, to_xyyz_xxxzz, to_xyyz_xxy, to_xyyz_xxyyy, to_xyyz_xxyyz, to_xyyz_xxyzz, to_xyyz_xxz, to_xyyz_xxzzz, to_xyyz_xyy, to_xyyz_xyyyy, to_xyyz_xyyyz, to_xyyz_xyyzz, to_xyyz_xyz, to_xyyz_xyzzz, to_xyyz_xzz, to_xyyz_xzzzz, to_xyyz_yyy, to_xyyz_yyz, to_xyyz_yzz, to_xyyz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_x_yyz_xxxx,     \
+                             to_x_x_yyz_xxxy, \
+                             to_x_x_yyz_xxxz, \
+                             to_x_x_yyz_xxyy, \
+                             to_x_x_yyz_xxyz, \
+                             to_x_x_yyz_xxzz, \
+                             to_x_x_yyz_xyyy, \
+                             to_x_x_yyz_xyyz, \
+                             to_x_x_yyz_xyzz, \
+                             to_x_x_yyz_xzzz, \
+                             to_x_x_yyz_yyyy, \
+                             to_x_x_yyz_yyyz, \
+                             to_x_x_yyz_yyzz, \
+                             to_x_x_yyz_yzzz, \
+                             to_x_x_yyz_zzzz, \
+                             to_xyyz_xxx,     \
+                             to_xyyz_xxxxx,   \
+                             to_xyyz_xxxxy,   \
+                             to_xyyz_xxxxz,   \
+                             to_xyyz_xxxyy,   \
+                             to_xyyz_xxxyz,   \
+                             to_xyyz_xxxzz,   \
+                             to_xyyz_xxy,     \
+                             to_xyyz_xxyyy,   \
+                             to_xyyz_xxyyz,   \
+                             to_xyyz_xxyzz,   \
+                             to_xyyz_xxz,     \
+                             to_xyyz_xxzzz,   \
+                             to_xyyz_xyy,     \
+                             to_xyyz_xyyyy,   \
+                             to_xyyz_xyyyz,   \
+                             to_xyyz_xyyzz,   \
+                             to_xyyz_xyz,     \
+                             to_xyyz_xyzzz,   \
+                             to_xyyz_xzz,     \
+                             to_xyyz_xzzzz,   \
+                             to_xyyz_yyy,     \
+                             to_xyyz_yyz,     \
+                             to_xyyz_yzz,     \
+                             to_xyyz_zzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -1923,7 +2441,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_x_yzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 0 * op_comps * 150 + i * 150 + 134);
 
-        #pragma omp simd aligned(to_x_x_yzz_xxxx, to_x_x_yzz_xxxy, to_x_x_yzz_xxxz, to_x_x_yzz_xxyy, to_x_x_yzz_xxyz, to_x_x_yzz_xxzz, to_x_x_yzz_xyyy, to_x_x_yzz_xyyz, to_x_x_yzz_xyzz, to_x_x_yzz_xzzz, to_x_x_yzz_yyyy, to_x_x_yzz_yyyz, to_x_x_yzz_yyzz, to_x_x_yzz_yzzz, to_x_x_yzz_zzzz, to_xyzz_xxx, to_xyzz_xxxxx, to_xyzz_xxxxy, to_xyzz_xxxxz, to_xyzz_xxxyy, to_xyzz_xxxyz, to_xyzz_xxxzz, to_xyzz_xxy, to_xyzz_xxyyy, to_xyzz_xxyyz, to_xyzz_xxyzz, to_xyzz_xxz, to_xyzz_xxzzz, to_xyzz_xyy, to_xyzz_xyyyy, to_xyzz_xyyyz, to_xyzz_xyyzz, to_xyzz_xyz, to_xyzz_xyzzz, to_xyzz_xzz, to_xyzz_xzzzz, to_xyzz_yyy, to_xyzz_yyz, to_xyzz_yzz, to_xyzz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_x_yzz_xxxx,     \
+                             to_x_x_yzz_xxxy, \
+                             to_x_x_yzz_xxxz, \
+                             to_x_x_yzz_xxyy, \
+                             to_x_x_yzz_xxyz, \
+                             to_x_x_yzz_xxzz, \
+                             to_x_x_yzz_xyyy, \
+                             to_x_x_yzz_xyyz, \
+                             to_x_x_yzz_xyzz, \
+                             to_x_x_yzz_xzzz, \
+                             to_x_x_yzz_yyyy, \
+                             to_x_x_yzz_yyyz, \
+                             to_x_x_yzz_yyzz, \
+                             to_x_x_yzz_yzzz, \
+                             to_x_x_yzz_zzzz, \
+                             to_xyzz_xxx,     \
+                             to_xyzz_xxxxx,   \
+                             to_xyzz_xxxxy,   \
+                             to_xyzz_xxxxz,   \
+                             to_xyzz_xxxyy,   \
+                             to_xyzz_xxxyz,   \
+                             to_xyzz_xxxzz,   \
+                             to_xyzz_xxy,     \
+                             to_xyzz_xxyyy,   \
+                             to_xyzz_xxyyz,   \
+                             to_xyzz_xxyzz,   \
+                             to_xyzz_xxz,     \
+                             to_xyzz_xxzzz,   \
+                             to_xyzz_xyy,     \
+                             to_xyzz_xyyyy,   \
+                             to_xyzz_xyyyz,   \
+                             to_xyzz_xyyzz,   \
+                             to_xyzz_xyz,     \
+                             to_xyzz_xyzzz,   \
+                             to_xyzz_xzz,     \
+                             to_xyzz_xzzzz,   \
+                             to_xyzz_yyy,     \
+                             to_xyzz_yyz,     \
+                             to_xyzz_yzz,     \
+                             to_xyzz_zzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -1993,7 +2551,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_x_zzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 0 * op_comps * 150 + i * 150 + 149);
 
-        #pragma omp simd aligned(to_x_x_zzz_xxxx, to_x_x_zzz_xxxy, to_x_x_zzz_xxxz, to_x_x_zzz_xxyy, to_x_x_zzz_xxyz, to_x_x_zzz_xxzz, to_x_x_zzz_xyyy, to_x_x_zzz_xyyz, to_x_x_zzz_xyzz, to_x_x_zzz_xzzz, to_x_x_zzz_yyyy, to_x_x_zzz_yyyz, to_x_x_zzz_yyzz, to_x_x_zzz_yzzz, to_x_x_zzz_zzzz, to_xzzz_xxx, to_xzzz_xxxxx, to_xzzz_xxxxy, to_xzzz_xxxxz, to_xzzz_xxxyy, to_xzzz_xxxyz, to_xzzz_xxxzz, to_xzzz_xxy, to_xzzz_xxyyy, to_xzzz_xxyyz, to_xzzz_xxyzz, to_xzzz_xxz, to_xzzz_xxzzz, to_xzzz_xyy, to_xzzz_xyyyy, to_xzzz_xyyyz, to_xzzz_xyyzz, to_xzzz_xyz, to_xzzz_xyzzz, to_xzzz_xzz, to_xzzz_xzzzz, to_xzzz_yyy, to_xzzz_yyz, to_xzzz_yzz, to_xzzz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_x_zzz_xxxx,     \
+                             to_x_x_zzz_xxxy, \
+                             to_x_x_zzz_xxxz, \
+                             to_x_x_zzz_xxyy, \
+                             to_x_x_zzz_xxyz, \
+                             to_x_x_zzz_xxzz, \
+                             to_x_x_zzz_xyyy, \
+                             to_x_x_zzz_xyyz, \
+                             to_x_x_zzz_xyzz, \
+                             to_x_x_zzz_xzzz, \
+                             to_x_x_zzz_yyyy, \
+                             to_x_x_zzz_yyyz, \
+                             to_x_x_zzz_yyzz, \
+                             to_x_x_zzz_yzzz, \
+                             to_x_x_zzz_zzzz, \
+                             to_xzzz_xxx,     \
+                             to_xzzz_xxxxx,   \
+                             to_xzzz_xxxxy,   \
+                             to_xzzz_xxxxz,   \
+                             to_xzzz_xxxyy,   \
+                             to_xzzz_xxxyz,   \
+                             to_xzzz_xxxzz,   \
+                             to_xzzz_xxy,     \
+                             to_xzzz_xxyyy,   \
+                             to_xzzz_xxyyz,   \
+                             to_xzzz_xxyzz,   \
+                             to_xzzz_xxz,     \
+                             to_xzzz_xxzzz,   \
+                             to_xzzz_xyy,     \
+                             to_xzzz_xyyyy,   \
+                             to_xzzz_xyyyz,   \
+                             to_xzzz_xyyzz,   \
+                             to_xzzz_xyz,     \
+                             to_xzzz_xyzzz,   \
+                             to_xzzz_xzz,     \
+                             to_xzzz_xzzzz,   \
+                             to_xzzz_yyy,     \
+                             to_xzzz_yyz,     \
+                             to_xzzz_yzz,     \
+                             to_xzzz_zzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -2063,7 +2661,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_y_xxx_zzzz = pbuffer.data(idx_op_geom_101_fg + 1 * op_comps * 150 + i * 150 + 14);
 
-        #pragma omp simd aligned(to_x_y_xxx_xxxx, to_x_y_xxx_xxxy, to_x_y_xxx_xxxz, to_x_y_xxx_xxyy, to_x_y_xxx_xxyz, to_x_y_xxx_xxzz, to_x_y_xxx_xyyy, to_x_y_xxx_xyyz, to_x_y_xxx_xyzz, to_x_y_xxx_xzzz, to_x_y_xxx_yyyy, to_x_y_xxx_yyyz, to_x_y_xxx_yyzz, to_x_y_xxx_yzzz, to_x_y_xxx_zzzz, to_xx_xxx, to_xx_xxxxy, to_xx_xxxyy, to_xx_xxxyz, to_xx_xxy, to_xx_xxyyy, to_xx_xxyyz, to_xx_xxyzz, to_xx_xxz, to_xx_xyy, to_xx_xyyyy, to_xx_xyyyz, to_xx_xyyzz, to_xx_xyz, to_xx_xyzzz, to_xx_xzz, to_xx_yyy, to_xx_yyyyy, to_xx_yyyyz, to_xx_yyyzz, to_xx_yyz, to_xx_yyzzz, to_xx_yzz, to_xx_yzzzz, to_xx_zzz, to_xxxx_xxx, to_xxxx_xxxxy, to_xxxx_xxxyy, to_xxxx_xxxyz, to_xxxx_xxy, to_xxxx_xxyyy, to_xxxx_xxyyz, to_xxxx_xxyzz, to_xxxx_xxz, to_xxxx_xyy, to_xxxx_xyyyy, to_xxxx_xyyyz, to_xxxx_xyyzz, to_xxxx_xyz, to_xxxx_xyzzz, to_xxxx_xzz, to_xxxx_yyy, to_xxxx_yyyyy, to_xxxx_yyyyz, to_xxxx_yyyzz, to_xxxx_yyz, to_xxxx_yyzzz, to_xxxx_yzz, to_xxxx_yzzzz, to_xxxx_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_y_xxx_xxxx,     \
+                             to_x_y_xxx_xxxy, \
+                             to_x_y_xxx_xxxz, \
+                             to_x_y_xxx_xxyy, \
+                             to_x_y_xxx_xxyz, \
+                             to_x_y_xxx_xxzz, \
+                             to_x_y_xxx_xyyy, \
+                             to_x_y_xxx_xyyz, \
+                             to_x_y_xxx_xyzz, \
+                             to_x_y_xxx_xzzz, \
+                             to_x_y_xxx_yyyy, \
+                             to_x_y_xxx_yyyz, \
+                             to_x_y_xxx_yyzz, \
+                             to_x_y_xxx_yzzz, \
+                             to_x_y_xxx_zzzz, \
+                             to_xx_xxx,       \
+                             to_xx_xxxxy,     \
+                             to_xx_xxxyy,     \
+                             to_xx_xxxyz,     \
+                             to_xx_xxy,       \
+                             to_xx_xxyyy,     \
+                             to_xx_xxyyz,     \
+                             to_xx_xxyzz,     \
+                             to_xx_xxz,       \
+                             to_xx_xyy,       \
+                             to_xx_xyyyy,     \
+                             to_xx_xyyyz,     \
+                             to_xx_xyyzz,     \
+                             to_xx_xyz,       \
+                             to_xx_xyzzz,     \
+                             to_xx_xzz,       \
+                             to_xx_yyy,       \
+                             to_xx_yyyyy,     \
+                             to_xx_yyyyz,     \
+                             to_xx_yyyzz,     \
+                             to_xx_yyz,       \
+                             to_xx_yyzzz,     \
+                             to_xx_yzz,       \
+                             to_xx_yzzzz,     \
+                             to_xx_zzz,       \
+                             to_xxxx_xxx,     \
+                             to_xxxx_xxxxy,   \
+                             to_xxxx_xxxyy,   \
+                             to_xxxx_xxxyz,   \
+                             to_xxxx_xxy,     \
+                             to_xxxx_xxyyy,   \
+                             to_xxxx_xxyyz,   \
+                             to_xxxx_xxyzz,   \
+                             to_xxxx_xxz,     \
+                             to_xxxx_xyy,     \
+                             to_xxxx_xyyyy,   \
+                             to_xxxx_xyyyz,   \
+                             to_xxxx_xyyzz,   \
+                             to_xxxx_xyz,     \
+                             to_xxxx_xyzzz,   \
+                             to_xxxx_xzz,     \
+                             to_xxxx_yyy,     \
+                             to_xxxx_yyyyy,   \
+                             to_xxxx_yyyyz,   \
+                             to_xxxx_yyyzz,   \
+                             to_xxxx_yyz,     \
+                             to_xxxx_yyzzz,   \
+                             to_xxxx_yzz,     \
+                             to_xxxx_yzzzz,   \
+                             to_xxxx_zzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -2072,31 +2735,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_x_y_xxx_xxxx[k] = -6.0 * to_xx_xxxxy[k] * tke_0 + 4.0 * to_xxxx_xxxxy[k] * tbe_0 * tke_0;
 
-            to_x_y_xxx_xxxy[k] = 3.0 * to_xx_xxx[k] - 6.0 * to_xx_xxxyy[k] * tke_0 - 2.0 * to_xxxx_xxx[k] * tbe_0 + 4.0 * to_xxxx_xxxyy[k] * tbe_0 * tke_0;
+            to_x_y_xxx_xxxy[k] =
+                3.0 * to_xx_xxx[k] - 6.0 * to_xx_xxxyy[k] * tke_0 - 2.0 * to_xxxx_xxx[k] * tbe_0 + 4.0 * to_xxxx_xxxyy[k] * tbe_0 * tke_0;
 
             to_x_y_xxx_xxxz[k] = -6.0 * to_xx_xxxyz[k] * tke_0 + 4.0 * to_xxxx_xxxyz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxx_xxyy[k] = 6.0 * to_xx_xxy[k] - 6.0 * to_xx_xxyyy[k] * tke_0 - 4.0 * to_xxxx_xxy[k] * tbe_0 + 4.0 * to_xxxx_xxyyy[k] * tbe_0 * tke_0;
+            to_x_y_xxx_xxyy[k] =
+                6.0 * to_xx_xxy[k] - 6.0 * to_xx_xxyyy[k] * tke_0 - 4.0 * to_xxxx_xxy[k] * tbe_0 + 4.0 * to_xxxx_xxyyy[k] * tbe_0 * tke_0;
 
-            to_x_y_xxx_xxyz[k] = 3.0 * to_xx_xxz[k] - 6.0 * to_xx_xxyyz[k] * tke_0 - 2.0 * to_xxxx_xxz[k] * tbe_0 + 4.0 * to_xxxx_xxyyz[k] * tbe_0 * tke_0;
+            to_x_y_xxx_xxyz[k] =
+                3.0 * to_xx_xxz[k] - 6.0 * to_xx_xxyyz[k] * tke_0 - 2.0 * to_xxxx_xxz[k] * tbe_0 + 4.0 * to_xxxx_xxyyz[k] * tbe_0 * tke_0;
 
             to_x_y_xxx_xxzz[k] = -6.0 * to_xx_xxyzz[k] * tke_0 + 4.0 * to_xxxx_xxyzz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxx_xyyy[k] = 9.0 * to_xx_xyy[k] - 6.0 * to_xx_xyyyy[k] * tke_0 - 6.0 * to_xxxx_xyy[k] * tbe_0 + 4.0 * to_xxxx_xyyyy[k] * tbe_0 * tke_0;
+            to_x_y_xxx_xyyy[k] =
+                9.0 * to_xx_xyy[k] - 6.0 * to_xx_xyyyy[k] * tke_0 - 6.0 * to_xxxx_xyy[k] * tbe_0 + 4.0 * to_xxxx_xyyyy[k] * tbe_0 * tke_0;
 
-            to_x_y_xxx_xyyz[k] = 6.0 * to_xx_xyz[k] - 6.0 * to_xx_xyyyz[k] * tke_0 - 4.0 * to_xxxx_xyz[k] * tbe_0 + 4.0 * to_xxxx_xyyyz[k] * tbe_0 * tke_0;
+            to_x_y_xxx_xyyz[k] =
+                6.0 * to_xx_xyz[k] - 6.0 * to_xx_xyyyz[k] * tke_0 - 4.0 * to_xxxx_xyz[k] * tbe_0 + 4.0 * to_xxxx_xyyyz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxx_xyzz[k] = 3.0 * to_xx_xzz[k] - 6.0 * to_xx_xyyzz[k] * tke_0 - 2.0 * to_xxxx_xzz[k] * tbe_0 + 4.0 * to_xxxx_xyyzz[k] * tbe_0 * tke_0;
+            to_x_y_xxx_xyzz[k] =
+                3.0 * to_xx_xzz[k] - 6.0 * to_xx_xyyzz[k] * tke_0 - 2.0 * to_xxxx_xzz[k] * tbe_0 + 4.0 * to_xxxx_xyyzz[k] * tbe_0 * tke_0;
 
             to_x_y_xxx_xzzz[k] = -6.0 * to_xx_xyzzz[k] * tke_0 + 4.0 * to_xxxx_xyzzz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxx_yyyy[k] = 12.0 * to_xx_yyy[k] - 6.0 * to_xx_yyyyy[k] * tke_0 - 8.0 * to_xxxx_yyy[k] * tbe_0 + 4.0 * to_xxxx_yyyyy[k] * tbe_0 * tke_0;
+            to_x_y_xxx_yyyy[k] =
+                12.0 * to_xx_yyy[k] - 6.0 * to_xx_yyyyy[k] * tke_0 - 8.0 * to_xxxx_yyy[k] * tbe_0 + 4.0 * to_xxxx_yyyyy[k] * tbe_0 * tke_0;
 
-            to_x_y_xxx_yyyz[k] = 9.0 * to_xx_yyz[k] - 6.0 * to_xx_yyyyz[k] * tke_0 - 6.0 * to_xxxx_yyz[k] * tbe_0 + 4.0 * to_xxxx_yyyyz[k] * tbe_0 * tke_0;
+            to_x_y_xxx_yyyz[k] =
+                9.0 * to_xx_yyz[k] - 6.0 * to_xx_yyyyz[k] * tke_0 - 6.0 * to_xxxx_yyz[k] * tbe_0 + 4.0 * to_xxxx_yyyyz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxx_yyzz[k] = 6.0 * to_xx_yzz[k] - 6.0 * to_xx_yyyzz[k] * tke_0 - 4.0 * to_xxxx_yzz[k] * tbe_0 + 4.0 * to_xxxx_yyyzz[k] * tbe_0 * tke_0;
+            to_x_y_xxx_yyzz[k] =
+                6.0 * to_xx_yzz[k] - 6.0 * to_xx_yyyzz[k] * tke_0 - 4.0 * to_xxxx_yzz[k] * tbe_0 + 4.0 * to_xxxx_yyyzz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxx_yzzz[k] = 3.0 * to_xx_zzz[k] - 6.0 * to_xx_yyzzz[k] * tke_0 - 2.0 * to_xxxx_zzz[k] * tbe_0 + 4.0 * to_xxxx_yyzzz[k] * tbe_0 * tke_0;
+            to_x_y_xxx_yzzz[k] =
+                3.0 * to_xx_zzz[k] - 6.0 * to_xx_yyzzz[k] * tke_0 - 2.0 * to_xxxx_zzz[k] * tbe_0 + 4.0 * to_xxxx_yyzzz[k] * tbe_0 * tke_0;
 
             to_x_y_xxx_zzzz[k] = -6.0 * to_xx_yzzzz[k] * tke_0 + 4.0 * to_xxxx_yzzzz[k] * tbe_0 * tke_0;
         }
@@ -2133,7 +2806,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_y_xxy_zzzz = pbuffer.data(idx_op_geom_101_fg + 1 * op_comps * 150 + i * 150 + 29);
 
-        #pragma omp simd aligned(to_x_y_xxy_xxxx, to_x_y_xxy_xxxy, to_x_y_xxy_xxxz, to_x_y_xxy_xxyy, to_x_y_xxy_xxyz, to_x_y_xxy_xxzz, to_x_y_xxy_xyyy, to_x_y_xxy_xyyz, to_x_y_xxy_xyzz, to_x_y_xxy_xzzz, to_x_y_xxy_yyyy, to_x_y_xxy_yyyz, to_x_y_xxy_yyzz, to_x_y_xxy_yzzz, to_x_y_xxy_zzzz, to_xxxy_xxx, to_xxxy_xxxxy, to_xxxy_xxxyy, to_xxxy_xxxyz, to_xxxy_xxy, to_xxxy_xxyyy, to_xxxy_xxyyz, to_xxxy_xxyzz, to_xxxy_xxz, to_xxxy_xyy, to_xxxy_xyyyy, to_xxxy_xyyyz, to_xxxy_xyyzz, to_xxxy_xyz, to_xxxy_xyzzz, to_xxxy_xzz, to_xxxy_yyy, to_xxxy_yyyyy, to_xxxy_yyyyz, to_xxxy_yyyzz, to_xxxy_yyz, to_xxxy_yyzzz, to_xxxy_yzz, to_xxxy_yzzzz, to_xxxy_zzz, to_xy_xxx, to_xy_xxxxy, to_xy_xxxyy, to_xy_xxxyz, to_xy_xxy, to_xy_xxyyy, to_xy_xxyyz, to_xy_xxyzz, to_xy_xxz, to_xy_xyy, to_xy_xyyyy, to_xy_xyyyz, to_xy_xyyzz, to_xy_xyz, to_xy_xyzzz, to_xy_xzz, to_xy_yyy, to_xy_yyyyy, to_xy_yyyyz, to_xy_yyyzz, to_xy_yyz, to_xy_yyzzz, to_xy_yzz, to_xy_yzzzz, to_xy_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_y_xxy_xxxx,     \
+                             to_x_y_xxy_xxxy, \
+                             to_x_y_xxy_xxxz, \
+                             to_x_y_xxy_xxyy, \
+                             to_x_y_xxy_xxyz, \
+                             to_x_y_xxy_xxzz, \
+                             to_x_y_xxy_xyyy, \
+                             to_x_y_xxy_xyyz, \
+                             to_x_y_xxy_xyzz, \
+                             to_x_y_xxy_xzzz, \
+                             to_x_y_xxy_yyyy, \
+                             to_x_y_xxy_yyyz, \
+                             to_x_y_xxy_yyzz, \
+                             to_x_y_xxy_yzzz, \
+                             to_x_y_xxy_zzzz, \
+                             to_xxxy_xxx,     \
+                             to_xxxy_xxxxy,   \
+                             to_xxxy_xxxyy,   \
+                             to_xxxy_xxxyz,   \
+                             to_xxxy_xxy,     \
+                             to_xxxy_xxyyy,   \
+                             to_xxxy_xxyyz,   \
+                             to_xxxy_xxyzz,   \
+                             to_xxxy_xxz,     \
+                             to_xxxy_xyy,     \
+                             to_xxxy_xyyyy,   \
+                             to_xxxy_xyyyz,   \
+                             to_xxxy_xyyzz,   \
+                             to_xxxy_xyz,     \
+                             to_xxxy_xyzzz,   \
+                             to_xxxy_xzz,     \
+                             to_xxxy_yyy,     \
+                             to_xxxy_yyyyy,   \
+                             to_xxxy_yyyyz,   \
+                             to_xxxy_yyyzz,   \
+                             to_xxxy_yyz,     \
+                             to_xxxy_yyzzz,   \
+                             to_xxxy_yzz,     \
+                             to_xxxy_yzzzz,   \
+                             to_xxxy_zzz,     \
+                             to_xy_xxx,       \
+                             to_xy_xxxxy,     \
+                             to_xy_xxxyy,     \
+                             to_xy_xxxyz,     \
+                             to_xy_xxy,       \
+                             to_xy_xxyyy,     \
+                             to_xy_xxyyz,     \
+                             to_xy_xxyzz,     \
+                             to_xy_xxz,       \
+                             to_xy_xyy,       \
+                             to_xy_xyyyy,     \
+                             to_xy_xyyyz,     \
+                             to_xy_xyyzz,     \
+                             to_xy_xyz,       \
+                             to_xy_xyzzz,     \
+                             to_xy_xzz,       \
+                             to_xy_yyy,       \
+                             to_xy_yyyyy,     \
+                             to_xy_yyyyz,     \
+                             to_xy_yyyzz,     \
+                             to_xy_yyz,       \
+                             to_xy_yyzzz,     \
+                             to_xy_yzz,       \
+                             to_xy_yzzzz,     \
+                             to_xy_zzz,       \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -2142,31 +2880,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_x_y_xxy_xxxx[k] = -4.0 * to_xy_xxxxy[k] * tke_0 + 4.0 * to_xxxy_xxxxy[k] * tbe_0 * tke_0;
 
-            to_x_y_xxy_xxxy[k] = 2.0 * to_xy_xxx[k] - 4.0 * to_xy_xxxyy[k] * tke_0 - 2.0 * to_xxxy_xxx[k] * tbe_0 + 4.0 * to_xxxy_xxxyy[k] * tbe_0 * tke_0;
+            to_x_y_xxy_xxxy[k] =
+                2.0 * to_xy_xxx[k] - 4.0 * to_xy_xxxyy[k] * tke_0 - 2.0 * to_xxxy_xxx[k] * tbe_0 + 4.0 * to_xxxy_xxxyy[k] * tbe_0 * tke_0;
 
             to_x_y_xxy_xxxz[k] = -4.0 * to_xy_xxxyz[k] * tke_0 + 4.0 * to_xxxy_xxxyz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxy_xxyy[k] = 4.0 * to_xy_xxy[k] - 4.0 * to_xy_xxyyy[k] * tke_0 - 4.0 * to_xxxy_xxy[k] * tbe_0 + 4.0 * to_xxxy_xxyyy[k] * tbe_0 * tke_0;
+            to_x_y_xxy_xxyy[k] =
+                4.0 * to_xy_xxy[k] - 4.0 * to_xy_xxyyy[k] * tke_0 - 4.0 * to_xxxy_xxy[k] * tbe_0 + 4.0 * to_xxxy_xxyyy[k] * tbe_0 * tke_0;
 
-            to_x_y_xxy_xxyz[k] = 2.0 * to_xy_xxz[k] - 4.0 * to_xy_xxyyz[k] * tke_0 - 2.0 * to_xxxy_xxz[k] * tbe_0 + 4.0 * to_xxxy_xxyyz[k] * tbe_0 * tke_0;
+            to_x_y_xxy_xxyz[k] =
+                2.0 * to_xy_xxz[k] - 4.0 * to_xy_xxyyz[k] * tke_0 - 2.0 * to_xxxy_xxz[k] * tbe_0 + 4.0 * to_xxxy_xxyyz[k] * tbe_0 * tke_0;
 
             to_x_y_xxy_xxzz[k] = -4.0 * to_xy_xxyzz[k] * tke_0 + 4.0 * to_xxxy_xxyzz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxy_xyyy[k] = 6.0 * to_xy_xyy[k] - 4.0 * to_xy_xyyyy[k] * tke_0 - 6.0 * to_xxxy_xyy[k] * tbe_0 + 4.0 * to_xxxy_xyyyy[k] * tbe_0 * tke_0;
+            to_x_y_xxy_xyyy[k] =
+                6.0 * to_xy_xyy[k] - 4.0 * to_xy_xyyyy[k] * tke_0 - 6.0 * to_xxxy_xyy[k] * tbe_0 + 4.0 * to_xxxy_xyyyy[k] * tbe_0 * tke_0;
 
-            to_x_y_xxy_xyyz[k] = 4.0 * to_xy_xyz[k] - 4.0 * to_xy_xyyyz[k] * tke_0 - 4.0 * to_xxxy_xyz[k] * tbe_0 + 4.0 * to_xxxy_xyyyz[k] * tbe_0 * tke_0;
+            to_x_y_xxy_xyyz[k] =
+                4.0 * to_xy_xyz[k] - 4.0 * to_xy_xyyyz[k] * tke_0 - 4.0 * to_xxxy_xyz[k] * tbe_0 + 4.0 * to_xxxy_xyyyz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxy_xyzz[k] = 2.0 * to_xy_xzz[k] - 4.0 * to_xy_xyyzz[k] * tke_0 - 2.0 * to_xxxy_xzz[k] * tbe_0 + 4.0 * to_xxxy_xyyzz[k] * tbe_0 * tke_0;
+            to_x_y_xxy_xyzz[k] =
+                2.0 * to_xy_xzz[k] - 4.0 * to_xy_xyyzz[k] * tke_0 - 2.0 * to_xxxy_xzz[k] * tbe_0 + 4.0 * to_xxxy_xyyzz[k] * tbe_0 * tke_0;
 
             to_x_y_xxy_xzzz[k] = -4.0 * to_xy_xyzzz[k] * tke_0 + 4.0 * to_xxxy_xyzzz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxy_yyyy[k] = 8.0 * to_xy_yyy[k] - 4.0 * to_xy_yyyyy[k] * tke_0 - 8.0 * to_xxxy_yyy[k] * tbe_0 + 4.0 * to_xxxy_yyyyy[k] * tbe_0 * tke_0;
+            to_x_y_xxy_yyyy[k] =
+                8.0 * to_xy_yyy[k] - 4.0 * to_xy_yyyyy[k] * tke_0 - 8.0 * to_xxxy_yyy[k] * tbe_0 + 4.0 * to_xxxy_yyyyy[k] * tbe_0 * tke_0;
 
-            to_x_y_xxy_yyyz[k] = 6.0 * to_xy_yyz[k] - 4.0 * to_xy_yyyyz[k] * tke_0 - 6.0 * to_xxxy_yyz[k] * tbe_0 + 4.0 * to_xxxy_yyyyz[k] * tbe_0 * tke_0;
+            to_x_y_xxy_yyyz[k] =
+                6.0 * to_xy_yyz[k] - 4.0 * to_xy_yyyyz[k] * tke_0 - 6.0 * to_xxxy_yyz[k] * tbe_0 + 4.0 * to_xxxy_yyyyz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxy_yyzz[k] = 4.0 * to_xy_yzz[k] - 4.0 * to_xy_yyyzz[k] * tke_0 - 4.0 * to_xxxy_yzz[k] * tbe_0 + 4.0 * to_xxxy_yyyzz[k] * tbe_0 * tke_0;
+            to_x_y_xxy_yyzz[k] =
+                4.0 * to_xy_yzz[k] - 4.0 * to_xy_yyyzz[k] * tke_0 - 4.0 * to_xxxy_yzz[k] * tbe_0 + 4.0 * to_xxxy_yyyzz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxy_yzzz[k] = 2.0 * to_xy_zzz[k] - 4.0 * to_xy_yyzzz[k] * tke_0 - 2.0 * to_xxxy_zzz[k] * tbe_0 + 4.0 * to_xxxy_yyzzz[k] * tbe_0 * tke_0;
+            to_x_y_xxy_yzzz[k] =
+                2.0 * to_xy_zzz[k] - 4.0 * to_xy_yyzzz[k] * tke_0 - 2.0 * to_xxxy_zzz[k] * tbe_0 + 4.0 * to_xxxy_yyzzz[k] * tbe_0 * tke_0;
 
             to_x_y_xxy_zzzz[k] = -4.0 * to_xy_yzzzz[k] * tke_0 + 4.0 * to_xxxy_yzzzz[k] * tbe_0 * tke_0;
         }
@@ -2203,7 +2951,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_y_xxz_zzzz = pbuffer.data(idx_op_geom_101_fg + 1 * op_comps * 150 + i * 150 + 44);
 
-        #pragma omp simd aligned(to_x_y_xxz_xxxx, to_x_y_xxz_xxxy, to_x_y_xxz_xxxz, to_x_y_xxz_xxyy, to_x_y_xxz_xxyz, to_x_y_xxz_xxzz, to_x_y_xxz_xyyy, to_x_y_xxz_xyyz, to_x_y_xxz_xyzz, to_x_y_xxz_xzzz, to_x_y_xxz_yyyy, to_x_y_xxz_yyyz, to_x_y_xxz_yyzz, to_x_y_xxz_yzzz, to_x_y_xxz_zzzz, to_xxxz_xxx, to_xxxz_xxxxy, to_xxxz_xxxyy, to_xxxz_xxxyz, to_xxxz_xxy, to_xxxz_xxyyy, to_xxxz_xxyyz, to_xxxz_xxyzz, to_xxxz_xxz, to_xxxz_xyy, to_xxxz_xyyyy, to_xxxz_xyyyz, to_xxxz_xyyzz, to_xxxz_xyz, to_xxxz_xyzzz, to_xxxz_xzz, to_xxxz_yyy, to_xxxz_yyyyy, to_xxxz_yyyyz, to_xxxz_yyyzz, to_xxxz_yyz, to_xxxz_yyzzz, to_xxxz_yzz, to_xxxz_yzzzz, to_xxxz_zzz, to_xz_xxx, to_xz_xxxxy, to_xz_xxxyy, to_xz_xxxyz, to_xz_xxy, to_xz_xxyyy, to_xz_xxyyz, to_xz_xxyzz, to_xz_xxz, to_xz_xyy, to_xz_xyyyy, to_xz_xyyyz, to_xz_xyyzz, to_xz_xyz, to_xz_xyzzz, to_xz_xzz, to_xz_yyy, to_xz_yyyyy, to_xz_yyyyz, to_xz_yyyzz, to_xz_yyz, to_xz_yyzzz, to_xz_yzz, to_xz_yzzzz, to_xz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_y_xxz_xxxx,     \
+                             to_x_y_xxz_xxxy, \
+                             to_x_y_xxz_xxxz, \
+                             to_x_y_xxz_xxyy, \
+                             to_x_y_xxz_xxyz, \
+                             to_x_y_xxz_xxzz, \
+                             to_x_y_xxz_xyyy, \
+                             to_x_y_xxz_xyyz, \
+                             to_x_y_xxz_xyzz, \
+                             to_x_y_xxz_xzzz, \
+                             to_x_y_xxz_yyyy, \
+                             to_x_y_xxz_yyyz, \
+                             to_x_y_xxz_yyzz, \
+                             to_x_y_xxz_yzzz, \
+                             to_x_y_xxz_zzzz, \
+                             to_xxxz_xxx,     \
+                             to_xxxz_xxxxy,   \
+                             to_xxxz_xxxyy,   \
+                             to_xxxz_xxxyz,   \
+                             to_xxxz_xxy,     \
+                             to_xxxz_xxyyy,   \
+                             to_xxxz_xxyyz,   \
+                             to_xxxz_xxyzz,   \
+                             to_xxxz_xxz,     \
+                             to_xxxz_xyy,     \
+                             to_xxxz_xyyyy,   \
+                             to_xxxz_xyyyz,   \
+                             to_xxxz_xyyzz,   \
+                             to_xxxz_xyz,     \
+                             to_xxxz_xyzzz,   \
+                             to_xxxz_xzz,     \
+                             to_xxxz_yyy,     \
+                             to_xxxz_yyyyy,   \
+                             to_xxxz_yyyyz,   \
+                             to_xxxz_yyyzz,   \
+                             to_xxxz_yyz,     \
+                             to_xxxz_yyzzz,   \
+                             to_xxxz_yzz,     \
+                             to_xxxz_yzzzz,   \
+                             to_xxxz_zzz,     \
+                             to_xz_xxx,       \
+                             to_xz_xxxxy,     \
+                             to_xz_xxxyy,     \
+                             to_xz_xxxyz,     \
+                             to_xz_xxy,       \
+                             to_xz_xxyyy,     \
+                             to_xz_xxyyz,     \
+                             to_xz_xxyzz,     \
+                             to_xz_xxz,       \
+                             to_xz_xyy,       \
+                             to_xz_xyyyy,     \
+                             to_xz_xyyyz,     \
+                             to_xz_xyyzz,     \
+                             to_xz_xyz,       \
+                             to_xz_xyzzz,     \
+                             to_xz_xzz,       \
+                             to_xz_yyy,       \
+                             to_xz_yyyyy,     \
+                             to_xz_yyyyz,     \
+                             to_xz_yyyzz,     \
+                             to_xz_yyz,       \
+                             to_xz_yyzzz,     \
+                             to_xz_yzz,       \
+                             to_xz_yzzzz,     \
+                             to_xz_zzz,       \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -2212,31 +3025,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_x_y_xxz_xxxx[k] = -4.0 * to_xz_xxxxy[k] * tke_0 + 4.0 * to_xxxz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_x_y_xxz_xxxy[k] = 2.0 * to_xz_xxx[k] - 4.0 * to_xz_xxxyy[k] * tke_0 - 2.0 * to_xxxz_xxx[k] * tbe_0 + 4.0 * to_xxxz_xxxyy[k] * tbe_0 * tke_0;
+            to_x_y_xxz_xxxy[k] =
+                2.0 * to_xz_xxx[k] - 4.0 * to_xz_xxxyy[k] * tke_0 - 2.0 * to_xxxz_xxx[k] * tbe_0 + 4.0 * to_xxxz_xxxyy[k] * tbe_0 * tke_0;
 
             to_x_y_xxz_xxxz[k] = -4.0 * to_xz_xxxyz[k] * tke_0 + 4.0 * to_xxxz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxz_xxyy[k] = 4.0 * to_xz_xxy[k] - 4.0 * to_xz_xxyyy[k] * tke_0 - 4.0 * to_xxxz_xxy[k] * tbe_0 + 4.0 * to_xxxz_xxyyy[k] * tbe_0 * tke_0;
+            to_x_y_xxz_xxyy[k] =
+                4.0 * to_xz_xxy[k] - 4.0 * to_xz_xxyyy[k] * tke_0 - 4.0 * to_xxxz_xxy[k] * tbe_0 + 4.0 * to_xxxz_xxyyy[k] * tbe_0 * tke_0;
 
-            to_x_y_xxz_xxyz[k] = 2.0 * to_xz_xxz[k] - 4.0 * to_xz_xxyyz[k] * tke_0 - 2.0 * to_xxxz_xxz[k] * tbe_0 + 4.0 * to_xxxz_xxyyz[k] * tbe_0 * tke_0;
+            to_x_y_xxz_xxyz[k] =
+                2.0 * to_xz_xxz[k] - 4.0 * to_xz_xxyyz[k] * tke_0 - 2.0 * to_xxxz_xxz[k] * tbe_0 + 4.0 * to_xxxz_xxyyz[k] * tbe_0 * tke_0;
 
             to_x_y_xxz_xxzz[k] = -4.0 * to_xz_xxyzz[k] * tke_0 + 4.0 * to_xxxz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxz_xyyy[k] = 6.0 * to_xz_xyy[k] - 4.0 * to_xz_xyyyy[k] * tke_0 - 6.0 * to_xxxz_xyy[k] * tbe_0 + 4.0 * to_xxxz_xyyyy[k] * tbe_0 * tke_0;
+            to_x_y_xxz_xyyy[k] =
+                6.0 * to_xz_xyy[k] - 4.0 * to_xz_xyyyy[k] * tke_0 - 6.0 * to_xxxz_xyy[k] * tbe_0 + 4.0 * to_xxxz_xyyyy[k] * tbe_0 * tke_0;
 
-            to_x_y_xxz_xyyz[k] = 4.0 * to_xz_xyz[k] - 4.0 * to_xz_xyyyz[k] * tke_0 - 4.0 * to_xxxz_xyz[k] * tbe_0 + 4.0 * to_xxxz_xyyyz[k] * tbe_0 * tke_0;
+            to_x_y_xxz_xyyz[k] =
+                4.0 * to_xz_xyz[k] - 4.0 * to_xz_xyyyz[k] * tke_0 - 4.0 * to_xxxz_xyz[k] * tbe_0 + 4.0 * to_xxxz_xyyyz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxz_xyzz[k] = 2.0 * to_xz_xzz[k] - 4.0 * to_xz_xyyzz[k] * tke_0 - 2.0 * to_xxxz_xzz[k] * tbe_0 + 4.0 * to_xxxz_xyyzz[k] * tbe_0 * tke_0;
+            to_x_y_xxz_xyzz[k] =
+                2.0 * to_xz_xzz[k] - 4.0 * to_xz_xyyzz[k] * tke_0 - 2.0 * to_xxxz_xzz[k] * tbe_0 + 4.0 * to_xxxz_xyyzz[k] * tbe_0 * tke_0;
 
             to_x_y_xxz_xzzz[k] = -4.0 * to_xz_xyzzz[k] * tke_0 + 4.0 * to_xxxz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxz_yyyy[k] = 8.0 * to_xz_yyy[k] - 4.0 * to_xz_yyyyy[k] * tke_0 - 8.0 * to_xxxz_yyy[k] * tbe_0 + 4.0 * to_xxxz_yyyyy[k] * tbe_0 * tke_0;
+            to_x_y_xxz_yyyy[k] =
+                8.0 * to_xz_yyy[k] - 4.0 * to_xz_yyyyy[k] * tke_0 - 8.0 * to_xxxz_yyy[k] * tbe_0 + 4.0 * to_xxxz_yyyyy[k] * tbe_0 * tke_0;
 
-            to_x_y_xxz_yyyz[k] = 6.0 * to_xz_yyz[k] - 4.0 * to_xz_yyyyz[k] * tke_0 - 6.0 * to_xxxz_yyz[k] * tbe_0 + 4.0 * to_xxxz_yyyyz[k] * tbe_0 * tke_0;
+            to_x_y_xxz_yyyz[k] =
+                6.0 * to_xz_yyz[k] - 4.0 * to_xz_yyyyz[k] * tke_0 - 6.0 * to_xxxz_yyz[k] * tbe_0 + 4.0 * to_xxxz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxz_yyzz[k] = 4.0 * to_xz_yzz[k] - 4.0 * to_xz_yyyzz[k] * tke_0 - 4.0 * to_xxxz_yzz[k] * tbe_0 + 4.0 * to_xxxz_yyyzz[k] * tbe_0 * tke_0;
+            to_x_y_xxz_yyzz[k] =
+                4.0 * to_xz_yzz[k] - 4.0 * to_xz_yyyzz[k] * tke_0 - 4.0 * to_xxxz_yzz[k] * tbe_0 + 4.0 * to_xxxz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_x_y_xxz_yzzz[k] = 2.0 * to_xz_zzz[k] - 4.0 * to_xz_yyzzz[k] * tke_0 - 2.0 * to_xxxz_zzz[k] * tbe_0 + 4.0 * to_xxxz_yyzzz[k] * tbe_0 * tke_0;
+            to_x_y_xxz_yzzz[k] =
+                2.0 * to_xz_zzz[k] - 4.0 * to_xz_yyzzz[k] * tke_0 - 2.0 * to_xxxz_zzz[k] * tbe_0 + 4.0 * to_xxxz_yyzzz[k] * tbe_0 * tke_0;
 
             to_x_y_xxz_zzzz[k] = -4.0 * to_xz_yzzzz[k] * tke_0 + 4.0 * to_xxxz_yzzzz[k] * tbe_0 * tke_0;
         }
@@ -2273,7 +3096,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_y_xyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 1 * op_comps * 150 + i * 150 + 59);
 
-        #pragma omp simd aligned(to_x_y_xyy_xxxx, to_x_y_xyy_xxxy, to_x_y_xyy_xxxz, to_x_y_xyy_xxyy, to_x_y_xyy_xxyz, to_x_y_xyy_xxzz, to_x_y_xyy_xyyy, to_x_y_xyy_xyyz, to_x_y_xyy_xyzz, to_x_y_xyy_xzzz, to_x_y_xyy_yyyy, to_x_y_xyy_yyyz, to_x_y_xyy_yyzz, to_x_y_xyy_yzzz, to_x_y_xyy_zzzz, to_xxyy_xxx, to_xxyy_xxxxy, to_xxyy_xxxyy, to_xxyy_xxxyz, to_xxyy_xxy, to_xxyy_xxyyy, to_xxyy_xxyyz, to_xxyy_xxyzz, to_xxyy_xxz, to_xxyy_xyy, to_xxyy_xyyyy, to_xxyy_xyyyz, to_xxyy_xyyzz, to_xxyy_xyz, to_xxyy_xyzzz, to_xxyy_xzz, to_xxyy_yyy, to_xxyy_yyyyy, to_xxyy_yyyyz, to_xxyy_yyyzz, to_xxyy_yyz, to_xxyy_yyzzz, to_xxyy_yzz, to_xxyy_yzzzz, to_xxyy_zzz, to_yy_xxx, to_yy_xxxxy, to_yy_xxxyy, to_yy_xxxyz, to_yy_xxy, to_yy_xxyyy, to_yy_xxyyz, to_yy_xxyzz, to_yy_xxz, to_yy_xyy, to_yy_xyyyy, to_yy_xyyyz, to_yy_xyyzz, to_yy_xyz, to_yy_xyzzz, to_yy_xzz, to_yy_yyy, to_yy_yyyyy, to_yy_yyyyz, to_yy_yyyzz, to_yy_yyz, to_yy_yyzzz, to_yy_yzz, to_yy_yzzzz, to_yy_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_y_xyy_xxxx,     \
+                             to_x_y_xyy_xxxy, \
+                             to_x_y_xyy_xxxz, \
+                             to_x_y_xyy_xxyy, \
+                             to_x_y_xyy_xxyz, \
+                             to_x_y_xyy_xxzz, \
+                             to_x_y_xyy_xyyy, \
+                             to_x_y_xyy_xyyz, \
+                             to_x_y_xyy_xyzz, \
+                             to_x_y_xyy_xzzz, \
+                             to_x_y_xyy_yyyy, \
+                             to_x_y_xyy_yyyz, \
+                             to_x_y_xyy_yyzz, \
+                             to_x_y_xyy_yzzz, \
+                             to_x_y_xyy_zzzz, \
+                             to_xxyy_xxx,     \
+                             to_xxyy_xxxxy,   \
+                             to_xxyy_xxxyy,   \
+                             to_xxyy_xxxyz,   \
+                             to_xxyy_xxy,     \
+                             to_xxyy_xxyyy,   \
+                             to_xxyy_xxyyz,   \
+                             to_xxyy_xxyzz,   \
+                             to_xxyy_xxz,     \
+                             to_xxyy_xyy,     \
+                             to_xxyy_xyyyy,   \
+                             to_xxyy_xyyyz,   \
+                             to_xxyy_xyyzz,   \
+                             to_xxyy_xyz,     \
+                             to_xxyy_xyzzz,   \
+                             to_xxyy_xzz,     \
+                             to_xxyy_yyy,     \
+                             to_xxyy_yyyyy,   \
+                             to_xxyy_yyyyz,   \
+                             to_xxyy_yyyzz,   \
+                             to_xxyy_yyz,     \
+                             to_xxyy_yyzzz,   \
+                             to_xxyy_yzz,     \
+                             to_xxyy_yzzzz,   \
+                             to_xxyy_zzz,     \
+                             to_yy_xxx,       \
+                             to_yy_xxxxy,     \
+                             to_yy_xxxyy,     \
+                             to_yy_xxxyz,     \
+                             to_yy_xxy,       \
+                             to_yy_xxyyy,     \
+                             to_yy_xxyyz,     \
+                             to_yy_xxyzz,     \
+                             to_yy_xxz,       \
+                             to_yy_xyy,       \
+                             to_yy_xyyyy,     \
+                             to_yy_xyyyz,     \
+                             to_yy_xyyzz,     \
+                             to_yy_xyz,       \
+                             to_yy_xyzzz,     \
+                             to_yy_xzz,       \
+                             to_yy_yyy,       \
+                             to_yy_yyyyy,     \
+                             to_yy_yyyyz,     \
+                             to_yy_yyyzz,     \
+                             to_yy_yyz,       \
+                             to_yy_yyzzz,     \
+                             to_yy_yzz,       \
+                             to_yy_yzzzz,     \
+                             to_yy_zzz,       \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -2286,25 +3174,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_x_y_xyy_xxxz[k] = -2.0 * to_yy_xxxyz[k] * tke_0 + 4.0 * to_xxyy_xxxyz[k] * tbe_0 * tke_0;
 
-            to_x_y_xyy_xxyy[k] = 2.0 * to_yy_xxy[k] - 2.0 * to_yy_xxyyy[k] * tke_0 - 4.0 * to_xxyy_xxy[k] * tbe_0 + 4.0 * to_xxyy_xxyyy[k] * tbe_0 * tke_0;
+            to_x_y_xyy_xxyy[k] =
+                2.0 * to_yy_xxy[k] - 2.0 * to_yy_xxyyy[k] * tke_0 - 4.0 * to_xxyy_xxy[k] * tbe_0 + 4.0 * to_xxyy_xxyyy[k] * tbe_0 * tke_0;
 
             to_x_y_xyy_xxyz[k] = to_yy_xxz[k] - 2.0 * to_yy_xxyyz[k] * tke_0 - 2.0 * to_xxyy_xxz[k] * tbe_0 + 4.0 * to_xxyy_xxyyz[k] * tbe_0 * tke_0;
 
             to_x_y_xyy_xxzz[k] = -2.0 * to_yy_xxyzz[k] * tke_0 + 4.0 * to_xxyy_xxyzz[k] * tbe_0 * tke_0;
 
-            to_x_y_xyy_xyyy[k] = 3.0 * to_yy_xyy[k] - 2.0 * to_yy_xyyyy[k] * tke_0 - 6.0 * to_xxyy_xyy[k] * tbe_0 + 4.0 * to_xxyy_xyyyy[k] * tbe_0 * tke_0;
+            to_x_y_xyy_xyyy[k] =
+                3.0 * to_yy_xyy[k] - 2.0 * to_yy_xyyyy[k] * tke_0 - 6.0 * to_xxyy_xyy[k] * tbe_0 + 4.0 * to_xxyy_xyyyy[k] * tbe_0 * tke_0;
 
-            to_x_y_xyy_xyyz[k] = 2.0 * to_yy_xyz[k] - 2.0 * to_yy_xyyyz[k] * tke_0 - 4.0 * to_xxyy_xyz[k] * tbe_0 + 4.0 * to_xxyy_xyyyz[k] * tbe_0 * tke_0;
+            to_x_y_xyy_xyyz[k] =
+                2.0 * to_yy_xyz[k] - 2.0 * to_yy_xyyyz[k] * tke_0 - 4.0 * to_xxyy_xyz[k] * tbe_0 + 4.0 * to_xxyy_xyyyz[k] * tbe_0 * tke_0;
 
             to_x_y_xyy_xyzz[k] = to_yy_xzz[k] - 2.0 * to_yy_xyyzz[k] * tke_0 - 2.0 * to_xxyy_xzz[k] * tbe_0 + 4.0 * to_xxyy_xyyzz[k] * tbe_0 * tke_0;
 
             to_x_y_xyy_xzzz[k] = -2.0 * to_yy_xyzzz[k] * tke_0 + 4.0 * to_xxyy_xyzzz[k] * tbe_0 * tke_0;
 
-            to_x_y_xyy_yyyy[k] = 4.0 * to_yy_yyy[k] - 2.0 * to_yy_yyyyy[k] * tke_0 - 8.0 * to_xxyy_yyy[k] * tbe_0 + 4.0 * to_xxyy_yyyyy[k] * tbe_0 * tke_0;
+            to_x_y_xyy_yyyy[k] =
+                4.0 * to_yy_yyy[k] - 2.0 * to_yy_yyyyy[k] * tke_0 - 8.0 * to_xxyy_yyy[k] * tbe_0 + 4.0 * to_xxyy_yyyyy[k] * tbe_0 * tke_0;
 
-            to_x_y_xyy_yyyz[k] = 3.0 * to_yy_yyz[k] - 2.0 * to_yy_yyyyz[k] * tke_0 - 6.0 * to_xxyy_yyz[k] * tbe_0 + 4.0 * to_xxyy_yyyyz[k] * tbe_0 * tke_0;
+            to_x_y_xyy_yyyz[k] =
+                3.0 * to_yy_yyz[k] - 2.0 * to_yy_yyyyz[k] * tke_0 - 6.0 * to_xxyy_yyz[k] * tbe_0 + 4.0 * to_xxyy_yyyyz[k] * tbe_0 * tke_0;
 
-            to_x_y_xyy_yyzz[k] = 2.0 * to_yy_yzz[k] - 2.0 * to_yy_yyyzz[k] * tke_0 - 4.0 * to_xxyy_yzz[k] * tbe_0 + 4.0 * to_xxyy_yyyzz[k] * tbe_0 * tke_0;
+            to_x_y_xyy_yyzz[k] =
+                2.0 * to_yy_yzz[k] - 2.0 * to_yy_yyyzz[k] * tke_0 - 4.0 * to_xxyy_yzz[k] * tbe_0 + 4.0 * to_xxyy_yyyzz[k] * tbe_0 * tke_0;
 
             to_x_y_xyy_yzzz[k] = to_yy_zzz[k] - 2.0 * to_yy_yyzzz[k] * tke_0 - 2.0 * to_xxyy_zzz[k] * tbe_0 + 4.0 * to_xxyy_yyzzz[k] * tbe_0 * tke_0;
 
@@ -2343,7 +3237,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_y_xyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 1 * op_comps * 150 + i * 150 + 74);
 
-        #pragma omp simd aligned(to_x_y_xyz_xxxx, to_x_y_xyz_xxxy, to_x_y_xyz_xxxz, to_x_y_xyz_xxyy, to_x_y_xyz_xxyz, to_x_y_xyz_xxzz, to_x_y_xyz_xyyy, to_x_y_xyz_xyyz, to_x_y_xyz_xyzz, to_x_y_xyz_xzzz, to_x_y_xyz_yyyy, to_x_y_xyz_yyyz, to_x_y_xyz_yyzz, to_x_y_xyz_yzzz, to_x_y_xyz_zzzz, to_xxyz_xxx, to_xxyz_xxxxy, to_xxyz_xxxyy, to_xxyz_xxxyz, to_xxyz_xxy, to_xxyz_xxyyy, to_xxyz_xxyyz, to_xxyz_xxyzz, to_xxyz_xxz, to_xxyz_xyy, to_xxyz_xyyyy, to_xxyz_xyyyz, to_xxyz_xyyzz, to_xxyz_xyz, to_xxyz_xyzzz, to_xxyz_xzz, to_xxyz_yyy, to_xxyz_yyyyy, to_xxyz_yyyyz, to_xxyz_yyyzz, to_xxyz_yyz, to_xxyz_yyzzz, to_xxyz_yzz, to_xxyz_yzzzz, to_xxyz_zzz, to_yz_xxx, to_yz_xxxxy, to_yz_xxxyy, to_yz_xxxyz, to_yz_xxy, to_yz_xxyyy, to_yz_xxyyz, to_yz_xxyzz, to_yz_xxz, to_yz_xyy, to_yz_xyyyy, to_yz_xyyyz, to_yz_xyyzz, to_yz_xyz, to_yz_xyzzz, to_yz_xzz, to_yz_yyy, to_yz_yyyyy, to_yz_yyyyz, to_yz_yyyzz, to_yz_yyz, to_yz_yyzzz, to_yz_yzz, to_yz_yzzzz, to_yz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_y_xyz_xxxx,     \
+                             to_x_y_xyz_xxxy, \
+                             to_x_y_xyz_xxxz, \
+                             to_x_y_xyz_xxyy, \
+                             to_x_y_xyz_xxyz, \
+                             to_x_y_xyz_xxzz, \
+                             to_x_y_xyz_xyyy, \
+                             to_x_y_xyz_xyyz, \
+                             to_x_y_xyz_xyzz, \
+                             to_x_y_xyz_xzzz, \
+                             to_x_y_xyz_yyyy, \
+                             to_x_y_xyz_yyyz, \
+                             to_x_y_xyz_yyzz, \
+                             to_x_y_xyz_yzzz, \
+                             to_x_y_xyz_zzzz, \
+                             to_xxyz_xxx,     \
+                             to_xxyz_xxxxy,   \
+                             to_xxyz_xxxyy,   \
+                             to_xxyz_xxxyz,   \
+                             to_xxyz_xxy,     \
+                             to_xxyz_xxyyy,   \
+                             to_xxyz_xxyyz,   \
+                             to_xxyz_xxyzz,   \
+                             to_xxyz_xxz,     \
+                             to_xxyz_xyy,     \
+                             to_xxyz_xyyyy,   \
+                             to_xxyz_xyyyz,   \
+                             to_xxyz_xyyzz,   \
+                             to_xxyz_xyz,     \
+                             to_xxyz_xyzzz,   \
+                             to_xxyz_xzz,     \
+                             to_xxyz_yyy,     \
+                             to_xxyz_yyyyy,   \
+                             to_xxyz_yyyyz,   \
+                             to_xxyz_yyyzz,   \
+                             to_xxyz_yyz,     \
+                             to_xxyz_yyzzz,   \
+                             to_xxyz_yzz,     \
+                             to_xxyz_yzzzz,   \
+                             to_xxyz_zzz,     \
+                             to_yz_xxx,       \
+                             to_yz_xxxxy,     \
+                             to_yz_xxxyy,     \
+                             to_yz_xxxyz,     \
+                             to_yz_xxy,       \
+                             to_yz_xxyyy,     \
+                             to_yz_xxyyz,     \
+                             to_yz_xxyzz,     \
+                             to_yz_xxz,       \
+                             to_yz_xyy,       \
+                             to_yz_xyyyy,     \
+                             to_yz_xyyyz,     \
+                             to_yz_xyyzz,     \
+                             to_yz_xyz,       \
+                             to_yz_xyzzz,     \
+                             to_yz_xzz,       \
+                             to_yz_yyy,       \
+                             to_yz_yyyyy,     \
+                             to_yz_yyyyz,     \
+                             to_yz_yyyzz,     \
+                             to_yz_yyz,       \
+                             to_yz_yyzzz,     \
+                             to_yz_yzz,       \
+                             to_yz_yzzzz,     \
+                             to_yz_zzz,       \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -2356,25 +3315,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_x_y_xyz_xxxz[k] = -2.0 * to_yz_xxxyz[k] * tke_0 + 4.0 * to_xxyz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_x_y_xyz_xxyy[k] = 2.0 * to_yz_xxy[k] - 2.0 * to_yz_xxyyy[k] * tke_0 - 4.0 * to_xxyz_xxy[k] * tbe_0 + 4.0 * to_xxyz_xxyyy[k] * tbe_0 * tke_0;
+            to_x_y_xyz_xxyy[k] =
+                2.0 * to_yz_xxy[k] - 2.0 * to_yz_xxyyy[k] * tke_0 - 4.0 * to_xxyz_xxy[k] * tbe_0 + 4.0 * to_xxyz_xxyyy[k] * tbe_0 * tke_0;
 
             to_x_y_xyz_xxyz[k] = to_yz_xxz[k] - 2.0 * to_yz_xxyyz[k] * tke_0 - 2.0 * to_xxyz_xxz[k] * tbe_0 + 4.0 * to_xxyz_xxyyz[k] * tbe_0 * tke_0;
 
             to_x_y_xyz_xxzz[k] = -2.0 * to_yz_xxyzz[k] * tke_0 + 4.0 * to_xxyz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_x_y_xyz_xyyy[k] = 3.0 * to_yz_xyy[k] - 2.0 * to_yz_xyyyy[k] * tke_0 - 6.0 * to_xxyz_xyy[k] * tbe_0 + 4.0 * to_xxyz_xyyyy[k] * tbe_0 * tke_0;
+            to_x_y_xyz_xyyy[k] =
+                3.0 * to_yz_xyy[k] - 2.0 * to_yz_xyyyy[k] * tke_0 - 6.0 * to_xxyz_xyy[k] * tbe_0 + 4.0 * to_xxyz_xyyyy[k] * tbe_0 * tke_0;
 
-            to_x_y_xyz_xyyz[k] = 2.0 * to_yz_xyz[k] - 2.0 * to_yz_xyyyz[k] * tke_0 - 4.0 * to_xxyz_xyz[k] * tbe_0 + 4.0 * to_xxyz_xyyyz[k] * tbe_0 * tke_0;
+            to_x_y_xyz_xyyz[k] =
+                2.0 * to_yz_xyz[k] - 2.0 * to_yz_xyyyz[k] * tke_0 - 4.0 * to_xxyz_xyz[k] * tbe_0 + 4.0 * to_xxyz_xyyyz[k] * tbe_0 * tke_0;
 
             to_x_y_xyz_xyzz[k] = to_yz_xzz[k] - 2.0 * to_yz_xyyzz[k] * tke_0 - 2.0 * to_xxyz_xzz[k] * tbe_0 + 4.0 * to_xxyz_xyyzz[k] * tbe_0 * tke_0;
 
             to_x_y_xyz_xzzz[k] = -2.0 * to_yz_xyzzz[k] * tke_0 + 4.0 * to_xxyz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_x_y_xyz_yyyy[k] = 4.0 * to_yz_yyy[k] - 2.0 * to_yz_yyyyy[k] * tke_0 - 8.0 * to_xxyz_yyy[k] * tbe_0 + 4.0 * to_xxyz_yyyyy[k] * tbe_0 * tke_0;
+            to_x_y_xyz_yyyy[k] =
+                4.0 * to_yz_yyy[k] - 2.0 * to_yz_yyyyy[k] * tke_0 - 8.0 * to_xxyz_yyy[k] * tbe_0 + 4.0 * to_xxyz_yyyyy[k] * tbe_0 * tke_0;
 
-            to_x_y_xyz_yyyz[k] = 3.0 * to_yz_yyz[k] - 2.0 * to_yz_yyyyz[k] * tke_0 - 6.0 * to_xxyz_yyz[k] * tbe_0 + 4.0 * to_xxyz_yyyyz[k] * tbe_0 * tke_0;
+            to_x_y_xyz_yyyz[k] =
+                3.0 * to_yz_yyz[k] - 2.0 * to_yz_yyyyz[k] * tke_0 - 6.0 * to_xxyz_yyz[k] * tbe_0 + 4.0 * to_xxyz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_x_y_xyz_yyzz[k] = 2.0 * to_yz_yzz[k] - 2.0 * to_yz_yyyzz[k] * tke_0 - 4.0 * to_xxyz_yzz[k] * tbe_0 + 4.0 * to_xxyz_yyyzz[k] * tbe_0 * tke_0;
+            to_x_y_xyz_yyzz[k] =
+                2.0 * to_yz_yzz[k] - 2.0 * to_yz_yyyzz[k] * tke_0 - 4.0 * to_xxyz_yzz[k] * tbe_0 + 4.0 * to_xxyz_yyyzz[k] * tbe_0 * tke_0;
 
             to_x_y_xyz_yzzz[k] = to_yz_zzz[k] - 2.0 * to_yz_yyzzz[k] * tke_0 - 2.0 * to_xxyz_zzz[k] * tbe_0 + 4.0 * to_xxyz_yyzzz[k] * tbe_0 * tke_0;
 
@@ -2413,7 +3378,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_y_xzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 1 * op_comps * 150 + i * 150 + 89);
 
-        #pragma omp simd aligned(to_x_y_xzz_xxxx, to_x_y_xzz_xxxy, to_x_y_xzz_xxxz, to_x_y_xzz_xxyy, to_x_y_xzz_xxyz, to_x_y_xzz_xxzz, to_x_y_xzz_xyyy, to_x_y_xzz_xyyz, to_x_y_xzz_xyzz, to_x_y_xzz_xzzz, to_x_y_xzz_yyyy, to_x_y_xzz_yyyz, to_x_y_xzz_yyzz, to_x_y_xzz_yzzz, to_x_y_xzz_zzzz, to_xxzz_xxx, to_xxzz_xxxxy, to_xxzz_xxxyy, to_xxzz_xxxyz, to_xxzz_xxy, to_xxzz_xxyyy, to_xxzz_xxyyz, to_xxzz_xxyzz, to_xxzz_xxz, to_xxzz_xyy, to_xxzz_xyyyy, to_xxzz_xyyyz, to_xxzz_xyyzz, to_xxzz_xyz, to_xxzz_xyzzz, to_xxzz_xzz, to_xxzz_yyy, to_xxzz_yyyyy, to_xxzz_yyyyz, to_xxzz_yyyzz, to_xxzz_yyz, to_xxzz_yyzzz, to_xxzz_yzz, to_xxzz_yzzzz, to_xxzz_zzz, to_zz_xxx, to_zz_xxxxy, to_zz_xxxyy, to_zz_xxxyz, to_zz_xxy, to_zz_xxyyy, to_zz_xxyyz, to_zz_xxyzz, to_zz_xxz, to_zz_xyy, to_zz_xyyyy, to_zz_xyyyz, to_zz_xyyzz, to_zz_xyz, to_zz_xyzzz, to_zz_xzz, to_zz_yyy, to_zz_yyyyy, to_zz_yyyyz, to_zz_yyyzz, to_zz_yyz, to_zz_yyzzz, to_zz_yzz, to_zz_yzzzz, to_zz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_y_xzz_xxxx,     \
+                             to_x_y_xzz_xxxy, \
+                             to_x_y_xzz_xxxz, \
+                             to_x_y_xzz_xxyy, \
+                             to_x_y_xzz_xxyz, \
+                             to_x_y_xzz_xxzz, \
+                             to_x_y_xzz_xyyy, \
+                             to_x_y_xzz_xyyz, \
+                             to_x_y_xzz_xyzz, \
+                             to_x_y_xzz_xzzz, \
+                             to_x_y_xzz_yyyy, \
+                             to_x_y_xzz_yyyz, \
+                             to_x_y_xzz_yyzz, \
+                             to_x_y_xzz_yzzz, \
+                             to_x_y_xzz_zzzz, \
+                             to_xxzz_xxx,     \
+                             to_xxzz_xxxxy,   \
+                             to_xxzz_xxxyy,   \
+                             to_xxzz_xxxyz,   \
+                             to_xxzz_xxy,     \
+                             to_xxzz_xxyyy,   \
+                             to_xxzz_xxyyz,   \
+                             to_xxzz_xxyzz,   \
+                             to_xxzz_xxz,     \
+                             to_xxzz_xyy,     \
+                             to_xxzz_xyyyy,   \
+                             to_xxzz_xyyyz,   \
+                             to_xxzz_xyyzz,   \
+                             to_xxzz_xyz,     \
+                             to_xxzz_xyzzz,   \
+                             to_xxzz_xzz,     \
+                             to_xxzz_yyy,     \
+                             to_xxzz_yyyyy,   \
+                             to_xxzz_yyyyz,   \
+                             to_xxzz_yyyzz,   \
+                             to_xxzz_yyz,     \
+                             to_xxzz_yyzzz,   \
+                             to_xxzz_yzz,     \
+                             to_xxzz_yzzzz,   \
+                             to_xxzz_zzz,     \
+                             to_zz_xxx,       \
+                             to_zz_xxxxy,     \
+                             to_zz_xxxyy,     \
+                             to_zz_xxxyz,     \
+                             to_zz_xxy,       \
+                             to_zz_xxyyy,     \
+                             to_zz_xxyyz,     \
+                             to_zz_xxyzz,     \
+                             to_zz_xxz,       \
+                             to_zz_xyy,       \
+                             to_zz_xyyyy,     \
+                             to_zz_xyyyz,     \
+                             to_zz_xyyzz,     \
+                             to_zz_xyz,       \
+                             to_zz_xyzzz,     \
+                             to_zz_xzz,       \
+                             to_zz_yyy,       \
+                             to_zz_yyyyy,     \
+                             to_zz_yyyyz,     \
+                             to_zz_yyyzz,     \
+                             to_zz_yyz,       \
+                             to_zz_yyzzz,     \
+                             to_zz_yzz,       \
+                             to_zz_yzzzz,     \
+                             to_zz_zzz,       \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -2426,25 +3456,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_x_y_xzz_xxxz[k] = -2.0 * to_zz_xxxyz[k] * tke_0 + 4.0 * to_xxzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_x_y_xzz_xxyy[k] = 2.0 * to_zz_xxy[k] - 2.0 * to_zz_xxyyy[k] * tke_0 - 4.0 * to_xxzz_xxy[k] * tbe_0 + 4.0 * to_xxzz_xxyyy[k] * tbe_0 * tke_0;
+            to_x_y_xzz_xxyy[k] =
+                2.0 * to_zz_xxy[k] - 2.0 * to_zz_xxyyy[k] * tke_0 - 4.0 * to_xxzz_xxy[k] * tbe_0 + 4.0 * to_xxzz_xxyyy[k] * tbe_0 * tke_0;
 
             to_x_y_xzz_xxyz[k] = to_zz_xxz[k] - 2.0 * to_zz_xxyyz[k] * tke_0 - 2.0 * to_xxzz_xxz[k] * tbe_0 + 4.0 * to_xxzz_xxyyz[k] * tbe_0 * tke_0;
 
             to_x_y_xzz_xxzz[k] = -2.0 * to_zz_xxyzz[k] * tke_0 + 4.0 * to_xxzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_x_y_xzz_xyyy[k] = 3.0 * to_zz_xyy[k] - 2.0 * to_zz_xyyyy[k] * tke_0 - 6.0 * to_xxzz_xyy[k] * tbe_0 + 4.0 * to_xxzz_xyyyy[k] * tbe_0 * tke_0;
+            to_x_y_xzz_xyyy[k] =
+                3.0 * to_zz_xyy[k] - 2.0 * to_zz_xyyyy[k] * tke_0 - 6.0 * to_xxzz_xyy[k] * tbe_0 + 4.0 * to_xxzz_xyyyy[k] * tbe_0 * tke_0;
 
-            to_x_y_xzz_xyyz[k] = 2.0 * to_zz_xyz[k] - 2.0 * to_zz_xyyyz[k] * tke_0 - 4.0 * to_xxzz_xyz[k] * tbe_0 + 4.0 * to_xxzz_xyyyz[k] * tbe_0 * tke_0;
+            to_x_y_xzz_xyyz[k] =
+                2.0 * to_zz_xyz[k] - 2.0 * to_zz_xyyyz[k] * tke_0 - 4.0 * to_xxzz_xyz[k] * tbe_0 + 4.0 * to_xxzz_xyyyz[k] * tbe_0 * tke_0;
 
             to_x_y_xzz_xyzz[k] = to_zz_xzz[k] - 2.0 * to_zz_xyyzz[k] * tke_0 - 2.0 * to_xxzz_xzz[k] * tbe_0 + 4.0 * to_xxzz_xyyzz[k] * tbe_0 * tke_0;
 
             to_x_y_xzz_xzzz[k] = -2.0 * to_zz_xyzzz[k] * tke_0 + 4.0 * to_xxzz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_x_y_xzz_yyyy[k] = 4.0 * to_zz_yyy[k] - 2.0 * to_zz_yyyyy[k] * tke_0 - 8.0 * to_xxzz_yyy[k] * tbe_0 + 4.0 * to_xxzz_yyyyy[k] * tbe_0 * tke_0;
+            to_x_y_xzz_yyyy[k] =
+                4.0 * to_zz_yyy[k] - 2.0 * to_zz_yyyyy[k] * tke_0 - 8.0 * to_xxzz_yyy[k] * tbe_0 + 4.0 * to_xxzz_yyyyy[k] * tbe_0 * tke_0;
 
-            to_x_y_xzz_yyyz[k] = 3.0 * to_zz_yyz[k] - 2.0 * to_zz_yyyyz[k] * tke_0 - 6.0 * to_xxzz_yyz[k] * tbe_0 + 4.0 * to_xxzz_yyyyz[k] * tbe_0 * tke_0;
+            to_x_y_xzz_yyyz[k] =
+                3.0 * to_zz_yyz[k] - 2.0 * to_zz_yyyyz[k] * tke_0 - 6.0 * to_xxzz_yyz[k] * tbe_0 + 4.0 * to_xxzz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_x_y_xzz_yyzz[k] = 2.0 * to_zz_yzz[k] - 2.0 * to_zz_yyyzz[k] * tke_0 - 4.0 * to_xxzz_yzz[k] * tbe_0 + 4.0 * to_xxzz_yyyzz[k] * tbe_0 * tke_0;
+            to_x_y_xzz_yyzz[k] =
+                2.0 * to_zz_yzz[k] - 2.0 * to_zz_yyyzz[k] * tke_0 - 4.0 * to_xxzz_yzz[k] * tbe_0 + 4.0 * to_xxzz_yyyzz[k] * tbe_0 * tke_0;
 
             to_x_y_xzz_yzzz[k] = to_zz_zzz[k] - 2.0 * to_zz_yyzzz[k] * tke_0 - 2.0 * to_xxzz_zzz[k] * tbe_0 + 4.0 * to_xxzz_yyzzz[k] * tbe_0 * tke_0;
 
@@ -2483,7 +3519,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_y_yyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 1 * op_comps * 150 + i * 150 + 104);
 
-        #pragma omp simd aligned(to_x_y_yyy_xxxx, to_x_y_yyy_xxxy, to_x_y_yyy_xxxz, to_x_y_yyy_xxyy, to_x_y_yyy_xxyz, to_x_y_yyy_xxzz, to_x_y_yyy_xyyy, to_x_y_yyy_xyyz, to_x_y_yyy_xyzz, to_x_y_yyy_xzzz, to_x_y_yyy_yyyy, to_x_y_yyy_yyyz, to_x_y_yyy_yyzz, to_x_y_yyy_yzzz, to_x_y_yyy_zzzz, to_xyyy_xxx, to_xyyy_xxxxy, to_xyyy_xxxyy, to_xyyy_xxxyz, to_xyyy_xxy, to_xyyy_xxyyy, to_xyyy_xxyyz, to_xyyy_xxyzz, to_xyyy_xxz, to_xyyy_xyy, to_xyyy_xyyyy, to_xyyy_xyyyz, to_xyyy_xyyzz, to_xyyy_xyz, to_xyyy_xyzzz, to_xyyy_xzz, to_xyyy_yyy, to_xyyy_yyyyy, to_xyyy_yyyyz, to_xyyy_yyyzz, to_xyyy_yyz, to_xyyy_yyzzz, to_xyyy_yzz, to_xyyy_yzzzz, to_xyyy_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_y_yyy_xxxx,     \
+                             to_x_y_yyy_xxxy, \
+                             to_x_y_yyy_xxxz, \
+                             to_x_y_yyy_xxyy, \
+                             to_x_y_yyy_xxyz, \
+                             to_x_y_yyy_xxzz, \
+                             to_x_y_yyy_xyyy, \
+                             to_x_y_yyy_xyyz, \
+                             to_x_y_yyy_xyzz, \
+                             to_x_y_yyy_xzzz, \
+                             to_x_y_yyy_yyyy, \
+                             to_x_y_yyy_yyyz, \
+                             to_x_y_yyy_yyzz, \
+                             to_x_y_yyy_yzzz, \
+                             to_x_y_yyy_zzzz, \
+                             to_xyyy_xxx,     \
+                             to_xyyy_xxxxy,   \
+                             to_xyyy_xxxyy,   \
+                             to_xyyy_xxxyz,   \
+                             to_xyyy_xxy,     \
+                             to_xyyy_xxyyy,   \
+                             to_xyyy_xxyyz,   \
+                             to_xyyy_xxyzz,   \
+                             to_xyyy_xxz,     \
+                             to_xyyy_xyy,     \
+                             to_xyyy_xyyyy,   \
+                             to_xyyy_xyyyz,   \
+                             to_xyyy_xyyzz,   \
+                             to_xyyy_xyz,     \
+                             to_xyyy_xyzzz,   \
+                             to_xyyy_xzz,     \
+                             to_xyyy_yyy,     \
+                             to_xyyy_yyyyy,   \
+                             to_xyyy_yyyyz,   \
+                             to_xyyy_yyyzz,   \
+                             to_xyyy_yyz,     \
+                             to_xyyy_yyzzz,   \
+                             to_xyyy_yzz,     \
+                             to_xyyy_yzzzz,   \
+                             to_xyyy_zzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -2553,7 +3629,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_y_yyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 1 * op_comps * 150 + i * 150 + 119);
 
-        #pragma omp simd aligned(to_x_y_yyz_xxxx, to_x_y_yyz_xxxy, to_x_y_yyz_xxxz, to_x_y_yyz_xxyy, to_x_y_yyz_xxyz, to_x_y_yyz_xxzz, to_x_y_yyz_xyyy, to_x_y_yyz_xyyz, to_x_y_yyz_xyzz, to_x_y_yyz_xzzz, to_x_y_yyz_yyyy, to_x_y_yyz_yyyz, to_x_y_yyz_yyzz, to_x_y_yyz_yzzz, to_x_y_yyz_zzzz, to_xyyz_xxx, to_xyyz_xxxxy, to_xyyz_xxxyy, to_xyyz_xxxyz, to_xyyz_xxy, to_xyyz_xxyyy, to_xyyz_xxyyz, to_xyyz_xxyzz, to_xyyz_xxz, to_xyyz_xyy, to_xyyz_xyyyy, to_xyyz_xyyyz, to_xyyz_xyyzz, to_xyyz_xyz, to_xyyz_xyzzz, to_xyyz_xzz, to_xyyz_yyy, to_xyyz_yyyyy, to_xyyz_yyyyz, to_xyyz_yyyzz, to_xyyz_yyz, to_xyyz_yyzzz, to_xyyz_yzz, to_xyyz_yzzzz, to_xyyz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_y_yyz_xxxx,     \
+                             to_x_y_yyz_xxxy, \
+                             to_x_y_yyz_xxxz, \
+                             to_x_y_yyz_xxyy, \
+                             to_x_y_yyz_xxyz, \
+                             to_x_y_yyz_xxzz, \
+                             to_x_y_yyz_xyyy, \
+                             to_x_y_yyz_xyyz, \
+                             to_x_y_yyz_xyzz, \
+                             to_x_y_yyz_xzzz, \
+                             to_x_y_yyz_yyyy, \
+                             to_x_y_yyz_yyyz, \
+                             to_x_y_yyz_yyzz, \
+                             to_x_y_yyz_yzzz, \
+                             to_x_y_yyz_zzzz, \
+                             to_xyyz_xxx,     \
+                             to_xyyz_xxxxy,   \
+                             to_xyyz_xxxyy,   \
+                             to_xyyz_xxxyz,   \
+                             to_xyyz_xxy,     \
+                             to_xyyz_xxyyy,   \
+                             to_xyyz_xxyyz,   \
+                             to_xyyz_xxyzz,   \
+                             to_xyyz_xxz,     \
+                             to_xyyz_xyy,     \
+                             to_xyyz_xyyyy,   \
+                             to_xyyz_xyyyz,   \
+                             to_xyyz_xyyzz,   \
+                             to_xyyz_xyz,     \
+                             to_xyyz_xyzzz,   \
+                             to_xyyz_xzz,     \
+                             to_xyyz_yyy,     \
+                             to_xyyz_yyyyy,   \
+                             to_xyyz_yyyyz,   \
+                             to_xyyz_yyyzz,   \
+                             to_xyyz_yyz,     \
+                             to_xyyz_yyzzz,   \
+                             to_xyyz_yzz,     \
+                             to_xyyz_yzzzz,   \
+                             to_xyyz_zzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -2623,7 +3739,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_y_yzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 1 * op_comps * 150 + i * 150 + 134);
 
-        #pragma omp simd aligned(to_x_y_yzz_xxxx, to_x_y_yzz_xxxy, to_x_y_yzz_xxxz, to_x_y_yzz_xxyy, to_x_y_yzz_xxyz, to_x_y_yzz_xxzz, to_x_y_yzz_xyyy, to_x_y_yzz_xyyz, to_x_y_yzz_xyzz, to_x_y_yzz_xzzz, to_x_y_yzz_yyyy, to_x_y_yzz_yyyz, to_x_y_yzz_yyzz, to_x_y_yzz_yzzz, to_x_y_yzz_zzzz, to_xyzz_xxx, to_xyzz_xxxxy, to_xyzz_xxxyy, to_xyzz_xxxyz, to_xyzz_xxy, to_xyzz_xxyyy, to_xyzz_xxyyz, to_xyzz_xxyzz, to_xyzz_xxz, to_xyzz_xyy, to_xyzz_xyyyy, to_xyzz_xyyyz, to_xyzz_xyyzz, to_xyzz_xyz, to_xyzz_xyzzz, to_xyzz_xzz, to_xyzz_yyy, to_xyzz_yyyyy, to_xyzz_yyyyz, to_xyzz_yyyzz, to_xyzz_yyz, to_xyzz_yyzzz, to_xyzz_yzz, to_xyzz_yzzzz, to_xyzz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_y_yzz_xxxx,     \
+                             to_x_y_yzz_xxxy, \
+                             to_x_y_yzz_xxxz, \
+                             to_x_y_yzz_xxyy, \
+                             to_x_y_yzz_xxyz, \
+                             to_x_y_yzz_xxzz, \
+                             to_x_y_yzz_xyyy, \
+                             to_x_y_yzz_xyyz, \
+                             to_x_y_yzz_xyzz, \
+                             to_x_y_yzz_xzzz, \
+                             to_x_y_yzz_yyyy, \
+                             to_x_y_yzz_yyyz, \
+                             to_x_y_yzz_yyzz, \
+                             to_x_y_yzz_yzzz, \
+                             to_x_y_yzz_zzzz, \
+                             to_xyzz_xxx,     \
+                             to_xyzz_xxxxy,   \
+                             to_xyzz_xxxyy,   \
+                             to_xyzz_xxxyz,   \
+                             to_xyzz_xxy,     \
+                             to_xyzz_xxyyy,   \
+                             to_xyzz_xxyyz,   \
+                             to_xyzz_xxyzz,   \
+                             to_xyzz_xxz,     \
+                             to_xyzz_xyy,     \
+                             to_xyzz_xyyyy,   \
+                             to_xyzz_xyyyz,   \
+                             to_xyzz_xyyzz,   \
+                             to_xyzz_xyz,     \
+                             to_xyzz_xyzzz,   \
+                             to_xyzz_xzz,     \
+                             to_xyzz_yyy,     \
+                             to_xyzz_yyyyy,   \
+                             to_xyzz_yyyyz,   \
+                             to_xyzz_yyyzz,   \
+                             to_xyzz_yyz,     \
+                             to_xyzz_yyzzz,   \
+                             to_xyzz_yzz,     \
+                             to_xyzz_yzzzz,   \
+                             to_xyzz_zzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -2693,7 +3849,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_y_zzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 1 * op_comps * 150 + i * 150 + 149);
 
-        #pragma omp simd aligned(to_x_y_zzz_xxxx, to_x_y_zzz_xxxy, to_x_y_zzz_xxxz, to_x_y_zzz_xxyy, to_x_y_zzz_xxyz, to_x_y_zzz_xxzz, to_x_y_zzz_xyyy, to_x_y_zzz_xyyz, to_x_y_zzz_xyzz, to_x_y_zzz_xzzz, to_x_y_zzz_yyyy, to_x_y_zzz_yyyz, to_x_y_zzz_yyzz, to_x_y_zzz_yzzz, to_x_y_zzz_zzzz, to_xzzz_xxx, to_xzzz_xxxxy, to_xzzz_xxxyy, to_xzzz_xxxyz, to_xzzz_xxy, to_xzzz_xxyyy, to_xzzz_xxyyz, to_xzzz_xxyzz, to_xzzz_xxz, to_xzzz_xyy, to_xzzz_xyyyy, to_xzzz_xyyyz, to_xzzz_xyyzz, to_xzzz_xyz, to_xzzz_xyzzz, to_xzzz_xzz, to_xzzz_yyy, to_xzzz_yyyyy, to_xzzz_yyyyz, to_xzzz_yyyzz, to_xzzz_yyz, to_xzzz_yyzzz, to_xzzz_yzz, to_xzzz_yzzzz, to_xzzz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_x_y_zzz_xxxx,     \
+                             to_x_y_zzz_xxxy, \
+                             to_x_y_zzz_xxxz, \
+                             to_x_y_zzz_xxyy, \
+                             to_x_y_zzz_xxyz, \
+                             to_x_y_zzz_xxzz, \
+                             to_x_y_zzz_xyyy, \
+                             to_x_y_zzz_xyyz, \
+                             to_x_y_zzz_xyzz, \
+                             to_x_y_zzz_xzzz, \
+                             to_x_y_zzz_yyyy, \
+                             to_x_y_zzz_yyyz, \
+                             to_x_y_zzz_yyzz, \
+                             to_x_y_zzz_yzzz, \
+                             to_x_y_zzz_zzzz, \
+                             to_xzzz_xxx,     \
+                             to_xzzz_xxxxy,   \
+                             to_xzzz_xxxyy,   \
+                             to_xzzz_xxxyz,   \
+                             to_xzzz_xxy,     \
+                             to_xzzz_xxyyy,   \
+                             to_xzzz_xxyyz,   \
+                             to_xzzz_xxyzz,   \
+                             to_xzzz_xxz,     \
+                             to_xzzz_xyy,     \
+                             to_xzzz_xyyyy,   \
+                             to_xzzz_xyyyz,   \
+                             to_xzzz_xyyzz,   \
+                             to_xzzz_xyz,     \
+                             to_xzzz_xyzzz,   \
+                             to_xzzz_xzz,     \
+                             to_xzzz_yyy,     \
+                             to_xzzz_yyyyy,   \
+                             to_xzzz_yyyyz,   \
+                             to_xzzz_yyyzz,   \
+                             to_xzzz_yyz,     \
+                             to_xzzz_yyzzz,   \
+                             to_xzzz_yzz,     \
+                             to_xzzz_yzzzz,   \
+                             to_xzzz_zzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -2763,7 +3959,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_z_xxx_zzzz = pbuffer.data(idx_op_geom_101_fg + 2 * op_comps * 150 + i * 150 + 14);
 
-        #pragma omp simd aligned(to_x_z_xxx_xxxx, to_x_z_xxx_xxxy, to_x_z_xxx_xxxz, to_x_z_xxx_xxyy, to_x_z_xxx_xxyz, to_x_z_xxx_xxzz, to_x_z_xxx_xyyy, to_x_z_xxx_xyyz, to_x_z_xxx_xyzz, to_x_z_xxx_xzzz, to_x_z_xxx_yyyy, to_x_z_xxx_yyyz, to_x_z_xxx_yyzz, to_x_z_xxx_yzzz, to_x_z_xxx_zzzz, to_xx_xxx, to_xx_xxxxz, to_xx_xxxyz, to_xx_xxxzz, to_xx_xxy, to_xx_xxyyz, to_xx_xxyzz, to_xx_xxz, to_xx_xxzzz, to_xx_xyy, to_xx_xyyyz, to_xx_xyyzz, to_xx_xyz, to_xx_xyzzz, to_xx_xzz, to_xx_xzzzz, to_xx_yyy, to_xx_yyyyz, to_xx_yyyzz, to_xx_yyz, to_xx_yyzzz, to_xx_yzz, to_xx_yzzzz, to_xx_zzz, to_xx_zzzzz, to_xxxx_xxx, to_xxxx_xxxxz, to_xxxx_xxxyz, to_xxxx_xxxzz, to_xxxx_xxy, to_xxxx_xxyyz, to_xxxx_xxyzz, to_xxxx_xxz, to_xxxx_xxzzz, to_xxxx_xyy, to_xxxx_xyyyz, to_xxxx_xyyzz, to_xxxx_xyz, to_xxxx_xyzzz, to_xxxx_xzz, to_xxxx_xzzzz, to_xxxx_yyy, to_xxxx_yyyyz, to_xxxx_yyyzz, to_xxxx_yyz, to_xxxx_yyzzz, to_xxxx_yzz, to_xxxx_yzzzz, to_xxxx_zzz, to_xxxx_zzzzz, b_exps : 64)
+#pragma omp simd aligned(to_x_z_xxx_xxxx,     \
+                             to_x_z_xxx_xxxy, \
+                             to_x_z_xxx_xxxz, \
+                             to_x_z_xxx_xxyy, \
+                             to_x_z_xxx_xxyz, \
+                             to_x_z_xxx_xxzz, \
+                             to_x_z_xxx_xyyy, \
+                             to_x_z_xxx_xyyz, \
+                             to_x_z_xxx_xyzz, \
+                             to_x_z_xxx_xzzz, \
+                             to_x_z_xxx_yyyy, \
+                             to_x_z_xxx_yyyz, \
+                             to_x_z_xxx_yyzz, \
+                             to_x_z_xxx_yzzz, \
+                             to_x_z_xxx_zzzz, \
+                             to_xx_xxx,       \
+                             to_xx_xxxxz,     \
+                             to_xx_xxxyz,     \
+                             to_xx_xxxzz,     \
+                             to_xx_xxy,       \
+                             to_xx_xxyyz,     \
+                             to_xx_xxyzz,     \
+                             to_xx_xxz,       \
+                             to_xx_xxzzz,     \
+                             to_xx_xyy,       \
+                             to_xx_xyyyz,     \
+                             to_xx_xyyzz,     \
+                             to_xx_xyz,       \
+                             to_xx_xyzzz,     \
+                             to_xx_xzz,       \
+                             to_xx_xzzzz,     \
+                             to_xx_yyy,       \
+                             to_xx_yyyyz,     \
+                             to_xx_yyyzz,     \
+                             to_xx_yyz,       \
+                             to_xx_yyzzz,     \
+                             to_xx_yzz,       \
+                             to_xx_yzzzz,     \
+                             to_xx_zzz,       \
+                             to_xx_zzzzz,     \
+                             to_xxxx_xxx,     \
+                             to_xxxx_xxxxz,   \
+                             to_xxxx_xxxyz,   \
+                             to_xxxx_xxxzz,   \
+                             to_xxxx_xxy,     \
+                             to_xxxx_xxyyz,   \
+                             to_xxxx_xxyzz,   \
+                             to_xxxx_xxz,     \
+                             to_xxxx_xxzzz,   \
+                             to_xxxx_xyy,     \
+                             to_xxxx_xyyyz,   \
+                             to_xxxx_xyyzz,   \
+                             to_xxxx_xyz,     \
+                             to_xxxx_xyzzz,   \
+                             to_xxxx_xzz,     \
+                             to_xxxx_xzzzz,   \
+                             to_xxxx_yyy,     \
+                             to_xxxx_yyyyz,   \
+                             to_xxxx_yyyzz,   \
+                             to_xxxx_yyz,     \
+                             to_xxxx_yyzzz,   \
+                             to_xxxx_yzz,     \
+                             to_xxxx_yzzzz,   \
+                             to_xxxx_zzz,     \
+                             to_xxxx_zzzzz,   \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -2774,31 +4035,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_x_z_xxx_xxxy[k] = -6.0 * to_xx_xxxyz[k] * tke_0 + 4.0 * to_xxxx_xxxyz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxx_xxxz[k] = 3.0 * to_xx_xxx[k] - 6.0 * to_xx_xxxzz[k] * tke_0 - 2.0 * to_xxxx_xxx[k] * tbe_0 + 4.0 * to_xxxx_xxxzz[k] * tbe_0 * tke_0;
+            to_x_z_xxx_xxxz[k] =
+                3.0 * to_xx_xxx[k] - 6.0 * to_xx_xxxzz[k] * tke_0 - 2.0 * to_xxxx_xxx[k] * tbe_0 + 4.0 * to_xxxx_xxxzz[k] * tbe_0 * tke_0;
 
             to_x_z_xxx_xxyy[k] = -6.0 * to_xx_xxyyz[k] * tke_0 + 4.0 * to_xxxx_xxyyz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxx_xxyz[k] = 3.0 * to_xx_xxy[k] - 6.0 * to_xx_xxyzz[k] * tke_0 - 2.0 * to_xxxx_xxy[k] * tbe_0 + 4.0 * to_xxxx_xxyzz[k] * tbe_0 * tke_0;
+            to_x_z_xxx_xxyz[k] =
+                3.0 * to_xx_xxy[k] - 6.0 * to_xx_xxyzz[k] * tke_0 - 2.0 * to_xxxx_xxy[k] * tbe_0 + 4.0 * to_xxxx_xxyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxx_xxzz[k] = 6.0 * to_xx_xxz[k] - 6.0 * to_xx_xxzzz[k] * tke_0 - 4.0 * to_xxxx_xxz[k] * tbe_0 + 4.0 * to_xxxx_xxzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxx_xxzz[k] =
+                6.0 * to_xx_xxz[k] - 6.0 * to_xx_xxzzz[k] * tke_0 - 4.0 * to_xxxx_xxz[k] * tbe_0 + 4.0 * to_xxxx_xxzzz[k] * tbe_0 * tke_0;
 
             to_x_z_xxx_xyyy[k] = -6.0 * to_xx_xyyyz[k] * tke_0 + 4.0 * to_xxxx_xyyyz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxx_xyyz[k] = 3.0 * to_xx_xyy[k] - 6.0 * to_xx_xyyzz[k] * tke_0 - 2.0 * to_xxxx_xyy[k] * tbe_0 + 4.0 * to_xxxx_xyyzz[k] * tbe_0 * tke_0;
+            to_x_z_xxx_xyyz[k] =
+                3.0 * to_xx_xyy[k] - 6.0 * to_xx_xyyzz[k] * tke_0 - 2.0 * to_xxxx_xyy[k] * tbe_0 + 4.0 * to_xxxx_xyyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxx_xyzz[k] = 6.0 * to_xx_xyz[k] - 6.0 * to_xx_xyzzz[k] * tke_0 - 4.0 * to_xxxx_xyz[k] * tbe_0 + 4.0 * to_xxxx_xyzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxx_xyzz[k] =
+                6.0 * to_xx_xyz[k] - 6.0 * to_xx_xyzzz[k] * tke_0 - 4.0 * to_xxxx_xyz[k] * tbe_0 + 4.0 * to_xxxx_xyzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxx_xzzz[k] = 9.0 * to_xx_xzz[k] - 6.0 * to_xx_xzzzz[k] * tke_0 - 6.0 * to_xxxx_xzz[k] * tbe_0 + 4.0 * to_xxxx_xzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxx_xzzz[k] =
+                9.0 * to_xx_xzz[k] - 6.0 * to_xx_xzzzz[k] * tke_0 - 6.0 * to_xxxx_xzz[k] * tbe_0 + 4.0 * to_xxxx_xzzzz[k] * tbe_0 * tke_0;
 
             to_x_z_xxx_yyyy[k] = -6.0 * to_xx_yyyyz[k] * tke_0 + 4.0 * to_xxxx_yyyyz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxx_yyyz[k] = 3.0 * to_xx_yyy[k] - 6.0 * to_xx_yyyzz[k] * tke_0 - 2.0 * to_xxxx_yyy[k] * tbe_0 + 4.0 * to_xxxx_yyyzz[k] * tbe_0 * tke_0;
+            to_x_z_xxx_yyyz[k] =
+                3.0 * to_xx_yyy[k] - 6.0 * to_xx_yyyzz[k] * tke_0 - 2.0 * to_xxxx_yyy[k] * tbe_0 + 4.0 * to_xxxx_yyyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxx_yyzz[k] = 6.0 * to_xx_yyz[k] - 6.0 * to_xx_yyzzz[k] * tke_0 - 4.0 * to_xxxx_yyz[k] * tbe_0 + 4.0 * to_xxxx_yyzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxx_yyzz[k] =
+                6.0 * to_xx_yyz[k] - 6.0 * to_xx_yyzzz[k] * tke_0 - 4.0 * to_xxxx_yyz[k] * tbe_0 + 4.0 * to_xxxx_yyzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxx_yzzz[k] = 9.0 * to_xx_yzz[k] - 6.0 * to_xx_yzzzz[k] * tke_0 - 6.0 * to_xxxx_yzz[k] * tbe_0 + 4.0 * to_xxxx_yzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxx_yzzz[k] =
+                9.0 * to_xx_yzz[k] - 6.0 * to_xx_yzzzz[k] * tke_0 - 6.0 * to_xxxx_yzz[k] * tbe_0 + 4.0 * to_xxxx_yzzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxx_zzzz[k] = 12.0 * to_xx_zzz[k] - 6.0 * to_xx_zzzzz[k] * tke_0 - 8.0 * to_xxxx_zzz[k] * tbe_0 + 4.0 * to_xxxx_zzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxx_zzzz[k] =
+                12.0 * to_xx_zzz[k] - 6.0 * to_xx_zzzzz[k] * tke_0 - 8.0 * to_xxxx_zzz[k] * tbe_0 + 4.0 * to_xxxx_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 315-330 components of targeted buffer : FG
@@ -2833,7 +4104,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_z_xxy_zzzz = pbuffer.data(idx_op_geom_101_fg + 2 * op_comps * 150 + i * 150 + 29);
 
-        #pragma omp simd aligned(to_x_z_xxy_xxxx, to_x_z_xxy_xxxy, to_x_z_xxy_xxxz, to_x_z_xxy_xxyy, to_x_z_xxy_xxyz, to_x_z_xxy_xxzz, to_x_z_xxy_xyyy, to_x_z_xxy_xyyz, to_x_z_xxy_xyzz, to_x_z_xxy_xzzz, to_x_z_xxy_yyyy, to_x_z_xxy_yyyz, to_x_z_xxy_yyzz, to_x_z_xxy_yzzz, to_x_z_xxy_zzzz, to_xxxy_xxx, to_xxxy_xxxxz, to_xxxy_xxxyz, to_xxxy_xxxzz, to_xxxy_xxy, to_xxxy_xxyyz, to_xxxy_xxyzz, to_xxxy_xxz, to_xxxy_xxzzz, to_xxxy_xyy, to_xxxy_xyyyz, to_xxxy_xyyzz, to_xxxy_xyz, to_xxxy_xyzzz, to_xxxy_xzz, to_xxxy_xzzzz, to_xxxy_yyy, to_xxxy_yyyyz, to_xxxy_yyyzz, to_xxxy_yyz, to_xxxy_yyzzz, to_xxxy_yzz, to_xxxy_yzzzz, to_xxxy_zzz, to_xxxy_zzzzz, to_xy_xxx, to_xy_xxxxz, to_xy_xxxyz, to_xy_xxxzz, to_xy_xxy, to_xy_xxyyz, to_xy_xxyzz, to_xy_xxz, to_xy_xxzzz, to_xy_xyy, to_xy_xyyyz, to_xy_xyyzz, to_xy_xyz, to_xy_xyzzz, to_xy_xzz, to_xy_xzzzz, to_xy_yyy, to_xy_yyyyz, to_xy_yyyzz, to_xy_yyz, to_xy_yyzzz, to_xy_yzz, to_xy_yzzzz, to_xy_zzz, to_xy_zzzzz, b_exps : 64)
+#pragma omp simd aligned(to_x_z_xxy_xxxx,     \
+                             to_x_z_xxy_xxxy, \
+                             to_x_z_xxy_xxxz, \
+                             to_x_z_xxy_xxyy, \
+                             to_x_z_xxy_xxyz, \
+                             to_x_z_xxy_xxzz, \
+                             to_x_z_xxy_xyyy, \
+                             to_x_z_xxy_xyyz, \
+                             to_x_z_xxy_xyzz, \
+                             to_x_z_xxy_xzzz, \
+                             to_x_z_xxy_yyyy, \
+                             to_x_z_xxy_yyyz, \
+                             to_x_z_xxy_yyzz, \
+                             to_x_z_xxy_yzzz, \
+                             to_x_z_xxy_zzzz, \
+                             to_xxxy_xxx,     \
+                             to_xxxy_xxxxz,   \
+                             to_xxxy_xxxyz,   \
+                             to_xxxy_xxxzz,   \
+                             to_xxxy_xxy,     \
+                             to_xxxy_xxyyz,   \
+                             to_xxxy_xxyzz,   \
+                             to_xxxy_xxz,     \
+                             to_xxxy_xxzzz,   \
+                             to_xxxy_xyy,     \
+                             to_xxxy_xyyyz,   \
+                             to_xxxy_xyyzz,   \
+                             to_xxxy_xyz,     \
+                             to_xxxy_xyzzz,   \
+                             to_xxxy_xzz,     \
+                             to_xxxy_xzzzz,   \
+                             to_xxxy_yyy,     \
+                             to_xxxy_yyyyz,   \
+                             to_xxxy_yyyzz,   \
+                             to_xxxy_yyz,     \
+                             to_xxxy_yyzzz,   \
+                             to_xxxy_yzz,     \
+                             to_xxxy_yzzzz,   \
+                             to_xxxy_zzz,     \
+                             to_xxxy_zzzzz,   \
+                             to_xy_xxx,       \
+                             to_xy_xxxxz,     \
+                             to_xy_xxxyz,     \
+                             to_xy_xxxzz,     \
+                             to_xy_xxy,       \
+                             to_xy_xxyyz,     \
+                             to_xy_xxyzz,     \
+                             to_xy_xxz,       \
+                             to_xy_xxzzz,     \
+                             to_xy_xyy,       \
+                             to_xy_xyyyz,     \
+                             to_xy_xyyzz,     \
+                             to_xy_xyz,       \
+                             to_xy_xyzzz,     \
+                             to_xy_xzz,       \
+                             to_xy_xzzzz,     \
+                             to_xy_yyy,       \
+                             to_xy_yyyyz,     \
+                             to_xy_yyyzz,     \
+                             to_xy_yyz,       \
+                             to_xy_yyzzz,     \
+                             to_xy_yzz,       \
+                             to_xy_yzzzz,     \
+                             to_xy_zzz,       \
+                             to_xy_zzzzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -2844,31 +4180,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_x_z_xxy_xxxy[k] = -4.0 * to_xy_xxxyz[k] * tke_0 + 4.0 * to_xxxy_xxxyz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxy_xxxz[k] = 2.0 * to_xy_xxx[k] - 4.0 * to_xy_xxxzz[k] * tke_0 - 2.0 * to_xxxy_xxx[k] * tbe_0 + 4.0 * to_xxxy_xxxzz[k] * tbe_0 * tke_0;
+            to_x_z_xxy_xxxz[k] =
+                2.0 * to_xy_xxx[k] - 4.0 * to_xy_xxxzz[k] * tke_0 - 2.0 * to_xxxy_xxx[k] * tbe_0 + 4.0 * to_xxxy_xxxzz[k] * tbe_0 * tke_0;
 
             to_x_z_xxy_xxyy[k] = -4.0 * to_xy_xxyyz[k] * tke_0 + 4.0 * to_xxxy_xxyyz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxy_xxyz[k] = 2.0 * to_xy_xxy[k] - 4.0 * to_xy_xxyzz[k] * tke_0 - 2.0 * to_xxxy_xxy[k] * tbe_0 + 4.0 * to_xxxy_xxyzz[k] * tbe_0 * tke_0;
+            to_x_z_xxy_xxyz[k] =
+                2.0 * to_xy_xxy[k] - 4.0 * to_xy_xxyzz[k] * tke_0 - 2.0 * to_xxxy_xxy[k] * tbe_0 + 4.0 * to_xxxy_xxyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxy_xxzz[k] = 4.0 * to_xy_xxz[k] - 4.0 * to_xy_xxzzz[k] * tke_0 - 4.0 * to_xxxy_xxz[k] * tbe_0 + 4.0 * to_xxxy_xxzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxy_xxzz[k] =
+                4.0 * to_xy_xxz[k] - 4.0 * to_xy_xxzzz[k] * tke_0 - 4.0 * to_xxxy_xxz[k] * tbe_0 + 4.0 * to_xxxy_xxzzz[k] * tbe_0 * tke_0;
 
             to_x_z_xxy_xyyy[k] = -4.0 * to_xy_xyyyz[k] * tke_0 + 4.0 * to_xxxy_xyyyz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxy_xyyz[k] = 2.0 * to_xy_xyy[k] - 4.0 * to_xy_xyyzz[k] * tke_0 - 2.0 * to_xxxy_xyy[k] * tbe_0 + 4.0 * to_xxxy_xyyzz[k] * tbe_0 * tke_0;
+            to_x_z_xxy_xyyz[k] =
+                2.0 * to_xy_xyy[k] - 4.0 * to_xy_xyyzz[k] * tke_0 - 2.0 * to_xxxy_xyy[k] * tbe_0 + 4.0 * to_xxxy_xyyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxy_xyzz[k] = 4.0 * to_xy_xyz[k] - 4.0 * to_xy_xyzzz[k] * tke_0 - 4.0 * to_xxxy_xyz[k] * tbe_0 + 4.0 * to_xxxy_xyzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxy_xyzz[k] =
+                4.0 * to_xy_xyz[k] - 4.0 * to_xy_xyzzz[k] * tke_0 - 4.0 * to_xxxy_xyz[k] * tbe_0 + 4.0 * to_xxxy_xyzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxy_xzzz[k] = 6.0 * to_xy_xzz[k] - 4.0 * to_xy_xzzzz[k] * tke_0 - 6.0 * to_xxxy_xzz[k] * tbe_0 + 4.0 * to_xxxy_xzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxy_xzzz[k] =
+                6.0 * to_xy_xzz[k] - 4.0 * to_xy_xzzzz[k] * tke_0 - 6.0 * to_xxxy_xzz[k] * tbe_0 + 4.0 * to_xxxy_xzzzz[k] * tbe_0 * tke_0;
 
             to_x_z_xxy_yyyy[k] = -4.0 * to_xy_yyyyz[k] * tke_0 + 4.0 * to_xxxy_yyyyz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxy_yyyz[k] = 2.0 * to_xy_yyy[k] - 4.0 * to_xy_yyyzz[k] * tke_0 - 2.0 * to_xxxy_yyy[k] * tbe_0 + 4.0 * to_xxxy_yyyzz[k] * tbe_0 * tke_0;
+            to_x_z_xxy_yyyz[k] =
+                2.0 * to_xy_yyy[k] - 4.0 * to_xy_yyyzz[k] * tke_0 - 2.0 * to_xxxy_yyy[k] * tbe_0 + 4.0 * to_xxxy_yyyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxy_yyzz[k] = 4.0 * to_xy_yyz[k] - 4.0 * to_xy_yyzzz[k] * tke_0 - 4.0 * to_xxxy_yyz[k] * tbe_0 + 4.0 * to_xxxy_yyzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxy_yyzz[k] =
+                4.0 * to_xy_yyz[k] - 4.0 * to_xy_yyzzz[k] * tke_0 - 4.0 * to_xxxy_yyz[k] * tbe_0 + 4.0 * to_xxxy_yyzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxy_yzzz[k] = 6.0 * to_xy_yzz[k] - 4.0 * to_xy_yzzzz[k] * tke_0 - 6.0 * to_xxxy_yzz[k] * tbe_0 + 4.0 * to_xxxy_yzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxy_yzzz[k] =
+                6.0 * to_xy_yzz[k] - 4.0 * to_xy_yzzzz[k] * tke_0 - 6.0 * to_xxxy_yzz[k] * tbe_0 + 4.0 * to_xxxy_yzzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxy_zzzz[k] = 8.0 * to_xy_zzz[k] - 4.0 * to_xy_zzzzz[k] * tke_0 - 8.0 * to_xxxy_zzz[k] * tbe_0 + 4.0 * to_xxxy_zzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxy_zzzz[k] =
+                8.0 * to_xy_zzz[k] - 4.0 * to_xy_zzzzz[k] * tke_0 - 8.0 * to_xxxy_zzz[k] * tbe_0 + 4.0 * to_xxxy_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 330-345 components of targeted buffer : FG
@@ -2903,7 +4249,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_z_xxz_zzzz = pbuffer.data(idx_op_geom_101_fg + 2 * op_comps * 150 + i * 150 + 44);
 
-        #pragma omp simd aligned(to_x_z_xxz_xxxx, to_x_z_xxz_xxxy, to_x_z_xxz_xxxz, to_x_z_xxz_xxyy, to_x_z_xxz_xxyz, to_x_z_xxz_xxzz, to_x_z_xxz_xyyy, to_x_z_xxz_xyyz, to_x_z_xxz_xyzz, to_x_z_xxz_xzzz, to_x_z_xxz_yyyy, to_x_z_xxz_yyyz, to_x_z_xxz_yyzz, to_x_z_xxz_yzzz, to_x_z_xxz_zzzz, to_xxxz_xxx, to_xxxz_xxxxz, to_xxxz_xxxyz, to_xxxz_xxxzz, to_xxxz_xxy, to_xxxz_xxyyz, to_xxxz_xxyzz, to_xxxz_xxz, to_xxxz_xxzzz, to_xxxz_xyy, to_xxxz_xyyyz, to_xxxz_xyyzz, to_xxxz_xyz, to_xxxz_xyzzz, to_xxxz_xzz, to_xxxz_xzzzz, to_xxxz_yyy, to_xxxz_yyyyz, to_xxxz_yyyzz, to_xxxz_yyz, to_xxxz_yyzzz, to_xxxz_yzz, to_xxxz_yzzzz, to_xxxz_zzz, to_xxxz_zzzzz, to_xz_xxx, to_xz_xxxxz, to_xz_xxxyz, to_xz_xxxzz, to_xz_xxy, to_xz_xxyyz, to_xz_xxyzz, to_xz_xxz, to_xz_xxzzz, to_xz_xyy, to_xz_xyyyz, to_xz_xyyzz, to_xz_xyz, to_xz_xyzzz, to_xz_xzz, to_xz_xzzzz, to_xz_yyy, to_xz_yyyyz, to_xz_yyyzz, to_xz_yyz, to_xz_yyzzz, to_xz_yzz, to_xz_yzzzz, to_xz_zzz, to_xz_zzzzz, b_exps : 64)
+#pragma omp simd aligned(to_x_z_xxz_xxxx,     \
+                             to_x_z_xxz_xxxy, \
+                             to_x_z_xxz_xxxz, \
+                             to_x_z_xxz_xxyy, \
+                             to_x_z_xxz_xxyz, \
+                             to_x_z_xxz_xxzz, \
+                             to_x_z_xxz_xyyy, \
+                             to_x_z_xxz_xyyz, \
+                             to_x_z_xxz_xyzz, \
+                             to_x_z_xxz_xzzz, \
+                             to_x_z_xxz_yyyy, \
+                             to_x_z_xxz_yyyz, \
+                             to_x_z_xxz_yyzz, \
+                             to_x_z_xxz_yzzz, \
+                             to_x_z_xxz_zzzz, \
+                             to_xxxz_xxx,     \
+                             to_xxxz_xxxxz,   \
+                             to_xxxz_xxxyz,   \
+                             to_xxxz_xxxzz,   \
+                             to_xxxz_xxy,     \
+                             to_xxxz_xxyyz,   \
+                             to_xxxz_xxyzz,   \
+                             to_xxxz_xxz,     \
+                             to_xxxz_xxzzz,   \
+                             to_xxxz_xyy,     \
+                             to_xxxz_xyyyz,   \
+                             to_xxxz_xyyzz,   \
+                             to_xxxz_xyz,     \
+                             to_xxxz_xyzzz,   \
+                             to_xxxz_xzz,     \
+                             to_xxxz_xzzzz,   \
+                             to_xxxz_yyy,     \
+                             to_xxxz_yyyyz,   \
+                             to_xxxz_yyyzz,   \
+                             to_xxxz_yyz,     \
+                             to_xxxz_yyzzz,   \
+                             to_xxxz_yzz,     \
+                             to_xxxz_yzzzz,   \
+                             to_xxxz_zzz,     \
+                             to_xxxz_zzzzz,   \
+                             to_xz_xxx,       \
+                             to_xz_xxxxz,     \
+                             to_xz_xxxyz,     \
+                             to_xz_xxxzz,     \
+                             to_xz_xxy,       \
+                             to_xz_xxyyz,     \
+                             to_xz_xxyzz,     \
+                             to_xz_xxz,       \
+                             to_xz_xxzzz,     \
+                             to_xz_xyy,       \
+                             to_xz_xyyyz,     \
+                             to_xz_xyyzz,     \
+                             to_xz_xyz,       \
+                             to_xz_xyzzz,     \
+                             to_xz_xzz,       \
+                             to_xz_xzzzz,     \
+                             to_xz_yyy,       \
+                             to_xz_yyyyz,     \
+                             to_xz_yyyzz,     \
+                             to_xz_yyz,       \
+                             to_xz_yyzzz,     \
+                             to_xz_yzz,       \
+                             to_xz_yzzzz,     \
+                             to_xz_zzz,       \
+                             to_xz_zzzzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -2914,31 +4325,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_x_z_xxz_xxxy[k] = -4.0 * to_xz_xxxyz[k] * tke_0 + 4.0 * to_xxxz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxz_xxxz[k] = 2.0 * to_xz_xxx[k] - 4.0 * to_xz_xxxzz[k] * tke_0 - 2.0 * to_xxxz_xxx[k] * tbe_0 + 4.0 * to_xxxz_xxxzz[k] * tbe_0 * tke_0;
+            to_x_z_xxz_xxxz[k] =
+                2.0 * to_xz_xxx[k] - 4.0 * to_xz_xxxzz[k] * tke_0 - 2.0 * to_xxxz_xxx[k] * tbe_0 + 4.0 * to_xxxz_xxxzz[k] * tbe_0 * tke_0;
 
             to_x_z_xxz_xxyy[k] = -4.0 * to_xz_xxyyz[k] * tke_0 + 4.0 * to_xxxz_xxyyz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxz_xxyz[k] = 2.0 * to_xz_xxy[k] - 4.0 * to_xz_xxyzz[k] * tke_0 - 2.0 * to_xxxz_xxy[k] * tbe_0 + 4.0 * to_xxxz_xxyzz[k] * tbe_0 * tke_0;
+            to_x_z_xxz_xxyz[k] =
+                2.0 * to_xz_xxy[k] - 4.0 * to_xz_xxyzz[k] * tke_0 - 2.0 * to_xxxz_xxy[k] * tbe_0 + 4.0 * to_xxxz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxz_xxzz[k] = 4.0 * to_xz_xxz[k] - 4.0 * to_xz_xxzzz[k] * tke_0 - 4.0 * to_xxxz_xxz[k] * tbe_0 + 4.0 * to_xxxz_xxzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxz_xxzz[k] =
+                4.0 * to_xz_xxz[k] - 4.0 * to_xz_xxzzz[k] * tke_0 - 4.0 * to_xxxz_xxz[k] * tbe_0 + 4.0 * to_xxxz_xxzzz[k] * tbe_0 * tke_0;
 
             to_x_z_xxz_xyyy[k] = -4.0 * to_xz_xyyyz[k] * tke_0 + 4.0 * to_xxxz_xyyyz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxz_xyyz[k] = 2.0 * to_xz_xyy[k] - 4.0 * to_xz_xyyzz[k] * tke_0 - 2.0 * to_xxxz_xyy[k] * tbe_0 + 4.0 * to_xxxz_xyyzz[k] * tbe_0 * tke_0;
+            to_x_z_xxz_xyyz[k] =
+                2.0 * to_xz_xyy[k] - 4.0 * to_xz_xyyzz[k] * tke_0 - 2.0 * to_xxxz_xyy[k] * tbe_0 + 4.0 * to_xxxz_xyyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxz_xyzz[k] = 4.0 * to_xz_xyz[k] - 4.0 * to_xz_xyzzz[k] * tke_0 - 4.0 * to_xxxz_xyz[k] * tbe_0 + 4.0 * to_xxxz_xyzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxz_xyzz[k] =
+                4.0 * to_xz_xyz[k] - 4.0 * to_xz_xyzzz[k] * tke_0 - 4.0 * to_xxxz_xyz[k] * tbe_0 + 4.0 * to_xxxz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxz_xzzz[k] = 6.0 * to_xz_xzz[k] - 4.0 * to_xz_xzzzz[k] * tke_0 - 6.0 * to_xxxz_xzz[k] * tbe_0 + 4.0 * to_xxxz_xzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxz_xzzz[k] =
+                6.0 * to_xz_xzz[k] - 4.0 * to_xz_xzzzz[k] * tke_0 - 6.0 * to_xxxz_xzz[k] * tbe_0 + 4.0 * to_xxxz_xzzzz[k] * tbe_0 * tke_0;
 
             to_x_z_xxz_yyyy[k] = -4.0 * to_xz_yyyyz[k] * tke_0 + 4.0 * to_xxxz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxz_yyyz[k] = 2.0 * to_xz_yyy[k] - 4.0 * to_xz_yyyzz[k] * tke_0 - 2.0 * to_xxxz_yyy[k] * tbe_0 + 4.0 * to_xxxz_yyyzz[k] * tbe_0 * tke_0;
+            to_x_z_xxz_yyyz[k] =
+                2.0 * to_xz_yyy[k] - 4.0 * to_xz_yyyzz[k] * tke_0 - 2.0 * to_xxxz_yyy[k] * tbe_0 + 4.0 * to_xxxz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxz_yyzz[k] = 4.0 * to_xz_yyz[k] - 4.0 * to_xz_yyzzz[k] * tke_0 - 4.0 * to_xxxz_yyz[k] * tbe_0 + 4.0 * to_xxxz_yyzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxz_yyzz[k] =
+                4.0 * to_xz_yyz[k] - 4.0 * to_xz_yyzzz[k] * tke_0 - 4.0 * to_xxxz_yyz[k] * tbe_0 + 4.0 * to_xxxz_yyzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxz_yzzz[k] = 6.0 * to_xz_yzz[k] - 4.0 * to_xz_yzzzz[k] * tke_0 - 6.0 * to_xxxz_yzz[k] * tbe_0 + 4.0 * to_xxxz_yzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxz_yzzz[k] =
+                6.0 * to_xz_yzz[k] - 4.0 * to_xz_yzzzz[k] * tke_0 - 6.0 * to_xxxz_yzz[k] * tbe_0 + 4.0 * to_xxxz_yzzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xxz_zzzz[k] = 8.0 * to_xz_zzz[k] - 4.0 * to_xz_zzzzz[k] * tke_0 - 8.0 * to_xxxz_zzz[k] * tbe_0 + 4.0 * to_xxxz_zzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xxz_zzzz[k] =
+                8.0 * to_xz_zzz[k] - 4.0 * to_xz_zzzzz[k] * tke_0 - 8.0 * to_xxxz_zzz[k] * tbe_0 + 4.0 * to_xxxz_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 345-360 components of targeted buffer : FG
@@ -2973,7 +4394,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_z_xyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 2 * op_comps * 150 + i * 150 + 59);
 
-        #pragma omp simd aligned(to_x_z_xyy_xxxx, to_x_z_xyy_xxxy, to_x_z_xyy_xxxz, to_x_z_xyy_xxyy, to_x_z_xyy_xxyz, to_x_z_xyy_xxzz, to_x_z_xyy_xyyy, to_x_z_xyy_xyyz, to_x_z_xyy_xyzz, to_x_z_xyy_xzzz, to_x_z_xyy_yyyy, to_x_z_xyy_yyyz, to_x_z_xyy_yyzz, to_x_z_xyy_yzzz, to_x_z_xyy_zzzz, to_xxyy_xxx, to_xxyy_xxxxz, to_xxyy_xxxyz, to_xxyy_xxxzz, to_xxyy_xxy, to_xxyy_xxyyz, to_xxyy_xxyzz, to_xxyy_xxz, to_xxyy_xxzzz, to_xxyy_xyy, to_xxyy_xyyyz, to_xxyy_xyyzz, to_xxyy_xyz, to_xxyy_xyzzz, to_xxyy_xzz, to_xxyy_xzzzz, to_xxyy_yyy, to_xxyy_yyyyz, to_xxyy_yyyzz, to_xxyy_yyz, to_xxyy_yyzzz, to_xxyy_yzz, to_xxyy_yzzzz, to_xxyy_zzz, to_xxyy_zzzzz, to_yy_xxx, to_yy_xxxxz, to_yy_xxxyz, to_yy_xxxzz, to_yy_xxy, to_yy_xxyyz, to_yy_xxyzz, to_yy_xxz, to_yy_xxzzz, to_yy_xyy, to_yy_xyyyz, to_yy_xyyzz, to_yy_xyz, to_yy_xyzzz, to_yy_xzz, to_yy_xzzzz, to_yy_yyy, to_yy_yyyyz, to_yy_yyyzz, to_yy_yyz, to_yy_yyzzz, to_yy_yzz, to_yy_yzzzz, to_yy_zzz, to_yy_zzzzz, b_exps : 64)
+#pragma omp simd aligned(to_x_z_xyy_xxxx,     \
+                             to_x_z_xyy_xxxy, \
+                             to_x_z_xyy_xxxz, \
+                             to_x_z_xyy_xxyy, \
+                             to_x_z_xyy_xxyz, \
+                             to_x_z_xyy_xxzz, \
+                             to_x_z_xyy_xyyy, \
+                             to_x_z_xyy_xyyz, \
+                             to_x_z_xyy_xyzz, \
+                             to_x_z_xyy_xzzz, \
+                             to_x_z_xyy_yyyy, \
+                             to_x_z_xyy_yyyz, \
+                             to_x_z_xyy_yyzz, \
+                             to_x_z_xyy_yzzz, \
+                             to_x_z_xyy_zzzz, \
+                             to_xxyy_xxx,     \
+                             to_xxyy_xxxxz,   \
+                             to_xxyy_xxxyz,   \
+                             to_xxyy_xxxzz,   \
+                             to_xxyy_xxy,     \
+                             to_xxyy_xxyyz,   \
+                             to_xxyy_xxyzz,   \
+                             to_xxyy_xxz,     \
+                             to_xxyy_xxzzz,   \
+                             to_xxyy_xyy,     \
+                             to_xxyy_xyyyz,   \
+                             to_xxyy_xyyzz,   \
+                             to_xxyy_xyz,     \
+                             to_xxyy_xyzzz,   \
+                             to_xxyy_xzz,     \
+                             to_xxyy_xzzzz,   \
+                             to_xxyy_yyy,     \
+                             to_xxyy_yyyyz,   \
+                             to_xxyy_yyyzz,   \
+                             to_xxyy_yyz,     \
+                             to_xxyy_yyzzz,   \
+                             to_xxyy_yzz,     \
+                             to_xxyy_yzzzz,   \
+                             to_xxyy_zzz,     \
+                             to_xxyy_zzzzz,   \
+                             to_yy_xxx,       \
+                             to_yy_xxxxz,     \
+                             to_yy_xxxyz,     \
+                             to_yy_xxxzz,     \
+                             to_yy_xxy,       \
+                             to_yy_xxyyz,     \
+                             to_yy_xxyzz,     \
+                             to_yy_xxz,       \
+                             to_yy_xxzzz,     \
+                             to_yy_xyy,       \
+                             to_yy_xyyyz,     \
+                             to_yy_xyyzz,     \
+                             to_yy_xyz,       \
+                             to_yy_xyzzz,     \
+                             to_yy_xzz,       \
+                             to_yy_xzzzz,     \
+                             to_yy_yyy,       \
+                             to_yy_yyyyz,     \
+                             to_yy_yyyzz,     \
+                             to_yy_yyz,       \
+                             to_yy_yyzzz,     \
+                             to_yy_yzz,       \
+                             to_yy_yzzzz,     \
+                             to_yy_zzz,       \
+                             to_yy_zzzzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -2990,25 +4476,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_x_z_xyy_xxyz[k] = to_yy_xxy[k] - 2.0 * to_yy_xxyzz[k] * tke_0 - 2.0 * to_xxyy_xxy[k] * tbe_0 + 4.0 * to_xxyy_xxyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xyy_xxzz[k] = 2.0 * to_yy_xxz[k] - 2.0 * to_yy_xxzzz[k] * tke_0 - 4.0 * to_xxyy_xxz[k] * tbe_0 + 4.0 * to_xxyy_xxzzz[k] * tbe_0 * tke_0;
+            to_x_z_xyy_xxzz[k] =
+                2.0 * to_yy_xxz[k] - 2.0 * to_yy_xxzzz[k] * tke_0 - 4.0 * to_xxyy_xxz[k] * tbe_0 + 4.0 * to_xxyy_xxzzz[k] * tbe_0 * tke_0;
 
             to_x_z_xyy_xyyy[k] = -2.0 * to_yy_xyyyz[k] * tke_0 + 4.0 * to_xxyy_xyyyz[k] * tbe_0 * tke_0;
 
             to_x_z_xyy_xyyz[k] = to_yy_xyy[k] - 2.0 * to_yy_xyyzz[k] * tke_0 - 2.0 * to_xxyy_xyy[k] * tbe_0 + 4.0 * to_xxyy_xyyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xyy_xyzz[k] = 2.0 * to_yy_xyz[k] - 2.0 * to_yy_xyzzz[k] * tke_0 - 4.0 * to_xxyy_xyz[k] * tbe_0 + 4.0 * to_xxyy_xyzzz[k] * tbe_0 * tke_0;
+            to_x_z_xyy_xyzz[k] =
+                2.0 * to_yy_xyz[k] - 2.0 * to_yy_xyzzz[k] * tke_0 - 4.0 * to_xxyy_xyz[k] * tbe_0 + 4.0 * to_xxyy_xyzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xyy_xzzz[k] = 3.0 * to_yy_xzz[k] - 2.0 * to_yy_xzzzz[k] * tke_0 - 6.0 * to_xxyy_xzz[k] * tbe_0 + 4.0 * to_xxyy_xzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xyy_xzzz[k] =
+                3.0 * to_yy_xzz[k] - 2.0 * to_yy_xzzzz[k] * tke_0 - 6.0 * to_xxyy_xzz[k] * tbe_0 + 4.0 * to_xxyy_xzzzz[k] * tbe_0 * tke_0;
 
             to_x_z_xyy_yyyy[k] = -2.0 * to_yy_yyyyz[k] * tke_0 + 4.0 * to_xxyy_yyyyz[k] * tbe_0 * tke_0;
 
             to_x_z_xyy_yyyz[k] = to_yy_yyy[k] - 2.0 * to_yy_yyyzz[k] * tke_0 - 2.0 * to_xxyy_yyy[k] * tbe_0 + 4.0 * to_xxyy_yyyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xyy_yyzz[k] = 2.0 * to_yy_yyz[k] - 2.0 * to_yy_yyzzz[k] * tke_0 - 4.0 * to_xxyy_yyz[k] * tbe_0 + 4.0 * to_xxyy_yyzzz[k] * tbe_0 * tke_0;
+            to_x_z_xyy_yyzz[k] =
+                2.0 * to_yy_yyz[k] - 2.0 * to_yy_yyzzz[k] * tke_0 - 4.0 * to_xxyy_yyz[k] * tbe_0 + 4.0 * to_xxyy_yyzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xyy_yzzz[k] = 3.0 * to_yy_yzz[k] - 2.0 * to_yy_yzzzz[k] * tke_0 - 6.0 * to_xxyy_yzz[k] * tbe_0 + 4.0 * to_xxyy_yzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xyy_yzzz[k] =
+                3.0 * to_yy_yzz[k] - 2.0 * to_yy_yzzzz[k] * tke_0 - 6.0 * to_xxyy_yzz[k] * tbe_0 + 4.0 * to_xxyy_yzzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xyy_zzzz[k] = 4.0 * to_yy_zzz[k] - 2.0 * to_yy_zzzzz[k] * tke_0 - 8.0 * to_xxyy_zzz[k] * tbe_0 + 4.0 * to_xxyy_zzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xyy_zzzz[k] =
+                4.0 * to_yy_zzz[k] - 2.0 * to_yy_zzzzz[k] * tke_0 - 8.0 * to_xxyy_zzz[k] * tbe_0 + 4.0 * to_xxyy_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 360-375 components of targeted buffer : FG
@@ -3043,7 +4535,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_z_xyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 2 * op_comps * 150 + i * 150 + 74);
 
-        #pragma omp simd aligned(to_x_z_xyz_xxxx, to_x_z_xyz_xxxy, to_x_z_xyz_xxxz, to_x_z_xyz_xxyy, to_x_z_xyz_xxyz, to_x_z_xyz_xxzz, to_x_z_xyz_xyyy, to_x_z_xyz_xyyz, to_x_z_xyz_xyzz, to_x_z_xyz_xzzz, to_x_z_xyz_yyyy, to_x_z_xyz_yyyz, to_x_z_xyz_yyzz, to_x_z_xyz_yzzz, to_x_z_xyz_zzzz, to_xxyz_xxx, to_xxyz_xxxxz, to_xxyz_xxxyz, to_xxyz_xxxzz, to_xxyz_xxy, to_xxyz_xxyyz, to_xxyz_xxyzz, to_xxyz_xxz, to_xxyz_xxzzz, to_xxyz_xyy, to_xxyz_xyyyz, to_xxyz_xyyzz, to_xxyz_xyz, to_xxyz_xyzzz, to_xxyz_xzz, to_xxyz_xzzzz, to_xxyz_yyy, to_xxyz_yyyyz, to_xxyz_yyyzz, to_xxyz_yyz, to_xxyz_yyzzz, to_xxyz_yzz, to_xxyz_yzzzz, to_xxyz_zzz, to_xxyz_zzzzz, to_yz_xxx, to_yz_xxxxz, to_yz_xxxyz, to_yz_xxxzz, to_yz_xxy, to_yz_xxyyz, to_yz_xxyzz, to_yz_xxz, to_yz_xxzzz, to_yz_xyy, to_yz_xyyyz, to_yz_xyyzz, to_yz_xyz, to_yz_xyzzz, to_yz_xzz, to_yz_xzzzz, to_yz_yyy, to_yz_yyyyz, to_yz_yyyzz, to_yz_yyz, to_yz_yyzzz, to_yz_yzz, to_yz_yzzzz, to_yz_zzz, to_yz_zzzzz, b_exps : 64)
+#pragma omp simd aligned(to_x_z_xyz_xxxx,     \
+                             to_x_z_xyz_xxxy, \
+                             to_x_z_xyz_xxxz, \
+                             to_x_z_xyz_xxyy, \
+                             to_x_z_xyz_xxyz, \
+                             to_x_z_xyz_xxzz, \
+                             to_x_z_xyz_xyyy, \
+                             to_x_z_xyz_xyyz, \
+                             to_x_z_xyz_xyzz, \
+                             to_x_z_xyz_xzzz, \
+                             to_x_z_xyz_yyyy, \
+                             to_x_z_xyz_yyyz, \
+                             to_x_z_xyz_yyzz, \
+                             to_x_z_xyz_yzzz, \
+                             to_x_z_xyz_zzzz, \
+                             to_xxyz_xxx,     \
+                             to_xxyz_xxxxz,   \
+                             to_xxyz_xxxyz,   \
+                             to_xxyz_xxxzz,   \
+                             to_xxyz_xxy,     \
+                             to_xxyz_xxyyz,   \
+                             to_xxyz_xxyzz,   \
+                             to_xxyz_xxz,     \
+                             to_xxyz_xxzzz,   \
+                             to_xxyz_xyy,     \
+                             to_xxyz_xyyyz,   \
+                             to_xxyz_xyyzz,   \
+                             to_xxyz_xyz,     \
+                             to_xxyz_xyzzz,   \
+                             to_xxyz_xzz,     \
+                             to_xxyz_xzzzz,   \
+                             to_xxyz_yyy,     \
+                             to_xxyz_yyyyz,   \
+                             to_xxyz_yyyzz,   \
+                             to_xxyz_yyz,     \
+                             to_xxyz_yyzzz,   \
+                             to_xxyz_yzz,     \
+                             to_xxyz_yzzzz,   \
+                             to_xxyz_zzz,     \
+                             to_xxyz_zzzzz,   \
+                             to_yz_xxx,       \
+                             to_yz_xxxxz,     \
+                             to_yz_xxxyz,     \
+                             to_yz_xxxzz,     \
+                             to_yz_xxy,       \
+                             to_yz_xxyyz,     \
+                             to_yz_xxyzz,     \
+                             to_yz_xxz,       \
+                             to_yz_xxzzz,     \
+                             to_yz_xyy,       \
+                             to_yz_xyyyz,     \
+                             to_yz_xyyzz,     \
+                             to_yz_xyz,       \
+                             to_yz_xyzzz,     \
+                             to_yz_xzz,       \
+                             to_yz_xzzzz,     \
+                             to_yz_yyy,       \
+                             to_yz_yyyyz,     \
+                             to_yz_yyyzz,     \
+                             to_yz_yyz,       \
+                             to_yz_yyzzz,     \
+                             to_yz_yzz,       \
+                             to_yz_yzzzz,     \
+                             to_yz_zzz,       \
+                             to_yz_zzzzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -3060,25 +4617,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_x_z_xyz_xxyz[k] = to_yz_xxy[k] - 2.0 * to_yz_xxyzz[k] * tke_0 - 2.0 * to_xxyz_xxy[k] * tbe_0 + 4.0 * to_xxyz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xyz_xxzz[k] = 2.0 * to_yz_xxz[k] - 2.0 * to_yz_xxzzz[k] * tke_0 - 4.0 * to_xxyz_xxz[k] * tbe_0 + 4.0 * to_xxyz_xxzzz[k] * tbe_0 * tke_0;
+            to_x_z_xyz_xxzz[k] =
+                2.0 * to_yz_xxz[k] - 2.0 * to_yz_xxzzz[k] * tke_0 - 4.0 * to_xxyz_xxz[k] * tbe_0 + 4.0 * to_xxyz_xxzzz[k] * tbe_0 * tke_0;
 
             to_x_z_xyz_xyyy[k] = -2.0 * to_yz_xyyyz[k] * tke_0 + 4.0 * to_xxyz_xyyyz[k] * tbe_0 * tke_0;
 
             to_x_z_xyz_xyyz[k] = to_yz_xyy[k] - 2.0 * to_yz_xyyzz[k] * tke_0 - 2.0 * to_xxyz_xyy[k] * tbe_0 + 4.0 * to_xxyz_xyyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xyz_xyzz[k] = 2.0 * to_yz_xyz[k] - 2.0 * to_yz_xyzzz[k] * tke_0 - 4.0 * to_xxyz_xyz[k] * tbe_0 + 4.0 * to_xxyz_xyzzz[k] * tbe_0 * tke_0;
+            to_x_z_xyz_xyzz[k] =
+                2.0 * to_yz_xyz[k] - 2.0 * to_yz_xyzzz[k] * tke_0 - 4.0 * to_xxyz_xyz[k] * tbe_0 + 4.0 * to_xxyz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xyz_xzzz[k] = 3.0 * to_yz_xzz[k] - 2.0 * to_yz_xzzzz[k] * tke_0 - 6.0 * to_xxyz_xzz[k] * tbe_0 + 4.0 * to_xxyz_xzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xyz_xzzz[k] =
+                3.0 * to_yz_xzz[k] - 2.0 * to_yz_xzzzz[k] * tke_0 - 6.0 * to_xxyz_xzz[k] * tbe_0 + 4.0 * to_xxyz_xzzzz[k] * tbe_0 * tke_0;
 
             to_x_z_xyz_yyyy[k] = -2.0 * to_yz_yyyyz[k] * tke_0 + 4.0 * to_xxyz_yyyyz[k] * tbe_0 * tke_0;
 
             to_x_z_xyz_yyyz[k] = to_yz_yyy[k] - 2.0 * to_yz_yyyzz[k] * tke_0 - 2.0 * to_xxyz_yyy[k] * tbe_0 + 4.0 * to_xxyz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xyz_yyzz[k] = 2.0 * to_yz_yyz[k] - 2.0 * to_yz_yyzzz[k] * tke_0 - 4.0 * to_xxyz_yyz[k] * tbe_0 + 4.0 * to_xxyz_yyzzz[k] * tbe_0 * tke_0;
+            to_x_z_xyz_yyzz[k] =
+                2.0 * to_yz_yyz[k] - 2.0 * to_yz_yyzzz[k] * tke_0 - 4.0 * to_xxyz_yyz[k] * tbe_0 + 4.0 * to_xxyz_yyzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xyz_yzzz[k] = 3.0 * to_yz_yzz[k] - 2.0 * to_yz_yzzzz[k] * tke_0 - 6.0 * to_xxyz_yzz[k] * tbe_0 + 4.0 * to_xxyz_yzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xyz_yzzz[k] =
+                3.0 * to_yz_yzz[k] - 2.0 * to_yz_yzzzz[k] * tke_0 - 6.0 * to_xxyz_yzz[k] * tbe_0 + 4.0 * to_xxyz_yzzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xyz_zzzz[k] = 4.0 * to_yz_zzz[k] - 2.0 * to_yz_zzzzz[k] * tke_0 - 8.0 * to_xxyz_zzz[k] * tbe_0 + 4.0 * to_xxyz_zzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xyz_zzzz[k] =
+                4.0 * to_yz_zzz[k] - 2.0 * to_yz_zzzzz[k] * tke_0 - 8.0 * to_xxyz_zzz[k] * tbe_0 + 4.0 * to_xxyz_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 375-390 components of targeted buffer : FG
@@ -3113,7 +4676,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_z_xzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 2 * op_comps * 150 + i * 150 + 89);
 
-        #pragma omp simd aligned(to_x_z_xzz_xxxx, to_x_z_xzz_xxxy, to_x_z_xzz_xxxz, to_x_z_xzz_xxyy, to_x_z_xzz_xxyz, to_x_z_xzz_xxzz, to_x_z_xzz_xyyy, to_x_z_xzz_xyyz, to_x_z_xzz_xyzz, to_x_z_xzz_xzzz, to_x_z_xzz_yyyy, to_x_z_xzz_yyyz, to_x_z_xzz_yyzz, to_x_z_xzz_yzzz, to_x_z_xzz_zzzz, to_xxzz_xxx, to_xxzz_xxxxz, to_xxzz_xxxyz, to_xxzz_xxxzz, to_xxzz_xxy, to_xxzz_xxyyz, to_xxzz_xxyzz, to_xxzz_xxz, to_xxzz_xxzzz, to_xxzz_xyy, to_xxzz_xyyyz, to_xxzz_xyyzz, to_xxzz_xyz, to_xxzz_xyzzz, to_xxzz_xzz, to_xxzz_xzzzz, to_xxzz_yyy, to_xxzz_yyyyz, to_xxzz_yyyzz, to_xxzz_yyz, to_xxzz_yyzzz, to_xxzz_yzz, to_xxzz_yzzzz, to_xxzz_zzz, to_xxzz_zzzzz, to_zz_xxx, to_zz_xxxxz, to_zz_xxxyz, to_zz_xxxzz, to_zz_xxy, to_zz_xxyyz, to_zz_xxyzz, to_zz_xxz, to_zz_xxzzz, to_zz_xyy, to_zz_xyyyz, to_zz_xyyzz, to_zz_xyz, to_zz_xyzzz, to_zz_xzz, to_zz_xzzzz, to_zz_yyy, to_zz_yyyyz, to_zz_yyyzz, to_zz_yyz, to_zz_yyzzz, to_zz_yzz, to_zz_yzzzz, to_zz_zzz, to_zz_zzzzz, b_exps : 64)
+#pragma omp simd aligned(to_x_z_xzz_xxxx,     \
+                             to_x_z_xzz_xxxy, \
+                             to_x_z_xzz_xxxz, \
+                             to_x_z_xzz_xxyy, \
+                             to_x_z_xzz_xxyz, \
+                             to_x_z_xzz_xxzz, \
+                             to_x_z_xzz_xyyy, \
+                             to_x_z_xzz_xyyz, \
+                             to_x_z_xzz_xyzz, \
+                             to_x_z_xzz_xzzz, \
+                             to_x_z_xzz_yyyy, \
+                             to_x_z_xzz_yyyz, \
+                             to_x_z_xzz_yyzz, \
+                             to_x_z_xzz_yzzz, \
+                             to_x_z_xzz_zzzz, \
+                             to_xxzz_xxx,     \
+                             to_xxzz_xxxxz,   \
+                             to_xxzz_xxxyz,   \
+                             to_xxzz_xxxzz,   \
+                             to_xxzz_xxy,     \
+                             to_xxzz_xxyyz,   \
+                             to_xxzz_xxyzz,   \
+                             to_xxzz_xxz,     \
+                             to_xxzz_xxzzz,   \
+                             to_xxzz_xyy,     \
+                             to_xxzz_xyyyz,   \
+                             to_xxzz_xyyzz,   \
+                             to_xxzz_xyz,     \
+                             to_xxzz_xyzzz,   \
+                             to_xxzz_xzz,     \
+                             to_xxzz_xzzzz,   \
+                             to_xxzz_yyy,     \
+                             to_xxzz_yyyyz,   \
+                             to_xxzz_yyyzz,   \
+                             to_xxzz_yyz,     \
+                             to_xxzz_yyzzz,   \
+                             to_xxzz_yzz,     \
+                             to_xxzz_yzzzz,   \
+                             to_xxzz_zzz,     \
+                             to_xxzz_zzzzz,   \
+                             to_zz_xxx,       \
+                             to_zz_xxxxz,     \
+                             to_zz_xxxyz,     \
+                             to_zz_xxxzz,     \
+                             to_zz_xxy,       \
+                             to_zz_xxyyz,     \
+                             to_zz_xxyzz,     \
+                             to_zz_xxz,       \
+                             to_zz_xxzzz,     \
+                             to_zz_xyy,       \
+                             to_zz_xyyyz,     \
+                             to_zz_xyyzz,     \
+                             to_zz_xyz,       \
+                             to_zz_xyzzz,     \
+                             to_zz_xzz,       \
+                             to_zz_xzzzz,     \
+                             to_zz_yyy,       \
+                             to_zz_yyyyz,     \
+                             to_zz_yyyzz,     \
+                             to_zz_yyz,       \
+                             to_zz_yyzzz,     \
+                             to_zz_yzz,       \
+                             to_zz_yzzzz,     \
+                             to_zz_zzz,       \
+                             to_zz_zzzzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -3130,25 +4758,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_x_z_xzz_xxyz[k] = to_zz_xxy[k] - 2.0 * to_zz_xxyzz[k] * tke_0 - 2.0 * to_xxzz_xxy[k] * tbe_0 + 4.0 * to_xxzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xzz_xxzz[k] = 2.0 * to_zz_xxz[k] - 2.0 * to_zz_xxzzz[k] * tke_0 - 4.0 * to_xxzz_xxz[k] * tbe_0 + 4.0 * to_xxzz_xxzzz[k] * tbe_0 * tke_0;
+            to_x_z_xzz_xxzz[k] =
+                2.0 * to_zz_xxz[k] - 2.0 * to_zz_xxzzz[k] * tke_0 - 4.0 * to_xxzz_xxz[k] * tbe_0 + 4.0 * to_xxzz_xxzzz[k] * tbe_0 * tke_0;
 
             to_x_z_xzz_xyyy[k] = -2.0 * to_zz_xyyyz[k] * tke_0 + 4.0 * to_xxzz_xyyyz[k] * tbe_0 * tke_0;
 
             to_x_z_xzz_xyyz[k] = to_zz_xyy[k] - 2.0 * to_zz_xyyzz[k] * tke_0 - 2.0 * to_xxzz_xyy[k] * tbe_0 + 4.0 * to_xxzz_xyyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xzz_xyzz[k] = 2.0 * to_zz_xyz[k] - 2.0 * to_zz_xyzzz[k] * tke_0 - 4.0 * to_xxzz_xyz[k] * tbe_0 + 4.0 * to_xxzz_xyzzz[k] * tbe_0 * tke_0;
+            to_x_z_xzz_xyzz[k] =
+                2.0 * to_zz_xyz[k] - 2.0 * to_zz_xyzzz[k] * tke_0 - 4.0 * to_xxzz_xyz[k] * tbe_0 + 4.0 * to_xxzz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xzz_xzzz[k] = 3.0 * to_zz_xzz[k] - 2.0 * to_zz_xzzzz[k] * tke_0 - 6.0 * to_xxzz_xzz[k] * tbe_0 + 4.0 * to_xxzz_xzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xzz_xzzz[k] =
+                3.0 * to_zz_xzz[k] - 2.0 * to_zz_xzzzz[k] * tke_0 - 6.0 * to_xxzz_xzz[k] * tbe_0 + 4.0 * to_xxzz_xzzzz[k] * tbe_0 * tke_0;
 
             to_x_z_xzz_yyyy[k] = -2.0 * to_zz_yyyyz[k] * tke_0 + 4.0 * to_xxzz_yyyyz[k] * tbe_0 * tke_0;
 
             to_x_z_xzz_yyyz[k] = to_zz_yyy[k] - 2.0 * to_zz_yyyzz[k] * tke_0 - 2.0 * to_xxzz_yyy[k] * tbe_0 + 4.0 * to_xxzz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xzz_yyzz[k] = 2.0 * to_zz_yyz[k] - 2.0 * to_zz_yyzzz[k] * tke_0 - 4.0 * to_xxzz_yyz[k] * tbe_0 + 4.0 * to_xxzz_yyzzz[k] * tbe_0 * tke_0;
+            to_x_z_xzz_yyzz[k] =
+                2.0 * to_zz_yyz[k] - 2.0 * to_zz_yyzzz[k] * tke_0 - 4.0 * to_xxzz_yyz[k] * tbe_0 + 4.0 * to_xxzz_yyzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xzz_yzzz[k] = 3.0 * to_zz_yzz[k] - 2.0 * to_zz_yzzzz[k] * tke_0 - 6.0 * to_xxzz_yzz[k] * tbe_0 + 4.0 * to_xxzz_yzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xzz_yzzz[k] =
+                3.0 * to_zz_yzz[k] - 2.0 * to_zz_yzzzz[k] * tke_0 - 6.0 * to_xxzz_yzz[k] * tbe_0 + 4.0 * to_xxzz_yzzzz[k] * tbe_0 * tke_0;
 
-            to_x_z_xzz_zzzz[k] = 4.0 * to_zz_zzz[k] - 2.0 * to_zz_zzzzz[k] * tke_0 - 8.0 * to_xxzz_zzz[k] * tbe_0 + 4.0 * to_xxzz_zzzzz[k] * tbe_0 * tke_0;
+            to_x_z_xzz_zzzz[k] =
+                4.0 * to_zz_zzz[k] - 2.0 * to_zz_zzzzz[k] * tke_0 - 8.0 * to_xxzz_zzz[k] * tbe_0 + 4.0 * to_xxzz_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 390-405 components of targeted buffer : FG
@@ -3183,7 +4817,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_z_yyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 2 * op_comps * 150 + i * 150 + 104);
 
-        #pragma omp simd aligned(to_x_z_yyy_xxxx, to_x_z_yyy_xxxy, to_x_z_yyy_xxxz, to_x_z_yyy_xxyy, to_x_z_yyy_xxyz, to_x_z_yyy_xxzz, to_x_z_yyy_xyyy, to_x_z_yyy_xyyz, to_x_z_yyy_xyzz, to_x_z_yyy_xzzz, to_x_z_yyy_yyyy, to_x_z_yyy_yyyz, to_x_z_yyy_yyzz, to_x_z_yyy_yzzz, to_x_z_yyy_zzzz, to_xyyy_xxx, to_xyyy_xxxxz, to_xyyy_xxxyz, to_xyyy_xxxzz, to_xyyy_xxy, to_xyyy_xxyyz, to_xyyy_xxyzz, to_xyyy_xxz, to_xyyy_xxzzz, to_xyyy_xyy, to_xyyy_xyyyz, to_xyyy_xyyzz, to_xyyy_xyz, to_xyyy_xyzzz, to_xyyy_xzz, to_xyyy_xzzzz, to_xyyy_yyy, to_xyyy_yyyyz, to_xyyy_yyyzz, to_xyyy_yyz, to_xyyy_yyzzz, to_xyyy_yzz, to_xyyy_yzzzz, to_xyyy_zzz, to_xyyy_zzzzz, b_exps : 64)
+#pragma omp simd aligned(to_x_z_yyy_xxxx,     \
+                             to_x_z_yyy_xxxy, \
+                             to_x_z_yyy_xxxz, \
+                             to_x_z_yyy_xxyy, \
+                             to_x_z_yyy_xxyz, \
+                             to_x_z_yyy_xxzz, \
+                             to_x_z_yyy_xyyy, \
+                             to_x_z_yyy_xyyz, \
+                             to_x_z_yyy_xyzz, \
+                             to_x_z_yyy_xzzz, \
+                             to_x_z_yyy_yyyy, \
+                             to_x_z_yyy_yyyz, \
+                             to_x_z_yyy_yyzz, \
+                             to_x_z_yyy_yzzz, \
+                             to_x_z_yyy_zzzz, \
+                             to_xyyy_xxx,     \
+                             to_xyyy_xxxxz,   \
+                             to_xyyy_xxxyz,   \
+                             to_xyyy_xxxzz,   \
+                             to_xyyy_xxy,     \
+                             to_xyyy_xxyyz,   \
+                             to_xyyy_xxyzz,   \
+                             to_xyyy_xxz,     \
+                             to_xyyy_xxzzz,   \
+                             to_xyyy_xyy,     \
+                             to_xyyy_xyyyz,   \
+                             to_xyyy_xyyzz,   \
+                             to_xyyy_xyz,     \
+                             to_xyyy_xyzzz,   \
+                             to_xyyy_xzz,     \
+                             to_xyyy_xzzzz,   \
+                             to_xyyy_yyy,     \
+                             to_xyyy_yyyyz,   \
+                             to_xyyy_yyyzz,   \
+                             to_xyyy_yyz,     \
+                             to_xyyy_yyzzz,   \
+                             to_xyyy_yzz,     \
+                             to_xyyy_yzzzz,   \
+                             to_xyyy_zzz,     \
+                             to_xyyy_zzzzz,   \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -3253,7 +4927,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_z_yyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 2 * op_comps * 150 + i * 150 + 119);
 
-        #pragma omp simd aligned(to_x_z_yyz_xxxx, to_x_z_yyz_xxxy, to_x_z_yyz_xxxz, to_x_z_yyz_xxyy, to_x_z_yyz_xxyz, to_x_z_yyz_xxzz, to_x_z_yyz_xyyy, to_x_z_yyz_xyyz, to_x_z_yyz_xyzz, to_x_z_yyz_xzzz, to_x_z_yyz_yyyy, to_x_z_yyz_yyyz, to_x_z_yyz_yyzz, to_x_z_yyz_yzzz, to_x_z_yyz_zzzz, to_xyyz_xxx, to_xyyz_xxxxz, to_xyyz_xxxyz, to_xyyz_xxxzz, to_xyyz_xxy, to_xyyz_xxyyz, to_xyyz_xxyzz, to_xyyz_xxz, to_xyyz_xxzzz, to_xyyz_xyy, to_xyyz_xyyyz, to_xyyz_xyyzz, to_xyyz_xyz, to_xyyz_xyzzz, to_xyyz_xzz, to_xyyz_xzzzz, to_xyyz_yyy, to_xyyz_yyyyz, to_xyyz_yyyzz, to_xyyz_yyz, to_xyyz_yyzzz, to_xyyz_yzz, to_xyyz_yzzzz, to_xyyz_zzz, to_xyyz_zzzzz, b_exps : 64)
+#pragma omp simd aligned(to_x_z_yyz_xxxx,     \
+                             to_x_z_yyz_xxxy, \
+                             to_x_z_yyz_xxxz, \
+                             to_x_z_yyz_xxyy, \
+                             to_x_z_yyz_xxyz, \
+                             to_x_z_yyz_xxzz, \
+                             to_x_z_yyz_xyyy, \
+                             to_x_z_yyz_xyyz, \
+                             to_x_z_yyz_xyzz, \
+                             to_x_z_yyz_xzzz, \
+                             to_x_z_yyz_yyyy, \
+                             to_x_z_yyz_yyyz, \
+                             to_x_z_yyz_yyzz, \
+                             to_x_z_yyz_yzzz, \
+                             to_x_z_yyz_zzzz, \
+                             to_xyyz_xxx,     \
+                             to_xyyz_xxxxz,   \
+                             to_xyyz_xxxyz,   \
+                             to_xyyz_xxxzz,   \
+                             to_xyyz_xxy,     \
+                             to_xyyz_xxyyz,   \
+                             to_xyyz_xxyzz,   \
+                             to_xyyz_xxz,     \
+                             to_xyyz_xxzzz,   \
+                             to_xyyz_xyy,     \
+                             to_xyyz_xyyyz,   \
+                             to_xyyz_xyyzz,   \
+                             to_xyyz_xyz,     \
+                             to_xyyz_xyzzz,   \
+                             to_xyyz_xzz,     \
+                             to_xyyz_xzzzz,   \
+                             to_xyyz_yyy,     \
+                             to_xyyz_yyyyz,   \
+                             to_xyyz_yyyzz,   \
+                             to_xyyz_yyz,     \
+                             to_xyyz_yyzzz,   \
+                             to_xyyz_yzz,     \
+                             to_xyyz_yzzzz,   \
+                             to_xyyz_zzz,     \
+                             to_xyyz_zzzzz,   \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -3323,7 +5037,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_z_yzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 2 * op_comps * 150 + i * 150 + 134);
 
-        #pragma omp simd aligned(to_x_z_yzz_xxxx, to_x_z_yzz_xxxy, to_x_z_yzz_xxxz, to_x_z_yzz_xxyy, to_x_z_yzz_xxyz, to_x_z_yzz_xxzz, to_x_z_yzz_xyyy, to_x_z_yzz_xyyz, to_x_z_yzz_xyzz, to_x_z_yzz_xzzz, to_x_z_yzz_yyyy, to_x_z_yzz_yyyz, to_x_z_yzz_yyzz, to_x_z_yzz_yzzz, to_x_z_yzz_zzzz, to_xyzz_xxx, to_xyzz_xxxxz, to_xyzz_xxxyz, to_xyzz_xxxzz, to_xyzz_xxy, to_xyzz_xxyyz, to_xyzz_xxyzz, to_xyzz_xxz, to_xyzz_xxzzz, to_xyzz_xyy, to_xyzz_xyyyz, to_xyzz_xyyzz, to_xyzz_xyz, to_xyzz_xyzzz, to_xyzz_xzz, to_xyzz_xzzzz, to_xyzz_yyy, to_xyzz_yyyyz, to_xyzz_yyyzz, to_xyzz_yyz, to_xyzz_yyzzz, to_xyzz_yzz, to_xyzz_yzzzz, to_xyzz_zzz, to_xyzz_zzzzz, b_exps : 64)
+#pragma omp simd aligned(to_x_z_yzz_xxxx,     \
+                             to_x_z_yzz_xxxy, \
+                             to_x_z_yzz_xxxz, \
+                             to_x_z_yzz_xxyy, \
+                             to_x_z_yzz_xxyz, \
+                             to_x_z_yzz_xxzz, \
+                             to_x_z_yzz_xyyy, \
+                             to_x_z_yzz_xyyz, \
+                             to_x_z_yzz_xyzz, \
+                             to_x_z_yzz_xzzz, \
+                             to_x_z_yzz_yyyy, \
+                             to_x_z_yzz_yyyz, \
+                             to_x_z_yzz_yyzz, \
+                             to_x_z_yzz_yzzz, \
+                             to_x_z_yzz_zzzz, \
+                             to_xyzz_xxx,     \
+                             to_xyzz_xxxxz,   \
+                             to_xyzz_xxxyz,   \
+                             to_xyzz_xxxzz,   \
+                             to_xyzz_xxy,     \
+                             to_xyzz_xxyyz,   \
+                             to_xyzz_xxyzz,   \
+                             to_xyzz_xxz,     \
+                             to_xyzz_xxzzz,   \
+                             to_xyzz_xyy,     \
+                             to_xyzz_xyyyz,   \
+                             to_xyzz_xyyzz,   \
+                             to_xyzz_xyz,     \
+                             to_xyzz_xyzzz,   \
+                             to_xyzz_xzz,     \
+                             to_xyzz_xzzzz,   \
+                             to_xyzz_yyy,     \
+                             to_xyzz_yyyyz,   \
+                             to_xyzz_yyyzz,   \
+                             to_xyzz_yyz,     \
+                             to_xyzz_yyzzz,   \
+                             to_xyzz_yzz,     \
+                             to_xyzz_yzzzz,   \
+                             to_xyzz_zzz,     \
+                             to_xyzz_zzzzz,   \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -3393,7 +5147,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_x_z_zzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 2 * op_comps * 150 + i * 150 + 149);
 
-        #pragma omp simd aligned(to_x_z_zzz_xxxx, to_x_z_zzz_xxxy, to_x_z_zzz_xxxz, to_x_z_zzz_xxyy, to_x_z_zzz_xxyz, to_x_z_zzz_xxzz, to_x_z_zzz_xyyy, to_x_z_zzz_xyyz, to_x_z_zzz_xyzz, to_x_z_zzz_xzzz, to_x_z_zzz_yyyy, to_x_z_zzz_yyyz, to_x_z_zzz_yyzz, to_x_z_zzz_yzzz, to_x_z_zzz_zzzz, to_xzzz_xxx, to_xzzz_xxxxz, to_xzzz_xxxyz, to_xzzz_xxxzz, to_xzzz_xxy, to_xzzz_xxyyz, to_xzzz_xxyzz, to_xzzz_xxz, to_xzzz_xxzzz, to_xzzz_xyy, to_xzzz_xyyyz, to_xzzz_xyyzz, to_xzzz_xyz, to_xzzz_xyzzz, to_xzzz_xzz, to_xzzz_xzzzz, to_xzzz_yyy, to_xzzz_yyyyz, to_xzzz_yyyzz, to_xzzz_yyz, to_xzzz_yyzzz, to_xzzz_yzz, to_xzzz_yzzzz, to_xzzz_zzz, to_xzzz_zzzzz, b_exps : 64)
+#pragma omp simd aligned(to_x_z_zzz_xxxx,     \
+                             to_x_z_zzz_xxxy, \
+                             to_x_z_zzz_xxxz, \
+                             to_x_z_zzz_xxyy, \
+                             to_x_z_zzz_xxyz, \
+                             to_x_z_zzz_xxzz, \
+                             to_x_z_zzz_xyyy, \
+                             to_x_z_zzz_xyyz, \
+                             to_x_z_zzz_xyzz, \
+                             to_x_z_zzz_xzzz, \
+                             to_x_z_zzz_yyyy, \
+                             to_x_z_zzz_yyyz, \
+                             to_x_z_zzz_yyzz, \
+                             to_x_z_zzz_yzzz, \
+                             to_x_z_zzz_zzzz, \
+                             to_xzzz_xxx,     \
+                             to_xzzz_xxxxz,   \
+                             to_xzzz_xxxyz,   \
+                             to_xzzz_xxxzz,   \
+                             to_xzzz_xxy,     \
+                             to_xzzz_xxyyz,   \
+                             to_xzzz_xxyzz,   \
+                             to_xzzz_xxz,     \
+                             to_xzzz_xxzzz,   \
+                             to_xzzz_xyy,     \
+                             to_xzzz_xyyyz,   \
+                             to_xzzz_xyyzz,   \
+                             to_xzzz_xyz,     \
+                             to_xzzz_xyzzz,   \
+                             to_xzzz_xzz,     \
+                             to_xzzz_xzzzz,   \
+                             to_xzzz_yyy,     \
+                             to_xzzz_yyyyz,   \
+                             to_xzzz_yyyzz,   \
+                             to_xzzz_yyz,     \
+                             to_xzzz_yyzzz,   \
+                             to_xzzz_yzz,     \
+                             to_xzzz_yzzzz,   \
+                             to_xzzz_zzz,     \
+                             to_xzzz_zzzzz,   \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -3463,7 +5257,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_x_xxx_zzzz = pbuffer.data(idx_op_geom_101_fg + 3 * op_comps * 150 + i * 150 + 14);
 
-        #pragma omp simd aligned(to_xxxy_xxx, to_xxxy_xxxxx, to_xxxy_xxxxy, to_xxxy_xxxxz, to_xxxy_xxxyy, to_xxxy_xxxyz, to_xxxy_xxxzz, to_xxxy_xxy, to_xxxy_xxyyy, to_xxxy_xxyyz, to_xxxy_xxyzz, to_xxxy_xxz, to_xxxy_xxzzz, to_xxxy_xyy, to_xxxy_xyyyy, to_xxxy_xyyyz, to_xxxy_xyyzz, to_xxxy_xyz, to_xxxy_xyzzz, to_xxxy_xzz, to_xxxy_xzzzz, to_xxxy_yyy, to_xxxy_yyz, to_xxxy_yzz, to_xxxy_zzz, to_y_x_xxx_xxxx, to_y_x_xxx_xxxy, to_y_x_xxx_xxxz, to_y_x_xxx_xxyy, to_y_x_xxx_xxyz, to_y_x_xxx_xxzz, to_y_x_xxx_xyyy, to_y_x_xxx_xyyz, to_y_x_xxx_xyzz, to_y_x_xxx_xzzz, to_y_x_xxx_yyyy, to_y_x_xxx_yyyz, to_y_x_xxx_yyzz, to_y_x_xxx_yzzz, to_y_x_xxx_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xxxy_xxx,         \
+                             to_xxxy_xxxxx,   \
+                             to_xxxy_xxxxy,   \
+                             to_xxxy_xxxxz,   \
+                             to_xxxy_xxxyy,   \
+                             to_xxxy_xxxyz,   \
+                             to_xxxy_xxxzz,   \
+                             to_xxxy_xxy,     \
+                             to_xxxy_xxyyy,   \
+                             to_xxxy_xxyyz,   \
+                             to_xxxy_xxyzz,   \
+                             to_xxxy_xxz,     \
+                             to_xxxy_xxzzz,   \
+                             to_xxxy_xyy,     \
+                             to_xxxy_xyyyy,   \
+                             to_xxxy_xyyyz,   \
+                             to_xxxy_xyyzz,   \
+                             to_xxxy_xyz,     \
+                             to_xxxy_xyzzz,   \
+                             to_xxxy_xzz,     \
+                             to_xxxy_xzzzz,   \
+                             to_xxxy_yyy,     \
+                             to_xxxy_yyz,     \
+                             to_xxxy_yzz,     \
+                             to_xxxy_zzz,     \
+                             to_y_x_xxx_xxxx, \
+                             to_y_x_xxx_xxxy, \
+                             to_y_x_xxx_xxxz, \
+                             to_y_x_xxx_xxyy, \
+                             to_y_x_xxx_xxyz, \
+                             to_y_x_xxx_xxzz, \
+                             to_y_x_xxx_xyyy, \
+                             to_y_x_xxx_xyyz, \
+                             to_y_x_xxx_xyzz, \
+                             to_y_x_xxx_xzzz, \
+                             to_y_x_xxx_yyyy, \
+                             to_y_x_xxx_yyyz, \
+                             to_y_x_xxx_yyzz, \
+                             to_y_x_xxx_yzzz, \
+                             to_y_x_xxx_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -3533,24 +5367,95 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_x_xxy_zzzz = pbuffer.data(idx_op_geom_101_fg + 3 * op_comps * 150 + i * 150 + 29);
 
-        #pragma omp simd aligned(to_xx_xxx, to_xx_xxxxx, to_xx_xxxxy, to_xx_xxxxz, to_xx_xxxyy, to_xx_xxxyz, to_xx_xxxzz, to_xx_xxy, to_xx_xxyyy, to_xx_xxyyz, to_xx_xxyzz, to_xx_xxz, to_xx_xxzzz, to_xx_xyy, to_xx_xyyyy, to_xx_xyyyz, to_xx_xyyzz, to_xx_xyz, to_xx_xyzzz, to_xx_xzz, to_xx_xzzzz, to_xx_yyy, to_xx_yyz, to_xx_yzz, to_xx_zzz, to_xxyy_xxx, to_xxyy_xxxxx, to_xxyy_xxxxy, to_xxyy_xxxxz, to_xxyy_xxxyy, to_xxyy_xxxyz, to_xxyy_xxxzz, to_xxyy_xxy, to_xxyy_xxyyy, to_xxyy_xxyyz, to_xxyy_xxyzz, to_xxyy_xxz, to_xxyy_xxzzz, to_xxyy_xyy, to_xxyy_xyyyy, to_xxyy_xyyyz, to_xxyy_xyyzz, to_xxyy_xyz, to_xxyy_xyzzz, to_xxyy_xzz, to_xxyy_xzzzz, to_xxyy_yyy, to_xxyy_yyz, to_xxyy_yzz, to_xxyy_zzz, to_y_x_xxy_xxxx, to_y_x_xxy_xxxy, to_y_x_xxy_xxxz, to_y_x_xxy_xxyy, to_y_x_xxy_xxyz, to_y_x_xxy_xxzz, to_y_x_xxy_xyyy, to_y_x_xxy_xyyz, to_y_x_xxy_xyzz, to_y_x_xxy_xzzz, to_y_x_xxy_yyyy, to_y_x_xxy_yyyz, to_y_x_xxy_yyzz, to_y_x_xxy_yzzz, to_y_x_xxy_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xx_xxx,           \
+                             to_xx_xxxxx,     \
+                             to_xx_xxxxy,     \
+                             to_xx_xxxxz,     \
+                             to_xx_xxxyy,     \
+                             to_xx_xxxyz,     \
+                             to_xx_xxxzz,     \
+                             to_xx_xxy,       \
+                             to_xx_xxyyy,     \
+                             to_xx_xxyyz,     \
+                             to_xx_xxyzz,     \
+                             to_xx_xxz,       \
+                             to_xx_xxzzz,     \
+                             to_xx_xyy,       \
+                             to_xx_xyyyy,     \
+                             to_xx_xyyyz,     \
+                             to_xx_xyyzz,     \
+                             to_xx_xyz,       \
+                             to_xx_xyzzz,     \
+                             to_xx_xzz,       \
+                             to_xx_xzzzz,     \
+                             to_xx_yyy,       \
+                             to_xx_yyz,       \
+                             to_xx_yzz,       \
+                             to_xx_zzz,       \
+                             to_xxyy_xxx,     \
+                             to_xxyy_xxxxx,   \
+                             to_xxyy_xxxxy,   \
+                             to_xxyy_xxxxz,   \
+                             to_xxyy_xxxyy,   \
+                             to_xxyy_xxxyz,   \
+                             to_xxyy_xxxzz,   \
+                             to_xxyy_xxy,     \
+                             to_xxyy_xxyyy,   \
+                             to_xxyy_xxyyz,   \
+                             to_xxyy_xxyzz,   \
+                             to_xxyy_xxz,     \
+                             to_xxyy_xxzzz,   \
+                             to_xxyy_xyy,     \
+                             to_xxyy_xyyyy,   \
+                             to_xxyy_xyyyz,   \
+                             to_xxyy_xyyzz,   \
+                             to_xxyy_xyz,     \
+                             to_xxyy_xyzzz,   \
+                             to_xxyy_xzz,     \
+                             to_xxyy_xzzzz,   \
+                             to_xxyy_yyy,     \
+                             to_xxyy_yyz,     \
+                             to_xxyy_yzz,     \
+                             to_xxyy_zzz,     \
+                             to_y_x_xxy_xxxx, \
+                             to_y_x_xxy_xxxy, \
+                             to_y_x_xxy_xxxz, \
+                             to_y_x_xxy_xxyy, \
+                             to_y_x_xxy_xxyz, \
+                             to_y_x_xxy_xxzz, \
+                             to_y_x_xxy_xyyy, \
+                             to_y_x_xxy_xyyz, \
+                             to_y_x_xxy_xyzz, \
+                             to_y_x_xxy_xzzz, \
+                             to_y_x_xxy_yyyy, \
+                             to_y_x_xxy_yyyz, \
+                             to_y_x_xxy_yyzz, \
+                             to_y_x_xxy_yzzz, \
+                             to_y_x_xxy_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_y_x_xxy_xxxx[k] = 4.0 * to_xx_xxx[k] - 2.0 * to_xx_xxxxx[k] * tke_0 - 8.0 * to_xxyy_xxx[k] * tbe_0 + 4.0 * to_xxyy_xxxxx[k] * tbe_0 * tke_0;
+            to_y_x_xxy_xxxx[k] =
+                4.0 * to_xx_xxx[k] - 2.0 * to_xx_xxxxx[k] * tke_0 - 8.0 * to_xxyy_xxx[k] * tbe_0 + 4.0 * to_xxyy_xxxxx[k] * tbe_0 * tke_0;
 
-            to_y_x_xxy_xxxy[k] = 3.0 * to_xx_xxy[k] - 2.0 * to_xx_xxxxy[k] * tke_0 - 6.0 * to_xxyy_xxy[k] * tbe_0 + 4.0 * to_xxyy_xxxxy[k] * tbe_0 * tke_0;
+            to_y_x_xxy_xxxy[k] =
+                3.0 * to_xx_xxy[k] - 2.0 * to_xx_xxxxy[k] * tke_0 - 6.0 * to_xxyy_xxy[k] * tbe_0 + 4.0 * to_xxyy_xxxxy[k] * tbe_0 * tke_0;
 
-            to_y_x_xxy_xxxz[k] = 3.0 * to_xx_xxz[k] - 2.0 * to_xx_xxxxz[k] * tke_0 - 6.0 * to_xxyy_xxz[k] * tbe_0 + 4.0 * to_xxyy_xxxxz[k] * tbe_0 * tke_0;
+            to_y_x_xxy_xxxz[k] =
+                3.0 * to_xx_xxz[k] - 2.0 * to_xx_xxxxz[k] * tke_0 - 6.0 * to_xxyy_xxz[k] * tbe_0 + 4.0 * to_xxyy_xxxxz[k] * tbe_0 * tke_0;
 
-            to_y_x_xxy_xxyy[k] = 2.0 * to_xx_xyy[k] - 2.0 * to_xx_xxxyy[k] * tke_0 - 4.0 * to_xxyy_xyy[k] * tbe_0 + 4.0 * to_xxyy_xxxyy[k] * tbe_0 * tke_0;
+            to_y_x_xxy_xxyy[k] =
+                2.0 * to_xx_xyy[k] - 2.0 * to_xx_xxxyy[k] * tke_0 - 4.0 * to_xxyy_xyy[k] * tbe_0 + 4.0 * to_xxyy_xxxyy[k] * tbe_0 * tke_0;
 
-            to_y_x_xxy_xxyz[k] = 2.0 * to_xx_xyz[k] - 2.0 * to_xx_xxxyz[k] * tke_0 - 4.0 * to_xxyy_xyz[k] * tbe_0 + 4.0 * to_xxyy_xxxyz[k] * tbe_0 * tke_0;
+            to_y_x_xxy_xxyz[k] =
+                2.0 * to_xx_xyz[k] - 2.0 * to_xx_xxxyz[k] * tke_0 - 4.0 * to_xxyy_xyz[k] * tbe_0 + 4.0 * to_xxyy_xxxyz[k] * tbe_0 * tke_0;
 
-            to_y_x_xxy_xxzz[k] = 2.0 * to_xx_xzz[k] - 2.0 * to_xx_xxxzz[k] * tke_0 - 4.0 * to_xxyy_xzz[k] * tbe_0 + 4.0 * to_xxyy_xxxzz[k] * tbe_0 * tke_0;
+            to_y_x_xxy_xxzz[k] =
+                2.0 * to_xx_xzz[k] - 2.0 * to_xx_xxxzz[k] * tke_0 - 4.0 * to_xxyy_xzz[k] * tbe_0 + 4.0 * to_xxyy_xxxzz[k] * tbe_0 * tke_0;
 
             to_y_x_xxy_xyyy[k] = to_xx_yyy[k] - 2.0 * to_xx_xxyyy[k] * tke_0 - 2.0 * to_xxyy_yyy[k] * tbe_0 + 4.0 * to_xxyy_xxyyy[k] * tbe_0 * tke_0;
 
@@ -3603,7 +5508,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_x_xxz_zzzz = pbuffer.data(idx_op_geom_101_fg + 3 * op_comps * 150 + i * 150 + 44);
 
-        #pragma omp simd aligned(to_xxyz_xxx, to_xxyz_xxxxx, to_xxyz_xxxxy, to_xxyz_xxxxz, to_xxyz_xxxyy, to_xxyz_xxxyz, to_xxyz_xxxzz, to_xxyz_xxy, to_xxyz_xxyyy, to_xxyz_xxyyz, to_xxyz_xxyzz, to_xxyz_xxz, to_xxyz_xxzzz, to_xxyz_xyy, to_xxyz_xyyyy, to_xxyz_xyyyz, to_xxyz_xyyzz, to_xxyz_xyz, to_xxyz_xyzzz, to_xxyz_xzz, to_xxyz_xzzzz, to_xxyz_yyy, to_xxyz_yyz, to_xxyz_yzz, to_xxyz_zzz, to_y_x_xxz_xxxx, to_y_x_xxz_xxxy, to_y_x_xxz_xxxz, to_y_x_xxz_xxyy, to_y_x_xxz_xxyz, to_y_x_xxz_xxzz, to_y_x_xxz_xyyy, to_y_x_xxz_xyyz, to_y_x_xxz_xyzz, to_y_x_xxz_xzzz, to_y_x_xxz_yyyy, to_y_x_xxz_yyyz, to_y_x_xxz_yyzz, to_y_x_xxz_yzzz, to_y_x_xxz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xxyz_xxx,         \
+                             to_xxyz_xxxxx,   \
+                             to_xxyz_xxxxy,   \
+                             to_xxyz_xxxxz,   \
+                             to_xxyz_xxxyy,   \
+                             to_xxyz_xxxyz,   \
+                             to_xxyz_xxxzz,   \
+                             to_xxyz_xxy,     \
+                             to_xxyz_xxyyy,   \
+                             to_xxyz_xxyyz,   \
+                             to_xxyz_xxyzz,   \
+                             to_xxyz_xxz,     \
+                             to_xxyz_xxzzz,   \
+                             to_xxyz_xyy,     \
+                             to_xxyz_xyyyy,   \
+                             to_xxyz_xyyyz,   \
+                             to_xxyz_xyyzz,   \
+                             to_xxyz_xyz,     \
+                             to_xxyz_xyzzz,   \
+                             to_xxyz_xzz,     \
+                             to_xxyz_xzzzz,   \
+                             to_xxyz_yyy,     \
+                             to_xxyz_yyz,     \
+                             to_xxyz_yzz,     \
+                             to_xxyz_zzz,     \
+                             to_y_x_xxz_xxxx, \
+                             to_y_x_xxz_xxxy, \
+                             to_y_x_xxz_xxxz, \
+                             to_y_x_xxz_xxyy, \
+                             to_y_x_xxz_xxyz, \
+                             to_y_x_xxz_xxzz, \
+                             to_y_x_xxz_xyyy, \
+                             to_y_x_xxz_xyyz, \
+                             to_y_x_xxz_xyzz, \
+                             to_y_x_xxz_xzzz, \
+                             to_y_x_xxz_yyyy, \
+                             to_y_x_xxz_yyyz, \
+                             to_y_x_xxz_yyzz, \
+                             to_y_x_xxz_yzzz, \
+                             to_y_x_xxz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -3673,32 +5618,107 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_x_xyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 3 * op_comps * 150 + i * 150 + 59);
 
-        #pragma omp simd aligned(to_xy_xxx, to_xy_xxxxx, to_xy_xxxxy, to_xy_xxxxz, to_xy_xxxyy, to_xy_xxxyz, to_xy_xxxzz, to_xy_xxy, to_xy_xxyyy, to_xy_xxyyz, to_xy_xxyzz, to_xy_xxz, to_xy_xxzzz, to_xy_xyy, to_xy_xyyyy, to_xy_xyyyz, to_xy_xyyzz, to_xy_xyz, to_xy_xyzzz, to_xy_xzz, to_xy_xzzzz, to_xy_yyy, to_xy_yyz, to_xy_yzz, to_xy_zzz, to_xyyy_xxx, to_xyyy_xxxxx, to_xyyy_xxxxy, to_xyyy_xxxxz, to_xyyy_xxxyy, to_xyyy_xxxyz, to_xyyy_xxxzz, to_xyyy_xxy, to_xyyy_xxyyy, to_xyyy_xxyyz, to_xyyy_xxyzz, to_xyyy_xxz, to_xyyy_xxzzz, to_xyyy_xyy, to_xyyy_xyyyy, to_xyyy_xyyyz, to_xyyy_xyyzz, to_xyyy_xyz, to_xyyy_xyzzz, to_xyyy_xzz, to_xyyy_xzzzz, to_xyyy_yyy, to_xyyy_yyz, to_xyyy_yzz, to_xyyy_zzz, to_y_x_xyy_xxxx, to_y_x_xyy_xxxy, to_y_x_xyy_xxxz, to_y_x_xyy_xxyy, to_y_x_xyy_xxyz, to_y_x_xyy_xxzz, to_y_x_xyy_xyyy, to_y_x_xyy_xyyz, to_y_x_xyy_xyzz, to_y_x_xyy_xzzz, to_y_x_xyy_yyyy, to_y_x_xyy_yyyz, to_y_x_xyy_yyzz, to_y_x_xyy_yzzz, to_y_x_xyy_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xy_xxx,           \
+                             to_xy_xxxxx,     \
+                             to_xy_xxxxy,     \
+                             to_xy_xxxxz,     \
+                             to_xy_xxxyy,     \
+                             to_xy_xxxyz,     \
+                             to_xy_xxxzz,     \
+                             to_xy_xxy,       \
+                             to_xy_xxyyy,     \
+                             to_xy_xxyyz,     \
+                             to_xy_xxyzz,     \
+                             to_xy_xxz,       \
+                             to_xy_xxzzz,     \
+                             to_xy_xyy,       \
+                             to_xy_xyyyy,     \
+                             to_xy_xyyyz,     \
+                             to_xy_xyyzz,     \
+                             to_xy_xyz,       \
+                             to_xy_xyzzz,     \
+                             to_xy_xzz,       \
+                             to_xy_xzzzz,     \
+                             to_xy_yyy,       \
+                             to_xy_yyz,       \
+                             to_xy_yzz,       \
+                             to_xy_zzz,       \
+                             to_xyyy_xxx,     \
+                             to_xyyy_xxxxx,   \
+                             to_xyyy_xxxxy,   \
+                             to_xyyy_xxxxz,   \
+                             to_xyyy_xxxyy,   \
+                             to_xyyy_xxxyz,   \
+                             to_xyyy_xxxzz,   \
+                             to_xyyy_xxy,     \
+                             to_xyyy_xxyyy,   \
+                             to_xyyy_xxyyz,   \
+                             to_xyyy_xxyzz,   \
+                             to_xyyy_xxz,     \
+                             to_xyyy_xxzzz,   \
+                             to_xyyy_xyy,     \
+                             to_xyyy_xyyyy,   \
+                             to_xyyy_xyyyz,   \
+                             to_xyyy_xyyzz,   \
+                             to_xyyy_xyz,     \
+                             to_xyyy_xyzzz,   \
+                             to_xyyy_xzz,     \
+                             to_xyyy_xzzzz,   \
+                             to_xyyy_yyy,     \
+                             to_xyyy_yyz,     \
+                             to_xyyy_yzz,     \
+                             to_xyyy_zzz,     \
+                             to_y_x_xyy_xxxx, \
+                             to_y_x_xyy_xxxy, \
+                             to_y_x_xyy_xxxz, \
+                             to_y_x_xyy_xxyy, \
+                             to_y_x_xyy_xxyz, \
+                             to_y_x_xyy_xxzz, \
+                             to_y_x_xyy_xyyy, \
+                             to_y_x_xyy_xyyz, \
+                             to_y_x_xyy_xyzz, \
+                             to_y_x_xyy_xzzz, \
+                             to_y_x_xyy_yyyy, \
+                             to_y_x_xyy_yyyz, \
+                             to_y_x_xyy_yyzz, \
+                             to_y_x_xyy_yzzz, \
+                             to_y_x_xyy_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_y_x_xyy_xxxx[k] = 8.0 * to_xy_xxx[k] - 4.0 * to_xy_xxxxx[k] * tke_0 - 8.0 * to_xyyy_xxx[k] * tbe_0 + 4.0 * to_xyyy_xxxxx[k] * tbe_0 * tke_0;
+            to_y_x_xyy_xxxx[k] =
+                8.0 * to_xy_xxx[k] - 4.0 * to_xy_xxxxx[k] * tke_0 - 8.0 * to_xyyy_xxx[k] * tbe_0 + 4.0 * to_xyyy_xxxxx[k] * tbe_0 * tke_0;
 
-            to_y_x_xyy_xxxy[k] = 6.0 * to_xy_xxy[k] - 4.0 * to_xy_xxxxy[k] * tke_0 - 6.0 * to_xyyy_xxy[k] * tbe_0 + 4.0 * to_xyyy_xxxxy[k] * tbe_0 * tke_0;
+            to_y_x_xyy_xxxy[k] =
+                6.0 * to_xy_xxy[k] - 4.0 * to_xy_xxxxy[k] * tke_0 - 6.0 * to_xyyy_xxy[k] * tbe_0 + 4.0 * to_xyyy_xxxxy[k] * tbe_0 * tke_0;
 
-            to_y_x_xyy_xxxz[k] = 6.0 * to_xy_xxz[k] - 4.0 * to_xy_xxxxz[k] * tke_0 - 6.0 * to_xyyy_xxz[k] * tbe_0 + 4.0 * to_xyyy_xxxxz[k] * tbe_0 * tke_0;
+            to_y_x_xyy_xxxz[k] =
+                6.0 * to_xy_xxz[k] - 4.0 * to_xy_xxxxz[k] * tke_0 - 6.0 * to_xyyy_xxz[k] * tbe_0 + 4.0 * to_xyyy_xxxxz[k] * tbe_0 * tke_0;
 
-            to_y_x_xyy_xxyy[k] = 4.0 * to_xy_xyy[k] - 4.0 * to_xy_xxxyy[k] * tke_0 - 4.0 * to_xyyy_xyy[k] * tbe_0 + 4.0 * to_xyyy_xxxyy[k] * tbe_0 * tke_0;
+            to_y_x_xyy_xxyy[k] =
+                4.0 * to_xy_xyy[k] - 4.0 * to_xy_xxxyy[k] * tke_0 - 4.0 * to_xyyy_xyy[k] * tbe_0 + 4.0 * to_xyyy_xxxyy[k] * tbe_0 * tke_0;
 
-            to_y_x_xyy_xxyz[k] = 4.0 * to_xy_xyz[k] - 4.0 * to_xy_xxxyz[k] * tke_0 - 4.0 * to_xyyy_xyz[k] * tbe_0 + 4.0 * to_xyyy_xxxyz[k] * tbe_0 * tke_0;
+            to_y_x_xyy_xxyz[k] =
+                4.0 * to_xy_xyz[k] - 4.0 * to_xy_xxxyz[k] * tke_0 - 4.0 * to_xyyy_xyz[k] * tbe_0 + 4.0 * to_xyyy_xxxyz[k] * tbe_0 * tke_0;
 
-            to_y_x_xyy_xxzz[k] = 4.0 * to_xy_xzz[k] - 4.0 * to_xy_xxxzz[k] * tke_0 - 4.0 * to_xyyy_xzz[k] * tbe_0 + 4.0 * to_xyyy_xxxzz[k] * tbe_0 * tke_0;
+            to_y_x_xyy_xxzz[k] =
+                4.0 * to_xy_xzz[k] - 4.0 * to_xy_xxxzz[k] * tke_0 - 4.0 * to_xyyy_xzz[k] * tbe_0 + 4.0 * to_xyyy_xxxzz[k] * tbe_0 * tke_0;
 
-            to_y_x_xyy_xyyy[k] = 2.0 * to_xy_yyy[k] - 4.0 * to_xy_xxyyy[k] * tke_0 - 2.0 * to_xyyy_yyy[k] * tbe_0 + 4.0 * to_xyyy_xxyyy[k] * tbe_0 * tke_0;
+            to_y_x_xyy_xyyy[k] =
+                2.0 * to_xy_yyy[k] - 4.0 * to_xy_xxyyy[k] * tke_0 - 2.0 * to_xyyy_yyy[k] * tbe_0 + 4.0 * to_xyyy_xxyyy[k] * tbe_0 * tke_0;
 
-            to_y_x_xyy_xyyz[k] = 2.0 * to_xy_yyz[k] - 4.0 * to_xy_xxyyz[k] * tke_0 - 2.0 * to_xyyy_yyz[k] * tbe_0 + 4.0 * to_xyyy_xxyyz[k] * tbe_0 * tke_0;
+            to_y_x_xyy_xyyz[k] =
+                2.0 * to_xy_yyz[k] - 4.0 * to_xy_xxyyz[k] * tke_0 - 2.0 * to_xyyy_yyz[k] * tbe_0 + 4.0 * to_xyyy_xxyyz[k] * tbe_0 * tke_0;
 
-            to_y_x_xyy_xyzz[k] = 2.0 * to_xy_yzz[k] - 4.0 * to_xy_xxyzz[k] * tke_0 - 2.0 * to_xyyy_yzz[k] * tbe_0 + 4.0 * to_xyyy_xxyzz[k] * tbe_0 * tke_0;
+            to_y_x_xyy_xyzz[k] =
+                2.0 * to_xy_yzz[k] - 4.0 * to_xy_xxyzz[k] * tke_0 - 2.0 * to_xyyy_yzz[k] * tbe_0 + 4.0 * to_xyyy_xxyzz[k] * tbe_0 * tke_0;
 
-            to_y_x_xyy_xzzz[k] = 2.0 * to_xy_zzz[k] - 4.0 * to_xy_xxzzz[k] * tke_0 - 2.0 * to_xyyy_zzz[k] * tbe_0 + 4.0 * to_xyyy_xxzzz[k] * tbe_0 * tke_0;
+            to_y_x_xyy_xzzz[k] =
+                2.0 * to_xy_zzz[k] - 4.0 * to_xy_xxzzz[k] * tke_0 - 2.0 * to_xyyy_zzz[k] * tbe_0 + 4.0 * to_xyyy_xxzzz[k] * tbe_0 * tke_0;
 
             to_y_x_xyy_yyyy[k] = -4.0 * to_xy_xyyyy[k] * tke_0 + 4.0 * to_xyyy_xyyyy[k] * tbe_0 * tke_0;
 
@@ -3743,24 +5763,95 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_x_xyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 3 * op_comps * 150 + i * 150 + 74);
 
-        #pragma omp simd aligned(to_xyyz_xxx, to_xyyz_xxxxx, to_xyyz_xxxxy, to_xyyz_xxxxz, to_xyyz_xxxyy, to_xyyz_xxxyz, to_xyyz_xxxzz, to_xyyz_xxy, to_xyyz_xxyyy, to_xyyz_xxyyz, to_xyyz_xxyzz, to_xyyz_xxz, to_xyyz_xxzzz, to_xyyz_xyy, to_xyyz_xyyyy, to_xyyz_xyyyz, to_xyyz_xyyzz, to_xyyz_xyz, to_xyyz_xyzzz, to_xyyz_xzz, to_xyyz_xzzzz, to_xyyz_yyy, to_xyyz_yyz, to_xyyz_yzz, to_xyyz_zzz, to_xz_xxx, to_xz_xxxxx, to_xz_xxxxy, to_xz_xxxxz, to_xz_xxxyy, to_xz_xxxyz, to_xz_xxxzz, to_xz_xxy, to_xz_xxyyy, to_xz_xxyyz, to_xz_xxyzz, to_xz_xxz, to_xz_xxzzz, to_xz_xyy, to_xz_xyyyy, to_xz_xyyyz, to_xz_xyyzz, to_xz_xyz, to_xz_xyzzz, to_xz_xzz, to_xz_xzzzz, to_xz_yyy, to_xz_yyz, to_xz_yzz, to_xz_zzz, to_y_x_xyz_xxxx, to_y_x_xyz_xxxy, to_y_x_xyz_xxxz, to_y_x_xyz_xxyy, to_y_x_xyz_xxyz, to_y_x_xyz_xxzz, to_y_x_xyz_xyyy, to_y_x_xyz_xyyz, to_y_x_xyz_xyzz, to_y_x_xyz_xzzz, to_y_x_xyz_yyyy, to_y_x_xyz_yyyz, to_y_x_xyz_yyzz, to_y_x_xyz_yzzz, to_y_x_xyz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xyyz_xxx,         \
+                             to_xyyz_xxxxx,   \
+                             to_xyyz_xxxxy,   \
+                             to_xyyz_xxxxz,   \
+                             to_xyyz_xxxyy,   \
+                             to_xyyz_xxxyz,   \
+                             to_xyyz_xxxzz,   \
+                             to_xyyz_xxy,     \
+                             to_xyyz_xxyyy,   \
+                             to_xyyz_xxyyz,   \
+                             to_xyyz_xxyzz,   \
+                             to_xyyz_xxz,     \
+                             to_xyyz_xxzzz,   \
+                             to_xyyz_xyy,     \
+                             to_xyyz_xyyyy,   \
+                             to_xyyz_xyyyz,   \
+                             to_xyyz_xyyzz,   \
+                             to_xyyz_xyz,     \
+                             to_xyyz_xyzzz,   \
+                             to_xyyz_xzz,     \
+                             to_xyyz_xzzzz,   \
+                             to_xyyz_yyy,     \
+                             to_xyyz_yyz,     \
+                             to_xyyz_yzz,     \
+                             to_xyyz_zzz,     \
+                             to_xz_xxx,       \
+                             to_xz_xxxxx,     \
+                             to_xz_xxxxy,     \
+                             to_xz_xxxxz,     \
+                             to_xz_xxxyy,     \
+                             to_xz_xxxyz,     \
+                             to_xz_xxxzz,     \
+                             to_xz_xxy,       \
+                             to_xz_xxyyy,     \
+                             to_xz_xxyyz,     \
+                             to_xz_xxyzz,     \
+                             to_xz_xxz,       \
+                             to_xz_xxzzz,     \
+                             to_xz_xyy,       \
+                             to_xz_xyyyy,     \
+                             to_xz_xyyyz,     \
+                             to_xz_xyyzz,     \
+                             to_xz_xyz,       \
+                             to_xz_xyzzz,     \
+                             to_xz_xzz,       \
+                             to_xz_xzzzz,     \
+                             to_xz_yyy,       \
+                             to_xz_yyz,       \
+                             to_xz_yzz,       \
+                             to_xz_zzz,       \
+                             to_y_x_xyz_xxxx, \
+                             to_y_x_xyz_xxxy, \
+                             to_y_x_xyz_xxxz, \
+                             to_y_x_xyz_xxyy, \
+                             to_y_x_xyz_xxyz, \
+                             to_y_x_xyz_xxzz, \
+                             to_y_x_xyz_xyyy, \
+                             to_y_x_xyz_xyyz, \
+                             to_y_x_xyz_xyzz, \
+                             to_y_x_xyz_xzzz, \
+                             to_y_x_xyz_yyyy, \
+                             to_y_x_xyz_yyyz, \
+                             to_y_x_xyz_yyzz, \
+                             to_y_x_xyz_yzzz, \
+                             to_y_x_xyz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_y_x_xyz_xxxx[k] = 4.0 * to_xz_xxx[k] - 2.0 * to_xz_xxxxx[k] * tke_0 - 8.0 * to_xyyz_xxx[k] * tbe_0 + 4.0 * to_xyyz_xxxxx[k] * tbe_0 * tke_0;
+            to_y_x_xyz_xxxx[k] =
+                4.0 * to_xz_xxx[k] - 2.0 * to_xz_xxxxx[k] * tke_0 - 8.0 * to_xyyz_xxx[k] * tbe_0 + 4.0 * to_xyyz_xxxxx[k] * tbe_0 * tke_0;
 
-            to_y_x_xyz_xxxy[k] = 3.0 * to_xz_xxy[k] - 2.0 * to_xz_xxxxy[k] * tke_0 - 6.0 * to_xyyz_xxy[k] * tbe_0 + 4.0 * to_xyyz_xxxxy[k] * tbe_0 * tke_0;
+            to_y_x_xyz_xxxy[k] =
+                3.0 * to_xz_xxy[k] - 2.0 * to_xz_xxxxy[k] * tke_0 - 6.0 * to_xyyz_xxy[k] * tbe_0 + 4.0 * to_xyyz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_y_x_xyz_xxxz[k] = 3.0 * to_xz_xxz[k] - 2.0 * to_xz_xxxxz[k] * tke_0 - 6.0 * to_xyyz_xxz[k] * tbe_0 + 4.0 * to_xyyz_xxxxz[k] * tbe_0 * tke_0;
+            to_y_x_xyz_xxxz[k] =
+                3.0 * to_xz_xxz[k] - 2.0 * to_xz_xxxxz[k] * tke_0 - 6.0 * to_xyyz_xxz[k] * tbe_0 + 4.0 * to_xyyz_xxxxz[k] * tbe_0 * tke_0;
 
-            to_y_x_xyz_xxyy[k] = 2.0 * to_xz_xyy[k] - 2.0 * to_xz_xxxyy[k] * tke_0 - 4.0 * to_xyyz_xyy[k] * tbe_0 + 4.0 * to_xyyz_xxxyy[k] * tbe_0 * tke_0;
+            to_y_x_xyz_xxyy[k] =
+                2.0 * to_xz_xyy[k] - 2.0 * to_xz_xxxyy[k] * tke_0 - 4.0 * to_xyyz_xyy[k] * tbe_0 + 4.0 * to_xyyz_xxxyy[k] * tbe_0 * tke_0;
 
-            to_y_x_xyz_xxyz[k] = 2.0 * to_xz_xyz[k] - 2.0 * to_xz_xxxyz[k] * tke_0 - 4.0 * to_xyyz_xyz[k] * tbe_0 + 4.0 * to_xyyz_xxxyz[k] * tbe_0 * tke_0;
+            to_y_x_xyz_xxyz[k] =
+                2.0 * to_xz_xyz[k] - 2.0 * to_xz_xxxyz[k] * tke_0 - 4.0 * to_xyyz_xyz[k] * tbe_0 + 4.0 * to_xyyz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_y_x_xyz_xxzz[k] = 2.0 * to_xz_xzz[k] - 2.0 * to_xz_xxxzz[k] * tke_0 - 4.0 * to_xyyz_xzz[k] * tbe_0 + 4.0 * to_xyyz_xxxzz[k] * tbe_0 * tke_0;
+            to_y_x_xyz_xxzz[k] =
+                2.0 * to_xz_xzz[k] - 2.0 * to_xz_xxxzz[k] * tke_0 - 4.0 * to_xyyz_xzz[k] * tbe_0 + 4.0 * to_xyyz_xxxzz[k] * tbe_0 * tke_0;
 
             to_y_x_xyz_xyyy[k] = to_xz_yyy[k] - 2.0 * to_xz_xxyyy[k] * tke_0 - 2.0 * to_xyyz_yyy[k] * tbe_0 + 4.0 * to_xyyz_xxyyy[k] * tbe_0 * tke_0;
 
@@ -3813,7 +5904,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_x_xzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 3 * op_comps * 150 + i * 150 + 89);
 
-        #pragma omp simd aligned(to_xyzz_xxx, to_xyzz_xxxxx, to_xyzz_xxxxy, to_xyzz_xxxxz, to_xyzz_xxxyy, to_xyzz_xxxyz, to_xyzz_xxxzz, to_xyzz_xxy, to_xyzz_xxyyy, to_xyzz_xxyyz, to_xyzz_xxyzz, to_xyzz_xxz, to_xyzz_xxzzz, to_xyzz_xyy, to_xyzz_xyyyy, to_xyzz_xyyyz, to_xyzz_xyyzz, to_xyzz_xyz, to_xyzz_xyzzz, to_xyzz_xzz, to_xyzz_xzzzz, to_xyzz_yyy, to_xyzz_yyz, to_xyzz_yzz, to_xyzz_zzz, to_y_x_xzz_xxxx, to_y_x_xzz_xxxy, to_y_x_xzz_xxxz, to_y_x_xzz_xxyy, to_y_x_xzz_xxyz, to_y_x_xzz_xxzz, to_y_x_xzz_xyyy, to_y_x_xzz_xyyz, to_y_x_xzz_xyzz, to_y_x_xzz_xzzz, to_y_x_xzz_yyyy, to_y_x_xzz_yyyz, to_y_x_xzz_yyzz, to_y_x_xzz_yzzz, to_y_x_xzz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xyzz_xxx,         \
+                             to_xyzz_xxxxx,   \
+                             to_xyzz_xxxxy,   \
+                             to_xyzz_xxxxz,   \
+                             to_xyzz_xxxyy,   \
+                             to_xyzz_xxxyz,   \
+                             to_xyzz_xxxzz,   \
+                             to_xyzz_xxy,     \
+                             to_xyzz_xxyyy,   \
+                             to_xyzz_xxyyz,   \
+                             to_xyzz_xxyzz,   \
+                             to_xyzz_xxz,     \
+                             to_xyzz_xxzzz,   \
+                             to_xyzz_xyy,     \
+                             to_xyzz_xyyyy,   \
+                             to_xyzz_xyyyz,   \
+                             to_xyzz_xyyzz,   \
+                             to_xyzz_xyz,     \
+                             to_xyzz_xyzzz,   \
+                             to_xyzz_xzz,     \
+                             to_xyzz_xzzzz,   \
+                             to_xyzz_yyy,     \
+                             to_xyzz_yyz,     \
+                             to_xyzz_yzz,     \
+                             to_xyzz_zzz,     \
+                             to_y_x_xzz_xxxx, \
+                             to_y_x_xzz_xxxy, \
+                             to_y_x_xzz_xxxz, \
+                             to_y_x_xzz_xxyy, \
+                             to_y_x_xzz_xxyz, \
+                             to_y_x_xzz_xxzz, \
+                             to_y_x_xzz_xyyy, \
+                             to_y_x_xzz_xyyz, \
+                             to_y_x_xzz_xyzz, \
+                             to_y_x_xzz_xzzz, \
+                             to_y_x_xzz_yyyy, \
+                             to_y_x_xzz_yyyz, \
+                             to_y_x_xzz_yyzz, \
+                             to_y_x_xzz_yzzz, \
+                             to_y_x_xzz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -3883,32 +6014,107 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_x_yyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 3 * op_comps * 150 + i * 150 + 104);
 
-        #pragma omp simd aligned(to_y_x_yyy_xxxx, to_y_x_yyy_xxxy, to_y_x_yyy_xxxz, to_y_x_yyy_xxyy, to_y_x_yyy_xxyz, to_y_x_yyy_xxzz, to_y_x_yyy_xyyy, to_y_x_yyy_xyyz, to_y_x_yyy_xyzz, to_y_x_yyy_xzzz, to_y_x_yyy_yyyy, to_y_x_yyy_yyyz, to_y_x_yyy_yyzz, to_y_x_yyy_yzzz, to_y_x_yyy_zzzz, to_yy_xxx, to_yy_xxxxx, to_yy_xxxxy, to_yy_xxxxz, to_yy_xxxyy, to_yy_xxxyz, to_yy_xxxzz, to_yy_xxy, to_yy_xxyyy, to_yy_xxyyz, to_yy_xxyzz, to_yy_xxz, to_yy_xxzzz, to_yy_xyy, to_yy_xyyyy, to_yy_xyyyz, to_yy_xyyzz, to_yy_xyz, to_yy_xyzzz, to_yy_xzz, to_yy_xzzzz, to_yy_yyy, to_yy_yyz, to_yy_yzz, to_yy_zzz, to_yyyy_xxx, to_yyyy_xxxxx, to_yyyy_xxxxy, to_yyyy_xxxxz, to_yyyy_xxxyy, to_yyyy_xxxyz, to_yyyy_xxxzz, to_yyyy_xxy, to_yyyy_xxyyy, to_yyyy_xxyyz, to_yyyy_xxyzz, to_yyyy_xxz, to_yyyy_xxzzz, to_yyyy_xyy, to_yyyy_xyyyy, to_yyyy_xyyyz, to_yyyy_xyyzz, to_yyyy_xyz, to_yyyy_xyzzz, to_yyyy_xzz, to_yyyy_xzzzz, to_yyyy_yyy, to_yyyy_yyz, to_yyyy_yzz, to_yyyy_zzz, b_exps : 64)
+#pragma omp simd aligned(to_y_x_yyy_xxxx,     \
+                             to_y_x_yyy_xxxy, \
+                             to_y_x_yyy_xxxz, \
+                             to_y_x_yyy_xxyy, \
+                             to_y_x_yyy_xxyz, \
+                             to_y_x_yyy_xxzz, \
+                             to_y_x_yyy_xyyy, \
+                             to_y_x_yyy_xyyz, \
+                             to_y_x_yyy_xyzz, \
+                             to_y_x_yyy_xzzz, \
+                             to_y_x_yyy_yyyy, \
+                             to_y_x_yyy_yyyz, \
+                             to_y_x_yyy_yyzz, \
+                             to_y_x_yyy_yzzz, \
+                             to_y_x_yyy_zzzz, \
+                             to_yy_xxx,       \
+                             to_yy_xxxxx,     \
+                             to_yy_xxxxy,     \
+                             to_yy_xxxxz,     \
+                             to_yy_xxxyy,     \
+                             to_yy_xxxyz,     \
+                             to_yy_xxxzz,     \
+                             to_yy_xxy,       \
+                             to_yy_xxyyy,     \
+                             to_yy_xxyyz,     \
+                             to_yy_xxyzz,     \
+                             to_yy_xxz,       \
+                             to_yy_xxzzz,     \
+                             to_yy_xyy,       \
+                             to_yy_xyyyy,     \
+                             to_yy_xyyyz,     \
+                             to_yy_xyyzz,     \
+                             to_yy_xyz,       \
+                             to_yy_xyzzz,     \
+                             to_yy_xzz,       \
+                             to_yy_xzzzz,     \
+                             to_yy_yyy,       \
+                             to_yy_yyz,       \
+                             to_yy_yzz,       \
+                             to_yy_zzz,       \
+                             to_yyyy_xxx,     \
+                             to_yyyy_xxxxx,   \
+                             to_yyyy_xxxxy,   \
+                             to_yyyy_xxxxz,   \
+                             to_yyyy_xxxyy,   \
+                             to_yyyy_xxxyz,   \
+                             to_yyyy_xxxzz,   \
+                             to_yyyy_xxy,     \
+                             to_yyyy_xxyyy,   \
+                             to_yyyy_xxyyz,   \
+                             to_yyyy_xxyzz,   \
+                             to_yyyy_xxz,     \
+                             to_yyyy_xxzzz,   \
+                             to_yyyy_xyy,     \
+                             to_yyyy_xyyyy,   \
+                             to_yyyy_xyyyz,   \
+                             to_yyyy_xyyzz,   \
+                             to_yyyy_xyz,     \
+                             to_yyyy_xyzzz,   \
+                             to_yyyy_xzz,     \
+                             to_yyyy_xzzzz,   \
+                             to_yyyy_yyy,     \
+                             to_yyyy_yyz,     \
+                             to_yyyy_yzz,     \
+                             to_yyyy_zzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_y_x_yyy_xxxx[k] = 12.0 * to_yy_xxx[k] - 6.0 * to_yy_xxxxx[k] * tke_0 - 8.0 * to_yyyy_xxx[k] * tbe_0 + 4.0 * to_yyyy_xxxxx[k] * tbe_0 * tke_0;
+            to_y_x_yyy_xxxx[k] =
+                12.0 * to_yy_xxx[k] - 6.0 * to_yy_xxxxx[k] * tke_0 - 8.0 * to_yyyy_xxx[k] * tbe_0 + 4.0 * to_yyyy_xxxxx[k] * tbe_0 * tke_0;
 
-            to_y_x_yyy_xxxy[k] = 9.0 * to_yy_xxy[k] - 6.0 * to_yy_xxxxy[k] * tke_0 - 6.0 * to_yyyy_xxy[k] * tbe_0 + 4.0 * to_yyyy_xxxxy[k] * tbe_0 * tke_0;
+            to_y_x_yyy_xxxy[k] =
+                9.0 * to_yy_xxy[k] - 6.0 * to_yy_xxxxy[k] * tke_0 - 6.0 * to_yyyy_xxy[k] * tbe_0 + 4.0 * to_yyyy_xxxxy[k] * tbe_0 * tke_0;
 
-            to_y_x_yyy_xxxz[k] = 9.0 * to_yy_xxz[k] - 6.0 * to_yy_xxxxz[k] * tke_0 - 6.0 * to_yyyy_xxz[k] * tbe_0 + 4.0 * to_yyyy_xxxxz[k] * tbe_0 * tke_0;
+            to_y_x_yyy_xxxz[k] =
+                9.0 * to_yy_xxz[k] - 6.0 * to_yy_xxxxz[k] * tke_0 - 6.0 * to_yyyy_xxz[k] * tbe_0 + 4.0 * to_yyyy_xxxxz[k] * tbe_0 * tke_0;
 
-            to_y_x_yyy_xxyy[k] = 6.0 * to_yy_xyy[k] - 6.0 * to_yy_xxxyy[k] * tke_0 - 4.0 * to_yyyy_xyy[k] * tbe_0 + 4.0 * to_yyyy_xxxyy[k] * tbe_0 * tke_0;
+            to_y_x_yyy_xxyy[k] =
+                6.0 * to_yy_xyy[k] - 6.0 * to_yy_xxxyy[k] * tke_0 - 4.0 * to_yyyy_xyy[k] * tbe_0 + 4.0 * to_yyyy_xxxyy[k] * tbe_0 * tke_0;
 
-            to_y_x_yyy_xxyz[k] = 6.0 * to_yy_xyz[k] - 6.0 * to_yy_xxxyz[k] * tke_0 - 4.0 * to_yyyy_xyz[k] * tbe_0 + 4.0 * to_yyyy_xxxyz[k] * tbe_0 * tke_0;
+            to_y_x_yyy_xxyz[k] =
+                6.0 * to_yy_xyz[k] - 6.0 * to_yy_xxxyz[k] * tke_0 - 4.0 * to_yyyy_xyz[k] * tbe_0 + 4.0 * to_yyyy_xxxyz[k] * tbe_0 * tke_0;
 
-            to_y_x_yyy_xxzz[k] = 6.0 * to_yy_xzz[k] - 6.0 * to_yy_xxxzz[k] * tke_0 - 4.0 * to_yyyy_xzz[k] * tbe_0 + 4.0 * to_yyyy_xxxzz[k] * tbe_0 * tke_0;
+            to_y_x_yyy_xxzz[k] =
+                6.0 * to_yy_xzz[k] - 6.0 * to_yy_xxxzz[k] * tke_0 - 4.0 * to_yyyy_xzz[k] * tbe_0 + 4.0 * to_yyyy_xxxzz[k] * tbe_0 * tke_0;
 
-            to_y_x_yyy_xyyy[k] = 3.0 * to_yy_yyy[k] - 6.0 * to_yy_xxyyy[k] * tke_0 - 2.0 * to_yyyy_yyy[k] * tbe_0 + 4.0 * to_yyyy_xxyyy[k] * tbe_0 * tke_0;
+            to_y_x_yyy_xyyy[k] =
+                3.0 * to_yy_yyy[k] - 6.0 * to_yy_xxyyy[k] * tke_0 - 2.0 * to_yyyy_yyy[k] * tbe_0 + 4.0 * to_yyyy_xxyyy[k] * tbe_0 * tke_0;
 
-            to_y_x_yyy_xyyz[k] = 3.0 * to_yy_yyz[k] - 6.0 * to_yy_xxyyz[k] * tke_0 - 2.0 * to_yyyy_yyz[k] * tbe_0 + 4.0 * to_yyyy_xxyyz[k] * tbe_0 * tke_0;
+            to_y_x_yyy_xyyz[k] =
+                3.0 * to_yy_yyz[k] - 6.0 * to_yy_xxyyz[k] * tke_0 - 2.0 * to_yyyy_yyz[k] * tbe_0 + 4.0 * to_yyyy_xxyyz[k] * tbe_0 * tke_0;
 
-            to_y_x_yyy_xyzz[k] = 3.0 * to_yy_yzz[k] - 6.0 * to_yy_xxyzz[k] * tke_0 - 2.0 * to_yyyy_yzz[k] * tbe_0 + 4.0 * to_yyyy_xxyzz[k] * tbe_0 * tke_0;
+            to_y_x_yyy_xyzz[k] =
+                3.0 * to_yy_yzz[k] - 6.0 * to_yy_xxyzz[k] * tke_0 - 2.0 * to_yyyy_yzz[k] * tbe_0 + 4.0 * to_yyyy_xxyzz[k] * tbe_0 * tke_0;
 
-            to_y_x_yyy_xzzz[k] = 3.0 * to_yy_zzz[k] - 6.0 * to_yy_xxzzz[k] * tke_0 - 2.0 * to_yyyy_zzz[k] * tbe_0 + 4.0 * to_yyyy_xxzzz[k] * tbe_0 * tke_0;
+            to_y_x_yyy_xzzz[k] =
+                3.0 * to_yy_zzz[k] - 6.0 * to_yy_xxzzz[k] * tke_0 - 2.0 * to_yyyy_zzz[k] * tbe_0 + 4.0 * to_yyyy_xxzzz[k] * tbe_0 * tke_0;
 
             to_y_x_yyy_yyyy[k] = -6.0 * to_yy_xyyyy[k] * tke_0 + 4.0 * to_yyyy_xyyyy[k] * tbe_0 * tke_0;
 
@@ -3953,32 +6159,107 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_x_yyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 3 * op_comps * 150 + i * 150 + 119);
 
-        #pragma omp simd aligned(to_y_x_yyz_xxxx, to_y_x_yyz_xxxy, to_y_x_yyz_xxxz, to_y_x_yyz_xxyy, to_y_x_yyz_xxyz, to_y_x_yyz_xxzz, to_y_x_yyz_xyyy, to_y_x_yyz_xyyz, to_y_x_yyz_xyzz, to_y_x_yyz_xzzz, to_y_x_yyz_yyyy, to_y_x_yyz_yyyz, to_y_x_yyz_yyzz, to_y_x_yyz_yzzz, to_y_x_yyz_zzzz, to_yyyz_xxx, to_yyyz_xxxxx, to_yyyz_xxxxy, to_yyyz_xxxxz, to_yyyz_xxxyy, to_yyyz_xxxyz, to_yyyz_xxxzz, to_yyyz_xxy, to_yyyz_xxyyy, to_yyyz_xxyyz, to_yyyz_xxyzz, to_yyyz_xxz, to_yyyz_xxzzz, to_yyyz_xyy, to_yyyz_xyyyy, to_yyyz_xyyyz, to_yyyz_xyyzz, to_yyyz_xyz, to_yyyz_xyzzz, to_yyyz_xzz, to_yyyz_xzzzz, to_yyyz_yyy, to_yyyz_yyz, to_yyyz_yzz, to_yyyz_zzz, to_yz_xxx, to_yz_xxxxx, to_yz_xxxxy, to_yz_xxxxz, to_yz_xxxyy, to_yz_xxxyz, to_yz_xxxzz, to_yz_xxy, to_yz_xxyyy, to_yz_xxyyz, to_yz_xxyzz, to_yz_xxz, to_yz_xxzzz, to_yz_xyy, to_yz_xyyyy, to_yz_xyyyz, to_yz_xyyzz, to_yz_xyz, to_yz_xyzzz, to_yz_xzz, to_yz_xzzzz, to_yz_yyy, to_yz_yyz, to_yz_yzz, to_yz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_y_x_yyz_xxxx,     \
+                             to_y_x_yyz_xxxy, \
+                             to_y_x_yyz_xxxz, \
+                             to_y_x_yyz_xxyy, \
+                             to_y_x_yyz_xxyz, \
+                             to_y_x_yyz_xxzz, \
+                             to_y_x_yyz_xyyy, \
+                             to_y_x_yyz_xyyz, \
+                             to_y_x_yyz_xyzz, \
+                             to_y_x_yyz_xzzz, \
+                             to_y_x_yyz_yyyy, \
+                             to_y_x_yyz_yyyz, \
+                             to_y_x_yyz_yyzz, \
+                             to_y_x_yyz_yzzz, \
+                             to_y_x_yyz_zzzz, \
+                             to_yyyz_xxx,     \
+                             to_yyyz_xxxxx,   \
+                             to_yyyz_xxxxy,   \
+                             to_yyyz_xxxxz,   \
+                             to_yyyz_xxxyy,   \
+                             to_yyyz_xxxyz,   \
+                             to_yyyz_xxxzz,   \
+                             to_yyyz_xxy,     \
+                             to_yyyz_xxyyy,   \
+                             to_yyyz_xxyyz,   \
+                             to_yyyz_xxyzz,   \
+                             to_yyyz_xxz,     \
+                             to_yyyz_xxzzz,   \
+                             to_yyyz_xyy,     \
+                             to_yyyz_xyyyy,   \
+                             to_yyyz_xyyyz,   \
+                             to_yyyz_xyyzz,   \
+                             to_yyyz_xyz,     \
+                             to_yyyz_xyzzz,   \
+                             to_yyyz_xzz,     \
+                             to_yyyz_xzzzz,   \
+                             to_yyyz_yyy,     \
+                             to_yyyz_yyz,     \
+                             to_yyyz_yzz,     \
+                             to_yyyz_zzz,     \
+                             to_yz_xxx,       \
+                             to_yz_xxxxx,     \
+                             to_yz_xxxxy,     \
+                             to_yz_xxxxz,     \
+                             to_yz_xxxyy,     \
+                             to_yz_xxxyz,     \
+                             to_yz_xxxzz,     \
+                             to_yz_xxy,       \
+                             to_yz_xxyyy,     \
+                             to_yz_xxyyz,     \
+                             to_yz_xxyzz,     \
+                             to_yz_xxz,       \
+                             to_yz_xxzzz,     \
+                             to_yz_xyy,       \
+                             to_yz_xyyyy,     \
+                             to_yz_xyyyz,     \
+                             to_yz_xyyzz,     \
+                             to_yz_xyz,       \
+                             to_yz_xyzzz,     \
+                             to_yz_xzz,       \
+                             to_yz_xzzzz,     \
+                             to_yz_yyy,       \
+                             to_yz_yyz,       \
+                             to_yz_yzz,       \
+                             to_yz_zzz,       \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_y_x_yyz_xxxx[k] = 8.0 * to_yz_xxx[k] - 4.0 * to_yz_xxxxx[k] * tke_0 - 8.0 * to_yyyz_xxx[k] * tbe_0 + 4.0 * to_yyyz_xxxxx[k] * tbe_0 * tke_0;
+            to_y_x_yyz_xxxx[k] =
+                8.0 * to_yz_xxx[k] - 4.0 * to_yz_xxxxx[k] * tke_0 - 8.0 * to_yyyz_xxx[k] * tbe_0 + 4.0 * to_yyyz_xxxxx[k] * tbe_0 * tke_0;
 
-            to_y_x_yyz_xxxy[k] = 6.0 * to_yz_xxy[k] - 4.0 * to_yz_xxxxy[k] * tke_0 - 6.0 * to_yyyz_xxy[k] * tbe_0 + 4.0 * to_yyyz_xxxxy[k] * tbe_0 * tke_0;
+            to_y_x_yyz_xxxy[k] =
+                6.0 * to_yz_xxy[k] - 4.0 * to_yz_xxxxy[k] * tke_0 - 6.0 * to_yyyz_xxy[k] * tbe_0 + 4.0 * to_yyyz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_y_x_yyz_xxxz[k] = 6.0 * to_yz_xxz[k] - 4.0 * to_yz_xxxxz[k] * tke_0 - 6.0 * to_yyyz_xxz[k] * tbe_0 + 4.0 * to_yyyz_xxxxz[k] * tbe_0 * tke_0;
+            to_y_x_yyz_xxxz[k] =
+                6.0 * to_yz_xxz[k] - 4.0 * to_yz_xxxxz[k] * tke_0 - 6.0 * to_yyyz_xxz[k] * tbe_0 + 4.0 * to_yyyz_xxxxz[k] * tbe_0 * tke_0;
 
-            to_y_x_yyz_xxyy[k] = 4.0 * to_yz_xyy[k] - 4.0 * to_yz_xxxyy[k] * tke_0 - 4.0 * to_yyyz_xyy[k] * tbe_0 + 4.0 * to_yyyz_xxxyy[k] * tbe_0 * tke_0;
+            to_y_x_yyz_xxyy[k] =
+                4.0 * to_yz_xyy[k] - 4.0 * to_yz_xxxyy[k] * tke_0 - 4.0 * to_yyyz_xyy[k] * tbe_0 + 4.0 * to_yyyz_xxxyy[k] * tbe_0 * tke_0;
 
-            to_y_x_yyz_xxyz[k] = 4.0 * to_yz_xyz[k] - 4.0 * to_yz_xxxyz[k] * tke_0 - 4.0 * to_yyyz_xyz[k] * tbe_0 + 4.0 * to_yyyz_xxxyz[k] * tbe_0 * tke_0;
+            to_y_x_yyz_xxyz[k] =
+                4.0 * to_yz_xyz[k] - 4.0 * to_yz_xxxyz[k] * tke_0 - 4.0 * to_yyyz_xyz[k] * tbe_0 + 4.0 * to_yyyz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_y_x_yyz_xxzz[k] = 4.0 * to_yz_xzz[k] - 4.0 * to_yz_xxxzz[k] * tke_0 - 4.0 * to_yyyz_xzz[k] * tbe_0 + 4.0 * to_yyyz_xxxzz[k] * tbe_0 * tke_0;
+            to_y_x_yyz_xxzz[k] =
+                4.0 * to_yz_xzz[k] - 4.0 * to_yz_xxxzz[k] * tke_0 - 4.0 * to_yyyz_xzz[k] * tbe_0 + 4.0 * to_yyyz_xxxzz[k] * tbe_0 * tke_0;
 
-            to_y_x_yyz_xyyy[k] = 2.0 * to_yz_yyy[k] - 4.0 * to_yz_xxyyy[k] * tke_0 - 2.0 * to_yyyz_yyy[k] * tbe_0 + 4.0 * to_yyyz_xxyyy[k] * tbe_0 * tke_0;
+            to_y_x_yyz_xyyy[k] =
+                2.0 * to_yz_yyy[k] - 4.0 * to_yz_xxyyy[k] * tke_0 - 2.0 * to_yyyz_yyy[k] * tbe_0 + 4.0 * to_yyyz_xxyyy[k] * tbe_0 * tke_0;
 
-            to_y_x_yyz_xyyz[k] = 2.0 * to_yz_yyz[k] - 4.0 * to_yz_xxyyz[k] * tke_0 - 2.0 * to_yyyz_yyz[k] * tbe_0 + 4.0 * to_yyyz_xxyyz[k] * tbe_0 * tke_0;
+            to_y_x_yyz_xyyz[k] =
+                2.0 * to_yz_yyz[k] - 4.0 * to_yz_xxyyz[k] * tke_0 - 2.0 * to_yyyz_yyz[k] * tbe_0 + 4.0 * to_yyyz_xxyyz[k] * tbe_0 * tke_0;
 
-            to_y_x_yyz_xyzz[k] = 2.0 * to_yz_yzz[k] - 4.0 * to_yz_xxyzz[k] * tke_0 - 2.0 * to_yyyz_yzz[k] * tbe_0 + 4.0 * to_yyyz_xxyzz[k] * tbe_0 * tke_0;
+            to_y_x_yyz_xyzz[k] =
+                2.0 * to_yz_yzz[k] - 4.0 * to_yz_xxyzz[k] * tke_0 - 2.0 * to_yyyz_yzz[k] * tbe_0 + 4.0 * to_yyyz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_y_x_yyz_xzzz[k] = 2.0 * to_yz_zzz[k] - 4.0 * to_yz_xxzzz[k] * tke_0 - 2.0 * to_yyyz_zzz[k] * tbe_0 + 4.0 * to_yyyz_xxzzz[k] * tbe_0 * tke_0;
+            to_y_x_yyz_xzzz[k] =
+                2.0 * to_yz_zzz[k] - 4.0 * to_yz_xxzzz[k] * tke_0 - 2.0 * to_yyyz_zzz[k] * tbe_0 + 4.0 * to_yyyz_xxzzz[k] * tbe_0 * tke_0;
 
             to_y_x_yyz_yyyy[k] = -4.0 * to_yz_xyyyy[k] * tke_0 + 4.0 * to_yyyz_xyyyy[k] * tbe_0 * tke_0;
 
@@ -4023,24 +6304,95 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_x_yzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 3 * op_comps * 150 + i * 150 + 134);
 
-        #pragma omp simd aligned(to_y_x_yzz_xxxx, to_y_x_yzz_xxxy, to_y_x_yzz_xxxz, to_y_x_yzz_xxyy, to_y_x_yzz_xxyz, to_y_x_yzz_xxzz, to_y_x_yzz_xyyy, to_y_x_yzz_xyyz, to_y_x_yzz_xyzz, to_y_x_yzz_xzzz, to_y_x_yzz_yyyy, to_y_x_yzz_yyyz, to_y_x_yzz_yyzz, to_y_x_yzz_yzzz, to_y_x_yzz_zzzz, to_yyzz_xxx, to_yyzz_xxxxx, to_yyzz_xxxxy, to_yyzz_xxxxz, to_yyzz_xxxyy, to_yyzz_xxxyz, to_yyzz_xxxzz, to_yyzz_xxy, to_yyzz_xxyyy, to_yyzz_xxyyz, to_yyzz_xxyzz, to_yyzz_xxz, to_yyzz_xxzzz, to_yyzz_xyy, to_yyzz_xyyyy, to_yyzz_xyyyz, to_yyzz_xyyzz, to_yyzz_xyz, to_yyzz_xyzzz, to_yyzz_xzz, to_yyzz_xzzzz, to_yyzz_yyy, to_yyzz_yyz, to_yyzz_yzz, to_yyzz_zzz, to_zz_xxx, to_zz_xxxxx, to_zz_xxxxy, to_zz_xxxxz, to_zz_xxxyy, to_zz_xxxyz, to_zz_xxxzz, to_zz_xxy, to_zz_xxyyy, to_zz_xxyyz, to_zz_xxyzz, to_zz_xxz, to_zz_xxzzz, to_zz_xyy, to_zz_xyyyy, to_zz_xyyyz, to_zz_xyyzz, to_zz_xyz, to_zz_xyzzz, to_zz_xzz, to_zz_xzzzz, to_zz_yyy, to_zz_yyz, to_zz_yzz, to_zz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_y_x_yzz_xxxx,     \
+                             to_y_x_yzz_xxxy, \
+                             to_y_x_yzz_xxxz, \
+                             to_y_x_yzz_xxyy, \
+                             to_y_x_yzz_xxyz, \
+                             to_y_x_yzz_xxzz, \
+                             to_y_x_yzz_xyyy, \
+                             to_y_x_yzz_xyyz, \
+                             to_y_x_yzz_xyzz, \
+                             to_y_x_yzz_xzzz, \
+                             to_y_x_yzz_yyyy, \
+                             to_y_x_yzz_yyyz, \
+                             to_y_x_yzz_yyzz, \
+                             to_y_x_yzz_yzzz, \
+                             to_y_x_yzz_zzzz, \
+                             to_yyzz_xxx,     \
+                             to_yyzz_xxxxx,   \
+                             to_yyzz_xxxxy,   \
+                             to_yyzz_xxxxz,   \
+                             to_yyzz_xxxyy,   \
+                             to_yyzz_xxxyz,   \
+                             to_yyzz_xxxzz,   \
+                             to_yyzz_xxy,     \
+                             to_yyzz_xxyyy,   \
+                             to_yyzz_xxyyz,   \
+                             to_yyzz_xxyzz,   \
+                             to_yyzz_xxz,     \
+                             to_yyzz_xxzzz,   \
+                             to_yyzz_xyy,     \
+                             to_yyzz_xyyyy,   \
+                             to_yyzz_xyyyz,   \
+                             to_yyzz_xyyzz,   \
+                             to_yyzz_xyz,     \
+                             to_yyzz_xyzzz,   \
+                             to_yyzz_xzz,     \
+                             to_yyzz_xzzzz,   \
+                             to_yyzz_yyy,     \
+                             to_yyzz_yyz,     \
+                             to_yyzz_yzz,     \
+                             to_yyzz_zzz,     \
+                             to_zz_xxx,       \
+                             to_zz_xxxxx,     \
+                             to_zz_xxxxy,     \
+                             to_zz_xxxxz,     \
+                             to_zz_xxxyy,     \
+                             to_zz_xxxyz,     \
+                             to_zz_xxxzz,     \
+                             to_zz_xxy,       \
+                             to_zz_xxyyy,     \
+                             to_zz_xxyyz,     \
+                             to_zz_xxyzz,     \
+                             to_zz_xxz,       \
+                             to_zz_xxzzz,     \
+                             to_zz_xyy,       \
+                             to_zz_xyyyy,     \
+                             to_zz_xyyyz,     \
+                             to_zz_xyyzz,     \
+                             to_zz_xyz,       \
+                             to_zz_xyzzz,     \
+                             to_zz_xzz,       \
+                             to_zz_xzzzz,     \
+                             to_zz_yyy,       \
+                             to_zz_yyz,       \
+                             to_zz_yzz,       \
+                             to_zz_zzz,       \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_y_x_yzz_xxxx[k] = 4.0 * to_zz_xxx[k] - 2.0 * to_zz_xxxxx[k] * tke_0 - 8.0 * to_yyzz_xxx[k] * tbe_0 + 4.0 * to_yyzz_xxxxx[k] * tbe_0 * tke_0;
+            to_y_x_yzz_xxxx[k] =
+                4.0 * to_zz_xxx[k] - 2.0 * to_zz_xxxxx[k] * tke_0 - 8.0 * to_yyzz_xxx[k] * tbe_0 + 4.0 * to_yyzz_xxxxx[k] * tbe_0 * tke_0;
 
-            to_y_x_yzz_xxxy[k] = 3.0 * to_zz_xxy[k] - 2.0 * to_zz_xxxxy[k] * tke_0 - 6.0 * to_yyzz_xxy[k] * tbe_0 + 4.0 * to_yyzz_xxxxy[k] * tbe_0 * tke_0;
+            to_y_x_yzz_xxxy[k] =
+                3.0 * to_zz_xxy[k] - 2.0 * to_zz_xxxxy[k] * tke_0 - 6.0 * to_yyzz_xxy[k] * tbe_0 + 4.0 * to_yyzz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_y_x_yzz_xxxz[k] = 3.0 * to_zz_xxz[k] - 2.0 * to_zz_xxxxz[k] * tke_0 - 6.0 * to_yyzz_xxz[k] * tbe_0 + 4.0 * to_yyzz_xxxxz[k] * tbe_0 * tke_0;
+            to_y_x_yzz_xxxz[k] =
+                3.0 * to_zz_xxz[k] - 2.0 * to_zz_xxxxz[k] * tke_0 - 6.0 * to_yyzz_xxz[k] * tbe_0 + 4.0 * to_yyzz_xxxxz[k] * tbe_0 * tke_0;
 
-            to_y_x_yzz_xxyy[k] = 2.0 * to_zz_xyy[k] - 2.0 * to_zz_xxxyy[k] * tke_0 - 4.0 * to_yyzz_xyy[k] * tbe_0 + 4.0 * to_yyzz_xxxyy[k] * tbe_0 * tke_0;
+            to_y_x_yzz_xxyy[k] =
+                2.0 * to_zz_xyy[k] - 2.0 * to_zz_xxxyy[k] * tke_0 - 4.0 * to_yyzz_xyy[k] * tbe_0 + 4.0 * to_yyzz_xxxyy[k] * tbe_0 * tke_0;
 
-            to_y_x_yzz_xxyz[k] = 2.0 * to_zz_xyz[k] - 2.0 * to_zz_xxxyz[k] * tke_0 - 4.0 * to_yyzz_xyz[k] * tbe_0 + 4.0 * to_yyzz_xxxyz[k] * tbe_0 * tke_0;
+            to_y_x_yzz_xxyz[k] =
+                2.0 * to_zz_xyz[k] - 2.0 * to_zz_xxxyz[k] * tke_0 - 4.0 * to_yyzz_xyz[k] * tbe_0 + 4.0 * to_yyzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_y_x_yzz_xxzz[k] = 2.0 * to_zz_xzz[k] - 2.0 * to_zz_xxxzz[k] * tke_0 - 4.0 * to_yyzz_xzz[k] * tbe_0 + 4.0 * to_yyzz_xxxzz[k] * tbe_0 * tke_0;
+            to_y_x_yzz_xxzz[k] =
+                2.0 * to_zz_xzz[k] - 2.0 * to_zz_xxxzz[k] * tke_0 - 4.0 * to_yyzz_xzz[k] * tbe_0 + 4.0 * to_yyzz_xxxzz[k] * tbe_0 * tke_0;
 
             to_y_x_yzz_xyyy[k] = to_zz_yyy[k] - 2.0 * to_zz_xxyyy[k] * tke_0 - 2.0 * to_yyzz_yyy[k] * tbe_0 + 4.0 * to_yyzz_xxyyy[k] * tbe_0 * tke_0;
 
@@ -4093,7 +6445,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_x_zzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 3 * op_comps * 150 + i * 150 + 149);
 
-        #pragma omp simd aligned(to_y_x_zzz_xxxx, to_y_x_zzz_xxxy, to_y_x_zzz_xxxz, to_y_x_zzz_xxyy, to_y_x_zzz_xxyz, to_y_x_zzz_xxzz, to_y_x_zzz_xyyy, to_y_x_zzz_xyyz, to_y_x_zzz_xyzz, to_y_x_zzz_xzzz, to_y_x_zzz_yyyy, to_y_x_zzz_yyyz, to_y_x_zzz_yyzz, to_y_x_zzz_yzzz, to_y_x_zzz_zzzz, to_yzzz_xxx, to_yzzz_xxxxx, to_yzzz_xxxxy, to_yzzz_xxxxz, to_yzzz_xxxyy, to_yzzz_xxxyz, to_yzzz_xxxzz, to_yzzz_xxy, to_yzzz_xxyyy, to_yzzz_xxyyz, to_yzzz_xxyzz, to_yzzz_xxz, to_yzzz_xxzzz, to_yzzz_xyy, to_yzzz_xyyyy, to_yzzz_xyyyz, to_yzzz_xyyzz, to_yzzz_xyz, to_yzzz_xyzzz, to_yzzz_xzz, to_yzzz_xzzzz, to_yzzz_yyy, to_yzzz_yyz, to_yzzz_yzz, to_yzzz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_y_x_zzz_xxxx,     \
+                             to_y_x_zzz_xxxy, \
+                             to_y_x_zzz_xxxz, \
+                             to_y_x_zzz_xxyy, \
+                             to_y_x_zzz_xxyz, \
+                             to_y_x_zzz_xxzz, \
+                             to_y_x_zzz_xyyy, \
+                             to_y_x_zzz_xyyz, \
+                             to_y_x_zzz_xyzz, \
+                             to_y_x_zzz_xzzz, \
+                             to_y_x_zzz_yyyy, \
+                             to_y_x_zzz_yyyz, \
+                             to_y_x_zzz_yyzz, \
+                             to_y_x_zzz_yzzz, \
+                             to_y_x_zzz_zzzz, \
+                             to_yzzz_xxx,     \
+                             to_yzzz_xxxxx,   \
+                             to_yzzz_xxxxy,   \
+                             to_yzzz_xxxxz,   \
+                             to_yzzz_xxxyy,   \
+                             to_yzzz_xxxyz,   \
+                             to_yzzz_xxxzz,   \
+                             to_yzzz_xxy,     \
+                             to_yzzz_xxyyy,   \
+                             to_yzzz_xxyyz,   \
+                             to_yzzz_xxyzz,   \
+                             to_yzzz_xxz,     \
+                             to_yzzz_xxzzz,   \
+                             to_yzzz_xyy,     \
+                             to_yzzz_xyyyy,   \
+                             to_yzzz_xyyyz,   \
+                             to_yzzz_xyyzz,   \
+                             to_yzzz_xyz,     \
+                             to_yzzz_xyzzz,   \
+                             to_yzzz_xzz,     \
+                             to_yzzz_xzzzz,   \
+                             to_yzzz_yyy,     \
+                             to_yzzz_yyz,     \
+                             to_yzzz_yzz,     \
+                             to_yzzz_zzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -4163,7 +6555,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_y_xxx_zzzz = pbuffer.data(idx_op_geom_101_fg + 4 * op_comps * 150 + i * 150 + 14);
 
-        #pragma omp simd aligned(to_xxxy_xxx, to_xxxy_xxxxy, to_xxxy_xxxyy, to_xxxy_xxxyz, to_xxxy_xxy, to_xxxy_xxyyy, to_xxxy_xxyyz, to_xxxy_xxyzz, to_xxxy_xxz, to_xxxy_xyy, to_xxxy_xyyyy, to_xxxy_xyyyz, to_xxxy_xyyzz, to_xxxy_xyz, to_xxxy_xyzzz, to_xxxy_xzz, to_xxxy_yyy, to_xxxy_yyyyy, to_xxxy_yyyyz, to_xxxy_yyyzz, to_xxxy_yyz, to_xxxy_yyzzz, to_xxxy_yzz, to_xxxy_yzzzz, to_xxxy_zzz, to_y_y_xxx_xxxx, to_y_y_xxx_xxxy, to_y_y_xxx_xxxz, to_y_y_xxx_xxyy, to_y_y_xxx_xxyz, to_y_y_xxx_xxzz, to_y_y_xxx_xyyy, to_y_y_xxx_xyyz, to_y_y_xxx_xyzz, to_y_y_xxx_xzzz, to_y_y_xxx_yyyy, to_y_y_xxx_yyyz, to_y_y_xxx_yyzz, to_y_y_xxx_yzzz, to_y_y_xxx_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xxxy_xxx,         \
+                             to_xxxy_xxxxy,   \
+                             to_xxxy_xxxyy,   \
+                             to_xxxy_xxxyz,   \
+                             to_xxxy_xxy,     \
+                             to_xxxy_xxyyy,   \
+                             to_xxxy_xxyyz,   \
+                             to_xxxy_xxyzz,   \
+                             to_xxxy_xxz,     \
+                             to_xxxy_xyy,     \
+                             to_xxxy_xyyyy,   \
+                             to_xxxy_xyyyz,   \
+                             to_xxxy_xyyzz,   \
+                             to_xxxy_xyz,     \
+                             to_xxxy_xyzzz,   \
+                             to_xxxy_xzz,     \
+                             to_xxxy_yyy,     \
+                             to_xxxy_yyyyy,   \
+                             to_xxxy_yyyyz,   \
+                             to_xxxy_yyyzz,   \
+                             to_xxxy_yyz,     \
+                             to_xxxy_yyzzz,   \
+                             to_xxxy_yzz,     \
+                             to_xxxy_yzzzz,   \
+                             to_xxxy_zzz,     \
+                             to_y_y_xxx_xxxx, \
+                             to_y_y_xxx_xxxy, \
+                             to_y_y_xxx_xxxz, \
+                             to_y_y_xxx_xxyy, \
+                             to_y_y_xxx_xxyz, \
+                             to_y_y_xxx_xxzz, \
+                             to_y_y_xxx_xyyy, \
+                             to_y_y_xxx_xyyz, \
+                             to_y_y_xxx_xyzz, \
+                             to_y_y_xxx_xzzz, \
+                             to_y_y_xxx_yyyy, \
+                             to_y_y_xxx_yyyz, \
+                             to_y_y_xxx_yyzz, \
+                             to_y_y_xxx_yzzz, \
+                             to_y_y_xxx_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -4233,7 +6665,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_y_xxy_zzzz = pbuffer.data(idx_op_geom_101_fg + 4 * op_comps * 150 + i * 150 + 29);
 
-        #pragma omp simd aligned(to_xx_xxx, to_xx_xxxxy, to_xx_xxxyy, to_xx_xxxyz, to_xx_xxy, to_xx_xxyyy, to_xx_xxyyz, to_xx_xxyzz, to_xx_xxz, to_xx_xyy, to_xx_xyyyy, to_xx_xyyyz, to_xx_xyyzz, to_xx_xyz, to_xx_xyzzz, to_xx_xzz, to_xx_yyy, to_xx_yyyyy, to_xx_yyyyz, to_xx_yyyzz, to_xx_yyz, to_xx_yyzzz, to_xx_yzz, to_xx_yzzzz, to_xx_zzz, to_xxyy_xxx, to_xxyy_xxxxy, to_xxyy_xxxyy, to_xxyy_xxxyz, to_xxyy_xxy, to_xxyy_xxyyy, to_xxyy_xxyyz, to_xxyy_xxyzz, to_xxyy_xxz, to_xxyy_xyy, to_xxyy_xyyyy, to_xxyy_xyyyz, to_xxyy_xyyzz, to_xxyy_xyz, to_xxyy_xyzzz, to_xxyy_xzz, to_xxyy_yyy, to_xxyy_yyyyy, to_xxyy_yyyyz, to_xxyy_yyyzz, to_xxyy_yyz, to_xxyy_yyzzz, to_xxyy_yzz, to_xxyy_yzzzz, to_xxyy_zzz, to_y_y_xxy_xxxx, to_y_y_xxy_xxxy, to_y_y_xxy_xxxz, to_y_y_xxy_xxyy, to_y_y_xxy_xxyz, to_y_y_xxy_xxzz, to_y_y_xxy_xyyy, to_y_y_xxy_xyyz, to_y_y_xxy_xyzz, to_y_y_xxy_xzzz, to_y_y_xxy_yyyy, to_y_y_xxy_yyyz, to_y_y_xxy_yyzz, to_y_y_xxy_yzzz, to_y_y_xxy_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xx_xxx,           \
+                             to_xx_xxxxy,     \
+                             to_xx_xxxyy,     \
+                             to_xx_xxxyz,     \
+                             to_xx_xxy,       \
+                             to_xx_xxyyy,     \
+                             to_xx_xxyyz,     \
+                             to_xx_xxyzz,     \
+                             to_xx_xxz,       \
+                             to_xx_xyy,       \
+                             to_xx_xyyyy,     \
+                             to_xx_xyyyz,     \
+                             to_xx_xyyzz,     \
+                             to_xx_xyz,       \
+                             to_xx_xyzzz,     \
+                             to_xx_xzz,       \
+                             to_xx_yyy,       \
+                             to_xx_yyyyy,     \
+                             to_xx_yyyyz,     \
+                             to_xx_yyyzz,     \
+                             to_xx_yyz,       \
+                             to_xx_yyzzz,     \
+                             to_xx_yzz,       \
+                             to_xx_yzzzz,     \
+                             to_xx_zzz,       \
+                             to_xxyy_xxx,     \
+                             to_xxyy_xxxxy,   \
+                             to_xxyy_xxxyy,   \
+                             to_xxyy_xxxyz,   \
+                             to_xxyy_xxy,     \
+                             to_xxyy_xxyyy,   \
+                             to_xxyy_xxyyz,   \
+                             to_xxyy_xxyzz,   \
+                             to_xxyy_xxz,     \
+                             to_xxyy_xyy,     \
+                             to_xxyy_xyyyy,   \
+                             to_xxyy_xyyyz,   \
+                             to_xxyy_xyyzz,   \
+                             to_xxyy_xyz,     \
+                             to_xxyy_xyzzz,   \
+                             to_xxyy_xzz,     \
+                             to_xxyy_yyy,     \
+                             to_xxyy_yyyyy,   \
+                             to_xxyy_yyyyz,   \
+                             to_xxyy_yyyzz,   \
+                             to_xxyy_yyz,     \
+                             to_xxyy_yyzzz,   \
+                             to_xxyy_yzz,     \
+                             to_xxyy_yzzzz,   \
+                             to_xxyy_zzz,     \
+                             to_y_y_xxy_xxxx, \
+                             to_y_y_xxy_xxxy, \
+                             to_y_y_xxy_xxxz, \
+                             to_y_y_xxy_xxyy, \
+                             to_y_y_xxy_xxyz, \
+                             to_y_y_xxy_xxzz, \
+                             to_y_y_xxy_xyyy, \
+                             to_y_y_xxy_xyyz, \
+                             to_y_y_xxy_xyzz, \
+                             to_y_y_xxy_xzzz, \
+                             to_y_y_xxy_yyyy, \
+                             to_y_y_xxy_yyyz, \
+                             to_y_y_xxy_yyzz, \
+                             to_y_y_xxy_yzzz, \
+                             to_y_y_xxy_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -4246,25 +6743,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_y_y_xxy_xxxz[k] = -2.0 * to_xx_xxxyz[k] * tke_0 + 4.0 * to_xxyy_xxxyz[k] * tbe_0 * tke_0;
 
-            to_y_y_xxy_xxyy[k] = 2.0 * to_xx_xxy[k] - 2.0 * to_xx_xxyyy[k] * tke_0 - 4.0 * to_xxyy_xxy[k] * tbe_0 + 4.0 * to_xxyy_xxyyy[k] * tbe_0 * tke_0;
+            to_y_y_xxy_xxyy[k] =
+                2.0 * to_xx_xxy[k] - 2.0 * to_xx_xxyyy[k] * tke_0 - 4.0 * to_xxyy_xxy[k] * tbe_0 + 4.0 * to_xxyy_xxyyy[k] * tbe_0 * tke_0;
 
             to_y_y_xxy_xxyz[k] = to_xx_xxz[k] - 2.0 * to_xx_xxyyz[k] * tke_0 - 2.0 * to_xxyy_xxz[k] * tbe_0 + 4.0 * to_xxyy_xxyyz[k] * tbe_0 * tke_0;
 
             to_y_y_xxy_xxzz[k] = -2.0 * to_xx_xxyzz[k] * tke_0 + 4.0 * to_xxyy_xxyzz[k] * tbe_0 * tke_0;
 
-            to_y_y_xxy_xyyy[k] = 3.0 * to_xx_xyy[k] - 2.0 * to_xx_xyyyy[k] * tke_0 - 6.0 * to_xxyy_xyy[k] * tbe_0 + 4.0 * to_xxyy_xyyyy[k] * tbe_0 * tke_0;
+            to_y_y_xxy_xyyy[k] =
+                3.0 * to_xx_xyy[k] - 2.0 * to_xx_xyyyy[k] * tke_0 - 6.0 * to_xxyy_xyy[k] * tbe_0 + 4.0 * to_xxyy_xyyyy[k] * tbe_0 * tke_0;
 
-            to_y_y_xxy_xyyz[k] = 2.0 * to_xx_xyz[k] - 2.0 * to_xx_xyyyz[k] * tke_0 - 4.0 * to_xxyy_xyz[k] * tbe_0 + 4.0 * to_xxyy_xyyyz[k] * tbe_0 * tke_0;
+            to_y_y_xxy_xyyz[k] =
+                2.0 * to_xx_xyz[k] - 2.0 * to_xx_xyyyz[k] * tke_0 - 4.0 * to_xxyy_xyz[k] * tbe_0 + 4.0 * to_xxyy_xyyyz[k] * tbe_0 * tke_0;
 
             to_y_y_xxy_xyzz[k] = to_xx_xzz[k] - 2.0 * to_xx_xyyzz[k] * tke_0 - 2.0 * to_xxyy_xzz[k] * tbe_0 + 4.0 * to_xxyy_xyyzz[k] * tbe_0 * tke_0;
 
             to_y_y_xxy_xzzz[k] = -2.0 * to_xx_xyzzz[k] * tke_0 + 4.0 * to_xxyy_xyzzz[k] * tbe_0 * tke_0;
 
-            to_y_y_xxy_yyyy[k] = 4.0 * to_xx_yyy[k] - 2.0 * to_xx_yyyyy[k] * tke_0 - 8.0 * to_xxyy_yyy[k] * tbe_0 + 4.0 * to_xxyy_yyyyy[k] * tbe_0 * tke_0;
+            to_y_y_xxy_yyyy[k] =
+                4.0 * to_xx_yyy[k] - 2.0 * to_xx_yyyyy[k] * tke_0 - 8.0 * to_xxyy_yyy[k] * tbe_0 + 4.0 * to_xxyy_yyyyy[k] * tbe_0 * tke_0;
 
-            to_y_y_xxy_yyyz[k] = 3.0 * to_xx_yyz[k] - 2.0 * to_xx_yyyyz[k] * tke_0 - 6.0 * to_xxyy_yyz[k] * tbe_0 + 4.0 * to_xxyy_yyyyz[k] * tbe_0 * tke_0;
+            to_y_y_xxy_yyyz[k] =
+                3.0 * to_xx_yyz[k] - 2.0 * to_xx_yyyyz[k] * tke_0 - 6.0 * to_xxyy_yyz[k] * tbe_0 + 4.0 * to_xxyy_yyyyz[k] * tbe_0 * tke_0;
 
-            to_y_y_xxy_yyzz[k] = 2.0 * to_xx_yzz[k] - 2.0 * to_xx_yyyzz[k] * tke_0 - 4.0 * to_xxyy_yzz[k] * tbe_0 + 4.0 * to_xxyy_yyyzz[k] * tbe_0 * tke_0;
+            to_y_y_xxy_yyzz[k] =
+                2.0 * to_xx_yzz[k] - 2.0 * to_xx_yyyzz[k] * tke_0 - 4.0 * to_xxyy_yzz[k] * tbe_0 + 4.0 * to_xxyy_yyyzz[k] * tbe_0 * tke_0;
 
             to_y_y_xxy_yzzz[k] = to_xx_zzz[k] - 2.0 * to_xx_yyzzz[k] * tke_0 - 2.0 * to_xxyy_zzz[k] * tbe_0 + 4.0 * to_xxyy_yyzzz[k] * tbe_0 * tke_0;
 
@@ -4303,7 +6806,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_y_xxz_zzzz = pbuffer.data(idx_op_geom_101_fg + 4 * op_comps * 150 + i * 150 + 44);
 
-        #pragma omp simd aligned(to_xxyz_xxx, to_xxyz_xxxxy, to_xxyz_xxxyy, to_xxyz_xxxyz, to_xxyz_xxy, to_xxyz_xxyyy, to_xxyz_xxyyz, to_xxyz_xxyzz, to_xxyz_xxz, to_xxyz_xyy, to_xxyz_xyyyy, to_xxyz_xyyyz, to_xxyz_xyyzz, to_xxyz_xyz, to_xxyz_xyzzz, to_xxyz_xzz, to_xxyz_yyy, to_xxyz_yyyyy, to_xxyz_yyyyz, to_xxyz_yyyzz, to_xxyz_yyz, to_xxyz_yyzzz, to_xxyz_yzz, to_xxyz_yzzzz, to_xxyz_zzz, to_y_y_xxz_xxxx, to_y_y_xxz_xxxy, to_y_y_xxz_xxxz, to_y_y_xxz_xxyy, to_y_y_xxz_xxyz, to_y_y_xxz_xxzz, to_y_y_xxz_xyyy, to_y_y_xxz_xyyz, to_y_y_xxz_xyzz, to_y_y_xxz_xzzz, to_y_y_xxz_yyyy, to_y_y_xxz_yyyz, to_y_y_xxz_yyzz, to_y_y_xxz_yzzz, to_y_y_xxz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xxyz_xxx,         \
+                             to_xxyz_xxxxy,   \
+                             to_xxyz_xxxyy,   \
+                             to_xxyz_xxxyz,   \
+                             to_xxyz_xxy,     \
+                             to_xxyz_xxyyy,   \
+                             to_xxyz_xxyyz,   \
+                             to_xxyz_xxyzz,   \
+                             to_xxyz_xxz,     \
+                             to_xxyz_xyy,     \
+                             to_xxyz_xyyyy,   \
+                             to_xxyz_xyyyz,   \
+                             to_xxyz_xyyzz,   \
+                             to_xxyz_xyz,     \
+                             to_xxyz_xyzzz,   \
+                             to_xxyz_xzz,     \
+                             to_xxyz_yyy,     \
+                             to_xxyz_yyyyy,   \
+                             to_xxyz_yyyyz,   \
+                             to_xxyz_yyyzz,   \
+                             to_xxyz_yyz,     \
+                             to_xxyz_yyzzz,   \
+                             to_xxyz_yzz,     \
+                             to_xxyz_yzzzz,   \
+                             to_xxyz_zzz,     \
+                             to_y_y_xxz_xxxx, \
+                             to_y_y_xxz_xxxy, \
+                             to_y_y_xxz_xxxz, \
+                             to_y_y_xxz_xxyy, \
+                             to_y_y_xxz_xxyz, \
+                             to_y_y_xxz_xxzz, \
+                             to_y_y_xxz_xyyy, \
+                             to_y_y_xxz_xyyz, \
+                             to_y_y_xxz_xyzz, \
+                             to_y_y_xxz_xzzz, \
+                             to_y_y_xxz_yyyy, \
+                             to_y_y_xxz_yyyz, \
+                             to_y_y_xxz_yyzz, \
+                             to_y_y_xxz_yzzz, \
+                             to_y_y_xxz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -4373,7 +6916,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_y_xyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 4 * op_comps * 150 + i * 150 + 59);
 
-        #pragma omp simd aligned(to_xy_xxx, to_xy_xxxxy, to_xy_xxxyy, to_xy_xxxyz, to_xy_xxy, to_xy_xxyyy, to_xy_xxyyz, to_xy_xxyzz, to_xy_xxz, to_xy_xyy, to_xy_xyyyy, to_xy_xyyyz, to_xy_xyyzz, to_xy_xyz, to_xy_xyzzz, to_xy_xzz, to_xy_yyy, to_xy_yyyyy, to_xy_yyyyz, to_xy_yyyzz, to_xy_yyz, to_xy_yyzzz, to_xy_yzz, to_xy_yzzzz, to_xy_zzz, to_xyyy_xxx, to_xyyy_xxxxy, to_xyyy_xxxyy, to_xyyy_xxxyz, to_xyyy_xxy, to_xyyy_xxyyy, to_xyyy_xxyyz, to_xyyy_xxyzz, to_xyyy_xxz, to_xyyy_xyy, to_xyyy_xyyyy, to_xyyy_xyyyz, to_xyyy_xyyzz, to_xyyy_xyz, to_xyyy_xyzzz, to_xyyy_xzz, to_xyyy_yyy, to_xyyy_yyyyy, to_xyyy_yyyyz, to_xyyy_yyyzz, to_xyyy_yyz, to_xyyy_yyzzz, to_xyyy_yzz, to_xyyy_yzzzz, to_xyyy_zzz, to_y_y_xyy_xxxx, to_y_y_xyy_xxxy, to_y_y_xyy_xxxz, to_y_y_xyy_xxyy, to_y_y_xyy_xxyz, to_y_y_xyy_xxzz, to_y_y_xyy_xyyy, to_y_y_xyy_xyyz, to_y_y_xyy_xyzz, to_y_y_xyy_xzzz, to_y_y_xyy_yyyy, to_y_y_xyy_yyyz, to_y_y_xyy_yyzz, to_y_y_xyy_yzzz, to_y_y_xyy_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xy_xxx,           \
+                             to_xy_xxxxy,     \
+                             to_xy_xxxyy,     \
+                             to_xy_xxxyz,     \
+                             to_xy_xxy,       \
+                             to_xy_xxyyy,     \
+                             to_xy_xxyyz,     \
+                             to_xy_xxyzz,     \
+                             to_xy_xxz,       \
+                             to_xy_xyy,       \
+                             to_xy_xyyyy,     \
+                             to_xy_xyyyz,     \
+                             to_xy_xyyzz,     \
+                             to_xy_xyz,       \
+                             to_xy_xyzzz,     \
+                             to_xy_xzz,       \
+                             to_xy_yyy,       \
+                             to_xy_yyyyy,     \
+                             to_xy_yyyyz,     \
+                             to_xy_yyyzz,     \
+                             to_xy_yyz,       \
+                             to_xy_yyzzz,     \
+                             to_xy_yzz,       \
+                             to_xy_yzzzz,     \
+                             to_xy_zzz,       \
+                             to_xyyy_xxx,     \
+                             to_xyyy_xxxxy,   \
+                             to_xyyy_xxxyy,   \
+                             to_xyyy_xxxyz,   \
+                             to_xyyy_xxy,     \
+                             to_xyyy_xxyyy,   \
+                             to_xyyy_xxyyz,   \
+                             to_xyyy_xxyzz,   \
+                             to_xyyy_xxz,     \
+                             to_xyyy_xyy,     \
+                             to_xyyy_xyyyy,   \
+                             to_xyyy_xyyyz,   \
+                             to_xyyy_xyyzz,   \
+                             to_xyyy_xyz,     \
+                             to_xyyy_xyzzz,   \
+                             to_xyyy_xzz,     \
+                             to_xyyy_yyy,     \
+                             to_xyyy_yyyyy,   \
+                             to_xyyy_yyyyz,   \
+                             to_xyyy_yyyzz,   \
+                             to_xyyy_yyz,     \
+                             to_xyyy_yyzzz,   \
+                             to_xyyy_yzz,     \
+                             to_xyyy_yzzzz,   \
+                             to_xyyy_zzz,     \
+                             to_y_y_xyy_xxxx, \
+                             to_y_y_xyy_xxxy, \
+                             to_y_y_xyy_xxxz, \
+                             to_y_y_xyy_xxyy, \
+                             to_y_y_xyy_xxyz, \
+                             to_y_y_xyy_xxzz, \
+                             to_y_y_xyy_xyyy, \
+                             to_y_y_xyy_xyyz, \
+                             to_y_y_xyy_xyzz, \
+                             to_y_y_xyy_xzzz, \
+                             to_y_y_xyy_yyyy, \
+                             to_y_y_xyy_yyyz, \
+                             to_y_y_xyy_yyzz, \
+                             to_y_y_xyy_yzzz, \
+                             to_y_y_xyy_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -4382,31 +6990,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_y_y_xyy_xxxx[k] = -4.0 * to_xy_xxxxy[k] * tke_0 + 4.0 * to_xyyy_xxxxy[k] * tbe_0 * tke_0;
 
-            to_y_y_xyy_xxxy[k] = 2.0 * to_xy_xxx[k] - 4.0 * to_xy_xxxyy[k] * tke_0 - 2.0 * to_xyyy_xxx[k] * tbe_0 + 4.0 * to_xyyy_xxxyy[k] * tbe_0 * tke_0;
+            to_y_y_xyy_xxxy[k] =
+                2.0 * to_xy_xxx[k] - 4.0 * to_xy_xxxyy[k] * tke_0 - 2.0 * to_xyyy_xxx[k] * tbe_0 + 4.0 * to_xyyy_xxxyy[k] * tbe_0 * tke_0;
 
             to_y_y_xyy_xxxz[k] = -4.0 * to_xy_xxxyz[k] * tke_0 + 4.0 * to_xyyy_xxxyz[k] * tbe_0 * tke_0;
 
-            to_y_y_xyy_xxyy[k] = 4.0 * to_xy_xxy[k] - 4.0 * to_xy_xxyyy[k] * tke_0 - 4.0 * to_xyyy_xxy[k] * tbe_0 + 4.0 * to_xyyy_xxyyy[k] * tbe_0 * tke_0;
+            to_y_y_xyy_xxyy[k] =
+                4.0 * to_xy_xxy[k] - 4.0 * to_xy_xxyyy[k] * tke_0 - 4.0 * to_xyyy_xxy[k] * tbe_0 + 4.0 * to_xyyy_xxyyy[k] * tbe_0 * tke_0;
 
-            to_y_y_xyy_xxyz[k] = 2.0 * to_xy_xxz[k] - 4.0 * to_xy_xxyyz[k] * tke_0 - 2.0 * to_xyyy_xxz[k] * tbe_0 + 4.0 * to_xyyy_xxyyz[k] * tbe_0 * tke_0;
+            to_y_y_xyy_xxyz[k] =
+                2.0 * to_xy_xxz[k] - 4.0 * to_xy_xxyyz[k] * tke_0 - 2.0 * to_xyyy_xxz[k] * tbe_0 + 4.0 * to_xyyy_xxyyz[k] * tbe_0 * tke_0;
 
             to_y_y_xyy_xxzz[k] = -4.0 * to_xy_xxyzz[k] * tke_0 + 4.0 * to_xyyy_xxyzz[k] * tbe_0 * tke_0;
 
-            to_y_y_xyy_xyyy[k] = 6.0 * to_xy_xyy[k] - 4.0 * to_xy_xyyyy[k] * tke_0 - 6.0 * to_xyyy_xyy[k] * tbe_0 + 4.0 * to_xyyy_xyyyy[k] * tbe_0 * tke_0;
+            to_y_y_xyy_xyyy[k] =
+                6.0 * to_xy_xyy[k] - 4.0 * to_xy_xyyyy[k] * tke_0 - 6.0 * to_xyyy_xyy[k] * tbe_0 + 4.0 * to_xyyy_xyyyy[k] * tbe_0 * tke_0;
 
-            to_y_y_xyy_xyyz[k] = 4.0 * to_xy_xyz[k] - 4.0 * to_xy_xyyyz[k] * tke_0 - 4.0 * to_xyyy_xyz[k] * tbe_0 + 4.0 * to_xyyy_xyyyz[k] * tbe_0 * tke_0;
+            to_y_y_xyy_xyyz[k] =
+                4.0 * to_xy_xyz[k] - 4.0 * to_xy_xyyyz[k] * tke_0 - 4.0 * to_xyyy_xyz[k] * tbe_0 + 4.0 * to_xyyy_xyyyz[k] * tbe_0 * tke_0;
 
-            to_y_y_xyy_xyzz[k] = 2.0 * to_xy_xzz[k] - 4.0 * to_xy_xyyzz[k] * tke_0 - 2.0 * to_xyyy_xzz[k] * tbe_0 + 4.0 * to_xyyy_xyyzz[k] * tbe_0 * tke_0;
+            to_y_y_xyy_xyzz[k] =
+                2.0 * to_xy_xzz[k] - 4.0 * to_xy_xyyzz[k] * tke_0 - 2.0 * to_xyyy_xzz[k] * tbe_0 + 4.0 * to_xyyy_xyyzz[k] * tbe_0 * tke_0;
 
             to_y_y_xyy_xzzz[k] = -4.0 * to_xy_xyzzz[k] * tke_0 + 4.0 * to_xyyy_xyzzz[k] * tbe_0 * tke_0;
 
-            to_y_y_xyy_yyyy[k] = 8.0 * to_xy_yyy[k] - 4.0 * to_xy_yyyyy[k] * tke_0 - 8.0 * to_xyyy_yyy[k] * tbe_0 + 4.0 * to_xyyy_yyyyy[k] * tbe_0 * tke_0;
+            to_y_y_xyy_yyyy[k] =
+                8.0 * to_xy_yyy[k] - 4.0 * to_xy_yyyyy[k] * tke_0 - 8.0 * to_xyyy_yyy[k] * tbe_0 + 4.0 * to_xyyy_yyyyy[k] * tbe_0 * tke_0;
 
-            to_y_y_xyy_yyyz[k] = 6.0 * to_xy_yyz[k] - 4.0 * to_xy_yyyyz[k] * tke_0 - 6.0 * to_xyyy_yyz[k] * tbe_0 + 4.0 * to_xyyy_yyyyz[k] * tbe_0 * tke_0;
+            to_y_y_xyy_yyyz[k] =
+                6.0 * to_xy_yyz[k] - 4.0 * to_xy_yyyyz[k] * tke_0 - 6.0 * to_xyyy_yyz[k] * tbe_0 + 4.0 * to_xyyy_yyyyz[k] * tbe_0 * tke_0;
 
-            to_y_y_xyy_yyzz[k] = 4.0 * to_xy_yzz[k] - 4.0 * to_xy_yyyzz[k] * tke_0 - 4.0 * to_xyyy_yzz[k] * tbe_0 + 4.0 * to_xyyy_yyyzz[k] * tbe_0 * tke_0;
+            to_y_y_xyy_yyzz[k] =
+                4.0 * to_xy_yzz[k] - 4.0 * to_xy_yyyzz[k] * tke_0 - 4.0 * to_xyyy_yzz[k] * tbe_0 + 4.0 * to_xyyy_yyyzz[k] * tbe_0 * tke_0;
 
-            to_y_y_xyy_yzzz[k] = 2.0 * to_xy_zzz[k] - 4.0 * to_xy_yyzzz[k] * tke_0 - 2.0 * to_xyyy_zzz[k] * tbe_0 + 4.0 * to_xyyy_yyzzz[k] * tbe_0 * tke_0;
+            to_y_y_xyy_yzzz[k] =
+                2.0 * to_xy_zzz[k] - 4.0 * to_xy_yyzzz[k] * tke_0 - 2.0 * to_xyyy_zzz[k] * tbe_0 + 4.0 * to_xyyy_yyzzz[k] * tbe_0 * tke_0;
 
             to_y_y_xyy_zzzz[k] = -4.0 * to_xy_yzzzz[k] * tke_0 + 4.0 * to_xyyy_yzzzz[k] * tbe_0 * tke_0;
         }
@@ -4443,7 +7061,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_y_xyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 4 * op_comps * 150 + i * 150 + 74);
 
-        #pragma omp simd aligned(to_xyyz_xxx, to_xyyz_xxxxy, to_xyyz_xxxyy, to_xyyz_xxxyz, to_xyyz_xxy, to_xyyz_xxyyy, to_xyyz_xxyyz, to_xyyz_xxyzz, to_xyyz_xxz, to_xyyz_xyy, to_xyyz_xyyyy, to_xyyz_xyyyz, to_xyyz_xyyzz, to_xyyz_xyz, to_xyyz_xyzzz, to_xyyz_xzz, to_xyyz_yyy, to_xyyz_yyyyy, to_xyyz_yyyyz, to_xyyz_yyyzz, to_xyyz_yyz, to_xyyz_yyzzz, to_xyyz_yzz, to_xyyz_yzzzz, to_xyyz_zzz, to_xz_xxx, to_xz_xxxxy, to_xz_xxxyy, to_xz_xxxyz, to_xz_xxy, to_xz_xxyyy, to_xz_xxyyz, to_xz_xxyzz, to_xz_xxz, to_xz_xyy, to_xz_xyyyy, to_xz_xyyyz, to_xz_xyyzz, to_xz_xyz, to_xz_xyzzz, to_xz_xzz, to_xz_yyy, to_xz_yyyyy, to_xz_yyyyz, to_xz_yyyzz, to_xz_yyz, to_xz_yyzzz, to_xz_yzz, to_xz_yzzzz, to_xz_zzz, to_y_y_xyz_xxxx, to_y_y_xyz_xxxy, to_y_y_xyz_xxxz, to_y_y_xyz_xxyy, to_y_y_xyz_xxyz, to_y_y_xyz_xxzz, to_y_y_xyz_xyyy, to_y_y_xyz_xyyz, to_y_y_xyz_xyzz, to_y_y_xyz_xzzz, to_y_y_xyz_yyyy, to_y_y_xyz_yyyz, to_y_y_xyz_yyzz, to_y_y_xyz_yzzz, to_y_y_xyz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xyyz_xxx,         \
+                             to_xyyz_xxxxy,   \
+                             to_xyyz_xxxyy,   \
+                             to_xyyz_xxxyz,   \
+                             to_xyyz_xxy,     \
+                             to_xyyz_xxyyy,   \
+                             to_xyyz_xxyyz,   \
+                             to_xyyz_xxyzz,   \
+                             to_xyyz_xxz,     \
+                             to_xyyz_xyy,     \
+                             to_xyyz_xyyyy,   \
+                             to_xyyz_xyyyz,   \
+                             to_xyyz_xyyzz,   \
+                             to_xyyz_xyz,     \
+                             to_xyyz_xyzzz,   \
+                             to_xyyz_xzz,     \
+                             to_xyyz_yyy,     \
+                             to_xyyz_yyyyy,   \
+                             to_xyyz_yyyyz,   \
+                             to_xyyz_yyyzz,   \
+                             to_xyyz_yyz,     \
+                             to_xyyz_yyzzz,   \
+                             to_xyyz_yzz,     \
+                             to_xyyz_yzzzz,   \
+                             to_xyyz_zzz,     \
+                             to_xz_xxx,       \
+                             to_xz_xxxxy,     \
+                             to_xz_xxxyy,     \
+                             to_xz_xxxyz,     \
+                             to_xz_xxy,       \
+                             to_xz_xxyyy,     \
+                             to_xz_xxyyz,     \
+                             to_xz_xxyzz,     \
+                             to_xz_xxz,       \
+                             to_xz_xyy,       \
+                             to_xz_xyyyy,     \
+                             to_xz_xyyyz,     \
+                             to_xz_xyyzz,     \
+                             to_xz_xyz,       \
+                             to_xz_xyzzz,     \
+                             to_xz_xzz,       \
+                             to_xz_yyy,       \
+                             to_xz_yyyyy,     \
+                             to_xz_yyyyz,     \
+                             to_xz_yyyzz,     \
+                             to_xz_yyz,       \
+                             to_xz_yyzzz,     \
+                             to_xz_yzz,       \
+                             to_xz_yzzzz,     \
+                             to_xz_zzz,       \
+                             to_y_y_xyz_xxxx, \
+                             to_y_y_xyz_xxxy, \
+                             to_y_y_xyz_xxxz, \
+                             to_y_y_xyz_xxyy, \
+                             to_y_y_xyz_xxyz, \
+                             to_y_y_xyz_xxzz, \
+                             to_y_y_xyz_xyyy, \
+                             to_y_y_xyz_xyyz, \
+                             to_y_y_xyz_xyzz, \
+                             to_y_y_xyz_xzzz, \
+                             to_y_y_xyz_yyyy, \
+                             to_y_y_xyz_yyyz, \
+                             to_y_y_xyz_yyzz, \
+                             to_y_y_xyz_yzzz, \
+                             to_y_y_xyz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -4456,25 +7139,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_y_y_xyz_xxxz[k] = -2.0 * to_xz_xxxyz[k] * tke_0 + 4.0 * to_xyyz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_y_y_xyz_xxyy[k] = 2.0 * to_xz_xxy[k] - 2.0 * to_xz_xxyyy[k] * tke_0 - 4.0 * to_xyyz_xxy[k] * tbe_0 + 4.0 * to_xyyz_xxyyy[k] * tbe_0 * tke_0;
+            to_y_y_xyz_xxyy[k] =
+                2.0 * to_xz_xxy[k] - 2.0 * to_xz_xxyyy[k] * tke_0 - 4.0 * to_xyyz_xxy[k] * tbe_0 + 4.0 * to_xyyz_xxyyy[k] * tbe_0 * tke_0;
 
             to_y_y_xyz_xxyz[k] = to_xz_xxz[k] - 2.0 * to_xz_xxyyz[k] * tke_0 - 2.0 * to_xyyz_xxz[k] * tbe_0 + 4.0 * to_xyyz_xxyyz[k] * tbe_0 * tke_0;
 
             to_y_y_xyz_xxzz[k] = -2.0 * to_xz_xxyzz[k] * tke_0 + 4.0 * to_xyyz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_y_y_xyz_xyyy[k] = 3.0 * to_xz_xyy[k] - 2.0 * to_xz_xyyyy[k] * tke_0 - 6.0 * to_xyyz_xyy[k] * tbe_0 + 4.0 * to_xyyz_xyyyy[k] * tbe_0 * tke_0;
+            to_y_y_xyz_xyyy[k] =
+                3.0 * to_xz_xyy[k] - 2.0 * to_xz_xyyyy[k] * tke_0 - 6.0 * to_xyyz_xyy[k] * tbe_0 + 4.0 * to_xyyz_xyyyy[k] * tbe_0 * tke_0;
 
-            to_y_y_xyz_xyyz[k] = 2.0 * to_xz_xyz[k] - 2.0 * to_xz_xyyyz[k] * tke_0 - 4.0 * to_xyyz_xyz[k] * tbe_0 + 4.0 * to_xyyz_xyyyz[k] * tbe_0 * tke_0;
+            to_y_y_xyz_xyyz[k] =
+                2.0 * to_xz_xyz[k] - 2.0 * to_xz_xyyyz[k] * tke_0 - 4.0 * to_xyyz_xyz[k] * tbe_0 + 4.0 * to_xyyz_xyyyz[k] * tbe_0 * tke_0;
 
             to_y_y_xyz_xyzz[k] = to_xz_xzz[k] - 2.0 * to_xz_xyyzz[k] * tke_0 - 2.0 * to_xyyz_xzz[k] * tbe_0 + 4.0 * to_xyyz_xyyzz[k] * tbe_0 * tke_0;
 
             to_y_y_xyz_xzzz[k] = -2.0 * to_xz_xyzzz[k] * tke_0 + 4.0 * to_xyyz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_y_y_xyz_yyyy[k] = 4.0 * to_xz_yyy[k] - 2.0 * to_xz_yyyyy[k] * tke_0 - 8.0 * to_xyyz_yyy[k] * tbe_0 + 4.0 * to_xyyz_yyyyy[k] * tbe_0 * tke_0;
+            to_y_y_xyz_yyyy[k] =
+                4.0 * to_xz_yyy[k] - 2.0 * to_xz_yyyyy[k] * tke_0 - 8.0 * to_xyyz_yyy[k] * tbe_0 + 4.0 * to_xyyz_yyyyy[k] * tbe_0 * tke_0;
 
-            to_y_y_xyz_yyyz[k] = 3.0 * to_xz_yyz[k] - 2.0 * to_xz_yyyyz[k] * tke_0 - 6.0 * to_xyyz_yyz[k] * tbe_0 + 4.0 * to_xyyz_yyyyz[k] * tbe_0 * tke_0;
+            to_y_y_xyz_yyyz[k] =
+                3.0 * to_xz_yyz[k] - 2.0 * to_xz_yyyyz[k] * tke_0 - 6.0 * to_xyyz_yyz[k] * tbe_0 + 4.0 * to_xyyz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_y_y_xyz_yyzz[k] = 2.0 * to_xz_yzz[k] - 2.0 * to_xz_yyyzz[k] * tke_0 - 4.0 * to_xyyz_yzz[k] * tbe_0 + 4.0 * to_xyyz_yyyzz[k] * tbe_0 * tke_0;
+            to_y_y_xyz_yyzz[k] =
+                2.0 * to_xz_yzz[k] - 2.0 * to_xz_yyyzz[k] * tke_0 - 4.0 * to_xyyz_yzz[k] * tbe_0 + 4.0 * to_xyyz_yyyzz[k] * tbe_0 * tke_0;
 
             to_y_y_xyz_yzzz[k] = to_xz_zzz[k] - 2.0 * to_xz_yyzzz[k] * tke_0 - 2.0 * to_xyyz_zzz[k] * tbe_0 + 4.0 * to_xyyz_yyzzz[k] * tbe_0 * tke_0;
 
@@ -4513,7 +7202,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_y_xzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 4 * op_comps * 150 + i * 150 + 89);
 
-        #pragma omp simd aligned(to_xyzz_xxx, to_xyzz_xxxxy, to_xyzz_xxxyy, to_xyzz_xxxyz, to_xyzz_xxy, to_xyzz_xxyyy, to_xyzz_xxyyz, to_xyzz_xxyzz, to_xyzz_xxz, to_xyzz_xyy, to_xyzz_xyyyy, to_xyzz_xyyyz, to_xyzz_xyyzz, to_xyzz_xyz, to_xyzz_xyzzz, to_xyzz_xzz, to_xyzz_yyy, to_xyzz_yyyyy, to_xyzz_yyyyz, to_xyzz_yyyzz, to_xyzz_yyz, to_xyzz_yyzzz, to_xyzz_yzz, to_xyzz_yzzzz, to_xyzz_zzz, to_y_y_xzz_xxxx, to_y_y_xzz_xxxy, to_y_y_xzz_xxxz, to_y_y_xzz_xxyy, to_y_y_xzz_xxyz, to_y_y_xzz_xxzz, to_y_y_xzz_xyyy, to_y_y_xzz_xyyz, to_y_y_xzz_xyzz, to_y_y_xzz_xzzz, to_y_y_xzz_yyyy, to_y_y_xzz_yyyz, to_y_y_xzz_yyzz, to_y_y_xzz_yzzz, to_y_y_xzz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xyzz_xxx,         \
+                             to_xyzz_xxxxy,   \
+                             to_xyzz_xxxyy,   \
+                             to_xyzz_xxxyz,   \
+                             to_xyzz_xxy,     \
+                             to_xyzz_xxyyy,   \
+                             to_xyzz_xxyyz,   \
+                             to_xyzz_xxyzz,   \
+                             to_xyzz_xxz,     \
+                             to_xyzz_xyy,     \
+                             to_xyzz_xyyyy,   \
+                             to_xyzz_xyyyz,   \
+                             to_xyzz_xyyzz,   \
+                             to_xyzz_xyz,     \
+                             to_xyzz_xyzzz,   \
+                             to_xyzz_xzz,     \
+                             to_xyzz_yyy,     \
+                             to_xyzz_yyyyy,   \
+                             to_xyzz_yyyyz,   \
+                             to_xyzz_yyyzz,   \
+                             to_xyzz_yyz,     \
+                             to_xyzz_yyzzz,   \
+                             to_xyzz_yzz,     \
+                             to_xyzz_yzzzz,   \
+                             to_xyzz_zzz,     \
+                             to_y_y_xzz_xxxx, \
+                             to_y_y_xzz_xxxy, \
+                             to_y_y_xzz_xxxz, \
+                             to_y_y_xzz_xxyy, \
+                             to_y_y_xzz_xxyz, \
+                             to_y_y_xzz_xxzz, \
+                             to_y_y_xzz_xyyy, \
+                             to_y_y_xzz_xyyz, \
+                             to_y_y_xzz_xyzz, \
+                             to_y_y_xzz_xzzz, \
+                             to_y_y_xzz_yyyy, \
+                             to_y_y_xzz_yyyz, \
+                             to_y_y_xzz_yyzz, \
+                             to_y_y_xzz_yzzz, \
+                             to_y_y_xzz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -4583,7 +7312,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_y_yyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 4 * op_comps * 150 + i * 150 + 104);
 
-        #pragma omp simd aligned(to_y_y_yyy_xxxx, to_y_y_yyy_xxxy, to_y_y_yyy_xxxz, to_y_y_yyy_xxyy, to_y_y_yyy_xxyz, to_y_y_yyy_xxzz, to_y_y_yyy_xyyy, to_y_y_yyy_xyyz, to_y_y_yyy_xyzz, to_y_y_yyy_xzzz, to_y_y_yyy_yyyy, to_y_y_yyy_yyyz, to_y_y_yyy_yyzz, to_y_y_yyy_yzzz, to_y_y_yyy_zzzz, to_yy_xxx, to_yy_xxxxy, to_yy_xxxyy, to_yy_xxxyz, to_yy_xxy, to_yy_xxyyy, to_yy_xxyyz, to_yy_xxyzz, to_yy_xxz, to_yy_xyy, to_yy_xyyyy, to_yy_xyyyz, to_yy_xyyzz, to_yy_xyz, to_yy_xyzzz, to_yy_xzz, to_yy_yyy, to_yy_yyyyy, to_yy_yyyyz, to_yy_yyyzz, to_yy_yyz, to_yy_yyzzz, to_yy_yzz, to_yy_yzzzz, to_yy_zzz, to_yyyy_xxx, to_yyyy_xxxxy, to_yyyy_xxxyy, to_yyyy_xxxyz, to_yyyy_xxy, to_yyyy_xxyyy, to_yyyy_xxyyz, to_yyyy_xxyzz, to_yyyy_xxz, to_yyyy_xyy, to_yyyy_xyyyy, to_yyyy_xyyyz, to_yyyy_xyyzz, to_yyyy_xyz, to_yyyy_xyzzz, to_yyyy_xzz, to_yyyy_yyy, to_yyyy_yyyyy, to_yyyy_yyyyz, to_yyyy_yyyzz, to_yyyy_yyz, to_yyyy_yyzzz, to_yyyy_yzz, to_yyyy_yzzzz, to_yyyy_zzz, b_exps : 64)
+#pragma omp simd aligned(to_y_y_yyy_xxxx,     \
+                             to_y_y_yyy_xxxy, \
+                             to_y_y_yyy_xxxz, \
+                             to_y_y_yyy_xxyy, \
+                             to_y_y_yyy_xxyz, \
+                             to_y_y_yyy_xxzz, \
+                             to_y_y_yyy_xyyy, \
+                             to_y_y_yyy_xyyz, \
+                             to_y_y_yyy_xyzz, \
+                             to_y_y_yyy_xzzz, \
+                             to_y_y_yyy_yyyy, \
+                             to_y_y_yyy_yyyz, \
+                             to_y_y_yyy_yyzz, \
+                             to_y_y_yyy_yzzz, \
+                             to_y_y_yyy_zzzz, \
+                             to_yy_xxx,       \
+                             to_yy_xxxxy,     \
+                             to_yy_xxxyy,     \
+                             to_yy_xxxyz,     \
+                             to_yy_xxy,       \
+                             to_yy_xxyyy,     \
+                             to_yy_xxyyz,     \
+                             to_yy_xxyzz,     \
+                             to_yy_xxz,       \
+                             to_yy_xyy,       \
+                             to_yy_xyyyy,     \
+                             to_yy_xyyyz,     \
+                             to_yy_xyyzz,     \
+                             to_yy_xyz,       \
+                             to_yy_xyzzz,     \
+                             to_yy_xzz,       \
+                             to_yy_yyy,       \
+                             to_yy_yyyyy,     \
+                             to_yy_yyyyz,     \
+                             to_yy_yyyzz,     \
+                             to_yy_yyz,       \
+                             to_yy_yyzzz,     \
+                             to_yy_yzz,       \
+                             to_yy_yzzzz,     \
+                             to_yy_zzz,       \
+                             to_yyyy_xxx,     \
+                             to_yyyy_xxxxy,   \
+                             to_yyyy_xxxyy,   \
+                             to_yyyy_xxxyz,   \
+                             to_yyyy_xxy,     \
+                             to_yyyy_xxyyy,   \
+                             to_yyyy_xxyyz,   \
+                             to_yyyy_xxyzz,   \
+                             to_yyyy_xxz,     \
+                             to_yyyy_xyy,     \
+                             to_yyyy_xyyyy,   \
+                             to_yyyy_xyyyz,   \
+                             to_yyyy_xyyzz,   \
+                             to_yyyy_xyz,     \
+                             to_yyyy_xyzzz,   \
+                             to_yyyy_xzz,     \
+                             to_yyyy_yyy,     \
+                             to_yyyy_yyyyy,   \
+                             to_yyyy_yyyyz,   \
+                             to_yyyy_yyyzz,   \
+                             to_yyyy_yyz,     \
+                             to_yyyy_yyzzz,   \
+                             to_yyyy_yzz,     \
+                             to_yyyy_yzzzz,   \
+                             to_yyyy_zzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -4592,31 +7386,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_y_y_yyy_xxxx[k] = -6.0 * to_yy_xxxxy[k] * tke_0 + 4.0 * to_yyyy_xxxxy[k] * tbe_0 * tke_0;
 
-            to_y_y_yyy_xxxy[k] = 3.0 * to_yy_xxx[k] - 6.0 * to_yy_xxxyy[k] * tke_0 - 2.0 * to_yyyy_xxx[k] * tbe_0 + 4.0 * to_yyyy_xxxyy[k] * tbe_0 * tke_0;
+            to_y_y_yyy_xxxy[k] =
+                3.0 * to_yy_xxx[k] - 6.0 * to_yy_xxxyy[k] * tke_0 - 2.0 * to_yyyy_xxx[k] * tbe_0 + 4.0 * to_yyyy_xxxyy[k] * tbe_0 * tke_0;
 
             to_y_y_yyy_xxxz[k] = -6.0 * to_yy_xxxyz[k] * tke_0 + 4.0 * to_yyyy_xxxyz[k] * tbe_0 * tke_0;
 
-            to_y_y_yyy_xxyy[k] = 6.0 * to_yy_xxy[k] - 6.0 * to_yy_xxyyy[k] * tke_0 - 4.0 * to_yyyy_xxy[k] * tbe_0 + 4.0 * to_yyyy_xxyyy[k] * tbe_0 * tke_0;
+            to_y_y_yyy_xxyy[k] =
+                6.0 * to_yy_xxy[k] - 6.0 * to_yy_xxyyy[k] * tke_0 - 4.0 * to_yyyy_xxy[k] * tbe_0 + 4.0 * to_yyyy_xxyyy[k] * tbe_0 * tke_0;
 
-            to_y_y_yyy_xxyz[k] = 3.0 * to_yy_xxz[k] - 6.0 * to_yy_xxyyz[k] * tke_0 - 2.0 * to_yyyy_xxz[k] * tbe_0 + 4.0 * to_yyyy_xxyyz[k] * tbe_0 * tke_0;
+            to_y_y_yyy_xxyz[k] =
+                3.0 * to_yy_xxz[k] - 6.0 * to_yy_xxyyz[k] * tke_0 - 2.0 * to_yyyy_xxz[k] * tbe_0 + 4.0 * to_yyyy_xxyyz[k] * tbe_0 * tke_0;
 
             to_y_y_yyy_xxzz[k] = -6.0 * to_yy_xxyzz[k] * tke_0 + 4.0 * to_yyyy_xxyzz[k] * tbe_0 * tke_0;
 
-            to_y_y_yyy_xyyy[k] = 9.0 * to_yy_xyy[k] - 6.0 * to_yy_xyyyy[k] * tke_0 - 6.0 * to_yyyy_xyy[k] * tbe_0 + 4.0 * to_yyyy_xyyyy[k] * tbe_0 * tke_0;
+            to_y_y_yyy_xyyy[k] =
+                9.0 * to_yy_xyy[k] - 6.0 * to_yy_xyyyy[k] * tke_0 - 6.0 * to_yyyy_xyy[k] * tbe_0 + 4.0 * to_yyyy_xyyyy[k] * tbe_0 * tke_0;
 
-            to_y_y_yyy_xyyz[k] = 6.0 * to_yy_xyz[k] - 6.0 * to_yy_xyyyz[k] * tke_0 - 4.0 * to_yyyy_xyz[k] * tbe_0 + 4.0 * to_yyyy_xyyyz[k] * tbe_0 * tke_0;
+            to_y_y_yyy_xyyz[k] =
+                6.0 * to_yy_xyz[k] - 6.0 * to_yy_xyyyz[k] * tke_0 - 4.0 * to_yyyy_xyz[k] * tbe_0 + 4.0 * to_yyyy_xyyyz[k] * tbe_0 * tke_0;
 
-            to_y_y_yyy_xyzz[k] = 3.0 * to_yy_xzz[k] - 6.0 * to_yy_xyyzz[k] * tke_0 - 2.0 * to_yyyy_xzz[k] * tbe_0 + 4.0 * to_yyyy_xyyzz[k] * tbe_0 * tke_0;
+            to_y_y_yyy_xyzz[k] =
+                3.0 * to_yy_xzz[k] - 6.0 * to_yy_xyyzz[k] * tke_0 - 2.0 * to_yyyy_xzz[k] * tbe_0 + 4.0 * to_yyyy_xyyzz[k] * tbe_0 * tke_0;
 
             to_y_y_yyy_xzzz[k] = -6.0 * to_yy_xyzzz[k] * tke_0 + 4.0 * to_yyyy_xyzzz[k] * tbe_0 * tke_0;
 
-            to_y_y_yyy_yyyy[k] = 12.0 * to_yy_yyy[k] - 6.0 * to_yy_yyyyy[k] * tke_0 - 8.0 * to_yyyy_yyy[k] * tbe_0 + 4.0 * to_yyyy_yyyyy[k] * tbe_0 * tke_0;
+            to_y_y_yyy_yyyy[k] =
+                12.0 * to_yy_yyy[k] - 6.0 * to_yy_yyyyy[k] * tke_0 - 8.0 * to_yyyy_yyy[k] * tbe_0 + 4.0 * to_yyyy_yyyyy[k] * tbe_0 * tke_0;
 
-            to_y_y_yyy_yyyz[k] = 9.0 * to_yy_yyz[k] - 6.0 * to_yy_yyyyz[k] * tke_0 - 6.0 * to_yyyy_yyz[k] * tbe_0 + 4.0 * to_yyyy_yyyyz[k] * tbe_0 * tke_0;
+            to_y_y_yyy_yyyz[k] =
+                9.0 * to_yy_yyz[k] - 6.0 * to_yy_yyyyz[k] * tke_0 - 6.0 * to_yyyy_yyz[k] * tbe_0 + 4.0 * to_yyyy_yyyyz[k] * tbe_0 * tke_0;
 
-            to_y_y_yyy_yyzz[k] = 6.0 * to_yy_yzz[k] - 6.0 * to_yy_yyyzz[k] * tke_0 - 4.0 * to_yyyy_yzz[k] * tbe_0 + 4.0 * to_yyyy_yyyzz[k] * tbe_0 * tke_0;
+            to_y_y_yyy_yyzz[k] =
+                6.0 * to_yy_yzz[k] - 6.0 * to_yy_yyyzz[k] * tke_0 - 4.0 * to_yyyy_yzz[k] * tbe_0 + 4.0 * to_yyyy_yyyzz[k] * tbe_0 * tke_0;
 
-            to_y_y_yyy_yzzz[k] = 3.0 * to_yy_zzz[k] - 6.0 * to_yy_yyzzz[k] * tke_0 - 2.0 * to_yyyy_zzz[k] * tbe_0 + 4.0 * to_yyyy_yyzzz[k] * tbe_0 * tke_0;
+            to_y_y_yyy_yzzz[k] =
+                3.0 * to_yy_zzz[k] - 6.0 * to_yy_yyzzz[k] * tke_0 - 2.0 * to_yyyy_zzz[k] * tbe_0 + 4.0 * to_yyyy_yyzzz[k] * tbe_0 * tke_0;
 
             to_y_y_yyy_zzzz[k] = -6.0 * to_yy_yzzzz[k] * tke_0 + 4.0 * to_yyyy_yzzzz[k] * tbe_0 * tke_0;
         }
@@ -4653,7 +7457,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_y_yyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 4 * op_comps * 150 + i * 150 + 119);
 
-        #pragma omp simd aligned(to_y_y_yyz_xxxx, to_y_y_yyz_xxxy, to_y_y_yyz_xxxz, to_y_y_yyz_xxyy, to_y_y_yyz_xxyz, to_y_y_yyz_xxzz, to_y_y_yyz_xyyy, to_y_y_yyz_xyyz, to_y_y_yyz_xyzz, to_y_y_yyz_xzzz, to_y_y_yyz_yyyy, to_y_y_yyz_yyyz, to_y_y_yyz_yyzz, to_y_y_yyz_yzzz, to_y_y_yyz_zzzz, to_yyyz_xxx, to_yyyz_xxxxy, to_yyyz_xxxyy, to_yyyz_xxxyz, to_yyyz_xxy, to_yyyz_xxyyy, to_yyyz_xxyyz, to_yyyz_xxyzz, to_yyyz_xxz, to_yyyz_xyy, to_yyyz_xyyyy, to_yyyz_xyyyz, to_yyyz_xyyzz, to_yyyz_xyz, to_yyyz_xyzzz, to_yyyz_xzz, to_yyyz_yyy, to_yyyz_yyyyy, to_yyyz_yyyyz, to_yyyz_yyyzz, to_yyyz_yyz, to_yyyz_yyzzz, to_yyyz_yzz, to_yyyz_yzzzz, to_yyyz_zzz, to_yz_xxx, to_yz_xxxxy, to_yz_xxxyy, to_yz_xxxyz, to_yz_xxy, to_yz_xxyyy, to_yz_xxyyz, to_yz_xxyzz, to_yz_xxz, to_yz_xyy, to_yz_xyyyy, to_yz_xyyyz, to_yz_xyyzz, to_yz_xyz, to_yz_xyzzz, to_yz_xzz, to_yz_yyy, to_yz_yyyyy, to_yz_yyyyz, to_yz_yyyzz, to_yz_yyz, to_yz_yyzzz, to_yz_yzz, to_yz_yzzzz, to_yz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_y_y_yyz_xxxx,     \
+                             to_y_y_yyz_xxxy, \
+                             to_y_y_yyz_xxxz, \
+                             to_y_y_yyz_xxyy, \
+                             to_y_y_yyz_xxyz, \
+                             to_y_y_yyz_xxzz, \
+                             to_y_y_yyz_xyyy, \
+                             to_y_y_yyz_xyyz, \
+                             to_y_y_yyz_xyzz, \
+                             to_y_y_yyz_xzzz, \
+                             to_y_y_yyz_yyyy, \
+                             to_y_y_yyz_yyyz, \
+                             to_y_y_yyz_yyzz, \
+                             to_y_y_yyz_yzzz, \
+                             to_y_y_yyz_zzzz, \
+                             to_yyyz_xxx,     \
+                             to_yyyz_xxxxy,   \
+                             to_yyyz_xxxyy,   \
+                             to_yyyz_xxxyz,   \
+                             to_yyyz_xxy,     \
+                             to_yyyz_xxyyy,   \
+                             to_yyyz_xxyyz,   \
+                             to_yyyz_xxyzz,   \
+                             to_yyyz_xxz,     \
+                             to_yyyz_xyy,     \
+                             to_yyyz_xyyyy,   \
+                             to_yyyz_xyyyz,   \
+                             to_yyyz_xyyzz,   \
+                             to_yyyz_xyz,     \
+                             to_yyyz_xyzzz,   \
+                             to_yyyz_xzz,     \
+                             to_yyyz_yyy,     \
+                             to_yyyz_yyyyy,   \
+                             to_yyyz_yyyyz,   \
+                             to_yyyz_yyyzz,   \
+                             to_yyyz_yyz,     \
+                             to_yyyz_yyzzz,   \
+                             to_yyyz_yzz,     \
+                             to_yyyz_yzzzz,   \
+                             to_yyyz_zzz,     \
+                             to_yz_xxx,       \
+                             to_yz_xxxxy,     \
+                             to_yz_xxxyy,     \
+                             to_yz_xxxyz,     \
+                             to_yz_xxy,       \
+                             to_yz_xxyyy,     \
+                             to_yz_xxyyz,     \
+                             to_yz_xxyzz,     \
+                             to_yz_xxz,       \
+                             to_yz_xyy,       \
+                             to_yz_xyyyy,     \
+                             to_yz_xyyyz,     \
+                             to_yz_xyyzz,     \
+                             to_yz_xyz,       \
+                             to_yz_xyzzz,     \
+                             to_yz_xzz,       \
+                             to_yz_yyy,       \
+                             to_yz_yyyyy,     \
+                             to_yz_yyyyz,     \
+                             to_yz_yyyzz,     \
+                             to_yz_yyz,       \
+                             to_yz_yyzzz,     \
+                             to_yz_yzz,       \
+                             to_yz_yzzzz,     \
+                             to_yz_zzz,       \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -4662,31 +7531,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_y_y_yyz_xxxx[k] = -4.0 * to_yz_xxxxy[k] * tke_0 + 4.0 * to_yyyz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_y_y_yyz_xxxy[k] = 2.0 * to_yz_xxx[k] - 4.0 * to_yz_xxxyy[k] * tke_0 - 2.0 * to_yyyz_xxx[k] * tbe_0 + 4.0 * to_yyyz_xxxyy[k] * tbe_0 * tke_0;
+            to_y_y_yyz_xxxy[k] =
+                2.0 * to_yz_xxx[k] - 4.0 * to_yz_xxxyy[k] * tke_0 - 2.0 * to_yyyz_xxx[k] * tbe_0 + 4.0 * to_yyyz_xxxyy[k] * tbe_0 * tke_0;
 
             to_y_y_yyz_xxxz[k] = -4.0 * to_yz_xxxyz[k] * tke_0 + 4.0 * to_yyyz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_y_y_yyz_xxyy[k] = 4.0 * to_yz_xxy[k] - 4.0 * to_yz_xxyyy[k] * tke_0 - 4.0 * to_yyyz_xxy[k] * tbe_0 + 4.0 * to_yyyz_xxyyy[k] * tbe_0 * tke_0;
+            to_y_y_yyz_xxyy[k] =
+                4.0 * to_yz_xxy[k] - 4.0 * to_yz_xxyyy[k] * tke_0 - 4.0 * to_yyyz_xxy[k] * tbe_0 + 4.0 * to_yyyz_xxyyy[k] * tbe_0 * tke_0;
 
-            to_y_y_yyz_xxyz[k] = 2.0 * to_yz_xxz[k] - 4.0 * to_yz_xxyyz[k] * tke_0 - 2.0 * to_yyyz_xxz[k] * tbe_0 + 4.0 * to_yyyz_xxyyz[k] * tbe_0 * tke_0;
+            to_y_y_yyz_xxyz[k] =
+                2.0 * to_yz_xxz[k] - 4.0 * to_yz_xxyyz[k] * tke_0 - 2.0 * to_yyyz_xxz[k] * tbe_0 + 4.0 * to_yyyz_xxyyz[k] * tbe_0 * tke_0;
 
             to_y_y_yyz_xxzz[k] = -4.0 * to_yz_xxyzz[k] * tke_0 + 4.0 * to_yyyz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_y_y_yyz_xyyy[k] = 6.0 * to_yz_xyy[k] - 4.0 * to_yz_xyyyy[k] * tke_0 - 6.0 * to_yyyz_xyy[k] * tbe_0 + 4.0 * to_yyyz_xyyyy[k] * tbe_0 * tke_0;
+            to_y_y_yyz_xyyy[k] =
+                6.0 * to_yz_xyy[k] - 4.0 * to_yz_xyyyy[k] * tke_0 - 6.0 * to_yyyz_xyy[k] * tbe_0 + 4.0 * to_yyyz_xyyyy[k] * tbe_0 * tke_0;
 
-            to_y_y_yyz_xyyz[k] = 4.0 * to_yz_xyz[k] - 4.0 * to_yz_xyyyz[k] * tke_0 - 4.0 * to_yyyz_xyz[k] * tbe_0 + 4.0 * to_yyyz_xyyyz[k] * tbe_0 * tke_0;
+            to_y_y_yyz_xyyz[k] =
+                4.0 * to_yz_xyz[k] - 4.0 * to_yz_xyyyz[k] * tke_0 - 4.0 * to_yyyz_xyz[k] * tbe_0 + 4.0 * to_yyyz_xyyyz[k] * tbe_0 * tke_0;
 
-            to_y_y_yyz_xyzz[k] = 2.0 * to_yz_xzz[k] - 4.0 * to_yz_xyyzz[k] * tke_0 - 2.0 * to_yyyz_xzz[k] * tbe_0 + 4.0 * to_yyyz_xyyzz[k] * tbe_0 * tke_0;
+            to_y_y_yyz_xyzz[k] =
+                2.0 * to_yz_xzz[k] - 4.0 * to_yz_xyyzz[k] * tke_0 - 2.0 * to_yyyz_xzz[k] * tbe_0 + 4.0 * to_yyyz_xyyzz[k] * tbe_0 * tke_0;
 
             to_y_y_yyz_xzzz[k] = -4.0 * to_yz_xyzzz[k] * tke_0 + 4.0 * to_yyyz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_y_y_yyz_yyyy[k] = 8.0 * to_yz_yyy[k] - 4.0 * to_yz_yyyyy[k] * tke_0 - 8.0 * to_yyyz_yyy[k] * tbe_0 + 4.0 * to_yyyz_yyyyy[k] * tbe_0 * tke_0;
+            to_y_y_yyz_yyyy[k] =
+                8.0 * to_yz_yyy[k] - 4.0 * to_yz_yyyyy[k] * tke_0 - 8.0 * to_yyyz_yyy[k] * tbe_0 + 4.0 * to_yyyz_yyyyy[k] * tbe_0 * tke_0;
 
-            to_y_y_yyz_yyyz[k] = 6.0 * to_yz_yyz[k] - 4.0 * to_yz_yyyyz[k] * tke_0 - 6.0 * to_yyyz_yyz[k] * tbe_0 + 4.0 * to_yyyz_yyyyz[k] * tbe_0 * tke_0;
+            to_y_y_yyz_yyyz[k] =
+                6.0 * to_yz_yyz[k] - 4.0 * to_yz_yyyyz[k] * tke_0 - 6.0 * to_yyyz_yyz[k] * tbe_0 + 4.0 * to_yyyz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_y_y_yyz_yyzz[k] = 4.0 * to_yz_yzz[k] - 4.0 * to_yz_yyyzz[k] * tke_0 - 4.0 * to_yyyz_yzz[k] * tbe_0 + 4.0 * to_yyyz_yyyzz[k] * tbe_0 * tke_0;
+            to_y_y_yyz_yyzz[k] =
+                4.0 * to_yz_yzz[k] - 4.0 * to_yz_yyyzz[k] * tke_0 - 4.0 * to_yyyz_yzz[k] * tbe_0 + 4.0 * to_yyyz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_y_y_yyz_yzzz[k] = 2.0 * to_yz_zzz[k] - 4.0 * to_yz_yyzzz[k] * tke_0 - 2.0 * to_yyyz_zzz[k] * tbe_0 + 4.0 * to_yyyz_yyzzz[k] * tbe_0 * tke_0;
+            to_y_y_yyz_yzzz[k] =
+                2.0 * to_yz_zzz[k] - 4.0 * to_yz_yyzzz[k] * tke_0 - 2.0 * to_yyyz_zzz[k] * tbe_0 + 4.0 * to_yyyz_yyzzz[k] * tbe_0 * tke_0;
 
             to_y_y_yyz_zzzz[k] = -4.0 * to_yz_yzzzz[k] * tke_0 + 4.0 * to_yyyz_yzzzz[k] * tbe_0 * tke_0;
         }
@@ -4723,7 +7602,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_y_yzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 4 * op_comps * 150 + i * 150 + 134);
 
-        #pragma omp simd aligned(to_y_y_yzz_xxxx, to_y_y_yzz_xxxy, to_y_y_yzz_xxxz, to_y_y_yzz_xxyy, to_y_y_yzz_xxyz, to_y_y_yzz_xxzz, to_y_y_yzz_xyyy, to_y_y_yzz_xyyz, to_y_y_yzz_xyzz, to_y_y_yzz_xzzz, to_y_y_yzz_yyyy, to_y_y_yzz_yyyz, to_y_y_yzz_yyzz, to_y_y_yzz_yzzz, to_y_y_yzz_zzzz, to_yyzz_xxx, to_yyzz_xxxxy, to_yyzz_xxxyy, to_yyzz_xxxyz, to_yyzz_xxy, to_yyzz_xxyyy, to_yyzz_xxyyz, to_yyzz_xxyzz, to_yyzz_xxz, to_yyzz_xyy, to_yyzz_xyyyy, to_yyzz_xyyyz, to_yyzz_xyyzz, to_yyzz_xyz, to_yyzz_xyzzz, to_yyzz_xzz, to_yyzz_yyy, to_yyzz_yyyyy, to_yyzz_yyyyz, to_yyzz_yyyzz, to_yyzz_yyz, to_yyzz_yyzzz, to_yyzz_yzz, to_yyzz_yzzzz, to_yyzz_zzz, to_zz_xxx, to_zz_xxxxy, to_zz_xxxyy, to_zz_xxxyz, to_zz_xxy, to_zz_xxyyy, to_zz_xxyyz, to_zz_xxyzz, to_zz_xxz, to_zz_xyy, to_zz_xyyyy, to_zz_xyyyz, to_zz_xyyzz, to_zz_xyz, to_zz_xyzzz, to_zz_xzz, to_zz_yyy, to_zz_yyyyy, to_zz_yyyyz, to_zz_yyyzz, to_zz_yyz, to_zz_yyzzz, to_zz_yzz, to_zz_yzzzz, to_zz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_y_y_yzz_xxxx,     \
+                             to_y_y_yzz_xxxy, \
+                             to_y_y_yzz_xxxz, \
+                             to_y_y_yzz_xxyy, \
+                             to_y_y_yzz_xxyz, \
+                             to_y_y_yzz_xxzz, \
+                             to_y_y_yzz_xyyy, \
+                             to_y_y_yzz_xyyz, \
+                             to_y_y_yzz_xyzz, \
+                             to_y_y_yzz_xzzz, \
+                             to_y_y_yzz_yyyy, \
+                             to_y_y_yzz_yyyz, \
+                             to_y_y_yzz_yyzz, \
+                             to_y_y_yzz_yzzz, \
+                             to_y_y_yzz_zzzz, \
+                             to_yyzz_xxx,     \
+                             to_yyzz_xxxxy,   \
+                             to_yyzz_xxxyy,   \
+                             to_yyzz_xxxyz,   \
+                             to_yyzz_xxy,     \
+                             to_yyzz_xxyyy,   \
+                             to_yyzz_xxyyz,   \
+                             to_yyzz_xxyzz,   \
+                             to_yyzz_xxz,     \
+                             to_yyzz_xyy,     \
+                             to_yyzz_xyyyy,   \
+                             to_yyzz_xyyyz,   \
+                             to_yyzz_xyyzz,   \
+                             to_yyzz_xyz,     \
+                             to_yyzz_xyzzz,   \
+                             to_yyzz_xzz,     \
+                             to_yyzz_yyy,     \
+                             to_yyzz_yyyyy,   \
+                             to_yyzz_yyyyz,   \
+                             to_yyzz_yyyzz,   \
+                             to_yyzz_yyz,     \
+                             to_yyzz_yyzzz,   \
+                             to_yyzz_yzz,     \
+                             to_yyzz_yzzzz,   \
+                             to_yyzz_zzz,     \
+                             to_zz_xxx,       \
+                             to_zz_xxxxy,     \
+                             to_zz_xxxyy,     \
+                             to_zz_xxxyz,     \
+                             to_zz_xxy,       \
+                             to_zz_xxyyy,     \
+                             to_zz_xxyyz,     \
+                             to_zz_xxyzz,     \
+                             to_zz_xxz,       \
+                             to_zz_xyy,       \
+                             to_zz_xyyyy,     \
+                             to_zz_xyyyz,     \
+                             to_zz_xyyzz,     \
+                             to_zz_xyz,       \
+                             to_zz_xyzzz,     \
+                             to_zz_xzz,       \
+                             to_zz_yyy,       \
+                             to_zz_yyyyy,     \
+                             to_zz_yyyyz,     \
+                             to_zz_yyyzz,     \
+                             to_zz_yyz,       \
+                             to_zz_yyzzz,     \
+                             to_zz_yzz,       \
+                             to_zz_yzzzz,     \
+                             to_zz_zzz,       \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -4736,25 +7680,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_y_y_yzz_xxxz[k] = -2.0 * to_zz_xxxyz[k] * tke_0 + 4.0 * to_yyzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_y_y_yzz_xxyy[k] = 2.0 * to_zz_xxy[k] - 2.0 * to_zz_xxyyy[k] * tke_0 - 4.0 * to_yyzz_xxy[k] * tbe_0 + 4.0 * to_yyzz_xxyyy[k] * tbe_0 * tke_0;
+            to_y_y_yzz_xxyy[k] =
+                2.0 * to_zz_xxy[k] - 2.0 * to_zz_xxyyy[k] * tke_0 - 4.0 * to_yyzz_xxy[k] * tbe_0 + 4.0 * to_yyzz_xxyyy[k] * tbe_0 * tke_0;
 
             to_y_y_yzz_xxyz[k] = to_zz_xxz[k] - 2.0 * to_zz_xxyyz[k] * tke_0 - 2.0 * to_yyzz_xxz[k] * tbe_0 + 4.0 * to_yyzz_xxyyz[k] * tbe_0 * tke_0;
 
             to_y_y_yzz_xxzz[k] = -2.0 * to_zz_xxyzz[k] * tke_0 + 4.0 * to_yyzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_y_y_yzz_xyyy[k] = 3.0 * to_zz_xyy[k] - 2.0 * to_zz_xyyyy[k] * tke_0 - 6.0 * to_yyzz_xyy[k] * tbe_0 + 4.0 * to_yyzz_xyyyy[k] * tbe_0 * tke_0;
+            to_y_y_yzz_xyyy[k] =
+                3.0 * to_zz_xyy[k] - 2.0 * to_zz_xyyyy[k] * tke_0 - 6.0 * to_yyzz_xyy[k] * tbe_0 + 4.0 * to_yyzz_xyyyy[k] * tbe_0 * tke_0;
 
-            to_y_y_yzz_xyyz[k] = 2.0 * to_zz_xyz[k] - 2.0 * to_zz_xyyyz[k] * tke_0 - 4.0 * to_yyzz_xyz[k] * tbe_0 + 4.0 * to_yyzz_xyyyz[k] * tbe_0 * tke_0;
+            to_y_y_yzz_xyyz[k] =
+                2.0 * to_zz_xyz[k] - 2.0 * to_zz_xyyyz[k] * tke_0 - 4.0 * to_yyzz_xyz[k] * tbe_0 + 4.0 * to_yyzz_xyyyz[k] * tbe_0 * tke_0;
 
             to_y_y_yzz_xyzz[k] = to_zz_xzz[k] - 2.0 * to_zz_xyyzz[k] * tke_0 - 2.0 * to_yyzz_xzz[k] * tbe_0 + 4.0 * to_yyzz_xyyzz[k] * tbe_0 * tke_0;
 
             to_y_y_yzz_xzzz[k] = -2.0 * to_zz_xyzzz[k] * tke_0 + 4.0 * to_yyzz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_y_y_yzz_yyyy[k] = 4.0 * to_zz_yyy[k] - 2.0 * to_zz_yyyyy[k] * tke_0 - 8.0 * to_yyzz_yyy[k] * tbe_0 + 4.0 * to_yyzz_yyyyy[k] * tbe_0 * tke_0;
+            to_y_y_yzz_yyyy[k] =
+                4.0 * to_zz_yyy[k] - 2.0 * to_zz_yyyyy[k] * tke_0 - 8.0 * to_yyzz_yyy[k] * tbe_0 + 4.0 * to_yyzz_yyyyy[k] * tbe_0 * tke_0;
 
-            to_y_y_yzz_yyyz[k] = 3.0 * to_zz_yyz[k] - 2.0 * to_zz_yyyyz[k] * tke_0 - 6.0 * to_yyzz_yyz[k] * tbe_0 + 4.0 * to_yyzz_yyyyz[k] * tbe_0 * tke_0;
+            to_y_y_yzz_yyyz[k] =
+                3.0 * to_zz_yyz[k] - 2.0 * to_zz_yyyyz[k] * tke_0 - 6.0 * to_yyzz_yyz[k] * tbe_0 + 4.0 * to_yyzz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_y_y_yzz_yyzz[k] = 2.0 * to_zz_yzz[k] - 2.0 * to_zz_yyyzz[k] * tke_0 - 4.0 * to_yyzz_yzz[k] * tbe_0 + 4.0 * to_yyzz_yyyzz[k] * tbe_0 * tke_0;
+            to_y_y_yzz_yyzz[k] =
+                2.0 * to_zz_yzz[k] - 2.0 * to_zz_yyyzz[k] * tke_0 - 4.0 * to_yyzz_yzz[k] * tbe_0 + 4.0 * to_yyzz_yyyzz[k] * tbe_0 * tke_0;
 
             to_y_y_yzz_yzzz[k] = to_zz_zzz[k] - 2.0 * to_zz_yyzzz[k] * tke_0 - 2.0 * to_yyzz_zzz[k] * tbe_0 + 4.0 * to_yyzz_yyzzz[k] * tbe_0 * tke_0;
 
@@ -4793,7 +7743,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_y_zzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 4 * op_comps * 150 + i * 150 + 149);
 
-        #pragma omp simd aligned(to_y_y_zzz_xxxx, to_y_y_zzz_xxxy, to_y_y_zzz_xxxz, to_y_y_zzz_xxyy, to_y_y_zzz_xxyz, to_y_y_zzz_xxzz, to_y_y_zzz_xyyy, to_y_y_zzz_xyyz, to_y_y_zzz_xyzz, to_y_y_zzz_xzzz, to_y_y_zzz_yyyy, to_y_y_zzz_yyyz, to_y_y_zzz_yyzz, to_y_y_zzz_yzzz, to_y_y_zzz_zzzz, to_yzzz_xxx, to_yzzz_xxxxy, to_yzzz_xxxyy, to_yzzz_xxxyz, to_yzzz_xxy, to_yzzz_xxyyy, to_yzzz_xxyyz, to_yzzz_xxyzz, to_yzzz_xxz, to_yzzz_xyy, to_yzzz_xyyyy, to_yzzz_xyyyz, to_yzzz_xyyzz, to_yzzz_xyz, to_yzzz_xyzzz, to_yzzz_xzz, to_yzzz_yyy, to_yzzz_yyyyy, to_yzzz_yyyyz, to_yzzz_yyyzz, to_yzzz_yyz, to_yzzz_yyzzz, to_yzzz_yzz, to_yzzz_yzzzz, to_yzzz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_y_y_zzz_xxxx,     \
+                             to_y_y_zzz_xxxy, \
+                             to_y_y_zzz_xxxz, \
+                             to_y_y_zzz_xxyy, \
+                             to_y_y_zzz_xxyz, \
+                             to_y_y_zzz_xxzz, \
+                             to_y_y_zzz_xyyy, \
+                             to_y_y_zzz_xyyz, \
+                             to_y_y_zzz_xyzz, \
+                             to_y_y_zzz_xzzz, \
+                             to_y_y_zzz_yyyy, \
+                             to_y_y_zzz_yyyz, \
+                             to_y_y_zzz_yyzz, \
+                             to_y_y_zzz_yzzz, \
+                             to_y_y_zzz_zzzz, \
+                             to_yzzz_xxx,     \
+                             to_yzzz_xxxxy,   \
+                             to_yzzz_xxxyy,   \
+                             to_yzzz_xxxyz,   \
+                             to_yzzz_xxy,     \
+                             to_yzzz_xxyyy,   \
+                             to_yzzz_xxyyz,   \
+                             to_yzzz_xxyzz,   \
+                             to_yzzz_xxz,     \
+                             to_yzzz_xyy,     \
+                             to_yzzz_xyyyy,   \
+                             to_yzzz_xyyyz,   \
+                             to_yzzz_xyyzz,   \
+                             to_yzzz_xyz,     \
+                             to_yzzz_xyzzz,   \
+                             to_yzzz_xzz,     \
+                             to_yzzz_yyy,     \
+                             to_yzzz_yyyyy,   \
+                             to_yzzz_yyyyz,   \
+                             to_yzzz_yyyzz,   \
+                             to_yzzz_yyz,     \
+                             to_yzzz_yyzzz,   \
+                             to_yzzz_yzz,     \
+                             to_yzzz_yzzzz,   \
+                             to_yzzz_zzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -4863,7 +7853,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_z_xxx_zzzz = pbuffer.data(idx_op_geom_101_fg + 5 * op_comps * 150 + i * 150 + 14);
 
-        #pragma omp simd aligned(to_xxxy_xxx, to_xxxy_xxxxz, to_xxxy_xxxyz, to_xxxy_xxxzz, to_xxxy_xxy, to_xxxy_xxyyz, to_xxxy_xxyzz, to_xxxy_xxz, to_xxxy_xxzzz, to_xxxy_xyy, to_xxxy_xyyyz, to_xxxy_xyyzz, to_xxxy_xyz, to_xxxy_xyzzz, to_xxxy_xzz, to_xxxy_xzzzz, to_xxxy_yyy, to_xxxy_yyyyz, to_xxxy_yyyzz, to_xxxy_yyz, to_xxxy_yyzzz, to_xxxy_yzz, to_xxxy_yzzzz, to_xxxy_zzz, to_xxxy_zzzzz, to_y_z_xxx_xxxx, to_y_z_xxx_xxxy, to_y_z_xxx_xxxz, to_y_z_xxx_xxyy, to_y_z_xxx_xxyz, to_y_z_xxx_xxzz, to_y_z_xxx_xyyy, to_y_z_xxx_xyyz, to_y_z_xxx_xyzz, to_y_z_xxx_xzzz, to_y_z_xxx_yyyy, to_y_z_xxx_yyyz, to_y_z_xxx_yyzz, to_y_z_xxx_yzzz, to_y_z_xxx_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xxxy_xxx,         \
+                             to_xxxy_xxxxz,   \
+                             to_xxxy_xxxyz,   \
+                             to_xxxy_xxxzz,   \
+                             to_xxxy_xxy,     \
+                             to_xxxy_xxyyz,   \
+                             to_xxxy_xxyzz,   \
+                             to_xxxy_xxz,     \
+                             to_xxxy_xxzzz,   \
+                             to_xxxy_xyy,     \
+                             to_xxxy_xyyyz,   \
+                             to_xxxy_xyyzz,   \
+                             to_xxxy_xyz,     \
+                             to_xxxy_xyzzz,   \
+                             to_xxxy_xzz,     \
+                             to_xxxy_xzzzz,   \
+                             to_xxxy_yyy,     \
+                             to_xxxy_yyyyz,   \
+                             to_xxxy_yyyzz,   \
+                             to_xxxy_yyz,     \
+                             to_xxxy_yyzzz,   \
+                             to_xxxy_yzz,     \
+                             to_xxxy_yzzzz,   \
+                             to_xxxy_zzz,     \
+                             to_xxxy_zzzzz,   \
+                             to_y_z_xxx_xxxx, \
+                             to_y_z_xxx_xxxy, \
+                             to_y_z_xxx_xxxz, \
+                             to_y_z_xxx_xxyy, \
+                             to_y_z_xxx_xxyz, \
+                             to_y_z_xxx_xxzz, \
+                             to_y_z_xxx_xyyy, \
+                             to_y_z_xxx_xyyz, \
+                             to_y_z_xxx_xyzz, \
+                             to_y_z_xxx_xzzz, \
+                             to_y_z_xxx_yyyy, \
+                             to_y_z_xxx_yyyz, \
+                             to_y_z_xxx_yyzz, \
+                             to_y_z_xxx_yzzz, \
+                             to_y_z_xxx_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -4933,7 +7963,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_z_xxy_zzzz = pbuffer.data(idx_op_geom_101_fg + 5 * op_comps * 150 + i * 150 + 29);
 
-        #pragma omp simd aligned(to_xx_xxx, to_xx_xxxxz, to_xx_xxxyz, to_xx_xxxzz, to_xx_xxy, to_xx_xxyyz, to_xx_xxyzz, to_xx_xxz, to_xx_xxzzz, to_xx_xyy, to_xx_xyyyz, to_xx_xyyzz, to_xx_xyz, to_xx_xyzzz, to_xx_xzz, to_xx_xzzzz, to_xx_yyy, to_xx_yyyyz, to_xx_yyyzz, to_xx_yyz, to_xx_yyzzz, to_xx_yzz, to_xx_yzzzz, to_xx_zzz, to_xx_zzzzz, to_xxyy_xxx, to_xxyy_xxxxz, to_xxyy_xxxyz, to_xxyy_xxxzz, to_xxyy_xxy, to_xxyy_xxyyz, to_xxyy_xxyzz, to_xxyy_xxz, to_xxyy_xxzzz, to_xxyy_xyy, to_xxyy_xyyyz, to_xxyy_xyyzz, to_xxyy_xyz, to_xxyy_xyzzz, to_xxyy_xzz, to_xxyy_xzzzz, to_xxyy_yyy, to_xxyy_yyyyz, to_xxyy_yyyzz, to_xxyy_yyz, to_xxyy_yyzzz, to_xxyy_yzz, to_xxyy_yzzzz, to_xxyy_zzz, to_xxyy_zzzzz, to_y_z_xxy_xxxx, to_y_z_xxy_xxxy, to_y_z_xxy_xxxz, to_y_z_xxy_xxyy, to_y_z_xxy_xxyz, to_y_z_xxy_xxzz, to_y_z_xxy_xyyy, to_y_z_xxy_xyyz, to_y_z_xxy_xyzz, to_y_z_xxy_xzzz, to_y_z_xxy_yyyy, to_y_z_xxy_yyyz, to_y_z_xxy_yyzz, to_y_z_xxy_yzzz, to_y_z_xxy_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xx_xxx,           \
+                             to_xx_xxxxz,     \
+                             to_xx_xxxyz,     \
+                             to_xx_xxxzz,     \
+                             to_xx_xxy,       \
+                             to_xx_xxyyz,     \
+                             to_xx_xxyzz,     \
+                             to_xx_xxz,       \
+                             to_xx_xxzzz,     \
+                             to_xx_xyy,       \
+                             to_xx_xyyyz,     \
+                             to_xx_xyyzz,     \
+                             to_xx_xyz,       \
+                             to_xx_xyzzz,     \
+                             to_xx_xzz,       \
+                             to_xx_xzzzz,     \
+                             to_xx_yyy,       \
+                             to_xx_yyyyz,     \
+                             to_xx_yyyzz,     \
+                             to_xx_yyz,       \
+                             to_xx_yyzzz,     \
+                             to_xx_yzz,       \
+                             to_xx_yzzzz,     \
+                             to_xx_zzz,       \
+                             to_xx_zzzzz,     \
+                             to_xxyy_xxx,     \
+                             to_xxyy_xxxxz,   \
+                             to_xxyy_xxxyz,   \
+                             to_xxyy_xxxzz,   \
+                             to_xxyy_xxy,     \
+                             to_xxyy_xxyyz,   \
+                             to_xxyy_xxyzz,   \
+                             to_xxyy_xxz,     \
+                             to_xxyy_xxzzz,   \
+                             to_xxyy_xyy,     \
+                             to_xxyy_xyyyz,   \
+                             to_xxyy_xyyzz,   \
+                             to_xxyy_xyz,     \
+                             to_xxyy_xyzzz,   \
+                             to_xxyy_xzz,     \
+                             to_xxyy_xzzzz,   \
+                             to_xxyy_yyy,     \
+                             to_xxyy_yyyyz,   \
+                             to_xxyy_yyyzz,   \
+                             to_xxyy_yyz,     \
+                             to_xxyy_yyzzz,   \
+                             to_xxyy_yzz,     \
+                             to_xxyy_yzzzz,   \
+                             to_xxyy_zzz,     \
+                             to_xxyy_zzzzz,   \
+                             to_y_z_xxy_xxxx, \
+                             to_y_z_xxy_xxxy, \
+                             to_y_z_xxy_xxxz, \
+                             to_y_z_xxy_xxyy, \
+                             to_y_z_xxy_xxyz, \
+                             to_y_z_xxy_xxzz, \
+                             to_y_z_xxy_xyyy, \
+                             to_y_z_xxy_xyyz, \
+                             to_y_z_xxy_xyzz, \
+                             to_y_z_xxy_xzzz, \
+                             to_y_z_xxy_yyyy, \
+                             to_y_z_xxy_yyyz, \
+                             to_y_z_xxy_yyzz, \
+                             to_y_z_xxy_yzzz, \
+                             to_y_z_xxy_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -4950,25 +8045,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_y_z_xxy_xxyz[k] = to_xx_xxy[k] - 2.0 * to_xx_xxyzz[k] * tke_0 - 2.0 * to_xxyy_xxy[k] * tbe_0 + 4.0 * to_xxyy_xxyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xxy_xxzz[k] = 2.0 * to_xx_xxz[k] - 2.0 * to_xx_xxzzz[k] * tke_0 - 4.0 * to_xxyy_xxz[k] * tbe_0 + 4.0 * to_xxyy_xxzzz[k] * tbe_0 * tke_0;
+            to_y_z_xxy_xxzz[k] =
+                2.0 * to_xx_xxz[k] - 2.0 * to_xx_xxzzz[k] * tke_0 - 4.0 * to_xxyy_xxz[k] * tbe_0 + 4.0 * to_xxyy_xxzzz[k] * tbe_0 * tke_0;
 
             to_y_z_xxy_xyyy[k] = -2.0 * to_xx_xyyyz[k] * tke_0 + 4.0 * to_xxyy_xyyyz[k] * tbe_0 * tke_0;
 
             to_y_z_xxy_xyyz[k] = to_xx_xyy[k] - 2.0 * to_xx_xyyzz[k] * tke_0 - 2.0 * to_xxyy_xyy[k] * tbe_0 + 4.0 * to_xxyy_xyyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xxy_xyzz[k] = 2.0 * to_xx_xyz[k] - 2.0 * to_xx_xyzzz[k] * tke_0 - 4.0 * to_xxyy_xyz[k] * tbe_0 + 4.0 * to_xxyy_xyzzz[k] * tbe_0 * tke_0;
+            to_y_z_xxy_xyzz[k] =
+                2.0 * to_xx_xyz[k] - 2.0 * to_xx_xyzzz[k] * tke_0 - 4.0 * to_xxyy_xyz[k] * tbe_0 + 4.0 * to_xxyy_xyzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xxy_xzzz[k] = 3.0 * to_xx_xzz[k] - 2.0 * to_xx_xzzzz[k] * tke_0 - 6.0 * to_xxyy_xzz[k] * tbe_0 + 4.0 * to_xxyy_xzzzz[k] * tbe_0 * tke_0;
+            to_y_z_xxy_xzzz[k] =
+                3.0 * to_xx_xzz[k] - 2.0 * to_xx_xzzzz[k] * tke_0 - 6.0 * to_xxyy_xzz[k] * tbe_0 + 4.0 * to_xxyy_xzzzz[k] * tbe_0 * tke_0;
 
             to_y_z_xxy_yyyy[k] = -2.0 * to_xx_yyyyz[k] * tke_0 + 4.0 * to_xxyy_yyyyz[k] * tbe_0 * tke_0;
 
             to_y_z_xxy_yyyz[k] = to_xx_yyy[k] - 2.0 * to_xx_yyyzz[k] * tke_0 - 2.0 * to_xxyy_yyy[k] * tbe_0 + 4.0 * to_xxyy_yyyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xxy_yyzz[k] = 2.0 * to_xx_yyz[k] - 2.0 * to_xx_yyzzz[k] * tke_0 - 4.0 * to_xxyy_yyz[k] * tbe_0 + 4.0 * to_xxyy_yyzzz[k] * tbe_0 * tke_0;
+            to_y_z_xxy_yyzz[k] =
+                2.0 * to_xx_yyz[k] - 2.0 * to_xx_yyzzz[k] * tke_0 - 4.0 * to_xxyy_yyz[k] * tbe_0 + 4.0 * to_xxyy_yyzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xxy_yzzz[k] = 3.0 * to_xx_yzz[k] - 2.0 * to_xx_yzzzz[k] * tke_0 - 6.0 * to_xxyy_yzz[k] * tbe_0 + 4.0 * to_xxyy_yzzzz[k] * tbe_0 * tke_0;
+            to_y_z_xxy_yzzz[k] =
+                3.0 * to_xx_yzz[k] - 2.0 * to_xx_yzzzz[k] * tke_0 - 6.0 * to_xxyy_yzz[k] * tbe_0 + 4.0 * to_xxyy_yzzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xxy_zzzz[k] = 4.0 * to_xx_zzz[k] - 2.0 * to_xx_zzzzz[k] * tke_0 - 8.0 * to_xxyy_zzz[k] * tbe_0 + 4.0 * to_xxyy_zzzzz[k] * tbe_0 * tke_0;
+            to_y_z_xxy_zzzz[k] =
+                4.0 * to_xx_zzz[k] - 2.0 * to_xx_zzzzz[k] * tke_0 - 8.0 * to_xxyy_zzz[k] * tbe_0 + 4.0 * to_xxyy_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 780-795 components of targeted buffer : FG
@@ -5003,7 +8104,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_z_xxz_zzzz = pbuffer.data(idx_op_geom_101_fg + 5 * op_comps * 150 + i * 150 + 44);
 
-        #pragma omp simd aligned(to_xxyz_xxx, to_xxyz_xxxxz, to_xxyz_xxxyz, to_xxyz_xxxzz, to_xxyz_xxy, to_xxyz_xxyyz, to_xxyz_xxyzz, to_xxyz_xxz, to_xxyz_xxzzz, to_xxyz_xyy, to_xxyz_xyyyz, to_xxyz_xyyzz, to_xxyz_xyz, to_xxyz_xyzzz, to_xxyz_xzz, to_xxyz_xzzzz, to_xxyz_yyy, to_xxyz_yyyyz, to_xxyz_yyyzz, to_xxyz_yyz, to_xxyz_yyzzz, to_xxyz_yzz, to_xxyz_yzzzz, to_xxyz_zzz, to_xxyz_zzzzz, to_y_z_xxz_xxxx, to_y_z_xxz_xxxy, to_y_z_xxz_xxxz, to_y_z_xxz_xxyy, to_y_z_xxz_xxyz, to_y_z_xxz_xxzz, to_y_z_xxz_xyyy, to_y_z_xxz_xyyz, to_y_z_xxz_xyzz, to_y_z_xxz_xzzz, to_y_z_xxz_yyyy, to_y_z_xxz_yyyz, to_y_z_xxz_yyzz, to_y_z_xxz_yzzz, to_y_z_xxz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xxyz_xxx,         \
+                             to_xxyz_xxxxz,   \
+                             to_xxyz_xxxyz,   \
+                             to_xxyz_xxxzz,   \
+                             to_xxyz_xxy,     \
+                             to_xxyz_xxyyz,   \
+                             to_xxyz_xxyzz,   \
+                             to_xxyz_xxz,     \
+                             to_xxyz_xxzzz,   \
+                             to_xxyz_xyy,     \
+                             to_xxyz_xyyyz,   \
+                             to_xxyz_xyyzz,   \
+                             to_xxyz_xyz,     \
+                             to_xxyz_xyzzz,   \
+                             to_xxyz_xzz,     \
+                             to_xxyz_xzzzz,   \
+                             to_xxyz_yyy,     \
+                             to_xxyz_yyyyz,   \
+                             to_xxyz_yyyzz,   \
+                             to_xxyz_yyz,     \
+                             to_xxyz_yyzzz,   \
+                             to_xxyz_yzz,     \
+                             to_xxyz_yzzzz,   \
+                             to_xxyz_zzz,     \
+                             to_xxyz_zzzzz,   \
+                             to_y_z_xxz_xxxx, \
+                             to_y_z_xxz_xxxy, \
+                             to_y_z_xxz_xxxz, \
+                             to_y_z_xxz_xxyy, \
+                             to_y_z_xxz_xxyz, \
+                             to_y_z_xxz_xxzz, \
+                             to_y_z_xxz_xyyy, \
+                             to_y_z_xxz_xyyz, \
+                             to_y_z_xxz_xyzz, \
+                             to_y_z_xxz_xzzz, \
+                             to_y_z_xxz_yyyy, \
+                             to_y_z_xxz_yyyz, \
+                             to_y_z_xxz_yyzz, \
+                             to_y_z_xxz_yzzz, \
+                             to_y_z_xxz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -5073,7 +8214,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_z_xyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 5 * op_comps * 150 + i * 150 + 59);
 
-        #pragma omp simd aligned(to_xy_xxx, to_xy_xxxxz, to_xy_xxxyz, to_xy_xxxzz, to_xy_xxy, to_xy_xxyyz, to_xy_xxyzz, to_xy_xxz, to_xy_xxzzz, to_xy_xyy, to_xy_xyyyz, to_xy_xyyzz, to_xy_xyz, to_xy_xyzzz, to_xy_xzz, to_xy_xzzzz, to_xy_yyy, to_xy_yyyyz, to_xy_yyyzz, to_xy_yyz, to_xy_yyzzz, to_xy_yzz, to_xy_yzzzz, to_xy_zzz, to_xy_zzzzz, to_xyyy_xxx, to_xyyy_xxxxz, to_xyyy_xxxyz, to_xyyy_xxxzz, to_xyyy_xxy, to_xyyy_xxyyz, to_xyyy_xxyzz, to_xyyy_xxz, to_xyyy_xxzzz, to_xyyy_xyy, to_xyyy_xyyyz, to_xyyy_xyyzz, to_xyyy_xyz, to_xyyy_xyzzz, to_xyyy_xzz, to_xyyy_xzzzz, to_xyyy_yyy, to_xyyy_yyyyz, to_xyyy_yyyzz, to_xyyy_yyz, to_xyyy_yyzzz, to_xyyy_yzz, to_xyyy_yzzzz, to_xyyy_zzz, to_xyyy_zzzzz, to_y_z_xyy_xxxx, to_y_z_xyy_xxxy, to_y_z_xyy_xxxz, to_y_z_xyy_xxyy, to_y_z_xyy_xxyz, to_y_z_xyy_xxzz, to_y_z_xyy_xyyy, to_y_z_xyy_xyyz, to_y_z_xyy_xyzz, to_y_z_xyy_xzzz, to_y_z_xyy_yyyy, to_y_z_xyy_yyyz, to_y_z_xyy_yyzz, to_y_z_xyy_yzzz, to_y_z_xyy_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xy_xxx,           \
+                             to_xy_xxxxz,     \
+                             to_xy_xxxyz,     \
+                             to_xy_xxxzz,     \
+                             to_xy_xxy,       \
+                             to_xy_xxyyz,     \
+                             to_xy_xxyzz,     \
+                             to_xy_xxz,       \
+                             to_xy_xxzzz,     \
+                             to_xy_xyy,       \
+                             to_xy_xyyyz,     \
+                             to_xy_xyyzz,     \
+                             to_xy_xyz,       \
+                             to_xy_xyzzz,     \
+                             to_xy_xzz,       \
+                             to_xy_xzzzz,     \
+                             to_xy_yyy,       \
+                             to_xy_yyyyz,     \
+                             to_xy_yyyzz,     \
+                             to_xy_yyz,       \
+                             to_xy_yyzzz,     \
+                             to_xy_yzz,       \
+                             to_xy_yzzzz,     \
+                             to_xy_zzz,       \
+                             to_xy_zzzzz,     \
+                             to_xyyy_xxx,     \
+                             to_xyyy_xxxxz,   \
+                             to_xyyy_xxxyz,   \
+                             to_xyyy_xxxzz,   \
+                             to_xyyy_xxy,     \
+                             to_xyyy_xxyyz,   \
+                             to_xyyy_xxyzz,   \
+                             to_xyyy_xxz,     \
+                             to_xyyy_xxzzz,   \
+                             to_xyyy_xyy,     \
+                             to_xyyy_xyyyz,   \
+                             to_xyyy_xyyzz,   \
+                             to_xyyy_xyz,     \
+                             to_xyyy_xyzzz,   \
+                             to_xyyy_xzz,     \
+                             to_xyyy_xzzzz,   \
+                             to_xyyy_yyy,     \
+                             to_xyyy_yyyyz,   \
+                             to_xyyy_yyyzz,   \
+                             to_xyyy_yyz,     \
+                             to_xyyy_yyzzz,   \
+                             to_xyyy_yzz,     \
+                             to_xyyy_yzzzz,   \
+                             to_xyyy_zzz,     \
+                             to_xyyy_zzzzz,   \
+                             to_y_z_xyy_xxxx, \
+                             to_y_z_xyy_xxxy, \
+                             to_y_z_xyy_xxxz, \
+                             to_y_z_xyy_xxyy, \
+                             to_y_z_xyy_xxyz, \
+                             to_y_z_xyy_xxzz, \
+                             to_y_z_xyy_xyyy, \
+                             to_y_z_xyy_xyyz, \
+                             to_y_z_xyy_xyzz, \
+                             to_y_z_xyy_xzzz, \
+                             to_y_z_xyy_yyyy, \
+                             to_y_z_xyy_yyyz, \
+                             to_y_z_xyy_yyzz, \
+                             to_y_z_xyy_yzzz, \
+                             to_y_z_xyy_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -5084,31 +8290,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_y_z_xyy_xxxy[k] = -4.0 * to_xy_xxxyz[k] * tke_0 + 4.0 * to_xyyy_xxxyz[k] * tbe_0 * tke_0;
 
-            to_y_z_xyy_xxxz[k] = 2.0 * to_xy_xxx[k] - 4.0 * to_xy_xxxzz[k] * tke_0 - 2.0 * to_xyyy_xxx[k] * tbe_0 + 4.0 * to_xyyy_xxxzz[k] * tbe_0 * tke_0;
+            to_y_z_xyy_xxxz[k] =
+                2.0 * to_xy_xxx[k] - 4.0 * to_xy_xxxzz[k] * tke_0 - 2.0 * to_xyyy_xxx[k] * tbe_0 + 4.0 * to_xyyy_xxxzz[k] * tbe_0 * tke_0;
 
             to_y_z_xyy_xxyy[k] = -4.0 * to_xy_xxyyz[k] * tke_0 + 4.0 * to_xyyy_xxyyz[k] * tbe_0 * tke_0;
 
-            to_y_z_xyy_xxyz[k] = 2.0 * to_xy_xxy[k] - 4.0 * to_xy_xxyzz[k] * tke_0 - 2.0 * to_xyyy_xxy[k] * tbe_0 + 4.0 * to_xyyy_xxyzz[k] * tbe_0 * tke_0;
+            to_y_z_xyy_xxyz[k] =
+                2.0 * to_xy_xxy[k] - 4.0 * to_xy_xxyzz[k] * tke_0 - 2.0 * to_xyyy_xxy[k] * tbe_0 + 4.0 * to_xyyy_xxyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xyy_xxzz[k] = 4.0 * to_xy_xxz[k] - 4.0 * to_xy_xxzzz[k] * tke_0 - 4.0 * to_xyyy_xxz[k] * tbe_0 + 4.0 * to_xyyy_xxzzz[k] * tbe_0 * tke_0;
+            to_y_z_xyy_xxzz[k] =
+                4.0 * to_xy_xxz[k] - 4.0 * to_xy_xxzzz[k] * tke_0 - 4.0 * to_xyyy_xxz[k] * tbe_0 + 4.0 * to_xyyy_xxzzz[k] * tbe_0 * tke_0;
 
             to_y_z_xyy_xyyy[k] = -4.0 * to_xy_xyyyz[k] * tke_0 + 4.0 * to_xyyy_xyyyz[k] * tbe_0 * tke_0;
 
-            to_y_z_xyy_xyyz[k] = 2.0 * to_xy_xyy[k] - 4.0 * to_xy_xyyzz[k] * tke_0 - 2.0 * to_xyyy_xyy[k] * tbe_0 + 4.0 * to_xyyy_xyyzz[k] * tbe_0 * tke_0;
+            to_y_z_xyy_xyyz[k] =
+                2.0 * to_xy_xyy[k] - 4.0 * to_xy_xyyzz[k] * tke_0 - 2.0 * to_xyyy_xyy[k] * tbe_0 + 4.0 * to_xyyy_xyyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xyy_xyzz[k] = 4.0 * to_xy_xyz[k] - 4.0 * to_xy_xyzzz[k] * tke_0 - 4.0 * to_xyyy_xyz[k] * tbe_0 + 4.0 * to_xyyy_xyzzz[k] * tbe_0 * tke_0;
+            to_y_z_xyy_xyzz[k] =
+                4.0 * to_xy_xyz[k] - 4.0 * to_xy_xyzzz[k] * tke_0 - 4.0 * to_xyyy_xyz[k] * tbe_0 + 4.0 * to_xyyy_xyzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xyy_xzzz[k] = 6.0 * to_xy_xzz[k] - 4.0 * to_xy_xzzzz[k] * tke_0 - 6.0 * to_xyyy_xzz[k] * tbe_0 + 4.0 * to_xyyy_xzzzz[k] * tbe_0 * tke_0;
+            to_y_z_xyy_xzzz[k] =
+                6.0 * to_xy_xzz[k] - 4.0 * to_xy_xzzzz[k] * tke_0 - 6.0 * to_xyyy_xzz[k] * tbe_0 + 4.0 * to_xyyy_xzzzz[k] * tbe_0 * tke_0;
 
             to_y_z_xyy_yyyy[k] = -4.0 * to_xy_yyyyz[k] * tke_0 + 4.0 * to_xyyy_yyyyz[k] * tbe_0 * tke_0;
 
-            to_y_z_xyy_yyyz[k] = 2.0 * to_xy_yyy[k] - 4.0 * to_xy_yyyzz[k] * tke_0 - 2.0 * to_xyyy_yyy[k] * tbe_0 + 4.0 * to_xyyy_yyyzz[k] * tbe_0 * tke_0;
+            to_y_z_xyy_yyyz[k] =
+                2.0 * to_xy_yyy[k] - 4.0 * to_xy_yyyzz[k] * tke_0 - 2.0 * to_xyyy_yyy[k] * tbe_0 + 4.0 * to_xyyy_yyyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xyy_yyzz[k] = 4.0 * to_xy_yyz[k] - 4.0 * to_xy_yyzzz[k] * tke_0 - 4.0 * to_xyyy_yyz[k] * tbe_0 + 4.0 * to_xyyy_yyzzz[k] * tbe_0 * tke_0;
+            to_y_z_xyy_yyzz[k] =
+                4.0 * to_xy_yyz[k] - 4.0 * to_xy_yyzzz[k] * tke_0 - 4.0 * to_xyyy_yyz[k] * tbe_0 + 4.0 * to_xyyy_yyzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xyy_yzzz[k] = 6.0 * to_xy_yzz[k] - 4.0 * to_xy_yzzzz[k] * tke_0 - 6.0 * to_xyyy_yzz[k] * tbe_0 + 4.0 * to_xyyy_yzzzz[k] * tbe_0 * tke_0;
+            to_y_z_xyy_yzzz[k] =
+                6.0 * to_xy_yzz[k] - 4.0 * to_xy_yzzzz[k] * tke_0 - 6.0 * to_xyyy_yzz[k] * tbe_0 + 4.0 * to_xyyy_yzzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xyy_zzzz[k] = 8.0 * to_xy_zzz[k] - 4.0 * to_xy_zzzzz[k] * tke_0 - 8.0 * to_xyyy_zzz[k] * tbe_0 + 4.0 * to_xyyy_zzzzz[k] * tbe_0 * tke_0;
+            to_y_z_xyy_zzzz[k] =
+                8.0 * to_xy_zzz[k] - 4.0 * to_xy_zzzzz[k] * tke_0 - 8.0 * to_xyyy_zzz[k] * tbe_0 + 4.0 * to_xyyy_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 810-825 components of targeted buffer : FG
@@ -5143,7 +8359,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_z_xyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 5 * op_comps * 150 + i * 150 + 74);
 
-        #pragma omp simd aligned(to_xyyz_xxx, to_xyyz_xxxxz, to_xyyz_xxxyz, to_xyyz_xxxzz, to_xyyz_xxy, to_xyyz_xxyyz, to_xyyz_xxyzz, to_xyyz_xxz, to_xyyz_xxzzz, to_xyyz_xyy, to_xyyz_xyyyz, to_xyyz_xyyzz, to_xyyz_xyz, to_xyyz_xyzzz, to_xyyz_xzz, to_xyyz_xzzzz, to_xyyz_yyy, to_xyyz_yyyyz, to_xyyz_yyyzz, to_xyyz_yyz, to_xyyz_yyzzz, to_xyyz_yzz, to_xyyz_yzzzz, to_xyyz_zzz, to_xyyz_zzzzz, to_xz_xxx, to_xz_xxxxz, to_xz_xxxyz, to_xz_xxxzz, to_xz_xxy, to_xz_xxyyz, to_xz_xxyzz, to_xz_xxz, to_xz_xxzzz, to_xz_xyy, to_xz_xyyyz, to_xz_xyyzz, to_xz_xyz, to_xz_xyzzz, to_xz_xzz, to_xz_xzzzz, to_xz_yyy, to_xz_yyyyz, to_xz_yyyzz, to_xz_yyz, to_xz_yyzzz, to_xz_yzz, to_xz_yzzzz, to_xz_zzz, to_xz_zzzzz, to_y_z_xyz_xxxx, to_y_z_xyz_xxxy, to_y_z_xyz_xxxz, to_y_z_xyz_xxyy, to_y_z_xyz_xxyz, to_y_z_xyz_xxzz, to_y_z_xyz_xyyy, to_y_z_xyz_xyyz, to_y_z_xyz_xyzz, to_y_z_xyz_xzzz, to_y_z_xyz_yyyy, to_y_z_xyz_yyyz, to_y_z_xyz_yyzz, to_y_z_xyz_yzzz, to_y_z_xyz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xyyz_xxx,         \
+                             to_xyyz_xxxxz,   \
+                             to_xyyz_xxxyz,   \
+                             to_xyyz_xxxzz,   \
+                             to_xyyz_xxy,     \
+                             to_xyyz_xxyyz,   \
+                             to_xyyz_xxyzz,   \
+                             to_xyyz_xxz,     \
+                             to_xyyz_xxzzz,   \
+                             to_xyyz_xyy,     \
+                             to_xyyz_xyyyz,   \
+                             to_xyyz_xyyzz,   \
+                             to_xyyz_xyz,     \
+                             to_xyyz_xyzzz,   \
+                             to_xyyz_xzz,     \
+                             to_xyyz_xzzzz,   \
+                             to_xyyz_yyy,     \
+                             to_xyyz_yyyyz,   \
+                             to_xyyz_yyyzz,   \
+                             to_xyyz_yyz,     \
+                             to_xyyz_yyzzz,   \
+                             to_xyyz_yzz,     \
+                             to_xyyz_yzzzz,   \
+                             to_xyyz_zzz,     \
+                             to_xyyz_zzzzz,   \
+                             to_xz_xxx,       \
+                             to_xz_xxxxz,     \
+                             to_xz_xxxyz,     \
+                             to_xz_xxxzz,     \
+                             to_xz_xxy,       \
+                             to_xz_xxyyz,     \
+                             to_xz_xxyzz,     \
+                             to_xz_xxz,       \
+                             to_xz_xxzzz,     \
+                             to_xz_xyy,       \
+                             to_xz_xyyyz,     \
+                             to_xz_xyyzz,     \
+                             to_xz_xyz,       \
+                             to_xz_xyzzz,     \
+                             to_xz_xzz,       \
+                             to_xz_xzzzz,     \
+                             to_xz_yyy,       \
+                             to_xz_yyyyz,     \
+                             to_xz_yyyzz,     \
+                             to_xz_yyz,       \
+                             to_xz_yyzzz,     \
+                             to_xz_yzz,       \
+                             to_xz_yzzzz,     \
+                             to_xz_zzz,       \
+                             to_xz_zzzzz,     \
+                             to_y_z_xyz_xxxx, \
+                             to_y_z_xyz_xxxy, \
+                             to_y_z_xyz_xxxz, \
+                             to_y_z_xyz_xxyy, \
+                             to_y_z_xyz_xxyz, \
+                             to_y_z_xyz_xxzz, \
+                             to_y_z_xyz_xyyy, \
+                             to_y_z_xyz_xyyz, \
+                             to_y_z_xyz_xyzz, \
+                             to_y_z_xyz_xzzz, \
+                             to_y_z_xyz_yyyy, \
+                             to_y_z_xyz_yyyz, \
+                             to_y_z_xyz_yyzz, \
+                             to_y_z_xyz_yzzz, \
+                             to_y_z_xyz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -5160,25 +8441,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_y_z_xyz_xxyz[k] = to_xz_xxy[k] - 2.0 * to_xz_xxyzz[k] * tke_0 - 2.0 * to_xyyz_xxy[k] * tbe_0 + 4.0 * to_xyyz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xyz_xxzz[k] = 2.0 * to_xz_xxz[k] - 2.0 * to_xz_xxzzz[k] * tke_0 - 4.0 * to_xyyz_xxz[k] * tbe_0 + 4.0 * to_xyyz_xxzzz[k] * tbe_0 * tke_0;
+            to_y_z_xyz_xxzz[k] =
+                2.0 * to_xz_xxz[k] - 2.0 * to_xz_xxzzz[k] * tke_0 - 4.0 * to_xyyz_xxz[k] * tbe_0 + 4.0 * to_xyyz_xxzzz[k] * tbe_0 * tke_0;
 
             to_y_z_xyz_xyyy[k] = -2.0 * to_xz_xyyyz[k] * tke_0 + 4.0 * to_xyyz_xyyyz[k] * tbe_0 * tke_0;
 
             to_y_z_xyz_xyyz[k] = to_xz_xyy[k] - 2.0 * to_xz_xyyzz[k] * tke_0 - 2.0 * to_xyyz_xyy[k] * tbe_0 + 4.0 * to_xyyz_xyyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xyz_xyzz[k] = 2.0 * to_xz_xyz[k] - 2.0 * to_xz_xyzzz[k] * tke_0 - 4.0 * to_xyyz_xyz[k] * tbe_0 + 4.0 * to_xyyz_xyzzz[k] * tbe_0 * tke_0;
+            to_y_z_xyz_xyzz[k] =
+                2.0 * to_xz_xyz[k] - 2.0 * to_xz_xyzzz[k] * tke_0 - 4.0 * to_xyyz_xyz[k] * tbe_0 + 4.0 * to_xyyz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xyz_xzzz[k] = 3.0 * to_xz_xzz[k] - 2.0 * to_xz_xzzzz[k] * tke_0 - 6.0 * to_xyyz_xzz[k] * tbe_0 + 4.0 * to_xyyz_xzzzz[k] * tbe_0 * tke_0;
+            to_y_z_xyz_xzzz[k] =
+                3.0 * to_xz_xzz[k] - 2.0 * to_xz_xzzzz[k] * tke_0 - 6.0 * to_xyyz_xzz[k] * tbe_0 + 4.0 * to_xyyz_xzzzz[k] * tbe_0 * tke_0;
 
             to_y_z_xyz_yyyy[k] = -2.0 * to_xz_yyyyz[k] * tke_0 + 4.0 * to_xyyz_yyyyz[k] * tbe_0 * tke_0;
 
             to_y_z_xyz_yyyz[k] = to_xz_yyy[k] - 2.0 * to_xz_yyyzz[k] * tke_0 - 2.0 * to_xyyz_yyy[k] * tbe_0 + 4.0 * to_xyyz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xyz_yyzz[k] = 2.0 * to_xz_yyz[k] - 2.0 * to_xz_yyzzz[k] * tke_0 - 4.0 * to_xyyz_yyz[k] * tbe_0 + 4.0 * to_xyyz_yyzzz[k] * tbe_0 * tke_0;
+            to_y_z_xyz_yyzz[k] =
+                2.0 * to_xz_yyz[k] - 2.0 * to_xz_yyzzz[k] * tke_0 - 4.0 * to_xyyz_yyz[k] * tbe_0 + 4.0 * to_xyyz_yyzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xyz_yzzz[k] = 3.0 * to_xz_yzz[k] - 2.0 * to_xz_yzzzz[k] * tke_0 - 6.0 * to_xyyz_yzz[k] * tbe_0 + 4.0 * to_xyyz_yzzzz[k] * tbe_0 * tke_0;
+            to_y_z_xyz_yzzz[k] =
+                3.0 * to_xz_yzz[k] - 2.0 * to_xz_yzzzz[k] * tke_0 - 6.0 * to_xyyz_yzz[k] * tbe_0 + 4.0 * to_xyyz_yzzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_xyz_zzzz[k] = 4.0 * to_xz_zzz[k] - 2.0 * to_xz_zzzzz[k] * tke_0 - 8.0 * to_xyyz_zzz[k] * tbe_0 + 4.0 * to_xyyz_zzzzz[k] * tbe_0 * tke_0;
+            to_y_z_xyz_zzzz[k] =
+                4.0 * to_xz_zzz[k] - 2.0 * to_xz_zzzzz[k] * tke_0 - 8.0 * to_xyyz_zzz[k] * tbe_0 + 4.0 * to_xyyz_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 825-840 components of targeted buffer : FG
@@ -5213,7 +8500,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_z_xzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 5 * op_comps * 150 + i * 150 + 89);
 
-        #pragma omp simd aligned(to_xyzz_xxx, to_xyzz_xxxxz, to_xyzz_xxxyz, to_xyzz_xxxzz, to_xyzz_xxy, to_xyzz_xxyyz, to_xyzz_xxyzz, to_xyzz_xxz, to_xyzz_xxzzz, to_xyzz_xyy, to_xyzz_xyyyz, to_xyzz_xyyzz, to_xyzz_xyz, to_xyzz_xyzzz, to_xyzz_xzz, to_xyzz_xzzzz, to_xyzz_yyy, to_xyzz_yyyyz, to_xyzz_yyyzz, to_xyzz_yyz, to_xyzz_yyzzz, to_xyzz_yzz, to_xyzz_yzzzz, to_xyzz_zzz, to_xyzz_zzzzz, to_y_z_xzz_xxxx, to_y_z_xzz_xxxy, to_y_z_xzz_xxxz, to_y_z_xzz_xxyy, to_y_z_xzz_xxyz, to_y_z_xzz_xxzz, to_y_z_xzz_xyyy, to_y_z_xzz_xyyz, to_y_z_xzz_xyzz, to_y_z_xzz_xzzz, to_y_z_xzz_yyyy, to_y_z_xzz_yyyz, to_y_z_xzz_yyzz, to_y_z_xzz_yzzz, to_y_z_xzz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xyzz_xxx,         \
+                             to_xyzz_xxxxz,   \
+                             to_xyzz_xxxyz,   \
+                             to_xyzz_xxxzz,   \
+                             to_xyzz_xxy,     \
+                             to_xyzz_xxyyz,   \
+                             to_xyzz_xxyzz,   \
+                             to_xyzz_xxz,     \
+                             to_xyzz_xxzzz,   \
+                             to_xyzz_xyy,     \
+                             to_xyzz_xyyyz,   \
+                             to_xyzz_xyyzz,   \
+                             to_xyzz_xyz,     \
+                             to_xyzz_xyzzz,   \
+                             to_xyzz_xzz,     \
+                             to_xyzz_xzzzz,   \
+                             to_xyzz_yyy,     \
+                             to_xyzz_yyyyz,   \
+                             to_xyzz_yyyzz,   \
+                             to_xyzz_yyz,     \
+                             to_xyzz_yyzzz,   \
+                             to_xyzz_yzz,     \
+                             to_xyzz_yzzzz,   \
+                             to_xyzz_zzz,     \
+                             to_xyzz_zzzzz,   \
+                             to_y_z_xzz_xxxx, \
+                             to_y_z_xzz_xxxy, \
+                             to_y_z_xzz_xxxz, \
+                             to_y_z_xzz_xxyy, \
+                             to_y_z_xzz_xxyz, \
+                             to_y_z_xzz_xxzz, \
+                             to_y_z_xzz_xyyy, \
+                             to_y_z_xzz_xyyz, \
+                             to_y_z_xzz_xyzz, \
+                             to_y_z_xzz_xzzz, \
+                             to_y_z_xzz_yyyy, \
+                             to_y_z_xzz_yyyz, \
+                             to_y_z_xzz_yyzz, \
+                             to_y_z_xzz_yzzz, \
+                             to_y_z_xzz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -5283,7 +8610,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_z_yyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 5 * op_comps * 150 + i * 150 + 104);
 
-        #pragma omp simd aligned(to_y_z_yyy_xxxx, to_y_z_yyy_xxxy, to_y_z_yyy_xxxz, to_y_z_yyy_xxyy, to_y_z_yyy_xxyz, to_y_z_yyy_xxzz, to_y_z_yyy_xyyy, to_y_z_yyy_xyyz, to_y_z_yyy_xyzz, to_y_z_yyy_xzzz, to_y_z_yyy_yyyy, to_y_z_yyy_yyyz, to_y_z_yyy_yyzz, to_y_z_yyy_yzzz, to_y_z_yyy_zzzz, to_yy_xxx, to_yy_xxxxz, to_yy_xxxyz, to_yy_xxxzz, to_yy_xxy, to_yy_xxyyz, to_yy_xxyzz, to_yy_xxz, to_yy_xxzzz, to_yy_xyy, to_yy_xyyyz, to_yy_xyyzz, to_yy_xyz, to_yy_xyzzz, to_yy_xzz, to_yy_xzzzz, to_yy_yyy, to_yy_yyyyz, to_yy_yyyzz, to_yy_yyz, to_yy_yyzzz, to_yy_yzz, to_yy_yzzzz, to_yy_zzz, to_yy_zzzzz, to_yyyy_xxx, to_yyyy_xxxxz, to_yyyy_xxxyz, to_yyyy_xxxzz, to_yyyy_xxy, to_yyyy_xxyyz, to_yyyy_xxyzz, to_yyyy_xxz, to_yyyy_xxzzz, to_yyyy_xyy, to_yyyy_xyyyz, to_yyyy_xyyzz, to_yyyy_xyz, to_yyyy_xyzzz, to_yyyy_xzz, to_yyyy_xzzzz, to_yyyy_yyy, to_yyyy_yyyyz, to_yyyy_yyyzz, to_yyyy_yyz, to_yyyy_yyzzz, to_yyyy_yzz, to_yyyy_yzzzz, to_yyyy_zzz, to_yyyy_zzzzz, b_exps : 64)
+#pragma omp simd aligned(to_y_z_yyy_xxxx,     \
+                             to_y_z_yyy_xxxy, \
+                             to_y_z_yyy_xxxz, \
+                             to_y_z_yyy_xxyy, \
+                             to_y_z_yyy_xxyz, \
+                             to_y_z_yyy_xxzz, \
+                             to_y_z_yyy_xyyy, \
+                             to_y_z_yyy_xyyz, \
+                             to_y_z_yyy_xyzz, \
+                             to_y_z_yyy_xzzz, \
+                             to_y_z_yyy_yyyy, \
+                             to_y_z_yyy_yyyz, \
+                             to_y_z_yyy_yyzz, \
+                             to_y_z_yyy_yzzz, \
+                             to_y_z_yyy_zzzz, \
+                             to_yy_xxx,       \
+                             to_yy_xxxxz,     \
+                             to_yy_xxxyz,     \
+                             to_yy_xxxzz,     \
+                             to_yy_xxy,       \
+                             to_yy_xxyyz,     \
+                             to_yy_xxyzz,     \
+                             to_yy_xxz,       \
+                             to_yy_xxzzz,     \
+                             to_yy_xyy,       \
+                             to_yy_xyyyz,     \
+                             to_yy_xyyzz,     \
+                             to_yy_xyz,       \
+                             to_yy_xyzzz,     \
+                             to_yy_xzz,       \
+                             to_yy_xzzzz,     \
+                             to_yy_yyy,       \
+                             to_yy_yyyyz,     \
+                             to_yy_yyyzz,     \
+                             to_yy_yyz,       \
+                             to_yy_yyzzz,     \
+                             to_yy_yzz,       \
+                             to_yy_yzzzz,     \
+                             to_yy_zzz,       \
+                             to_yy_zzzzz,     \
+                             to_yyyy_xxx,     \
+                             to_yyyy_xxxxz,   \
+                             to_yyyy_xxxyz,   \
+                             to_yyyy_xxxzz,   \
+                             to_yyyy_xxy,     \
+                             to_yyyy_xxyyz,   \
+                             to_yyyy_xxyzz,   \
+                             to_yyyy_xxz,     \
+                             to_yyyy_xxzzz,   \
+                             to_yyyy_xyy,     \
+                             to_yyyy_xyyyz,   \
+                             to_yyyy_xyyzz,   \
+                             to_yyyy_xyz,     \
+                             to_yyyy_xyzzz,   \
+                             to_yyyy_xzz,     \
+                             to_yyyy_xzzzz,   \
+                             to_yyyy_yyy,     \
+                             to_yyyy_yyyyz,   \
+                             to_yyyy_yyyzz,   \
+                             to_yyyy_yyz,     \
+                             to_yyyy_yyzzz,   \
+                             to_yyyy_yzz,     \
+                             to_yyyy_yzzzz,   \
+                             to_yyyy_zzz,     \
+                             to_yyyy_zzzzz,   \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -5294,31 +8686,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_y_z_yyy_xxxy[k] = -6.0 * to_yy_xxxyz[k] * tke_0 + 4.0 * to_yyyy_xxxyz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyy_xxxz[k] = 3.0 * to_yy_xxx[k] - 6.0 * to_yy_xxxzz[k] * tke_0 - 2.0 * to_yyyy_xxx[k] * tbe_0 + 4.0 * to_yyyy_xxxzz[k] * tbe_0 * tke_0;
+            to_y_z_yyy_xxxz[k] =
+                3.0 * to_yy_xxx[k] - 6.0 * to_yy_xxxzz[k] * tke_0 - 2.0 * to_yyyy_xxx[k] * tbe_0 + 4.0 * to_yyyy_xxxzz[k] * tbe_0 * tke_0;
 
             to_y_z_yyy_xxyy[k] = -6.0 * to_yy_xxyyz[k] * tke_0 + 4.0 * to_yyyy_xxyyz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyy_xxyz[k] = 3.0 * to_yy_xxy[k] - 6.0 * to_yy_xxyzz[k] * tke_0 - 2.0 * to_yyyy_xxy[k] * tbe_0 + 4.0 * to_yyyy_xxyzz[k] * tbe_0 * tke_0;
+            to_y_z_yyy_xxyz[k] =
+                3.0 * to_yy_xxy[k] - 6.0 * to_yy_xxyzz[k] * tke_0 - 2.0 * to_yyyy_xxy[k] * tbe_0 + 4.0 * to_yyyy_xxyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyy_xxzz[k] = 6.0 * to_yy_xxz[k] - 6.0 * to_yy_xxzzz[k] * tke_0 - 4.0 * to_yyyy_xxz[k] * tbe_0 + 4.0 * to_yyyy_xxzzz[k] * tbe_0 * tke_0;
+            to_y_z_yyy_xxzz[k] =
+                6.0 * to_yy_xxz[k] - 6.0 * to_yy_xxzzz[k] * tke_0 - 4.0 * to_yyyy_xxz[k] * tbe_0 + 4.0 * to_yyyy_xxzzz[k] * tbe_0 * tke_0;
 
             to_y_z_yyy_xyyy[k] = -6.0 * to_yy_xyyyz[k] * tke_0 + 4.0 * to_yyyy_xyyyz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyy_xyyz[k] = 3.0 * to_yy_xyy[k] - 6.0 * to_yy_xyyzz[k] * tke_0 - 2.0 * to_yyyy_xyy[k] * tbe_0 + 4.0 * to_yyyy_xyyzz[k] * tbe_0 * tke_0;
+            to_y_z_yyy_xyyz[k] =
+                3.0 * to_yy_xyy[k] - 6.0 * to_yy_xyyzz[k] * tke_0 - 2.0 * to_yyyy_xyy[k] * tbe_0 + 4.0 * to_yyyy_xyyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyy_xyzz[k] = 6.0 * to_yy_xyz[k] - 6.0 * to_yy_xyzzz[k] * tke_0 - 4.0 * to_yyyy_xyz[k] * tbe_0 + 4.0 * to_yyyy_xyzzz[k] * tbe_0 * tke_0;
+            to_y_z_yyy_xyzz[k] =
+                6.0 * to_yy_xyz[k] - 6.0 * to_yy_xyzzz[k] * tke_0 - 4.0 * to_yyyy_xyz[k] * tbe_0 + 4.0 * to_yyyy_xyzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyy_xzzz[k] = 9.0 * to_yy_xzz[k] - 6.0 * to_yy_xzzzz[k] * tke_0 - 6.0 * to_yyyy_xzz[k] * tbe_0 + 4.0 * to_yyyy_xzzzz[k] * tbe_0 * tke_0;
+            to_y_z_yyy_xzzz[k] =
+                9.0 * to_yy_xzz[k] - 6.0 * to_yy_xzzzz[k] * tke_0 - 6.0 * to_yyyy_xzz[k] * tbe_0 + 4.0 * to_yyyy_xzzzz[k] * tbe_0 * tke_0;
 
             to_y_z_yyy_yyyy[k] = -6.0 * to_yy_yyyyz[k] * tke_0 + 4.0 * to_yyyy_yyyyz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyy_yyyz[k] = 3.0 * to_yy_yyy[k] - 6.0 * to_yy_yyyzz[k] * tke_0 - 2.0 * to_yyyy_yyy[k] * tbe_0 + 4.0 * to_yyyy_yyyzz[k] * tbe_0 * tke_0;
+            to_y_z_yyy_yyyz[k] =
+                3.0 * to_yy_yyy[k] - 6.0 * to_yy_yyyzz[k] * tke_0 - 2.0 * to_yyyy_yyy[k] * tbe_0 + 4.0 * to_yyyy_yyyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyy_yyzz[k] = 6.0 * to_yy_yyz[k] - 6.0 * to_yy_yyzzz[k] * tke_0 - 4.0 * to_yyyy_yyz[k] * tbe_0 + 4.0 * to_yyyy_yyzzz[k] * tbe_0 * tke_0;
+            to_y_z_yyy_yyzz[k] =
+                6.0 * to_yy_yyz[k] - 6.0 * to_yy_yyzzz[k] * tke_0 - 4.0 * to_yyyy_yyz[k] * tbe_0 + 4.0 * to_yyyy_yyzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyy_yzzz[k] = 9.0 * to_yy_yzz[k] - 6.0 * to_yy_yzzzz[k] * tke_0 - 6.0 * to_yyyy_yzz[k] * tbe_0 + 4.0 * to_yyyy_yzzzz[k] * tbe_0 * tke_0;
+            to_y_z_yyy_yzzz[k] =
+                9.0 * to_yy_yzz[k] - 6.0 * to_yy_yzzzz[k] * tke_0 - 6.0 * to_yyyy_yzz[k] * tbe_0 + 4.0 * to_yyyy_yzzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyy_zzzz[k] = 12.0 * to_yy_zzz[k] - 6.0 * to_yy_zzzzz[k] * tke_0 - 8.0 * to_yyyy_zzz[k] * tbe_0 + 4.0 * to_yyyy_zzzzz[k] * tbe_0 * tke_0;
+            to_y_z_yyy_zzzz[k] =
+                12.0 * to_yy_zzz[k] - 6.0 * to_yy_zzzzz[k] * tke_0 - 8.0 * to_yyyy_zzz[k] * tbe_0 + 4.0 * to_yyyy_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 855-870 components of targeted buffer : FG
@@ -5353,7 +8755,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_z_yyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 5 * op_comps * 150 + i * 150 + 119);
 
-        #pragma omp simd aligned(to_y_z_yyz_xxxx, to_y_z_yyz_xxxy, to_y_z_yyz_xxxz, to_y_z_yyz_xxyy, to_y_z_yyz_xxyz, to_y_z_yyz_xxzz, to_y_z_yyz_xyyy, to_y_z_yyz_xyyz, to_y_z_yyz_xyzz, to_y_z_yyz_xzzz, to_y_z_yyz_yyyy, to_y_z_yyz_yyyz, to_y_z_yyz_yyzz, to_y_z_yyz_yzzz, to_y_z_yyz_zzzz, to_yyyz_xxx, to_yyyz_xxxxz, to_yyyz_xxxyz, to_yyyz_xxxzz, to_yyyz_xxy, to_yyyz_xxyyz, to_yyyz_xxyzz, to_yyyz_xxz, to_yyyz_xxzzz, to_yyyz_xyy, to_yyyz_xyyyz, to_yyyz_xyyzz, to_yyyz_xyz, to_yyyz_xyzzz, to_yyyz_xzz, to_yyyz_xzzzz, to_yyyz_yyy, to_yyyz_yyyyz, to_yyyz_yyyzz, to_yyyz_yyz, to_yyyz_yyzzz, to_yyyz_yzz, to_yyyz_yzzzz, to_yyyz_zzz, to_yyyz_zzzzz, to_yz_xxx, to_yz_xxxxz, to_yz_xxxyz, to_yz_xxxzz, to_yz_xxy, to_yz_xxyyz, to_yz_xxyzz, to_yz_xxz, to_yz_xxzzz, to_yz_xyy, to_yz_xyyyz, to_yz_xyyzz, to_yz_xyz, to_yz_xyzzz, to_yz_xzz, to_yz_xzzzz, to_yz_yyy, to_yz_yyyyz, to_yz_yyyzz, to_yz_yyz, to_yz_yyzzz, to_yz_yzz, to_yz_yzzzz, to_yz_zzz, to_yz_zzzzz, b_exps : 64)
+#pragma omp simd aligned(to_y_z_yyz_xxxx,     \
+                             to_y_z_yyz_xxxy, \
+                             to_y_z_yyz_xxxz, \
+                             to_y_z_yyz_xxyy, \
+                             to_y_z_yyz_xxyz, \
+                             to_y_z_yyz_xxzz, \
+                             to_y_z_yyz_xyyy, \
+                             to_y_z_yyz_xyyz, \
+                             to_y_z_yyz_xyzz, \
+                             to_y_z_yyz_xzzz, \
+                             to_y_z_yyz_yyyy, \
+                             to_y_z_yyz_yyyz, \
+                             to_y_z_yyz_yyzz, \
+                             to_y_z_yyz_yzzz, \
+                             to_y_z_yyz_zzzz, \
+                             to_yyyz_xxx,     \
+                             to_yyyz_xxxxz,   \
+                             to_yyyz_xxxyz,   \
+                             to_yyyz_xxxzz,   \
+                             to_yyyz_xxy,     \
+                             to_yyyz_xxyyz,   \
+                             to_yyyz_xxyzz,   \
+                             to_yyyz_xxz,     \
+                             to_yyyz_xxzzz,   \
+                             to_yyyz_xyy,     \
+                             to_yyyz_xyyyz,   \
+                             to_yyyz_xyyzz,   \
+                             to_yyyz_xyz,     \
+                             to_yyyz_xyzzz,   \
+                             to_yyyz_xzz,     \
+                             to_yyyz_xzzzz,   \
+                             to_yyyz_yyy,     \
+                             to_yyyz_yyyyz,   \
+                             to_yyyz_yyyzz,   \
+                             to_yyyz_yyz,     \
+                             to_yyyz_yyzzz,   \
+                             to_yyyz_yzz,     \
+                             to_yyyz_yzzzz,   \
+                             to_yyyz_zzz,     \
+                             to_yyyz_zzzzz,   \
+                             to_yz_xxx,       \
+                             to_yz_xxxxz,     \
+                             to_yz_xxxyz,     \
+                             to_yz_xxxzz,     \
+                             to_yz_xxy,       \
+                             to_yz_xxyyz,     \
+                             to_yz_xxyzz,     \
+                             to_yz_xxz,       \
+                             to_yz_xxzzz,     \
+                             to_yz_xyy,       \
+                             to_yz_xyyyz,     \
+                             to_yz_xyyzz,     \
+                             to_yz_xyz,       \
+                             to_yz_xyzzz,     \
+                             to_yz_xzz,       \
+                             to_yz_xzzzz,     \
+                             to_yz_yyy,       \
+                             to_yz_yyyyz,     \
+                             to_yz_yyyzz,     \
+                             to_yz_yyz,       \
+                             to_yz_yyzzz,     \
+                             to_yz_yzz,       \
+                             to_yz_yzzzz,     \
+                             to_yz_zzz,       \
+                             to_yz_zzzzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -5364,31 +8831,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_y_z_yyz_xxxy[k] = -4.0 * to_yz_xxxyz[k] * tke_0 + 4.0 * to_yyyz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyz_xxxz[k] = 2.0 * to_yz_xxx[k] - 4.0 * to_yz_xxxzz[k] * tke_0 - 2.0 * to_yyyz_xxx[k] * tbe_0 + 4.0 * to_yyyz_xxxzz[k] * tbe_0 * tke_0;
+            to_y_z_yyz_xxxz[k] =
+                2.0 * to_yz_xxx[k] - 4.0 * to_yz_xxxzz[k] * tke_0 - 2.0 * to_yyyz_xxx[k] * tbe_0 + 4.0 * to_yyyz_xxxzz[k] * tbe_0 * tke_0;
 
             to_y_z_yyz_xxyy[k] = -4.0 * to_yz_xxyyz[k] * tke_0 + 4.0 * to_yyyz_xxyyz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyz_xxyz[k] = 2.0 * to_yz_xxy[k] - 4.0 * to_yz_xxyzz[k] * tke_0 - 2.0 * to_yyyz_xxy[k] * tbe_0 + 4.0 * to_yyyz_xxyzz[k] * tbe_0 * tke_0;
+            to_y_z_yyz_xxyz[k] =
+                2.0 * to_yz_xxy[k] - 4.0 * to_yz_xxyzz[k] * tke_0 - 2.0 * to_yyyz_xxy[k] * tbe_0 + 4.0 * to_yyyz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyz_xxzz[k] = 4.0 * to_yz_xxz[k] - 4.0 * to_yz_xxzzz[k] * tke_0 - 4.0 * to_yyyz_xxz[k] * tbe_0 + 4.0 * to_yyyz_xxzzz[k] * tbe_0 * tke_0;
+            to_y_z_yyz_xxzz[k] =
+                4.0 * to_yz_xxz[k] - 4.0 * to_yz_xxzzz[k] * tke_0 - 4.0 * to_yyyz_xxz[k] * tbe_0 + 4.0 * to_yyyz_xxzzz[k] * tbe_0 * tke_0;
 
             to_y_z_yyz_xyyy[k] = -4.0 * to_yz_xyyyz[k] * tke_0 + 4.0 * to_yyyz_xyyyz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyz_xyyz[k] = 2.0 * to_yz_xyy[k] - 4.0 * to_yz_xyyzz[k] * tke_0 - 2.0 * to_yyyz_xyy[k] * tbe_0 + 4.0 * to_yyyz_xyyzz[k] * tbe_0 * tke_0;
+            to_y_z_yyz_xyyz[k] =
+                2.0 * to_yz_xyy[k] - 4.0 * to_yz_xyyzz[k] * tke_0 - 2.0 * to_yyyz_xyy[k] * tbe_0 + 4.0 * to_yyyz_xyyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyz_xyzz[k] = 4.0 * to_yz_xyz[k] - 4.0 * to_yz_xyzzz[k] * tke_0 - 4.0 * to_yyyz_xyz[k] * tbe_0 + 4.0 * to_yyyz_xyzzz[k] * tbe_0 * tke_0;
+            to_y_z_yyz_xyzz[k] =
+                4.0 * to_yz_xyz[k] - 4.0 * to_yz_xyzzz[k] * tke_0 - 4.0 * to_yyyz_xyz[k] * tbe_0 + 4.0 * to_yyyz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyz_xzzz[k] = 6.0 * to_yz_xzz[k] - 4.0 * to_yz_xzzzz[k] * tke_0 - 6.0 * to_yyyz_xzz[k] * tbe_0 + 4.0 * to_yyyz_xzzzz[k] * tbe_0 * tke_0;
+            to_y_z_yyz_xzzz[k] =
+                6.0 * to_yz_xzz[k] - 4.0 * to_yz_xzzzz[k] * tke_0 - 6.0 * to_yyyz_xzz[k] * tbe_0 + 4.0 * to_yyyz_xzzzz[k] * tbe_0 * tke_0;
 
             to_y_z_yyz_yyyy[k] = -4.0 * to_yz_yyyyz[k] * tke_0 + 4.0 * to_yyyz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyz_yyyz[k] = 2.0 * to_yz_yyy[k] - 4.0 * to_yz_yyyzz[k] * tke_0 - 2.0 * to_yyyz_yyy[k] * tbe_0 + 4.0 * to_yyyz_yyyzz[k] * tbe_0 * tke_0;
+            to_y_z_yyz_yyyz[k] =
+                2.0 * to_yz_yyy[k] - 4.0 * to_yz_yyyzz[k] * tke_0 - 2.0 * to_yyyz_yyy[k] * tbe_0 + 4.0 * to_yyyz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyz_yyzz[k] = 4.0 * to_yz_yyz[k] - 4.0 * to_yz_yyzzz[k] * tke_0 - 4.0 * to_yyyz_yyz[k] * tbe_0 + 4.0 * to_yyyz_yyzzz[k] * tbe_0 * tke_0;
+            to_y_z_yyz_yyzz[k] =
+                4.0 * to_yz_yyz[k] - 4.0 * to_yz_yyzzz[k] * tke_0 - 4.0 * to_yyyz_yyz[k] * tbe_0 + 4.0 * to_yyyz_yyzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyz_yzzz[k] = 6.0 * to_yz_yzz[k] - 4.0 * to_yz_yzzzz[k] * tke_0 - 6.0 * to_yyyz_yzz[k] * tbe_0 + 4.0 * to_yyyz_yzzzz[k] * tbe_0 * tke_0;
+            to_y_z_yyz_yzzz[k] =
+                6.0 * to_yz_yzz[k] - 4.0 * to_yz_yzzzz[k] * tke_0 - 6.0 * to_yyyz_yzz[k] * tbe_0 + 4.0 * to_yyyz_yzzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yyz_zzzz[k] = 8.0 * to_yz_zzz[k] - 4.0 * to_yz_zzzzz[k] * tke_0 - 8.0 * to_yyyz_zzz[k] * tbe_0 + 4.0 * to_yyyz_zzzzz[k] * tbe_0 * tke_0;
+            to_y_z_yyz_zzzz[k] =
+                8.0 * to_yz_zzz[k] - 4.0 * to_yz_zzzzz[k] * tke_0 - 8.0 * to_yyyz_zzz[k] * tbe_0 + 4.0 * to_yyyz_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 870-885 components of targeted buffer : FG
@@ -5423,7 +8900,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_z_yzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 5 * op_comps * 150 + i * 150 + 134);
 
-        #pragma omp simd aligned(to_y_z_yzz_xxxx, to_y_z_yzz_xxxy, to_y_z_yzz_xxxz, to_y_z_yzz_xxyy, to_y_z_yzz_xxyz, to_y_z_yzz_xxzz, to_y_z_yzz_xyyy, to_y_z_yzz_xyyz, to_y_z_yzz_xyzz, to_y_z_yzz_xzzz, to_y_z_yzz_yyyy, to_y_z_yzz_yyyz, to_y_z_yzz_yyzz, to_y_z_yzz_yzzz, to_y_z_yzz_zzzz, to_yyzz_xxx, to_yyzz_xxxxz, to_yyzz_xxxyz, to_yyzz_xxxzz, to_yyzz_xxy, to_yyzz_xxyyz, to_yyzz_xxyzz, to_yyzz_xxz, to_yyzz_xxzzz, to_yyzz_xyy, to_yyzz_xyyyz, to_yyzz_xyyzz, to_yyzz_xyz, to_yyzz_xyzzz, to_yyzz_xzz, to_yyzz_xzzzz, to_yyzz_yyy, to_yyzz_yyyyz, to_yyzz_yyyzz, to_yyzz_yyz, to_yyzz_yyzzz, to_yyzz_yzz, to_yyzz_yzzzz, to_yyzz_zzz, to_yyzz_zzzzz, to_zz_xxx, to_zz_xxxxz, to_zz_xxxyz, to_zz_xxxzz, to_zz_xxy, to_zz_xxyyz, to_zz_xxyzz, to_zz_xxz, to_zz_xxzzz, to_zz_xyy, to_zz_xyyyz, to_zz_xyyzz, to_zz_xyz, to_zz_xyzzz, to_zz_xzz, to_zz_xzzzz, to_zz_yyy, to_zz_yyyyz, to_zz_yyyzz, to_zz_yyz, to_zz_yyzzz, to_zz_yzz, to_zz_yzzzz, to_zz_zzz, to_zz_zzzzz, b_exps : 64)
+#pragma omp simd aligned(to_y_z_yzz_xxxx,     \
+                             to_y_z_yzz_xxxy, \
+                             to_y_z_yzz_xxxz, \
+                             to_y_z_yzz_xxyy, \
+                             to_y_z_yzz_xxyz, \
+                             to_y_z_yzz_xxzz, \
+                             to_y_z_yzz_xyyy, \
+                             to_y_z_yzz_xyyz, \
+                             to_y_z_yzz_xyzz, \
+                             to_y_z_yzz_xzzz, \
+                             to_y_z_yzz_yyyy, \
+                             to_y_z_yzz_yyyz, \
+                             to_y_z_yzz_yyzz, \
+                             to_y_z_yzz_yzzz, \
+                             to_y_z_yzz_zzzz, \
+                             to_yyzz_xxx,     \
+                             to_yyzz_xxxxz,   \
+                             to_yyzz_xxxyz,   \
+                             to_yyzz_xxxzz,   \
+                             to_yyzz_xxy,     \
+                             to_yyzz_xxyyz,   \
+                             to_yyzz_xxyzz,   \
+                             to_yyzz_xxz,     \
+                             to_yyzz_xxzzz,   \
+                             to_yyzz_xyy,     \
+                             to_yyzz_xyyyz,   \
+                             to_yyzz_xyyzz,   \
+                             to_yyzz_xyz,     \
+                             to_yyzz_xyzzz,   \
+                             to_yyzz_xzz,     \
+                             to_yyzz_xzzzz,   \
+                             to_yyzz_yyy,     \
+                             to_yyzz_yyyyz,   \
+                             to_yyzz_yyyzz,   \
+                             to_yyzz_yyz,     \
+                             to_yyzz_yyzzz,   \
+                             to_yyzz_yzz,     \
+                             to_yyzz_yzzzz,   \
+                             to_yyzz_zzz,     \
+                             to_yyzz_zzzzz,   \
+                             to_zz_xxx,       \
+                             to_zz_xxxxz,     \
+                             to_zz_xxxyz,     \
+                             to_zz_xxxzz,     \
+                             to_zz_xxy,       \
+                             to_zz_xxyyz,     \
+                             to_zz_xxyzz,     \
+                             to_zz_xxz,       \
+                             to_zz_xxzzz,     \
+                             to_zz_xyy,       \
+                             to_zz_xyyyz,     \
+                             to_zz_xyyzz,     \
+                             to_zz_xyz,       \
+                             to_zz_xyzzz,     \
+                             to_zz_xzz,       \
+                             to_zz_xzzzz,     \
+                             to_zz_yyy,       \
+                             to_zz_yyyyz,     \
+                             to_zz_yyyzz,     \
+                             to_zz_yyz,       \
+                             to_zz_yyzzz,     \
+                             to_zz_yzz,       \
+                             to_zz_yzzzz,     \
+                             to_zz_zzz,       \
+                             to_zz_zzzzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -5440,25 +8982,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_y_z_yzz_xxyz[k] = to_zz_xxy[k] - 2.0 * to_zz_xxyzz[k] * tke_0 - 2.0 * to_yyzz_xxy[k] * tbe_0 + 4.0 * to_yyzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yzz_xxzz[k] = 2.0 * to_zz_xxz[k] - 2.0 * to_zz_xxzzz[k] * tke_0 - 4.0 * to_yyzz_xxz[k] * tbe_0 + 4.0 * to_yyzz_xxzzz[k] * tbe_0 * tke_0;
+            to_y_z_yzz_xxzz[k] =
+                2.0 * to_zz_xxz[k] - 2.0 * to_zz_xxzzz[k] * tke_0 - 4.0 * to_yyzz_xxz[k] * tbe_0 + 4.0 * to_yyzz_xxzzz[k] * tbe_0 * tke_0;
 
             to_y_z_yzz_xyyy[k] = -2.0 * to_zz_xyyyz[k] * tke_0 + 4.0 * to_yyzz_xyyyz[k] * tbe_0 * tke_0;
 
             to_y_z_yzz_xyyz[k] = to_zz_xyy[k] - 2.0 * to_zz_xyyzz[k] * tke_0 - 2.0 * to_yyzz_xyy[k] * tbe_0 + 4.0 * to_yyzz_xyyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yzz_xyzz[k] = 2.0 * to_zz_xyz[k] - 2.0 * to_zz_xyzzz[k] * tke_0 - 4.0 * to_yyzz_xyz[k] * tbe_0 + 4.0 * to_yyzz_xyzzz[k] * tbe_0 * tke_0;
+            to_y_z_yzz_xyzz[k] =
+                2.0 * to_zz_xyz[k] - 2.0 * to_zz_xyzzz[k] * tke_0 - 4.0 * to_yyzz_xyz[k] * tbe_0 + 4.0 * to_yyzz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yzz_xzzz[k] = 3.0 * to_zz_xzz[k] - 2.0 * to_zz_xzzzz[k] * tke_0 - 6.0 * to_yyzz_xzz[k] * tbe_0 + 4.0 * to_yyzz_xzzzz[k] * tbe_0 * tke_0;
+            to_y_z_yzz_xzzz[k] =
+                3.0 * to_zz_xzz[k] - 2.0 * to_zz_xzzzz[k] * tke_0 - 6.0 * to_yyzz_xzz[k] * tbe_0 + 4.0 * to_yyzz_xzzzz[k] * tbe_0 * tke_0;
 
             to_y_z_yzz_yyyy[k] = -2.0 * to_zz_yyyyz[k] * tke_0 + 4.0 * to_yyzz_yyyyz[k] * tbe_0 * tke_0;
 
             to_y_z_yzz_yyyz[k] = to_zz_yyy[k] - 2.0 * to_zz_yyyzz[k] * tke_0 - 2.0 * to_yyzz_yyy[k] * tbe_0 + 4.0 * to_yyzz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yzz_yyzz[k] = 2.0 * to_zz_yyz[k] - 2.0 * to_zz_yyzzz[k] * tke_0 - 4.0 * to_yyzz_yyz[k] * tbe_0 + 4.0 * to_yyzz_yyzzz[k] * tbe_0 * tke_0;
+            to_y_z_yzz_yyzz[k] =
+                2.0 * to_zz_yyz[k] - 2.0 * to_zz_yyzzz[k] * tke_0 - 4.0 * to_yyzz_yyz[k] * tbe_0 + 4.0 * to_yyzz_yyzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yzz_yzzz[k] = 3.0 * to_zz_yzz[k] - 2.0 * to_zz_yzzzz[k] * tke_0 - 6.0 * to_yyzz_yzz[k] * tbe_0 + 4.0 * to_yyzz_yzzzz[k] * tbe_0 * tke_0;
+            to_y_z_yzz_yzzz[k] =
+                3.0 * to_zz_yzz[k] - 2.0 * to_zz_yzzzz[k] * tke_0 - 6.0 * to_yyzz_yzz[k] * tbe_0 + 4.0 * to_yyzz_yzzzz[k] * tbe_0 * tke_0;
 
-            to_y_z_yzz_zzzz[k] = 4.0 * to_zz_zzz[k] - 2.0 * to_zz_zzzzz[k] * tke_0 - 8.0 * to_yyzz_zzz[k] * tbe_0 + 4.0 * to_yyzz_zzzzz[k] * tbe_0 * tke_0;
+            to_y_z_yzz_zzzz[k] =
+                4.0 * to_zz_zzz[k] - 2.0 * to_zz_zzzzz[k] * tke_0 - 8.0 * to_yyzz_zzz[k] * tbe_0 + 4.0 * to_yyzz_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 885-900 components of targeted buffer : FG
@@ -5493,7 +9041,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_y_z_zzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 5 * op_comps * 150 + i * 150 + 149);
 
-        #pragma omp simd aligned(to_y_z_zzz_xxxx, to_y_z_zzz_xxxy, to_y_z_zzz_xxxz, to_y_z_zzz_xxyy, to_y_z_zzz_xxyz, to_y_z_zzz_xxzz, to_y_z_zzz_xyyy, to_y_z_zzz_xyyz, to_y_z_zzz_xyzz, to_y_z_zzz_xzzz, to_y_z_zzz_yyyy, to_y_z_zzz_yyyz, to_y_z_zzz_yyzz, to_y_z_zzz_yzzz, to_y_z_zzz_zzzz, to_yzzz_xxx, to_yzzz_xxxxz, to_yzzz_xxxyz, to_yzzz_xxxzz, to_yzzz_xxy, to_yzzz_xxyyz, to_yzzz_xxyzz, to_yzzz_xxz, to_yzzz_xxzzz, to_yzzz_xyy, to_yzzz_xyyyz, to_yzzz_xyyzz, to_yzzz_xyz, to_yzzz_xyzzz, to_yzzz_xzz, to_yzzz_xzzzz, to_yzzz_yyy, to_yzzz_yyyyz, to_yzzz_yyyzz, to_yzzz_yyz, to_yzzz_yyzzz, to_yzzz_yzz, to_yzzz_yzzzz, to_yzzz_zzz, to_yzzz_zzzzz, b_exps : 64)
+#pragma omp simd aligned(to_y_z_zzz_xxxx,     \
+                             to_y_z_zzz_xxxy, \
+                             to_y_z_zzz_xxxz, \
+                             to_y_z_zzz_xxyy, \
+                             to_y_z_zzz_xxyz, \
+                             to_y_z_zzz_xxzz, \
+                             to_y_z_zzz_xyyy, \
+                             to_y_z_zzz_xyyz, \
+                             to_y_z_zzz_xyzz, \
+                             to_y_z_zzz_xzzz, \
+                             to_y_z_zzz_yyyy, \
+                             to_y_z_zzz_yyyz, \
+                             to_y_z_zzz_yyzz, \
+                             to_y_z_zzz_yzzz, \
+                             to_y_z_zzz_zzzz, \
+                             to_yzzz_xxx,     \
+                             to_yzzz_xxxxz,   \
+                             to_yzzz_xxxyz,   \
+                             to_yzzz_xxxzz,   \
+                             to_yzzz_xxy,     \
+                             to_yzzz_xxyyz,   \
+                             to_yzzz_xxyzz,   \
+                             to_yzzz_xxz,     \
+                             to_yzzz_xxzzz,   \
+                             to_yzzz_xyy,     \
+                             to_yzzz_xyyyz,   \
+                             to_yzzz_xyyzz,   \
+                             to_yzzz_xyz,     \
+                             to_yzzz_xyzzz,   \
+                             to_yzzz_xzz,     \
+                             to_yzzz_xzzzz,   \
+                             to_yzzz_yyy,     \
+                             to_yzzz_yyyyz,   \
+                             to_yzzz_yyyzz,   \
+                             to_yzzz_yyz,     \
+                             to_yzzz_yyzzz,   \
+                             to_yzzz_yzz,     \
+                             to_yzzz_yzzzz,   \
+                             to_yzzz_zzz,     \
+                             to_yzzz_zzzzz,   \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -5563,7 +9151,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_x_xxx_zzzz = pbuffer.data(idx_op_geom_101_fg + 6 * op_comps * 150 + i * 150 + 14);
 
-        #pragma omp simd aligned(to_xxxz_xxx, to_xxxz_xxxxx, to_xxxz_xxxxy, to_xxxz_xxxxz, to_xxxz_xxxyy, to_xxxz_xxxyz, to_xxxz_xxxzz, to_xxxz_xxy, to_xxxz_xxyyy, to_xxxz_xxyyz, to_xxxz_xxyzz, to_xxxz_xxz, to_xxxz_xxzzz, to_xxxz_xyy, to_xxxz_xyyyy, to_xxxz_xyyyz, to_xxxz_xyyzz, to_xxxz_xyz, to_xxxz_xyzzz, to_xxxz_xzz, to_xxxz_xzzzz, to_xxxz_yyy, to_xxxz_yyz, to_xxxz_yzz, to_xxxz_zzz, to_z_x_xxx_xxxx, to_z_x_xxx_xxxy, to_z_x_xxx_xxxz, to_z_x_xxx_xxyy, to_z_x_xxx_xxyz, to_z_x_xxx_xxzz, to_z_x_xxx_xyyy, to_z_x_xxx_xyyz, to_z_x_xxx_xyzz, to_z_x_xxx_xzzz, to_z_x_xxx_yyyy, to_z_x_xxx_yyyz, to_z_x_xxx_yyzz, to_z_x_xxx_yzzz, to_z_x_xxx_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xxxz_xxx,         \
+                             to_xxxz_xxxxx,   \
+                             to_xxxz_xxxxy,   \
+                             to_xxxz_xxxxz,   \
+                             to_xxxz_xxxyy,   \
+                             to_xxxz_xxxyz,   \
+                             to_xxxz_xxxzz,   \
+                             to_xxxz_xxy,     \
+                             to_xxxz_xxyyy,   \
+                             to_xxxz_xxyyz,   \
+                             to_xxxz_xxyzz,   \
+                             to_xxxz_xxz,     \
+                             to_xxxz_xxzzz,   \
+                             to_xxxz_xyy,     \
+                             to_xxxz_xyyyy,   \
+                             to_xxxz_xyyyz,   \
+                             to_xxxz_xyyzz,   \
+                             to_xxxz_xyz,     \
+                             to_xxxz_xyzzz,   \
+                             to_xxxz_xzz,     \
+                             to_xxxz_xzzzz,   \
+                             to_xxxz_yyy,     \
+                             to_xxxz_yyz,     \
+                             to_xxxz_yzz,     \
+                             to_xxxz_zzz,     \
+                             to_z_x_xxx_xxxx, \
+                             to_z_x_xxx_xxxy, \
+                             to_z_x_xxx_xxxz, \
+                             to_z_x_xxx_xxyy, \
+                             to_z_x_xxx_xxyz, \
+                             to_z_x_xxx_xxzz, \
+                             to_z_x_xxx_xyyy, \
+                             to_z_x_xxx_xyyz, \
+                             to_z_x_xxx_xyzz, \
+                             to_z_x_xxx_xzzz, \
+                             to_z_x_xxx_yyyy, \
+                             to_z_x_xxx_yyyz, \
+                             to_z_x_xxx_yyzz, \
+                             to_z_x_xxx_yzzz, \
+                             to_z_x_xxx_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -5633,7 +9261,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_x_xxy_zzzz = pbuffer.data(idx_op_geom_101_fg + 6 * op_comps * 150 + i * 150 + 29);
 
-        #pragma omp simd aligned(to_xxyz_xxx, to_xxyz_xxxxx, to_xxyz_xxxxy, to_xxyz_xxxxz, to_xxyz_xxxyy, to_xxyz_xxxyz, to_xxyz_xxxzz, to_xxyz_xxy, to_xxyz_xxyyy, to_xxyz_xxyyz, to_xxyz_xxyzz, to_xxyz_xxz, to_xxyz_xxzzz, to_xxyz_xyy, to_xxyz_xyyyy, to_xxyz_xyyyz, to_xxyz_xyyzz, to_xxyz_xyz, to_xxyz_xyzzz, to_xxyz_xzz, to_xxyz_xzzzz, to_xxyz_yyy, to_xxyz_yyz, to_xxyz_yzz, to_xxyz_zzz, to_z_x_xxy_xxxx, to_z_x_xxy_xxxy, to_z_x_xxy_xxxz, to_z_x_xxy_xxyy, to_z_x_xxy_xxyz, to_z_x_xxy_xxzz, to_z_x_xxy_xyyy, to_z_x_xxy_xyyz, to_z_x_xxy_xyzz, to_z_x_xxy_xzzz, to_z_x_xxy_yyyy, to_z_x_xxy_yyyz, to_z_x_xxy_yyzz, to_z_x_xxy_yzzz, to_z_x_xxy_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xxyz_xxx,         \
+                             to_xxyz_xxxxx,   \
+                             to_xxyz_xxxxy,   \
+                             to_xxyz_xxxxz,   \
+                             to_xxyz_xxxyy,   \
+                             to_xxyz_xxxyz,   \
+                             to_xxyz_xxxzz,   \
+                             to_xxyz_xxy,     \
+                             to_xxyz_xxyyy,   \
+                             to_xxyz_xxyyz,   \
+                             to_xxyz_xxyzz,   \
+                             to_xxyz_xxz,     \
+                             to_xxyz_xxzzz,   \
+                             to_xxyz_xyy,     \
+                             to_xxyz_xyyyy,   \
+                             to_xxyz_xyyyz,   \
+                             to_xxyz_xyyzz,   \
+                             to_xxyz_xyz,     \
+                             to_xxyz_xyzzz,   \
+                             to_xxyz_xzz,     \
+                             to_xxyz_xzzzz,   \
+                             to_xxyz_yyy,     \
+                             to_xxyz_yyz,     \
+                             to_xxyz_yzz,     \
+                             to_xxyz_zzz,     \
+                             to_z_x_xxy_xxxx, \
+                             to_z_x_xxy_xxxy, \
+                             to_z_x_xxy_xxxz, \
+                             to_z_x_xxy_xxyy, \
+                             to_z_x_xxy_xxyz, \
+                             to_z_x_xxy_xxzz, \
+                             to_z_x_xxy_xyyy, \
+                             to_z_x_xxy_xyyz, \
+                             to_z_x_xxy_xyzz, \
+                             to_z_x_xxy_xzzz, \
+                             to_z_x_xxy_yyyy, \
+                             to_z_x_xxy_yyyz, \
+                             to_z_x_xxy_yyzz, \
+                             to_z_x_xxy_yzzz, \
+                             to_z_x_xxy_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -5703,24 +9371,95 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_x_xxz_zzzz = pbuffer.data(idx_op_geom_101_fg + 6 * op_comps * 150 + i * 150 + 44);
 
-        #pragma omp simd aligned(to_xx_xxx, to_xx_xxxxx, to_xx_xxxxy, to_xx_xxxxz, to_xx_xxxyy, to_xx_xxxyz, to_xx_xxxzz, to_xx_xxy, to_xx_xxyyy, to_xx_xxyyz, to_xx_xxyzz, to_xx_xxz, to_xx_xxzzz, to_xx_xyy, to_xx_xyyyy, to_xx_xyyyz, to_xx_xyyzz, to_xx_xyz, to_xx_xyzzz, to_xx_xzz, to_xx_xzzzz, to_xx_yyy, to_xx_yyz, to_xx_yzz, to_xx_zzz, to_xxzz_xxx, to_xxzz_xxxxx, to_xxzz_xxxxy, to_xxzz_xxxxz, to_xxzz_xxxyy, to_xxzz_xxxyz, to_xxzz_xxxzz, to_xxzz_xxy, to_xxzz_xxyyy, to_xxzz_xxyyz, to_xxzz_xxyzz, to_xxzz_xxz, to_xxzz_xxzzz, to_xxzz_xyy, to_xxzz_xyyyy, to_xxzz_xyyyz, to_xxzz_xyyzz, to_xxzz_xyz, to_xxzz_xyzzz, to_xxzz_xzz, to_xxzz_xzzzz, to_xxzz_yyy, to_xxzz_yyz, to_xxzz_yzz, to_xxzz_zzz, to_z_x_xxz_xxxx, to_z_x_xxz_xxxy, to_z_x_xxz_xxxz, to_z_x_xxz_xxyy, to_z_x_xxz_xxyz, to_z_x_xxz_xxzz, to_z_x_xxz_xyyy, to_z_x_xxz_xyyz, to_z_x_xxz_xyzz, to_z_x_xxz_xzzz, to_z_x_xxz_yyyy, to_z_x_xxz_yyyz, to_z_x_xxz_yyzz, to_z_x_xxz_yzzz, to_z_x_xxz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xx_xxx,           \
+                             to_xx_xxxxx,     \
+                             to_xx_xxxxy,     \
+                             to_xx_xxxxz,     \
+                             to_xx_xxxyy,     \
+                             to_xx_xxxyz,     \
+                             to_xx_xxxzz,     \
+                             to_xx_xxy,       \
+                             to_xx_xxyyy,     \
+                             to_xx_xxyyz,     \
+                             to_xx_xxyzz,     \
+                             to_xx_xxz,       \
+                             to_xx_xxzzz,     \
+                             to_xx_xyy,       \
+                             to_xx_xyyyy,     \
+                             to_xx_xyyyz,     \
+                             to_xx_xyyzz,     \
+                             to_xx_xyz,       \
+                             to_xx_xyzzz,     \
+                             to_xx_xzz,       \
+                             to_xx_xzzzz,     \
+                             to_xx_yyy,       \
+                             to_xx_yyz,       \
+                             to_xx_yzz,       \
+                             to_xx_zzz,       \
+                             to_xxzz_xxx,     \
+                             to_xxzz_xxxxx,   \
+                             to_xxzz_xxxxy,   \
+                             to_xxzz_xxxxz,   \
+                             to_xxzz_xxxyy,   \
+                             to_xxzz_xxxyz,   \
+                             to_xxzz_xxxzz,   \
+                             to_xxzz_xxy,     \
+                             to_xxzz_xxyyy,   \
+                             to_xxzz_xxyyz,   \
+                             to_xxzz_xxyzz,   \
+                             to_xxzz_xxz,     \
+                             to_xxzz_xxzzz,   \
+                             to_xxzz_xyy,     \
+                             to_xxzz_xyyyy,   \
+                             to_xxzz_xyyyz,   \
+                             to_xxzz_xyyzz,   \
+                             to_xxzz_xyz,     \
+                             to_xxzz_xyzzz,   \
+                             to_xxzz_xzz,     \
+                             to_xxzz_xzzzz,   \
+                             to_xxzz_yyy,     \
+                             to_xxzz_yyz,     \
+                             to_xxzz_yzz,     \
+                             to_xxzz_zzz,     \
+                             to_z_x_xxz_xxxx, \
+                             to_z_x_xxz_xxxy, \
+                             to_z_x_xxz_xxxz, \
+                             to_z_x_xxz_xxyy, \
+                             to_z_x_xxz_xxyz, \
+                             to_z_x_xxz_xxzz, \
+                             to_z_x_xxz_xyyy, \
+                             to_z_x_xxz_xyyz, \
+                             to_z_x_xxz_xyzz, \
+                             to_z_x_xxz_xzzz, \
+                             to_z_x_xxz_yyyy, \
+                             to_z_x_xxz_yyyz, \
+                             to_z_x_xxz_yyzz, \
+                             to_z_x_xxz_yzzz, \
+                             to_z_x_xxz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_z_x_xxz_xxxx[k] = 4.0 * to_xx_xxx[k] - 2.0 * to_xx_xxxxx[k] * tke_0 - 8.0 * to_xxzz_xxx[k] * tbe_0 + 4.0 * to_xxzz_xxxxx[k] * tbe_0 * tke_0;
+            to_z_x_xxz_xxxx[k] =
+                4.0 * to_xx_xxx[k] - 2.0 * to_xx_xxxxx[k] * tke_0 - 8.0 * to_xxzz_xxx[k] * tbe_0 + 4.0 * to_xxzz_xxxxx[k] * tbe_0 * tke_0;
 
-            to_z_x_xxz_xxxy[k] = 3.0 * to_xx_xxy[k] - 2.0 * to_xx_xxxxy[k] * tke_0 - 6.0 * to_xxzz_xxy[k] * tbe_0 + 4.0 * to_xxzz_xxxxy[k] * tbe_0 * tke_0;
+            to_z_x_xxz_xxxy[k] =
+                3.0 * to_xx_xxy[k] - 2.0 * to_xx_xxxxy[k] * tke_0 - 6.0 * to_xxzz_xxy[k] * tbe_0 + 4.0 * to_xxzz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_z_x_xxz_xxxz[k] = 3.0 * to_xx_xxz[k] - 2.0 * to_xx_xxxxz[k] * tke_0 - 6.0 * to_xxzz_xxz[k] * tbe_0 + 4.0 * to_xxzz_xxxxz[k] * tbe_0 * tke_0;
+            to_z_x_xxz_xxxz[k] =
+                3.0 * to_xx_xxz[k] - 2.0 * to_xx_xxxxz[k] * tke_0 - 6.0 * to_xxzz_xxz[k] * tbe_0 + 4.0 * to_xxzz_xxxxz[k] * tbe_0 * tke_0;
 
-            to_z_x_xxz_xxyy[k] = 2.0 * to_xx_xyy[k] - 2.0 * to_xx_xxxyy[k] * tke_0 - 4.0 * to_xxzz_xyy[k] * tbe_0 + 4.0 * to_xxzz_xxxyy[k] * tbe_0 * tke_0;
+            to_z_x_xxz_xxyy[k] =
+                2.0 * to_xx_xyy[k] - 2.0 * to_xx_xxxyy[k] * tke_0 - 4.0 * to_xxzz_xyy[k] * tbe_0 + 4.0 * to_xxzz_xxxyy[k] * tbe_0 * tke_0;
 
-            to_z_x_xxz_xxyz[k] = 2.0 * to_xx_xyz[k] - 2.0 * to_xx_xxxyz[k] * tke_0 - 4.0 * to_xxzz_xyz[k] * tbe_0 + 4.0 * to_xxzz_xxxyz[k] * tbe_0 * tke_0;
+            to_z_x_xxz_xxyz[k] =
+                2.0 * to_xx_xyz[k] - 2.0 * to_xx_xxxyz[k] * tke_0 - 4.0 * to_xxzz_xyz[k] * tbe_0 + 4.0 * to_xxzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_z_x_xxz_xxzz[k] = 2.0 * to_xx_xzz[k] - 2.0 * to_xx_xxxzz[k] * tke_0 - 4.0 * to_xxzz_xzz[k] * tbe_0 + 4.0 * to_xxzz_xxxzz[k] * tbe_0 * tke_0;
+            to_z_x_xxz_xxzz[k] =
+                2.0 * to_xx_xzz[k] - 2.0 * to_xx_xxxzz[k] * tke_0 - 4.0 * to_xxzz_xzz[k] * tbe_0 + 4.0 * to_xxzz_xxxzz[k] * tbe_0 * tke_0;
 
             to_z_x_xxz_xyyy[k] = to_xx_yyy[k] - 2.0 * to_xx_xxyyy[k] * tke_0 - 2.0 * to_xxzz_yyy[k] * tbe_0 + 4.0 * to_xxzz_xxyyy[k] * tbe_0 * tke_0;
 
@@ -5773,7 +9512,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_x_xyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 6 * op_comps * 150 + i * 150 + 59);
 
-        #pragma omp simd aligned(to_xyyz_xxx, to_xyyz_xxxxx, to_xyyz_xxxxy, to_xyyz_xxxxz, to_xyyz_xxxyy, to_xyyz_xxxyz, to_xyyz_xxxzz, to_xyyz_xxy, to_xyyz_xxyyy, to_xyyz_xxyyz, to_xyyz_xxyzz, to_xyyz_xxz, to_xyyz_xxzzz, to_xyyz_xyy, to_xyyz_xyyyy, to_xyyz_xyyyz, to_xyyz_xyyzz, to_xyyz_xyz, to_xyyz_xyzzz, to_xyyz_xzz, to_xyyz_xzzzz, to_xyyz_yyy, to_xyyz_yyz, to_xyyz_yzz, to_xyyz_zzz, to_z_x_xyy_xxxx, to_z_x_xyy_xxxy, to_z_x_xyy_xxxz, to_z_x_xyy_xxyy, to_z_x_xyy_xxyz, to_z_x_xyy_xxzz, to_z_x_xyy_xyyy, to_z_x_xyy_xyyz, to_z_x_xyy_xyzz, to_z_x_xyy_xzzz, to_z_x_xyy_yyyy, to_z_x_xyy_yyyz, to_z_x_xyy_yyzz, to_z_x_xyy_yzzz, to_z_x_xyy_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xyyz_xxx,         \
+                             to_xyyz_xxxxx,   \
+                             to_xyyz_xxxxy,   \
+                             to_xyyz_xxxxz,   \
+                             to_xyyz_xxxyy,   \
+                             to_xyyz_xxxyz,   \
+                             to_xyyz_xxxzz,   \
+                             to_xyyz_xxy,     \
+                             to_xyyz_xxyyy,   \
+                             to_xyyz_xxyyz,   \
+                             to_xyyz_xxyzz,   \
+                             to_xyyz_xxz,     \
+                             to_xyyz_xxzzz,   \
+                             to_xyyz_xyy,     \
+                             to_xyyz_xyyyy,   \
+                             to_xyyz_xyyyz,   \
+                             to_xyyz_xyyzz,   \
+                             to_xyyz_xyz,     \
+                             to_xyyz_xyzzz,   \
+                             to_xyyz_xzz,     \
+                             to_xyyz_xzzzz,   \
+                             to_xyyz_yyy,     \
+                             to_xyyz_yyz,     \
+                             to_xyyz_yzz,     \
+                             to_xyyz_zzz,     \
+                             to_z_x_xyy_xxxx, \
+                             to_z_x_xyy_xxxy, \
+                             to_z_x_xyy_xxxz, \
+                             to_z_x_xyy_xxyy, \
+                             to_z_x_xyy_xxyz, \
+                             to_z_x_xyy_xxzz, \
+                             to_z_x_xyy_xyyy, \
+                             to_z_x_xyy_xyyz, \
+                             to_z_x_xyy_xyzz, \
+                             to_z_x_xyy_xzzz, \
+                             to_z_x_xyy_yyyy, \
+                             to_z_x_xyy_yyyz, \
+                             to_z_x_xyy_yyzz, \
+                             to_z_x_xyy_yzzz, \
+                             to_z_x_xyy_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -5843,24 +9622,95 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_x_xyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 6 * op_comps * 150 + i * 150 + 74);
 
-        #pragma omp simd aligned(to_xy_xxx, to_xy_xxxxx, to_xy_xxxxy, to_xy_xxxxz, to_xy_xxxyy, to_xy_xxxyz, to_xy_xxxzz, to_xy_xxy, to_xy_xxyyy, to_xy_xxyyz, to_xy_xxyzz, to_xy_xxz, to_xy_xxzzz, to_xy_xyy, to_xy_xyyyy, to_xy_xyyyz, to_xy_xyyzz, to_xy_xyz, to_xy_xyzzz, to_xy_xzz, to_xy_xzzzz, to_xy_yyy, to_xy_yyz, to_xy_yzz, to_xy_zzz, to_xyzz_xxx, to_xyzz_xxxxx, to_xyzz_xxxxy, to_xyzz_xxxxz, to_xyzz_xxxyy, to_xyzz_xxxyz, to_xyzz_xxxzz, to_xyzz_xxy, to_xyzz_xxyyy, to_xyzz_xxyyz, to_xyzz_xxyzz, to_xyzz_xxz, to_xyzz_xxzzz, to_xyzz_xyy, to_xyzz_xyyyy, to_xyzz_xyyyz, to_xyzz_xyyzz, to_xyzz_xyz, to_xyzz_xyzzz, to_xyzz_xzz, to_xyzz_xzzzz, to_xyzz_yyy, to_xyzz_yyz, to_xyzz_yzz, to_xyzz_zzz, to_z_x_xyz_xxxx, to_z_x_xyz_xxxy, to_z_x_xyz_xxxz, to_z_x_xyz_xxyy, to_z_x_xyz_xxyz, to_z_x_xyz_xxzz, to_z_x_xyz_xyyy, to_z_x_xyz_xyyz, to_z_x_xyz_xyzz, to_z_x_xyz_xzzz, to_z_x_xyz_yyyy, to_z_x_xyz_yyyz, to_z_x_xyz_yyzz, to_z_x_xyz_yzzz, to_z_x_xyz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xy_xxx,           \
+                             to_xy_xxxxx,     \
+                             to_xy_xxxxy,     \
+                             to_xy_xxxxz,     \
+                             to_xy_xxxyy,     \
+                             to_xy_xxxyz,     \
+                             to_xy_xxxzz,     \
+                             to_xy_xxy,       \
+                             to_xy_xxyyy,     \
+                             to_xy_xxyyz,     \
+                             to_xy_xxyzz,     \
+                             to_xy_xxz,       \
+                             to_xy_xxzzz,     \
+                             to_xy_xyy,       \
+                             to_xy_xyyyy,     \
+                             to_xy_xyyyz,     \
+                             to_xy_xyyzz,     \
+                             to_xy_xyz,       \
+                             to_xy_xyzzz,     \
+                             to_xy_xzz,       \
+                             to_xy_xzzzz,     \
+                             to_xy_yyy,       \
+                             to_xy_yyz,       \
+                             to_xy_yzz,       \
+                             to_xy_zzz,       \
+                             to_xyzz_xxx,     \
+                             to_xyzz_xxxxx,   \
+                             to_xyzz_xxxxy,   \
+                             to_xyzz_xxxxz,   \
+                             to_xyzz_xxxyy,   \
+                             to_xyzz_xxxyz,   \
+                             to_xyzz_xxxzz,   \
+                             to_xyzz_xxy,     \
+                             to_xyzz_xxyyy,   \
+                             to_xyzz_xxyyz,   \
+                             to_xyzz_xxyzz,   \
+                             to_xyzz_xxz,     \
+                             to_xyzz_xxzzz,   \
+                             to_xyzz_xyy,     \
+                             to_xyzz_xyyyy,   \
+                             to_xyzz_xyyyz,   \
+                             to_xyzz_xyyzz,   \
+                             to_xyzz_xyz,     \
+                             to_xyzz_xyzzz,   \
+                             to_xyzz_xzz,     \
+                             to_xyzz_xzzzz,   \
+                             to_xyzz_yyy,     \
+                             to_xyzz_yyz,     \
+                             to_xyzz_yzz,     \
+                             to_xyzz_zzz,     \
+                             to_z_x_xyz_xxxx, \
+                             to_z_x_xyz_xxxy, \
+                             to_z_x_xyz_xxxz, \
+                             to_z_x_xyz_xxyy, \
+                             to_z_x_xyz_xxyz, \
+                             to_z_x_xyz_xxzz, \
+                             to_z_x_xyz_xyyy, \
+                             to_z_x_xyz_xyyz, \
+                             to_z_x_xyz_xyzz, \
+                             to_z_x_xyz_xzzz, \
+                             to_z_x_xyz_yyyy, \
+                             to_z_x_xyz_yyyz, \
+                             to_z_x_xyz_yyzz, \
+                             to_z_x_xyz_yzzz, \
+                             to_z_x_xyz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_z_x_xyz_xxxx[k] = 4.0 * to_xy_xxx[k] - 2.0 * to_xy_xxxxx[k] * tke_0 - 8.0 * to_xyzz_xxx[k] * tbe_0 + 4.0 * to_xyzz_xxxxx[k] * tbe_0 * tke_0;
+            to_z_x_xyz_xxxx[k] =
+                4.0 * to_xy_xxx[k] - 2.0 * to_xy_xxxxx[k] * tke_0 - 8.0 * to_xyzz_xxx[k] * tbe_0 + 4.0 * to_xyzz_xxxxx[k] * tbe_0 * tke_0;
 
-            to_z_x_xyz_xxxy[k] = 3.0 * to_xy_xxy[k] - 2.0 * to_xy_xxxxy[k] * tke_0 - 6.0 * to_xyzz_xxy[k] * tbe_0 + 4.0 * to_xyzz_xxxxy[k] * tbe_0 * tke_0;
+            to_z_x_xyz_xxxy[k] =
+                3.0 * to_xy_xxy[k] - 2.0 * to_xy_xxxxy[k] * tke_0 - 6.0 * to_xyzz_xxy[k] * tbe_0 + 4.0 * to_xyzz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_z_x_xyz_xxxz[k] = 3.0 * to_xy_xxz[k] - 2.0 * to_xy_xxxxz[k] * tke_0 - 6.0 * to_xyzz_xxz[k] * tbe_0 + 4.0 * to_xyzz_xxxxz[k] * tbe_0 * tke_0;
+            to_z_x_xyz_xxxz[k] =
+                3.0 * to_xy_xxz[k] - 2.0 * to_xy_xxxxz[k] * tke_0 - 6.0 * to_xyzz_xxz[k] * tbe_0 + 4.0 * to_xyzz_xxxxz[k] * tbe_0 * tke_0;
 
-            to_z_x_xyz_xxyy[k] = 2.0 * to_xy_xyy[k] - 2.0 * to_xy_xxxyy[k] * tke_0 - 4.0 * to_xyzz_xyy[k] * tbe_0 + 4.0 * to_xyzz_xxxyy[k] * tbe_0 * tke_0;
+            to_z_x_xyz_xxyy[k] =
+                2.0 * to_xy_xyy[k] - 2.0 * to_xy_xxxyy[k] * tke_0 - 4.0 * to_xyzz_xyy[k] * tbe_0 + 4.0 * to_xyzz_xxxyy[k] * tbe_0 * tke_0;
 
-            to_z_x_xyz_xxyz[k] = 2.0 * to_xy_xyz[k] - 2.0 * to_xy_xxxyz[k] * tke_0 - 4.0 * to_xyzz_xyz[k] * tbe_0 + 4.0 * to_xyzz_xxxyz[k] * tbe_0 * tke_0;
+            to_z_x_xyz_xxyz[k] =
+                2.0 * to_xy_xyz[k] - 2.0 * to_xy_xxxyz[k] * tke_0 - 4.0 * to_xyzz_xyz[k] * tbe_0 + 4.0 * to_xyzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_z_x_xyz_xxzz[k] = 2.0 * to_xy_xzz[k] - 2.0 * to_xy_xxxzz[k] * tke_0 - 4.0 * to_xyzz_xzz[k] * tbe_0 + 4.0 * to_xyzz_xxxzz[k] * tbe_0 * tke_0;
+            to_z_x_xyz_xxzz[k] =
+                2.0 * to_xy_xzz[k] - 2.0 * to_xy_xxxzz[k] * tke_0 - 4.0 * to_xyzz_xzz[k] * tbe_0 + 4.0 * to_xyzz_xxxzz[k] * tbe_0 * tke_0;
 
             to_z_x_xyz_xyyy[k] = to_xy_yyy[k] - 2.0 * to_xy_xxyyy[k] * tke_0 - 2.0 * to_xyzz_yyy[k] * tbe_0 + 4.0 * to_xyzz_xxyyy[k] * tbe_0 * tke_0;
 
@@ -5913,32 +9763,107 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_x_xzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 6 * op_comps * 150 + i * 150 + 89);
 
-        #pragma omp simd aligned(to_xz_xxx, to_xz_xxxxx, to_xz_xxxxy, to_xz_xxxxz, to_xz_xxxyy, to_xz_xxxyz, to_xz_xxxzz, to_xz_xxy, to_xz_xxyyy, to_xz_xxyyz, to_xz_xxyzz, to_xz_xxz, to_xz_xxzzz, to_xz_xyy, to_xz_xyyyy, to_xz_xyyyz, to_xz_xyyzz, to_xz_xyz, to_xz_xyzzz, to_xz_xzz, to_xz_xzzzz, to_xz_yyy, to_xz_yyz, to_xz_yzz, to_xz_zzz, to_xzzz_xxx, to_xzzz_xxxxx, to_xzzz_xxxxy, to_xzzz_xxxxz, to_xzzz_xxxyy, to_xzzz_xxxyz, to_xzzz_xxxzz, to_xzzz_xxy, to_xzzz_xxyyy, to_xzzz_xxyyz, to_xzzz_xxyzz, to_xzzz_xxz, to_xzzz_xxzzz, to_xzzz_xyy, to_xzzz_xyyyy, to_xzzz_xyyyz, to_xzzz_xyyzz, to_xzzz_xyz, to_xzzz_xyzzz, to_xzzz_xzz, to_xzzz_xzzzz, to_xzzz_yyy, to_xzzz_yyz, to_xzzz_yzz, to_xzzz_zzz, to_z_x_xzz_xxxx, to_z_x_xzz_xxxy, to_z_x_xzz_xxxz, to_z_x_xzz_xxyy, to_z_x_xzz_xxyz, to_z_x_xzz_xxzz, to_z_x_xzz_xyyy, to_z_x_xzz_xyyz, to_z_x_xzz_xyzz, to_z_x_xzz_xzzz, to_z_x_xzz_yyyy, to_z_x_xzz_yyyz, to_z_x_xzz_yyzz, to_z_x_xzz_yzzz, to_z_x_xzz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xz_xxx,           \
+                             to_xz_xxxxx,     \
+                             to_xz_xxxxy,     \
+                             to_xz_xxxxz,     \
+                             to_xz_xxxyy,     \
+                             to_xz_xxxyz,     \
+                             to_xz_xxxzz,     \
+                             to_xz_xxy,       \
+                             to_xz_xxyyy,     \
+                             to_xz_xxyyz,     \
+                             to_xz_xxyzz,     \
+                             to_xz_xxz,       \
+                             to_xz_xxzzz,     \
+                             to_xz_xyy,       \
+                             to_xz_xyyyy,     \
+                             to_xz_xyyyz,     \
+                             to_xz_xyyzz,     \
+                             to_xz_xyz,       \
+                             to_xz_xyzzz,     \
+                             to_xz_xzz,       \
+                             to_xz_xzzzz,     \
+                             to_xz_yyy,       \
+                             to_xz_yyz,       \
+                             to_xz_yzz,       \
+                             to_xz_zzz,       \
+                             to_xzzz_xxx,     \
+                             to_xzzz_xxxxx,   \
+                             to_xzzz_xxxxy,   \
+                             to_xzzz_xxxxz,   \
+                             to_xzzz_xxxyy,   \
+                             to_xzzz_xxxyz,   \
+                             to_xzzz_xxxzz,   \
+                             to_xzzz_xxy,     \
+                             to_xzzz_xxyyy,   \
+                             to_xzzz_xxyyz,   \
+                             to_xzzz_xxyzz,   \
+                             to_xzzz_xxz,     \
+                             to_xzzz_xxzzz,   \
+                             to_xzzz_xyy,     \
+                             to_xzzz_xyyyy,   \
+                             to_xzzz_xyyyz,   \
+                             to_xzzz_xyyzz,   \
+                             to_xzzz_xyz,     \
+                             to_xzzz_xyzzz,   \
+                             to_xzzz_xzz,     \
+                             to_xzzz_xzzzz,   \
+                             to_xzzz_yyy,     \
+                             to_xzzz_yyz,     \
+                             to_xzzz_yzz,     \
+                             to_xzzz_zzz,     \
+                             to_z_x_xzz_xxxx, \
+                             to_z_x_xzz_xxxy, \
+                             to_z_x_xzz_xxxz, \
+                             to_z_x_xzz_xxyy, \
+                             to_z_x_xzz_xxyz, \
+                             to_z_x_xzz_xxzz, \
+                             to_z_x_xzz_xyyy, \
+                             to_z_x_xzz_xyyz, \
+                             to_z_x_xzz_xyzz, \
+                             to_z_x_xzz_xzzz, \
+                             to_z_x_xzz_yyyy, \
+                             to_z_x_xzz_yyyz, \
+                             to_z_x_xzz_yyzz, \
+                             to_z_x_xzz_yzzz, \
+                             to_z_x_xzz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_z_x_xzz_xxxx[k] = 8.0 * to_xz_xxx[k] - 4.0 * to_xz_xxxxx[k] * tke_0 - 8.0 * to_xzzz_xxx[k] * tbe_0 + 4.0 * to_xzzz_xxxxx[k] * tbe_0 * tke_0;
+            to_z_x_xzz_xxxx[k] =
+                8.0 * to_xz_xxx[k] - 4.0 * to_xz_xxxxx[k] * tke_0 - 8.0 * to_xzzz_xxx[k] * tbe_0 + 4.0 * to_xzzz_xxxxx[k] * tbe_0 * tke_0;
 
-            to_z_x_xzz_xxxy[k] = 6.0 * to_xz_xxy[k] - 4.0 * to_xz_xxxxy[k] * tke_0 - 6.0 * to_xzzz_xxy[k] * tbe_0 + 4.0 * to_xzzz_xxxxy[k] * tbe_0 * tke_0;
+            to_z_x_xzz_xxxy[k] =
+                6.0 * to_xz_xxy[k] - 4.0 * to_xz_xxxxy[k] * tke_0 - 6.0 * to_xzzz_xxy[k] * tbe_0 + 4.0 * to_xzzz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_z_x_xzz_xxxz[k] = 6.0 * to_xz_xxz[k] - 4.0 * to_xz_xxxxz[k] * tke_0 - 6.0 * to_xzzz_xxz[k] * tbe_0 + 4.0 * to_xzzz_xxxxz[k] * tbe_0 * tke_0;
+            to_z_x_xzz_xxxz[k] =
+                6.0 * to_xz_xxz[k] - 4.0 * to_xz_xxxxz[k] * tke_0 - 6.0 * to_xzzz_xxz[k] * tbe_0 + 4.0 * to_xzzz_xxxxz[k] * tbe_0 * tke_0;
 
-            to_z_x_xzz_xxyy[k] = 4.0 * to_xz_xyy[k] - 4.0 * to_xz_xxxyy[k] * tke_0 - 4.0 * to_xzzz_xyy[k] * tbe_0 + 4.0 * to_xzzz_xxxyy[k] * tbe_0 * tke_0;
+            to_z_x_xzz_xxyy[k] =
+                4.0 * to_xz_xyy[k] - 4.0 * to_xz_xxxyy[k] * tke_0 - 4.0 * to_xzzz_xyy[k] * tbe_0 + 4.0 * to_xzzz_xxxyy[k] * tbe_0 * tke_0;
 
-            to_z_x_xzz_xxyz[k] = 4.0 * to_xz_xyz[k] - 4.0 * to_xz_xxxyz[k] * tke_0 - 4.0 * to_xzzz_xyz[k] * tbe_0 + 4.0 * to_xzzz_xxxyz[k] * tbe_0 * tke_0;
+            to_z_x_xzz_xxyz[k] =
+                4.0 * to_xz_xyz[k] - 4.0 * to_xz_xxxyz[k] * tke_0 - 4.0 * to_xzzz_xyz[k] * tbe_0 + 4.0 * to_xzzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_z_x_xzz_xxzz[k] = 4.0 * to_xz_xzz[k] - 4.0 * to_xz_xxxzz[k] * tke_0 - 4.0 * to_xzzz_xzz[k] * tbe_0 + 4.0 * to_xzzz_xxxzz[k] * tbe_0 * tke_0;
+            to_z_x_xzz_xxzz[k] =
+                4.0 * to_xz_xzz[k] - 4.0 * to_xz_xxxzz[k] * tke_0 - 4.0 * to_xzzz_xzz[k] * tbe_0 + 4.0 * to_xzzz_xxxzz[k] * tbe_0 * tke_0;
 
-            to_z_x_xzz_xyyy[k] = 2.0 * to_xz_yyy[k] - 4.0 * to_xz_xxyyy[k] * tke_0 - 2.0 * to_xzzz_yyy[k] * tbe_0 + 4.0 * to_xzzz_xxyyy[k] * tbe_0 * tke_0;
+            to_z_x_xzz_xyyy[k] =
+                2.0 * to_xz_yyy[k] - 4.0 * to_xz_xxyyy[k] * tke_0 - 2.0 * to_xzzz_yyy[k] * tbe_0 + 4.0 * to_xzzz_xxyyy[k] * tbe_0 * tke_0;
 
-            to_z_x_xzz_xyyz[k] = 2.0 * to_xz_yyz[k] - 4.0 * to_xz_xxyyz[k] * tke_0 - 2.0 * to_xzzz_yyz[k] * tbe_0 + 4.0 * to_xzzz_xxyyz[k] * tbe_0 * tke_0;
+            to_z_x_xzz_xyyz[k] =
+                2.0 * to_xz_yyz[k] - 4.0 * to_xz_xxyyz[k] * tke_0 - 2.0 * to_xzzz_yyz[k] * tbe_0 + 4.0 * to_xzzz_xxyyz[k] * tbe_0 * tke_0;
 
-            to_z_x_xzz_xyzz[k] = 2.0 * to_xz_yzz[k] - 4.0 * to_xz_xxyzz[k] * tke_0 - 2.0 * to_xzzz_yzz[k] * tbe_0 + 4.0 * to_xzzz_xxyzz[k] * tbe_0 * tke_0;
+            to_z_x_xzz_xyzz[k] =
+                2.0 * to_xz_yzz[k] - 4.0 * to_xz_xxyzz[k] * tke_0 - 2.0 * to_xzzz_yzz[k] * tbe_0 + 4.0 * to_xzzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_z_x_xzz_xzzz[k] = 2.0 * to_xz_zzz[k] - 4.0 * to_xz_xxzzz[k] * tke_0 - 2.0 * to_xzzz_zzz[k] * tbe_0 + 4.0 * to_xzzz_xxzzz[k] * tbe_0 * tke_0;
+            to_z_x_xzz_xzzz[k] =
+                2.0 * to_xz_zzz[k] - 4.0 * to_xz_xxzzz[k] * tke_0 - 2.0 * to_xzzz_zzz[k] * tbe_0 + 4.0 * to_xzzz_xxzzz[k] * tbe_0 * tke_0;
 
             to_z_x_xzz_yyyy[k] = -4.0 * to_xz_xyyyy[k] * tke_0 + 4.0 * to_xzzz_xyyyy[k] * tbe_0 * tke_0;
 
@@ -5983,7 +9908,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_x_yyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 6 * op_comps * 150 + i * 150 + 104);
 
-        #pragma omp simd aligned(to_yyyz_xxx, to_yyyz_xxxxx, to_yyyz_xxxxy, to_yyyz_xxxxz, to_yyyz_xxxyy, to_yyyz_xxxyz, to_yyyz_xxxzz, to_yyyz_xxy, to_yyyz_xxyyy, to_yyyz_xxyyz, to_yyyz_xxyzz, to_yyyz_xxz, to_yyyz_xxzzz, to_yyyz_xyy, to_yyyz_xyyyy, to_yyyz_xyyyz, to_yyyz_xyyzz, to_yyyz_xyz, to_yyyz_xyzzz, to_yyyz_xzz, to_yyyz_xzzzz, to_yyyz_yyy, to_yyyz_yyz, to_yyyz_yzz, to_yyyz_zzz, to_z_x_yyy_xxxx, to_z_x_yyy_xxxy, to_z_x_yyy_xxxz, to_z_x_yyy_xxyy, to_z_x_yyy_xxyz, to_z_x_yyy_xxzz, to_z_x_yyy_xyyy, to_z_x_yyy_xyyz, to_z_x_yyy_xyzz, to_z_x_yyy_xzzz, to_z_x_yyy_yyyy, to_z_x_yyy_yyyz, to_z_x_yyy_yyzz, to_z_x_yyy_yzzz, to_z_x_yyy_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_yyyz_xxx,         \
+                             to_yyyz_xxxxx,   \
+                             to_yyyz_xxxxy,   \
+                             to_yyyz_xxxxz,   \
+                             to_yyyz_xxxyy,   \
+                             to_yyyz_xxxyz,   \
+                             to_yyyz_xxxzz,   \
+                             to_yyyz_xxy,     \
+                             to_yyyz_xxyyy,   \
+                             to_yyyz_xxyyz,   \
+                             to_yyyz_xxyzz,   \
+                             to_yyyz_xxz,     \
+                             to_yyyz_xxzzz,   \
+                             to_yyyz_xyy,     \
+                             to_yyyz_xyyyy,   \
+                             to_yyyz_xyyyz,   \
+                             to_yyyz_xyyzz,   \
+                             to_yyyz_xyz,     \
+                             to_yyyz_xyzzz,   \
+                             to_yyyz_xzz,     \
+                             to_yyyz_xzzzz,   \
+                             to_yyyz_yyy,     \
+                             to_yyyz_yyz,     \
+                             to_yyyz_yzz,     \
+                             to_yyyz_zzz,     \
+                             to_z_x_yyy_xxxx, \
+                             to_z_x_yyy_xxxy, \
+                             to_z_x_yyy_xxxz, \
+                             to_z_x_yyy_xxyy, \
+                             to_z_x_yyy_xxyz, \
+                             to_z_x_yyy_xxzz, \
+                             to_z_x_yyy_xyyy, \
+                             to_z_x_yyy_xyyz, \
+                             to_z_x_yyy_xyzz, \
+                             to_z_x_yyy_xzzz, \
+                             to_z_x_yyy_yyyy, \
+                             to_z_x_yyy_yyyz, \
+                             to_z_x_yyy_yyzz, \
+                             to_z_x_yyy_yzzz, \
+                             to_z_x_yyy_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -6053,24 +10018,95 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_x_yyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 6 * op_comps * 150 + i * 150 + 119);
 
-        #pragma omp simd aligned(to_yy_xxx, to_yy_xxxxx, to_yy_xxxxy, to_yy_xxxxz, to_yy_xxxyy, to_yy_xxxyz, to_yy_xxxzz, to_yy_xxy, to_yy_xxyyy, to_yy_xxyyz, to_yy_xxyzz, to_yy_xxz, to_yy_xxzzz, to_yy_xyy, to_yy_xyyyy, to_yy_xyyyz, to_yy_xyyzz, to_yy_xyz, to_yy_xyzzz, to_yy_xzz, to_yy_xzzzz, to_yy_yyy, to_yy_yyz, to_yy_yzz, to_yy_zzz, to_yyzz_xxx, to_yyzz_xxxxx, to_yyzz_xxxxy, to_yyzz_xxxxz, to_yyzz_xxxyy, to_yyzz_xxxyz, to_yyzz_xxxzz, to_yyzz_xxy, to_yyzz_xxyyy, to_yyzz_xxyyz, to_yyzz_xxyzz, to_yyzz_xxz, to_yyzz_xxzzz, to_yyzz_xyy, to_yyzz_xyyyy, to_yyzz_xyyyz, to_yyzz_xyyzz, to_yyzz_xyz, to_yyzz_xyzzz, to_yyzz_xzz, to_yyzz_xzzzz, to_yyzz_yyy, to_yyzz_yyz, to_yyzz_yzz, to_yyzz_zzz, to_z_x_yyz_xxxx, to_z_x_yyz_xxxy, to_z_x_yyz_xxxz, to_z_x_yyz_xxyy, to_z_x_yyz_xxyz, to_z_x_yyz_xxzz, to_z_x_yyz_xyyy, to_z_x_yyz_xyyz, to_z_x_yyz_xyzz, to_z_x_yyz_xzzz, to_z_x_yyz_yyyy, to_z_x_yyz_yyyz, to_z_x_yyz_yyzz, to_z_x_yyz_yzzz, to_z_x_yyz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_yy_xxx,           \
+                             to_yy_xxxxx,     \
+                             to_yy_xxxxy,     \
+                             to_yy_xxxxz,     \
+                             to_yy_xxxyy,     \
+                             to_yy_xxxyz,     \
+                             to_yy_xxxzz,     \
+                             to_yy_xxy,       \
+                             to_yy_xxyyy,     \
+                             to_yy_xxyyz,     \
+                             to_yy_xxyzz,     \
+                             to_yy_xxz,       \
+                             to_yy_xxzzz,     \
+                             to_yy_xyy,       \
+                             to_yy_xyyyy,     \
+                             to_yy_xyyyz,     \
+                             to_yy_xyyzz,     \
+                             to_yy_xyz,       \
+                             to_yy_xyzzz,     \
+                             to_yy_xzz,       \
+                             to_yy_xzzzz,     \
+                             to_yy_yyy,       \
+                             to_yy_yyz,       \
+                             to_yy_yzz,       \
+                             to_yy_zzz,       \
+                             to_yyzz_xxx,     \
+                             to_yyzz_xxxxx,   \
+                             to_yyzz_xxxxy,   \
+                             to_yyzz_xxxxz,   \
+                             to_yyzz_xxxyy,   \
+                             to_yyzz_xxxyz,   \
+                             to_yyzz_xxxzz,   \
+                             to_yyzz_xxy,     \
+                             to_yyzz_xxyyy,   \
+                             to_yyzz_xxyyz,   \
+                             to_yyzz_xxyzz,   \
+                             to_yyzz_xxz,     \
+                             to_yyzz_xxzzz,   \
+                             to_yyzz_xyy,     \
+                             to_yyzz_xyyyy,   \
+                             to_yyzz_xyyyz,   \
+                             to_yyzz_xyyzz,   \
+                             to_yyzz_xyz,     \
+                             to_yyzz_xyzzz,   \
+                             to_yyzz_xzz,     \
+                             to_yyzz_xzzzz,   \
+                             to_yyzz_yyy,     \
+                             to_yyzz_yyz,     \
+                             to_yyzz_yzz,     \
+                             to_yyzz_zzz,     \
+                             to_z_x_yyz_xxxx, \
+                             to_z_x_yyz_xxxy, \
+                             to_z_x_yyz_xxxz, \
+                             to_z_x_yyz_xxyy, \
+                             to_z_x_yyz_xxyz, \
+                             to_z_x_yyz_xxzz, \
+                             to_z_x_yyz_xyyy, \
+                             to_z_x_yyz_xyyz, \
+                             to_z_x_yyz_xyzz, \
+                             to_z_x_yyz_xzzz, \
+                             to_z_x_yyz_yyyy, \
+                             to_z_x_yyz_yyyz, \
+                             to_z_x_yyz_yyzz, \
+                             to_z_x_yyz_yzzz, \
+                             to_z_x_yyz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_z_x_yyz_xxxx[k] = 4.0 * to_yy_xxx[k] - 2.0 * to_yy_xxxxx[k] * tke_0 - 8.0 * to_yyzz_xxx[k] * tbe_0 + 4.0 * to_yyzz_xxxxx[k] * tbe_0 * tke_0;
+            to_z_x_yyz_xxxx[k] =
+                4.0 * to_yy_xxx[k] - 2.0 * to_yy_xxxxx[k] * tke_0 - 8.0 * to_yyzz_xxx[k] * tbe_0 + 4.0 * to_yyzz_xxxxx[k] * tbe_0 * tke_0;
 
-            to_z_x_yyz_xxxy[k] = 3.0 * to_yy_xxy[k] - 2.0 * to_yy_xxxxy[k] * tke_0 - 6.0 * to_yyzz_xxy[k] * tbe_0 + 4.0 * to_yyzz_xxxxy[k] * tbe_0 * tke_0;
+            to_z_x_yyz_xxxy[k] =
+                3.0 * to_yy_xxy[k] - 2.0 * to_yy_xxxxy[k] * tke_0 - 6.0 * to_yyzz_xxy[k] * tbe_0 + 4.0 * to_yyzz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_z_x_yyz_xxxz[k] = 3.0 * to_yy_xxz[k] - 2.0 * to_yy_xxxxz[k] * tke_0 - 6.0 * to_yyzz_xxz[k] * tbe_0 + 4.0 * to_yyzz_xxxxz[k] * tbe_0 * tke_0;
+            to_z_x_yyz_xxxz[k] =
+                3.0 * to_yy_xxz[k] - 2.0 * to_yy_xxxxz[k] * tke_0 - 6.0 * to_yyzz_xxz[k] * tbe_0 + 4.0 * to_yyzz_xxxxz[k] * tbe_0 * tke_0;
 
-            to_z_x_yyz_xxyy[k] = 2.0 * to_yy_xyy[k] - 2.0 * to_yy_xxxyy[k] * tke_0 - 4.0 * to_yyzz_xyy[k] * tbe_0 + 4.0 * to_yyzz_xxxyy[k] * tbe_0 * tke_0;
+            to_z_x_yyz_xxyy[k] =
+                2.0 * to_yy_xyy[k] - 2.0 * to_yy_xxxyy[k] * tke_0 - 4.0 * to_yyzz_xyy[k] * tbe_0 + 4.0 * to_yyzz_xxxyy[k] * tbe_0 * tke_0;
 
-            to_z_x_yyz_xxyz[k] = 2.0 * to_yy_xyz[k] - 2.0 * to_yy_xxxyz[k] * tke_0 - 4.0 * to_yyzz_xyz[k] * tbe_0 + 4.0 * to_yyzz_xxxyz[k] * tbe_0 * tke_0;
+            to_z_x_yyz_xxyz[k] =
+                2.0 * to_yy_xyz[k] - 2.0 * to_yy_xxxyz[k] * tke_0 - 4.0 * to_yyzz_xyz[k] * tbe_0 + 4.0 * to_yyzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_z_x_yyz_xxzz[k] = 2.0 * to_yy_xzz[k] - 2.0 * to_yy_xxxzz[k] * tke_0 - 4.0 * to_yyzz_xzz[k] * tbe_0 + 4.0 * to_yyzz_xxxzz[k] * tbe_0 * tke_0;
+            to_z_x_yyz_xxzz[k] =
+                2.0 * to_yy_xzz[k] - 2.0 * to_yy_xxxzz[k] * tke_0 - 4.0 * to_yyzz_xzz[k] * tbe_0 + 4.0 * to_yyzz_xxxzz[k] * tbe_0 * tke_0;
 
             to_z_x_yyz_xyyy[k] = to_yy_yyy[k] - 2.0 * to_yy_xxyyy[k] * tke_0 - 2.0 * to_yyzz_yyy[k] * tbe_0 + 4.0 * to_yyzz_xxyyy[k] * tbe_0 * tke_0;
 
@@ -6123,32 +10159,107 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_x_yzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 6 * op_comps * 150 + i * 150 + 134);
 
-        #pragma omp simd aligned(to_yz_xxx, to_yz_xxxxx, to_yz_xxxxy, to_yz_xxxxz, to_yz_xxxyy, to_yz_xxxyz, to_yz_xxxzz, to_yz_xxy, to_yz_xxyyy, to_yz_xxyyz, to_yz_xxyzz, to_yz_xxz, to_yz_xxzzz, to_yz_xyy, to_yz_xyyyy, to_yz_xyyyz, to_yz_xyyzz, to_yz_xyz, to_yz_xyzzz, to_yz_xzz, to_yz_xzzzz, to_yz_yyy, to_yz_yyz, to_yz_yzz, to_yz_zzz, to_yzzz_xxx, to_yzzz_xxxxx, to_yzzz_xxxxy, to_yzzz_xxxxz, to_yzzz_xxxyy, to_yzzz_xxxyz, to_yzzz_xxxzz, to_yzzz_xxy, to_yzzz_xxyyy, to_yzzz_xxyyz, to_yzzz_xxyzz, to_yzzz_xxz, to_yzzz_xxzzz, to_yzzz_xyy, to_yzzz_xyyyy, to_yzzz_xyyyz, to_yzzz_xyyzz, to_yzzz_xyz, to_yzzz_xyzzz, to_yzzz_xzz, to_yzzz_xzzzz, to_yzzz_yyy, to_yzzz_yyz, to_yzzz_yzz, to_yzzz_zzz, to_z_x_yzz_xxxx, to_z_x_yzz_xxxy, to_z_x_yzz_xxxz, to_z_x_yzz_xxyy, to_z_x_yzz_xxyz, to_z_x_yzz_xxzz, to_z_x_yzz_xyyy, to_z_x_yzz_xyyz, to_z_x_yzz_xyzz, to_z_x_yzz_xzzz, to_z_x_yzz_yyyy, to_z_x_yzz_yyyz, to_z_x_yzz_yyzz, to_z_x_yzz_yzzz, to_z_x_yzz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_yz_xxx,           \
+                             to_yz_xxxxx,     \
+                             to_yz_xxxxy,     \
+                             to_yz_xxxxz,     \
+                             to_yz_xxxyy,     \
+                             to_yz_xxxyz,     \
+                             to_yz_xxxzz,     \
+                             to_yz_xxy,       \
+                             to_yz_xxyyy,     \
+                             to_yz_xxyyz,     \
+                             to_yz_xxyzz,     \
+                             to_yz_xxz,       \
+                             to_yz_xxzzz,     \
+                             to_yz_xyy,       \
+                             to_yz_xyyyy,     \
+                             to_yz_xyyyz,     \
+                             to_yz_xyyzz,     \
+                             to_yz_xyz,       \
+                             to_yz_xyzzz,     \
+                             to_yz_xzz,       \
+                             to_yz_xzzzz,     \
+                             to_yz_yyy,       \
+                             to_yz_yyz,       \
+                             to_yz_yzz,       \
+                             to_yz_zzz,       \
+                             to_yzzz_xxx,     \
+                             to_yzzz_xxxxx,   \
+                             to_yzzz_xxxxy,   \
+                             to_yzzz_xxxxz,   \
+                             to_yzzz_xxxyy,   \
+                             to_yzzz_xxxyz,   \
+                             to_yzzz_xxxzz,   \
+                             to_yzzz_xxy,     \
+                             to_yzzz_xxyyy,   \
+                             to_yzzz_xxyyz,   \
+                             to_yzzz_xxyzz,   \
+                             to_yzzz_xxz,     \
+                             to_yzzz_xxzzz,   \
+                             to_yzzz_xyy,     \
+                             to_yzzz_xyyyy,   \
+                             to_yzzz_xyyyz,   \
+                             to_yzzz_xyyzz,   \
+                             to_yzzz_xyz,     \
+                             to_yzzz_xyzzz,   \
+                             to_yzzz_xzz,     \
+                             to_yzzz_xzzzz,   \
+                             to_yzzz_yyy,     \
+                             to_yzzz_yyz,     \
+                             to_yzzz_yzz,     \
+                             to_yzzz_zzz,     \
+                             to_z_x_yzz_xxxx, \
+                             to_z_x_yzz_xxxy, \
+                             to_z_x_yzz_xxxz, \
+                             to_z_x_yzz_xxyy, \
+                             to_z_x_yzz_xxyz, \
+                             to_z_x_yzz_xxzz, \
+                             to_z_x_yzz_xyyy, \
+                             to_z_x_yzz_xyyz, \
+                             to_z_x_yzz_xyzz, \
+                             to_z_x_yzz_xzzz, \
+                             to_z_x_yzz_yyyy, \
+                             to_z_x_yzz_yyyz, \
+                             to_z_x_yzz_yyzz, \
+                             to_z_x_yzz_yzzz, \
+                             to_z_x_yzz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_z_x_yzz_xxxx[k] = 8.0 * to_yz_xxx[k] - 4.0 * to_yz_xxxxx[k] * tke_0 - 8.0 * to_yzzz_xxx[k] * tbe_0 + 4.0 * to_yzzz_xxxxx[k] * tbe_0 * tke_0;
+            to_z_x_yzz_xxxx[k] =
+                8.0 * to_yz_xxx[k] - 4.0 * to_yz_xxxxx[k] * tke_0 - 8.0 * to_yzzz_xxx[k] * tbe_0 + 4.0 * to_yzzz_xxxxx[k] * tbe_0 * tke_0;
 
-            to_z_x_yzz_xxxy[k] = 6.0 * to_yz_xxy[k] - 4.0 * to_yz_xxxxy[k] * tke_0 - 6.0 * to_yzzz_xxy[k] * tbe_0 + 4.0 * to_yzzz_xxxxy[k] * tbe_0 * tke_0;
+            to_z_x_yzz_xxxy[k] =
+                6.0 * to_yz_xxy[k] - 4.0 * to_yz_xxxxy[k] * tke_0 - 6.0 * to_yzzz_xxy[k] * tbe_0 + 4.0 * to_yzzz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_z_x_yzz_xxxz[k] = 6.0 * to_yz_xxz[k] - 4.0 * to_yz_xxxxz[k] * tke_0 - 6.0 * to_yzzz_xxz[k] * tbe_0 + 4.0 * to_yzzz_xxxxz[k] * tbe_0 * tke_0;
+            to_z_x_yzz_xxxz[k] =
+                6.0 * to_yz_xxz[k] - 4.0 * to_yz_xxxxz[k] * tke_0 - 6.0 * to_yzzz_xxz[k] * tbe_0 + 4.0 * to_yzzz_xxxxz[k] * tbe_0 * tke_0;
 
-            to_z_x_yzz_xxyy[k] = 4.0 * to_yz_xyy[k] - 4.0 * to_yz_xxxyy[k] * tke_0 - 4.0 * to_yzzz_xyy[k] * tbe_0 + 4.0 * to_yzzz_xxxyy[k] * tbe_0 * tke_0;
+            to_z_x_yzz_xxyy[k] =
+                4.0 * to_yz_xyy[k] - 4.0 * to_yz_xxxyy[k] * tke_0 - 4.0 * to_yzzz_xyy[k] * tbe_0 + 4.0 * to_yzzz_xxxyy[k] * tbe_0 * tke_0;
 
-            to_z_x_yzz_xxyz[k] = 4.0 * to_yz_xyz[k] - 4.0 * to_yz_xxxyz[k] * tke_0 - 4.0 * to_yzzz_xyz[k] * tbe_0 + 4.0 * to_yzzz_xxxyz[k] * tbe_0 * tke_0;
+            to_z_x_yzz_xxyz[k] =
+                4.0 * to_yz_xyz[k] - 4.0 * to_yz_xxxyz[k] * tke_0 - 4.0 * to_yzzz_xyz[k] * tbe_0 + 4.0 * to_yzzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_z_x_yzz_xxzz[k] = 4.0 * to_yz_xzz[k] - 4.0 * to_yz_xxxzz[k] * tke_0 - 4.0 * to_yzzz_xzz[k] * tbe_0 + 4.0 * to_yzzz_xxxzz[k] * tbe_0 * tke_0;
+            to_z_x_yzz_xxzz[k] =
+                4.0 * to_yz_xzz[k] - 4.0 * to_yz_xxxzz[k] * tke_0 - 4.0 * to_yzzz_xzz[k] * tbe_0 + 4.0 * to_yzzz_xxxzz[k] * tbe_0 * tke_0;
 
-            to_z_x_yzz_xyyy[k] = 2.0 * to_yz_yyy[k] - 4.0 * to_yz_xxyyy[k] * tke_0 - 2.0 * to_yzzz_yyy[k] * tbe_0 + 4.0 * to_yzzz_xxyyy[k] * tbe_0 * tke_0;
+            to_z_x_yzz_xyyy[k] =
+                2.0 * to_yz_yyy[k] - 4.0 * to_yz_xxyyy[k] * tke_0 - 2.0 * to_yzzz_yyy[k] * tbe_0 + 4.0 * to_yzzz_xxyyy[k] * tbe_0 * tke_0;
 
-            to_z_x_yzz_xyyz[k] = 2.0 * to_yz_yyz[k] - 4.0 * to_yz_xxyyz[k] * tke_0 - 2.0 * to_yzzz_yyz[k] * tbe_0 + 4.0 * to_yzzz_xxyyz[k] * tbe_0 * tke_0;
+            to_z_x_yzz_xyyz[k] =
+                2.0 * to_yz_yyz[k] - 4.0 * to_yz_xxyyz[k] * tke_0 - 2.0 * to_yzzz_yyz[k] * tbe_0 + 4.0 * to_yzzz_xxyyz[k] * tbe_0 * tke_0;
 
-            to_z_x_yzz_xyzz[k] = 2.0 * to_yz_yzz[k] - 4.0 * to_yz_xxyzz[k] * tke_0 - 2.0 * to_yzzz_yzz[k] * tbe_0 + 4.0 * to_yzzz_xxyzz[k] * tbe_0 * tke_0;
+            to_z_x_yzz_xyzz[k] =
+                2.0 * to_yz_yzz[k] - 4.0 * to_yz_xxyzz[k] * tke_0 - 2.0 * to_yzzz_yzz[k] * tbe_0 + 4.0 * to_yzzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_z_x_yzz_xzzz[k] = 2.0 * to_yz_zzz[k] - 4.0 * to_yz_xxzzz[k] * tke_0 - 2.0 * to_yzzz_zzz[k] * tbe_0 + 4.0 * to_yzzz_xxzzz[k] * tbe_0 * tke_0;
+            to_z_x_yzz_xzzz[k] =
+                2.0 * to_yz_zzz[k] - 4.0 * to_yz_xxzzz[k] * tke_0 - 2.0 * to_yzzz_zzz[k] * tbe_0 + 4.0 * to_yzzz_xxzzz[k] * tbe_0 * tke_0;
 
             to_z_x_yzz_yyyy[k] = -4.0 * to_yz_xyyyy[k] * tke_0 + 4.0 * to_yzzz_xyyyy[k] * tbe_0 * tke_0;
 
@@ -6193,32 +10304,107 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_x_zzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 6 * op_comps * 150 + i * 150 + 149);
 
-        #pragma omp simd aligned(to_z_x_zzz_xxxx, to_z_x_zzz_xxxy, to_z_x_zzz_xxxz, to_z_x_zzz_xxyy, to_z_x_zzz_xxyz, to_z_x_zzz_xxzz, to_z_x_zzz_xyyy, to_z_x_zzz_xyyz, to_z_x_zzz_xyzz, to_z_x_zzz_xzzz, to_z_x_zzz_yyyy, to_z_x_zzz_yyyz, to_z_x_zzz_yyzz, to_z_x_zzz_yzzz, to_z_x_zzz_zzzz, to_zz_xxx, to_zz_xxxxx, to_zz_xxxxy, to_zz_xxxxz, to_zz_xxxyy, to_zz_xxxyz, to_zz_xxxzz, to_zz_xxy, to_zz_xxyyy, to_zz_xxyyz, to_zz_xxyzz, to_zz_xxz, to_zz_xxzzz, to_zz_xyy, to_zz_xyyyy, to_zz_xyyyz, to_zz_xyyzz, to_zz_xyz, to_zz_xyzzz, to_zz_xzz, to_zz_xzzzz, to_zz_yyy, to_zz_yyz, to_zz_yzz, to_zz_zzz, to_zzzz_xxx, to_zzzz_xxxxx, to_zzzz_xxxxy, to_zzzz_xxxxz, to_zzzz_xxxyy, to_zzzz_xxxyz, to_zzzz_xxxzz, to_zzzz_xxy, to_zzzz_xxyyy, to_zzzz_xxyyz, to_zzzz_xxyzz, to_zzzz_xxz, to_zzzz_xxzzz, to_zzzz_xyy, to_zzzz_xyyyy, to_zzzz_xyyyz, to_zzzz_xyyzz, to_zzzz_xyz, to_zzzz_xyzzz, to_zzzz_xzz, to_zzzz_xzzzz, to_zzzz_yyy, to_zzzz_yyz, to_zzzz_yzz, to_zzzz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_z_x_zzz_xxxx,     \
+                             to_z_x_zzz_xxxy, \
+                             to_z_x_zzz_xxxz, \
+                             to_z_x_zzz_xxyy, \
+                             to_z_x_zzz_xxyz, \
+                             to_z_x_zzz_xxzz, \
+                             to_z_x_zzz_xyyy, \
+                             to_z_x_zzz_xyyz, \
+                             to_z_x_zzz_xyzz, \
+                             to_z_x_zzz_xzzz, \
+                             to_z_x_zzz_yyyy, \
+                             to_z_x_zzz_yyyz, \
+                             to_z_x_zzz_yyzz, \
+                             to_z_x_zzz_yzzz, \
+                             to_z_x_zzz_zzzz, \
+                             to_zz_xxx,       \
+                             to_zz_xxxxx,     \
+                             to_zz_xxxxy,     \
+                             to_zz_xxxxz,     \
+                             to_zz_xxxyy,     \
+                             to_zz_xxxyz,     \
+                             to_zz_xxxzz,     \
+                             to_zz_xxy,       \
+                             to_zz_xxyyy,     \
+                             to_zz_xxyyz,     \
+                             to_zz_xxyzz,     \
+                             to_zz_xxz,       \
+                             to_zz_xxzzz,     \
+                             to_zz_xyy,       \
+                             to_zz_xyyyy,     \
+                             to_zz_xyyyz,     \
+                             to_zz_xyyzz,     \
+                             to_zz_xyz,       \
+                             to_zz_xyzzz,     \
+                             to_zz_xzz,       \
+                             to_zz_xzzzz,     \
+                             to_zz_yyy,       \
+                             to_zz_yyz,       \
+                             to_zz_yzz,       \
+                             to_zz_zzz,       \
+                             to_zzzz_xxx,     \
+                             to_zzzz_xxxxx,   \
+                             to_zzzz_xxxxy,   \
+                             to_zzzz_xxxxz,   \
+                             to_zzzz_xxxyy,   \
+                             to_zzzz_xxxyz,   \
+                             to_zzzz_xxxzz,   \
+                             to_zzzz_xxy,     \
+                             to_zzzz_xxyyy,   \
+                             to_zzzz_xxyyz,   \
+                             to_zzzz_xxyzz,   \
+                             to_zzzz_xxz,     \
+                             to_zzzz_xxzzz,   \
+                             to_zzzz_xyy,     \
+                             to_zzzz_xyyyy,   \
+                             to_zzzz_xyyyz,   \
+                             to_zzzz_xyyzz,   \
+                             to_zzzz_xyz,     \
+                             to_zzzz_xyzzz,   \
+                             to_zzzz_xzz,     \
+                             to_zzzz_xzzzz,   \
+                             to_zzzz_yyy,     \
+                             to_zzzz_yyz,     \
+                             to_zzzz_yzz,     \
+                             to_zzzz_zzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
 
             const double tke_0 = b_exps[k];
 
-            to_z_x_zzz_xxxx[k] = 12.0 * to_zz_xxx[k] - 6.0 * to_zz_xxxxx[k] * tke_0 - 8.0 * to_zzzz_xxx[k] * tbe_0 + 4.0 * to_zzzz_xxxxx[k] * tbe_0 * tke_0;
+            to_z_x_zzz_xxxx[k] =
+                12.0 * to_zz_xxx[k] - 6.0 * to_zz_xxxxx[k] * tke_0 - 8.0 * to_zzzz_xxx[k] * tbe_0 + 4.0 * to_zzzz_xxxxx[k] * tbe_0 * tke_0;
 
-            to_z_x_zzz_xxxy[k] = 9.0 * to_zz_xxy[k] - 6.0 * to_zz_xxxxy[k] * tke_0 - 6.0 * to_zzzz_xxy[k] * tbe_0 + 4.0 * to_zzzz_xxxxy[k] * tbe_0 * tke_0;
+            to_z_x_zzz_xxxy[k] =
+                9.0 * to_zz_xxy[k] - 6.0 * to_zz_xxxxy[k] * tke_0 - 6.0 * to_zzzz_xxy[k] * tbe_0 + 4.0 * to_zzzz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_z_x_zzz_xxxz[k] = 9.0 * to_zz_xxz[k] - 6.0 * to_zz_xxxxz[k] * tke_0 - 6.0 * to_zzzz_xxz[k] * tbe_0 + 4.0 * to_zzzz_xxxxz[k] * tbe_0 * tke_0;
+            to_z_x_zzz_xxxz[k] =
+                9.0 * to_zz_xxz[k] - 6.0 * to_zz_xxxxz[k] * tke_0 - 6.0 * to_zzzz_xxz[k] * tbe_0 + 4.0 * to_zzzz_xxxxz[k] * tbe_0 * tke_0;
 
-            to_z_x_zzz_xxyy[k] = 6.0 * to_zz_xyy[k] - 6.0 * to_zz_xxxyy[k] * tke_0 - 4.0 * to_zzzz_xyy[k] * tbe_0 + 4.0 * to_zzzz_xxxyy[k] * tbe_0 * tke_0;
+            to_z_x_zzz_xxyy[k] =
+                6.0 * to_zz_xyy[k] - 6.0 * to_zz_xxxyy[k] * tke_0 - 4.0 * to_zzzz_xyy[k] * tbe_0 + 4.0 * to_zzzz_xxxyy[k] * tbe_0 * tke_0;
 
-            to_z_x_zzz_xxyz[k] = 6.0 * to_zz_xyz[k] - 6.0 * to_zz_xxxyz[k] * tke_0 - 4.0 * to_zzzz_xyz[k] * tbe_0 + 4.0 * to_zzzz_xxxyz[k] * tbe_0 * tke_0;
+            to_z_x_zzz_xxyz[k] =
+                6.0 * to_zz_xyz[k] - 6.0 * to_zz_xxxyz[k] * tke_0 - 4.0 * to_zzzz_xyz[k] * tbe_0 + 4.0 * to_zzzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_z_x_zzz_xxzz[k] = 6.0 * to_zz_xzz[k] - 6.0 * to_zz_xxxzz[k] * tke_0 - 4.0 * to_zzzz_xzz[k] * tbe_0 + 4.0 * to_zzzz_xxxzz[k] * tbe_0 * tke_0;
+            to_z_x_zzz_xxzz[k] =
+                6.0 * to_zz_xzz[k] - 6.0 * to_zz_xxxzz[k] * tke_0 - 4.0 * to_zzzz_xzz[k] * tbe_0 + 4.0 * to_zzzz_xxxzz[k] * tbe_0 * tke_0;
 
-            to_z_x_zzz_xyyy[k] = 3.0 * to_zz_yyy[k] - 6.0 * to_zz_xxyyy[k] * tke_0 - 2.0 * to_zzzz_yyy[k] * tbe_0 + 4.0 * to_zzzz_xxyyy[k] * tbe_0 * tke_0;
+            to_z_x_zzz_xyyy[k] =
+                3.0 * to_zz_yyy[k] - 6.0 * to_zz_xxyyy[k] * tke_0 - 2.0 * to_zzzz_yyy[k] * tbe_0 + 4.0 * to_zzzz_xxyyy[k] * tbe_0 * tke_0;
 
-            to_z_x_zzz_xyyz[k] = 3.0 * to_zz_yyz[k] - 6.0 * to_zz_xxyyz[k] * tke_0 - 2.0 * to_zzzz_yyz[k] * tbe_0 + 4.0 * to_zzzz_xxyyz[k] * tbe_0 * tke_0;
+            to_z_x_zzz_xyyz[k] =
+                3.0 * to_zz_yyz[k] - 6.0 * to_zz_xxyyz[k] * tke_0 - 2.0 * to_zzzz_yyz[k] * tbe_0 + 4.0 * to_zzzz_xxyyz[k] * tbe_0 * tke_0;
 
-            to_z_x_zzz_xyzz[k] = 3.0 * to_zz_yzz[k] - 6.0 * to_zz_xxyzz[k] * tke_0 - 2.0 * to_zzzz_yzz[k] * tbe_0 + 4.0 * to_zzzz_xxyzz[k] * tbe_0 * tke_0;
+            to_z_x_zzz_xyzz[k] =
+                3.0 * to_zz_yzz[k] - 6.0 * to_zz_xxyzz[k] * tke_0 - 2.0 * to_zzzz_yzz[k] * tbe_0 + 4.0 * to_zzzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_z_x_zzz_xzzz[k] = 3.0 * to_zz_zzz[k] - 6.0 * to_zz_xxzzz[k] * tke_0 - 2.0 * to_zzzz_zzz[k] * tbe_0 + 4.0 * to_zzzz_xxzzz[k] * tbe_0 * tke_0;
+            to_z_x_zzz_xzzz[k] =
+                3.0 * to_zz_zzz[k] - 6.0 * to_zz_xxzzz[k] * tke_0 - 2.0 * to_zzzz_zzz[k] * tbe_0 + 4.0 * to_zzzz_xxzzz[k] * tbe_0 * tke_0;
 
             to_z_x_zzz_yyyy[k] = -6.0 * to_zz_xyyyy[k] * tke_0 + 4.0 * to_zzzz_xyyyy[k] * tbe_0 * tke_0;
 
@@ -6263,7 +10449,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_y_xxx_zzzz = pbuffer.data(idx_op_geom_101_fg + 7 * op_comps * 150 + i * 150 + 14);
 
-        #pragma omp simd aligned(to_xxxz_xxx, to_xxxz_xxxxy, to_xxxz_xxxyy, to_xxxz_xxxyz, to_xxxz_xxy, to_xxxz_xxyyy, to_xxxz_xxyyz, to_xxxz_xxyzz, to_xxxz_xxz, to_xxxz_xyy, to_xxxz_xyyyy, to_xxxz_xyyyz, to_xxxz_xyyzz, to_xxxz_xyz, to_xxxz_xyzzz, to_xxxz_xzz, to_xxxz_yyy, to_xxxz_yyyyy, to_xxxz_yyyyz, to_xxxz_yyyzz, to_xxxz_yyz, to_xxxz_yyzzz, to_xxxz_yzz, to_xxxz_yzzzz, to_xxxz_zzz, to_z_y_xxx_xxxx, to_z_y_xxx_xxxy, to_z_y_xxx_xxxz, to_z_y_xxx_xxyy, to_z_y_xxx_xxyz, to_z_y_xxx_xxzz, to_z_y_xxx_xyyy, to_z_y_xxx_xyyz, to_z_y_xxx_xyzz, to_z_y_xxx_xzzz, to_z_y_xxx_yyyy, to_z_y_xxx_yyyz, to_z_y_xxx_yyzz, to_z_y_xxx_yzzz, to_z_y_xxx_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xxxz_xxx,         \
+                             to_xxxz_xxxxy,   \
+                             to_xxxz_xxxyy,   \
+                             to_xxxz_xxxyz,   \
+                             to_xxxz_xxy,     \
+                             to_xxxz_xxyyy,   \
+                             to_xxxz_xxyyz,   \
+                             to_xxxz_xxyzz,   \
+                             to_xxxz_xxz,     \
+                             to_xxxz_xyy,     \
+                             to_xxxz_xyyyy,   \
+                             to_xxxz_xyyyz,   \
+                             to_xxxz_xyyzz,   \
+                             to_xxxz_xyz,     \
+                             to_xxxz_xyzzz,   \
+                             to_xxxz_xzz,     \
+                             to_xxxz_yyy,     \
+                             to_xxxz_yyyyy,   \
+                             to_xxxz_yyyyz,   \
+                             to_xxxz_yyyzz,   \
+                             to_xxxz_yyz,     \
+                             to_xxxz_yyzzz,   \
+                             to_xxxz_yzz,     \
+                             to_xxxz_yzzzz,   \
+                             to_xxxz_zzz,     \
+                             to_z_y_xxx_xxxx, \
+                             to_z_y_xxx_xxxy, \
+                             to_z_y_xxx_xxxz, \
+                             to_z_y_xxx_xxyy, \
+                             to_z_y_xxx_xxyz, \
+                             to_z_y_xxx_xxzz, \
+                             to_z_y_xxx_xyyy, \
+                             to_z_y_xxx_xyyz, \
+                             to_z_y_xxx_xyzz, \
+                             to_z_y_xxx_xzzz, \
+                             to_z_y_xxx_yyyy, \
+                             to_z_y_xxx_yyyz, \
+                             to_z_y_xxx_yyzz, \
+                             to_z_y_xxx_yzzz, \
+                             to_z_y_xxx_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -6333,7 +10559,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_y_xxy_zzzz = pbuffer.data(idx_op_geom_101_fg + 7 * op_comps * 150 + i * 150 + 29);
 
-        #pragma omp simd aligned(to_xxyz_xxx, to_xxyz_xxxxy, to_xxyz_xxxyy, to_xxyz_xxxyz, to_xxyz_xxy, to_xxyz_xxyyy, to_xxyz_xxyyz, to_xxyz_xxyzz, to_xxyz_xxz, to_xxyz_xyy, to_xxyz_xyyyy, to_xxyz_xyyyz, to_xxyz_xyyzz, to_xxyz_xyz, to_xxyz_xyzzz, to_xxyz_xzz, to_xxyz_yyy, to_xxyz_yyyyy, to_xxyz_yyyyz, to_xxyz_yyyzz, to_xxyz_yyz, to_xxyz_yyzzz, to_xxyz_yzz, to_xxyz_yzzzz, to_xxyz_zzz, to_z_y_xxy_xxxx, to_z_y_xxy_xxxy, to_z_y_xxy_xxxz, to_z_y_xxy_xxyy, to_z_y_xxy_xxyz, to_z_y_xxy_xxzz, to_z_y_xxy_xyyy, to_z_y_xxy_xyyz, to_z_y_xxy_xyzz, to_z_y_xxy_xzzz, to_z_y_xxy_yyyy, to_z_y_xxy_yyyz, to_z_y_xxy_yyzz, to_z_y_xxy_yzzz, to_z_y_xxy_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xxyz_xxx,         \
+                             to_xxyz_xxxxy,   \
+                             to_xxyz_xxxyy,   \
+                             to_xxyz_xxxyz,   \
+                             to_xxyz_xxy,     \
+                             to_xxyz_xxyyy,   \
+                             to_xxyz_xxyyz,   \
+                             to_xxyz_xxyzz,   \
+                             to_xxyz_xxz,     \
+                             to_xxyz_xyy,     \
+                             to_xxyz_xyyyy,   \
+                             to_xxyz_xyyyz,   \
+                             to_xxyz_xyyzz,   \
+                             to_xxyz_xyz,     \
+                             to_xxyz_xyzzz,   \
+                             to_xxyz_xzz,     \
+                             to_xxyz_yyy,     \
+                             to_xxyz_yyyyy,   \
+                             to_xxyz_yyyyz,   \
+                             to_xxyz_yyyzz,   \
+                             to_xxyz_yyz,     \
+                             to_xxyz_yyzzz,   \
+                             to_xxyz_yzz,     \
+                             to_xxyz_yzzzz,   \
+                             to_xxyz_zzz,     \
+                             to_z_y_xxy_xxxx, \
+                             to_z_y_xxy_xxxy, \
+                             to_z_y_xxy_xxxz, \
+                             to_z_y_xxy_xxyy, \
+                             to_z_y_xxy_xxyz, \
+                             to_z_y_xxy_xxzz, \
+                             to_z_y_xxy_xyyy, \
+                             to_z_y_xxy_xyyz, \
+                             to_z_y_xxy_xyzz, \
+                             to_z_y_xxy_xzzz, \
+                             to_z_y_xxy_yyyy, \
+                             to_z_y_xxy_yyyz, \
+                             to_z_y_xxy_yyzz, \
+                             to_z_y_xxy_yzzz, \
+                             to_z_y_xxy_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -6403,7 +10669,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_y_xxz_zzzz = pbuffer.data(idx_op_geom_101_fg + 7 * op_comps * 150 + i * 150 + 44);
 
-        #pragma omp simd aligned(to_xx_xxx, to_xx_xxxxy, to_xx_xxxyy, to_xx_xxxyz, to_xx_xxy, to_xx_xxyyy, to_xx_xxyyz, to_xx_xxyzz, to_xx_xxz, to_xx_xyy, to_xx_xyyyy, to_xx_xyyyz, to_xx_xyyzz, to_xx_xyz, to_xx_xyzzz, to_xx_xzz, to_xx_yyy, to_xx_yyyyy, to_xx_yyyyz, to_xx_yyyzz, to_xx_yyz, to_xx_yyzzz, to_xx_yzz, to_xx_yzzzz, to_xx_zzz, to_xxzz_xxx, to_xxzz_xxxxy, to_xxzz_xxxyy, to_xxzz_xxxyz, to_xxzz_xxy, to_xxzz_xxyyy, to_xxzz_xxyyz, to_xxzz_xxyzz, to_xxzz_xxz, to_xxzz_xyy, to_xxzz_xyyyy, to_xxzz_xyyyz, to_xxzz_xyyzz, to_xxzz_xyz, to_xxzz_xyzzz, to_xxzz_xzz, to_xxzz_yyy, to_xxzz_yyyyy, to_xxzz_yyyyz, to_xxzz_yyyzz, to_xxzz_yyz, to_xxzz_yyzzz, to_xxzz_yzz, to_xxzz_yzzzz, to_xxzz_zzz, to_z_y_xxz_xxxx, to_z_y_xxz_xxxy, to_z_y_xxz_xxxz, to_z_y_xxz_xxyy, to_z_y_xxz_xxyz, to_z_y_xxz_xxzz, to_z_y_xxz_xyyy, to_z_y_xxz_xyyz, to_z_y_xxz_xyzz, to_z_y_xxz_xzzz, to_z_y_xxz_yyyy, to_z_y_xxz_yyyz, to_z_y_xxz_yyzz, to_z_y_xxz_yzzz, to_z_y_xxz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xx_xxx,           \
+                             to_xx_xxxxy,     \
+                             to_xx_xxxyy,     \
+                             to_xx_xxxyz,     \
+                             to_xx_xxy,       \
+                             to_xx_xxyyy,     \
+                             to_xx_xxyyz,     \
+                             to_xx_xxyzz,     \
+                             to_xx_xxz,       \
+                             to_xx_xyy,       \
+                             to_xx_xyyyy,     \
+                             to_xx_xyyyz,     \
+                             to_xx_xyyzz,     \
+                             to_xx_xyz,       \
+                             to_xx_xyzzz,     \
+                             to_xx_xzz,       \
+                             to_xx_yyy,       \
+                             to_xx_yyyyy,     \
+                             to_xx_yyyyz,     \
+                             to_xx_yyyzz,     \
+                             to_xx_yyz,       \
+                             to_xx_yyzzz,     \
+                             to_xx_yzz,       \
+                             to_xx_yzzzz,     \
+                             to_xx_zzz,       \
+                             to_xxzz_xxx,     \
+                             to_xxzz_xxxxy,   \
+                             to_xxzz_xxxyy,   \
+                             to_xxzz_xxxyz,   \
+                             to_xxzz_xxy,     \
+                             to_xxzz_xxyyy,   \
+                             to_xxzz_xxyyz,   \
+                             to_xxzz_xxyzz,   \
+                             to_xxzz_xxz,     \
+                             to_xxzz_xyy,     \
+                             to_xxzz_xyyyy,   \
+                             to_xxzz_xyyyz,   \
+                             to_xxzz_xyyzz,   \
+                             to_xxzz_xyz,     \
+                             to_xxzz_xyzzz,   \
+                             to_xxzz_xzz,     \
+                             to_xxzz_yyy,     \
+                             to_xxzz_yyyyy,   \
+                             to_xxzz_yyyyz,   \
+                             to_xxzz_yyyzz,   \
+                             to_xxzz_yyz,     \
+                             to_xxzz_yyzzz,   \
+                             to_xxzz_yzz,     \
+                             to_xxzz_yzzzz,   \
+                             to_xxzz_zzz,     \
+                             to_z_y_xxz_xxxx, \
+                             to_z_y_xxz_xxxy, \
+                             to_z_y_xxz_xxxz, \
+                             to_z_y_xxz_xxyy, \
+                             to_z_y_xxz_xxyz, \
+                             to_z_y_xxz_xxzz, \
+                             to_z_y_xxz_xyyy, \
+                             to_z_y_xxz_xyyz, \
+                             to_z_y_xxz_xyzz, \
+                             to_z_y_xxz_xzzz, \
+                             to_z_y_xxz_yyyy, \
+                             to_z_y_xxz_yyyz, \
+                             to_z_y_xxz_yyzz, \
+                             to_z_y_xxz_yzzz, \
+                             to_z_y_xxz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -6416,25 +10747,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_z_y_xxz_xxxz[k] = -2.0 * to_xx_xxxyz[k] * tke_0 + 4.0 * to_xxzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_z_y_xxz_xxyy[k] = 2.0 * to_xx_xxy[k] - 2.0 * to_xx_xxyyy[k] * tke_0 - 4.0 * to_xxzz_xxy[k] * tbe_0 + 4.0 * to_xxzz_xxyyy[k] * tbe_0 * tke_0;
+            to_z_y_xxz_xxyy[k] =
+                2.0 * to_xx_xxy[k] - 2.0 * to_xx_xxyyy[k] * tke_0 - 4.0 * to_xxzz_xxy[k] * tbe_0 + 4.0 * to_xxzz_xxyyy[k] * tbe_0 * tke_0;
 
             to_z_y_xxz_xxyz[k] = to_xx_xxz[k] - 2.0 * to_xx_xxyyz[k] * tke_0 - 2.0 * to_xxzz_xxz[k] * tbe_0 + 4.0 * to_xxzz_xxyyz[k] * tbe_0 * tke_0;
 
             to_z_y_xxz_xxzz[k] = -2.0 * to_xx_xxyzz[k] * tke_0 + 4.0 * to_xxzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_z_y_xxz_xyyy[k] = 3.0 * to_xx_xyy[k] - 2.0 * to_xx_xyyyy[k] * tke_0 - 6.0 * to_xxzz_xyy[k] * tbe_0 + 4.0 * to_xxzz_xyyyy[k] * tbe_0 * tke_0;
+            to_z_y_xxz_xyyy[k] =
+                3.0 * to_xx_xyy[k] - 2.0 * to_xx_xyyyy[k] * tke_0 - 6.0 * to_xxzz_xyy[k] * tbe_0 + 4.0 * to_xxzz_xyyyy[k] * tbe_0 * tke_0;
 
-            to_z_y_xxz_xyyz[k] = 2.0 * to_xx_xyz[k] - 2.0 * to_xx_xyyyz[k] * tke_0 - 4.0 * to_xxzz_xyz[k] * tbe_0 + 4.0 * to_xxzz_xyyyz[k] * tbe_0 * tke_0;
+            to_z_y_xxz_xyyz[k] =
+                2.0 * to_xx_xyz[k] - 2.0 * to_xx_xyyyz[k] * tke_0 - 4.0 * to_xxzz_xyz[k] * tbe_0 + 4.0 * to_xxzz_xyyyz[k] * tbe_0 * tke_0;
 
             to_z_y_xxz_xyzz[k] = to_xx_xzz[k] - 2.0 * to_xx_xyyzz[k] * tke_0 - 2.0 * to_xxzz_xzz[k] * tbe_0 + 4.0 * to_xxzz_xyyzz[k] * tbe_0 * tke_0;
 
             to_z_y_xxz_xzzz[k] = -2.0 * to_xx_xyzzz[k] * tke_0 + 4.0 * to_xxzz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_z_y_xxz_yyyy[k] = 4.0 * to_xx_yyy[k] - 2.0 * to_xx_yyyyy[k] * tke_0 - 8.0 * to_xxzz_yyy[k] * tbe_0 + 4.0 * to_xxzz_yyyyy[k] * tbe_0 * tke_0;
+            to_z_y_xxz_yyyy[k] =
+                4.0 * to_xx_yyy[k] - 2.0 * to_xx_yyyyy[k] * tke_0 - 8.0 * to_xxzz_yyy[k] * tbe_0 + 4.0 * to_xxzz_yyyyy[k] * tbe_0 * tke_0;
 
-            to_z_y_xxz_yyyz[k] = 3.0 * to_xx_yyz[k] - 2.0 * to_xx_yyyyz[k] * tke_0 - 6.0 * to_xxzz_yyz[k] * tbe_0 + 4.0 * to_xxzz_yyyyz[k] * tbe_0 * tke_0;
+            to_z_y_xxz_yyyz[k] =
+                3.0 * to_xx_yyz[k] - 2.0 * to_xx_yyyyz[k] * tke_0 - 6.0 * to_xxzz_yyz[k] * tbe_0 + 4.0 * to_xxzz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_z_y_xxz_yyzz[k] = 2.0 * to_xx_yzz[k] - 2.0 * to_xx_yyyzz[k] * tke_0 - 4.0 * to_xxzz_yzz[k] * tbe_0 + 4.0 * to_xxzz_yyyzz[k] * tbe_0 * tke_0;
+            to_z_y_xxz_yyzz[k] =
+                2.0 * to_xx_yzz[k] - 2.0 * to_xx_yyyzz[k] * tke_0 - 4.0 * to_xxzz_yzz[k] * tbe_0 + 4.0 * to_xxzz_yyyzz[k] * tbe_0 * tke_0;
 
             to_z_y_xxz_yzzz[k] = to_xx_zzz[k] - 2.0 * to_xx_yyzzz[k] * tke_0 - 2.0 * to_xxzz_zzz[k] * tbe_0 + 4.0 * to_xxzz_yyzzz[k] * tbe_0 * tke_0;
 
@@ -6473,7 +10810,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_y_xyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 7 * op_comps * 150 + i * 150 + 59);
 
-        #pragma omp simd aligned(to_xyyz_xxx, to_xyyz_xxxxy, to_xyyz_xxxyy, to_xyyz_xxxyz, to_xyyz_xxy, to_xyyz_xxyyy, to_xyyz_xxyyz, to_xyyz_xxyzz, to_xyyz_xxz, to_xyyz_xyy, to_xyyz_xyyyy, to_xyyz_xyyyz, to_xyyz_xyyzz, to_xyyz_xyz, to_xyyz_xyzzz, to_xyyz_xzz, to_xyyz_yyy, to_xyyz_yyyyy, to_xyyz_yyyyz, to_xyyz_yyyzz, to_xyyz_yyz, to_xyyz_yyzzz, to_xyyz_yzz, to_xyyz_yzzzz, to_xyyz_zzz, to_z_y_xyy_xxxx, to_z_y_xyy_xxxy, to_z_y_xyy_xxxz, to_z_y_xyy_xxyy, to_z_y_xyy_xxyz, to_z_y_xyy_xxzz, to_z_y_xyy_xyyy, to_z_y_xyy_xyyz, to_z_y_xyy_xyzz, to_z_y_xyy_xzzz, to_z_y_xyy_yyyy, to_z_y_xyy_yyyz, to_z_y_xyy_yyzz, to_z_y_xyy_yzzz, to_z_y_xyy_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xyyz_xxx,         \
+                             to_xyyz_xxxxy,   \
+                             to_xyyz_xxxyy,   \
+                             to_xyyz_xxxyz,   \
+                             to_xyyz_xxy,     \
+                             to_xyyz_xxyyy,   \
+                             to_xyyz_xxyyz,   \
+                             to_xyyz_xxyzz,   \
+                             to_xyyz_xxz,     \
+                             to_xyyz_xyy,     \
+                             to_xyyz_xyyyy,   \
+                             to_xyyz_xyyyz,   \
+                             to_xyyz_xyyzz,   \
+                             to_xyyz_xyz,     \
+                             to_xyyz_xyzzz,   \
+                             to_xyyz_xzz,     \
+                             to_xyyz_yyy,     \
+                             to_xyyz_yyyyy,   \
+                             to_xyyz_yyyyz,   \
+                             to_xyyz_yyyzz,   \
+                             to_xyyz_yyz,     \
+                             to_xyyz_yyzzz,   \
+                             to_xyyz_yzz,     \
+                             to_xyyz_yzzzz,   \
+                             to_xyyz_zzz,     \
+                             to_z_y_xyy_xxxx, \
+                             to_z_y_xyy_xxxy, \
+                             to_z_y_xyy_xxxz, \
+                             to_z_y_xyy_xxyy, \
+                             to_z_y_xyy_xxyz, \
+                             to_z_y_xyy_xxzz, \
+                             to_z_y_xyy_xyyy, \
+                             to_z_y_xyy_xyyz, \
+                             to_z_y_xyy_xyzz, \
+                             to_z_y_xyy_xzzz, \
+                             to_z_y_xyy_yyyy, \
+                             to_z_y_xyy_yyyz, \
+                             to_z_y_xyy_yyzz, \
+                             to_z_y_xyy_yzzz, \
+                             to_z_y_xyy_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -6543,7 +10920,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_y_xyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 7 * op_comps * 150 + i * 150 + 74);
 
-        #pragma omp simd aligned(to_xy_xxx, to_xy_xxxxy, to_xy_xxxyy, to_xy_xxxyz, to_xy_xxy, to_xy_xxyyy, to_xy_xxyyz, to_xy_xxyzz, to_xy_xxz, to_xy_xyy, to_xy_xyyyy, to_xy_xyyyz, to_xy_xyyzz, to_xy_xyz, to_xy_xyzzz, to_xy_xzz, to_xy_yyy, to_xy_yyyyy, to_xy_yyyyz, to_xy_yyyzz, to_xy_yyz, to_xy_yyzzz, to_xy_yzz, to_xy_yzzzz, to_xy_zzz, to_xyzz_xxx, to_xyzz_xxxxy, to_xyzz_xxxyy, to_xyzz_xxxyz, to_xyzz_xxy, to_xyzz_xxyyy, to_xyzz_xxyyz, to_xyzz_xxyzz, to_xyzz_xxz, to_xyzz_xyy, to_xyzz_xyyyy, to_xyzz_xyyyz, to_xyzz_xyyzz, to_xyzz_xyz, to_xyzz_xyzzz, to_xyzz_xzz, to_xyzz_yyy, to_xyzz_yyyyy, to_xyzz_yyyyz, to_xyzz_yyyzz, to_xyzz_yyz, to_xyzz_yyzzz, to_xyzz_yzz, to_xyzz_yzzzz, to_xyzz_zzz, to_z_y_xyz_xxxx, to_z_y_xyz_xxxy, to_z_y_xyz_xxxz, to_z_y_xyz_xxyy, to_z_y_xyz_xxyz, to_z_y_xyz_xxzz, to_z_y_xyz_xyyy, to_z_y_xyz_xyyz, to_z_y_xyz_xyzz, to_z_y_xyz_xzzz, to_z_y_xyz_yyyy, to_z_y_xyz_yyyz, to_z_y_xyz_yyzz, to_z_y_xyz_yzzz, to_z_y_xyz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xy_xxx,           \
+                             to_xy_xxxxy,     \
+                             to_xy_xxxyy,     \
+                             to_xy_xxxyz,     \
+                             to_xy_xxy,       \
+                             to_xy_xxyyy,     \
+                             to_xy_xxyyz,     \
+                             to_xy_xxyzz,     \
+                             to_xy_xxz,       \
+                             to_xy_xyy,       \
+                             to_xy_xyyyy,     \
+                             to_xy_xyyyz,     \
+                             to_xy_xyyzz,     \
+                             to_xy_xyz,       \
+                             to_xy_xyzzz,     \
+                             to_xy_xzz,       \
+                             to_xy_yyy,       \
+                             to_xy_yyyyy,     \
+                             to_xy_yyyyz,     \
+                             to_xy_yyyzz,     \
+                             to_xy_yyz,       \
+                             to_xy_yyzzz,     \
+                             to_xy_yzz,       \
+                             to_xy_yzzzz,     \
+                             to_xy_zzz,       \
+                             to_xyzz_xxx,     \
+                             to_xyzz_xxxxy,   \
+                             to_xyzz_xxxyy,   \
+                             to_xyzz_xxxyz,   \
+                             to_xyzz_xxy,     \
+                             to_xyzz_xxyyy,   \
+                             to_xyzz_xxyyz,   \
+                             to_xyzz_xxyzz,   \
+                             to_xyzz_xxz,     \
+                             to_xyzz_xyy,     \
+                             to_xyzz_xyyyy,   \
+                             to_xyzz_xyyyz,   \
+                             to_xyzz_xyyzz,   \
+                             to_xyzz_xyz,     \
+                             to_xyzz_xyzzz,   \
+                             to_xyzz_xzz,     \
+                             to_xyzz_yyy,     \
+                             to_xyzz_yyyyy,   \
+                             to_xyzz_yyyyz,   \
+                             to_xyzz_yyyzz,   \
+                             to_xyzz_yyz,     \
+                             to_xyzz_yyzzz,   \
+                             to_xyzz_yzz,     \
+                             to_xyzz_yzzzz,   \
+                             to_xyzz_zzz,     \
+                             to_z_y_xyz_xxxx, \
+                             to_z_y_xyz_xxxy, \
+                             to_z_y_xyz_xxxz, \
+                             to_z_y_xyz_xxyy, \
+                             to_z_y_xyz_xxyz, \
+                             to_z_y_xyz_xxzz, \
+                             to_z_y_xyz_xyyy, \
+                             to_z_y_xyz_xyyz, \
+                             to_z_y_xyz_xyzz, \
+                             to_z_y_xyz_xzzz, \
+                             to_z_y_xyz_yyyy, \
+                             to_z_y_xyz_yyyz, \
+                             to_z_y_xyz_yyzz, \
+                             to_z_y_xyz_yzzz, \
+                             to_z_y_xyz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -6556,25 +10998,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_z_y_xyz_xxxz[k] = -2.0 * to_xy_xxxyz[k] * tke_0 + 4.0 * to_xyzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_z_y_xyz_xxyy[k] = 2.0 * to_xy_xxy[k] - 2.0 * to_xy_xxyyy[k] * tke_0 - 4.0 * to_xyzz_xxy[k] * tbe_0 + 4.0 * to_xyzz_xxyyy[k] * tbe_0 * tke_0;
+            to_z_y_xyz_xxyy[k] =
+                2.0 * to_xy_xxy[k] - 2.0 * to_xy_xxyyy[k] * tke_0 - 4.0 * to_xyzz_xxy[k] * tbe_0 + 4.0 * to_xyzz_xxyyy[k] * tbe_0 * tke_0;
 
             to_z_y_xyz_xxyz[k] = to_xy_xxz[k] - 2.0 * to_xy_xxyyz[k] * tke_0 - 2.0 * to_xyzz_xxz[k] * tbe_0 + 4.0 * to_xyzz_xxyyz[k] * tbe_0 * tke_0;
 
             to_z_y_xyz_xxzz[k] = -2.0 * to_xy_xxyzz[k] * tke_0 + 4.0 * to_xyzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_z_y_xyz_xyyy[k] = 3.0 * to_xy_xyy[k] - 2.0 * to_xy_xyyyy[k] * tke_0 - 6.0 * to_xyzz_xyy[k] * tbe_0 + 4.0 * to_xyzz_xyyyy[k] * tbe_0 * tke_0;
+            to_z_y_xyz_xyyy[k] =
+                3.0 * to_xy_xyy[k] - 2.0 * to_xy_xyyyy[k] * tke_0 - 6.0 * to_xyzz_xyy[k] * tbe_0 + 4.0 * to_xyzz_xyyyy[k] * tbe_0 * tke_0;
 
-            to_z_y_xyz_xyyz[k] = 2.0 * to_xy_xyz[k] - 2.0 * to_xy_xyyyz[k] * tke_0 - 4.0 * to_xyzz_xyz[k] * tbe_0 + 4.0 * to_xyzz_xyyyz[k] * tbe_0 * tke_0;
+            to_z_y_xyz_xyyz[k] =
+                2.0 * to_xy_xyz[k] - 2.0 * to_xy_xyyyz[k] * tke_0 - 4.0 * to_xyzz_xyz[k] * tbe_0 + 4.0 * to_xyzz_xyyyz[k] * tbe_0 * tke_0;
 
             to_z_y_xyz_xyzz[k] = to_xy_xzz[k] - 2.0 * to_xy_xyyzz[k] * tke_0 - 2.0 * to_xyzz_xzz[k] * tbe_0 + 4.0 * to_xyzz_xyyzz[k] * tbe_0 * tke_0;
 
             to_z_y_xyz_xzzz[k] = -2.0 * to_xy_xyzzz[k] * tke_0 + 4.0 * to_xyzz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_z_y_xyz_yyyy[k] = 4.0 * to_xy_yyy[k] - 2.0 * to_xy_yyyyy[k] * tke_0 - 8.0 * to_xyzz_yyy[k] * tbe_0 + 4.0 * to_xyzz_yyyyy[k] * tbe_0 * tke_0;
+            to_z_y_xyz_yyyy[k] =
+                4.0 * to_xy_yyy[k] - 2.0 * to_xy_yyyyy[k] * tke_0 - 8.0 * to_xyzz_yyy[k] * tbe_0 + 4.0 * to_xyzz_yyyyy[k] * tbe_0 * tke_0;
 
-            to_z_y_xyz_yyyz[k] = 3.0 * to_xy_yyz[k] - 2.0 * to_xy_yyyyz[k] * tke_0 - 6.0 * to_xyzz_yyz[k] * tbe_0 + 4.0 * to_xyzz_yyyyz[k] * tbe_0 * tke_0;
+            to_z_y_xyz_yyyz[k] =
+                3.0 * to_xy_yyz[k] - 2.0 * to_xy_yyyyz[k] * tke_0 - 6.0 * to_xyzz_yyz[k] * tbe_0 + 4.0 * to_xyzz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_z_y_xyz_yyzz[k] = 2.0 * to_xy_yzz[k] - 2.0 * to_xy_yyyzz[k] * tke_0 - 4.0 * to_xyzz_yzz[k] * tbe_0 + 4.0 * to_xyzz_yyyzz[k] * tbe_0 * tke_0;
+            to_z_y_xyz_yyzz[k] =
+                2.0 * to_xy_yzz[k] - 2.0 * to_xy_yyyzz[k] * tke_0 - 4.0 * to_xyzz_yzz[k] * tbe_0 + 4.0 * to_xyzz_yyyzz[k] * tbe_0 * tke_0;
 
             to_z_y_xyz_yzzz[k] = to_xy_zzz[k] - 2.0 * to_xy_yyzzz[k] * tke_0 - 2.0 * to_xyzz_zzz[k] * tbe_0 + 4.0 * to_xyzz_yyzzz[k] * tbe_0 * tke_0;
 
@@ -6613,7 +11061,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_y_xzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 7 * op_comps * 150 + i * 150 + 89);
 
-        #pragma omp simd aligned(to_xz_xxx, to_xz_xxxxy, to_xz_xxxyy, to_xz_xxxyz, to_xz_xxy, to_xz_xxyyy, to_xz_xxyyz, to_xz_xxyzz, to_xz_xxz, to_xz_xyy, to_xz_xyyyy, to_xz_xyyyz, to_xz_xyyzz, to_xz_xyz, to_xz_xyzzz, to_xz_xzz, to_xz_yyy, to_xz_yyyyy, to_xz_yyyyz, to_xz_yyyzz, to_xz_yyz, to_xz_yyzzz, to_xz_yzz, to_xz_yzzzz, to_xz_zzz, to_xzzz_xxx, to_xzzz_xxxxy, to_xzzz_xxxyy, to_xzzz_xxxyz, to_xzzz_xxy, to_xzzz_xxyyy, to_xzzz_xxyyz, to_xzzz_xxyzz, to_xzzz_xxz, to_xzzz_xyy, to_xzzz_xyyyy, to_xzzz_xyyyz, to_xzzz_xyyzz, to_xzzz_xyz, to_xzzz_xyzzz, to_xzzz_xzz, to_xzzz_yyy, to_xzzz_yyyyy, to_xzzz_yyyyz, to_xzzz_yyyzz, to_xzzz_yyz, to_xzzz_yyzzz, to_xzzz_yzz, to_xzzz_yzzzz, to_xzzz_zzz, to_z_y_xzz_xxxx, to_z_y_xzz_xxxy, to_z_y_xzz_xxxz, to_z_y_xzz_xxyy, to_z_y_xzz_xxyz, to_z_y_xzz_xxzz, to_z_y_xzz_xyyy, to_z_y_xzz_xyyz, to_z_y_xzz_xyzz, to_z_y_xzz_xzzz, to_z_y_xzz_yyyy, to_z_y_xzz_yyyz, to_z_y_xzz_yyzz, to_z_y_xzz_yzzz, to_z_y_xzz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xz_xxx,           \
+                             to_xz_xxxxy,     \
+                             to_xz_xxxyy,     \
+                             to_xz_xxxyz,     \
+                             to_xz_xxy,       \
+                             to_xz_xxyyy,     \
+                             to_xz_xxyyz,     \
+                             to_xz_xxyzz,     \
+                             to_xz_xxz,       \
+                             to_xz_xyy,       \
+                             to_xz_xyyyy,     \
+                             to_xz_xyyyz,     \
+                             to_xz_xyyzz,     \
+                             to_xz_xyz,       \
+                             to_xz_xyzzz,     \
+                             to_xz_xzz,       \
+                             to_xz_yyy,       \
+                             to_xz_yyyyy,     \
+                             to_xz_yyyyz,     \
+                             to_xz_yyyzz,     \
+                             to_xz_yyz,       \
+                             to_xz_yyzzz,     \
+                             to_xz_yzz,       \
+                             to_xz_yzzzz,     \
+                             to_xz_zzz,       \
+                             to_xzzz_xxx,     \
+                             to_xzzz_xxxxy,   \
+                             to_xzzz_xxxyy,   \
+                             to_xzzz_xxxyz,   \
+                             to_xzzz_xxy,     \
+                             to_xzzz_xxyyy,   \
+                             to_xzzz_xxyyz,   \
+                             to_xzzz_xxyzz,   \
+                             to_xzzz_xxz,     \
+                             to_xzzz_xyy,     \
+                             to_xzzz_xyyyy,   \
+                             to_xzzz_xyyyz,   \
+                             to_xzzz_xyyzz,   \
+                             to_xzzz_xyz,     \
+                             to_xzzz_xyzzz,   \
+                             to_xzzz_xzz,     \
+                             to_xzzz_yyy,     \
+                             to_xzzz_yyyyy,   \
+                             to_xzzz_yyyyz,   \
+                             to_xzzz_yyyzz,   \
+                             to_xzzz_yyz,     \
+                             to_xzzz_yyzzz,   \
+                             to_xzzz_yzz,     \
+                             to_xzzz_yzzzz,   \
+                             to_xzzz_zzz,     \
+                             to_z_y_xzz_xxxx, \
+                             to_z_y_xzz_xxxy, \
+                             to_z_y_xzz_xxxz, \
+                             to_z_y_xzz_xxyy, \
+                             to_z_y_xzz_xxyz, \
+                             to_z_y_xzz_xxzz, \
+                             to_z_y_xzz_xyyy, \
+                             to_z_y_xzz_xyyz, \
+                             to_z_y_xzz_xyzz, \
+                             to_z_y_xzz_xzzz, \
+                             to_z_y_xzz_yyyy, \
+                             to_z_y_xzz_yyyz, \
+                             to_z_y_xzz_yyzz, \
+                             to_z_y_xzz_yzzz, \
+                             to_z_y_xzz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -6622,31 +11135,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_z_y_xzz_xxxx[k] = -4.0 * to_xz_xxxxy[k] * tke_0 + 4.0 * to_xzzz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_z_y_xzz_xxxy[k] = 2.0 * to_xz_xxx[k] - 4.0 * to_xz_xxxyy[k] * tke_0 - 2.0 * to_xzzz_xxx[k] * tbe_0 + 4.0 * to_xzzz_xxxyy[k] * tbe_0 * tke_0;
+            to_z_y_xzz_xxxy[k] =
+                2.0 * to_xz_xxx[k] - 4.0 * to_xz_xxxyy[k] * tke_0 - 2.0 * to_xzzz_xxx[k] * tbe_0 + 4.0 * to_xzzz_xxxyy[k] * tbe_0 * tke_0;
 
             to_z_y_xzz_xxxz[k] = -4.0 * to_xz_xxxyz[k] * tke_0 + 4.0 * to_xzzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_z_y_xzz_xxyy[k] = 4.0 * to_xz_xxy[k] - 4.0 * to_xz_xxyyy[k] * tke_0 - 4.0 * to_xzzz_xxy[k] * tbe_0 + 4.0 * to_xzzz_xxyyy[k] * tbe_0 * tke_0;
+            to_z_y_xzz_xxyy[k] =
+                4.0 * to_xz_xxy[k] - 4.0 * to_xz_xxyyy[k] * tke_0 - 4.0 * to_xzzz_xxy[k] * tbe_0 + 4.0 * to_xzzz_xxyyy[k] * tbe_0 * tke_0;
 
-            to_z_y_xzz_xxyz[k] = 2.0 * to_xz_xxz[k] - 4.0 * to_xz_xxyyz[k] * tke_0 - 2.0 * to_xzzz_xxz[k] * tbe_0 + 4.0 * to_xzzz_xxyyz[k] * tbe_0 * tke_0;
+            to_z_y_xzz_xxyz[k] =
+                2.0 * to_xz_xxz[k] - 4.0 * to_xz_xxyyz[k] * tke_0 - 2.0 * to_xzzz_xxz[k] * tbe_0 + 4.0 * to_xzzz_xxyyz[k] * tbe_0 * tke_0;
 
             to_z_y_xzz_xxzz[k] = -4.0 * to_xz_xxyzz[k] * tke_0 + 4.0 * to_xzzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_z_y_xzz_xyyy[k] = 6.0 * to_xz_xyy[k] - 4.0 * to_xz_xyyyy[k] * tke_0 - 6.0 * to_xzzz_xyy[k] * tbe_0 + 4.0 * to_xzzz_xyyyy[k] * tbe_0 * tke_0;
+            to_z_y_xzz_xyyy[k] =
+                6.0 * to_xz_xyy[k] - 4.0 * to_xz_xyyyy[k] * tke_0 - 6.0 * to_xzzz_xyy[k] * tbe_0 + 4.0 * to_xzzz_xyyyy[k] * tbe_0 * tke_0;
 
-            to_z_y_xzz_xyyz[k] = 4.0 * to_xz_xyz[k] - 4.0 * to_xz_xyyyz[k] * tke_0 - 4.0 * to_xzzz_xyz[k] * tbe_0 + 4.0 * to_xzzz_xyyyz[k] * tbe_0 * tke_0;
+            to_z_y_xzz_xyyz[k] =
+                4.0 * to_xz_xyz[k] - 4.0 * to_xz_xyyyz[k] * tke_0 - 4.0 * to_xzzz_xyz[k] * tbe_0 + 4.0 * to_xzzz_xyyyz[k] * tbe_0 * tke_0;
 
-            to_z_y_xzz_xyzz[k] = 2.0 * to_xz_xzz[k] - 4.0 * to_xz_xyyzz[k] * tke_0 - 2.0 * to_xzzz_xzz[k] * tbe_0 + 4.0 * to_xzzz_xyyzz[k] * tbe_0 * tke_0;
+            to_z_y_xzz_xyzz[k] =
+                2.0 * to_xz_xzz[k] - 4.0 * to_xz_xyyzz[k] * tke_0 - 2.0 * to_xzzz_xzz[k] * tbe_0 + 4.0 * to_xzzz_xyyzz[k] * tbe_0 * tke_0;
 
             to_z_y_xzz_xzzz[k] = -4.0 * to_xz_xyzzz[k] * tke_0 + 4.0 * to_xzzz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_z_y_xzz_yyyy[k] = 8.0 * to_xz_yyy[k] - 4.0 * to_xz_yyyyy[k] * tke_0 - 8.0 * to_xzzz_yyy[k] * tbe_0 + 4.0 * to_xzzz_yyyyy[k] * tbe_0 * tke_0;
+            to_z_y_xzz_yyyy[k] =
+                8.0 * to_xz_yyy[k] - 4.0 * to_xz_yyyyy[k] * tke_0 - 8.0 * to_xzzz_yyy[k] * tbe_0 + 4.0 * to_xzzz_yyyyy[k] * tbe_0 * tke_0;
 
-            to_z_y_xzz_yyyz[k] = 6.0 * to_xz_yyz[k] - 4.0 * to_xz_yyyyz[k] * tke_0 - 6.0 * to_xzzz_yyz[k] * tbe_0 + 4.0 * to_xzzz_yyyyz[k] * tbe_0 * tke_0;
+            to_z_y_xzz_yyyz[k] =
+                6.0 * to_xz_yyz[k] - 4.0 * to_xz_yyyyz[k] * tke_0 - 6.0 * to_xzzz_yyz[k] * tbe_0 + 4.0 * to_xzzz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_z_y_xzz_yyzz[k] = 4.0 * to_xz_yzz[k] - 4.0 * to_xz_yyyzz[k] * tke_0 - 4.0 * to_xzzz_yzz[k] * tbe_0 + 4.0 * to_xzzz_yyyzz[k] * tbe_0 * tke_0;
+            to_z_y_xzz_yyzz[k] =
+                4.0 * to_xz_yzz[k] - 4.0 * to_xz_yyyzz[k] * tke_0 - 4.0 * to_xzzz_yzz[k] * tbe_0 + 4.0 * to_xzzz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_z_y_xzz_yzzz[k] = 2.0 * to_xz_zzz[k] - 4.0 * to_xz_yyzzz[k] * tke_0 - 2.0 * to_xzzz_zzz[k] * tbe_0 + 4.0 * to_xzzz_yyzzz[k] * tbe_0 * tke_0;
+            to_z_y_xzz_yzzz[k] =
+                2.0 * to_xz_zzz[k] - 4.0 * to_xz_yyzzz[k] * tke_0 - 2.0 * to_xzzz_zzz[k] * tbe_0 + 4.0 * to_xzzz_yyzzz[k] * tbe_0 * tke_0;
 
             to_z_y_xzz_zzzz[k] = -4.0 * to_xz_yzzzz[k] * tke_0 + 4.0 * to_xzzz_yzzzz[k] * tbe_0 * tke_0;
         }
@@ -6683,7 +11206,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_y_yyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 7 * op_comps * 150 + i * 150 + 104);
 
-        #pragma omp simd aligned(to_yyyz_xxx, to_yyyz_xxxxy, to_yyyz_xxxyy, to_yyyz_xxxyz, to_yyyz_xxy, to_yyyz_xxyyy, to_yyyz_xxyyz, to_yyyz_xxyzz, to_yyyz_xxz, to_yyyz_xyy, to_yyyz_xyyyy, to_yyyz_xyyyz, to_yyyz_xyyzz, to_yyyz_xyz, to_yyyz_xyzzz, to_yyyz_xzz, to_yyyz_yyy, to_yyyz_yyyyy, to_yyyz_yyyyz, to_yyyz_yyyzz, to_yyyz_yyz, to_yyyz_yyzzz, to_yyyz_yzz, to_yyyz_yzzzz, to_yyyz_zzz, to_z_y_yyy_xxxx, to_z_y_yyy_xxxy, to_z_y_yyy_xxxz, to_z_y_yyy_xxyy, to_z_y_yyy_xxyz, to_z_y_yyy_xxzz, to_z_y_yyy_xyyy, to_z_y_yyy_xyyz, to_z_y_yyy_xyzz, to_z_y_yyy_xzzz, to_z_y_yyy_yyyy, to_z_y_yyy_yyyz, to_z_y_yyy_yyzz, to_z_y_yyy_yzzz, to_z_y_yyy_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_yyyz_xxx,         \
+                             to_yyyz_xxxxy,   \
+                             to_yyyz_xxxyy,   \
+                             to_yyyz_xxxyz,   \
+                             to_yyyz_xxy,     \
+                             to_yyyz_xxyyy,   \
+                             to_yyyz_xxyyz,   \
+                             to_yyyz_xxyzz,   \
+                             to_yyyz_xxz,     \
+                             to_yyyz_xyy,     \
+                             to_yyyz_xyyyy,   \
+                             to_yyyz_xyyyz,   \
+                             to_yyyz_xyyzz,   \
+                             to_yyyz_xyz,     \
+                             to_yyyz_xyzzz,   \
+                             to_yyyz_xzz,     \
+                             to_yyyz_yyy,     \
+                             to_yyyz_yyyyy,   \
+                             to_yyyz_yyyyz,   \
+                             to_yyyz_yyyzz,   \
+                             to_yyyz_yyz,     \
+                             to_yyyz_yyzzz,   \
+                             to_yyyz_yzz,     \
+                             to_yyyz_yzzzz,   \
+                             to_yyyz_zzz,     \
+                             to_z_y_yyy_xxxx, \
+                             to_z_y_yyy_xxxy, \
+                             to_z_y_yyy_xxxz, \
+                             to_z_y_yyy_xxyy, \
+                             to_z_y_yyy_xxyz, \
+                             to_z_y_yyy_xxzz, \
+                             to_z_y_yyy_xyyy, \
+                             to_z_y_yyy_xyyz, \
+                             to_z_y_yyy_xyzz, \
+                             to_z_y_yyy_xzzz, \
+                             to_z_y_yyy_yyyy, \
+                             to_z_y_yyy_yyyz, \
+                             to_z_y_yyy_yyzz, \
+                             to_z_y_yyy_yzzz, \
+                             to_z_y_yyy_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -6753,7 +11316,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_y_yyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 7 * op_comps * 150 + i * 150 + 119);
 
-        #pragma omp simd aligned(to_yy_xxx, to_yy_xxxxy, to_yy_xxxyy, to_yy_xxxyz, to_yy_xxy, to_yy_xxyyy, to_yy_xxyyz, to_yy_xxyzz, to_yy_xxz, to_yy_xyy, to_yy_xyyyy, to_yy_xyyyz, to_yy_xyyzz, to_yy_xyz, to_yy_xyzzz, to_yy_xzz, to_yy_yyy, to_yy_yyyyy, to_yy_yyyyz, to_yy_yyyzz, to_yy_yyz, to_yy_yyzzz, to_yy_yzz, to_yy_yzzzz, to_yy_zzz, to_yyzz_xxx, to_yyzz_xxxxy, to_yyzz_xxxyy, to_yyzz_xxxyz, to_yyzz_xxy, to_yyzz_xxyyy, to_yyzz_xxyyz, to_yyzz_xxyzz, to_yyzz_xxz, to_yyzz_xyy, to_yyzz_xyyyy, to_yyzz_xyyyz, to_yyzz_xyyzz, to_yyzz_xyz, to_yyzz_xyzzz, to_yyzz_xzz, to_yyzz_yyy, to_yyzz_yyyyy, to_yyzz_yyyyz, to_yyzz_yyyzz, to_yyzz_yyz, to_yyzz_yyzzz, to_yyzz_yzz, to_yyzz_yzzzz, to_yyzz_zzz, to_z_y_yyz_xxxx, to_z_y_yyz_xxxy, to_z_y_yyz_xxxz, to_z_y_yyz_xxyy, to_z_y_yyz_xxyz, to_z_y_yyz_xxzz, to_z_y_yyz_xyyy, to_z_y_yyz_xyyz, to_z_y_yyz_xyzz, to_z_y_yyz_xzzz, to_z_y_yyz_yyyy, to_z_y_yyz_yyyz, to_z_y_yyz_yyzz, to_z_y_yyz_yzzz, to_z_y_yyz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_yy_xxx,           \
+                             to_yy_xxxxy,     \
+                             to_yy_xxxyy,     \
+                             to_yy_xxxyz,     \
+                             to_yy_xxy,       \
+                             to_yy_xxyyy,     \
+                             to_yy_xxyyz,     \
+                             to_yy_xxyzz,     \
+                             to_yy_xxz,       \
+                             to_yy_xyy,       \
+                             to_yy_xyyyy,     \
+                             to_yy_xyyyz,     \
+                             to_yy_xyyzz,     \
+                             to_yy_xyz,       \
+                             to_yy_xyzzz,     \
+                             to_yy_xzz,       \
+                             to_yy_yyy,       \
+                             to_yy_yyyyy,     \
+                             to_yy_yyyyz,     \
+                             to_yy_yyyzz,     \
+                             to_yy_yyz,       \
+                             to_yy_yyzzz,     \
+                             to_yy_yzz,       \
+                             to_yy_yzzzz,     \
+                             to_yy_zzz,       \
+                             to_yyzz_xxx,     \
+                             to_yyzz_xxxxy,   \
+                             to_yyzz_xxxyy,   \
+                             to_yyzz_xxxyz,   \
+                             to_yyzz_xxy,     \
+                             to_yyzz_xxyyy,   \
+                             to_yyzz_xxyyz,   \
+                             to_yyzz_xxyzz,   \
+                             to_yyzz_xxz,     \
+                             to_yyzz_xyy,     \
+                             to_yyzz_xyyyy,   \
+                             to_yyzz_xyyyz,   \
+                             to_yyzz_xyyzz,   \
+                             to_yyzz_xyz,     \
+                             to_yyzz_xyzzz,   \
+                             to_yyzz_xzz,     \
+                             to_yyzz_yyy,     \
+                             to_yyzz_yyyyy,   \
+                             to_yyzz_yyyyz,   \
+                             to_yyzz_yyyzz,   \
+                             to_yyzz_yyz,     \
+                             to_yyzz_yyzzz,   \
+                             to_yyzz_yzz,     \
+                             to_yyzz_yzzzz,   \
+                             to_yyzz_zzz,     \
+                             to_z_y_yyz_xxxx, \
+                             to_z_y_yyz_xxxy, \
+                             to_z_y_yyz_xxxz, \
+                             to_z_y_yyz_xxyy, \
+                             to_z_y_yyz_xxyz, \
+                             to_z_y_yyz_xxzz, \
+                             to_z_y_yyz_xyyy, \
+                             to_z_y_yyz_xyyz, \
+                             to_z_y_yyz_xyzz, \
+                             to_z_y_yyz_xzzz, \
+                             to_z_y_yyz_yyyy, \
+                             to_z_y_yyz_yyyz, \
+                             to_z_y_yyz_yyzz, \
+                             to_z_y_yyz_yzzz, \
+                             to_z_y_yyz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -6766,25 +11394,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_z_y_yyz_xxxz[k] = -2.0 * to_yy_xxxyz[k] * tke_0 + 4.0 * to_yyzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_z_y_yyz_xxyy[k] = 2.0 * to_yy_xxy[k] - 2.0 * to_yy_xxyyy[k] * tke_0 - 4.0 * to_yyzz_xxy[k] * tbe_0 + 4.0 * to_yyzz_xxyyy[k] * tbe_0 * tke_0;
+            to_z_y_yyz_xxyy[k] =
+                2.0 * to_yy_xxy[k] - 2.0 * to_yy_xxyyy[k] * tke_0 - 4.0 * to_yyzz_xxy[k] * tbe_0 + 4.0 * to_yyzz_xxyyy[k] * tbe_0 * tke_0;
 
             to_z_y_yyz_xxyz[k] = to_yy_xxz[k] - 2.0 * to_yy_xxyyz[k] * tke_0 - 2.0 * to_yyzz_xxz[k] * tbe_0 + 4.0 * to_yyzz_xxyyz[k] * tbe_0 * tke_0;
 
             to_z_y_yyz_xxzz[k] = -2.0 * to_yy_xxyzz[k] * tke_0 + 4.0 * to_yyzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_z_y_yyz_xyyy[k] = 3.0 * to_yy_xyy[k] - 2.0 * to_yy_xyyyy[k] * tke_0 - 6.0 * to_yyzz_xyy[k] * tbe_0 + 4.0 * to_yyzz_xyyyy[k] * tbe_0 * tke_0;
+            to_z_y_yyz_xyyy[k] =
+                3.0 * to_yy_xyy[k] - 2.0 * to_yy_xyyyy[k] * tke_0 - 6.0 * to_yyzz_xyy[k] * tbe_0 + 4.0 * to_yyzz_xyyyy[k] * tbe_0 * tke_0;
 
-            to_z_y_yyz_xyyz[k] = 2.0 * to_yy_xyz[k] - 2.0 * to_yy_xyyyz[k] * tke_0 - 4.0 * to_yyzz_xyz[k] * tbe_0 + 4.0 * to_yyzz_xyyyz[k] * tbe_0 * tke_0;
+            to_z_y_yyz_xyyz[k] =
+                2.0 * to_yy_xyz[k] - 2.0 * to_yy_xyyyz[k] * tke_0 - 4.0 * to_yyzz_xyz[k] * tbe_0 + 4.0 * to_yyzz_xyyyz[k] * tbe_0 * tke_0;
 
             to_z_y_yyz_xyzz[k] = to_yy_xzz[k] - 2.0 * to_yy_xyyzz[k] * tke_0 - 2.0 * to_yyzz_xzz[k] * tbe_0 + 4.0 * to_yyzz_xyyzz[k] * tbe_0 * tke_0;
 
             to_z_y_yyz_xzzz[k] = -2.0 * to_yy_xyzzz[k] * tke_0 + 4.0 * to_yyzz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_z_y_yyz_yyyy[k] = 4.0 * to_yy_yyy[k] - 2.0 * to_yy_yyyyy[k] * tke_0 - 8.0 * to_yyzz_yyy[k] * tbe_0 + 4.0 * to_yyzz_yyyyy[k] * tbe_0 * tke_0;
+            to_z_y_yyz_yyyy[k] =
+                4.0 * to_yy_yyy[k] - 2.0 * to_yy_yyyyy[k] * tke_0 - 8.0 * to_yyzz_yyy[k] * tbe_0 + 4.0 * to_yyzz_yyyyy[k] * tbe_0 * tke_0;
 
-            to_z_y_yyz_yyyz[k] = 3.0 * to_yy_yyz[k] - 2.0 * to_yy_yyyyz[k] * tke_0 - 6.0 * to_yyzz_yyz[k] * tbe_0 + 4.0 * to_yyzz_yyyyz[k] * tbe_0 * tke_0;
+            to_z_y_yyz_yyyz[k] =
+                3.0 * to_yy_yyz[k] - 2.0 * to_yy_yyyyz[k] * tke_0 - 6.0 * to_yyzz_yyz[k] * tbe_0 + 4.0 * to_yyzz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_z_y_yyz_yyzz[k] = 2.0 * to_yy_yzz[k] - 2.0 * to_yy_yyyzz[k] * tke_0 - 4.0 * to_yyzz_yzz[k] * tbe_0 + 4.0 * to_yyzz_yyyzz[k] * tbe_0 * tke_0;
+            to_z_y_yyz_yyzz[k] =
+                2.0 * to_yy_yzz[k] - 2.0 * to_yy_yyyzz[k] * tke_0 - 4.0 * to_yyzz_yzz[k] * tbe_0 + 4.0 * to_yyzz_yyyzz[k] * tbe_0 * tke_0;
 
             to_z_y_yyz_yzzz[k] = to_yy_zzz[k] - 2.0 * to_yy_yyzzz[k] * tke_0 - 2.0 * to_yyzz_zzz[k] * tbe_0 + 4.0 * to_yyzz_yyzzz[k] * tbe_0 * tke_0;
 
@@ -6823,7 +11457,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_y_yzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 7 * op_comps * 150 + i * 150 + 134);
 
-        #pragma omp simd aligned(to_yz_xxx, to_yz_xxxxy, to_yz_xxxyy, to_yz_xxxyz, to_yz_xxy, to_yz_xxyyy, to_yz_xxyyz, to_yz_xxyzz, to_yz_xxz, to_yz_xyy, to_yz_xyyyy, to_yz_xyyyz, to_yz_xyyzz, to_yz_xyz, to_yz_xyzzz, to_yz_xzz, to_yz_yyy, to_yz_yyyyy, to_yz_yyyyz, to_yz_yyyzz, to_yz_yyz, to_yz_yyzzz, to_yz_yzz, to_yz_yzzzz, to_yz_zzz, to_yzzz_xxx, to_yzzz_xxxxy, to_yzzz_xxxyy, to_yzzz_xxxyz, to_yzzz_xxy, to_yzzz_xxyyy, to_yzzz_xxyyz, to_yzzz_xxyzz, to_yzzz_xxz, to_yzzz_xyy, to_yzzz_xyyyy, to_yzzz_xyyyz, to_yzzz_xyyzz, to_yzzz_xyz, to_yzzz_xyzzz, to_yzzz_xzz, to_yzzz_yyy, to_yzzz_yyyyy, to_yzzz_yyyyz, to_yzzz_yyyzz, to_yzzz_yyz, to_yzzz_yyzzz, to_yzzz_yzz, to_yzzz_yzzzz, to_yzzz_zzz, to_z_y_yzz_xxxx, to_z_y_yzz_xxxy, to_z_y_yzz_xxxz, to_z_y_yzz_xxyy, to_z_y_yzz_xxyz, to_z_y_yzz_xxzz, to_z_y_yzz_xyyy, to_z_y_yzz_xyyz, to_z_y_yzz_xyzz, to_z_y_yzz_xzzz, to_z_y_yzz_yyyy, to_z_y_yzz_yyyz, to_z_y_yzz_yyzz, to_z_y_yzz_yzzz, to_z_y_yzz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_yz_xxx,           \
+                             to_yz_xxxxy,     \
+                             to_yz_xxxyy,     \
+                             to_yz_xxxyz,     \
+                             to_yz_xxy,       \
+                             to_yz_xxyyy,     \
+                             to_yz_xxyyz,     \
+                             to_yz_xxyzz,     \
+                             to_yz_xxz,       \
+                             to_yz_xyy,       \
+                             to_yz_xyyyy,     \
+                             to_yz_xyyyz,     \
+                             to_yz_xyyzz,     \
+                             to_yz_xyz,       \
+                             to_yz_xyzzz,     \
+                             to_yz_xzz,       \
+                             to_yz_yyy,       \
+                             to_yz_yyyyy,     \
+                             to_yz_yyyyz,     \
+                             to_yz_yyyzz,     \
+                             to_yz_yyz,       \
+                             to_yz_yyzzz,     \
+                             to_yz_yzz,       \
+                             to_yz_yzzzz,     \
+                             to_yz_zzz,       \
+                             to_yzzz_xxx,     \
+                             to_yzzz_xxxxy,   \
+                             to_yzzz_xxxyy,   \
+                             to_yzzz_xxxyz,   \
+                             to_yzzz_xxy,     \
+                             to_yzzz_xxyyy,   \
+                             to_yzzz_xxyyz,   \
+                             to_yzzz_xxyzz,   \
+                             to_yzzz_xxz,     \
+                             to_yzzz_xyy,     \
+                             to_yzzz_xyyyy,   \
+                             to_yzzz_xyyyz,   \
+                             to_yzzz_xyyzz,   \
+                             to_yzzz_xyz,     \
+                             to_yzzz_xyzzz,   \
+                             to_yzzz_xzz,     \
+                             to_yzzz_yyy,     \
+                             to_yzzz_yyyyy,   \
+                             to_yzzz_yyyyz,   \
+                             to_yzzz_yyyzz,   \
+                             to_yzzz_yyz,     \
+                             to_yzzz_yyzzz,   \
+                             to_yzzz_yzz,     \
+                             to_yzzz_yzzzz,   \
+                             to_yzzz_zzz,     \
+                             to_z_y_yzz_xxxx, \
+                             to_z_y_yzz_xxxy, \
+                             to_z_y_yzz_xxxz, \
+                             to_z_y_yzz_xxyy, \
+                             to_z_y_yzz_xxyz, \
+                             to_z_y_yzz_xxzz, \
+                             to_z_y_yzz_xyyy, \
+                             to_z_y_yzz_xyyz, \
+                             to_z_y_yzz_xyzz, \
+                             to_z_y_yzz_xzzz, \
+                             to_z_y_yzz_yyyy, \
+                             to_z_y_yzz_yyyz, \
+                             to_z_y_yzz_yyzz, \
+                             to_z_y_yzz_yzzz, \
+                             to_z_y_yzz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -6832,31 +11531,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_z_y_yzz_xxxx[k] = -4.0 * to_yz_xxxxy[k] * tke_0 + 4.0 * to_yzzz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_z_y_yzz_xxxy[k] = 2.0 * to_yz_xxx[k] - 4.0 * to_yz_xxxyy[k] * tke_0 - 2.0 * to_yzzz_xxx[k] * tbe_0 + 4.0 * to_yzzz_xxxyy[k] * tbe_0 * tke_0;
+            to_z_y_yzz_xxxy[k] =
+                2.0 * to_yz_xxx[k] - 4.0 * to_yz_xxxyy[k] * tke_0 - 2.0 * to_yzzz_xxx[k] * tbe_0 + 4.0 * to_yzzz_xxxyy[k] * tbe_0 * tke_0;
 
             to_z_y_yzz_xxxz[k] = -4.0 * to_yz_xxxyz[k] * tke_0 + 4.0 * to_yzzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_z_y_yzz_xxyy[k] = 4.0 * to_yz_xxy[k] - 4.0 * to_yz_xxyyy[k] * tke_0 - 4.0 * to_yzzz_xxy[k] * tbe_0 + 4.0 * to_yzzz_xxyyy[k] * tbe_0 * tke_0;
+            to_z_y_yzz_xxyy[k] =
+                4.0 * to_yz_xxy[k] - 4.0 * to_yz_xxyyy[k] * tke_0 - 4.0 * to_yzzz_xxy[k] * tbe_0 + 4.0 * to_yzzz_xxyyy[k] * tbe_0 * tke_0;
 
-            to_z_y_yzz_xxyz[k] = 2.0 * to_yz_xxz[k] - 4.0 * to_yz_xxyyz[k] * tke_0 - 2.0 * to_yzzz_xxz[k] * tbe_0 + 4.0 * to_yzzz_xxyyz[k] * tbe_0 * tke_0;
+            to_z_y_yzz_xxyz[k] =
+                2.0 * to_yz_xxz[k] - 4.0 * to_yz_xxyyz[k] * tke_0 - 2.0 * to_yzzz_xxz[k] * tbe_0 + 4.0 * to_yzzz_xxyyz[k] * tbe_0 * tke_0;
 
             to_z_y_yzz_xxzz[k] = -4.0 * to_yz_xxyzz[k] * tke_0 + 4.0 * to_yzzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_z_y_yzz_xyyy[k] = 6.0 * to_yz_xyy[k] - 4.0 * to_yz_xyyyy[k] * tke_0 - 6.0 * to_yzzz_xyy[k] * tbe_0 + 4.0 * to_yzzz_xyyyy[k] * tbe_0 * tke_0;
+            to_z_y_yzz_xyyy[k] =
+                6.0 * to_yz_xyy[k] - 4.0 * to_yz_xyyyy[k] * tke_0 - 6.0 * to_yzzz_xyy[k] * tbe_0 + 4.0 * to_yzzz_xyyyy[k] * tbe_0 * tke_0;
 
-            to_z_y_yzz_xyyz[k] = 4.0 * to_yz_xyz[k] - 4.0 * to_yz_xyyyz[k] * tke_0 - 4.0 * to_yzzz_xyz[k] * tbe_0 + 4.0 * to_yzzz_xyyyz[k] * tbe_0 * tke_0;
+            to_z_y_yzz_xyyz[k] =
+                4.0 * to_yz_xyz[k] - 4.0 * to_yz_xyyyz[k] * tke_0 - 4.0 * to_yzzz_xyz[k] * tbe_0 + 4.0 * to_yzzz_xyyyz[k] * tbe_0 * tke_0;
 
-            to_z_y_yzz_xyzz[k] = 2.0 * to_yz_xzz[k] - 4.0 * to_yz_xyyzz[k] * tke_0 - 2.0 * to_yzzz_xzz[k] * tbe_0 + 4.0 * to_yzzz_xyyzz[k] * tbe_0 * tke_0;
+            to_z_y_yzz_xyzz[k] =
+                2.0 * to_yz_xzz[k] - 4.0 * to_yz_xyyzz[k] * tke_0 - 2.0 * to_yzzz_xzz[k] * tbe_0 + 4.0 * to_yzzz_xyyzz[k] * tbe_0 * tke_0;
 
             to_z_y_yzz_xzzz[k] = -4.0 * to_yz_xyzzz[k] * tke_0 + 4.0 * to_yzzz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_z_y_yzz_yyyy[k] = 8.0 * to_yz_yyy[k] - 4.0 * to_yz_yyyyy[k] * tke_0 - 8.0 * to_yzzz_yyy[k] * tbe_0 + 4.0 * to_yzzz_yyyyy[k] * tbe_0 * tke_0;
+            to_z_y_yzz_yyyy[k] =
+                8.0 * to_yz_yyy[k] - 4.0 * to_yz_yyyyy[k] * tke_0 - 8.0 * to_yzzz_yyy[k] * tbe_0 + 4.0 * to_yzzz_yyyyy[k] * tbe_0 * tke_0;
 
-            to_z_y_yzz_yyyz[k] = 6.0 * to_yz_yyz[k] - 4.0 * to_yz_yyyyz[k] * tke_0 - 6.0 * to_yzzz_yyz[k] * tbe_0 + 4.0 * to_yzzz_yyyyz[k] * tbe_0 * tke_0;
+            to_z_y_yzz_yyyz[k] =
+                6.0 * to_yz_yyz[k] - 4.0 * to_yz_yyyyz[k] * tke_0 - 6.0 * to_yzzz_yyz[k] * tbe_0 + 4.0 * to_yzzz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_z_y_yzz_yyzz[k] = 4.0 * to_yz_yzz[k] - 4.0 * to_yz_yyyzz[k] * tke_0 - 4.0 * to_yzzz_yzz[k] * tbe_0 + 4.0 * to_yzzz_yyyzz[k] * tbe_0 * tke_0;
+            to_z_y_yzz_yyzz[k] =
+                4.0 * to_yz_yzz[k] - 4.0 * to_yz_yyyzz[k] * tke_0 - 4.0 * to_yzzz_yzz[k] * tbe_0 + 4.0 * to_yzzz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_z_y_yzz_yzzz[k] = 2.0 * to_yz_zzz[k] - 4.0 * to_yz_yyzzz[k] * tke_0 - 2.0 * to_yzzz_zzz[k] * tbe_0 + 4.0 * to_yzzz_yyzzz[k] * tbe_0 * tke_0;
+            to_z_y_yzz_yzzz[k] =
+                2.0 * to_yz_zzz[k] - 4.0 * to_yz_yyzzz[k] * tke_0 - 2.0 * to_yzzz_zzz[k] * tbe_0 + 4.0 * to_yzzz_yyzzz[k] * tbe_0 * tke_0;
 
             to_z_y_yzz_zzzz[k] = -4.0 * to_yz_yzzzz[k] * tke_0 + 4.0 * to_yzzz_yzzzz[k] * tbe_0 * tke_0;
         }
@@ -6893,7 +11602,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_y_zzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 7 * op_comps * 150 + i * 150 + 149);
 
-        #pragma omp simd aligned(to_z_y_zzz_xxxx, to_z_y_zzz_xxxy, to_z_y_zzz_xxxz, to_z_y_zzz_xxyy, to_z_y_zzz_xxyz, to_z_y_zzz_xxzz, to_z_y_zzz_xyyy, to_z_y_zzz_xyyz, to_z_y_zzz_xyzz, to_z_y_zzz_xzzz, to_z_y_zzz_yyyy, to_z_y_zzz_yyyz, to_z_y_zzz_yyzz, to_z_y_zzz_yzzz, to_z_y_zzz_zzzz, to_zz_xxx, to_zz_xxxxy, to_zz_xxxyy, to_zz_xxxyz, to_zz_xxy, to_zz_xxyyy, to_zz_xxyyz, to_zz_xxyzz, to_zz_xxz, to_zz_xyy, to_zz_xyyyy, to_zz_xyyyz, to_zz_xyyzz, to_zz_xyz, to_zz_xyzzz, to_zz_xzz, to_zz_yyy, to_zz_yyyyy, to_zz_yyyyz, to_zz_yyyzz, to_zz_yyz, to_zz_yyzzz, to_zz_yzz, to_zz_yzzzz, to_zz_zzz, to_zzzz_xxx, to_zzzz_xxxxy, to_zzzz_xxxyy, to_zzzz_xxxyz, to_zzzz_xxy, to_zzzz_xxyyy, to_zzzz_xxyyz, to_zzzz_xxyzz, to_zzzz_xxz, to_zzzz_xyy, to_zzzz_xyyyy, to_zzzz_xyyyz, to_zzzz_xyyzz, to_zzzz_xyz, to_zzzz_xyzzz, to_zzzz_xzz, to_zzzz_yyy, to_zzzz_yyyyy, to_zzzz_yyyyz, to_zzzz_yyyzz, to_zzzz_yyz, to_zzzz_yyzzz, to_zzzz_yzz, to_zzzz_yzzzz, to_zzzz_zzz, b_exps : 64)
+#pragma omp simd aligned(to_z_y_zzz_xxxx,     \
+                             to_z_y_zzz_xxxy, \
+                             to_z_y_zzz_xxxz, \
+                             to_z_y_zzz_xxyy, \
+                             to_z_y_zzz_xxyz, \
+                             to_z_y_zzz_xxzz, \
+                             to_z_y_zzz_xyyy, \
+                             to_z_y_zzz_xyyz, \
+                             to_z_y_zzz_xyzz, \
+                             to_z_y_zzz_xzzz, \
+                             to_z_y_zzz_yyyy, \
+                             to_z_y_zzz_yyyz, \
+                             to_z_y_zzz_yyzz, \
+                             to_z_y_zzz_yzzz, \
+                             to_z_y_zzz_zzzz, \
+                             to_zz_xxx,       \
+                             to_zz_xxxxy,     \
+                             to_zz_xxxyy,     \
+                             to_zz_xxxyz,     \
+                             to_zz_xxy,       \
+                             to_zz_xxyyy,     \
+                             to_zz_xxyyz,     \
+                             to_zz_xxyzz,     \
+                             to_zz_xxz,       \
+                             to_zz_xyy,       \
+                             to_zz_xyyyy,     \
+                             to_zz_xyyyz,     \
+                             to_zz_xyyzz,     \
+                             to_zz_xyz,       \
+                             to_zz_xyzzz,     \
+                             to_zz_xzz,       \
+                             to_zz_yyy,       \
+                             to_zz_yyyyy,     \
+                             to_zz_yyyyz,     \
+                             to_zz_yyyzz,     \
+                             to_zz_yyz,       \
+                             to_zz_yyzzz,     \
+                             to_zz_yzz,       \
+                             to_zz_yzzzz,     \
+                             to_zz_zzz,       \
+                             to_zzzz_xxx,     \
+                             to_zzzz_xxxxy,   \
+                             to_zzzz_xxxyy,   \
+                             to_zzzz_xxxyz,   \
+                             to_zzzz_xxy,     \
+                             to_zzzz_xxyyy,   \
+                             to_zzzz_xxyyz,   \
+                             to_zzzz_xxyzz,   \
+                             to_zzzz_xxz,     \
+                             to_zzzz_xyy,     \
+                             to_zzzz_xyyyy,   \
+                             to_zzzz_xyyyz,   \
+                             to_zzzz_xyyzz,   \
+                             to_zzzz_xyz,     \
+                             to_zzzz_xyzzz,   \
+                             to_zzzz_xzz,     \
+                             to_zzzz_yyy,     \
+                             to_zzzz_yyyyy,   \
+                             to_zzzz_yyyyz,   \
+                             to_zzzz_yyyzz,   \
+                             to_zzzz_yyz,     \
+                             to_zzzz_yyzzz,   \
+                             to_zzzz_yzz,     \
+                             to_zzzz_yzzzz,   \
+                             to_zzzz_zzz,     \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -6902,31 +11676,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_z_y_zzz_xxxx[k] = -6.0 * to_zz_xxxxy[k] * tke_0 + 4.0 * to_zzzz_xxxxy[k] * tbe_0 * tke_0;
 
-            to_z_y_zzz_xxxy[k] = 3.0 * to_zz_xxx[k] - 6.0 * to_zz_xxxyy[k] * tke_0 - 2.0 * to_zzzz_xxx[k] * tbe_0 + 4.0 * to_zzzz_xxxyy[k] * tbe_0 * tke_0;
+            to_z_y_zzz_xxxy[k] =
+                3.0 * to_zz_xxx[k] - 6.0 * to_zz_xxxyy[k] * tke_0 - 2.0 * to_zzzz_xxx[k] * tbe_0 + 4.0 * to_zzzz_xxxyy[k] * tbe_0 * tke_0;
 
             to_z_y_zzz_xxxz[k] = -6.0 * to_zz_xxxyz[k] * tke_0 + 4.0 * to_zzzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_z_y_zzz_xxyy[k] = 6.0 * to_zz_xxy[k] - 6.0 * to_zz_xxyyy[k] * tke_0 - 4.0 * to_zzzz_xxy[k] * tbe_0 + 4.0 * to_zzzz_xxyyy[k] * tbe_0 * tke_0;
+            to_z_y_zzz_xxyy[k] =
+                6.0 * to_zz_xxy[k] - 6.0 * to_zz_xxyyy[k] * tke_0 - 4.0 * to_zzzz_xxy[k] * tbe_0 + 4.0 * to_zzzz_xxyyy[k] * tbe_0 * tke_0;
 
-            to_z_y_zzz_xxyz[k] = 3.0 * to_zz_xxz[k] - 6.0 * to_zz_xxyyz[k] * tke_0 - 2.0 * to_zzzz_xxz[k] * tbe_0 + 4.0 * to_zzzz_xxyyz[k] * tbe_0 * tke_0;
+            to_z_y_zzz_xxyz[k] =
+                3.0 * to_zz_xxz[k] - 6.0 * to_zz_xxyyz[k] * tke_0 - 2.0 * to_zzzz_xxz[k] * tbe_0 + 4.0 * to_zzzz_xxyyz[k] * tbe_0 * tke_0;
 
             to_z_y_zzz_xxzz[k] = -6.0 * to_zz_xxyzz[k] * tke_0 + 4.0 * to_zzzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_z_y_zzz_xyyy[k] = 9.0 * to_zz_xyy[k] - 6.0 * to_zz_xyyyy[k] * tke_0 - 6.0 * to_zzzz_xyy[k] * tbe_0 + 4.0 * to_zzzz_xyyyy[k] * tbe_0 * tke_0;
+            to_z_y_zzz_xyyy[k] =
+                9.0 * to_zz_xyy[k] - 6.0 * to_zz_xyyyy[k] * tke_0 - 6.0 * to_zzzz_xyy[k] * tbe_0 + 4.0 * to_zzzz_xyyyy[k] * tbe_0 * tke_0;
 
-            to_z_y_zzz_xyyz[k] = 6.0 * to_zz_xyz[k] - 6.0 * to_zz_xyyyz[k] * tke_0 - 4.0 * to_zzzz_xyz[k] * tbe_0 + 4.0 * to_zzzz_xyyyz[k] * tbe_0 * tke_0;
+            to_z_y_zzz_xyyz[k] =
+                6.0 * to_zz_xyz[k] - 6.0 * to_zz_xyyyz[k] * tke_0 - 4.0 * to_zzzz_xyz[k] * tbe_0 + 4.0 * to_zzzz_xyyyz[k] * tbe_0 * tke_0;
 
-            to_z_y_zzz_xyzz[k] = 3.0 * to_zz_xzz[k] - 6.0 * to_zz_xyyzz[k] * tke_0 - 2.0 * to_zzzz_xzz[k] * tbe_0 + 4.0 * to_zzzz_xyyzz[k] * tbe_0 * tke_0;
+            to_z_y_zzz_xyzz[k] =
+                3.0 * to_zz_xzz[k] - 6.0 * to_zz_xyyzz[k] * tke_0 - 2.0 * to_zzzz_xzz[k] * tbe_0 + 4.0 * to_zzzz_xyyzz[k] * tbe_0 * tke_0;
 
             to_z_y_zzz_xzzz[k] = -6.0 * to_zz_xyzzz[k] * tke_0 + 4.0 * to_zzzz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_z_y_zzz_yyyy[k] = 12.0 * to_zz_yyy[k] - 6.0 * to_zz_yyyyy[k] * tke_0 - 8.0 * to_zzzz_yyy[k] * tbe_0 + 4.0 * to_zzzz_yyyyy[k] * tbe_0 * tke_0;
+            to_z_y_zzz_yyyy[k] =
+                12.0 * to_zz_yyy[k] - 6.0 * to_zz_yyyyy[k] * tke_0 - 8.0 * to_zzzz_yyy[k] * tbe_0 + 4.0 * to_zzzz_yyyyy[k] * tbe_0 * tke_0;
 
-            to_z_y_zzz_yyyz[k] = 9.0 * to_zz_yyz[k] - 6.0 * to_zz_yyyyz[k] * tke_0 - 6.0 * to_zzzz_yyz[k] * tbe_0 + 4.0 * to_zzzz_yyyyz[k] * tbe_0 * tke_0;
+            to_z_y_zzz_yyyz[k] =
+                9.0 * to_zz_yyz[k] - 6.0 * to_zz_yyyyz[k] * tke_0 - 6.0 * to_zzzz_yyz[k] * tbe_0 + 4.0 * to_zzzz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_z_y_zzz_yyzz[k] = 6.0 * to_zz_yzz[k] - 6.0 * to_zz_yyyzz[k] * tke_0 - 4.0 * to_zzzz_yzz[k] * tbe_0 + 4.0 * to_zzzz_yyyzz[k] * tbe_0 * tke_0;
+            to_z_y_zzz_yyzz[k] =
+                6.0 * to_zz_yzz[k] - 6.0 * to_zz_yyyzz[k] * tke_0 - 4.0 * to_zzzz_yzz[k] * tbe_0 + 4.0 * to_zzzz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_z_y_zzz_yzzz[k] = 3.0 * to_zz_zzz[k] - 6.0 * to_zz_yyzzz[k] * tke_0 - 2.0 * to_zzzz_zzz[k] * tbe_0 + 4.0 * to_zzzz_yyzzz[k] * tbe_0 * tke_0;
+            to_z_y_zzz_yzzz[k] =
+                3.0 * to_zz_zzz[k] - 6.0 * to_zz_yyzzz[k] * tke_0 - 2.0 * to_zzzz_zzz[k] * tbe_0 + 4.0 * to_zzzz_yyzzz[k] * tbe_0 * tke_0;
 
             to_z_y_zzz_zzzz[k] = -6.0 * to_zz_yzzzz[k] * tke_0 + 4.0 * to_zzzz_yzzzz[k] * tbe_0 * tke_0;
         }
@@ -6963,7 +11747,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_z_xxx_zzzz = pbuffer.data(idx_op_geom_101_fg + 8 * op_comps * 150 + i * 150 + 14);
 
-        #pragma omp simd aligned(to_xxxz_xxx, to_xxxz_xxxxz, to_xxxz_xxxyz, to_xxxz_xxxzz, to_xxxz_xxy, to_xxxz_xxyyz, to_xxxz_xxyzz, to_xxxz_xxz, to_xxxz_xxzzz, to_xxxz_xyy, to_xxxz_xyyyz, to_xxxz_xyyzz, to_xxxz_xyz, to_xxxz_xyzzz, to_xxxz_xzz, to_xxxz_xzzzz, to_xxxz_yyy, to_xxxz_yyyyz, to_xxxz_yyyzz, to_xxxz_yyz, to_xxxz_yyzzz, to_xxxz_yzz, to_xxxz_yzzzz, to_xxxz_zzz, to_xxxz_zzzzz, to_z_z_xxx_xxxx, to_z_z_xxx_xxxy, to_z_z_xxx_xxxz, to_z_z_xxx_xxyy, to_z_z_xxx_xxyz, to_z_z_xxx_xxzz, to_z_z_xxx_xyyy, to_z_z_xxx_xyyz, to_z_z_xxx_xyzz, to_z_z_xxx_xzzz, to_z_z_xxx_yyyy, to_z_z_xxx_yyyz, to_z_z_xxx_yyzz, to_z_z_xxx_yzzz, to_z_z_xxx_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xxxz_xxx,         \
+                             to_xxxz_xxxxz,   \
+                             to_xxxz_xxxyz,   \
+                             to_xxxz_xxxzz,   \
+                             to_xxxz_xxy,     \
+                             to_xxxz_xxyyz,   \
+                             to_xxxz_xxyzz,   \
+                             to_xxxz_xxz,     \
+                             to_xxxz_xxzzz,   \
+                             to_xxxz_xyy,     \
+                             to_xxxz_xyyyz,   \
+                             to_xxxz_xyyzz,   \
+                             to_xxxz_xyz,     \
+                             to_xxxz_xyzzz,   \
+                             to_xxxz_xzz,     \
+                             to_xxxz_xzzzz,   \
+                             to_xxxz_yyy,     \
+                             to_xxxz_yyyyz,   \
+                             to_xxxz_yyyzz,   \
+                             to_xxxz_yyz,     \
+                             to_xxxz_yyzzz,   \
+                             to_xxxz_yzz,     \
+                             to_xxxz_yzzzz,   \
+                             to_xxxz_zzz,     \
+                             to_xxxz_zzzzz,   \
+                             to_z_z_xxx_xxxx, \
+                             to_z_z_xxx_xxxy, \
+                             to_z_z_xxx_xxxz, \
+                             to_z_z_xxx_xxyy, \
+                             to_z_z_xxx_xxyz, \
+                             to_z_z_xxx_xxzz, \
+                             to_z_z_xxx_xyyy, \
+                             to_z_z_xxx_xyyz, \
+                             to_z_z_xxx_xyzz, \
+                             to_z_z_xxx_xzzz, \
+                             to_z_z_xxx_yyyy, \
+                             to_z_z_xxx_yyyz, \
+                             to_z_z_xxx_yyzz, \
+                             to_z_z_xxx_yzzz, \
+                             to_z_z_xxx_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -7033,7 +11857,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_z_xxy_zzzz = pbuffer.data(idx_op_geom_101_fg + 8 * op_comps * 150 + i * 150 + 29);
 
-        #pragma omp simd aligned(to_xxyz_xxx, to_xxyz_xxxxz, to_xxyz_xxxyz, to_xxyz_xxxzz, to_xxyz_xxy, to_xxyz_xxyyz, to_xxyz_xxyzz, to_xxyz_xxz, to_xxyz_xxzzz, to_xxyz_xyy, to_xxyz_xyyyz, to_xxyz_xyyzz, to_xxyz_xyz, to_xxyz_xyzzz, to_xxyz_xzz, to_xxyz_xzzzz, to_xxyz_yyy, to_xxyz_yyyyz, to_xxyz_yyyzz, to_xxyz_yyz, to_xxyz_yyzzz, to_xxyz_yzz, to_xxyz_yzzzz, to_xxyz_zzz, to_xxyz_zzzzz, to_z_z_xxy_xxxx, to_z_z_xxy_xxxy, to_z_z_xxy_xxxz, to_z_z_xxy_xxyy, to_z_z_xxy_xxyz, to_z_z_xxy_xxzz, to_z_z_xxy_xyyy, to_z_z_xxy_xyyz, to_z_z_xxy_xyzz, to_z_z_xxy_xzzz, to_z_z_xxy_yyyy, to_z_z_xxy_yyyz, to_z_z_xxy_yyzz, to_z_z_xxy_yzzz, to_z_z_xxy_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xxyz_xxx,         \
+                             to_xxyz_xxxxz,   \
+                             to_xxyz_xxxyz,   \
+                             to_xxyz_xxxzz,   \
+                             to_xxyz_xxy,     \
+                             to_xxyz_xxyyz,   \
+                             to_xxyz_xxyzz,   \
+                             to_xxyz_xxz,     \
+                             to_xxyz_xxzzz,   \
+                             to_xxyz_xyy,     \
+                             to_xxyz_xyyyz,   \
+                             to_xxyz_xyyzz,   \
+                             to_xxyz_xyz,     \
+                             to_xxyz_xyzzz,   \
+                             to_xxyz_xzz,     \
+                             to_xxyz_xzzzz,   \
+                             to_xxyz_yyy,     \
+                             to_xxyz_yyyyz,   \
+                             to_xxyz_yyyzz,   \
+                             to_xxyz_yyz,     \
+                             to_xxyz_yyzzz,   \
+                             to_xxyz_yzz,     \
+                             to_xxyz_yzzzz,   \
+                             to_xxyz_zzz,     \
+                             to_xxyz_zzzzz,   \
+                             to_z_z_xxy_xxxx, \
+                             to_z_z_xxy_xxxy, \
+                             to_z_z_xxy_xxxz, \
+                             to_z_z_xxy_xxyy, \
+                             to_z_z_xxy_xxyz, \
+                             to_z_z_xxy_xxzz, \
+                             to_z_z_xxy_xyyy, \
+                             to_z_z_xxy_xyyz, \
+                             to_z_z_xxy_xyzz, \
+                             to_z_z_xxy_xzzz, \
+                             to_z_z_xxy_yyyy, \
+                             to_z_z_xxy_yyyz, \
+                             to_z_z_xxy_yyzz, \
+                             to_z_z_xxy_yzzz, \
+                             to_z_z_xxy_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -7103,7 +11967,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_z_xxz_zzzz = pbuffer.data(idx_op_geom_101_fg + 8 * op_comps * 150 + i * 150 + 44);
 
-        #pragma omp simd aligned(to_xx_xxx, to_xx_xxxxz, to_xx_xxxyz, to_xx_xxxzz, to_xx_xxy, to_xx_xxyyz, to_xx_xxyzz, to_xx_xxz, to_xx_xxzzz, to_xx_xyy, to_xx_xyyyz, to_xx_xyyzz, to_xx_xyz, to_xx_xyzzz, to_xx_xzz, to_xx_xzzzz, to_xx_yyy, to_xx_yyyyz, to_xx_yyyzz, to_xx_yyz, to_xx_yyzzz, to_xx_yzz, to_xx_yzzzz, to_xx_zzz, to_xx_zzzzz, to_xxzz_xxx, to_xxzz_xxxxz, to_xxzz_xxxyz, to_xxzz_xxxzz, to_xxzz_xxy, to_xxzz_xxyyz, to_xxzz_xxyzz, to_xxzz_xxz, to_xxzz_xxzzz, to_xxzz_xyy, to_xxzz_xyyyz, to_xxzz_xyyzz, to_xxzz_xyz, to_xxzz_xyzzz, to_xxzz_xzz, to_xxzz_xzzzz, to_xxzz_yyy, to_xxzz_yyyyz, to_xxzz_yyyzz, to_xxzz_yyz, to_xxzz_yyzzz, to_xxzz_yzz, to_xxzz_yzzzz, to_xxzz_zzz, to_xxzz_zzzzz, to_z_z_xxz_xxxx, to_z_z_xxz_xxxy, to_z_z_xxz_xxxz, to_z_z_xxz_xxyy, to_z_z_xxz_xxyz, to_z_z_xxz_xxzz, to_z_z_xxz_xyyy, to_z_z_xxz_xyyz, to_z_z_xxz_xyzz, to_z_z_xxz_xzzz, to_z_z_xxz_yyyy, to_z_z_xxz_yyyz, to_z_z_xxz_yyzz, to_z_z_xxz_yzzz, to_z_z_xxz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xx_xxx,           \
+                             to_xx_xxxxz,     \
+                             to_xx_xxxyz,     \
+                             to_xx_xxxzz,     \
+                             to_xx_xxy,       \
+                             to_xx_xxyyz,     \
+                             to_xx_xxyzz,     \
+                             to_xx_xxz,       \
+                             to_xx_xxzzz,     \
+                             to_xx_xyy,       \
+                             to_xx_xyyyz,     \
+                             to_xx_xyyzz,     \
+                             to_xx_xyz,       \
+                             to_xx_xyzzz,     \
+                             to_xx_xzz,       \
+                             to_xx_xzzzz,     \
+                             to_xx_yyy,       \
+                             to_xx_yyyyz,     \
+                             to_xx_yyyzz,     \
+                             to_xx_yyz,       \
+                             to_xx_yyzzz,     \
+                             to_xx_yzz,       \
+                             to_xx_yzzzz,     \
+                             to_xx_zzz,       \
+                             to_xx_zzzzz,     \
+                             to_xxzz_xxx,     \
+                             to_xxzz_xxxxz,   \
+                             to_xxzz_xxxyz,   \
+                             to_xxzz_xxxzz,   \
+                             to_xxzz_xxy,     \
+                             to_xxzz_xxyyz,   \
+                             to_xxzz_xxyzz,   \
+                             to_xxzz_xxz,     \
+                             to_xxzz_xxzzz,   \
+                             to_xxzz_xyy,     \
+                             to_xxzz_xyyyz,   \
+                             to_xxzz_xyyzz,   \
+                             to_xxzz_xyz,     \
+                             to_xxzz_xyzzz,   \
+                             to_xxzz_xzz,     \
+                             to_xxzz_xzzzz,   \
+                             to_xxzz_yyy,     \
+                             to_xxzz_yyyyz,   \
+                             to_xxzz_yyyzz,   \
+                             to_xxzz_yyz,     \
+                             to_xxzz_yyzzz,   \
+                             to_xxzz_yzz,     \
+                             to_xxzz_yzzzz,   \
+                             to_xxzz_zzz,     \
+                             to_xxzz_zzzzz,   \
+                             to_z_z_xxz_xxxx, \
+                             to_z_z_xxz_xxxy, \
+                             to_z_z_xxz_xxxz, \
+                             to_z_z_xxz_xxyy, \
+                             to_z_z_xxz_xxyz, \
+                             to_z_z_xxz_xxzz, \
+                             to_z_z_xxz_xyyy, \
+                             to_z_z_xxz_xyyz, \
+                             to_z_z_xxz_xyzz, \
+                             to_z_z_xxz_xzzz, \
+                             to_z_z_xxz_yyyy, \
+                             to_z_z_xxz_yyyz, \
+                             to_z_z_xxz_yyzz, \
+                             to_z_z_xxz_yzzz, \
+                             to_z_z_xxz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -7120,25 +12049,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_z_z_xxz_xxyz[k] = to_xx_xxy[k] - 2.0 * to_xx_xxyzz[k] * tke_0 - 2.0 * to_xxzz_xxy[k] * tbe_0 + 4.0 * to_xxzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xxz_xxzz[k] = 2.0 * to_xx_xxz[k] - 2.0 * to_xx_xxzzz[k] * tke_0 - 4.0 * to_xxzz_xxz[k] * tbe_0 + 4.0 * to_xxzz_xxzzz[k] * tbe_0 * tke_0;
+            to_z_z_xxz_xxzz[k] =
+                2.0 * to_xx_xxz[k] - 2.0 * to_xx_xxzzz[k] * tke_0 - 4.0 * to_xxzz_xxz[k] * tbe_0 + 4.0 * to_xxzz_xxzzz[k] * tbe_0 * tke_0;
 
             to_z_z_xxz_xyyy[k] = -2.0 * to_xx_xyyyz[k] * tke_0 + 4.0 * to_xxzz_xyyyz[k] * tbe_0 * tke_0;
 
             to_z_z_xxz_xyyz[k] = to_xx_xyy[k] - 2.0 * to_xx_xyyzz[k] * tke_0 - 2.0 * to_xxzz_xyy[k] * tbe_0 + 4.0 * to_xxzz_xyyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xxz_xyzz[k] = 2.0 * to_xx_xyz[k] - 2.0 * to_xx_xyzzz[k] * tke_0 - 4.0 * to_xxzz_xyz[k] * tbe_0 + 4.0 * to_xxzz_xyzzz[k] * tbe_0 * tke_0;
+            to_z_z_xxz_xyzz[k] =
+                2.0 * to_xx_xyz[k] - 2.0 * to_xx_xyzzz[k] * tke_0 - 4.0 * to_xxzz_xyz[k] * tbe_0 + 4.0 * to_xxzz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xxz_xzzz[k] = 3.0 * to_xx_xzz[k] - 2.0 * to_xx_xzzzz[k] * tke_0 - 6.0 * to_xxzz_xzz[k] * tbe_0 + 4.0 * to_xxzz_xzzzz[k] * tbe_0 * tke_0;
+            to_z_z_xxz_xzzz[k] =
+                3.0 * to_xx_xzz[k] - 2.0 * to_xx_xzzzz[k] * tke_0 - 6.0 * to_xxzz_xzz[k] * tbe_0 + 4.0 * to_xxzz_xzzzz[k] * tbe_0 * tke_0;
 
             to_z_z_xxz_yyyy[k] = -2.0 * to_xx_yyyyz[k] * tke_0 + 4.0 * to_xxzz_yyyyz[k] * tbe_0 * tke_0;
 
             to_z_z_xxz_yyyz[k] = to_xx_yyy[k] - 2.0 * to_xx_yyyzz[k] * tke_0 - 2.0 * to_xxzz_yyy[k] * tbe_0 + 4.0 * to_xxzz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xxz_yyzz[k] = 2.0 * to_xx_yyz[k] - 2.0 * to_xx_yyzzz[k] * tke_0 - 4.0 * to_xxzz_yyz[k] * tbe_0 + 4.0 * to_xxzz_yyzzz[k] * tbe_0 * tke_0;
+            to_z_z_xxz_yyzz[k] =
+                2.0 * to_xx_yyz[k] - 2.0 * to_xx_yyzzz[k] * tke_0 - 4.0 * to_xxzz_yyz[k] * tbe_0 + 4.0 * to_xxzz_yyzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xxz_yzzz[k] = 3.0 * to_xx_yzz[k] - 2.0 * to_xx_yzzzz[k] * tke_0 - 6.0 * to_xxzz_yzz[k] * tbe_0 + 4.0 * to_xxzz_yzzzz[k] * tbe_0 * tke_0;
+            to_z_z_xxz_yzzz[k] =
+                3.0 * to_xx_yzz[k] - 2.0 * to_xx_yzzzz[k] * tke_0 - 6.0 * to_xxzz_yzz[k] * tbe_0 + 4.0 * to_xxzz_yzzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xxz_zzzz[k] = 4.0 * to_xx_zzz[k] - 2.0 * to_xx_zzzzz[k] * tke_0 - 8.0 * to_xxzz_zzz[k] * tbe_0 + 4.0 * to_xxzz_zzzzz[k] * tbe_0 * tke_0;
+            to_z_z_xxz_zzzz[k] =
+                4.0 * to_xx_zzz[k] - 2.0 * to_xx_zzzzz[k] * tke_0 - 8.0 * to_xxzz_zzz[k] * tbe_0 + 4.0 * to_xxzz_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 1245-1260 components of targeted buffer : FG
@@ -7173,7 +12108,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_z_xyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 8 * op_comps * 150 + i * 150 + 59);
 
-        #pragma omp simd aligned(to_xyyz_xxx, to_xyyz_xxxxz, to_xyyz_xxxyz, to_xyyz_xxxzz, to_xyyz_xxy, to_xyyz_xxyyz, to_xyyz_xxyzz, to_xyyz_xxz, to_xyyz_xxzzz, to_xyyz_xyy, to_xyyz_xyyyz, to_xyyz_xyyzz, to_xyyz_xyz, to_xyyz_xyzzz, to_xyyz_xzz, to_xyyz_xzzzz, to_xyyz_yyy, to_xyyz_yyyyz, to_xyyz_yyyzz, to_xyyz_yyz, to_xyyz_yyzzz, to_xyyz_yzz, to_xyyz_yzzzz, to_xyyz_zzz, to_xyyz_zzzzz, to_z_z_xyy_xxxx, to_z_z_xyy_xxxy, to_z_z_xyy_xxxz, to_z_z_xyy_xxyy, to_z_z_xyy_xxyz, to_z_z_xyy_xxzz, to_z_z_xyy_xyyy, to_z_z_xyy_xyyz, to_z_z_xyy_xyzz, to_z_z_xyy_xzzz, to_z_z_xyy_yyyy, to_z_z_xyy_yyyz, to_z_z_xyy_yyzz, to_z_z_xyy_yzzz, to_z_z_xyy_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xyyz_xxx,         \
+                             to_xyyz_xxxxz,   \
+                             to_xyyz_xxxyz,   \
+                             to_xyyz_xxxzz,   \
+                             to_xyyz_xxy,     \
+                             to_xyyz_xxyyz,   \
+                             to_xyyz_xxyzz,   \
+                             to_xyyz_xxz,     \
+                             to_xyyz_xxzzz,   \
+                             to_xyyz_xyy,     \
+                             to_xyyz_xyyyz,   \
+                             to_xyyz_xyyzz,   \
+                             to_xyyz_xyz,     \
+                             to_xyyz_xyzzz,   \
+                             to_xyyz_xzz,     \
+                             to_xyyz_xzzzz,   \
+                             to_xyyz_yyy,     \
+                             to_xyyz_yyyyz,   \
+                             to_xyyz_yyyzz,   \
+                             to_xyyz_yyz,     \
+                             to_xyyz_yyzzz,   \
+                             to_xyyz_yzz,     \
+                             to_xyyz_yzzzz,   \
+                             to_xyyz_zzz,     \
+                             to_xyyz_zzzzz,   \
+                             to_z_z_xyy_xxxx, \
+                             to_z_z_xyy_xxxy, \
+                             to_z_z_xyy_xxxz, \
+                             to_z_z_xyy_xxyy, \
+                             to_z_z_xyy_xxyz, \
+                             to_z_z_xyy_xxzz, \
+                             to_z_z_xyy_xyyy, \
+                             to_z_z_xyy_xyyz, \
+                             to_z_z_xyy_xyzz, \
+                             to_z_z_xyy_xzzz, \
+                             to_z_z_xyy_yyyy, \
+                             to_z_z_xyy_yyyz, \
+                             to_z_z_xyy_yyzz, \
+                             to_z_z_xyy_yzzz, \
+                             to_z_z_xyy_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -7243,7 +12218,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_z_xyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 8 * op_comps * 150 + i * 150 + 74);
 
-        #pragma omp simd aligned(to_xy_xxx, to_xy_xxxxz, to_xy_xxxyz, to_xy_xxxzz, to_xy_xxy, to_xy_xxyyz, to_xy_xxyzz, to_xy_xxz, to_xy_xxzzz, to_xy_xyy, to_xy_xyyyz, to_xy_xyyzz, to_xy_xyz, to_xy_xyzzz, to_xy_xzz, to_xy_xzzzz, to_xy_yyy, to_xy_yyyyz, to_xy_yyyzz, to_xy_yyz, to_xy_yyzzz, to_xy_yzz, to_xy_yzzzz, to_xy_zzz, to_xy_zzzzz, to_xyzz_xxx, to_xyzz_xxxxz, to_xyzz_xxxyz, to_xyzz_xxxzz, to_xyzz_xxy, to_xyzz_xxyyz, to_xyzz_xxyzz, to_xyzz_xxz, to_xyzz_xxzzz, to_xyzz_xyy, to_xyzz_xyyyz, to_xyzz_xyyzz, to_xyzz_xyz, to_xyzz_xyzzz, to_xyzz_xzz, to_xyzz_xzzzz, to_xyzz_yyy, to_xyzz_yyyyz, to_xyzz_yyyzz, to_xyzz_yyz, to_xyzz_yyzzz, to_xyzz_yzz, to_xyzz_yzzzz, to_xyzz_zzz, to_xyzz_zzzzz, to_z_z_xyz_xxxx, to_z_z_xyz_xxxy, to_z_z_xyz_xxxz, to_z_z_xyz_xxyy, to_z_z_xyz_xxyz, to_z_z_xyz_xxzz, to_z_z_xyz_xyyy, to_z_z_xyz_xyyz, to_z_z_xyz_xyzz, to_z_z_xyz_xzzz, to_z_z_xyz_yyyy, to_z_z_xyz_yyyz, to_z_z_xyz_yyzz, to_z_z_xyz_yzzz, to_z_z_xyz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xy_xxx,           \
+                             to_xy_xxxxz,     \
+                             to_xy_xxxyz,     \
+                             to_xy_xxxzz,     \
+                             to_xy_xxy,       \
+                             to_xy_xxyyz,     \
+                             to_xy_xxyzz,     \
+                             to_xy_xxz,       \
+                             to_xy_xxzzz,     \
+                             to_xy_xyy,       \
+                             to_xy_xyyyz,     \
+                             to_xy_xyyzz,     \
+                             to_xy_xyz,       \
+                             to_xy_xyzzz,     \
+                             to_xy_xzz,       \
+                             to_xy_xzzzz,     \
+                             to_xy_yyy,       \
+                             to_xy_yyyyz,     \
+                             to_xy_yyyzz,     \
+                             to_xy_yyz,       \
+                             to_xy_yyzzz,     \
+                             to_xy_yzz,       \
+                             to_xy_yzzzz,     \
+                             to_xy_zzz,       \
+                             to_xy_zzzzz,     \
+                             to_xyzz_xxx,     \
+                             to_xyzz_xxxxz,   \
+                             to_xyzz_xxxyz,   \
+                             to_xyzz_xxxzz,   \
+                             to_xyzz_xxy,     \
+                             to_xyzz_xxyyz,   \
+                             to_xyzz_xxyzz,   \
+                             to_xyzz_xxz,     \
+                             to_xyzz_xxzzz,   \
+                             to_xyzz_xyy,     \
+                             to_xyzz_xyyyz,   \
+                             to_xyzz_xyyzz,   \
+                             to_xyzz_xyz,     \
+                             to_xyzz_xyzzz,   \
+                             to_xyzz_xzz,     \
+                             to_xyzz_xzzzz,   \
+                             to_xyzz_yyy,     \
+                             to_xyzz_yyyyz,   \
+                             to_xyzz_yyyzz,   \
+                             to_xyzz_yyz,     \
+                             to_xyzz_yyzzz,   \
+                             to_xyzz_yzz,     \
+                             to_xyzz_yzzzz,   \
+                             to_xyzz_zzz,     \
+                             to_xyzz_zzzzz,   \
+                             to_z_z_xyz_xxxx, \
+                             to_z_z_xyz_xxxy, \
+                             to_z_z_xyz_xxxz, \
+                             to_z_z_xyz_xxyy, \
+                             to_z_z_xyz_xxyz, \
+                             to_z_z_xyz_xxzz, \
+                             to_z_z_xyz_xyyy, \
+                             to_z_z_xyz_xyyz, \
+                             to_z_z_xyz_xyzz, \
+                             to_z_z_xyz_xzzz, \
+                             to_z_z_xyz_yyyy, \
+                             to_z_z_xyz_yyyz, \
+                             to_z_z_xyz_yyzz, \
+                             to_z_z_xyz_yzzz, \
+                             to_z_z_xyz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -7260,25 +12300,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_z_z_xyz_xxyz[k] = to_xy_xxy[k] - 2.0 * to_xy_xxyzz[k] * tke_0 - 2.0 * to_xyzz_xxy[k] * tbe_0 + 4.0 * to_xyzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xyz_xxzz[k] = 2.0 * to_xy_xxz[k] - 2.0 * to_xy_xxzzz[k] * tke_0 - 4.0 * to_xyzz_xxz[k] * tbe_0 + 4.0 * to_xyzz_xxzzz[k] * tbe_0 * tke_0;
+            to_z_z_xyz_xxzz[k] =
+                2.0 * to_xy_xxz[k] - 2.0 * to_xy_xxzzz[k] * tke_0 - 4.0 * to_xyzz_xxz[k] * tbe_0 + 4.0 * to_xyzz_xxzzz[k] * tbe_0 * tke_0;
 
             to_z_z_xyz_xyyy[k] = -2.0 * to_xy_xyyyz[k] * tke_0 + 4.0 * to_xyzz_xyyyz[k] * tbe_0 * tke_0;
 
             to_z_z_xyz_xyyz[k] = to_xy_xyy[k] - 2.0 * to_xy_xyyzz[k] * tke_0 - 2.0 * to_xyzz_xyy[k] * tbe_0 + 4.0 * to_xyzz_xyyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xyz_xyzz[k] = 2.0 * to_xy_xyz[k] - 2.0 * to_xy_xyzzz[k] * tke_0 - 4.0 * to_xyzz_xyz[k] * tbe_0 + 4.0 * to_xyzz_xyzzz[k] * tbe_0 * tke_0;
+            to_z_z_xyz_xyzz[k] =
+                2.0 * to_xy_xyz[k] - 2.0 * to_xy_xyzzz[k] * tke_0 - 4.0 * to_xyzz_xyz[k] * tbe_0 + 4.0 * to_xyzz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xyz_xzzz[k] = 3.0 * to_xy_xzz[k] - 2.0 * to_xy_xzzzz[k] * tke_0 - 6.0 * to_xyzz_xzz[k] * tbe_0 + 4.0 * to_xyzz_xzzzz[k] * tbe_0 * tke_0;
+            to_z_z_xyz_xzzz[k] =
+                3.0 * to_xy_xzz[k] - 2.0 * to_xy_xzzzz[k] * tke_0 - 6.0 * to_xyzz_xzz[k] * tbe_0 + 4.0 * to_xyzz_xzzzz[k] * tbe_0 * tke_0;
 
             to_z_z_xyz_yyyy[k] = -2.0 * to_xy_yyyyz[k] * tke_0 + 4.0 * to_xyzz_yyyyz[k] * tbe_0 * tke_0;
 
             to_z_z_xyz_yyyz[k] = to_xy_yyy[k] - 2.0 * to_xy_yyyzz[k] * tke_0 - 2.0 * to_xyzz_yyy[k] * tbe_0 + 4.0 * to_xyzz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xyz_yyzz[k] = 2.0 * to_xy_yyz[k] - 2.0 * to_xy_yyzzz[k] * tke_0 - 4.0 * to_xyzz_yyz[k] * tbe_0 + 4.0 * to_xyzz_yyzzz[k] * tbe_0 * tke_0;
+            to_z_z_xyz_yyzz[k] =
+                2.0 * to_xy_yyz[k] - 2.0 * to_xy_yyzzz[k] * tke_0 - 4.0 * to_xyzz_yyz[k] * tbe_0 + 4.0 * to_xyzz_yyzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xyz_yzzz[k] = 3.0 * to_xy_yzz[k] - 2.0 * to_xy_yzzzz[k] * tke_0 - 6.0 * to_xyzz_yzz[k] * tbe_0 + 4.0 * to_xyzz_yzzzz[k] * tbe_0 * tke_0;
+            to_z_z_xyz_yzzz[k] =
+                3.0 * to_xy_yzz[k] - 2.0 * to_xy_yzzzz[k] * tke_0 - 6.0 * to_xyzz_yzz[k] * tbe_0 + 4.0 * to_xyzz_yzzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xyz_zzzz[k] = 4.0 * to_xy_zzz[k] - 2.0 * to_xy_zzzzz[k] * tke_0 - 8.0 * to_xyzz_zzz[k] * tbe_0 + 4.0 * to_xyzz_zzzzz[k] * tbe_0 * tke_0;
+            to_z_z_xyz_zzzz[k] =
+                4.0 * to_xy_zzz[k] - 2.0 * to_xy_zzzzz[k] * tke_0 - 8.0 * to_xyzz_zzz[k] * tbe_0 + 4.0 * to_xyzz_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 1275-1290 components of targeted buffer : FG
@@ -7313,7 +12359,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_z_xzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 8 * op_comps * 150 + i * 150 + 89);
 
-        #pragma omp simd aligned(to_xz_xxx, to_xz_xxxxz, to_xz_xxxyz, to_xz_xxxzz, to_xz_xxy, to_xz_xxyyz, to_xz_xxyzz, to_xz_xxz, to_xz_xxzzz, to_xz_xyy, to_xz_xyyyz, to_xz_xyyzz, to_xz_xyz, to_xz_xyzzz, to_xz_xzz, to_xz_xzzzz, to_xz_yyy, to_xz_yyyyz, to_xz_yyyzz, to_xz_yyz, to_xz_yyzzz, to_xz_yzz, to_xz_yzzzz, to_xz_zzz, to_xz_zzzzz, to_xzzz_xxx, to_xzzz_xxxxz, to_xzzz_xxxyz, to_xzzz_xxxzz, to_xzzz_xxy, to_xzzz_xxyyz, to_xzzz_xxyzz, to_xzzz_xxz, to_xzzz_xxzzz, to_xzzz_xyy, to_xzzz_xyyyz, to_xzzz_xyyzz, to_xzzz_xyz, to_xzzz_xyzzz, to_xzzz_xzz, to_xzzz_xzzzz, to_xzzz_yyy, to_xzzz_yyyyz, to_xzzz_yyyzz, to_xzzz_yyz, to_xzzz_yyzzz, to_xzzz_yzz, to_xzzz_yzzzz, to_xzzz_zzz, to_xzzz_zzzzz, to_z_z_xzz_xxxx, to_z_z_xzz_xxxy, to_z_z_xzz_xxxz, to_z_z_xzz_xxyy, to_z_z_xzz_xxyz, to_z_z_xzz_xxzz, to_z_z_xzz_xyyy, to_z_z_xzz_xyyz, to_z_z_xzz_xyzz, to_z_z_xzz_xzzz, to_z_z_xzz_yyyy, to_z_z_xzz_yyyz, to_z_z_xzz_yyzz, to_z_z_xzz_yzzz, to_z_z_xzz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_xz_xxx,           \
+                             to_xz_xxxxz,     \
+                             to_xz_xxxyz,     \
+                             to_xz_xxxzz,     \
+                             to_xz_xxy,       \
+                             to_xz_xxyyz,     \
+                             to_xz_xxyzz,     \
+                             to_xz_xxz,       \
+                             to_xz_xxzzz,     \
+                             to_xz_xyy,       \
+                             to_xz_xyyyz,     \
+                             to_xz_xyyzz,     \
+                             to_xz_xyz,       \
+                             to_xz_xyzzz,     \
+                             to_xz_xzz,       \
+                             to_xz_xzzzz,     \
+                             to_xz_yyy,       \
+                             to_xz_yyyyz,     \
+                             to_xz_yyyzz,     \
+                             to_xz_yyz,       \
+                             to_xz_yyzzz,     \
+                             to_xz_yzz,       \
+                             to_xz_yzzzz,     \
+                             to_xz_zzz,       \
+                             to_xz_zzzzz,     \
+                             to_xzzz_xxx,     \
+                             to_xzzz_xxxxz,   \
+                             to_xzzz_xxxyz,   \
+                             to_xzzz_xxxzz,   \
+                             to_xzzz_xxy,     \
+                             to_xzzz_xxyyz,   \
+                             to_xzzz_xxyzz,   \
+                             to_xzzz_xxz,     \
+                             to_xzzz_xxzzz,   \
+                             to_xzzz_xyy,     \
+                             to_xzzz_xyyyz,   \
+                             to_xzzz_xyyzz,   \
+                             to_xzzz_xyz,     \
+                             to_xzzz_xyzzz,   \
+                             to_xzzz_xzz,     \
+                             to_xzzz_xzzzz,   \
+                             to_xzzz_yyy,     \
+                             to_xzzz_yyyyz,   \
+                             to_xzzz_yyyzz,   \
+                             to_xzzz_yyz,     \
+                             to_xzzz_yyzzz,   \
+                             to_xzzz_yzz,     \
+                             to_xzzz_yzzzz,   \
+                             to_xzzz_zzz,     \
+                             to_xzzz_zzzzz,   \
+                             to_z_z_xzz_xxxx, \
+                             to_z_z_xzz_xxxy, \
+                             to_z_z_xzz_xxxz, \
+                             to_z_z_xzz_xxyy, \
+                             to_z_z_xzz_xxyz, \
+                             to_z_z_xzz_xxzz, \
+                             to_z_z_xzz_xyyy, \
+                             to_z_z_xzz_xyyz, \
+                             to_z_z_xzz_xyzz, \
+                             to_z_z_xzz_xzzz, \
+                             to_z_z_xzz_yyyy, \
+                             to_z_z_xzz_yyyz, \
+                             to_z_z_xzz_yyzz, \
+                             to_z_z_xzz_yzzz, \
+                             to_z_z_xzz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -7324,31 +12435,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_z_z_xzz_xxxy[k] = -4.0 * to_xz_xxxyz[k] * tke_0 + 4.0 * to_xzzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_z_z_xzz_xxxz[k] = 2.0 * to_xz_xxx[k] - 4.0 * to_xz_xxxzz[k] * tke_0 - 2.0 * to_xzzz_xxx[k] * tbe_0 + 4.0 * to_xzzz_xxxzz[k] * tbe_0 * tke_0;
+            to_z_z_xzz_xxxz[k] =
+                2.0 * to_xz_xxx[k] - 4.0 * to_xz_xxxzz[k] * tke_0 - 2.0 * to_xzzz_xxx[k] * tbe_0 + 4.0 * to_xzzz_xxxzz[k] * tbe_0 * tke_0;
 
             to_z_z_xzz_xxyy[k] = -4.0 * to_xz_xxyyz[k] * tke_0 + 4.0 * to_xzzz_xxyyz[k] * tbe_0 * tke_0;
 
-            to_z_z_xzz_xxyz[k] = 2.0 * to_xz_xxy[k] - 4.0 * to_xz_xxyzz[k] * tke_0 - 2.0 * to_xzzz_xxy[k] * tbe_0 + 4.0 * to_xzzz_xxyzz[k] * tbe_0 * tke_0;
+            to_z_z_xzz_xxyz[k] =
+                2.0 * to_xz_xxy[k] - 4.0 * to_xz_xxyzz[k] * tke_0 - 2.0 * to_xzzz_xxy[k] * tbe_0 + 4.0 * to_xzzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xzz_xxzz[k] = 4.0 * to_xz_xxz[k] - 4.0 * to_xz_xxzzz[k] * tke_0 - 4.0 * to_xzzz_xxz[k] * tbe_0 + 4.0 * to_xzzz_xxzzz[k] * tbe_0 * tke_0;
+            to_z_z_xzz_xxzz[k] =
+                4.0 * to_xz_xxz[k] - 4.0 * to_xz_xxzzz[k] * tke_0 - 4.0 * to_xzzz_xxz[k] * tbe_0 + 4.0 * to_xzzz_xxzzz[k] * tbe_0 * tke_0;
 
             to_z_z_xzz_xyyy[k] = -4.0 * to_xz_xyyyz[k] * tke_0 + 4.0 * to_xzzz_xyyyz[k] * tbe_0 * tke_0;
 
-            to_z_z_xzz_xyyz[k] = 2.0 * to_xz_xyy[k] - 4.0 * to_xz_xyyzz[k] * tke_0 - 2.0 * to_xzzz_xyy[k] * tbe_0 + 4.0 * to_xzzz_xyyzz[k] * tbe_0 * tke_0;
+            to_z_z_xzz_xyyz[k] =
+                2.0 * to_xz_xyy[k] - 4.0 * to_xz_xyyzz[k] * tke_0 - 2.0 * to_xzzz_xyy[k] * tbe_0 + 4.0 * to_xzzz_xyyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xzz_xyzz[k] = 4.0 * to_xz_xyz[k] - 4.0 * to_xz_xyzzz[k] * tke_0 - 4.0 * to_xzzz_xyz[k] * tbe_0 + 4.0 * to_xzzz_xyzzz[k] * tbe_0 * tke_0;
+            to_z_z_xzz_xyzz[k] =
+                4.0 * to_xz_xyz[k] - 4.0 * to_xz_xyzzz[k] * tke_0 - 4.0 * to_xzzz_xyz[k] * tbe_0 + 4.0 * to_xzzz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xzz_xzzz[k] = 6.0 * to_xz_xzz[k] - 4.0 * to_xz_xzzzz[k] * tke_0 - 6.0 * to_xzzz_xzz[k] * tbe_0 + 4.0 * to_xzzz_xzzzz[k] * tbe_0 * tke_0;
+            to_z_z_xzz_xzzz[k] =
+                6.0 * to_xz_xzz[k] - 4.0 * to_xz_xzzzz[k] * tke_0 - 6.0 * to_xzzz_xzz[k] * tbe_0 + 4.0 * to_xzzz_xzzzz[k] * tbe_0 * tke_0;
 
             to_z_z_xzz_yyyy[k] = -4.0 * to_xz_yyyyz[k] * tke_0 + 4.0 * to_xzzz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_z_z_xzz_yyyz[k] = 2.0 * to_xz_yyy[k] - 4.0 * to_xz_yyyzz[k] * tke_0 - 2.0 * to_xzzz_yyy[k] * tbe_0 + 4.0 * to_xzzz_yyyzz[k] * tbe_0 * tke_0;
+            to_z_z_xzz_yyyz[k] =
+                2.0 * to_xz_yyy[k] - 4.0 * to_xz_yyyzz[k] * tke_0 - 2.0 * to_xzzz_yyy[k] * tbe_0 + 4.0 * to_xzzz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xzz_yyzz[k] = 4.0 * to_xz_yyz[k] - 4.0 * to_xz_yyzzz[k] * tke_0 - 4.0 * to_xzzz_yyz[k] * tbe_0 + 4.0 * to_xzzz_yyzzz[k] * tbe_0 * tke_0;
+            to_z_z_xzz_yyzz[k] =
+                4.0 * to_xz_yyz[k] - 4.0 * to_xz_yyzzz[k] * tke_0 - 4.0 * to_xzzz_yyz[k] * tbe_0 + 4.0 * to_xzzz_yyzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xzz_yzzz[k] = 6.0 * to_xz_yzz[k] - 4.0 * to_xz_yzzzz[k] * tke_0 - 6.0 * to_xzzz_yzz[k] * tbe_0 + 4.0 * to_xzzz_yzzzz[k] * tbe_0 * tke_0;
+            to_z_z_xzz_yzzz[k] =
+                6.0 * to_xz_yzz[k] - 4.0 * to_xz_yzzzz[k] * tke_0 - 6.0 * to_xzzz_yzz[k] * tbe_0 + 4.0 * to_xzzz_yzzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_xzz_zzzz[k] = 8.0 * to_xz_zzz[k] - 4.0 * to_xz_zzzzz[k] * tke_0 - 8.0 * to_xzzz_zzz[k] * tbe_0 + 4.0 * to_xzzz_zzzzz[k] * tbe_0 * tke_0;
+            to_z_z_xzz_zzzz[k] =
+                8.0 * to_xz_zzz[k] - 4.0 * to_xz_zzzzz[k] * tke_0 - 8.0 * to_xzzz_zzz[k] * tbe_0 + 4.0 * to_xzzz_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 1290-1305 components of targeted buffer : FG
@@ -7383,7 +12504,47 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_z_yyy_zzzz = pbuffer.data(idx_op_geom_101_fg + 8 * op_comps * 150 + i * 150 + 104);
 
-        #pragma omp simd aligned(to_yyyz_xxx, to_yyyz_xxxxz, to_yyyz_xxxyz, to_yyyz_xxxzz, to_yyyz_xxy, to_yyyz_xxyyz, to_yyyz_xxyzz, to_yyyz_xxz, to_yyyz_xxzzz, to_yyyz_xyy, to_yyyz_xyyyz, to_yyyz_xyyzz, to_yyyz_xyz, to_yyyz_xyzzz, to_yyyz_xzz, to_yyyz_xzzzz, to_yyyz_yyy, to_yyyz_yyyyz, to_yyyz_yyyzz, to_yyyz_yyz, to_yyyz_yyzzz, to_yyyz_yzz, to_yyyz_yzzzz, to_yyyz_zzz, to_yyyz_zzzzz, to_z_z_yyy_xxxx, to_z_z_yyy_xxxy, to_z_z_yyy_xxxz, to_z_z_yyy_xxyy, to_z_z_yyy_xxyz, to_z_z_yyy_xxzz, to_z_z_yyy_xyyy, to_z_z_yyy_xyyz, to_z_z_yyy_xyzz, to_z_z_yyy_xzzz, to_z_z_yyy_yyyy, to_z_z_yyy_yyyz, to_z_z_yyy_yyzz, to_z_z_yyy_yzzz, to_z_z_yyy_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_yyyz_xxx,         \
+                             to_yyyz_xxxxz,   \
+                             to_yyyz_xxxyz,   \
+                             to_yyyz_xxxzz,   \
+                             to_yyyz_xxy,     \
+                             to_yyyz_xxyyz,   \
+                             to_yyyz_xxyzz,   \
+                             to_yyyz_xxz,     \
+                             to_yyyz_xxzzz,   \
+                             to_yyyz_xyy,     \
+                             to_yyyz_xyyyz,   \
+                             to_yyyz_xyyzz,   \
+                             to_yyyz_xyz,     \
+                             to_yyyz_xyzzz,   \
+                             to_yyyz_xzz,     \
+                             to_yyyz_xzzzz,   \
+                             to_yyyz_yyy,     \
+                             to_yyyz_yyyyz,   \
+                             to_yyyz_yyyzz,   \
+                             to_yyyz_yyz,     \
+                             to_yyyz_yyzzz,   \
+                             to_yyyz_yzz,     \
+                             to_yyyz_yzzzz,   \
+                             to_yyyz_zzz,     \
+                             to_yyyz_zzzzz,   \
+                             to_z_z_yyy_xxxx, \
+                             to_z_z_yyy_xxxy, \
+                             to_z_z_yyy_xxxz, \
+                             to_z_z_yyy_xxyy, \
+                             to_z_z_yyy_xxyz, \
+                             to_z_z_yyy_xxzz, \
+                             to_z_z_yyy_xyyy, \
+                             to_z_z_yyy_xyyz, \
+                             to_z_z_yyy_xyzz, \
+                             to_z_z_yyy_xzzz, \
+                             to_z_z_yyy_yyyy, \
+                             to_z_z_yyy_yyyz, \
+                             to_z_z_yyy_yyzz, \
+                             to_z_z_yyy_yzzz, \
+                             to_z_z_yyy_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -7453,7 +12614,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_z_yyz_zzzz = pbuffer.data(idx_op_geom_101_fg + 8 * op_comps * 150 + i * 150 + 119);
 
-        #pragma omp simd aligned(to_yy_xxx, to_yy_xxxxz, to_yy_xxxyz, to_yy_xxxzz, to_yy_xxy, to_yy_xxyyz, to_yy_xxyzz, to_yy_xxz, to_yy_xxzzz, to_yy_xyy, to_yy_xyyyz, to_yy_xyyzz, to_yy_xyz, to_yy_xyzzz, to_yy_xzz, to_yy_xzzzz, to_yy_yyy, to_yy_yyyyz, to_yy_yyyzz, to_yy_yyz, to_yy_yyzzz, to_yy_yzz, to_yy_yzzzz, to_yy_zzz, to_yy_zzzzz, to_yyzz_xxx, to_yyzz_xxxxz, to_yyzz_xxxyz, to_yyzz_xxxzz, to_yyzz_xxy, to_yyzz_xxyyz, to_yyzz_xxyzz, to_yyzz_xxz, to_yyzz_xxzzz, to_yyzz_xyy, to_yyzz_xyyyz, to_yyzz_xyyzz, to_yyzz_xyz, to_yyzz_xyzzz, to_yyzz_xzz, to_yyzz_xzzzz, to_yyzz_yyy, to_yyzz_yyyyz, to_yyzz_yyyzz, to_yyzz_yyz, to_yyzz_yyzzz, to_yyzz_yzz, to_yyzz_yzzzz, to_yyzz_zzz, to_yyzz_zzzzz, to_z_z_yyz_xxxx, to_z_z_yyz_xxxy, to_z_z_yyz_xxxz, to_z_z_yyz_xxyy, to_z_z_yyz_xxyz, to_z_z_yyz_xxzz, to_z_z_yyz_xyyy, to_z_z_yyz_xyyz, to_z_z_yyz_xyzz, to_z_z_yyz_xzzz, to_z_z_yyz_yyyy, to_z_z_yyz_yyyz, to_z_z_yyz_yyzz, to_z_z_yyz_yzzz, to_z_z_yyz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_yy_xxx,           \
+                             to_yy_xxxxz,     \
+                             to_yy_xxxyz,     \
+                             to_yy_xxxzz,     \
+                             to_yy_xxy,       \
+                             to_yy_xxyyz,     \
+                             to_yy_xxyzz,     \
+                             to_yy_xxz,       \
+                             to_yy_xxzzz,     \
+                             to_yy_xyy,       \
+                             to_yy_xyyyz,     \
+                             to_yy_xyyzz,     \
+                             to_yy_xyz,       \
+                             to_yy_xyzzz,     \
+                             to_yy_xzz,       \
+                             to_yy_xzzzz,     \
+                             to_yy_yyy,       \
+                             to_yy_yyyyz,     \
+                             to_yy_yyyzz,     \
+                             to_yy_yyz,       \
+                             to_yy_yyzzz,     \
+                             to_yy_yzz,       \
+                             to_yy_yzzzz,     \
+                             to_yy_zzz,       \
+                             to_yy_zzzzz,     \
+                             to_yyzz_xxx,     \
+                             to_yyzz_xxxxz,   \
+                             to_yyzz_xxxyz,   \
+                             to_yyzz_xxxzz,   \
+                             to_yyzz_xxy,     \
+                             to_yyzz_xxyyz,   \
+                             to_yyzz_xxyzz,   \
+                             to_yyzz_xxz,     \
+                             to_yyzz_xxzzz,   \
+                             to_yyzz_xyy,     \
+                             to_yyzz_xyyyz,   \
+                             to_yyzz_xyyzz,   \
+                             to_yyzz_xyz,     \
+                             to_yyzz_xyzzz,   \
+                             to_yyzz_xzz,     \
+                             to_yyzz_xzzzz,   \
+                             to_yyzz_yyy,     \
+                             to_yyzz_yyyyz,   \
+                             to_yyzz_yyyzz,   \
+                             to_yyzz_yyz,     \
+                             to_yyzz_yyzzz,   \
+                             to_yyzz_yzz,     \
+                             to_yyzz_yzzzz,   \
+                             to_yyzz_zzz,     \
+                             to_yyzz_zzzzz,   \
+                             to_z_z_yyz_xxxx, \
+                             to_z_z_yyz_xxxy, \
+                             to_z_z_yyz_xxxz, \
+                             to_z_z_yyz_xxyy, \
+                             to_z_z_yyz_xxyz, \
+                             to_z_z_yyz_xxzz, \
+                             to_z_z_yyz_xyyy, \
+                             to_z_z_yyz_xyyz, \
+                             to_z_z_yyz_xyzz, \
+                             to_z_z_yyz_xzzz, \
+                             to_z_z_yyz_yyyy, \
+                             to_z_z_yyz_yyyz, \
+                             to_z_z_yyz_yyzz, \
+                             to_z_z_yyz_yzzz, \
+                             to_z_z_yyz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -7470,25 +12696,31 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_z_z_yyz_xxyz[k] = to_yy_xxy[k] - 2.0 * to_yy_xxyzz[k] * tke_0 - 2.0 * to_yyzz_xxy[k] * tbe_0 + 4.0 * to_yyzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_yyz_xxzz[k] = 2.0 * to_yy_xxz[k] - 2.0 * to_yy_xxzzz[k] * tke_0 - 4.0 * to_yyzz_xxz[k] * tbe_0 + 4.0 * to_yyzz_xxzzz[k] * tbe_0 * tke_0;
+            to_z_z_yyz_xxzz[k] =
+                2.0 * to_yy_xxz[k] - 2.0 * to_yy_xxzzz[k] * tke_0 - 4.0 * to_yyzz_xxz[k] * tbe_0 + 4.0 * to_yyzz_xxzzz[k] * tbe_0 * tke_0;
 
             to_z_z_yyz_xyyy[k] = -2.0 * to_yy_xyyyz[k] * tke_0 + 4.0 * to_yyzz_xyyyz[k] * tbe_0 * tke_0;
 
             to_z_z_yyz_xyyz[k] = to_yy_xyy[k] - 2.0 * to_yy_xyyzz[k] * tke_0 - 2.0 * to_yyzz_xyy[k] * tbe_0 + 4.0 * to_yyzz_xyyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_yyz_xyzz[k] = 2.0 * to_yy_xyz[k] - 2.0 * to_yy_xyzzz[k] * tke_0 - 4.0 * to_yyzz_xyz[k] * tbe_0 + 4.0 * to_yyzz_xyzzz[k] * tbe_0 * tke_0;
+            to_z_z_yyz_xyzz[k] =
+                2.0 * to_yy_xyz[k] - 2.0 * to_yy_xyzzz[k] * tke_0 - 4.0 * to_yyzz_xyz[k] * tbe_0 + 4.0 * to_yyzz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_yyz_xzzz[k] = 3.0 * to_yy_xzz[k] - 2.0 * to_yy_xzzzz[k] * tke_0 - 6.0 * to_yyzz_xzz[k] * tbe_0 + 4.0 * to_yyzz_xzzzz[k] * tbe_0 * tke_0;
+            to_z_z_yyz_xzzz[k] =
+                3.0 * to_yy_xzz[k] - 2.0 * to_yy_xzzzz[k] * tke_0 - 6.0 * to_yyzz_xzz[k] * tbe_0 + 4.0 * to_yyzz_xzzzz[k] * tbe_0 * tke_0;
 
             to_z_z_yyz_yyyy[k] = -2.0 * to_yy_yyyyz[k] * tke_0 + 4.0 * to_yyzz_yyyyz[k] * tbe_0 * tke_0;
 
             to_z_z_yyz_yyyz[k] = to_yy_yyy[k] - 2.0 * to_yy_yyyzz[k] * tke_0 - 2.0 * to_yyzz_yyy[k] * tbe_0 + 4.0 * to_yyzz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_yyz_yyzz[k] = 2.0 * to_yy_yyz[k] - 2.0 * to_yy_yyzzz[k] * tke_0 - 4.0 * to_yyzz_yyz[k] * tbe_0 + 4.0 * to_yyzz_yyzzz[k] * tbe_0 * tke_0;
+            to_z_z_yyz_yyzz[k] =
+                2.0 * to_yy_yyz[k] - 2.0 * to_yy_yyzzz[k] * tke_0 - 4.0 * to_yyzz_yyz[k] * tbe_0 + 4.0 * to_yyzz_yyzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_yyz_yzzz[k] = 3.0 * to_yy_yzz[k] - 2.0 * to_yy_yzzzz[k] * tke_0 - 6.0 * to_yyzz_yzz[k] * tbe_0 + 4.0 * to_yyzz_yzzzz[k] * tbe_0 * tke_0;
+            to_z_z_yyz_yzzz[k] =
+                3.0 * to_yy_yzz[k] - 2.0 * to_yy_yzzzz[k] * tke_0 - 6.0 * to_yyzz_yzz[k] * tbe_0 + 4.0 * to_yyzz_yzzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_yyz_zzzz[k] = 4.0 * to_yy_zzz[k] - 2.0 * to_yy_zzzzz[k] * tke_0 - 8.0 * to_yyzz_zzz[k] * tbe_0 + 4.0 * to_yyzz_zzzzz[k] * tbe_0 * tke_0;
+            to_z_z_yyz_zzzz[k] =
+                4.0 * to_yy_zzz[k] - 2.0 * to_yy_zzzzz[k] * tke_0 - 8.0 * to_yyzz_zzz[k] * tbe_0 + 4.0 * to_yyzz_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 1320-1335 components of targeted buffer : FG
@@ -7523,7 +12755,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_z_yzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 8 * op_comps * 150 + i * 150 + 134);
 
-        #pragma omp simd aligned(to_yz_xxx, to_yz_xxxxz, to_yz_xxxyz, to_yz_xxxzz, to_yz_xxy, to_yz_xxyyz, to_yz_xxyzz, to_yz_xxz, to_yz_xxzzz, to_yz_xyy, to_yz_xyyyz, to_yz_xyyzz, to_yz_xyz, to_yz_xyzzz, to_yz_xzz, to_yz_xzzzz, to_yz_yyy, to_yz_yyyyz, to_yz_yyyzz, to_yz_yyz, to_yz_yyzzz, to_yz_yzz, to_yz_yzzzz, to_yz_zzz, to_yz_zzzzz, to_yzzz_xxx, to_yzzz_xxxxz, to_yzzz_xxxyz, to_yzzz_xxxzz, to_yzzz_xxy, to_yzzz_xxyyz, to_yzzz_xxyzz, to_yzzz_xxz, to_yzzz_xxzzz, to_yzzz_xyy, to_yzzz_xyyyz, to_yzzz_xyyzz, to_yzzz_xyz, to_yzzz_xyzzz, to_yzzz_xzz, to_yzzz_xzzzz, to_yzzz_yyy, to_yzzz_yyyyz, to_yzzz_yyyzz, to_yzzz_yyz, to_yzzz_yyzzz, to_yzzz_yzz, to_yzzz_yzzzz, to_yzzz_zzz, to_yzzz_zzzzz, to_z_z_yzz_xxxx, to_z_z_yzz_xxxy, to_z_z_yzz_xxxz, to_z_z_yzz_xxyy, to_z_z_yzz_xxyz, to_z_z_yzz_xxzz, to_z_z_yzz_xyyy, to_z_z_yzz_xyyz, to_z_z_yzz_xyzz, to_z_z_yzz_xzzz, to_z_z_yzz_yyyy, to_z_z_yzz_yyyz, to_z_z_yzz_yyzz, to_z_z_yzz_yzzz, to_z_z_yzz_zzzz, b_exps : 64)
+#pragma omp simd aligned(to_yz_xxx,           \
+                             to_yz_xxxxz,     \
+                             to_yz_xxxyz,     \
+                             to_yz_xxxzz,     \
+                             to_yz_xxy,       \
+                             to_yz_xxyyz,     \
+                             to_yz_xxyzz,     \
+                             to_yz_xxz,       \
+                             to_yz_xxzzz,     \
+                             to_yz_xyy,       \
+                             to_yz_xyyyz,     \
+                             to_yz_xyyzz,     \
+                             to_yz_xyz,       \
+                             to_yz_xyzzz,     \
+                             to_yz_xzz,       \
+                             to_yz_xzzzz,     \
+                             to_yz_yyy,       \
+                             to_yz_yyyyz,     \
+                             to_yz_yyyzz,     \
+                             to_yz_yyz,       \
+                             to_yz_yyzzz,     \
+                             to_yz_yzz,       \
+                             to_yz_yzzzz,     \
+                             to_yz_zzz,       \
+                             to_yz_zzzzz,     \
+                             to_yzzz_xxx,     \
+                             to_yzzz_xxxxz,   \
+                             to_yzzz_xxxyz,   \
+                             to_yzzz_xxxzz,   \
+                             to_yzzz_xxy,     \
+                             to_yzzz_xxyyz,   \
+                             to_yzzz_xxyzz,   \
+                             to_yzzz_xxz,     \
+                             to_yzzz_xxzzz,   \
+                             to_yzzz_xyy,     \
+                             to_yzzz_xyyyz,   \
+                             to_yzzz_xyyzz,   \
+                             to_yzzz_xyz,     \
+                             to_yzzz_xyzzz,   \
+                             to_yzzz_xzz,     \
+                             to_yzzz_xzzzz,   \
+                             to_yzzz_yyy,     \
+                             to_yzzz_yyyyz,   \
+                             to_yzzz_yyyzz,   \
+                             to_yzzz_yyz,     \
+                             to_yzzz_yyzzz,   \
+                             to_yzzz_yzz,     \
+                             to_yzzz_yzzzz,   \
+                             to_yzzz_zzz,     \
+                             to_yzzz_zzzzz,   \
+                             to_z_z_yzz_xxxx, \
+                             to_z_z_yzz_xxxy, \
+                             to_z_z_yzz_xxxz, \
+                             to_z_z_yzz_xxyy, \
+                             to_z_z_yzz_xxyz, \
+                             to_z_z_yzz_xxzz, \
+                             to_z_z_yzz_xyyy, \
+                             to_z_z_yzz_xyyz, \
+                             to_z_z_yzz_xyzz, \
+                             to_z_z_yzz_xzzz, \
+                             to_z_z_yzz_yyyy, \
+                             to_z_z_yzz_yyyz, \
+                             to_z_z_yzz_yyzz, \
+                             to_z_z_yzz_yzzz, \
+                             to_z_z_yzz_zzzz, \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -7534,31 +12831,41 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_z_z_yzz_xxxy[k] = -4.0 * to_yz_xxxyz[k] * tke_0 + 4.0 * to_yzzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_z_z_yzz_xxxz[k] = 2.0 * to_yz_xxx[k] - 4.0 * to_yz_xxxzz[k] * tke_0 - 2.0 * to_yzzz_xxx[k] * tbe_0 + 4.0 * to_yzzz_xxxzz[k] * tbe_0 * tke_0;
+            to_z_z_yzz_xxxz[k] =
+                2.0 * to_yz_xxx[k] - 4.0 * to_yz_xxxzz[k] * tke_0 - 2.0 * to_yzzz_xxx[k] * tbe_0 + 4.0 * to_yzzz_xxxzz[k] * tbe_0 * tke_0;
 
             to_z_z_yzz_xxyy[k] = -4.0 * to_yz_xxyyz[k] * tke_0 + 4.0 * to_yzzz_xxyyz[k] * tbe_0 * tke_0;
 
-            to_z_z_yzz_xxyz[k] = 2.0 * to_yz_xxy[k] - 4.0 * to_yz_xxyzz[k] * tke_0 - 2.0 * to_yzzz_xxy[k] * tbe_0 + 4.0 * to_yzzz_xxyzz[k] * tbe_0 * tke_0;
+            to_z_z_yzz_xxyz[k] =
+                2.0 * to_yz_xxy[k] - 4.0 * to_yz_xxyzz[k] * tke_0 - 2.0 * to_yzzz_xxy[k] * tbe_0 + 4.0 * to_yzzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_yzz_xxzz[k] = 4.0 * to_yz_xxz[k] - 4.0 * to_yz_xxzzz[k] * tke_0 - 4.0 * to_yzzz_xxz[k] * tbe_0 + 4.0 * to_yzzz_xxzzz[k] * tbe_0 * tke_0;
+            to_z_z_yzz_xxzz[k] =
+                4.0 * to_yz_xxz[k] - 4.0 * to_yz_xxzzz[k] * tke_0 - 4.0 * to_yzzz_xxz[k] * tbe_0 + 4.0 * to_yzzz_xxzzz[k] * tbe_0 * tke_0;
 
             to_z_z_yzz_xyyy[k] = -4.0 * to_yz_xyyyz[k] * tke_0 + 4.0 * to_yzzz_xyyyz[k] * tbe_0 * tke_0;
 
-            to_z_z_yzz_xyyz[k] = 2.0 * to_yz_xyy[k] - 4.0 * to_yz_xyyzz[k] * tke_0 - 2.0 * to_yzzz_xyy[k] * tbe_0 + 4.0 * to_yzzz_xyyzz[k] * tbe_0 * tke_0;
+            to_z_z_yzz_xyyz[k] =
+                2.0 * to_yz_xyy[k] - 4.0 * to_yz_xyyzz[k] * tke_0 - 2.0 * to_yzzz_xyy[k] * tbe_0 + 4.0 * to_yzzz_xyyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_yzz_xyzz[k] = 4.0 * to_yz_xyz[k] - 4.0 * to_yz_xyzzz[k] * tke_0 - 4.0 * to_yzzz_xyz[k] * tbe_0 + 4.0 * to_yzzz_xyzzz[k] * tbe_0 * tke_0;
+            to_z_z_yzz_xyzz[k] =
+                4.0 * to_yz_xyz[k] - 4.0 * to_yz_xyzzz[k] * tke_0 - 4.0 * to_yzzz_xyz[k] * tbe_0 + 4.0 * to_yzzz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_yzz_xzzz[k] = 6.0 * to_yz_xzz[k] - 4.0 * to_yz_xzzzz[k] * tke_0 - 6.0 * to_yzzz_xzz[k] * tbe_0 + 4.0 * to_yzzz_xzzzz[k] * tbe_0 * tke_0;
+            to_z_z_yzz_xzzz[k] =
+                6.0 * to_yz_xzz[k] - 4.0 * to_yz_xzzzz[k] * tke_0 - 6.0 * to_yzzz_xzz[k] * tbe_0 + 4.0 * to_yzzz_xzzzz[k] * tbe_0 * tke_0;
 
             to_z_z_yzz_yyyy[k] = -4.0 * to_yz_yyyyz[k] * tke_0 + 4.0 * to_yzzz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_z_z_yzz_yyyz[k] = 2.0 * to_yz_yyy[k] - 4.0 * to_yz_yyyzz[k] * tke_0 - 2.0 * to_yzzz_yyy[k] * tbe_0 + 4.0 * to_yzzz_yyyzz[k] * tbe_0 * tke_0;
+            to_z_z_yzz_yyyz[k] =
+                2.0 * to_yz_yyy[k] - 4.0 * to_yz_yyyzz[k] * tke_0 - 2.0 * to_yzzz_yyy[k] * tbe_0 + 4.0 * to_yzzz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_yzz_yyzz[k] = 4.0 * to_yz_yyz[k] - 4.0 * to_yz_yyzzz[k] * tke_0 - 4.0 * to_yzzz_yyz[k] * tbe_0 + 4.0 * to_yzzz_yyzzz[k] * tbe_0 * tke_0;
+            to_z_z_yzz_yyzz[k] =
+                4.0 * to_yz_yyz[k] - 4.0 * to_yz_yyzzz[k] * tke_0 - 4.0 * to_yzzz_yyz[k] * tbe_0 + 4.0 * to_yzzz_yyzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_yzz_yzzz[k] = 6.0 * to_yz_yzz[k] - 4.0 * to_yz_yzzzz[k] * tke_0 - 6.0 * to_yzzz_yzz[k] * tbe_0 + 4.0 * to_yzzz_yzzzz[k] * tbe_0 * tke_0;
+            to_z_z_yzz_yzzz[k] =
+                6.0 * to_yz_yzz[k] - 4.0 * to_yz_yzzzz[k] * tke_0 - 6.0 * to_yzzz_yzz[k] * tbe_0 + 4.0 * to_yzzz_yzzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_yzz_zzzz[k] = 8.0 * to_yz_zzz[k] - 4.0 * to_yz_zzzzz[k] * tke_0 - 8.0 * to_yzzz_zzz[k] * tbe_0 + 4.0 * to_yzzz_zzzzz[k] * tbe_0 * tke_0;
+            to_z_z_yzz_zzzz[k] =
+                8.0 * to_yz_zzz[k] - 4.0 * to_yz_zzzzz[k] * tke_0 - 8.0 * to_yzzz_zzz[k] * tbe_0 + 4.0 * to_yzzz_zzzzz[k] * tbe_0 * tke_0;
         }
 
         // Set up 1335-1350 components of targeted buffer : FG
@@ -7593,7 +12900,72 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
         auto to_z_z_zzz_zzzz = pbuffer.data(idx_op_geom_101_fg + 8 * op_comps * 150 + i * 150 + 149);
 
-        #pragma omp simd aligned(to_z_z_zzz_xxxx, to_z_z_zzz_xxxy, to_z_z_zzz_xxxz, to_z_z_zzz_xxyy, to_z_z_zzz_xxyz, to_z_z_zzz_xxzz, to_z_z_zzz_xyyy, to_z_z_zzz_xyyz, to_z_z_zzz_xyzz, to_z_z_zzz_xzzz, to_z_z_zzz_yyyy, to_z_z_zzz_yyyz, to_z_z_zzz_yyzz, to_z_z_zzz_yzzz, to_z_z_zzz_zzzz, to_zz_xxx, to_zz_xxxxz, to_zz_xxxyz, to_zz_xxxzz, to_zz_xxy, to_zz_xxyyz, to_zz_xxyzz, to_zz_xxz, to_zz_xxzzz, to_zz_xyy, to_zz_xyyyz, to_zz_xyyzz, to_zz_xyz, to_zz_xyzzz, to_zz_xzz, to_zz_xzzzz, to_zz_yyy, to_zz_yyyyz, to_zz_yyyzz, to_zz_yyz, to_zz_yyzzz, to_zz_yzz, to_zz_yzzzz, to_zz_zzz, to_zz_zzzzz, to_zzzz_xxx, to_zzzz_xxxxz, to_zzzz_xxxyz, to_zzzz_xxxzz, to_zzzz_xxy, to_zzzz_xxyyz, to_zzzz_xxyzz, to_zzzz_xxz, to_zzzz_xxzzz, to_zzzz_xyy, to_zzzz_xyyyz, to_zzzz_xyyzz, to_zzzz_xyz, to_zzzz_xyzzz, to_zzzz_xzz, to_zzzz_xzzzz, to_zzzz_yyy, to_zzzz_yyyyz, to_zzzz_yyyzz, to_zzzz_yyz, to_zzzz_yyzzz, to_zzzz_yzz, to_zzzz_yzzzz, to_zzzz_zzz, to_zzzz_zzzzz, b_exps : 64)
+#pragma omp simd aligned(to_z_z_zzz_xxxx,     \
+                             to_z_z_zzz_xxxy, \
+                             to_z_z_zzz_xxxz, \
+                             to_z_z_zzz_xxyy, \
+                             to_z_z_zzz_xxyz, \
+                             to_z_z_zzz_xxzz, \
+                             to_z_z_zzz_xyyy, \
+                             to_z_z_zzz_xyyz, \
+                             to_z_z_zzz_xyzz, \
+                             to_z_z_zzz_xzzz, \
+                             to_z_z_zzz_yyyy, \
+                             to_z_z_zzz_yyyz, \
+                             to_z_z_zzz_yyzz, \
+                             to_z_z_zzz_yzzz, \
+                             to_z_z_zzz_zzzz, \
+                             to_zz_xxx,       \
+                             to_zz_xxxxz,     \
+                             to_zz_xxxyz,     \
+                             to_zz_xxxzz,     \
+                             to_zz_xxy,       \
+                             to_zz_xxyyz,     \
+                             to_zz_xxyzz,     \
+                             to_zz_xxz,       \
+                             to_zz_xxzzz,     \
+                             to_zz_xyy,       \
+                             to_zz_xyyyz,     \
+                             to_zz_xyyzz,     \
+                             to_zz_xyz,       \
+                             to_zz_xyzzz,     \
+                             to_zz_xzz,       \
+                             to_zz_xzzzz,     \
+                             to_zz_yyy,       \
+                             to_zz_yyyyz,     \
+                             to_zz_yyyzz,     \
+                             to_zz_yyz,       \
+                             to_zz_yyzzz,     \
+                             to_zz_yzz,       \
+                             to_zz_yzzzz,     \
+                             to_zz_zzz,       \
+                             to_zz_zzzzz,     \
+                             to_zzzz_xxx,     \
+                             to_zzzz_xxxxz,   \
+                             to_zzzz_xxxyz,   \
+                             to_zzzz_xxxzz,   \
+                             to_zzzz_xxy,     \
+                             to_zzzz_xxyyz,   \
+                             to_zzzz_xxyzz,   \
+                             to_zzzz_xxz,     \
+                             to_zzzz_xxzzz,   \
+                             to_zzzz_xyy,     \
+                             to_zzzz_xyyyz,   \
+                             to_zzzz_xyyzz,   \
+                             to_zzzz_xyz,     \
+                             to_zzzz_xyzzz,   \
+                             to_zzzz_xzz,     \
+                             to_zzzz_xzzzz,   \
+                             to_zzzz_yyy,     \
+                             to_zzzz_yyyyz,   \
+                             to_zzzz_yyyzz,   \
+                             to_zzzz_yyz,     \
+                             to_zzzz_yyzzz,   \
+                             to_zzzz_yzz,     \
+                             to_zzzz_yzzzz,   \
+                             to_zzzz_zzz,     \
+                             to_zzzz_zzzzz,   \
+                             b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -7604,36 +12976,43 @@ comp_prim_op_geom_11_fg(CSimdArray<double>& pbuffer,
 
             to_z_z_zzz_xxxy[k] = -6.0 * to_zz_xxxyz[k] * tke_0 + 4.0 * to_zzzz_xxxyz[k] * tbe_0 * tke_0;
 
-            to_z_z_zzz_xxxz[k] = 3.0 * to_zz_xxx[k] - 6.0 * to_zz_xxxzz[k] * tke_0 - 2.0 * to_zzzz_xxx[k] * tbe_0 + 4.0 * to_zzzz_xxxzz[k] * tbe_0 * tke_0;
+            to_z_z_zzz_xxxz[k] =
+                3.0 * to_zz_xxx[k] - 6.0 * to_zz_xxxzz[k] * tke_0 - 2.0 * to_zzzz_xxx[k] * tbe_0 + 4.0 * to_zzzz_xxxzz[k] * tbe_0 * tke_0;
 
             to_z_z_zzz_xxyy[k] = -6.0 * to_zz_xxyyz[k] * tke_0 + 4.0 * to_zzzz_xxyyz[k] * tbe_0 * tke_0;
 
-            to_z_z_zzz_xxyz[k] = 3.0 * to_zz_xxy[k] - 6.0 * to_zz_xxyzz[k] * tke_0 - 2.0 * to_zzzz_xxy[k] * tbe_0 + 4.0 * to_zzzz_xxyzz[k] * tbe_0 * tke_0;
+            to_z_z_zzz_xxyz[k] =
+                3.0 * to_zz_xxy[k] - 6.0 * to_zz_xxyzz[k] * tke_0 - 2.0 * to_zzzz_xxy[k] * tbe_0 + 4.0 * to_zzzz_xxyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_zzz_xxzz[k] = 6.0 * to_zz_xxz[k] - 6.0 * to_zz_xxzzz[k] * tke_0 - 4.0 * to_zzzz_xxz[k] * tbe_0 + 4.0 * to_zzzz_xxzzz[k] * tbe_0 * tke_0;
+            to_z_z_zzz_xxzz[k] =
+                6.0 * to_zz_xxz[k] - 6.0 * to_zz_xxzzz[k] * tke_0 - 4.0 * to_zzzz_xxz[k] * tbe_0 + 4.0 * to_zzzz_xxzzz[k] * tbe_0 * tke_0;
 
             to_z_z_zzz_xyyy[k] = -6.0 * to_zz_xyyyz[k] * tke_0 + 4.0 * to_zzzz_xyyyz[k] * tbe_0 * tke_0;
 
-            to_z_z_zzz_xyyz[k] = 3.0 * to_zz_xyy[k] - 6.0 * to_zz_xyyzz[k] * tke_0 - 2.0 * to_zzzz_xyy[k] * tbe_0 + 4.0 * to_zzzz_xyyzz[k] * tbe_0 * tke_0;
+            to_z_z_zzz_xyyz[k] =
+                3.0 * to_zz_xyy[k] - 6.0 * to_zz_xyyzz[k] * tke_0 - 2.0 * to_zzzz_xyy[k] * tbe_0 + 4.0 * to_zzzz_xyyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_zzz_xyzz[k] = 6.0 * to_zz_xyz[k] - 6.0 * to_zz_xyzzz[k] * tke_0 - 4.0 * to_zzzz_xyz[k] * tbe_0 + 4.0 * to_zzzz_xyzzz[k] * tbe_0 * tke_0;
+            to_z_z_zzz_xyzz[k] =
+                6.0 * to_zz_xyz[k] - 6.0 * to_zz_xyzzz[k] * tke_0 - 4.0 * to_zzzz_xyz[k] * tbe_0 + 4.0 * to_zzzz_xyzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_zzz_xzzz[k] = 9.0 * to_zz_xzz[k] - 6.0 * to_zz_xzzzz[k] * tke_0 - 6.0 * to_zzzz_xzz[k] * tbe_0 + 4.0 * to_zzzz_xzzzz[k] * tbe_0 * tke_0;
+            to_z_z_zzz_xzzz[k] =
+                9.0 * to_zz_xzz[k] - 6.0 * to_zz_xzzzz[k] * tke_0 - 6.0 * to_zzzz_xzz[k] * tbe_0 + 4.0 * to_zzzz_xzzzz[k] * tbe_0 * tke_0;
 
             to_z_z_zzz_yyyy[k] = -6.0 * to_zz_yyyyz[k] * tke_0 + 4.0 * to_zzzz_yyyyz[k] * tbe_0 * tke_0;
 
-            to_z_z_zzz_yyyz[k] = 3.0 * to_zz_yyy[k] - 6.0 * to_zz_yyyzz[k] * tke_0 - 2.0 * to_zzzz_yyy[k] * tbe_0 + 4.0 * to_zzzz_yyyzz[k] * tbe_0 * tke_0;
+            to_z_z_zzz_yyyz[k] =
+                3.0 * to_zz_yyy[k] - 6.0 * to_zz_yyyzz[k] * tke_0 - 2.0 * to_zzzz_yyy[k] * tbe_0 + 4.0 * to_zzzz_yyyzz[k] * tbe_0 * tke_0;
 
-            to_z_z_zzz_yyzz[k] = 6.0 * to_zz_yyz[k] - 6.0 * to_zz_yyzzz[k] * tke_0 - 4.0 * to_zzzz_yyz[k] * tbe_0 + 4.0 * to_zzzz_yyzzz[k] * tbe_0 * tke_0;
+            to_z_z_zzz_yyzz[k] =
+                6.0 * to_zz_yyz[k] - 6.0 * to_zz_yyzzz[k] * tke_0 - 4.0 * to_zzzz_yyz[k] * tbe_0 + 4.0 * to_zzzz_yyzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_zzz_yzzz[k] = 9.0 * to_zz_yzz[k] - 6.0 * to_zz_yzzzz[k] * tke_0 - 6.0 * to_zzzz_yzz[k] * tbe_0 + 4.0 * to_zzzz_yzzzz[k] * tbe_0 * tke_0;
+            to_z_z_zzz_yzzz[k] =
+                9.0 * to_zz_yzz[k] - 6.0 * to_zz_yzzzz[k] * tke_0 - 6.0 * to_zzzz_yzz[k] * tbe_0 + 4.0 * to_zzzz_yzzzz[k] * tbe_0 * tke_0;
 
-            to_z_z_zzz_zzzz[k] = 12.0 * to_zz_zzz[k] - 6.0 * to_zz_zzzzz[k] * tke_0 - 8.0 * to_zzzz_zzz[k] * tbe_0 + 4.0 * to_zzzz_zzzzz[k] * tbe_0 * tke_0;
+            to_z_z_zzz_zzzz[k] =
+                12.0 * to_zz_zzz[k] - 6.0 * to_zz_zzzzz[k] * tke_0 - 8.0 * to_zzzz_zzz[k] * tbe_0 + 4.0 * to_zzzz_zzzzz[k] * tbe_0 * tke_0;
         }
-
     }
-
 }
 
-} // t2cgeom namespace
-
+}  // namespace t2cgeom

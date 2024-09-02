@@ -12,18 +12,14 @@ CMatrices::CMatrices(const std::map<std::string, CMatrix>& matrices)
 
     : _matrices(std::map<std::string, CMatrix*>())
 {
-    std::ranges::for_each(matrices, [&](const auto& mvalue) {
-        _matrices.insert({mvalue.first, new CMatrix(mvalue.second)});
-    });
+    std::ranges::for_each(matrices, [&](const auto& mvalue) { _matrices.insert({mvalue.first, new CMatrix(mvalue.second)}); });
 }
 
 CMatrices::CMatrices(const CMatrices& other)
 
     : _matrices(std::map<std::string, CMatrix*>())
 {
-    std::ranges::for_each(other._matrices, [&](const auto& mvalue) {
-        _matrices.insert({mvalue.first, new CMatrix(*mvalue.second)});
-    });
+    std::ranges::for_each(other._matrices, [&](const auto& mvalue) { _matrices.insert({mvalue.first, new CMatrix(*mvalue.second)}); });
 }
 
 CMatrices::CMatrices(CMatrices&& other) noexcept
@@ -43,9 +39,7 @@ CMatrices::operator=(const CMatrices& other) -> CMatrices&
 {
     _deallocate();
 
-    std::ranges::for_each(other._matrices, [&](const auto& mvalue) {
-        _matrices.insert({mvalue.first, new CMatrix(*mvalue.second)});
-    });
+    std::ranges::for_each(other._matrices, [&](const auto& mvalue) { _matrices.insert({mvalue.first, new CMatrix(*mvalue.second)}); });
 
     return *this;
 }
@@ -61,9 +55,8 @@ CMatrices::operator=(CMatrices&& other) noexcept -> CMatrices&
 auto
 CMatrices::operator==(const CMatrices& other) const -> bool
 {
-    return std::ranges::equal(_matrices, other._matrices, [&](auto lhs, auto rhs) -> bool {
-        return (lhs.first == rhs.first) && (*lhs.second == *rhs.second);
-    });
+    return std::ranges::equal(
+        _matrices, other._matrices, [&](auto lhs, auto rhs) -> bool { return (lhs.first == rhs.first) && (*lhs.second == *rhs.second); });
 }
 
 auto

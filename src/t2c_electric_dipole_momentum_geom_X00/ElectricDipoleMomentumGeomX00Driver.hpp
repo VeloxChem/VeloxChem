@@ -3,12 +3,12 @@
 
 #include <vector>
 
+#include "ElectricDipoleMomentumGeom100Func.hpp"
 #include "GtoFunc.hpp"
 #include "Matrices.hpp"
 #include "MatricesFunc.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
-#include "ElectricDipoleMomentumGeom100Func.hpp"
 #include "OpenMPFunc.hpp"
 #include "Point.hpp"
 #include "T2CDistributor.hpp"
@@ -59,18 +59,15 @@ class CElectricDipoleMomentumGeomX00Driver
     /// @param origin The origin of electric dipole momentum.
     /// @param iatom The index of atom.
     /// @return The nuclear potential matrix.
-    auto compute(const CMolecularBasis             &basis,
-                 const CMolecule                   &molecule,
-                 const TPoint<double>& origin,
-                 const int                         iatom) const -> CMatrices;
+    auto compute(const CMolecularBasis &basis, const CMolecule &molecule, const TPoint<double> &origin, const int iatom) const -> CMatrices;
 };
 
 template <int N>
 auto
-CElectricDipoleMomentumGeomX00Driver<N>::compute(const CMolecularBasis             &basis,
-                                  const CMolecule                   &molecule,
-                                                 const TPoint<double>& origin,
-                                  const int                         iatom) const -> CMatrices
+CElectricDipoleMomentumGeomX00Driver<N>::compute(const CMolecularBasis &basis,
+                                                 const CMolecule       &molecule,
+                                                 const TPoint<double>  &origin,
+                                                 const int              iatom) const -> CMatrices
 {
     // set up operator derivatives matrices
 
@@ -83,7 +80,7 @@ CElectricDipoleMomentumGeomX00Driver<N>::compute(const CMolecularBasis          
     auto ptr_basis = &basis;
 
     auto ptr_molecule = &molecule;
-    
+
     auto ptr_origin = &origin;
 
     auto ptr_dip_mats = &dip_mats;
@@ -96,21 +93,25 @@ CElectricDipoleMomentumGeomX00Driver<N>::compute(const CMolecularBasis          
     {
 #pragma omp single nowait
         {
-            const auto bra_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule, {iatom, });
-            
+            const auto bra_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis,
+                                                                 *ptr_molecule,
+                                                                 {
+                                                                     iatom,
+                                                                 });
+
             const auto ket_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule);
 
             const auto tasks = omp::make_work_tasks(bra_gto_blocks, ket_gto_blocks);
 
-            std::ranges::for_each(std::ranges::reverse_view(tasks), [&](const auto& task) {
+            std::ranges::for_each(std::ranges::reverse_view(tasks), [&](const auto &task) {
                 auto bra_gtos    = bra_gto_blocks[task[0]];
                 auto ket_gtos    = ket_gto_blocks[task[1]];
                 auto bra_indices = std::pair<size_t, size_t>{task[2], task[3]};
                 auto ket_indices = std::pair<size_t, size_t>{task[4], task[5]};
 #pragma omp task firstprivate(bra_gtos, ket_gtos, bra_indices, ket_indices)
                 {
-                    const auto coords = std::vector<TPoint<double>>(1, *ptr_origin);
-                    const auto data = std::vector<double>();
+                    const auto                 coords = std::vector<TPoint<double>>(1, *ptr_origin);
+                    const auto                 data   = std::vector<double>();
                     CT2CDistributor<CMatrices> distributor(ptr_dip_mats, coords, data);
                     if constexpr (N == 1)
                     {

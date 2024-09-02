@@ -3,7 +3,6 @@
 
 #include <array>
 
-#include "GtoBlock.hpp"
 #include "ElectricDipoleMomentumGeom110RecDD.hpp"
 #include "ElectricDipoleMomentumGeom110RecDF.hpp"
 #include "ElectricDipoleMomentumGeom110RecDG.hpp"
@@ -29,6 +28,7 @@
 #include "ElectricDipoleMomentumGeom110RecSG.hpp"
 #include "ElectricDipoleMomentumGeom110RecSP.hpp"
 #include "ElectricDipoleMomentumGeom110RecSS.hpp"
+#include "GtoBlock.hpp"
 
 namespace dipfunc {
 
@@ -42,11 +42,11 @@ namespace dipfunc {
 template <class T>
 auto
 compute_geom_100(T&                               distributor,
-        const CGtoBlock&                 bra_gto_block,
-        const CGtoBlock&                 ket_gto_block,
-        const std::pair<size_t, size_t>& bra_indices,
-        const std::pair<size_t, size_t>& ket_indices,
-        const bool                       bra_eq_ket) -> void
+                 const CGtoBlock&                 bra_gto_block,
+                 const CGtoBlock&                 ket_gto_block,
+                 const std::pair<size_t, size_t>& bra_indices,
+                 const std::pair<size_t, size_t>& ket_indices,
+                 const bool                       bra_eq_ket) -> void
 {
     const auto bra_angmom = bra_gto_block.angular_momentum();
 
@@ -229,6 +229,5 @@ compute_geom_100(T&                               distributor,
 }
 
 }  // namespace dipfunc
-
 
 #endif /* ElectricDipoleMomentumGeom100Func_hpp */

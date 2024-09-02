@@ -1,55 +1,54 @@
 #ifndef KineticEnergyGeom200RecGD_hpp
 #define KineticEnergyGeom200RecGD_hpp
 
-#include <cstddef>
 #include <array>
+#include <cstddef>
 #include <utility>
 
-#include "GtoBlock.hpp"
-#include "SimdArray.hpp"
-#include "OverlapPrimRecSS.hpp"
-#include "KineticEnergyPrimRecSS.hpp"
-#include "OverlapPrimRecSP.hpp"
-#include "KineticEnergyPrimRecSP.hpp"
-#include "OverlapPrimRecSD.hpp"
-#include "KineticEnergyPrimRecSD.hpp"
-#include "OverlapPrimRecPS.hpp"
-#include "KineticEnergyPrimRecPS.hpp"
-#include "OverlapPrimRecPP.hpp"
-#include "KineticEnergyPrimRecPP.hpp"
-#include "OverlapPrimRecPD.hpp"
-#include "KineticEnergyPrimRecPD.hpp"
-#include "OverlapPrimRecDS.hpp"
-#include "KineticEnergyPrimRecDS.hpp"
-#include "OverlapPrimRecDP.hpp"
-#include "KineticEnergyPrimRecDP.hpp"
-#include "OverlapPrimRecDD.hpp"
-#include "KineticEnergyPrimRecDD.hpp"
-#include "OverlapPrimRecFS.hpp"
-#include "KineticEnergyPrimRecFS.hpp"
-#include "OverlapPrimRecFP.hpp"
-#include "KineticEnergyPrimRecFP.hpp"
-#include "OverlapPrimRecFD.hpp"
-#include "KineticEnergyPrimRecFD.hpp"
-#include "OverlapPrimRecGS.hpp"
-#include "KineticEnergyPrimRecGS.hpp"
-#include "OverlapPrimRecGP.hpp"
-#include "KineticEnergyPrimRecGP.hpp"
-#include "OverlapPrimRecGD.hpp"
-#include "KineticEnergyPrimRecGD.hpp"
-#include "OverlapPrimRecHP.hpp"
-#include "KineticEnergyPrimRecHP.hpp"
-#include "OverlapPrimRecHD.hpp"
-#include "KineticEnergyPrimRecHD.hpp"
-#include "OverlapPrimRecID.hpp"
-#include "KineticEnergyPrimRecID.hpp"
-#include "GeometricalDerivatives2X0ForGY.hpp"
-
-#include "T2CUtils.hpp"
-#include "T2CTransform.hpp"
 #include "BatchFunc.hpp"
+#include "GeometricalDerivatives2X0ForGY.hpp"
+#include "GtoBlock.hpp"
+#include "KineticEnergyPrimRecDD.hpp"
+#include "KineticEnergyPrimRecDP.hpp"
+#include "KineticEnergyPrimRecDS.hpp"
+#include "KineticEnergyPrimRecFD.hpp"
+#include "KineticEnergyPrimRecFP.hpp"
+#include "KineticEnergyPrimRecFS.hpp"
+#include "KineticEnergyPrimRecGD.hpp"
+#include "KineticEnergyPrimRecGP.hpp"
+#include "KineticEnergyPrimRecGS.hpp"
+#include "KineticEnergyPrimRecHD.hpp"
+#include "KineticEnergyPrimRecHP.hpp"
+#include "KineticEnergyPrimRecID.hpp"
+#include "KineticEnergyPrimRecPD.hpp"
+#include "KineticEnergyPrimRecPP.hpp"
+#include "KineticEnergyPrimRecPS.hpp"
+#include "KineticEnergyPrimRecSD.hpp"
+#include "KineticEnergyPrimRecSP.hpp"
+#include "KineticEnergyPrimRecSS.hpp"
+#include "OverlapPrimRecDD.hpp"
+#include "OverlapPrimRecDP.hpp"
+#include "OverlapPrimRecDS.hpp"
+#include "OverlapPrimRecFD.hpp"
+#include "OverlapPrimRecFP.hpp"
+#include "OverlapPrimRecFS.hpp"
+#include "OverlapPrimRecGD.hpp"
+#include "OverlapPrimRecGP.hpp"
+#include "OverlapPrimRecGS.hpp"
+#include "OverlapPrimRecHD.hpp"
+#include "OverlapPrimRecHP.hpp"
+#include "OverlapPrimRecID.hpp"
+#include "OverlapPrimRecPD.hpp"
+#include "OverlapPrimRecPP.hpp"
+#include "OverlapPrimRecPS.hpp"
+#include "OverlapPrimRecSD.hpp"
+#include "OverlapPrimRecSP.hpp"
+#include "OverlapPrimRecSS.hpp"
+#include "SimdArray.hpp"
+#include "T2CTransform.hpp"
+#include "T2CUtils.hpp"
 
-namespace kinrec { // kinrec namespace
+namespace kinrec {  // kinrec namespace
 
 /// @brief Computes (d^(2)/dA^(2)G|T|D)  integrals for pair of basis functions blocks.
 /// @param distributor The integrals distributor.
@@ -60,12 +59,12 @@ namespace kinrec { // kinrec namespace
 /// @param bra_eq_ket True if basis functions blocks on bra and ket are the same, False otherwise.
 template <class T>
 auto
-comp_kinetic_energy_geom_20_gd(T& distributor,
-                               const CGtoBlock& bra_gto_block,
-                               const CGtoBlock& ket_gto_block,
+comp_kinetic_energy_geom_20_gd(T&                               distributor,
+                               const CGtoBlock&                 bra_gto_block,
+                               const CGtoBlock&                 ket_gto_block,
                                const std::pair<size_t, size_t>& bra_indices,
                                const std::pair<size_t, size_t>& ket_indices,
-                               const bool bra_eq_ket) -> void
+                               const bool                       bra_eq_ket) -> void
 {
     // intialize GTOs data on bra side
 
@@ -239,6 +238,6 @@ comp_kinetic_energy_geom_20_gd(T& distributor,
     }
 }
 
-} // kinrec namespace
+}  // namespace kinrec
 
 #endif /* KineticEnergyGeom200RecGD_hpp */

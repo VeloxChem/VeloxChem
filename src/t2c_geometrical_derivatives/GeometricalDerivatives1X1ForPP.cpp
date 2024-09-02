@@ -1,17 +1,17 @@
 #include "GeometricalDerivatives1X1ForPP.hpp"
 
-namespace t2cgeom { // t2cgeom namespace
+namespace t2cgeom {  // t2cgeom namespace
 
 auto
-comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
-                        const size_t idx_op_geom_101_pp,
-                        const size_t idx_op_ss,
-                        const size_t idx_op_sd,
-                        const size_t idx_op_ds,
-                        const size_t idx_op_dd,
-                        const size_t op_comps,
+comp_prim_op_geom_11_pp(CSimdArray<double>&       pbuffer,
+                        const size_t              idx_op_geom_101_pp,
+                        const size_t              idx_op_ss,
+                        const size_t              idx_op_sd,
+                        const size_t              idx_op_ds,
+                        const size_t              idx_op_dd,
+                        const size_t              op_comps,
                         const CSimdArray<double>& factors,
-                        const double a_exp) -> void
+                        const double              a_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -135,7 +135,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_x_x_x_z = pbuffer.data(idx_op_geom_101_pp + 0 * op_comps * 9 + i * 9 + 2);
 
-        #pragma omp simd aligned(to_0_0, to_0_xx, to_0_xy, to_0_xz, to_x_x_x_x, to_x_x_x_y, to_x_x_x_z, to_xx_0, to_xx_xx, to_xx_xy, to_xx_xz, b_exps : 64)
+#pragma omp simd aligned(to_0_0, to_0_xx, to_0_xy, to_0_xz, to_x_x_x_x, to_x_x_x_y, to_x_x_x_z, to_xx_0, to_xx_xx, to_xx_xy, to_xx_xz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -157,7 +157,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_x_x_y_z = pbuffer.data(idx_op_geom_101_pp + 0 * op_comps * 9 + i * 9 + 5);
 
-        #pragma omp simd aligned(to_x_x_y_x, to_x_x_y_y, to_x_x_y_z, to_xy_0, to_xy_xx, to_xy_xy, to_xy_xz, b_exps : 64)
+#pragma omp simd aligned(to_x_x_y_x, to_x_x_y_y, to_x_x_y_z, to_xy_0, to_xy_xx, to_xy_xy, to_xy_xz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -179,7 +179,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_x_x_z_z = pbuffer.data(idx_op_geom_101_pp + 0 * op_comps * 9 + i * 9 + 8);
 
-        #pragma omp simd aligned(to_x_x_z_x, to_x_x_z_y, to_x_x_z_z, to_xz_0, to_xz_xx, to_xz_xy, to_xz_xz, b_exps : 64)
+#pragma omp simd aligned(to_x_x_z_x, to_x_x_z_y, to_x_x_z_z, to_xz_0, to_xz_xx, to_xz_xy, to_xz_xz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -201,7 +201,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_x_y_x_z = pbuffer.data(idx_op_geom_101_pp + 1 * op_comps * 9 + i * 9 + 2);
 
-        #pragma omp simd aligned(to_0_0, to_0_xy, to_0_yy, to_0_yz, to_x_y_x_x, to_x_y_x_y, to_x_y_x_z, to_xx_0, to_xx_xy, to_xx_yy, to_xx_yz, b_exps : 64)
+#pragma omp simd aligned(to_0_0, to_0_xy, to_0_yy, to_0_yz, to_x_y_x_x, to_x_y_x_y, to_x_y_x_z, to_xx_0, to_xx_xy, to_xx_yy, to_xx_yz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -223,7 +223,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_x_y_y_z = pbuffer.data(idx_op_geom_101_pp + 1 * op_comps * 9 + i * 9 + 5);
 
-        #pragma omp simd aligned(to_x_y_y_x, to_x_y_y_y, to_x_y_y_z, to_xy_0, to_xy_xy, to_xy_yy, to_xy_yz, b_exps : 64)
+#pragma omp simd aligned(to_x_y_y_x, to_x_y_y_y, to_x_y_y_z, to_xy_0, to_xy_xy, to_xy_yy, to_xy_yz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -245,7 +245,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_x_y_z_z = pbuffer.data(idx_op_geom_101_pp + 1 * op_comps * 9 + i * 9 + 8);
 
-        #pragma omp simd aligned(to_x_y_z_x, to_x_y_z_y, to_x_y_z_z, to_xz_0, to_xz_xy, to_xz_yy, to_xz_yz, b_exps : 64)
+#pragma omp simd aligned(to_x_y_z_x, to_x_y_z_y, to_x_y_z_z, to_xz_0, to_xz_xy, to_xz_yy, to_xz_yz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -267,7 +267,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_x_z_x_z = pbuffer.data(idx_op_geom_101_pp + 2 * op_comps * 9 + i * 9 + 2);
 
-        #pragma omp simd aligned(to_0_0, to_0_xz, to_0_yz, to_0_zz, to_x_z_x_x, to_x_z_x_y, to_x_z_x_z, to_xx_0, to_xx_xz, to_xx_yz, to_xx_zz, b_exps : 64)
+#pragma omp simd aligned(to_0_0, to_0_xz, to_0_yz, to_0_zz, to_x_z_x_x, to_x_z_x_y, to_x_z_x_z, to_xx_0, to_xx_xz, to_xx_yz, to_xx_zz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -289,7 +289,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_x_z_y_z = pbuffer.data(idx_op_geom_101_pp + 2 * op_comps * 9 + i * 9 + 5);
 
-        #pragma omp simd aligned(to_x_z_y_x, to_x_z_y_y, to_x_z_y_z, to_xy_0, to_xy_xz, to_xy_yz, to_xy_zz, b_exps : 64)
+#pragma omp simd aligned(to_x_z_y_x, to_x_z_y_y, to_x_z_y_z, to_xy_0, to_xy_xz, to_xy_yz, to_xy_zz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -311,7 +311,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_x_z_z_z = pbuffer.data(idx_op_geom_101_pp + 2 * op_comps * 9 + i * 9 + 8);
 
-        #pragma omp simd aligned(to_x_z_z_x, to_x_z_z_y, to_x_z_z_z, to_xz_0, to_xz_xz, to_xz_yz, to_xz_zz, b_exps : 64)
+#pragma omp simd aligned(to_x_z_z_x, to_x_z_z_y, to_x_z_z_z, to_xz_0, to_xz_xz, to_xz_yz, to_xz_zz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -333,7 +333,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_y_x_x_z = pbuffer.data(idx_op_geom_101_pp + 3 * op_comps * 9 + i * 9 + 2);
 
-        #pragma omp simd aligned(to_xy_0, to_xy_xx, to_xy_xy, to_xy_xz, to_y_x_x_x, to_y_x_x_y, to_y_x_x_z, b_exps : 64)
+#pragma omp simd aligned(to_xy_0, to_xy_xx, to_xy_xy, to_xy_xz, to_y_x_x_x, to_y_x_x_y, to_y_x_x_z, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -355,7 +355,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_y_x_y_z = pbuffer.data(idx_op_geom_101_pp + 3 * op_comps * 9 + i * 9 + 5);
 
-        #pragma omp simd aligned(to_0_0, to_0_xx, to_0_xy, to_0_xz, to_y_x_y_x, to_y_x_y_y, to_y_x_y_z, to_yy_0, to_yy_xx, to_yy_xy, to_yy_xz, b_exps : 64)
+#pragma omp simd aligned(to_0_0, to_0_xx, to_0_xy, to_0_xz, to_y_x_y_x, to_y_x_y_y, to_y_x_y_z, to_yy_0, to_yy_xx, to_yy_xy, to_yy_xz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -377,7 +377,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_y_x_z_z = pbuffer.data(idx_op_geom_101_pp + 3 * op_comps * 9 + i * 9 + 8);
 
-        #pragma omp simd aligned(to_y_x_z_x, to_y_x_z_y, to_y_x_z_z, to_yz_0, to_yz_xx, to_yz_xy, to_yz_xz, b_exps : 64)
+#pragma omp simd aligned(to_y_x_z_x, to_y_x_z_y, to_y_x_z_z, to_yz_0, to_yz_xx, to_yz_xy, to_yz_xz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -399,7 +399,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_y_y_x_z = pbuffer.data(idx_op_geom_101_pp + 4 * op_comps * 9 + i * 9 + 2);
 
-        #pragma omp simd aligned(to_xy_0, to_xy_xy, to_xy_yy, to_xy_yz, to_y_y_x_x, to_y_y_x_y, to_y_y_x_z, b_exps : 64)
+#pragma omp simd aligned(to_xy_0, to_xy_xy, to_xy_yy, to_xy_yz, to_y_y_x_x, to_y_y_x_y, to_y_y_x_z, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -421,7 +421,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_y_y_y_z = pbuffer.data(idx_op_geom_101_pp + 4 * op_comps * 9 + i * 9 + 5);
 
-        #pragma omp simd aligned(to_0_0, to_0_xy, to_0_yy, to_0_yz, to_y_y_y_x, to_y_y_y_y, to_y_y_y_z, to_yy_0, to_yy_xy, to_yy_yy, to_yy_yz, b_exps : 64)
+#pragma omp simd aligned(to_0_0, to_0_xy, to_0_yy, to_0_yz, to_y_y_y_x, to_y_y_y_y, to_y_y_y_z, to_yy_0, to_yy_xy, to_yy_yy, to_yy_yz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -443,7 +443,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_y_y_z_z = pbuffer.data(idx_op_geom_101_pp + 4 * op_comps * 9 + i * 9 + 8);
 
-        #pragma omp simd aligned(to_y_y_z_x, to_y_y_z_y, to_y_y_z_z, to_yz_0, to_yz_xy, to_yz_yy, to_yz_yz, b_exps : 64)
+#pragma omp simd aligned(to_y_y_z_x, to_y_y_z_y, to_y_y_z_z, to_yz_0, to_yz_xy, to_yz_yy, to_yz_yz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -465,7 +465,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_y_z_x_z = pbuffer.data(idx_op_geom_101_pp + 5 * op_comps * 9 + i * 9 + 2);
 
-        #pragma omp simd aligned(to_xy_0, to_xy_xz, to_xy_yz, to_xy_zz, to_y_z_x_x, to_y_z_x_y, to_y_z_x_z, b_exps : 64)
+#pragma omp simd aligned(to_xy_0, to_xy_xz, to_xy_yz, to_xy_zz, to_y_z_x_x, to_y_z_x_y, to_y_z_x_z, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -487,7 +487,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_y_z_y_z = pbuffer.data(idx_op_geom_101_pp + 5 * op_comps * 9 + i * 9 + 5);
 
-        #pragma omp simd aligned(to_0_0, to_0_xz, to_0_yz, to_0_zz, to_y_z_y_x, to_y_z_y_y, to_y_z_y_z, to_yy_0, to_yy_xz, to_yy_yz, to_yy_zz, b_exps : 64)
+#pragma omp simd aligned(to_0_0, to_0_xz, to_0_yz, to_0_zz, to_y_z_y_x, to_y_z_y_y, to_y_z_y_z, to_yy_0, to_yy_xz, to_yy_yz, to_yy_zz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -509,7 +509,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_y_z_z_z = pbuffer.data(idx_op_geom_101_pp + 5 * op_comps * 9 + i * 9 + 8);
 
-        #pragma omp simd aligned(to_y_z_z_x, to_y_z_z_y, to_y_z_z_z, to_yz_0, to_yz_xz, to_yz_yz, to_yz_zz, b_exps : 64)
+#pragma omp simd aligned(to_y_z_z_x, to_y_z_z_y, to_y_z_z_z, to_yz_0, to_yz_xz, to_yz_yz, to_yz_zz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -531,7 +531,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_z_x_x_z = pbuffer.data(idx_op_geom_101_pp + 6 * op_comps * 9 + i * 9 + 2);
 
-        #pragma omp simd aligned(to_xz_0, to_xz_xx, to_xz_xy, to_xz_xz, to_z_x_x_x, to_z_x_x_y, to_z_x_x_z, b_exps : 64)
+#pragma omp simd aligned(to_xz_0, to_xz_xx, to_xz_xy, to_xz_xz, to_z_x_x_x, to_z_x_x_y, to_z_x_x_z, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -553,7 +553,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_z_x_y_z = pbuffer.data(idx_op_geom_101_pp + 6 * op_comps * 9 + i * 9 + 5);
 
-        #pragma omp simd aligned(to_yz_0, to_yz_xx, to_yz_xy, to_yz_xz, to_z_x_y_x, to_z_x_y_y, to_z_x_y_z, b_exps : 64)
+#pragma omp simd aligned(to_yz_0, to_yz_xx, to_yz_xy, to_yz_xz, to_z_x_y_x, to_z_x_y_y, to_z_x_y_z, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -575,7 +575,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_z_x_z_z = pbuffer.data(idx_op_geom_101_pp + 6 * op_comps * 9 + i * 9 + 8);
 
-        #pragma omp simd aligned(to_0_0, to_0_xx, to_0_xy, to_0_xz, to_z_x_z_x, to_z_x_z_y, to_z_x_z_z, to_zz_0, to_zz_xx, to_zz_xy, to_zz_xz, b_exps : 64)
+#pragma omp simd aligned(to_0_0, to_0_xx, to_0_xy, to_0_xz, to_z_x_z_x, to_z_x_z_y, to_z_x_z_z, to_zz_0, to_zz_xx, to_zz_xy, to_zz_xz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -597,7 +597,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_z_y_x_z = pbuffer.data(idx_op_geom_101_pp + 7 * op_comps * 9 + i * 9 + 2);
 
-        #pragma omp simd aligned(to_xz_0, to_xz_xy, to_xz_yy, to_xz_yz, to_z_y_x_x, to_z_y_x_y, to_z_y_x_z, b_exps : 64)
+#pragma omp simd aligned(to_xz_0, to_xz_xy, to_xz_yy, to_xz_yz, to_z_y_x_x, to_z_y_x_y, to_z_y_x_z, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -619,7 +619,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_z_y_y_z = pbuffer.data(idx_op_geom_101_pp + 7 * op_comps * 9 + i * 9 + 5);
 
-        #pragma omp simd aligned(to_yz_0, to_yz_xy, to_yz_yy, to_yz_yz, to_z_y_y_x, to_z_y_y_y, to_z_y_y_z, b_exps : 64)
+#pragma omp simd aligned(to_yz_0, to_yz_xy, to_yz_yy, to_yz_yz, to_z_y_y_x, to_z_y_y_y, to_z_y_y_z, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -641,7 +641,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_z_y_z_z = pbuffer.data(idx_op_geom_101_pp + 7 * op_comps * 9 + i * 9 + 8);
 
-        #pragma omp simd aligned(to_0_0, to_0_xy, to_0_yy, to_0_yz, to_z_y_z_x, to_z_y_z_y, to_z_y_z_z, to_zz_0, to_zz_xy, to_zz_yy, to_zz_yz, b_exps : 64)
+#pragma omp simd aligned(to_0_0, to_0_xy, to_0_yy, to_0_yz, to_z_y_z_x, to_z_y_z_y, to_z_y_z_z, to_zz_0, to_zz_xy, to_zz_yy, to_zz_yz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -663,7 +663,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_z_z_x_z = pbuffer.data(idx_op_geom_101_pp + 8 * op_comps * 9 + i * 9 + 2);
 
-        #pragma omp simd aligned(to_xz_0, to_xz_xz, to_xz_yz, to_xz_zz, to_z_z_x_x, to_z_z_x_y, to_z_z_x_z, b_exps : 64)
+#pragma omp simd aligned(to_xz_0, to_xz_xz, to_xz_yz, to_xz_zz, to_z_z_x_x, to_z_z_x_y, to_z_z_x_z, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -685,7 +685,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_z_z_y_z = pbuffer.data(idx_op_geom_101_pp + 8 * op_comps * 9 + i * 9 + 5);
 
-        #pragma omp simd aligned(to_yz_0, to_yz_xz, to_yz_yz, to_yz_zz, to_z_z_y_x, to_z_z_y_y, to_z_z_y_z, b_exps : 64)
+#pragma omp simd aligned(to_yz_0, to_yz_xz, to_yz_yz, to_yz_zz, to_z_z_y_x, to_z_z_y_y, to_z_z_y_z, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -707,7 +707,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
         auto to_z_z_z_z = pbuffer.data(idx_op_geom_101_pp + 8 * op_comps * 9 + i * 9 + 8);
 
-        #pragma omp simd aligned(to_0_0, to_0_xz, to_0_yz, to_0_zz, to_z_z_z_x, to_z_z_z_y, to_z_z_z_z, to_zz_0, to_zz_xz, to_zz_yz, to_zz_zz, b_exps : 64)
+#pragma omp simd aligned(to_0_0, to_0_xz, to_0_yz, to_0_zz, to_z_z_z_x, to_z_z_z_y, to_z_z_z_z, to_zz_0, to_zz_xz, to_zz_yz, to_zz_zz, b_exps : 64)
         for (size_t k = 0; k < nelems; k++)
         {
             const double tbe_0 = a_exp;
@@ -720,10 +720,7 @@ comp_prim_op_geom_11_pp(CSimdArray<double>& pbuffer,
 
             to_z_z_z_z[k] = to_0_0[k] - 2.0 * to_0_zz[k] * tke_0 - 2.0 * to_zz_0[k] * tbe_0 + 4.0 * to_zz_zz[k] * tbe_0 * tke_0;
         }
-
     }
-
 }
 
-} // t2cgeom namespace
-
+}  // namespace t2cgeom

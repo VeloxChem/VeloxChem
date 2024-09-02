@@ -3,6 +3,8 @@ from .veloxchemlib import Point
 from .veloxchemlib import BasisFunction
 from .veloxchemlib import AtomBasis
 from .veloxchemlib import GtoBlock
+from .veloxchemlib import GtoPairBlock
+from .veloxchemlib import BlockedGtoPairBlock
 from .veloxchemlib import OverlapDriver
 from .veloxchemlib import KineticEnergyDriver
 from .veloxchemlib import NuclearPotentialDriver
@@ -43,6 +45,7 @@ from .veloxchemlib import tensor_order
 from .veloxchemlib import number_of_cartesian_components
 from .veloxchemlib import number_of_spherical_components
 from .veloxchemlib import make_gto_blocks
+from .veloxchemlib import make_gto_pair_blocks
 from .veloxchemlib import make_matrix
 from .veloxchemlib import make_matrices
 from .veloxchemlib import number_of_batches

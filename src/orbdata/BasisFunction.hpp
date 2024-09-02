@@ -13,9 +13,11 @@ class CBasisFunction
     /// @brief The default constructor.
     CBasisFunction();
 
-    /// @brief The constructor with exponents, normalization factors, and angular momentum.
+    /// @brief The constructor with exponents, normalization factors, and angular
+    /// momentum.
     /// @param exponents The vector of exponents of primitive Gaussian functions.
-    /// @param norms The vector of normalization factors of primitive Gaussian functions.
+    /// @param norms The vector of normalization factors of primitive Gaussian
+    /// functions.
     /// @param angular_momentum The angular momentum of basis function.
     CBasisFunction(const std::vector<double> &exponents, const std::vector<double> &norms, const int angular_momentum);
 

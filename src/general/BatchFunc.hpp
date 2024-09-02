@@ -56,7 +56,7 @@ inline auto
 batch_range(const T ibatch, const T nelements, const T bsize, const T position) -> std::pair<T, T>
 {
     auto range = batch::batch_range(ibatch, nelements, bsize);
-    
+
     return {range.first + position, range.second + position};
 }
 

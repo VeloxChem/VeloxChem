@@ -1,41 +1,40 @@
 #ifndef KineticEnergyGeom200RecFP_hpp
 #define KineticEnergyGeom200RecFP_hpp
 
-#include <cstddef>
 #include <array>
+#include <cstddef>
 #include <utility>
 
-#include "GtoBlock.hpp"
-#include "SimdArray.hpp"
-#include "OverlapPrimRecSS.hpp"
-#include "KineticEnergyPrimRecSS.hpp"
-#include "OverlapPrimRecSP.hpp"
-#include "KineticEnergyPrimRecSP.hpp"
-#include "OverlapPrimRecPS.hpp"
-#include "KineticEnergyPrimRecPS.hpp"
-#include "OverlapPrimRecPP.hpp"
-#include "KineticEnergyPrimRecPP.hpp"
-#include "OverlapPrimRecDS.hpp"
-#include "KineticEnergyPrimRecDS.hpp"
-#include "OverlapPrimRecDP.hpp"
-#include "KineticEnergyPrimRecDP.hpp"
-#include "OverlapPrimRecFS.hpp"
-#include "KineticEnergyPrimRecFS.hpp"
-#include "OverlapPrimRecFP.hpp"
-#include "KineticEnergyPrimRecFP.hpp"
-#include "OverlapPrimRecGS.hpp"
-#include "KineticEnergyPrimRecGS.hpp"
-#include "OverlapPrimRecGP.hpp"
-#include "KineticEnergyPrimRecGP.hpp"
-#include "OverlapPrimRecHP.hpp"
-#include "KineticEnergyPrimRecHP.hpp"
-#include "GeometricalDerivatives2X0ForFY.hpp"
-
-#include "T2CUtils.hpp"
-#include "T2CTransform.hpp"
 #include "BatchFunc.hpp"
+#include "GeometricalDerivatives2X0ForFY.hpp"
+#include "GtoBlock.hpp"
+#include "KineticEnergyPrimRecDP.hpp"
+#include "KineticEnergyPrimRecDS.hpp"
+#include "KineticEnergyPrimRecFP.hpp"
+#include "KineticEnergyPrimRecFS.hpp"
+#include "KineticEnergyPrimRecGP.hpp"
+#include "KineticEnergyPrimRecGS.hpp"
+#include "KineticEnergyPrimRecHP.hpp"
+#include "KineticEnergyPrimRecPP.hpp"
+#include "KineticEnergyPrimRecPS.hpp"
+#include "KineticEnergyPrimRecSP.hpp"
+#include "KineticEnergyPrimRecSS.hpp"
+#include "OverlapPrimRecDP.hpp"
+#include "OverlapPrimRecDS.hpp"
+#include "OverlapPrimRecFP.hpp"
+#include "OverlapPrimRecFS.hpp"
+#include "OverlapPrimRecGP.hpp"
+#include "OverlapPrimRecGS.hpp"
+#include "OverlapPrimRecHP.hpp"
+#include "OverlapPrimRecPP.hpp"
+#include "OverlapPrimRecPS.hpp"
+#include "OverlapPrimRecSP.hpp"
+#include "OverlapPrimRecSS.hpp"
+#include "SimdArray.hpp"
+#include "T2CTransform.hpp"
+#include "T2CUtils.hpp"
 
-namespace kinrec { // kinrec namespace
+namespace kinrec {  // kinrec namespace
 
 /// @brief Computes (d^(2)/dA^(2)F|T|P)  integrals for pair of basis functions blocks.
 /// @param distributor The integrals distributor.
@@ -46,12 +45,12 @@ namespace kinrec { // kinrec namespace
 /// @param bra_eq_ket True if basis functions blocks on bra and ket are the same, False otherwise.
 template <class T>
 auto
-comp_kinetic_energy_geom_20_fp(T& distributor,
-                               const CGtoBlock& bra_gto_block,
-                               const CGtoBlock& ket_gto_block,
+comp_kinetic_energy_geom_20_fp(T&                               distributor,
+                               const CGtoBlock&                 bra_gto_block,
+                               const CGtoBlock&                 ket_gto_block,
                                const std::pair<size_t, size_t>& bra_indices,
                                const std::pair<size_t, size_t>& ket_indices,
-                               const bool bra_eq_ket) -> void
+                               const bool                       bra_eq_ket) -> void
 {
     // intialize GTOs data on bra side
 
@@ -197,6 +196,6 @@ comp_kinetic_energy_geom_20_fp(T& distributor,
     }
 }
 
-} // kinrec namespace
+}  // namespace kinrec
 
 #endif /* KineticEnergyGeom200RecFP_hpp */

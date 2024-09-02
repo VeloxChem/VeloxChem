@@ -1,56 +1,55 @@
 #ifndef NuclearPotentialGeom110SumRecGG_hpp
 #define NuclearPotentialGeom110SumRecGG_hpp
 
-#include <cstddef>
 #include <array>
+#include <cstddef>
 #include <utility>
 
+#include "BatchFunc.hpp"
+#include "BoysFunc.hpp"
+#include "GeometricalDerivatives1X0ForGY.hpp"
 #include "GtoBlock.hpp"
-#include "SimdArray.hpp"
-#include "OverlapPrimRecSS.hpp"
-#include "NuclearPotentialPrimRecSS.hpp"
-#include "NuclearPotentialGeom010PrimRecSS.hpp"
-#include "NuclearPotentialPrimRecSP.hpp"
-#include "NuclearPotentialGeom010PrimRecSP.hpp"
-#include "NuclearPotentialPrimRecSD.hpp"
-#include "NuclearPotentialGeom010PrimRecSD.hpp"
-#include "NuclearPotentialPrimRecSF.hpp"
-#include "NuclearPotentialGeom010PrimRecSF.hpp"
-#include "NuclearPotentialPrimRecSG.hpp"
-#include "NuclearPotentialGeom010PrimRecSG.hpp"
-#include "NuclearPotentialGeom010PrimRecPS.hpp"
-#include "NuclearPotentialPrimRecPP.hpp"
-#include "NuclearPotentialGeom010PrimRecPP.hpp"
-#include "NuclearPotentialPrimRecPD.hpp"
-#include "NuclearPotentialGeom010PrimRecPD.hpp"
-#include "NuclearPotentialPrimRecPF.hpp"
-#include "NuclearPotentialGeom010PrimRecPF.hpp"
-#include "NuclearPotentialPrimRecPG.hpp"
-#include "NuclearPotentialGeom010PrimRecPG.hpp"
-#include "NuclearPotentialGeom010PrimRecDP.hpp"
-#include "NuclearPotentialPrimRecDD.hpp"
 #include "NuclearPotentialGeom010PrimRecDD.hpp"
-#include "NuclearPotentialPrimRecDF.hpp"
 #include "NuclearPotentialGeom010PrimRecDF.hpp"
-#include "NuclearPotentialPrimRecDG.hpp"
 #include "NuclearPotentialGeom010PrimRecDG.hpp"
+#include "NuclearPotentialGeom010PrimRecDP.hpp"
 #include "NuclearPotentialGeom010PrimRecFD.hpp"
-#include "NuclearPotentialPrimRecFF.hpp"
 #include "NuclearPotentialGeom010PrimRecFF.hpp"
-#include "NuclearPotentialPrimRecFG.hpp"
 #include "NuclearPotentialGeom010PrimRecFG.hpp"
 #include "NuclearPotentialGeom010PrimRecGF.hpp"
-#include "NuclearPotentialPrimRecGG.hpp"
 #include "NuclearPotentialGeom010PrimRecGG.hpp"
 #include "NuclearPotentialGeom010PrimRecHG.hpp"
-#include "GeometricalDerivatives1X0ForGY.hpp"
-
-#include "BoysFunc.hpp"
-#include "T2CUtils.hpp"
+#include "NuclearPotentialGeom010PrimRecPD.hpp"
+#include "NuclearPotentialGeom010PrimRecPF.hpp"
+#include "NuclearPotentialGeom010PrimRecPG.hpp"
+#include "NuclearPotentialGeom010PrimRecPP.hpp"
+#include "NuclearPotentialGeom010PrimRecPS.hpp"
+#include "NuclearPotentialGeom010PrimRecSD.hpp"
+#include "NuclearPotentialGeom010PrimRecSF.hpp"
+#include "NuclearPotentialGeom010PrimRecSG.hpp"
+#include "NuclearPotentialGeom010PrimRecSP.hpp"
+#include "NuclearPotentialGeom010PrimRecSS.hpp"
+#include "NuclearPotentialPrimRecDD.hpp"
+#include "NuclearPotentialPrimRecDF.hpp"
+#include "NuclearPotentialPrimRecDG.hpp"
+#include "NuclearPotentialPrimRecFF.hpp"
+#include "NuclearPotentialPrimRecFG.hpp"
+#include "NuclearPotentialPrimRecGG.hpp"
+#include "NuclearPotentialPrimRecPD.hpp"
+#include "NuclearPotentialPrimRecPF.hpp"
+#include "NuclearPotentialPrimRecPG.hpp"
+#include "NuclearPotentialPrimRecPP.hpp"
+#include "NuclearPotentialPrimRecSD.hpp"
+#include "NuclearPotentialPrimRecSF.hpp"
+#include "NuclearPotentialPrimRecSG.hpp"
+#include "NuclearPotentialPrimRecSP.hpp"
+#include "NuclearPotentialPrimRecSS.hpp"
+#include "OverlapPrimRecSS.hpp"
+#include "SimdArray.hpp"
 #include "T2CTransform.hpp"
-#include "BatchFunc.hpp"
+#include "T2CUtils.hpp"
 
-namespace npotrec { // npotrec namespace
+namespace npotrec {  // npotrec namespace
 
 /// @brief Computes (d^(1)/dA^(1)G|AG(1)|G)  integrals for pair of basis functions blocks.
 /// @param distributor The integrals distributor.
@@ -61,12 +60,12 @@ namespace npotrec { // npotrec namespace
 /// @param bra_eq_ket True if basis functions blocks on bra and ket are the same, False otherwise.
 template <class T>
 auto
-comp_sum_nuclear_potential_geom_110_gg(T& distributor,
-                                       const CGtoBlock& bra_gto_block,
-                                       const CGtoBlock& ket_gto_block,
+comp_sum_nuclear_potential_geom_110_gg(T&                               distributor,
+                                       const CGtoBlock&                 bra_gto_block,
+                                       const CGtoBlock&                 ket_gto_block,
                                        const std::pair<size_t, size_t>& bra_indices,
                                        const std::pair<size_t, size_t>& ket_indices,
-                                       const bool bra_eq_ket) -> void
+                                       const bool                       bra_eq_ket) -> void
 {
     // intialize external coordinate(s)
 
@@ -170,9 +169,9 @@ comp_sum_nuclear_potential_geom_110_gg(T& distributor,
 
                 t2cfunc::comp_coordinates_p(factors, 8, 2, r_a, a_exp);
 
-                t2cfunc::comp_distances_pa_from_p(factors, 11 , 8, r_a);
+                t2cfunc::comp_distances_pa_from_p(factors, 11, 8, r_a);
 
-                t2cfunc::comp_distances_pb_from_p(factors, 14 , 8, 2);
+                t2cfunc::comp_distances_pb_from_p(factors, 14, 8, 2);
 
                 ovlrec::comp_prim_overlap_ss(pbuffer, 0, factors, a_exp, a_norm);
 
@@ -500,11 +499,14 @@ comp_sum_nuclear_potential_geom_110_gg(T& distributor,
 
                     npotrec::comp_prim_nuclear_potential_gg(pbuffer, 10126, 4586, 4676, 6476, 6576, 7576, 7726, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_gg(pbuffer, 10351, 4856, 5126, 6676, 6976, 7576, 7876, 8326, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_gg(
+                        pbuffer, 10351, 4856, 5126, 6676, 6976, 7576, 7876, 8326, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_gg(pbuffer, 11026, 5126, 5396, 6976, 7276, 7726, 8326, 8776, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_gg(
+                        pbuffer, 11026, 5126, 5396, 6976, 7276, 7726, 8326, 8776, factors, 11, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_hg(pbuffer, 11701, 7876, 8326, 9226, 9676, 10126, 10351, 11026, factors, 11, 17, a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_hg(
+                        pbuffer, 11701, 7876, 8326, 9226, 9676, 10126, 10351, 11026, factors, 11, 17, a_exp);
 
                     t2cgeom::comp_prim_op_geom_10_gx(pbuffer, 12646, 7876, 11701, 3, 15, a_exp);
 
@@ -519,6 +521,6 @@ comp_sum_nuclear_potential_geom_110_gg(T& distributor,
     }
 }
 
-} // npotrec namespace
+}  // namespace npotrec
 
 #endif /* NuclearPotentialGeom110SumRecGG_hpp */

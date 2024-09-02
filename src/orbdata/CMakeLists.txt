@@ -2,9 +2,11 @@ target_sources(vlxobjs
   PRIVATE
     AtomBasis.cpp
     BasisFunction.cpp
+    BlockedGtoPairBlock.cpp
     GtoBlock.cpp
     GtoFunc.cpp
     GtoPairBlock.cpp
+    GtoPairBlockFunc.cpp
     MolecularBasis.cpp
   )
 

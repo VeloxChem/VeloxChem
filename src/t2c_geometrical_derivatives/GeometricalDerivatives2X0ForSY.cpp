@@ -1,15 +1,15 @@
 #include "GeometricalDerivatives2X0ForSY.hpp"
 
-namespace t2cgeom { // t2cgeom namespace
+namespace t2cgeom {  // t2cgeom namespace
 
 auto
 comp_prim_op_geom_20_sx(CSimdArray<double>& pbuffer,
-                        const size_t idx_op_geom_200_ss,
-                        const size_t idx_op_ss,
-                        const size_t idx_op_ds,
-                        const size_t op_comps,
-                        const size_t ket_comps,
-                        const double a_exp) -> void
+                        const size_t        idx_op_geom_200_ss,
+                        const size_t        idx_op_ss,
+                        const size_t        idx_op_ds,
+                        const size_t        op_comps,
+                        const size_t        ket_comps,
+                        const double        a_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -49,7 +49,19 @@ comp_prim_op_geom_20_sx(CSimdArray<double>& pbuffer,
 
             auto to_zz_0_0_0 = pbuffer.data(idx_op_geom_200_ss + 5 * op_comps * 1 * ket_comps + i * 1 * ket_comps + 0 * ket_comps + j);
 
-            #pragma omp simd aligned(to_0_0, to_xx_0, to_xx_0_0_0, to_xy_0, to_xy_0_0_0, to_xz_0, to_xz_0_0_0, to_yy_0, to_yy_0_0_0, to_yz_0, to_yz_0_0_0, to_zz_0, to_zz_0_0_0  : 64)
+#pragma omp simd aligned(to_0_0,          \
+                             to_xx_0,     \
+                             to_xx_0_0_0, \
+                             to_xy_0,     \
+                             to_xy_0_0_0, \
+                             to_xz_0,     \
+                             to_xz_0_0_0, \
+                             to_yy_0,     \
+                             to_yy_0_0_0, \
+                             to_yz_0,     \
+                             to_yz_0_0_0, \
+                             to_zz_0,     \
+                             to_zz_0_0_0 : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 const double tbe_0 = a_exp;
@@ -68,8 +80,6 @@ comp_prim_op_geom_20_sx(CSimdArray<double>& pbuffer,
             }
         }
     }
-
 }
 
-} // t2cgeom namespace
-
+}  // namespace t2cgeom

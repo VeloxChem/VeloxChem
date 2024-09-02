@@ -22,9 +22,7 @@ CMolecule::CMolecule()
 {
 }
 
-CMolecule::CMolecule(const std::vector<int>            &identifiers,
-                     const std::vector<TPoint<double>> &coordinates,
-                     const std::string                 &unit)
+CMolecule::CMolecule(const std::vector<int> &identifiers, const std::vector<TPoint<double>> &coordinates, const std::string &unit)
 
     : _charge{0.0}
 
@@ -266,8 +264,7 @@ CMolecule::charges() const -> std::vector<double>
 
     charges.reserve(_identifiers.size());
 
-    std::ranges::transform(
-        _identifiers, std::back_inserter(charges), [](const int i) { return static_cast<double>(i); });
+    std::ranges::transform(_identifiers, std::back_inserter(charges), [](const int i) { return static_cast<double>(i); });
 
     return charges;
 }
