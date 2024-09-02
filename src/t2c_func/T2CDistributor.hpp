@@ -32,7 +32,38 @@ class CT2CDistributor
         , _coordinates{coordinates}
 
         , _data{data} {};
+    
+    /// @brief The default copy constructor.
+    /// @param other The distributor to be copied.
+    CT2CDistributor(const CT2CDistributor &other) = delete;
 
+    /// @brief The default move constructor.
+    /// @param other The distributor to be moved.
+    CT2CDistributor(CT2CDistributor &&other) noexcept = delete;
+    
+    /// @brief The default destructor.
+    ~CT2CDistributor() = default;
+
+    /// @brief The default copy assignment operator.
+    /// @param other The distributor to be copy assigned.
+    /// @return The assigned distributor.
+    auto operator=(const CT2CDistributor &other) -> CT2CDistributor & = delete;
+
+    /// @brief The default move assignment operator.
+    /// @param other The distributor to be move assigned.
+    /// @return The assigned distributor.
+    auto operator=(CT2CDistributor &&other) noexcept -> CT2CDistributor & = delete;
+
+    /// @brief The equality operator.
+    /// @param other The distributor to be compared.
+    /// @return True if distributors are equal, False otherwise.
+    auto operator==(const CT2CDistributor &other) const -> bool = delete;
+
+    /// @brief The equality operator.
+    /// @param other The distributor to be compared.
+    /// @return True if distributors are not equal, False otherwise.
+    auto operator!=(const CT2CDistributor &other) const -> bool = delete;
+    
     /// @brief Distributes buffer of integrals into storage.
     /// @param buffer The integrals buffer.
     /// @param bra_indices The compressed contracted basis functions indexes on bra side.

@@ -1,15 +1,14 @@
 #ifndef T4CLocalDistributor_hpp
 #define T4CLocalDistributor_hpp
 
-#include <cstddef>
 #include <array>
+#include <cstddef>
 
-#include "SimdArray.hpp"
-#include "Matrix.hpp"
 #include "Matrices.hpp"
+#include "Matrix.hpp"
+#include "SimdArray.hpp"
 
 namespace t4cfunc {  // t2cfunc namespace
-
 
 /// Distributes buffer of integrals into Fock matrix: restricted  2J - K.
 /// @param focks  The local Fock matrices.
@@ -29,30 +28,28 @@ namespace t4cfunc {  // t2cfunc namespace
 /// @param c_angmom The angular momentum of integrals buffer on center C.
 /// @param d_angmom The angular momentum of integrals buffer on center D.
 /// @param bra_igto The index of GTO on bra side.
-/// @param ket_indices The index of the range [ket_first, ket_last) of GTOs on ket side.
+/// @param ket_range The index of the range [ket_first, ket_last) of GTOs on ket side.
 /// @param diagonal The flag indicating to use block diagonal distribution pattern of  integrals.
-auto
-local_distribute_rest_jk(      CMatrices&           focks,
-                         const CMatrix*             density,
-                         const CSimdArray<double>&  buffer,
-                         const size_t                offset,
-                         const std::vector<size_t>& a_indices,
-                         const std::vector<size_t>& b_indices,
-                         const std::vector<size_t>& c_indices,
-                         const std::vector<size_t>& d_indices,
-                         const std::vector<size_t>& a_loc_indices,
-                         const std::vector<size_t>& b_loc_indices,
-                         const std::vector<size_t>& c_loc_indices,
-                         const std::vector<size_t>& d_loc_indices,
-                         const int                  a_angmom,
-                         const int                  b_angmom,
-                         const int                  c_angmom,
-                         const int                  d_angmom,
-                         const size_t                  bra_igto,
-                         const std::pair<size_t, size_t>&  ket_range,
-                         const bool                 diagonal) -> void;
+auto local_distribute_rest_jk(CMatrices&                       focks,
+                              const CMatrix*                   density,
+                              const CSimdArray<double>&        buffer,
+                              const size_t                     offset,
+                              const std::vector<size_t>&       a_indices,
+                              const std::vector<size_t>&       b_indices,
+                              const std::vector<size_t>&       c_indices,
+                              const std::vector<size_t>&       d_indices,
+                              const std::vector<size_t>&       a_loc_indices,
+                              const std::vector<size_t>&       b_loc_indices,
+                              const std::vector<size_t>&       c_loc_indices,
+                              const std::vector<size_t>&       d_loc_indices,
+                              const int                        a_angmom,
+                              const int                        b_angmom,
+                              const int                        c_angmom,
+                              const int                        d_angmom,
+                              const size_t                     bra_igto,
+                              const std::pair<size_t, size_t>& ket_range,
+                              const bool                       diagonal) -> void;
 
 }  // namespace t4cfunc
-
 
 #endif /* T4CLocalDistributor_hpp */

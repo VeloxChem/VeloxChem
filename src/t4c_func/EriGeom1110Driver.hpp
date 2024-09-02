@@ -3,17 +3,17 @@
 
 #include <vector>
 
-#include "GtoFunc.hpp"
-#include "OpenMPFunc.hpp"
-#include "FockType.hpp"
-#include "Matrix.hpp"
-#include "Matrices.hpp"
-#include "FockMatrix.hpp"
+#include "EriGeom1110Func.hpp"
 #include "FockMatrices.hpp"
+#include "FockMatrix.hpp"
+#include "FockType.hpp"
+#include "GeoIntArchetypeTask.hpp"
+#include "GtoFunc.hpp"
+#include "Matrices.hpp"
+#include "Matrix.hpp"
+#include "OpenMPFunc.hpp"
 #include "T4CScreener.hpp"
 #include "TwoElExp.hpp"
-#include "GeoIntArchetypeTask.hpp"
-#include "EriGeom1110Func.hpp"
 
 /**
  Class CExpGeom1110Driver provides methods for computing Fock matrices
@@ -33,13 +33,8 @@ class CExpGeom1110Driver
      Computes Fock matrix for given density, basis and molecule.
      */
     template <class T, class U>
-    auto inline
-    compute(      T* distributor
-            const CMolecularBasis& basis,
-            const CMolecule&       molecule,
-            const U*               screener) const -> void
+    auto inline compute(T* distributor const CMolecularBasis& basis, const CMolecule& molecule, const U* screener) const -> void
     {
-
         //
         //  Loop over atom indices in arch_task
         //
@@ -48,12 +43,24 @@ class CExpGeom1110Driver
         {
             for (auto& [tints, ctasks] : task.getIntegralTask(atoms))
             {
-                const auto [a, b, c, d ] = tints;
+                const auto [a, b, c, d] = tints;
 
-                const auto bra_gto_pair_blocks = gtofunc::makeGtoPairBlocks(gtofunc::makeGtoBlocks(basis, molecule, {a, }),
-                                                                            gtofunc::makeGtoBlocks(basis, molecule, {b, }));
+                const auto bra_gto_pair_blocks = gtofunc::makeGtoPairBlocks(gtofunc::makeGtoBlocks(basis,
+                                                                                                   molecule,
+                                                                                                   {
+                                                                                                       a,
+                                                                                                   }),
+                                                                            gtofunc::makeGtoBlocks(basis,
+                                                                                                   molecule,
+                                                                                                   {
+                                                                                                       b,
+                                                                                                   }));
 
-                const auto ket_gto_pair_blocks = gtofunc::makeGtoPairBlocks(gtofunc::makeGtoBlocks(basis, molecule, {c, }),
+                const auto ket_gto_pair_blocks = gtofunc::makeGtoPairBlocks(gtofunc::makeGtoBlocks(basis,
+                                                                                                   molecule,
+                                                                                                   {
+                                                                                                       c,
+                                                                                                   }),
                                                                             gtofunc::makeGtoBlocks(basis, molecule));
 
                 // MR: I think the "15" is screening
@@ -63,7 +70,7 @@ class CExpGeom1110Driver
 
                 auto ptr_bra_gto_pair_blocks = bra_gto_pair_blocks.data();
                 auto ptr_ket_gto_pair_blocks = ket_gto_pair_blocks.data();
-                auto ptr_work_groups = work_groups.data();
+                auto ptr_work_groups         = work_groups.data();
 
                 // execute OMP tasks with static scheduling
 
