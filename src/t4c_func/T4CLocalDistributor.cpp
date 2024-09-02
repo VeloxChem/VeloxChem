@@ -29,17 +29,17 @@ local_distribute_rest_jk(      CMatrices&          focks,
 {
     // set up angular pairs
     
-    const auto pq_pair = std::array<int, 2>({a_angmom, b_angmom});
+    const auto pq_pair = std::pair<int, int>({a_angmom, b_angmom});
     
-    const auto rs_pair = std::array<int, 2>({c_angmom, d_angmom});
+    const auto rs_pair = std::pair<int, int>({c_angmom, d_angmom});
     
-    const auto pr_pair = std::array<int, 2>({a_angmom, c_angmom});
+    const auto pr_pair = std::pair<int, int>({a_angmom, c_angmom});
     
-    const auto ps_pair = std::array<int, 2>({a_angmom, d_angmom});
+    const auto ps_pair = std::pair<int, int>({a_angmom, d_angmom});
     
-    const auto qr_pair = std::array<int, 2>({b_angmom, c_angmom});
+    const auto qr_pair = std::pair<int, int>({b_angmom, c_angmom});
     
-    const auto qs_pair = std::array<int, 2>({b_angmom, d_angmom});
+    const auto qs_pair = std::pair<int, int>({b_angmom, d_angmom});
     
     // set up Fock submatrices
     
@@ -117,13 +117,13 @@ local_distribute_rest_jk(      CMatrices&          focks,
     
     // set up angular components
     
-    const auto acomps = tensor::number_of_spherical_components(a_angmom);
+    const auto acomps = tensor::number_of_spherical_components(std::array<int, 1>{a_angmom});
     
-    const auto bcomps = tensor::number_of_spherical_components(b_angmom);
+    const auto bcomps = tensor::number_of_spherical_components(std::array<int, 1>{b_angmom});
     
-    const auto ccomps = tensor::number_of_spherical_components(c_angmom);
+    const auto ccomps = tensor::number_of_spherical_components(std::array<int, 1>{c_angmom});
     
-    const auto dcomps = tensor::number_of_spherical_components(d_angmom);
+    const auto dcomps = tensor::number_of_spherical_components(std::array<int, 1>{d_angmom});
         
     for (int i = 0; i < acomps; i++)
     {
@@ -148,7 +148,7 @@ local_distribute_rest_jk(      CMatrices&          focks,
             {
                 for (int l = 0; l < dcomps; l++)
                 {
-                    auto curr_buffer = buffer[offset + i * bcomps * ccomps * dcomps + j * ccomps * dcomps  + k * dcomps + l];
+                    auto curr_buffer = buffer.data(offset + i * bcomps * ccomps * dcomps + j * ccomps * dcomps  + k * dcomps + l);
                     
                     for (int m = ket_range[0]; m < ket_range[1]; m++)
                     {
@@ -211,8 +211,6 @@ local_distribute_rest_jk(      CMatrices&          focks,
                         if ((p == r) && (q == s)) fval *= 0.5;
                         
                         // Coulomb contribution (F_pq)
-                        
-                        //std::cout << "loc_p, loc_q : " << loc_p << " , " << loc_q << " glob_p, glob_q : " << p << " , " << q << std::endl; 
                         
                         if (angord_rs)
                         {
