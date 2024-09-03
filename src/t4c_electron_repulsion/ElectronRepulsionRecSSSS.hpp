@@ -139,6 +139,8 @@ comp_electron_repulsion_ssss(T& distributor,
 
         for (auto j = bra_indices.first; j < bra_indices.second; j++)
         {
+            if (bra_eq_ket && (j >= ket_range.second)) continue;
+            
             // zero integral buffers
 
             cbuffer.zero();
