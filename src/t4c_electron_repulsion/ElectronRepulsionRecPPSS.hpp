@@ -2,6 +2,8 @@
 #define ElectronRepulsionRecPPSS_hpp
 
 #include <array>
+#include <cstddef>
+#include <utility>
 
 #include "ElectronRepulsionContrRecPPXX.hpp"
 #include "ElectronRepulsionPrimRecSDSS.hpp"
@@ -15,33 +17,27 @@
 
 namespace erirec { // erirec namespace
 
-/// Computes (PP|1/|r-r'||SS)  integrals for two GTOs pair blocks.
-/// - Parameter distributor: the pointer to Fock matrix/matrices distributor.
-/// - Parameter bra_gto_pair_block: the GTOs pair block on bra side.
-/// - Parameter ket_gto_pair_block: the GTOs pair block on ket side.
-/// - Parameter bra_indices: the range [bra_first, bra_last) of GTOs on bra side.
-/// - Parameter ket_indices: the range [ket_first, ket_last) of GTOs on ket side.
-template <class T>
-auto
-comp_electron_repulsion_ppss(T* distributor,
+/// @brief Computes (PP|1/|r-r'||SS)  integrals for two basis function pairs blocks.
+/// @param distributor The pointer to Fock matrix/matrices distributor.
+/// @param bra_gto_pair_block The GTOs pair block on bra side.
+/// @param ket_gto_pair_block The GTOs pair block on ket side.
+/// @param bra_indices The range [bra_first, bra_last) of basis function pairs on bra side.
+/// @param ket_indices The range [ket_first, ket_last) of basis function pairs on ket side.
+/// @param bra_eq_ket True if basis function pairs blocks on bra and ket are the same, False otherwise.
+template <class T, int N>
+inline auto
+comp_electron_repulsion_ppss(T& distributor,
                              const CGtoPairBlock& bra_gto_pair_block,
                              const CGtoPairBlock& ket_gto_pair_block,
-                             const std::array<int, 2>& bra_indices,
-                             const std::array<int, 2>& ket_indices) -> void
+                             const std::pair<size_t, size_t>& bra_indices,
+                             const std::pair<size_t, size_t>& ket_indices,
+                             const bool bra_eq_ket) -> void
 {
     // intialize GTOs pair data on bra side
 
-    const auto a_coords_x = bra_gto_pair_block.bra_coordinates_x();
+    const auto a_coords = bra_gto_pair_block.bra_coordinates();
 
-    const auto a_coords_y = bra_gto_pair_block.bra_coordinates_y();
-
-    const auto a_coords_z = bra_gto_pair_block.bra_coordinates_z();
-
-    const auto b_coords_x = bra_gto_pair_block.ket_coordinates_x();
-
-    const auto b_coords_y = bra_gto_pair_block.ket_coordinates_y();
-
-    const auto b_coords_z = bra_gto_pair_block.ket_coordinates_z();
+    const auto b_coords = bra_gto_pair_block.ket_coordinates();
 
     const auto a_vec_exps = bra_gto_pair_block.bra_exponents();
 
@@ -61,17 +57,9 @@ comp_electron_repulsion_ppss(T* distributor,
 
     // intialize GTOs data on ket side
 
-    const auto c_coords_x = ket_gto_pair_block.bra_coordinates_x();
+    const auto c_coords = ket_gto_pair_block.bra_coordinates();
 
-    const auto c_coords_y = ket_gto_pair_block.bra_coordinates_y();
-
-    const auto c_coords_z = ket_gto_pair_block.bra_coordinates_z();
-
-    const auto d_coords_x = ket_gto_pair_block.ket_coordinates_x();
-
-    const auto d_coords_y = ket_gto_pair_block.ket_coordinates_y();
-
-    const auto d_coords_z = ket_gto_pair_block.ket_coordinates_z();
+    const auto d_coords = ket_gto_pair_block.ket_coordinates();
 
     const auto c_vec_exps = ket_gto_pair_block.bra_exponents();
 
@@ -87,244 +75,239 @@ comp_electron_repulsion_ppss(T* distributor,
 
     const auto ket_npgtos = ket_gto_pair_block.number_of_primitive_pairs();
 
-    // set up dimensions of bra and ket ranges
-
-    const auto bra_dim = bra_indices[1] - bra_indices[0];
-
-    const auto ket_dim = ket_indices[1] - ket_indices[0];
-
     // allocate aligned 2D arrays for ket side
 
-    const auto ket_pdim = ket_dim * ket_npgtos;
-
-    CSimdArray<double> c_x(1, ket_pdim);
-
-    CSimdArray<double> c_y(1, ket_pdim);
-
-    CSimdArray<double> c_z(1, ket_pdim);
-
-    CSimdArray<double> d_x(1, ket_pdim);
-
-    CSimdArray<double> d_y(1, ket_pdim);
-
-    CSimdArray<double> d_z(1, ket_pdim);
-
-    CSimdArray<double> c_exps(1, ket_pdim);
-
-    CSimdArray<double> d_exps(1, ket_pdim);
-
-    CSimdArray<double> cd_norms(1, ket_pdim);
-
-    CSimdArray<double> cd_ovls(1, ket_pdim);
-
-     // load GTOs data for ket side
-
-    c_x.replicate(c_coords_x, ket_indices, ket_npgtos);
-
-    c_y.replicate(c_coords_y, ket_indices, ket_npgtos);
-
-    c_z.replicate(c_coords_z, ket_indices, ket_npgtos);
-
-    d_x.replicate(d_coords_x, ket_indices, ket_npgtos);
-
-    d_y.replicate(d_coords_y, ket_indices, ket_npgtos);
-
-    d_z.replicate(d_coords_z, ket_indices, ket_npgtos);
-
-    c_exps.load(c_vec_exps, ket_indices, ket_npgtos);
-
-    d_exps.load(d_vec_exps, ket_indices, ket_npgtos);
-
-    cd_norms.load(cd_vec_norms, ket_indices, ket_npgtos);
-
-    cd_ovls.load(cd_vec_ovls, ket_indices, ket_npgtos);
-
-    // allocate aligned coordinates of Q center
-
-    CSimdArray<double> q_x(1, ket_pdim);
-
-    CSimdArray<double> q_y(1, ket_pdim);
-
-    CSimdArray<double> q_z(1, ket_pdim);
-
-    // allocate aligned coordinates of W center
-
-    CSimdArray<double> w_x(1, ket_pdim);
-
-    CSimdArray<double> w_y(1, ket_pdim);
-
-    CSimdArray<double> w_z(1, ket_pdim);
-
-    // allocate aligned distances R(PQ) = P - Q
-
-    CSimdArray<double> pq_x(1, ket_pdim);
-
-    CSimdArray<double> pq_y(1, ket_pdim);
-
-    CSimdArray<double> pq_z(1, ket_pdim);
-
-    // allocate aligned distances R(WP) = W - P
-
-    CSimdArray<double> wp_x(1, ket_pdim);
-
-    CSimdArray<double> wp_y(1, ket_pdim);
-
-    CSimdArray<double> wp_z(1, ket_pdim);
-
-    // allocate combined overlap factor
-
-    CSimdArray<double> fss_abcd(1, ket_pdim);
+    CSimdArray<double> pfactors(23, ket_npgtos);
 
     // allocate aligned primitive integrals
 
-    CSimdArray<double> prim_buffer_0_ssss(1, ket_pdim);
+    if constexpr (N == 1) CSimdArray<double> pbuffer(15, ket_npgtos);
 
-    CSimdArray<double> prim_buffer_1_ssss(1, ket_pdim);
+    if constexpr (N == 2) CSimdArray<double> pbuffer(15, ket_npgtos);
 
-    CSimdArray<double> prim_buffer_2_ssss(1, ket_pdim);
-
-    CSimdArray<double> prim_buffer_0_spss(3, ket_pdim);
-
-    CSimdArray<double> prim_buffer_1_spss(3, ket_pdim);
-
-    CSimdArray<double> prim_buffer_0_sdss(6, ket_pdim);
+    if constexpr (N == 3) CSimdArray<double> pbuffer(30, ket_npgtos);
 
     // allocate aligned Cartesian integrals
 
-    CSimdArray<double> cart_buffer_0_spss(3, ket_dim);
+    if constexpr (N == 1) CSimdArray<double> cbuffer(9, 1);
 
-    CSimdArray<double> cart_buffer_0_sdss(6, ket_dim);
+    if constexpr (N == 2) CSimdArray<double> cbuffer(9, 1);
+
+    if constexpr (N == 3) CSimdArray<double> cbuffer(18, 1);
 
     // allocate aligned half transformed integrals
 
-    CSimdArray<double> ket_spher_buffer_0_spss(3, ket_dim);
+    if constexpr (N == 1) CSimdArray<double> skbuffer(18, 1);
 
-    CSimdArray<double> ket_spher_buffer_0_sdss(6, ket_dim);
+    if constexpr (N == 2) CSimdArray<double> skbuffer(18, 1);
 
-    CSimdArray<double> ket_spher_buffer_0_ppss(9, ket_dim);
+    if constexpr (N == 3) CSimdArray<double> skbuffer(36, 1);
 
     // allocate aligned spherical integrals
 
-    CSimdArray<double> spher_buffer_0_ppss(9, ket_dim);
+    if constexpr (N == 1) CSimdArray<double> sbuffer(9, 1);
 
-    // allocate accumulation buffer for integrals
+    if constexpr (N == 2) CSimdArray<double> sbuffer(9, 1);
 
-    CSimdArray<double> buffer(bra_dim * 9, ket_dim);
+    if constexpr (N == 3) CSimdArray<double> sbuffer(18, 1);
 
     // setup Boys fuction data
 
     const CBoysFunc<2> bf_table;
 
-    CSimdArray<double> bf_args(1, ket_pdim);
+    if constexpr (N == 1) CSimdArray<double> bf_data(4, ket_npgtos);
 
-    CSimdArray<double> bf_values(3, ket_pdim);
+    if constexpr (N == 2) CSimdArray<double> bf_data(4, ket_npgtos);
 
-    // loop over contracted GTOs on bra side
+    if constexpr (N == 3) CSimdArray<double> bf_data(8, ket_npgtos);
 
-    for (auto i = bra_indices[0]; i < bra_indices[1]; i++)
+    // set up ket partitioning
+
+    const auto ket_dim = ket_indices.second - ket_indices.first;
+
+    const auto ket_blocks = batch::number_of_batches(ket_dim, simd::width<double>());
+
+    for (size_t i = 0; i < ket_blocks; i++)
     {
-        // zero integral buffers
+        auto ket_range = batch::batch_range(i, ket_dim, simd::width<double>(), ket_indices.first);
 
-        cart_buffer_0_spss.zero();
+        pfactors.load(c_vec_exps, ket_range, 0, ket_npgtos);
 
-        cart_buffer_0_sdss.zero();
+        pfactors.load(d_vec_exps, ket_range, 1, ket_npgtos);
 
-        ket_spher_buffer_0_spss.zero();
+        pfactors.load(cd_vec_ovls, ket_range, 2, ket_npgtos);
 
-        ket_spher_buffer_0_sdss.zero();
+        pfactors.load(cd_vec_norms, ket_range, 3, ket_npgtos);
 
-        ket_spher_buffer_0_ppss.zero();
+        pfactors.replicate_points(c_coords, ket_range, 4, ket_npgtos);
 
-        spher_buffer_0_ppss.zero();
+        pfactors.replicate_points(d_coords, ket_range, 7, ket_npgtos);
 
-        // set up coordinates on bra side
+        // set up active SIMD width
 
-        const auto a_x = a_coords_x[i];
+        const auto ket_width = ket_range.second - ket_range.first;
 
-        const auto a_y = a_coords_y[i];
+        pbuffer.set_active_width(ket_width);
 
-        const auto a_z = a_coords_z[i];
+        cbuffer.set_active_width(ket_width);
 
-        const auto b_x = b_coords_x[i];
+        skbuffer.set_active_width(ket_width);
 
-        const auto b_y = b_coords_y[i];
+        sbuffer.set_active_width(ket_width);
 
-        const auto b_z = b_coords_z[i];
+        bf_data.set_active_width(ket_width);
 
-        // set up distances on bra side
+        // loop over basis function pairs on bra side
 
-        const auto ab_x = a_x - b_x;
-
-        const auto ab_y = a_y - b_y;
-
-        const auto ab_z = a_z - b_z;
-
-        for (int j = 0; j < bra_npgtos; j++)
+        for (auto j = bra_indices.first; j < bra_indices.second; j++)
         {
-            const auto a_exp = a_vec_exps[j * bra_ncgtos + i];
+            // zero integral buffers
 
-            const auto b_exp = b_vec_exps[j * bra_ncgtos + i];
+            cbuffer.zero();
 
-            const auto ab_norm = ab_vec_norms[j * bra_ncgtos + i];
+            skbuffer.zero();
 
-            const auto ab_ovl = ab_vec_ovls[j * bra_ncgtos + i];
+            sbuffer.zero();
 
-            const auto p_x = (a_x * a_exp + b_x * b_exp) / (a_exp + b_exp);
+            // set up coordinates on bra side
 
-            const auto p_y = (a_y * a_exp + b_y * b_exp) / (a_exp + b_exp);
+            const auto r_a = a_coords[j];
 
-            const auto p_z = (a_z * a_exp + b_z * b_exp) / (a_exp + b_exp);
+            const auto r_b = b_coords[j];
 
-            const auto pb_x = p_x - b_x;
+            const auto a_xyz = r_a.coordinates();
 
-            const auto pb_y = p_y - b_y;
+            const auto b_xyz = r_b.coordinates();
 
-            const auto pb_z = p_z - b_z;
+            const auto r_ab = TPoint<double>({a_xyz[0] - b_xyz[0], a_xyz[1] - b_xyz[1], a_xyz[2] - b_xyz[2]});
 
-            t4cfunc::comp_coordinates_q(q_x[0], q_y[0], q_z[0], c_x[0], c_y[0], c_z[0], d_x[0], d_y[0], d_z[0], c_exps[0], d_exps[0], ket_pdim);
+            for (int k = 0; k < bra_npgtos; k++)
+            {
+                const auto a_exp = a_vec_exps[k * bra_ncgtos + j];
 
-            t4cfunc::comp_coordinates_w(w_x[0], w_y[0], w_z[0], p_x, p_y, p_z, q_x[0], q_y[0], q_z[0], a_exp, b_exp, c_exps[0], d_exps[0], ket_pdim);
+                const auto b_exp = b_vec_exps[k * bra_ncgtos + j];
 
-            t4cfunc::comp_distances_pq(pq_x[0], pq_y[0], pq_z[0], p_x, p_y, p_z, q_x[0], q_y[0], q_z[0], ket_pdim);
+                const auto ab_norm = ab_vec_norms[k * bra_ncgtos + j];
 
-            t4cfunc::comp_distances_wp(wp_x[0], wp_y[0], wp_z[0], w_x[0], w_y[0], w_z[0], p_x, p_y, p_z, ket_pdim);
+                const auto ab_ovl = ab_vec_ovls[k * bra_ncgtos + j];
 
-            t4cfunc::comp_boys_args(bf_args, pq_x[0], pq_y[0], pq_z[0], a_exp, b_exp, c_exps[0], d_exps[0]);
+                const auto p_x = (a_xyz[0] * a_exp + b_xyz[0] * b_exp) / (a_exp + b_exp);
 
-            bf_table.compute(bf_values, bf_args);
+                const auto p_y = (a_xyz[1] * a_exp + b_xyz[1] * b_exp) / (a_exp + b_exp);
 
-            t4cfunc::comp_ovl_factors(fss_abcd, ab_ovl, cd_ovls[0], ab_norm, cd_norms[0], a_exp, b_exp, c_exps[0], d_exps[0]);
+                const auto p_z = (a_xyz[2] * a_exp + b_xyz[2] * b_exp) / (a_exp + b_exp);
 
-            erirec::comp_prim_electron_repulsion_ssss(prim_buffer_0_ssss, fss_abcd[0], bf_values[0]);
+                const auto r_p = TPoint<double>({p_x, p_y, p_z});
 
-            erirec::comp_prim_electron_repulsion_ssss(prim_buffer_1_ssss, fss_abcd[0], bf_values[1]);
+                const auto pb_x = p_x - b_xyz[0];
 
-            erirec::comp_prim_electron_repulsion_ssss(prim_buffer_2_ssss, fss_abcd[0], bf_values[2]);
+                const auto pb_y = p_y - b_xyz[1];
 
-            erirec::comp_prim_electron_repulsion_spss(prim_buffer_0_spss, prim_buffer_0_ssss, prim_buffer_1_ssss, pb_x, pb_y, pb_z, wp_x[0], wp_y[0], wp_z[0]);
+                const auto pb_z = p_z - b_xyz[2];
 
-            erirec::comp_prim_electron_repulsion_spss(prim_buffer_1_spss, prim_buffer_1_ssss, prim_buffer_2_ssss, pb_x, pb_y, pb_z, wp_x[0], wp_y[0], wp_z[0]);
+                const auto r_pb = TPoint<double>({pb_x, pb_y, pb_z});
 
-            erirec::comp_prim_electron_repulsion_sdss(prim_buffer_0_sdss, prim_buffer_0_ssss, prim_buffer_1_ssss, prim_buffer_0_spss, prim_buffer_1_spss, pb_x, pb_y, pb_z, wp_x[0], wp_y[0], wp_z[0], a_exp, b_exp, c_exps[0], d_exps[0]);
+                t4cfunc::comp_coordinates_q(pfactors, 10, 4, 7);
 
-            t2cfunc::reduce(cart_buffer_0_spss, prim_buffer_0_spss, ket_dim, ket_npgtos);
+                t4cfunc::comp_distances_pq(pfactors, 13, 10, r_p);
 
-            t2cfunc::reduce(cart_buffer_0_sdss, prim_buffer_0_sdss, ket_dim, ket_npgtos);
+                t4cfunc::comp_coordinates_w(pfactors, 17, 10, r_p, a_exp, b_exp);
 
+                t4cfunc::comp_distances_wp(pfactors, 20, 17, r_p);
+
+                if constexpr (N == 1) t4cfunc::comp_boys_args(bf_data, 3, pfactors, 13, a_exp, b_exp);
+
+                if constexpr (N == 2) t4cfunc::comp_boys_args(bf_data, 3, pfactors, 13, a_exp, b_exp, omega);
+
+                if constexpr (N == 3)
+                {
+                    t4cfunc::comp_boys_args(bf_data, 3, pfactors, 13, a_exp, b_exp);
+
+                    t4cfunc::comp_boys_args(bf_data, 7, pfactors, 13, a_exp, b_exp, omega);
+                }
+
+                if constexpr (N == 1) bf_table.compute(bf_data, 0, 3);
+
+                if constexpr (N == 2) bf_table.compute(bf_data, 0, 3, pfactors, a_exp, b_exp, omega);
+
+                if constexpr (N == 3)
+                {
+                    bf_table.compute(bf_data, 0, 3);
+
+                    bf_table.compute(bf_data, 4, 7, pfactors, a_exp, b_exp, omega);
+                }
+
+                t4cfunc::comp_ovl_factors(pfactors, 16, ab_ovl, ab_norm, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_ssss(buffer, 0, pfactors, 16, bf_data, 0);
+
+                erirec::comp_prim_electron_repulsion_ssss(buffer, 1, pfactors, 16, bf_data, 1);
+
+                erirec::comp_prim_electron_repulsion_ssss(buffer, 2, pfactors, 16, bf_data, 2);
+
+                if constexpr (N == 3)
+                {
+                    erirec::comp_prim_electron_repulsion_ssss(buffer, 15, pfactors, 16, bf_data, 4);
+
+                    erirec::comp_prim_electron_repulsion_ssss(buffer, 16, pfactors, 16, bf_data, 5);
+
+                    erirec::comp_prim_electron_repulsion_ssss(buffer, 17, pfactors, 16, bf_data, 6);
+                }
+
+                erirec::comp_prim_electron_repulsion_spss(pbuffer, 3, 0, 1, pfactors, 20, r_pb);
+
+                erirec::comp_prim_electron_repulsion_spss(pbuffer, 6, 1, 2, pfactors, 20, r_pb);
+
+                erirec::comp_prim_electron_repulsion_sdss(pbuffer, 9, 0, 1, 3, 6, pfactors, 20, r_pb, a_exp, b_exp);
+
+                if constexpr (N == 3)
+                {
+                    erirec::comp_prim_electron_repulsion_spss(pbuffer, 18, 15, 16, pfactors, 20, r_pb);
+
+                    erirec::comp_prim_electron_repulsion_spss(pbuffer, 21, 16, 17, pfactors, 20, r_pb);
+
+                    erirec::comp_prim_electron_repulsion_sdss(pbuffer, 24, 15, 16, 18, 21, pfactors, 20, r_pb, a_exp, b_exp);
+                }
+
+                t2cfunc::reduce(cbuffer, 0, pbuffer, 3, 3, ket_width, ket_npgtos);
+
+                t2cfunc::reduce(cbuffer, 3, pbuffer, 9, 6, ket_width, ket_npgtos);
+
+                if constexpr (N == 3)
+                {
+                    t2cfunc::reduce(cbuffer, 9, pbuffer, 18, 3, ket_width, ket_npgtos);
+
+                    t2cfunc::reduce(cbuffer, 12, pbuffer, 24, 6, ket_width, ket_npgtos);
+                }
+            }
+
+            t4cfunc::ket_transform<0, 0>(skbuffer, 0, cbuffer, 0, 0, 1);
+
+            t4cfunc::ket_transform<0, 0>(skbuffer, 3, cbuffer, 3, 0, 2);
+
+            if constexpr (N == 3)
+            {
+                t4cfunc::ket_transform<0, 0>(skbuffer, 18, cbuffer, 9, 0, 1);
+
+                t4cfunc::ket_transform<0, 0>(skbuffer, 21, cbuffer, 12, 0, 2);
+            }
+
+            erirec::comp_bra_hrr_electron_repulsion_ppxx(skbuffer, 9, 0, 3, r_ab, 0, 0);
+
+            if constexpr (N == 3)
+            {
+                erirec::comp_bra_hrr_electron_repulsion_ppxx(skbuffer, 27, 18, 21, r_ab, 0, 0);
+            }
+
+            t4cfunc::bra_transform<1, 1>(sbuffer, 0, skbuffer, 9, 0, 0);
+
+            if constexpr (N == 3)
+            {
+                t4cfunc::bra_transform<1, 1>(sbuffer, 9, skbuffer, 27, 0, 0);
+            }
         }
-
-        t4cfunc::ket_transform<0, 0>(ket_spher_buffer_0_spss, cart_buffer_0_spss, 0, 1);
-
-        t4cfunc::ket_transform<0, 0>(ket_spher_buffer_0_sdss, cart_buffer_0_sdss, 0, 2);
-
-        erirec::comp_bra_hrr_electron_repulsion_ppxx(ket_spher_buffer_0_ppss, ket_spher_buffer_0_spss, ket_spher_buffer_0_sdss, ab_x, ab_y, ab_z, 0, 0);
-
-        t4cfunc::bra_transform<1, 1>(spher_buffer_0_ppss, ket_spher_buffer_0_ppss, 0, 0);
-
-        t4cfunc::store_values(buffer, spher_buffer_0_ppss, 9 * (i - bra_indices[0]));
     }
 
-    distributor->distribute(buffer, a_indices, b_indices, c_indices, d_indices, 1, 1, 0, 0, bra_indices, ket_indices);
 }
 
 } // erirec namespace

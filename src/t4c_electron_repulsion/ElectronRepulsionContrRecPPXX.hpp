@@ -6,21 +6,19 @@
 namespace erirec { // erirec namespace
 
 /// Computes (PP|1/|r-r'|XX)  integrals for set of data buffers.
-/// - Parameter contr_buffer_ppxx: the contracted integrals buffer.
-/// - Parameter contr_buffer_spxx: the contracted integrals buffer.
-/// - Parameter contr_buffer_sdxx: the contracted integrals buffer.
-/// - Parameter ab_x: the Cartesian X distance R(AB) = A - B.
-/// - Parameter ab_y: the Cartesian Y distance R(AB) = A - B.
-/// - Parameter ab_z: the Cartesian Z distance R(AB) = A - B.
-/// - Parameter c_angmom: the angular momentum on center C.
-/// - Parameter d_angmom: the angular momentum on center D.
+/// @param cbuffer The contracted integrals buffer.
+/// @param idx_ppxx The contracted integrals buffer.
+/// @param idx_spxx The contracted integrals buffer.
+/// @param idx_sdxx The contracted integrals buffer.
+/// @param r_ab The Cartesian distance R(AB) = A - B.
+/// @param c_angmom The angular momentum on center C.
+/// @param d_angmom The angular momentum on center D.
 auto
-comp_bra_hrr_electron_repulsion_ppxx(CSimdArray<double>& contr_buffer_ppxx,
-                                     const CSimdArray<double>& contr_buffer_spxx,
-                                     const CSimdArray<double>& contr_buffer_sdxx,
-                                     const double ab_x,
-                                     const double ab_y,
-                                     const double ab_z,
+comp_bra_hrr_electron_repulsion_ppxx(CSimdArray<double>& cbuffer,
+                                     const size_t idx_ppxx,
+                                     const size_t idx_spxx,
+                                     const size_t idx_sdxx,
+                                     const TPoint<double>& r_ab,
                                      const int c_angmom,
                                      const int d_angmom) -> void;
 } // erirec namespace

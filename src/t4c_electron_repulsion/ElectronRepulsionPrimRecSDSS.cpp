@@ -3,64 +3,84 @@
 namespace erirec { // erirec namespace
 
 auto
-comp_prim_electron_repulsion_sdss(CSimdArray<double>& prim_buffer_0_sdss,
-                                  const CSimdArray<double>& prim_buffer_0_ssss,
-                                  const CSimdArray<double>& prim_buffer_1_ssss,
-                                  const CSimdArray<double>& prim_buffer_0_spss,
-                                  const CSimdArray<double>& prim_buffer_1_spss,
-                                  const double pb_x,
-                                  const double pb_y,
-                                  const double pb_z,
-                                  const double* wp_x,
-                                  const double* wp_y,
-                                  const double* wp_z,
+comp_prim_electron_repulsion_sdss(CSimdArray<double>& pbuffer,
+                                  const size_t idx_eri_0_sdss,
+                                  size_t idx_eri_0_ssss,
+                                  size_t idx_eri_1_ssss,
+                                  size_t idx_eri_0_spss,
+                                  size_t idx_eri_1_spss,
+                                  CSimdArray<double>& factors,
+                                  const size_t idx_wp,
+                                  const TPoint<double>& r_pb,
                                   const double a_exp,
-                                  const double b_exp,
-                                  const double* c_exps,
-                                  const double* d_exps) -> void
+                                  const double b_exp) -> void
 {
-    const auto ndims = prim_buffer_0_sdss.number_of_columns();
+    const auto nelems = pbuffer.number_of_active_elements();
 
-    /// Set up components of auxilary buffer : prim_buffer_0_ssss
+    // Set up exponents
 
-    auto g_0_0_0_0_0 = prim_buffer_0_ssss[0];
+    auto c_exps = factors.data(0);
 
-    /// Set up components of auxilary buffer : prim_buffer_1_ssss
+    auto d_exps = factors.data(1);
 
-    auto g_0_0_0_0_1 = prim_buffer_1_ssss[0];
+    // Set up R(WP) distances
 
-    /// Set up components of auxilary buffer : prim_buffer_0_spss
+    auto wp_x = factors.data(idx_wp);
 
-    auto g_0_x_0_0_0 = prim_buffer_0_spss[0];
+    auto wp_y = factors.data(idx_wp + 1);
 
-    auto g_0_y_0_0_0 = prim_buffer_0_spss[1];
+    auto wp_z = factors.data(idx_wp + 2);
 
-    auto g_0_z_0_0_0 = prim_buffer_0_spss[2];
+    // set up R(PB) distances
 
-    /// Set up components of auxilary buffer : prim_buffer_1_spss
+    const auto xyz = r_pb.coordinates();
 
-    auto g_0_x_0_0_1 = prim_buffer_1_spss[0];
+    const auto pb_x = xyz[0];
 
-    auto g_0_y_0_0_1 = prim_buffer_1_spss[1];
+    const auto pb_y = xyz[1];
 
-    auto g_0_z_0_0_1 = prim_buffer_1_spss[2];
+    const auto pb_z = xyz[2];
 
-    /// Set up components of targeted buffer : prim_buffer_0_sdss
+    /// Set up components of auxilary buffer : SSSS
 
-    auto g_0_xx_0_0_0 = prim_buffer_0_sdss[0];
+    auto g_0_0_0_0_0 = pbuffer.data(idx_eri_0_ssss);
 
-    auto g_0_xy_0_0_0 = prim_buffer_0_sdss[1];
+    /// Set up components of auxilary buffer : SSSS
 
-    auto g_0_xz_0_0_0 = prim_buffer_0_sdss[2];
+    auto g_0_0_0_0_1 = pbuffer.data(idx_eri_1_ssss);
 
-    auto g_0_yy_0_0_0 = prim_buffer_0_sdss[3];
+    /// Set up components of auxilary buffer : SPSS
 
-    auto g_0_yz_0_0_0 = prim_buffer_0_sdss[4];
+    auto g_0_x_0_0_0 = pbuffer.data(idx_eri_0_spss);
 
-    auto g_0_zz_0_0_0 = prim_buffer_0_sdss[5];
+    auto g_0_y_0_0_0 = pbuffer.data(idx_eri_0_spss + 1);
+
+    auto g_0_z_0_0_0 = pbuffer.data(idx_eri_0_spss + 2);
+
+    /// Set up components of auxilary buffer : SPSS
+
+    auto g_0_x_0_0_1 = pbuffer.data(idx_eri_1_spss);
+
+    auto g_0_y_0_0_1 = pbuffer.data(idx_eri_1_spss + 1);
+
+    auto g_0_z_0_0_1 = pbuffer.data(idx_eri_1_spss + 2);
+
+    /// Set up components of targeted buffer : SDSS
+
+    auto g_0_xx_0_0_0 = pbuffer.data(idx_eri_0_sdss);
+
+    auto g_0_xy_0_0_0 = pbuffer.data(idx_eri_0_sdss + 1);
+
+    auto g_0_xz_0_0_0 = pbuffer.data(idx_eri_0_sdss + 2);
+
+    auto g_0_yy_0_0_0 = pbuffer.data(idx_eri_0_sdss + 3);
+
+    auto g_0_yz_0_0_0 = pbuffer.data(idx_eri_0_sdss + 4);
+
+    auto g_0_zz_0_0_0 = pbuffer.data(idx_eri_0_sdss + 5);
 
     #pragma omp simd aligned(g_0_0_0_0_0, g_0_0_0_0_1, g_0_x_0_0_0, g_0_x_0_0_1, g_0_xx_0_0_0, g_0_xy_0_0_0, g_0_xz_0_0_0, g_0_y_0_0_0, g_0_y_0_0_1, g_0_yy_0_0_0, g_0_yz_0_0_0, g_0_z_0_0_0, g_0_z_0_0_1, g_0_zz_0_0_0, wp_x, wp_y, wp_z, c_exps, d_exps  : 64)
-    for (int i = 0; i < ndims; i++)
+    for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
 

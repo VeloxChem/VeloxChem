@@ -6,21 +6,23 @@
 namespace erirec { // erirec namespace
 
 /// Computes (XX|1/|r-r'||PP)  integrals for set of data buffers.
-/// - Parameter contr_buffer_xxpp: the contracted integrals buffer.
-/// - Parameter contr_buffer_xxsp: the contracted integrals buffer.
-/// - Parameter contr_buffer_xxsd: the contracted integrals buffer.
-/// - Parameter cd_x: the vector of Cartesian X distances R(CD) = C - D.
-/// - Parameter cd_y: the vector of Cartesian Y distances R(CD) = C - D.
-/// - Parameter cd_z: the vector of Cartesian Z distances R(CD) = C - D.
-/// - Parameter a_angmom: the angular momentum on center A.
-/// - Parameter b_angmom: the angular momentum on center B.
+/// @param cbuffer The contracted integrals buffer.
+/// @param idx_xxpp The contracted integrals buffer.
+/// @param pbuffer The Cartesian integrals buffer.
+/// @param idx_xxsp The contracted integrals buffer.
+/// @param idx_xxsd The contracted integrals buffer.
+/// @param factors The factors buffer.
+/// @param idx_cd The vector of distances R(CD) = C - D.
+/// @param a_angmom The angular momentum on center A.
+/// @param b_angmom The angular momentum on center B.
 auto
-comp_ket_hrr_electron_repulsion_xxpp(CSimdArray<double>& contr_buffer_xxpp,
-                                     const CSimdArray<double>& contr_buffer_xxsp,
-                                     const CSimdArray<double>& contr_buffer_xxsd,
-                                     const double* cd_x,
-                                     const double* cd_y,
-                                     const double* cd_z,
+comp_ket_hrr_electron_repulsion_xxpp(CSimdArray<double>& cbuffer,
+                                     const size_t idx_xxpp,
+                                     CSimdArray<double>& pbuffer,
+                                     const size_t idx_xxsp,
+                                     const size_t idx_xxsd,
+                                     const CSimdArray<double>& factors,
+                                     const size_t idx_cd,
                                      const int a_angmom,
                                      const int b_angmom) -> void;
 } // erirec namespace
