@@ -23,6 +23,7 @@ from .veloxchemlib import NuclearPotentialGeom200Driver
 from .veloxchemlib import NuclearPotentialGeom110Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import ElectricDipoleMomentumGeom100Driver
+from .veloxchemlib import FockDriver
 
 # C++ functions
 from .veloxchemlib import upper_case

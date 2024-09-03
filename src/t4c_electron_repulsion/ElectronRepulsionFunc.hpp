@@ -29,7 +29,7 @@ namespace erifunc {  // erifunc namespace
 /// @param bra_eq_ket True if basis function pairs blocks on bra and ket are the same, False otherwise.
 template <class T>
 inline auto
-compute(      T*                  distributor,
+compute(      T&                  distributor,
         const CGtoPairBlock& bra_gto_pair_block,
         const CGtoPairBlock& ket_gto_pair_block,
         const std::pair<size_t, size_t>& bra_indices,

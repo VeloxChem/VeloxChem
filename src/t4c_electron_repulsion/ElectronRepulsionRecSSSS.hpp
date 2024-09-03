@@ -193,9 +193,12 @@ comp_electron_repulsion_ssss(T& distributor,
             t4cfunc::ket_transform<0, 0>(skbuffer, 0, cbuffer, 0, 0, 0);
 
             t4cfunc::bra_transform<0, 0>(sbuffer, 0, skbuffer, 0, 0, 0);
+            
+            const bool diagonal = bra_eq_ket && (j >= ket_range.first) && (j < ket_range.second);
+            
+            distributor.distribute(sbuffer, 0, a_indices, b_indices, c_indices, d_indices, 0, 0, 0, 0, j, ket_range, diagonal);
         }
     }
-
 }
 
 } // erirec namespace
