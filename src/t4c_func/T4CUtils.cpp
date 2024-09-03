@@ -492,10 +492,10 @@ store_values(CSimdArray<double>& buffer, const CSimdArray<double>& values, const
 auto
 accumulate(CSubMatrix*             glob_matrix,
            const CSubMatrix*       loc_matrix,
-           const std::vector<int>& bra_loc_indices,
-           const std::vector<int>& ket_loc_indices,
-           const std::vector<int>& bra_glob_indices,
-           const std::vector<int>& ket_glob_indices,
+           const std::vector<size_t>& bra_loc_indices,
+           const std::vector<size_t>& ket_loc_indices,
+           const std::vector<size_t>& bra_glob_indices,
+           const std::vector<size_t>& ket_glob_indices,
            const int               bra_comps,
            const int               ket_comps,
            const bool              ang_order) -> void
@@ -512,11 +512,11 @@ accumulate(CSubMatrix*             glob_matrix,
 
             const auto ket_goff = j * ket_glob_indices[0];
 
-            for (int k = 0; k < bra_loc_indices[0]; k++)
+            for (size_t k = 0; k < bra_loc_indices[0]; k++)
             {
                 const auto kg = bra_goff + bra_glob_indices[k + 1];
 
-                for (int l = 0; l < ket_loc_indices[0]; l++)
+                for (size_t l = 0; l < ket_loc_indices[0]; l++)
                 {
                     const auto lg = ket_goff + ket_glob_indices[l + 1];
 

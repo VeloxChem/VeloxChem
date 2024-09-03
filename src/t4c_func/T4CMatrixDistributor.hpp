@@ -56,6 +56,10 @@ class CT4CMatrixDistributor
     /// @param other The distributor to be compared.
     /// @return True if distributors are not equal, False otherwise.
     auto operator!=(const CT4CMatrixDistributor& other) const -> bool = delete;
+    
+    /// @brief The gets range separation factors.
+    /// @return The range separation
+    auto get_omega() const -> double;
 
     /// Sets local matrices and their local/global indices.
     /// @param bra_gto_pair_block The basis function pairs block on bra side.
@@ -88,6 +92,12 @@ class CT4CMatrixDistributor
                     const size_t                     ibra_gto,
                     const std::pair<size_t, size_t>& ket_range,
                     const bool                       diagonal) -> void;
+    
+    
+    /// Accumulates local Fock matrices contributions to targeted Fock matrix.
+    /// @param bra_gto_pair_block The basis function pairs block on bra side.
+    /// @param ket_gto_pair_block The basis function pairs block on ket side.
+    auto accumulate(const CGtoPairBlock& bra_gto_pair_block, const CGtoPairBlock& ket_gto_pair_block) -> void;
 
    private:
     /// @brief The Fock matrix associated with distributor.
