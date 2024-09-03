@@ -6,7 +6,7 @@ from .molecule import Molecule
 from .symmetryoperations import (Inversion, Rotation, Reflection,
                                  ImproperRotation)
 from .symmetryoperations import rotation_matrix
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, safe_arccos
 
 
 class SymmetryAnalyzer:
@@ -146,16 +146,16 @@ class SymmetryAnalyzer:
 
         if tolerance == 'very loose':
             self._tolerance_eig = 0.8
-            self._tolerance_ang = 0.085
+            self._tolerance_ang = np.radians(5.0)
         elif tolerance == 'loose':
             self._tolerance_eig = 0.4
-            self._tolerance_ang = 0.070  # about 4 degrees
+            self._tolerance_ang = np.radians(4.0)
         elif tolerance == 'tight':
             self._tolerance_eig = 0.1
-            self._tolerance_ang = 0.050
+            self._tolerance_ang = np.radians(3.0)
         elif tolerance == 'very tight':
             self._tolerance_eig = 0.002
-            self._tolerance_ang = 0.035  # about 2 degrees
+            self._tolerance_ang = np.radians(2.0)
         else:
             raise KeyError(
                 "SymmetryAnalyzer: Tolerance criterion not available.")
@@ -248,6 +248,65 @@ class SymmetryAnalyzer:
                 print('Expected symmetry elements: ' +
                       ', '.join(results_dict["expected_symmetry_elements"]))
 
+    @staticmethod
+    def _reorder_symmetry_elements(symmetry_elements_list):
+        """
+        Reorder a list of symmetry elements based on order and type of symmetry
+        element. ImproperRotation and Rotation are prioritized.
+
+        :param symmetry_elements_list:
+            The list of symmetry elements. Example: ['3C2', '2S4', 'E']
+
+        :return:
+            The reordered list. Example: ['2S4', '3C2', 'E']
+        """
+
+        def get_op_name(sym_elem):
+            m = re.search(r'(\d*)(\D+.*)$', sym_elem)
+            return m.group(2)
+
+        def is_improper_rotation(sym_op_name):
+            return (sym_op_name.startswith('S') and sym_op_name[1:].isdigit())
+
+        def is_rotation(sym_op_name):
+            return (sym_op_name.startswith('C') and sym_op_name[1:].isdigit())
+
+        reordered_symmetry_elements = []
+
+        # find maximum order
+        max_op_order = 0
+        for sym_elem in symmetry_elements_list:
+            sym_op_name = get_op_name(sym_elem)
+            if is_improper_rotation(sym_op_name) or is_rotation(sym_op_name):
+                op_order = int(sym_op_name[1:])
+                if max_op_order < op_order:
+                    max_op_order = op_order
+
+        # prioritize ImproperRotation and Rotation
+        # also prioritize higher order elements
+        for op_order in range(max_op_order, 0, -1):
+
+            for sym_elem in symmetry_elements_list:
+                sym_op_name = get_op_name(sym_elem)
+                if (is_improper_rotation(sym_op_name) and
+                        int(sym_op_name[1:]) == op_order):
+                    reordered_symmetry_elements.append(sym_elem)
+
+            for sym_elem in symmetry_elements_list:
+                sym_op_name = get_op_name(sym_elem)
+                if (is_rotation(sym_op_name) and
+                        int(sym_op_name[1:]) == op_order):
+                    reordered_symmetry_elements.append(sym_elem)
+
+        # add the remaining elements
+        for sym_elem in symmetry_elements_list:
+            sym_op_name = get_op_name(sym_elem)
+            if not (is_improper_rotation(sym_op_name) or
+                    is_rotation(sym_op_name)):
+                reordered_symmetry_elements.append(sym_elem)
+
+        return reordered_symmetry_elements
+
     def symmetrize_pointgroup(self, symmetry_data, point_group=None):
         """
         Symmetrize and reorient molecule.
@@ -272,7 +331,8 @@ class SymmetryAnalyzer:
 
         # go through symmetry elements
 
-        symmetry_elements_list = self._all_symmetry_elements[point_group]
+        symmetry_elements_list = self._reorder_symmetry_elements(
+            self._all_symmetry_elements[point_group])
 
         symmetry_mapping = set()
         symmetry_operations = []
@@ -350,62 +410,63 @@ class SymmetryAnalyzer:
 
         symmetry_axes = []
         symmetry_indices = []
+
         for sym_idx, sym_op in enumerate(symmetry_operations):
-            if isinstance(sym_op, Rotation):
+            if isinstance(sym_op, (Rotation, ImproperRotation)):
                 symmetry_axes.append(np.array(sym_op._axis))
                 symmetry_indices.append(sym_idx)
         symmetry_axes = np.array(symmetry_axes)
 
-        tol_sq = self._tolerance_eig**2
         for i in range(symmetry_axes.shape[0]):
             sum_axis = np.array(symmetry_axes[i])
             count_axis = 1
-            sum_r2 = 0.0
+
             for sym_op in symmetry_operations:
-                if isinstance(sym_op, Rotation):
+                if isinstance(sym_op, (Rotation, ImproperRotation)):
                     op_axes = np.matmul(symmetry_axes, sym_op.get_matrix())
+
                     for j in range(op_axes.shape[0]):
-                        # note: scale axis to approx. C-H bond length
-                        rvec = (symmetry_axes[i] - op_axes[j]) * 2.06
-                        r2 = np.sum(rvec**2)
-                        if r2 < tol_sq:
-                            sum_axis += op_axes[j]
+                        dot = np.dot(symmetry_axes[i], op_axes[j])
+                        factor = 1.0 if dot > 0.0 else -1.0
+                        angle_radian = safe_arccos(abs(dot))
+
+                        if abs(angle_radian) < self._tolerance_ang:
+                            sum_axis += factor * op_axes[j]
                             count_axis += 1
-                            sum_r2 += r2
-            ave_axis = sum_axis / count_axis
+
             sym_idx = symmetry_indices[i]
-            # note: empirical threshold for averaging symmetry axes
-            if sum_r2 < 1e-6:
-                symmetry_operations[sym_idx]._axis = ave_axis
+            symmetry_operations[sym_idx]._axis = sum_axis / count_axis
 
-        # update reflection places
+        # update parallel and perpendicular symmetry elements
 
-        for i in range(len(symmetry_operations)):
-            if not isinstance(symmetry_operations[i], Reflection):
-                continue
-            ax_i = np.array(symmetry_operations[i]._axis)
-            for j in range(len(symmetry_operations)):
-                if not isinstance(symmetry_operations[j], Rotation):
-                    continue
-                ax_j = np.array(symmetry_operations[j]._axis)
-                if abs(np.dot(ax_i, ax_j)) < self._tolerance_ang:
-                    symmetry_operations[i]._axis = np.array(ax_j)
-
-        # update improper rotation axes
+        # TODO: idealize symmetry elements for spherical case
 
         for i in range(len(symmetry_operations)):
-            if not isinstance(symmetry_operations[i], ImproperRotation):
+            if isinstance(symmetry_operations[i], Inversion):
                 continue
-            ax_i = np.array(symmetry_operations[i]._axis)
+
             for j in range(len(symmetry_operations)):
-                if not isinstance(symmetry_operations[j], Rotation):
+                if isinstance(symmetry_operations[j], Inversion):
                     continue
+
+                ax_i = np.array(symmetry_operations[i]._axis)
                 ax_j = np.array(symmetry_operations[j]._axis)
-                # note: scale axis to approx. C-H bond length
-                rvec = (ax_i - ax_j) * 2.06
-                r2 = np.sum(rvec**2)
-                if r2 < tol_sq:
-                    symmetry_operations[i]._axis = np.array(ax_j)
+
+                dot = np.dot(ax_i, ax_j)
+                factor = 1.0 if dot > 0.0 else -1.0
+                angle_radian = safe_arccos(abs(dot))
+
+                # perpendicular
+                if abs(angle_radian - np.pi / 2.0) < self._tolerance_ang:
+                    y_axis = np.cross(ax_j, ax_i)
+                    y_axis /= np.linalg.norm(y_axis)
+                    symmetry_operations[i]._axis = np.cross(y_axis, ax_j)
+                    break
+
+                # parallel
+                elif abs(angle_radian) < self._tolerance_ang:
+                    symmetry_operations[i]._axis = np.array(factor * ax_j)
+                    break
 
         # find unique atoms
 
@@ -440,36 +501,42 @@ class SymmetryAnalyzer:
 
         for a in range(len(atoms)):
             vec_a = np.array(atoms[a])
+            if np.sum(vec_a**2) < tol_sq:
+                continue
+
             vec_a_norm = np.linalg.norm(vec_a)
+            u_vec_a = vec_a / vec_a_norm
 
             for sym_op in symmetry_operations:
                 if isinstance(sym_op, (Rotation, ImproperRotation)):
-                    axis = sym_op._axis
-                    if np.dot(vec_a, axis) > 0.0:
-                        vec_a_prime = axis * vec_a_norm
-                    else:
-                        vec_a_prime = axis * vec_a_norm * (-1.0)
-                    r2 = np.linalg.norm(vec_a - vec_a_prime)
-                    if r2 < tol_sq:
-                        atoms[a] = np.array(vec_a_prime)
+                    axis = np.array(sym_op._axis)
 
-                elif isinstance(sym_op, Reflection):
-                    axis = sym_op._axis
-                    if vec_a_norm**2 < self._tolerance_eig:
-                        continue
-                    u_vec_a = vec_a / vec_a_norm
-                    if abs(np.dot(u_vec_a, axis)) < self._tolerance_ang:
+                    dot = np.dot(u_vec_a, axis)
+                    factor = 1.0 if dot > 0.0 else -1.0
+                    angle_radian = safe_arccos(abs(dot))
+
+                    if abs(angle_radian) < self._tolerance_ang:
+                        atoms[a] = np.array(factor * axis * vec_a_norm)
+                        break
+
+                elif isinstance(sym_op, (Reflection, ImproperRotation)):
+                    axis = np.array(sym_op._axis)
+
+                    dot = np.dot(u_vec_a, axis)
+                    angle_radian = safe_arccos(abs(dot))
+
+                    if abs(angle_radian - np.pi / 2.0) < self._tolerance_ang:
                         y_axis = np.cross(axis, u_vec_a)
                         y_axis /= np.linalg.norm(y_axis)
-                        u_vec_a = np.cross(y_axis, axis)
-                        vec_a_prime = u_vec_a * vec_a_norm
-                        atoms[a] = np.array(vec_a_prime)
+                        atoms[a] = np.array(np.cross(y_axis, axis) * vec_a_norm)
+                        break
 
         # generate molecule from unique atoms
 
         for sym_op in symmetry_operations:
             sym_mat = sym_op.get_matrix()
             op_coords = np.matmul(np.array(atoms), sym_mat)
+
             for idx_i, vec_i in enumerate(op_coords):
                 idx_a = None
                 for a in range(self._natoms):
@@ -477,6 +544,7 @@ class SymmetryAnalyzer:
                     if r2_ia < tol_sq:
                         idx_a = a
                         break
+
                 if idx_a is not None and idx_a not in atom_orig_indices:
                     atoms.append(np.array(vec_i))
                     atom_orig_indices.append(idx_a)
@@ -494,7 +562,7 @@ class SymmetryAnalyzer:
 
         z_axis = None
         for sym_op in symmetry_operations:
-            if isinstance(sym_op, Rotation):
+            if isinstance(sym_op, (Rotation, ImproperRotation)):
                 z_axis = np.array(sym_op._axis)
                 break
         if z_axis is not None:
@@ -1050,6 +1118,7 @@ class SymmetryAnalyzer:
 
         sym_op_exists = True
         tol_sq = self._tolerance_eig**2
+
         for i in range(self._natoms):
             min_r2, min_idx = None, None
             for j in range(self._natoms):
@@ -1059,6 +1128,7 @@ class SymmetryAnalyzer:
                     if min_r2 is None or min_r2 > r2:
                         min_r2 = r2
                         min_idx = j
+
             if min_r2 < tol_sq:
                 if self._symbols[i] == self._symbols[min_idx] and i != min_idx:
                     self._mapping.add(tuple(sorted([i, min_idx])))
@@ -1157,8 +1227,16 @@ class SymmetryAnalyzer:
 
         centered_mol = Molecule(self._symbols, self._centered_coords, 'au')
         connectivity_matrix = centered_mol.get_connectivity_matrix()
+        Ivals, Ivecs = centered_mol.moments_of_inertia(principal_axes=True)
 
         points = []
+
+        # principal axes
+        for i in range(3):
+            vec = np.array(Ivecs[i])
+            norm = np.linalg.norm(vec)
+            if norm > 1e-8:
+                points.append(vec / norm)
 
         # atoms
         for i in range(self._natoms):
@@ -1197,14 +1275,23 @@ class SymmetryAnalyzer:
 
         # find duplicate points
         duplicate_indices = []
+        tol_sq = self._tolerance_eig**2
         for i in range(len(points)):
             p_i = points[i]
+
             for j in range(i + 1, len(points)):
                 if j in duplicate_indices:
                     continue
                 p_j = points[j]
+
                 # check if p_i == p_j or p_i == -p_j
-                if abs(abs(np.dot(p_i, p_j)) - 1.0) < 1e-8:
+                # note: scale axis to approx. C-H bond length
+                if np.dot(p_i, p_j) > 0.0:
+                    rvec = (p_i - p_j) * 2.06
+                else:
+                    rvec = (p_i + p_j) * 2.06
+                r2 = np.sum(rvec**2)
+                if r2 < tol_sq:
                     duplicate_indices.append(j)
 
         # remove duplicate points

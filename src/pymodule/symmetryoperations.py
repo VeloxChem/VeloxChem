@@ -5,6 +5,14 @@ from .errorhandler import assert_msg_critical
 
 class Inversion:
 
+    def __init__(self):
+
+        self._axis = None
+
+    def __str__(self):
+
+        return 'Ci'
+
     def get_matrix(self):
 
         return -np.identity(3)
@@ -22,6 +30,13 @@ class Rotation:
         assert_msg_critical(norm > 1e-8, 'Reflection: Invalid axis')
         self._axis = np.array(axis) / norm
 
+    def __str__(self):
+
+        if self._power == 1:
+            return f'C{self._order}'
+        else:
+            return f'C{self._order}^{self._power}'
+
     def get_matrix(self):
 
         return rotation_matrix(self._axis,
@@ -36,6 +51,10 @@ class Reflection:
         norm = np.linalg.norm(axis)
         assert_msg_critical(norm > 1e-8, 'Reflection: Invalid axis')
         self._axis = np.array(axis) / norm
+
+    def __str__(self):
+
+        return 'Cs'
 
     def get_matrix(self):
 
@@ -53,6 +72,13 @@ class ImproperRotation:
         norm = np.linalg.norm(axis)
         assert_msg_critical(norm > 1e-8, 'Reflection: Invalid axis')
         self._axis = np.array(axis) / norm
+
+    def __str__(self):
+
+        if self._power == 1:
+            return f'S{self._order}'
+        else:
+            return f'S{self._order}^{self._power}'
 
     def get_matrix(self):
 
