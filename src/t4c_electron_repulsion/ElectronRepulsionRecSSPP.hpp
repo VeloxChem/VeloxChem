@@ -24,7 +24,7 @@ namespace erirec { // erirec namespace
 /// @param bra_indices The range [bra_first, bra_last) of basis function pairs on bra side.
 /// @param ket_indices The range [ket_first, ket_last) of basis function pairs on ket side.
 /// @param bra_eq_ket True if basis function pairs blocks on bra and ket are the same, False otherwise.
-template <class T, int N>
+template <class T>
 inline auto
 comp_electron_repulsion_sspp(T& distributor,
                              const CGtoPairBlock& bra_gto_pair_block,
@@ -83,53 +83,29 @@ comp_electron_repulsion_sspp(T& distributor,
 
     // allocate aligned primitive integrals
 
-    if constexpr (N == 1) CSimdArray<double> pbuffer(15, ket_npgtos);
-
-    if constexpr (N == 2) CSimdArray<double> pbuffer(15, ket_npgtos);
-
-    if constexpr (N == 3) CSimdArray<double> pbuffer(30, ket_npgtos);
+    CSimdArray<double> pbuffer(15, ket_npgtos);
 
     // allocate aligned Cartesian integrals
 
-    if constexpr (N == 1) CSimdArray<double> cbuffer(9, 1);
-
-    if constexpr (N == 2) CSimdArray<double> cbuffer(9, 1);
-
-    if constexpr (N == 3) CSimdArray<double> cbuffer(18, 1);
+    CSimdArray<double> cbuffer(9, 1);
 
     // allocate aligned contracted integrals
 
-    if constexpr (N == 1) CSimdArray<double> ckbuffer(9, 1);
-
-    if constexpr (N == 2) CSimdArray<double> ckbuffer(9, 1);
-
-    if constexpr (N == 3) CSimdArray<double> ckbuffer(18, 1);
+    CSimdArray<double> ckbuffer(9, 1);
 
     // allocate aligned half transformed integrals
 
-    if constexpr (N == 1) CSimdArray<double> skbuffer(9, 1);
-
-    if constexpr (N == 2) CSimdArray<double> skbuffer(9, 1);
-
-    if constexpr (N == 3) CSimdArray<double> skbuffer(18, 1);
+    CSimdArray<double> skbuffer(9, 1);
 
     // allocate aligned spherical integrals
 
-    if constexpr (N == 1) CSimdArray<double> sbuffer(9, 1);
-
-    if constexpr (N == 2) CSimdArray<double> sbuffer(9, 1);
-
-    if constexpr (N == 3) CSimdArray<double> sbuffer(18, 1);
+    CSimdArray<double> sbuffer(9, 1);
 
     // setup Boys fuction data
 
     const CBoysFunc<2> bf_table;
 
-    if constexpr (N == 1) CSimdArray<double> bf_data(4, ket_npgtos);
-
-    if constexpr (N == 2) CSimdArray<double> bf_data(4, ket_npgtos);
-
-    if constexpr (N == 3) CSimdArray<double> bf_data(8, ket_npgtos);
+    CSimdArray<double> bf_data(4, ket_npgtos);
 
     // set up ket partitioning
 
@@ -225,44 +201,17 @@ comp_electron_repulsion_sspp(T& distributor,
 
                 t4cfunc::comp_distances_wq(pfactors, 23, 17, 10);
 
-                if constexpr (N == 1) t4cfunc::comp_boys_args(bf_data, 3, pfactors, 13, a_exp, b_exp);
+                t4cfunc::comp_boys_args(bf_data, 3, pfactors, 13, a_exp, b_exp);
 
-                if constexpr (N == 2) t4cfunc::comp_boys_args(bf_data, 3, pfactors, 13, a_exp, b_exp, omega);
+                bf_table.compute(bf_data, 0, 3);
 
-                if constexpr (N == 3)
-                {
-                    t4cfunc::comp_boys_args(bf_data, 3, pfactors, 13, a_exp, b_exp);
+                t4cfunc::comp_ovl_factors(pfactors, 16, 2, 3, ab_ovl, ab_norm, a_exp, b_exp);
 
-                    t4cfunc::comp_boys_args(bf_data, 7, pfactors, 13, a_exp, b_exp, omega);
-                }
+                erirec::comp_prim_electron_repulsion_ssss(pbuffer, 0, pfactors, 16, bf_data, 0);
 
-                if constexpr (N == 1) bf_table.compute(bf_data, 0, 3);
+                erirec::comp_prim_electron_repulsion_ssss(pbuffer, 1, pfactors, 16, bf_data, 1);
 
-                if constexpr (N == 2) bf_table.compute(bf_data, 0, 3, pfactors, a_exp, b_exp, omega);
-
-                if constexpr (N == 3)
-                {
-                    bf_table.compute(bf_data, 0, 3);
-
-                    bf_table.compute(bf_data, 4, 7, pfactors, a_exp, b_exp, omega);
-                }
-
-                t4cfunc::comp_ovl_factors(pfactors, 16, ab_ovl, ab_norm, a_exp, b_exp);
-
-                erirec::comp_prim_electron_repulsion_ssss(buffer, 0, pfactors, 16, bf_data, 0);
-
-                erirec::comp_prim_electron_repulsion_ssss(buffer, 1, pfactors, 16, bf_data, 1);
-
-                erirec::comp_prim_electron_repulsion_ssss(buffer, 2, pfactors, 16, bf_data, 2);
-
-                if constexpr (N == 3)
-                {
-                    erirec::comp_prim_electron_repulsion_ssss(buffer, 15, pfactors, 16, bf_data, 4);
-
-                    erirec::comp_prim_electron_repulsion_ssss(buffer, 16, pfactors, 16, bf_data, 5);
-
-                    erirec::comp_prim_electron_repulsion_ssss(buffer, 17, pfactors, 16, bf_data, 6);
-                }
+                erirec::comp_prim_electron_repulsion_ssss(pbuffer, 2, pfactors, 16, bf_data, 2);
 
                 erirec::comp_prim_electron_repulsion_sssp(pbuffer, 3, 0, 1, pfactors, 20, 23);
 
@@ -270,47 +219,16 @@ comp_electron_repulsion_sspp(T& distributor,
 
                 erirec::comp_prim_electron_repulsion_sssd(pbuffer, 9, 0, 1, 3, 6, pfactors, 20, 23, a_exp, b_exp);
 
-                if constexpr (N == 3)
-                {
-                    erirec::comp_prim_electron_repulsion_sssp(pbuffer, 18, 15, 16, pfactors, 20, 23);
-
-                    erirec::comp_prim_electron_repulsion_sssp(pbuffer, 21, 16, 17, pfactors, 20, 23);
-
-                    erirec::comp_prim_electron_repulsion_sssd(pbuffer, 24, 15, 16, 18, 21, pfactors, 20, 23, a_exp, b_exp);
-                }
-
                 t2cfunc::reduce(cbuffer, 0, pbuffer, 3, 3, ket_width, ket_npgtos);
 
                 t2cfunc::reduce(cbuffer, 3, pbuffer, 9, 6, ket_width, ket_npgtos);
-
-                if constexpr (N == 3)
-                {
-                    t2cfunc::reduce(cbuffer, 9, pbuffer, 18, 3, ket_width, ket_npgtos);
-
-                    t2cfunc::reduce(cbuffer, 12, pbuffer, 24, 6, ket_width, ket_npgtos);
-                }
             }
 
             erirec::comp_ket_hrr_electron_repulsion_xxpp(ckbuffer, 0, cbuffer, 0, 3, cfactors, 6, 0, 0);
 
-            if constexpr (N == 3)
-            {
-                erirec::comp_ket_hrr_electron_repulsion_xxpp(ckbuffer, 9, cbuffer, 9, 12, cfactors, 6, 0, 0);
-            }
-
             t4cfunc::ket_transform<1, 1>(skbuffer, 0, ckbuffer, 0, 0, 0);
 
-            if constexpr (N == 3)
-            {
-                t4cfunc::ket_transform<1, 1>(skbuffer, 9, ckbuffer, 9, 0, 0);
-            }
-
             t4cfunc::bra_transform<0, 0>(sbuffer, 0, skbuffer, 0, 1, 1);
-
-            if constexpr (N == 3)
-            {
-                t4cfunc::bra_transform<0, 0>(sbuffer, 9, skbuffer, 9, 1, 1);
-            }
         }
     }
 

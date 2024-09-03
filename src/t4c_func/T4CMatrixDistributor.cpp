@@ -1,7 +1,6 @@
 #include "T4CMatrixDistributor.hpp"
 
 #include "StringFormat.hpp"
-#include "T4CDistributor.hpp"
 #include "T4CUtils.hpp"
 #include "TensorComponents.hpp"
 #include "T4CLocalDistributor.hpp"

@@ -94,6 +94,22 @@ auto reduce(CSimdArray<double>& cbuffer, CSimdArray<double>& pbuffer, const size
 
 /// @brief Reduces primitive array to contracted array.
 /// @param cbuffer The contracted array.
+/// @param cposition The contracted array position.
+/// @param pbuffer The primitive array.
+/// @param pposition The starting position in primitive array.
+/// @param nrows The number of rows to contract. 
+/// @param ndims The dimensions of contracted row.
+/// @param nblocks The number of blocks in primitive row.
+auto reduce(CSimdArray<double>& cbuffer,
+            const size_t        cposition,
+            CSimdArray<double>& pbuffer,
+            const size_t pposition,
+            const size_t nrows,
+            const size_t ndims,
+            const size_t nblocks) -> void;
+
+/// @brief Reduces primitive array to contracted array.
+/// @param cbuffer The contracted array.
 /// @param pbuffer The primitive array.
 /// @param position The starting position in primitive array.
 /// @param factor The scaling factor of primitive array.

@@ -363,6 +363,25 @@ reduce(CSimdArray<double>& cbuffer, CSimdArray<double>& pbuffer, const size_t po
 }
 
 auto
+reduce(CSimdArray<double>& cbuffer, const size_t cposition, CSimdArray<double>& pbuffer, const size_t pposition, const size_t nrows, const size_t ndims, const size_t nblocks) -> void
+{
+    if (nrows > 0)
+    {
+        std::ranges::for_each(views::rectangular(nrows, nblocks), [&](const auto& index) {
+            const auto [i, j] = index;
+            auto pdata        = pbuffer.data(pposition + i);
+            auto cdata        = cbuffer.data(cposition + i);
+            auto pvals        = &pdata[j * ndims];
+#pragma omp simd
+            for (size_t k = 0; k < ndims; k++)
+            {
+                cdata[k] += pvals[k];
+            }
+        });
+    }
+}
+
+auto
 reduce(CSimdArray<double>& cbuffer, CSimdArray<double>& pbuffer, const size_t position, const double factor, const size_t ndims, const size_t nblocks)
     -> void
 {
