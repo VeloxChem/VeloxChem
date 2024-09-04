@@ -1831,7 +1831,7 @@ compute(      T&                  distributor,
             return;
     }
     
-    std::cout << " *** Integral not found in call tree :" << bra_angmoms[0] << " , " << bra_angmoms[1]  << " , " << ket_angmoms[0] << " , " << ket_angmoms[1] << std::endl;
+    std::cout << " *** Integral not found in call tree :" << bra_angmoms.first << " , " << bra_angmoms.second  << " , " << ket_angmoms.first << " , " << ket_angmoms.second << std::endl;
 }
 
 }  // namespace erifunc

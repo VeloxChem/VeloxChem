@@ -25,6 +25,17 @@ class TestFockDriver:
         bas = MolecularBasis.read(mol, 'def2-sv(p)')
 
         return mol, bas
+        
+    def get_data_co(self):
+
+        costr = """
+            C   0.100  -0.400  -1.000
+            O   0.300   1.400  -2.100
+        """
+        mol = Molecule.read_str(costr, 'au')
+        bas = MolecularBasis.read(mol, 'def2-QZVP')
+
+        return mol, bas
 
     def test_h4_fock_2jk_svp(self):
 
@@ -50,4 +61,30 @@ class TestFockDriver:
         fref = SubMatrix([0, 0, 8, 8])
         fref.set_values(np.ascontiguousarray(ref_mat))
         
+        assert fmat == fref
+
+    def test_co_fock_2jk_qzvp(self):
+
+        mol, bas = self.get_data_co()
+
+        # load density matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'co.qzvp.density.npy')
+        den_mat = make_matrix(bas, mat_t.symmetric)
+        den_mat.set_values(np.load(npyfile))
+
+        ## compute Fock matrix
+        fock_drv = FockDriver()
+        fock_mat = fock_drv.compute(bas, mol, den_mat, "2jk", 0.0, 0.0)
+
+        # load reference Fock matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'co.qzvp.fock.2j-k.npy')
+        ref_mat = np.load(npyfile)
+
+        # check full Fock matrix
+        fmat = fock_mat.full_matrix()
+        fref = SubMatrix([0, 0, 114, 114])
+        fref.set_values(np.ascontiguousarray(ref_mat))
+
         assert fmat == fref
