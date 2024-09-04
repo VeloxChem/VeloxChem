@@ -1,6 +1,9 @@
 #ifndef ElectronRepulsionContrRecPPXX_hpp
 #define ElectronRepulsionContrRecPPXX_hpp
 
+#include <cstddef>
+
+#include "Point.hpp"
 #include "SimdArray.hpp"
 
 namespace erirec { // erirec namespace

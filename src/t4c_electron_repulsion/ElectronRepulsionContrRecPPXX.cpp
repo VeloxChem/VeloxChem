@@ -63,7 +63,7 @@ comp_bra_hrr_electron_repulsion_ppxx(CSimdArray<double>& cbuffer,
 
             const auto pp_off = idx_ppxx + i * dcomps + j;
 
-            /// Set up 0-3 components of targeted buffer : contr_buffer_ppxx
+            /// Set up 0-3 components of targeted buffer : cbuffer.data(
 
             auto g_x_x = cbuffer.data(pp_off + 0 * ccomps * dcomps);
 
@@ -81,7 +81,7 @@ comp_bra_hrr_electron_repulsion_ppxx(CSimdArray<double>& cbuffer,
                 g_x_z[k] = -g_0_z[k] * ab_x + g_0_xz[k];
             }
 
-            /// Set up 3-6 components of targeted buffer : contr_buffer_ppxx
+            /// Set up 3-6 components of targeted buffer : cbuffer.data(
 
             auto g_y_x = cbuffer.data(pp_off + 3 * ccomps * dcomps);
 
@@ -99,7 +99,7 @@ comp_bra_hrr_electron_repulsion_ppxx(CSimdArray<double>& cbuffer,
                 g_y_z[k] = -g_0_z[k] * ab_y + g_0_yz[k];
             }
 
-            /// Set up 6-9 components of targeted buffer : contr_buffer_ppxx
+            /// Set up 6-9 components of targeted buffer : cbuffer.data(
 
             auto g_z_x = cbuffer.data(pp_off + 6 * ccomps * dcomps);
 

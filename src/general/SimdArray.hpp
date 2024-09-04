@@ -49,7 +49,7 @@ class CSimdArray
     {
         if (auto nelems = _rows * _columns; nelems > 0)
         {
-            _data = (T *)omp_aligned_alloc(64, nelems * simd::width<T>() * sizeof(T), omp_default_mem_alloc);
+            _data = (T*) std::aligned_alloc(64, nelems * simd::width<T>() * sizeof(T));
         }
     }
 
@@ -64,7 +64,7 @@ class CSimdArray
     /// @brief The custom destructor.
     ~CSimdArray()
     {
-        if (_data != nullptr) omp_free((void *)_data, omp_default_mem_alloc);
+        if (_data != nullptr) std::free((void*)_data);
     };
 
     /// @brief The default copy assignment operator.

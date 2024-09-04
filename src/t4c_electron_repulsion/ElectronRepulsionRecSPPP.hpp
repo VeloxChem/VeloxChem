@@ -16,6 +16,7 @@
 #include "T4CUtils.hpp"
 #include "T2CUtils.hpp"
 #include "GtoPairBlock.hpp"
+#include "BatchFunc.hpp"
 
 namespace erirec { // erirec namespace
 
@@ -244,6 +245,7 @@ comp_electron_repulsion_sppp(T& distributor,
                 t2cfunc::reduce(cbuffer, 0, pbuffer, 25, 9, ket_width, ket_npgtos);
 
                 t2cfunc::reduce(cbuffer, 9, pbuffer, 34, 18, ket_width, ket_npgtos);
+
             }
 
             erirec::comp_ket_hrr_electron_repulsion_xxpp(ckbuffer, 0, cbuffer, 0, 9, cfactors, 6, 0, 1);
@@ -251,6 +253,10 @@ comp_electron_repulsion_sppp(T& distributor,
             t4cfunc::ket_transform<1, 1>(skbuffer, 0, ckbuffer, 0, 0, 1);
 
             t4cfunc::bra_transform<0, 1>(sbuffer, 0, skbuffer, 0, 1, 1);
+
+            const bool diagonal = bra_eq_ket && (j >= ket_range.first) && (j < ket_range.second);
+
+            distributor.distribute(sbuffer, 0, a_indices, b_indices, c_indices, d_indices, 0, 1, 1, 1, j, ket_range, diagonal);
         }
     }
 
