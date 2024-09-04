@@ -1,30 +1,29 @@
 #ifndef ElectronRepulsionPrimRecSSSP_hpp
 #define ElectronRepulsionPrimRecSSSP_hpp
 
+#include <cstddef>
+
+#include "Point.hpp"
 #include "SimdArray.hpp"
 
 namespace erirec { // erirec namespace
 
 /// Computes [SS|1/|r-r'||SP]  integrals for set of data buffers.
-/// - Parameter prim_buffer_0_sssp: the primitive integrals buffer.
-/// - Parameter prim_buffer_0_ssss: the primitive integrals buffer.
-/// - Parameter prim_buffer_1_ssss: the primitive integrals buffer.
-/// - Parameter qd_x: the vector of Cartesian X distances R(QD) = Q - D.
-/// - Parameter qd_y: the vector of Cartesian Y distances R(QD) = Q - D.
-/// - Parameter qd_z: the vector of Cartesian Z distances R(QD) = Q - D.
-/// - Parameter wq_x: the vector of Cartesian X distances R(WQ) = W - Q.
-/// - Parameter wq_y: the vector of Cartesian Y distances R(WQ) = W - Q.
-/// - Parameter wq_z: the vector of Cartesian Z distances R(WQ) = W - Q.
+/// @param pbuffer The primitive integrals buffer.
+/// @param idx_eri_0_sssp The index of integral in primitive integrals buffer.
+/// @param idx_eri_0_ssss The primitive integrals buffer.
+/// @param idx_eri_1_ssss The primitive integrals buffer.
+/// @param factors The primitive factors buffer.
+/// @param idx_qd The vector of distances R(QD) = Q - D.
+/// @param idx_wq The vector of distances R(WQ) = W - Q.
 auto
-comp_prim_electron_repulsion_sssp(CSimdArray<double>& prim_buffer_0_sssp,
-                                  const CSimdArray<double>& prim_buffer_0_ssss,
-                                  const CSimdArray<double>& prim_buffer_1_ssss,
-                                  const double* qd_x,
-                                  const double* qd_y,
-                                  const double* qd_z,
-                                  const double* wq_x,
-                                  const double* wq_y,
-                                  const double* wq_z) -> void;
+comp_prim_electron_repulsion_sssp(CSimdArray<double>& pbuffer,
+                                  const size_t idx_eri_0_sssp,
+                                  size_t idx_eri_0_ssss,
+                                  size_t idx_eri_1_ssss,
+                                  CSimdArray<double>& factors,
+                                  const size_t idx_qd,
+                                  const size_t idx_wq) -> void;
 } // erirec namespace
 
 #endif /* ElectronRepulsionPrimRecSSSP_hpp */

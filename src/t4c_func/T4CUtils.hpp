@@ -152,7 +152,7 @@ auto comp_boys_args(CSimdArray<double>&       bf_data,
 /// @param bra_norm The normalization factor on bra side.
 /// @param a_exp The exponent on A center.
 /// @param b_exp The exponent on B center.
-auto comp_ovl_factors(const CSimdArray<double>& buffer,
+auto comp_ovl_factors(      CSimdArray<double>& buffer,
                       const size_t              index_ovl,
                       const size_t              index_ket_ovl,
                       const size_t              index_ket_norm,
@@ -185,10 +185,10 @@ auto store_values(CSimdArray<double>& buffer, const CSimdArray<double>& values, 
 /// - Parameter ang_order : the angular order of local/global matrix.
 auto accumulate(CSubMatrix*             glob_matrix,
                 const CSubMatrix*       loc_matrix,
-                const std::vector<int>& bra_loc_indices,
-                const std::vector<int>& ket_loc_indices,
-                const std::vector<int>& bra_glob_indices,
-                const std::vector<int>& ket_glob_indices,
+                const std::vector<size_t>& bra_loc_indices,
+                const std::vector<size_t>& ket_loc_indices,
+                const std::vector<size_t>& bra_glob_indices,
+                const std::vector<size_t>& ket_glob_indices,
                 const int               bra_comps,
                 const int               ket_comps,
                 const bool              ang_order) -> void;
@@ -198,7 +198,7 @@ auto accumulate(CSubMatrix*             glob_matrix,
 /// - Parameter cbuffer: the Cartesian integrals array.
 template <int N, int M>
 inline auto
-ket_transform(CSimdArray<double>& sbuffer, const CSimdArray<double>& cbuffer, const int a_angmom, const int b_angmom) -> void
+ket_transform(CSimdArray<double>& sbuffer, const size_t sposition, const CSimdArray<double>& cbuffer, const size_t cposition, const int a_angmom, const int b_angmom) -> void
 {
     const auto ndims = sbuffer.number_of_active_elements();
 
@@ -226,13 +226,13 @@ ket_transform(CSimdArray<double>& sbuffer, const CSimdArray<double>& cbuffer, co
             {
                 for (int l = 0; l < d_spher_comps; l++)
                 {
-                    auto dst_ptr = sbuffer.data(spher_off + k * d_spher_comps + l);
+                    auto dst_ptr = sbuffer.data(sposition + spher_off + k * d_spher_comps + l);
 
                     for (const auto& [c_idx, cfact] : spher_mom::transformation_factors<N>(k))
                     {
                         for (const auto& [d_idx, dfact] : spher_mom::transformation_factors<M>(l))
                         {
-                            auto src_ptr = cbuffer.data(cart_off + c_idx * d_cart_comps + d_idx);
+                            auto src_ptr = cbuffer.data(cposition + cart_off + c_idx * d_cart_comps + d_idx);
 
                             const double fact = cfact * dfact;
 
@@ -254,7 +254,7 @@ ket_transform(CSimdArray<double>& sbuffer, const CSimdArray<double>& cbuffer, co
 /// - Parameter cbuffer: the Cartesian integrals array.
 template <int N, int M>
 inline auto
-bra_transform(CSimdArray<double>& sbuffer, const CSimdArray<double>& cbuffer, const int c_angmom, const int d_angmom) -> void
+bra_transform(CSimdArray<double>& sbuffer, const size_t sposition, const CSimdArray<double>& cbuffer, const size_t cposition, const int c_angmom, const int d_angmom) -> void
 {
     const auto ndims = sbuffer.number_of_active_elements();
 
@@ -278,13 +278,13 @@ bra_transform(CSimdArray<double>& sbuffer, const CSimdArray<double>& cbuffer, co
             {
                 for (int l = 0; l < b_spher_comps; l++)
                 {
-                    auto dst_ptr = sbuffer.data((k * b_spher_comps + l) * c_spher_comps * d_spher_comps + ket_off);
+                    auto dst_ptr = sbuffer.data(sposition + (k * b_spher_comps + l) * c_spher_comps * d_spher_comps + ket_off);
 
                     for (const auto& [a_idx, afact] : spher_mom::transformation_factors<N>(k))
                     {
                         for (const auto& [b_idx, bfact] : spher_mom::transformation_factors<M>(l))
                         {
-                            auto src_ptr = cbuffer.data((a_idx * b_cart_comps + b_idx) * c_spher_comps * d_spher_comps + ket_off);
+                            auto src_ptr = cbuffer.data(cposition + (a_idx * b_cart_comps + b_idx) * c_spher_comps * d_spher_comps + ket_off);
 
                             const double fact = afact * bfact;
 
