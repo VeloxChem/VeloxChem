@@ -140,7 +140,7 @@ comp_electron_repulsion_ssss(T& distributor,
         for (auto j = bra_indices.first; j < bra_indices.second; j++)
         {
             if (bra_eq_ket && (j >= ket_range.second)) continue;
-            
+
             // zero integral buffers
 
             cbuffer.zero();
@@ -190,17 +190,19 @@ comp_electron_repulsion_ssss(T& distributor,
                 erirec::comp_prim_electron_repulsion_ssss(pbuffer, 0, pfactors, 16, bf_data, 0);
 
                 t2cfunc::reduce(cbuffer, 0, pbuffer, 0, 1, ket_width, ket_npgtos);
+
             }
 
             t4cfunc::ket_transform<0, 0>(skbuffer, 0, cbuffer, 0, 0, 0);
 
             t4cfunc::bra_transform<0, 0>(sbuffer, 0, skbuffer, 0, 0, 0);
-            
+
             const bool diagonal = bra_eq_ket && (j >= ket_range.first) && (j < ket_range.second);
-            
+
             distributor.distribute(sbuffer, 0, a_indices, b_indices, c_indices, d_indices, 0, 0, 0, 0, j, ket_range, diagonal);
         }
     }
+
 }
 
 } // erirec namespace
