@@ -5,6 +5,8 @@
 #include "TensorComponents.hpp"
 #include "T4CLocalDistributor.hpp"
 
+#include <iostream>
+
 CT4CMatrixDistributor::CT4CMatrixDistributor(CMatrix*           fock,
                                              const CMatrix*     density,
                                              const std::string& label,
@@ -50,6 +52,8 @@ CT4CMatrixDistributor::get_omega() const -> double
 auto
 CT4CMatrixDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, const CGtoPairBlock& ket_gto_pair_block) -> void
 {
+    std::cout << " *** DISTRIBUTOR *** " << std::endl;
+    
     // set up local indices
 
     _a_loc_indices = t4cfunc::masked_indices(bra_gto_pair_block.bra_orbital_indices());
@@ -59,6 +63,30 @@ CT4CMatrixDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, cons
     _c_loc_indices = t4cfunc::masked_indices(ket_gto_pair_block.bra_orbital_indices());
 
     _d_loc_indices = t4cfunc::masked_indices(ket_gto_pair_block.ket_orbital_indices());
+    
+    std::cout << "A local indices:" << std::endl;
+    
+    for (const auto idx : _a_loc_indices) std::cout << idx << " ";
+    
+    std::cout << std::endl;
+    
+    std::cout << "B local indices:" << std::endl;
+    
+    for (const auto idx : _b_loc_indices) std::cout << idx << " ";
+    
+    std::cout << std::endl;
+    
+    std::cout << "C local indices:" << std::endl;
+    
+    for (const auto idx : _c_loc_indices) std::cout << idx << " ";
+    
+    std::cout << std::endl;
+    
+    std::cout << "D local indices:" << std::endl;
+    
+    for (const auto idx : _d_loc_indices) std::cout << idx << " ";
+    
+    std::cout << std::endl;
 
     // set up global indices
 
@@ -69,6 +97,30 @@ CT4CMatrixDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, cons
     _c_glob_indices = t4cfunc::compresed_indices(ket_gto_pair_block.bra_orbital_indices());
 
     _d_glob_indices = t4cfunc::compresed_indices(ket_gto_pair_block.ket_orbital_indices());
+    
+    std::cout << "A global indices:" << std::endl;
+    
+    for (const auto idx : _a_glob_indices) std::cout << idx << " ";
+    
+    std::cout << std::endl;
+    
+    std::cout << "B global indices:" << std::endl;
+    
+    for (const auto idx : _b_glob_indices) std::cout << idx << " ";
+    
+    std::cout << std::endl;
+    
+    std::cout << "C global indices:" << std::endl;
+    
+    for (const auto idx : _c_glob_indices) std::cout << idx << " ";
+    
+    std::cout << std::endl;
+    
+    std::cout << "D global indices:" << std::endl;
+    
+    for (const auto idx : _d_glob_indices) std::cout << idx << " ";
+    
+    std::cout << std::endl;
 
     // set up local matrices
 

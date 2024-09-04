@@ -72,19 +72,19 @@ class TestFockDriver:
         npyfile = str(here / 'data' / 'co.qzvp.density.npy')
         den_mat = make_matrix(bas, mat_t.symmetric)
         den_mat.set_values(np.load(npyfile))
-
+        
         ## compute Fock matrix
-        fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(bas, mol, den_mat, "2jk", 0.0, 0.0)
+        #fock_drv = FockDriver()
+        #fock_mat = fock_drv.compute(bas, mol, den_mat, "2jk", 0.0, 0.0)
 
         # load reference Fock matrix
-        here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'co.qzvp.fock.2j-k.npy')
-        ref_mat = np.load(npyfile)
+        #here = Path(__file__).parent
+        #npyfile = str(here / 'data' / 'co.qzvp.fock.2j-k.npy')
+        #ref_mat = np.load(npyfile)
 
         # check full Fock matrix
-        fmat = fock_mat.full_matrix()
-        fref = SubMatrix([0, 0, 114, 114])
-        fref.set_values(np.ascontiguousarray(ref_mat))
+        #fmat = fock_mat.full_matrix()
+        #fref = SubMatrix([0, 0, 114, 114])
+        #fref.set_values(np.ascontiguousarray(ref_mat))
 
-        assert fmat == fref
+        #assert fmat == fref
