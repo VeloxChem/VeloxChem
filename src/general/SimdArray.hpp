@@ -49,7 +49,11 @@ class CSimdArray
     {
         if (auto nelems = _rows * _columns; nelems > 0)
         {
-            _data = (T*) std::aligned_alloc(64, nelems * simd::width<T>() * sizeof(T));
+            void *ptr = nullptr;
+
+            ::posix_memalign(&ptr, 64, nelems * simd::width<T>() * sizeof(T));
+
+            _data = (T*)ptr;
         }
     }
 
@@ -64,7 +68,7 @@ class CSimdArray
     /// @brief The custom destructor.
     ~CSimdArray()
     {
-        if (_data != nullptr) std::free((void*)_data);
+        if (_data != nullptr) ::free((void*)_data);
     };
 
     /// @brief The default copy assignment operator.

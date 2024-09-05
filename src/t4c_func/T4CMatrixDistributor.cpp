@@ -52,7 +52,7 @@ CT4CMatrixDistributor::get_omega() const -> double
 auto
 CT4CMatrixDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, const CGtoPairBlock& ket_gto_pair_block) -> void
 {
-    std::cout << " *** DISTRIBUTOR *** " << std::endl;
+    
     
     // set up local indices
 
@@ -63,6 +63,32 @@ CT4CMatrixDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, cons
     _c_loc_indices = t4cfunc::masked_indices(ket_gto_pair_block.bra_orbital_indices());
 
     _d_loc_indices = t4cfunc::masked_indices(ket_gto_pair_block.ket_orbital_indices());
+    
+    // set up global indices
+
+    _a_glob_indices = t4cfunc::compresed_indices(bra_gto_pair_block.bra_orbital_indices());
+
+    _b_glob_indices = t4cfunc::compresed_indices(bra_gto_pair_block.ket_orbital_indices());
+
+    _c_glob_indices = t4cfunc::compresed_indices(ket_gto_pair_block.bra_orbital_indices());
+
+    _d_glob_indices = t4cfunc::compresed_indices(ket_gto_pair_block.ket_orbital_indices());
+    
+    // set up local matrices
+
+    const auto bra_ang_moms = bra_gto_pair_block.angular_momentums();
+
+    const auto ket_ang_moms = ket_gto_pair_block.angular_momentums();
+
+    const auto a_dims = _a_loc_indices[0] * tensor::number_of_spherical_components(std::array<int, 1>{bra_ang_moms.first});
+
+    const auto b_dims = _b_loc_indices[0] * tensor::number_of_spherical_components(std::array<int, 1>{bra_ang_moms.second});
+
+    const auto c_dims = _c_loc_indices[0] * tensor::number_of_spherical_components(std::array<int, 1>{ket_ang_moms.first});
+
+    const auto d_dims = _d_loc_indices[0] * tensor::number_of_spherical_components(std::array<int, 1>{ket_ang_moms.second});
+    
+    std::cout << " *** DISTRIBUTOR(" << bra_ang_moms.first << "," << bra_ang_moms.second << "|" << ket_ang_moms.first << "," << ket_ang_moms.second << ") ***" << std::endl;
     
     std::cout << "A local indices:" << std::endl;
     
@@ -87,16 +113,6 @@ CT4CMatrixDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, cons
     for (const auto idx : _d_loc_indices) std::cout << idx << " ";
     
     std::cout << std::endl;
-
-    // set up global indices
-
-    _a_glob_indices = t4cfunc::compresed_indices(bra_gto_pair_block.bra_orbital_indices());
-
-    _b_glob_indices = t4cfunc::compresed_indices(bra_gto_pair_block.ket_orbital_indices());
-
-    _c_glob_indices = t4cfunc::compresed_indices(ket_gto_pair_block.bra_orbital_indices());
-
-    _d_glob_indices = t4cfunc::compresed_indices(ket_gto_pair_block.ket_orbital_indices());
     
     std::cout << "A global indices:" << std::endl;
     
@@ -121,20 +137,6 @@ CT4CMatrixDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, cons
     for (const auto idx : _d_glob_indices) std::cout << idx << " ";
     
     std::cout << std::endl;
-
-    // set up local matrices
-
-    const auto bra_ang_moms = bra_gto_pair_block.angular_momentums();
-
-    const auto ket_ang_moms = ket_gto_pair_block.angular_momentums();
-
-    const auto a_dims = _a_loc_indices[0] * tensor::number_of_spherical_components(std::array<int, 1>{bra_ang_moms.first});
-
-    const auto b_dims = _b_loc_indices[0] * tensor::number_of_spherical_components(std::array<int, 1>{bra_ang_moms.second});
-
-    const auto c_dims = _c_loc_indices[0] * tensor::number_of_spherical_components(std::array<int, 1>{ket_ang_moms.first});
-
-    const auto d_dims = _d_loc_indices[0] * tensor::number_of_spherical_components(std::array<int, 1>{ket_ang_moms.second});
 
     // adds submatrices storage
 
@@ -385,7 +387,7 @@ CT4CMatrixDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, const
 
                 const auto qr_pair = std::pair<int, int>({bra_ang_moms.second, ket_ang_moms.first});
 
-                const auto qs_pair = std::pair<int, int>({bra_ang_moms.second, ket_ang_moms.first});
+                const auto qs_pair = std::pair<int, int>({bra_ang_moms.second, ket_ang_moms.second});
 
                 // set up Fock submatrices
 
@@ -439,6 +441,28 @@ CT4CMatrixDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, const
                                     c_comps,
                                     angord_qr);
 
+                std::cout  << " ANGPAIR_PR : " << angord_pr << " ANGPAIR_PS : " << angord_ps <<  " ANGPAIR_QR : " << angord_qr << " ANGPAIR_QS : " << angord_qs << std::endl;
+                
+                std::cout << "QS local dimensions: ";
+                
+                std::cout << _matrices.matrix("QS")->sub_matrix({0, 0})->get_dimensions()[0] << ",";
+                
+                std::cout << _matrices.matrix("QS")->sub_matrix({0, 0})->get_dimensions()[1] << ",";
+                
+                std::cout << _matrices.matrix("QS")->sub_matrix({0, 0})->get_dimensions()[2] << ",";
+                
+                std::cout << _matrices.matrix("QS")->sub_matrix({0, 0})->get_dimensions()[3] << std::endl;
+                
+                std::cout << "QS global dimensions: ";
+                
+                std::cout << submat_qs->get_dimensions()[0] << ",";
+                
+                std::cout << submat_qs->get_dimensions()[1] << ",";
+                
+                std::cout << submat_qs->get_dimensions()[2] << ",";
+                
+                std::cout << submat_qs->get_dimensions()[3] << std::endl;
+                
                 t4cfunc::accumulate(submat_qs,
                                     _matrices.matrix("QS")->sub_matrix({0, 0}),
                                     _b_loc_indices,
