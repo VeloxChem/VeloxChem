@@ -88,55 +88,55 @@ CT4CMatrixDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, cons
 
     const auto d_dims = _d_loc_indices[0] * tensor::number_of_spherical_components(std::array<int, 1>{ket_ang_moms.second});
     
-    std::cout << " *** DISTRIBUTOR(" << bra_ang_moms.first << "," << bra_ang_moms.second << "|" << ket_ang_moms.first << "," << ket_ang_moms.second << ") ***" << std::endl;
-    
-    std::cout << "A local indices:" << std::endl;
-    
-    for (const auto idx : _a_loc_indices) std::cout << idx << " ";
-    
-    std::cout << std::endl;
-    
-    std::cout << "B local indices:" << std::endl;
-    
-    for (const auto idx : _b_loc_indices) std::cout << idx << " ";
-    
-    std::cout << std::endl;
-    
-    std::cout << "C local indices:" << std::endl;
-    
-    for (const auto idx : _c_loc_indices) std::cout << idx << " ";
-    
-    std::cout << std::endl;
-    
-    std::cout << "D local indices:" << std::endl;
-    
-    for (const auto idx : _d_loc_indices) std::cout << idx << " ";
-    
-    std::cout << std::endl;
-    
-    std::cout << "A global indices:" << std::endl;
-    
-    for (const auto idx : _a_glob_indices) std::cout << idx << " ";
-    
-    std::cout << std::endl;
-    
-    std::cout << "B global indices:" << std::endl;
-    
-    for (const auto idx : _b_glob_indices) std::cout << idx << " ";
-    
-    std::cout << std::endl;
-    
-    std::cout << "C global indices:" << std::endl;
-    
-    for (const auto idx : _c_glob_indices) std::cout << idx << " ";
-    
-    std::cout << std::endl;
-    
-    std::cout << "D global indices:" << std::endl;
-    
-    for (const auto idx : _d_glob_indices) std::cout << idx << " ";
-    
-    std::cout << std::endl;
+//    std::cout << " *** DISTRIBUTOR(" << bra_ang_moms.first << "," << bra_ang_moms.second << "|" << ket_ang_moms.first << "," << ket_ang_moms.second << ") ***" << std::endl;
+//    
+//    std::cout << "A local indices:" << std::endl;
+//    
+//    for (const auto idx : _a_loc_indices) std::cout << idx << " ";
+//    
+//    std::cout << std::endl;
+//    
+//    std::cout << "B local indices:" << std::endl;
+//    
+//    for (const auto idx : _b_loc_indices) std::cout << idx << " ";
+//    
+//    std::cout << std::endl;
+//    
+//    std::cout << "C local indices:" << std::endl;
+//    
+//    for (const auto idx : _c_loc_indices) std::cout << idx << " ";
+//    
+//    std::cout << std::endl;
+//    
+//    std::cout << "D local indices:" << std::endl;
+//    
+//    for (const auto idx : _d_loc_indices) std::cout << idx << " ";
+//    
+//    std::cout << std::endl;
+//    
+//    std::cout << "A global indices:" << std::endl;
+//    
+//    for (const auto idx : _a_glob_indices) std::cout << idx << " ";
+//    
+//    std::cout << std::endl;
+//    
+//    std::cout << "B global indices:" << std::endl;
+//    
+//    for (const auto idx : _b_glob_indices) std::cout << idx << " ";
+//    
+//    std::cout << std::endl;
+//    
+//    std::cout << "C global indices:" << std::endl;
+//    
+//    for (const auto idx : _c_glob_indices) std::cout << idx << " ";
+//    
+//    std::cout << std::endl;
+//    
+//    std::cout << "D global indices:" << std::endl;
+//    
+//    for (const auto idx : _d_glob_indices) std::cout << idx << " ";
+//    
+//    std::cout << std::endl;
 
     // adds submatrices storage
 
