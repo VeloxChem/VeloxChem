@@ -6,7 +6,7 @@ from .molecule import Molecule
 from .symmetryoperations import (Inversion, Rotation, Reflection,
                                  ImproperRotation)
 from .symmetryoperations import rotation_matrix
-from .errorhandler import assert_msg_critical, safe_arccos
+from .errorhandler import assert_msg_critical, safe_arccos, safe_arcsin
 
 
 class SymmetryAnalyzer:
@@ -154,11 +154,8 @@ class SymmetryAnalyzer:
             self._tolerance_eig = 0.1
             self._tolerance_ang = np.radians(3.0)
         elif tolerance == 'very tight':
-            self._tolerance_eig = 0.002
-            self._tolerance_ang = np.radians(2.0)
-        else:
-            raise KeyError(
-                "SymmetryAnalyzer: Tolerance criterion not available.")
+            self._tolerance_eig = 0.008
+            self._tolerance_ang = np.radians(0.2)
 
         # Read and express geometry in center of mass (COM) frame
         # Geom and COM in bohr because moments of inertia are defined in bohr
@@ -249,7 +246,52 @@ class SymmetryAnalyzer:
                       ', '.join(results_dict["expected_symmetry_elements"]))
 
     @staticmethod
-    def _reorder_symmetry_elements(symmetry_elements_list):
+    def _get_sym_op_name(sym_elem):
+        """
+        Get name of symmetry operation from symmetry element.
+
+        :param sym_elem:
+            The symmetry element.
+
+        :return:
+            The name of symmetry operation.
+        """
+
+        m = re.search(r'(\d*)(\D+.*)$', sym_elem)
+        # n_sym_ops = 1
+        # if m.group(1):
+        #     n_sym_ops = int(m.group(1))
+        sym_op_name = m.group(2)
+        return sym_op_name
+
+    @staticmethod
+    def _is_rotation(sym_op_name):
+        """
+        Check if symmetry operation is rotation (Cn).
+
+        :param sym_op_name:
+            The name of symmetry operation.
+
+        :return:
+            True if the symmetry operation is rotation, False otherwise.
+        """
+        return (sym_op_name.startswith('C') and sym_op_name[1:].isdigit())
+
+    @staticmethod
+    def _is_improper_rotation(sym_op_name):
+        """
+        Check if symmetry operation is impropert rotation (Sn).
+
+        :param sym_op_name:
+            The name of symmetry operation.
+
+        :return:
+            True if the symmetry operation is improper rotation, False
+            otherwise.
+        """
+        return (sym_op_name.startswith('S') and sym_op_name[1:].isdigit())
+
+    def _reorder_symmetry_elements(self, symmetry_elements_list):
         """
         Reorder a list of symmetry elements based on order and type of symmetry
         element. ImproperRotation and Rotation are prioritized.
@@ -261,23 +303,14 @@ class SymmetryAnalyzer:
             The reordered list. Example: ['2S4', '3C2', 'E']
         """
 
-        def get_op_name(sym_elem):
-            m = re.search(r'(\d*)(\D+.*)$', sym_elem)
-            return m.group(2)
-
-        def is_improper_rotation(sym_op_name):
-            return (sym_op_name.startswith('S') and sym_op_name[1:].isdigit())
-
-        def is_rotation(sym_op_name):
-            return (sym_op_name.startswith('C') and sym_op_name[1:].isdigit())
-
         reordered_symmetry_elements = []
 
         # find maximum order
         max_op_order = 0
         for sym_elem in symmetry_elements_list:
-            sym_op_name = get_op_name(sym_elem)
-            if is_improper_rotation(sym_op_name) or is_rotation(sym_op_name):
+            sym_op_name = self._get_sym_op_name(sym_elem)
+            if (self._is_improper_rotation(sym_op_name) or
+                    self._is_rotation(sym_op_name)):
                 op_order = int(sym_op_name[1:])
                 if max_op_order < op_order:
                     max_op_order = op_order
@@ -287,22 +320,22 @@ class SymmetryAnalyzer:
         for op_order in range(max_op_order, 0, -1):
 
             for sym_elem in symmetry_elements_list:
-                sym_op_name = get_op_name(sym_elem)
-                if (is_improper_rotation(sym_op_name) and
+                sym_op_name = self._get_sym_op_name(sym_elem)
+                if (self._is_improper_rotation(sym_op_name) and
                         int(sym_op_name[1:]) == op_order):
                     reordered_symmetry_elements.append(sym_elem)
 
             for sym_elem in symmetry_elements_list:
-                sym_op_name = get_op_name(sym_elem)
-                if (is_rotation(sym_op_name) and
+                sym_op_name = self._get_sym_op_name(sym_elem)
+                if (self._is_rotation(sym_op_name) and
                         int(sym_op_name[1:]) == op_order):
                     reordered_symmetry_elements.append(sym_elem)
 
         # add the remaining elements
         for sym_elem in symmetry_elements_list:
-            sym_op_name = get_op_name(sym_elem)
-            if not (is_improper_rotation(sym_op_name) or
-                    is_rotation(sym_op_name)):
+            sym_op_name = self._get_sym_op_name(sym_elem)
+            if not (self._is_improper_rotation(sym_op_name) or
+                    self._is_rotation(sym_op_name)):
                 reordered_symmetry_elements.append(sym_elem)
 
         return reordered_symmetry_elements
@@ -339,40 +372,40 @@ class SymmetryAnalyzer:
 
         mol_grid_points = self._get_mol_grid_points()
 
+        # note: special ordering of checks for spherical case
+        if point_group[0] in ['T', 'O', 'I']:
+            mol_grid_points = list(reversed(mol_grid_points))
+
         for sym_elem in symmetry_elements_list:
             if sym_elem == 'E':
                 continue
 
-            m = re.search(r'(\d*)(\D+.*)$', sym_elem)
-            # n_sym_ops = 1
-            # if m.group(1):
-            #     n_sym_ops = int(m.group(1))
-            sym_op_name = m.group(2)
+            sym_op_name = self._get_sym_op_name(sym_elem)
 
             # find rotation and improper rotation axes
-            if (sym_op_name.startswith('C') or
-                    sym_op_name.startswith('S')) and sym_op_name[1:].isdigit():
-                if sym_op_name.startswith('C'):
-                    m = re.search(r'^C(\d+)$', sym_op_name)
-                elif sym_op_name.startswith('S'):
-                    m = re.search(r'^S(\d+)$', sym_op_name)
-                order = int(m.group(1))
+            if self._is_rotation(sym_op_name) or self._is_improper_rotation(
+                    sym_op_name):
+                order = int(sym_op_name[1:])
                 assert_msg_critical(
                     order > 1, 'SymmetryAnalyzer.symmetrize_pointgroup: ' +
                     'Rotation order must be greater than 1')
 
                 for axis in mol_grid_points:
                     for power in range(1, order):
-                        if sym_op_name.startswith('C'):
+                        if self._is_rotation(sym_op_name):
                             sym_op = Rotation(axis, order=order, power=power)
-                        elif sym_op_name.startswith('S'):
+                        elif self._is_improper_rotation(sym_op_name):
                             sym_op = ImproperRotation(axis,
                                                       order=order,
                                                       power=power)
+
                         sym_op_exists = self._check_symmetry_operation(
                             sym_op, sym_op_name, mapping=True)
+
+                        # if Cn does not exist, skip Cn^2 etc.
                         if power == 1 and not sym_op_exists:
                             break
+
                         for pair in self._mapping:
                             symmetry_mapping.add(pair)
                         symmetry_operations.append(sym_op)
@@ -646,8 +679,8 @@ class SymmetryAnalyzer:
                 break
 
         p_axis = self._get_perpendicular(principal_axis)
-        for angle in np.arange(0, np.pi + self._tolerance_ang,
-                               0.01 * np.pi / 2):
+        for angle in np.arange(0, np.pi + 0.1 * self._tolerance_ang,
+                               0.1 * self._tolerance_ang):
             axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
             c2 = Rotation(axis, order=2)
             if self._check_symmetry_operation(c2, "C2_p"):
@@ -685,8 +718,8 @@ class SymmetryAnalyzer:
         # Get the perpendicualar axis to principal axis and check for C2 rotation axis
         # along p_axis by rotating p_axis along the principal axis
         p_axis = self._get_perpendicular(principal_axis)
-        for angle in np.arange(0, np.pi + self._tolerance_ang,
-                               0.01 * np.pi / self._max_order):
+        for angle in np.arange(0, np.pi + 0.1 * self._tolerance_ang,
+                               0.1 * self._tolerance_ang):
             axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
             c2 = Rotation(axis, order=2)
             if self._check_symmetry_operation(c2, "C2_p"):
@@ -765,12 +798,13 @@ class SymmetryAnalyzer:
                 """
 
                 r_matrix = rotation_matrix(
-                    p_axis_base, np.arcsin((np.sqrt(5) + 1) / (2 * np.sqrt(3))))
+                    p_axis_base,
+                    safe_arcsin((np.sqrt(5.0) + 1) / (2 * np.sqrt(3.0))))
                 axis = np.dot(principal_axis, r_matrix.T)
 
                 # set molecule orientation in I
-                for angle in np.arange(0, 2 * np.pi + self._tolerance_ang,
-                                       self._tolerance_ang):
+                for angle in np.arange(0, 2 * np.pi + 0.1 * self._tolerance_ang,
+                                       0.1 * self._tolerance_ang):
                     rot_matrix = rotation_matrix(principal_axis, angle)
 
                     c5_axis = np.dot(axis, rot_matrix.T)
@@ -804,8 +838,8 @@ class SymmetryAnalyzer:
 
             # Check for a C2 axis perpendicular to the first one (for reorientation)
             C2_p_axis = self._get_perpendicular(another_axis)
-            for angle in np.arange(0, np.pi + self._tolerance_ang,
-                                   0.01 * np.pi / 2):
+            for angle in np.arange(0, np.pi + 0.1 * self._tolerance_ang,
+                                   0.1 * self._tolerance_ang):
                 h_axis = np.dot(C2_p_axis, rotation_matrix(another_axis, angle))
                 if self._check_symmetry_operation(Rotation(h_axis, order=2),
                                                   "C2_p"):
@@ -830,8 +864,8 @@ class SymmetryAnalyzer:
                 r_matrix = rotation_matrix(p_axis_base, np.pi / 2)
                 axis = np.dot(principal_axis, r_matrix.T)
 
-                for angle in np.arange(0, 2 * np.pi + self._tolerance_ang,
-                                       self._tolerance_ang):
+                for angle in np.arange(0, 2 * np.pi + 0.1 * self._tolerance_ang,
+                                       0.1 * self._tolerance_ang):
                     rot_matrix = rotation_matrix(principal_axis, angle)
 
                     c4_axis = np.dot(axis, rot_matrix.T)
@@ -862,8 +896,8 @@ class SymmetryAnalyzer:
 
             # Check for a C2 axis perpendicular to the first one (for reorientation)
             C2_p_axis = self._get_perpendicular(principal_axis)
-            for angle in np.arange(0, np.pi + self._tolerance_ang,
-                                   0.01 * np.pi / 2):
+            for angle in np.arange(0, np.pi + 0.1 * self._tolerance_ang,
+                                   0.1 * self._tolerance_ang):
                 h_axis = np.dot(C2_p_axis,
                                 rotation_matrix(principal_axis, angle))
                 if self._check_symmetry_operation(Rotation(h_axis, order=2),
@@ -888,8 +922,8 @@ class SymmetryAnalyzer:
                 r_matrix = rotation_matrix(p_axis_base, -np.arccos(-1 / 3))
                 axis = np.dot(principal_axis, r_matrix.T)
 
-                for angle in np.arange(0, 2 * np.pi + self._tolerance_ang,
-                                       self._tolerance_ang):
+                for angle in np.arange(0, 2 * np.pi + 0.1 * self._tolerance_ang,
+                                       0.1 * self._tolerance_ang):
                     rot_matrix = rotation_matrix(principal_axis, angle)
 
                     c3_axis = np.dot(axis, rot_matrix.T)
@@ -914,8 +948,8 @@ class SymmetryAnalyzer:
 
             # Check for a C2 axis perpendicular to the first one (for reorientation)
             C2_p_axis = self._get_perpendicular(principal_axis)
-            for angle in np.arange(0, np.pi + self._tolerance_ang,
-                                   0.01 * np.pi / 2):
+            for angle in np.arange(0, np.pi + 0.1 * self._tolerance_ang,
+                                   0.1 * self._tolerance_ang):
                 h_axis = np.dot(C2_p_axis,
                                 rotation_matrix(principal_axis, angle))
                 if self._check_symmetry_operation(Rotation(h_axis, order=2),
@@ -930,8 +964,8 @@ class SymmetryAnalyzer:
 
             # Check for any reflexion plane
             # C2_p_axis = self._get_perpendicular(principal_axis)
-            for angle in np.arange(0, np.pi + self._tolerance_ang,
-                                   0.01 * np.pi / 2):
+            for angle in np.arange(0, np.pi + 0.1 * self._tolerance_ang,
+                                   0.1 * self._tolerance_ang):
                 h_axis = np.dot(C2_p_axis,
                                 rotation_matrix(principal_axis, angle))
                 if self._check_symmetry_operation(Reflection(h_axis),
@@ -993,8 +1027,8 @@ class SymmetryAnalyzer:
 
         # Check for reflexion planes containing the principal axis
         v_symbol = set()
-        for angle in np.arange(
-                0, np.pi, 0.01 * np.pi / self._max_order + self._tolerance_ang):
+        for angle in np.arange(0, np.pi + 0.1 * self._tolerance_ang,
+                               0.1 * self._tolerance_ang):
             axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
             if self._check_symmetry_operation(Reflection(axis),
                                               "sigma_v") and not h_symbols:
@@ -1047,8 +1081,8 @@ class SymmetryAnalyzer:
 
         # Check for reflexion planes containing the principal axis
         d_symbol = False
-        for angle in np.arange(0, np.pi + self._tolerance_ang,
-                               0.01 * np.pi / self._max_order):
+        for angle in np.arange(0, np.pi + 0.1 * self._tolerance_ang,
+                               0.1 * self._tolerance_ang):
             axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
             if self._check_symmetry_operation(
                     Reflection(axis),
@@ -1058,31 +1092,34 @@ class SymmetryAnalyzer:
 
     def _get_axis_rot_order(self, axis, n_max):
         """
-            Get rotation order for a given axis.
+        Get rotation order for a given axis.
 
-            :param axis:
-                The axis.
+        :param axis:
+            The axis.
+        :param n_max:
+            Maximum order to scan.
 
-            :param n_max:
-                Maximum order to scan.
-
-            :return:
-                The order.
-            """
+        :return:
+            The order.
+        """
 
         def max_rotation_order(tolerance):
             """
-                Set the range of maximum order possible.
+            Get the maximum order possible.
 
-                :param tolerance:
-                    The tolerance parameter.
-                """
+            :param tolerance:
+                The tolerance parameter.
+            """
 
-            for i in range(2, 15):
+            for i in range(2, 99):
                 if 2 * np.pi / (i * (i - 1)) <= tolerance:
                     return i - 1
+            return None
 
-        n_max = np.min([max_rotation_order(self._tolerance_ang), n_max])
+        tol_max_order = max_rotation_order(self._tolerance_ang)
+
+        if tol_max_order is not None:
+            n_max = min(tol_max_order, n_max)
 
         for i in range(n_max, 1, -1):
             Cn = Rotation(axis, order=i)
@@ -1231,16 +1268,16 @@ class SymmetryAnalyzer:
 
         points = []
 
-        # principal axes
-        for i in range(3):
-            vec = np.array(Ivecs[i])
+        # atoms
+        for i in range(self._natoms):
+            vec = np.array(self._centered_coords[i])
             norm = np.linalg.norm(vec)
             if norm > 1e-8:
                 points.append(vec / norm)
 
-        # atoms
-        for i in range(self._natoms):
-            vec = np.array(self._centered_coords[i])
+        # principal axes
+        for i in range(3):
+            vec = np.array(Ivecs[i])
             norm = np.linalg.norm(vec)
             if norm > 1e-8:
                 points.append(vec / norm)
@@ -1262,11 +1299,16 @@ class SymmetryAnalyzer:
             if norm > 1e-8:
                 points.append(vec / norm)
 
-        # centers of bonds
-        for i in range(self._natoms):
-            for j in range(i + 1, self._natoms):
-                if (connectivity_matrix[i][j] == 1 and
-                        self._symbols[i] == self._symbols[j]):
+        # centers of bonds between same elements
+        # only used for small molecule
+        # include non-bonded pairs for very small molecule (natoms <= 20)
+        if self._natoms <= 100:
+            for i in range(self._natoms):
+                for j in range(i + 1, self._natoms):
+                    if self._symbols[i] != self._symbols[j]:
+                        continue
+                    if self._natoms > 20 and connectivity_matrix[i][j] != 1:
+                        continue
                     vec = 0.5 * (self._centered_coords[i] +
                                  self._centered_coords[j])
                     norm = np.linalg.norm(vec)
