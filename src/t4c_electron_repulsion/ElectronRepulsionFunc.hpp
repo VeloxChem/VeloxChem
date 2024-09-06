@@ -1772,7 +1772,7 @@ compute(      T&                  distributor,
         (ket_angmoms == std::pair<int, int>({1, 2})))
     {
         erirec::comp_electron_repulsion_ggpd(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices, bra_eq_ket);
-            return;
+        return;
     }
 
     if ((bra_angmoms == std::pair<int, int>({4, 4})) &&

@@ -520,15 +520,13 @@ accumulate(CSubMatrix*             glob_matrix,
                 {
                     const auto lg = ket_goff + ket_glob_indices[l + 1];
                     
-                    //std::cout << kg << ", " << lg << " = " << bra_loff + k << " , " <<  ket_loff + l << std::endl;
-
                     if (ang_order)
                     {
                         glob_matrix->operator[]({kg, lg}) += loc_matrix->at({bra_loff + k, ket_loff + l});
                     }
                     else
                     {
-                        glob_matrix->operator[]({lg, kg}) += loc_matrix->at({ket_loff + l, bra_loff + k});
+                        glob_matrix->operator[]({lg, kg}) += loc_matrix->at({bra_loff + k, ket_loff + l});
                     }
                 }
             }
