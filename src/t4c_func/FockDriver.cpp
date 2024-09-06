@@ -63,7 +63,7 @@ CFockDriver::compute(const CMolecularBasis& basis,
                         
                         erifunc::compute<CT4CMatrixDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range, i == j);
                         
-                        //distributor.accumulate(bra_gpairs, ket_gpairs); 
+                        distributor.accumulate(bra_gpairs, ket_gpairs); 
                     }
                 }
             }

@@ -277,6 +277,8 @@ CT4CMatrixDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, cons
                           "SQ");
         }
     }
+    
+    _matrices.zero();
 }
 
 auto
@@ -441,27 +443,27 @@ CT4CMatrixDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, const
                                     c_comps,
                                     angord_qr);
 
-                std::cout  << " ANGPAIR_PR : " << angord_pr << " ANGPAIR_PS : " << angord_ps <<  " ANGPAIR_QR : " << angord_qr << " ANGPAIR_QS : " << angord_qs << std::endl;
-                
-                std::cout << "QS local dimensions: ";
-                
-                std::cout << _matrices.matrix("QS")->sub_matrix({0, 0})->get_dimensions()[0] << ",";
-                
-                std::cout << _matrices.matrix("QS")->sub_matrix({0, 0})->get_dimensions()[1] << ",";
-                
-                std::cout << _matrices.matrix("QS")->sub_matrix({0, 0})->get_dimensions()[2] << ",";
-                
-                std::cout << _matrices.matrix("QS")->sub_matrix({0, 0})->get_dimensions()[3] << std::endl;
-                
-                std::cout << "QS global dimensions: ";
-                
-                std::cout << submat_qs->get_dimensions()[0] << ",";
-                
-                std::cout << submat_qs->get_dimensions()[1] << ",";
-                
-                std::cout << submat_qs->get_dimensions()[2] << ",";
-                
-                std::cout << submat_qs->get_dimensions()[3] << std::endl;
+//                std::cout  << " ANGPAIR_PR : " << angord_pr << " ANGPAIR_PS : " << angord_ps <<  " ANGPAIR_QR : " << angord_qr << " ANGPAIR_QS : " << angord_qs << std::endl;
+//
+//                std::cout << "QS local dimensions: ";
+//
+//                std::cout << _matrices.matrix("QS")->sub_matrix({0, 0})->get_dimensions()[0] << ",";
+//
+//                std::cout << _matrices.matrix("QS")->sub_matrix({0, 0})->get_dimensions()[1] << ",";
+//                
+//                std::cout << _matrices.matrix("QS")->sub_matrix({0, 0})->get_dimensions()[2] << ",";
+//
+//                std::cout << _matrices.matrix("QS")->sub_matrix({0, 0})->get_dimensions()[3] << std::endl;
+//
+//                std::cout << "QS global dimensions: ";
+//
+//                std::cout << submat_qs->get_dimensions()[0] << ",";
+//
+//                std::cout << submat_qs->get_dimensions()[1] << ",";
+//
+//                std::cout << submat_qs->get_dimensions()[2] << ",";
+//
+//                std::cout << submat_qs->get_dimensions()[3] << std::endl;
                 
                 t4cfunc::accumulate(submat_qs,
                                     _matrices.matrix("QS")->sub_matrix({0, 0}),
