@@ -136,6 +136,8 @@ comp_electron_repulsion_sspf(T& distributor,
 
         cfactors.replicate_points(d_coords, ket_range, 3, 1);
 
+        t4cfunc::comp_distances_cd(cfactors, 6, 0, 3);
+
         // set up active SIMD width
 
         const auto ket_width = ket_range.second - ket_range.first;

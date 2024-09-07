@@ -10,7 +10,6 @@ from veloxchem import Matrices
 from veloxchem import make_matrix
 from veloxchem import mat_t
 
-
 class TestFockDriver:
 
     def get_data_h4(self):
@@ -40,11 +39,12 @@ class TestFockDriver:
     def get_data_h2o(self):
 
         h2ostr = """
-        O   0.0   0.0   0.0
-        H   0.0   1.4   1.1
-        H   0.0  -1.4   1.1
+            O    0.000000000000        0.000000000000        0.000000000000
+            H    0.000000000000        0.740848095288        0.582094932012
+            H    0.000000000000       -0.740848095288        0.582094932012
         """
-        mol = Molecule.read_str(h2ostr, 'au')
+
+        mol = Molecule.read_str(h2ostr, 'angstrom')
         bas = MolecularBasis.read(mol, 'sto-3g')
 
         return mol, bas
@@ -87,7 +87,7 @@ class TestFockDriver:
         
         ## compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(bas, mol, den_mat, "2jk", 0.0, 0.0)
+        #fock_mat = fock_drv.compute(bas, mol, den_mat, "2jk", 0.0, 0.0)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -113,9 +113,10 @@ class TestFockDriver:
             rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
                                                          sket:eket]))
             print(i,j)
-            print(np.max(cmat.to_numpy() - rmat.to_numpy()))
+            print(cmat.to_numpy())
+            print(rmat.to_numpy())
             # compare submatrices
-            #assert cmat == rmat
+            assert cmat == rmat
 
         # check full Fock matrix
         fmat = fock_mat.full_matrix()
@@ -142,7 +143,7 @@ class TestFockDriver:
 
         # load reference Fock matrix
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'h2o.sto3g.fock.2jk.npy')
+        npyfile = str(here / 'data' / 'h2o.sto3g.2jk.npy')
         ref_mat = np.load(npyfile)
         
         # dimension of molecular basis
@@ -163,10 +164,6 @@ class TestFockDriver:
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
             rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
                                                          sket:eket]))
-            print(i,j)
-            print(cmat.to_numpy())
-            print(rmat.to_numpy())
-            print(np.max(cmat.to_numpy() - rmat.to_numpy()))
             # compare submatrices
             assert cmat == rmat
 
@@ -175,6 +172,98 @@ class TestFockDriver:
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat))
         
-        assert False
+        assert fmat == fref
+        
+    def test_h2o_fock_j_sto3g(self):
+
+        mol_h2o, bas_sto3g = self.get_data_h2o()
+
+        # load density matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.sto3g.density.npy')
+        den_mat = make_matrix(bas_sto3g, mat_t.symmetric)
+        den_mat.set_values(np.load(npyfile))
+
+        # compute Fock matrix
+        fock_drv = FockDriver()
+        fock_mat = fock_drv.compute(bas_sto3g, mol_h2o, den_mat, "j", 0.0, 0.0)
+
+        # load reference Fock matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.sto3g.j.npy')
+        ref_mat = np.load(npyfile)
+        
+        # dimension of molecular basis
+        indexes = np.triu_indices(2)
+        basdims = [0, 4, 7]
+
+        # check individual overlap submatrices
+        for i, j in zip(indexes[0], indexes[1]):
+            # bra side
+            sbra = basdims[i]
+            ebra = basdims[i + 1]
+            # ket side
+            sket = basdims[j]
+            eket = basdims[j + 1]
+            # load computed submatrix
+            cmat = fock_mat.submatrix((i, j))
+            # load reference submatrix
+            rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
+                                                         sket:eket]))
+            # compare submatrices
+            assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat.full_matrix()
+        fref = SubMatrix([0, 0, 7, 7])
+        fref.set_values(np.ascontiguousarray(ref_mat))
+        
+        assert fmat == fref
+        
+    def test_h2o_fock_k_sto3g(self):
+
+        mol_h2o, bas_sto3g = self.get_data_h2o()
+
+        # load density matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.sto3g.density.npy')
+        den_mat = make_matrix(bas_sto3g, mat_t.symmetric)
+        den_mat.set_values(np.load(npyfile))
+
+        # compute Fock matrix
+        fock_drv = FockDriver()
+        fock_mat = fock_drv.compute(bas_sto3g, mol_h2o, den_mat, "k", 0.0, 0.0)
+
+        # load reference Fock matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.sto3g.k.npy')
+        ref_mat = np.load(npyfile)
+        
+        # dimension of molecular basis
+        indexes = np.triu_indices(2)
+        basdims = [0, 4, 7]
+
+        # check individual overlap submatrices
+        for i, j in zip(indexes[0], indexes[1]):
+            # bra side
+            sbra = basdims[i]
+            ebra = basdims[i + 1]
+            # ket side
+            sket = basdims[j]
+            eket = basdims[j + 1]
+            # load computed submatrix
+            cmat = fock_mat.submatrix((i, j))
+            # load reference submatrix
+            rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
+                                                         sket:eket]))
+            # compare submatrices
+            assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat.full_matrix()
+        fref = SubMatrix([0, 0, 7, 7])
+        fref.set_values(np.ascontiguousarray(ref_mat))
         
         assert fmat == fref

@@ -52,8 +52,6 @@ CT4CMatrixDistributor::get_omega() const -> double
 auto
 CT4CMatrixDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, const CGtoPairBlock& ket_gto_pair_block) -> void
 {
-    
-    
     // set up local indices
 
     _a_loc_indices = t4cfunc::masked_indices(bra_gto_pair_block.bra_orbital_indices());
@@ -320,6 +318,52 @@ CT4CMatrixDistributor::distribute(const CSimdArray<double>&        buffer,
                                               ket_range,
                                               diagonal);
         }
+        
+        if (_label == "j")
+        {
+            t4cfunc::local_distribute_rest_j(_matrices,
+                                              _density,
+                                              buffer,
+                                              offset,
+                                              a_indices,
+                                              b_indices,
+                                              c_indices,
+                                              d_indices,
+                                              _a_loc_indices,
+                                              _b_loc_indices,
+                                              _c_loc_indices,
+                                              _d_loc_indices,
+                                              a_angmom,
+                                              b_angmom,
+                                              c_angmom,
+                                              d_angmom,
+                                              ibra_gto,
+                                              ket_range,
+                                              diagonal);
+        }
+        
+        if (_label == "k")
+        {
+            t4cfunc::local_distribute_rest_k(_matrices,
+                                              _density,
+                                              buffer,
+                                              offset,
+                                              a_indices,
+                                              b_indices,
+                                              c_indices,
+                                              d_indices,
+                                              _a_loc_indices,
+                                              _b_loc_indices,
+                                              _c_loc_indices,
+                                              _d_loc_indices,
+                                              a_angmom,
+                                              b_angmom,
+                                              c_angmom,
+                                              d_angmom,
+                                              ibra_gto,
+                                              ket_range,
+                                              diagonal);
+        }
     }
 }
 
@@ -355,7 +399,53 @@ CT4CMatrixDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, const
                 const auto angord_pq = _fock->is_angular_order(bra_ang_moms);
 
                 const auto angord_rs = _fock->is_angular_order(ket_ang_moms);
-
+                
+//                // debug setup
+//                
+//                std::cout.precision(12);
+//                
+//                std::cout.setf(std::ios::fixed, std:: ios::floatfield);
+//                
+//                // debug PQ matrix
+//                
+//                auto rmat = _matrices.matrix("PQ")->sub_matrix({0, 0});
+//                
+//                auto rdims = rmat->get_dimensions();
+//                
+//                std::cout << "PQ matrix : " << rdims[0] << "," <<rdims[1] << "," << rdims[2] <<"," << rdims[3] << std::endl;
+//                
+//                for (size_t i = 0; i < rdims[2]; i++)
+//                {
+//                    for (size_t j = 0; j < rdims[3]; j++)
+//                    {
+//                        std::cout << " " << rmat->at({i, j});
+//                    }
+//                    
+//                    std::cout << std::endl;
+//                }
+//                
+//                std::cout << std::endl;
+//                
+//                // debug RS matrix
+//                
+//                rmat = _matrices.matrix("RS")->sub_matrix({0, 0});
+//                
+//                rdims = rmat->get_dimensions();
+//                
+//                std::cout << "RS matrix : " << rdims[0] << "," <<rdims[1] << "," << rdims[2] <<"," << rdims[3] << std::endl;
+//                
+//                for (size_t i = 0; i < rdims[2]; i++)
+//                {
+//                    for (size_t j = 0; j < rdims[3]; j++)
+//                    {
+//                        std::cout << " " << rmat->at({i, j});
+//                    }
+//                    
+//                    std::cout << std::endl;
+//                }
+//                
+//                std::cout << std::endl;
+                
                 // acummulate contributions to Fock matrix
 
                 t4cfunc::accumulate(submat_pq,
@@ -410,6 +500,86 @@ CT4CMatrixDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, const
                 const auto angord_qr = _fock->is_angular_order(qr_pair);
 
                 const auto angord_qs = _fock->is_angular_order(qs_pair);
+                
+//                // debug PR matrix
+//                
+//                auto rmat = _matrices.matrix("PR")->sub_matrix({0, 0});
+//                
+//                auto rdims = rmat->get_dimensions();
+//                
+//                std::cout << "PR matrix : " << rdims[0] << "," <<rdims[1] << "," << rdims[2] <<"," << rdims[3] << std::endl;
+//                
+//                for (size_t i = 0; i < rdims[2]; i++)
+//                {
+//                    for (size_t j = 0; j < rdims[3]; j++)
+//                    {
+//                        std::cout << " " << rmat->at({i, j});
+//                    }
+//                    
+//                    std::cout << std::endl;
+//                }
+//                
+//                std::cout << std::endl;
+//                
+//                // debug PS matrix
+//                
+//                rmat = _matrices.matrix("PS")->sub_matrix({0, 0});
+//                
+//                rdims = rmat->get_dimensions();
+//                
+//                std::cout << "PS matrix : " << rdims[0] << "," <<rdims[1] << "," << rdims[2] <<"," << rdims[3] << std::endl;
+//                
+//                for (size_t i = 0; i < rdims[2]; i++)
+//                {
+//                    for (size_t j = 0; j < rdims[3]; j++)
+//                    {
+//                        std::cout << " " << rmat->at({i, j});
+//                    }
+//                    
+//                    std::cout << std::endl;
+//                }
+//                
+//                std::cout << std::endl;
+//                
+//                // debug QR matrix
+//                
+//                rmat = _matrices.matrix("QR")->sub_matrix({0, 0});
+//                
+//                rdims = rmat->get_dimensions();
+//                
+//                std::cout << "QR matrix : " << rdims[0] << "," <<rdims[1] << "," << rdims[2] <<"," << rdims[3] << std::endl;
+//                
+//                for (size_t i = 0; i < rdims[2]; i++)
+//                {
+//                    for (size_t j = 0; j < rdims[3]; j++)
+//                    {
+//                        std::cout << " " << rmat->at({i, j});
+//                    }
+//                    
+//                    std::cout << std::endl;
+//                }
+//                
+//                std::cout << std::endl;
+//                
+//                // debug QS matrix
+//                
+//                rmat = _matrices.matrix("QS")->sub_matrix({0, 0});
+//                
+//                rdims = rmat->get_dimensions();
+//                
+//                std::cout << "QS matrix : " << rdims[0] << "," <<rdims[1] << "," << rdims[2] <<"," << rdims[3] << std::endl;
+//                
+//                for (size_t i = 0; i < rdims[2]; i++)
+//                {
+//                    for (size_t j = 0; j < rdims[3]; j++)
+//                    {
+//                        std::cout << " " << rmat->at({i, j});
+//                    }
+//                    
+//                    std::cout << std::endl;
+//                }
+//                
+//                std::cout << std::endl;
 
                 // acummulate contributions to Fock matrix
 
@@ -442,28 +612,6 @@ CT4CMatrixDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, const
                                     b_comps,
                                     c_comps,
                                     angord_qr);
-
-//                std::cout  << " ANGPAIR_PR : " << angord_pr << " ANGPAIR_PS : " << angord_ps <<  " ANGPAIR_QR : " << angord_qr << " ANGPAIR_QS : " << angord_qs << std::endl;
-//
-//                std::cout << "QS local dimensions: ";
-//
-//                std::cout << _matrices.matrix("QS")->sub_matrix({0, 0})->get_dimensions()[0] << ",";
-//
-//                std::cout << _matrices.matrix("QS")->sub_matrix({0, 0})->get_dimensions()[1] << ",";
-//                
-//                std::cout << _matrices.matrix("QS")->sub_matrix({0, 0})->get_dimensions()[2] << ",";
-//
-//                std::cout << _matrices.matrix("QS")->sub_matrix({0, 0})->get_dimensions()[3] << std::endl;
-//
-//                std::cout << "QS global dimensions: ";
-//
-//                std::cout << submat_qs->get_dimensions()[0] << ",";
-//
-//                std::cout << submat_qs->get_dimensions()[1] << ",";
-//
-//                std::cout << submat_qs->get_dimensions()[2] << ",";
-//
-//                std::cout << submat_qs->get_dimensions()[3] << std::endl;
                 
                 t4cfunc::accumulate(submat_qs,
                                     _matrices.matrix("QS")->sub_matrix({0, 0}),
