@@ -500,6 +500,8 @@ accumulate(CSubMatrix*             glob_matrix,
            const int               ket_comps,
            const bool              ang_order) -> void
 {
+    //std::cout << "*** Accumulate " << bra_comps << "," << ket_comps << " *** " << std::endl;
+    
     for (int i = 0; i < bra_comps; i++)
     {
         const auto bra_loff = i * bra_loc_indices[0];
@@ -510,15 +512,19 @@ accumulate(CSubMatrix*             glob_matrix,
         {
             const auto ket_loff = j * ket_loc_indices[0];
 
-            const auto ket_goff = j * ket_glob_indices[0];
+            const auto ket_goff = j * ket_glob_indices[0]; // this need fix for mixed basis
 
-            for (size_t k = 0; k < bra_loc_indices[0]; k++)
+           for (size_t k = 0; k < bra_loc_indices[0]; k++)
             {
                 const auto kg = bra_goff + bra_glob_indices[k + 1];
 
                 for (size_t l = 0; l < ket_loc_indices[0]; l++)
                 {
                     const auto lg = ket_goff + ket_glob_indices[l + 1];
+                    
+//                    std::cout << "(" << kg << "," << lg << ") = (" << bra_loff + k << "," << ket_loff + l << ") = ";
+//                    
+//                    std::cout << loc_matrix->at({bra_loff + k, ket_loff + l}) << std::endl;
                     
                     if (ang_order)
                     {
