@@ -425,11 +425,11 @@ comp_electron_repulsion_pdff(T& distributor,
 
             erirec::comp_ket_hrr_electron_repulsion_xxph(ckbuffer, 450, cbuffer, 150, 276, cfactors, 6, 0, 2);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxdf(ckbuffer, 828, cbuffer, 0, 0, cfactors, 6, 0, 2);
+            erirec::comp_ket_hrr_electron_repulsion_xxdf(ckbuffer, 828, 0, 180, cfactors, 6, 0, 2);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxdg(ckbuffer, 1188, cbuffer, 0, 0, cfactors, 6, 0, 2);
+            erirec::comp_ket_hrr_electron_repulsion_xxdg(ckbuffer, 1188, 180, 450, cfactors, 6, 0, 2);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxff(ckbuffer, 1728, cbuffer, 0, 0, cfactors, 6, 0, 2);
+            erirec::comp_ket_hrr_electron_repulsion_xxff(ckbuffer, 1728, 828, 1188, cfactors, 6, 0, 2);
 
             erirec::comp_ket_hrr_electron_repulsion_xxpf(ckbuffer, 2328, cbuffer, 444, 544, cfactors, 6, 0, 3);
 
@@ -437,15 +437,15 @@ comp_electron_repulsion_pdff(T& distributor,
 
             erirec::comp_ket_hrr_electron_repulsion_xxph(ckbuffer, 3078, cbuffer, 694, 904, cfactors, 6, 0, 3);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxdf(ckbuffer, 3708, cbuffer, 0, 0, cfactors, 6, 0, 3);
+            erirec::comp_ket_hrr_electron_repulsion_xxdf(ckbuffer, 3708, 2328, 2628, cfactors, 6, 0, 3);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxdg(ckbuffer, 4308, cbuffer, 0, 0, cfactors, 6, 0, 3);
+            erirec::comp_ket_hrr_electron_repulsion_xxdg(ckbuffer, 4308, 2628, 3078, cfactors, 6, 0, 3);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxff(ckbuffer, 5208, cbuffer, 0, 0, cfactors, 6, 0, 3);
+            erirec::comp_ket_hrr_electron_repulsion_xxff(ckbuffer, 5208, 3708, 4308, cfactors, 6, 0, 3);
 
             t4cfunc::ket_transform<3, 3>(skbuffer, 0, ckbuffer, 1728, 0, 2);
 
-            t4cfunc::ket_transform<3, 3>(skbuffer, 600, ckbuffer, 5208, 0, 3);
+            t4cfunc::ket_transform<3, 3>(skbuffer, 294, ckbuffer, 5208, 0, 3);
 
             erirec::comp_bra_hrr_electron_repulsion_pdxx(skbuffer, 784, 0, 294, r_ab, 3, 3);
 

@@ -504,11 +504,11 @@ comp_electron_repulsion_sgfg(T& distributor,
 
             erirec::comp_ket_hrr_electron_repulsion_xxpi(ckbuffer, 1620, cbuffer, 540, 960, cfactors, 6, 0, 4);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxdg(ckbuffer, 2880, cbuffer, 0, 0, cfactors, 6, 0, 4);
+            erirec::comp_ket_hrr_electron_repulsion_xxdg(ckbuffer, 2880, 0, 675, cfactors, 6, 0, 4);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxdh(ckbuffer, 4230, cbuffer, 0, 0, cfactors, 6, 0, 4);
+            erirec::comp_ket_hrr_electron_repulsion_xxdh(ckbuffer, 4230, 675, 1620, cfactors, 6, 0, 4);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxfg(ckbuffer, 6120, cbuffer, 0, 0, cfactors, 6, 0, 4);
+            erirec::comp_ket_hrr_electron_repulsion_xxfg(ckbuffer, 6120, 2880, 4230, cfactors, 6, 0, 4);
 
             t4cfunc::ket_transform<3, 4>(skbuffer, 0, ckbuffer, 6120, 0, 4);
 

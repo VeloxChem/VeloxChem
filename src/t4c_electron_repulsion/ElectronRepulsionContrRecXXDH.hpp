@@ -10,7 +10,6 @@ namespace erirec { // erirec namespace
 /// Computes (XX|1/|r-r'||DH)  integrals for set of data buffers.
 /// @param cbuffer The contracted integrals buffer.
 /// @param idx_xxdh The contracted integrals buffer.
-/// @param pbuffer The Cartesian integrals buffer.
 /// @param idx_xxph The contracted integrals buffer.
 /// @param idx_xxpi The contracted integrals buffer.
 /// @param factors The factors buffer.
@@ -20,7 +19,6 @@ namespace erirec { // erirec namespace
 auto
 comp_ket_hrr_electron_repulsion_xxdh(CSimdArray<double>& cbuffer,
                                      const size_t idx_xxdh,
-                                     CSimdArray<double>& pbuffer,
                                      const size_t idx_xxph,
                                      const size_t idx_xxpi,
                                      const CSimdArray<double>& factors,

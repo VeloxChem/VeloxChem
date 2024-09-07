@@ -284,7 +284,7 @@ comp_electron_repulsion_ssdg(T& distributor,
 
             erirec::comp_ket_hrr_electron_repulsion_xxph(ckbuffer, 45, cbuffer, 15, 36, cfactors, 6, 0, 0);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxdg(ckbuffer, 108, cbuffer, 0, 0, cfactors, 6, 0, 0);
+            erirec::comp_ket_hrr_electron_repulsion_xxdg(ckbuffer, 108, 0, 45, cfactors, 6, 0, 0);
 
             t4cfunc::ket_transform<2, 4>(skbuffer, 0, ckbuffer, 108, 0, 0);
 

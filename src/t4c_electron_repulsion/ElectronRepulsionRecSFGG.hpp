@@ -485,17 +485,17 @@ comp_electron_repulsion_sfgg(T& distributor,
 
             erirec::comp_ket_hrr_electron_repulsion_xxpk(ckbuffer, 1920, cbuffer, 640, 1000, cfactors, 6, 0, 3);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxdg(ckbuffer, 3000, cbuffer, 0, 0, cfactors, 6, 0, 3);
+            erirec::comp_ket_hrr_electron_repulsion_xxdg(ckbuffer, 3000, 0, 450, cfactors, 6, 0, 3);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxdh(ckbuffer, 3900, cbuffer, 0, 0, cfactors, 6, 0, 3);
+            erirec::comp_ket_hrr_electron_repulsion_xxdh(ckbuffer, 3900, 450, 1080, cfactors, 6, 0, 3);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxdi(ckbuffer, 5160, cbuffer, 0, 0, cfactors, 6, 0, 3);
+            erirec::comp_ket_hrr_electron_repulsion_xxdi(ckbuffer, 5160, 1080, 1920, cfactors, 6, 0, 3);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxfg(ckbuffer, 6840, cbuffer, 0, 0, cfactors, 6, 0, 3);
+            erirec::comp_ket_hrr_electron_repulsion_xxfg(ckbuffer, 6840, 3000, 3900, cfactors, 6, 0, 3);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxfh(ckbuffer, 8340, cbuffer, 0, 0, cfactors, 6, 0, 3);
+            erirec::comp_ket_hrr_electron_repulsion_xxfh(ckbuffer, 8340, 3900, 5160, cfactors, 6, 0, 3);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxgg(ckbuffer, 10440, cbuffer, 0, 0, cfactors, 6, 0, 3);
+            erirec::comp_ket_hrr_electron_repulsion_xxgg(ckbuffer, 10440, 6840, 8340, cfactors, 6, 0, 3);
 
             t4cfunc::ket_transform<4, 4>(skbuffer, 0, ckbuffer, 10440, 0, 3);
 

@@ -633,11 +633,11 @@ comp_electron_repulsion_fgpg(T& distributor,
 
             t4cfunc::ket_transform<1, 4>(skbuffer, 0, ckbuffer, 0, 0, 4);
 
-            t4cfunc::ket_transform<1, 4>(skbuffer, 675, ckbuffer, 675, 0, 5);
+            t4cfunc::ket_transform<1, 4>(skbuffer, 405, ckbuffer, 675, 0, 5);
 
-            t4cfunc::ket_transform<1, 4>(skbuffer, 1620, ckbuffer, 1620, 0, 6);
+            t4cfunc::ket_transform<1, 4>(skbuffer, 972, ckbuffer, 1620, 0, 6);
 
-            t4cfunc::ket_transform<1, 4>(skbuffer, 2880, ckbuffer, 2880, 0, 7);
+            t4cfunc::ket_transform<1, 4>(skbuffer, 1728, ckbuffer, 2880, 0, 7);
 
             erirec::comp_bra_hrr_electron_repulsion_pgxx(skbuffer, 2700, 0, 405, r_ab, 1, 4);
 
