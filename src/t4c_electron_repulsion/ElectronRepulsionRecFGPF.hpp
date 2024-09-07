@@ -591,11 +591,11 @@ comp_electron_repulsion_fgpf(T& distributor,
 
             t4cfunc::ket_transform<1, 3>(skbuffer, 0, ckbuffer, 0, 0, 4);
 
-            t4cfunc::ket_transform<1, 3>(skbuffer, 450, ckbuffer, 450, 0, 5);
+            t4cfunc::ket_transform<1, 3>(skbuffer, 315, ckbuffer, 450, 0, 5);
 
-            t4cfunc::ket_transform<1, 3>(skbuffer, 1080, ckbuffer, 1080, 0, 6);
+            t4cfunc::ket_transform<1, 3>(skbuffer, 756, ckbuffer, 1080, 0, 6);
 
-            t4cfunc::ket_transform<1, 3>(skbuffer, 1920, ckbuffer, 1920, 0, 7);
+            t4cfunc::ket_transform<1, 3>(skbuffer, 1344, ckbuffer, 1920, 0, 7);
 
             erirec::comp_bra_hrr_electron_repulsion_pgxx(skbuffer, 2100, 0, 315, r_ab, 1, 3);
 

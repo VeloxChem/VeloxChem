@@ -342,7 +342,7 @@ comp_electron_repulsion_pdpf(T& distributor,
 
             t4cfunc::ket_transform<1, 3>(skbuffer, 0, ckbuffer, 0, 0, 2);
 
-            t4cfunc::ket_transform<1, 3>(skbuffer, 180, ckbuffer, 180, 0, 3);
+            t4cfunc::ket_transform<1, 3>(skbuffer, 126, ckbuffer, 180, 0, 3);
 
             erirec::comp_bra_hrr_electron_repulsion_pdxx(skbuffer, 336, 0, 126, r_ab, 1, 3);
 

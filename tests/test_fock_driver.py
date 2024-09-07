@@ -28,11 +28,11 @@ class TestFockDriver:
     def get_data_co(self):
 
         costr = """
-            C   0.100  -0.400  -1.000
-            O   0.300   1.400  -2.100
+            C 0.0000 0.0000 0.0000
+            O 0.1000 0.3400 1.3100
         """
         mol = Molecule.read_str(costr, 'au')
-        bas = MolecularBasis.read(mol, 'def2-QZVP')
+        bas = MolecularBasis.read(mol, 'def2-svp')
 
         return mol, bas
         
@@ -81,22 +81,22 @@ class TestFockDriver:
 
         # load density matrix
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'co.qzvp.density.npy')
+        npyfile = str(here / 'data' / 'co.svp.density.npy')
         den_mat = make_matrix(bas, mat_t.symmetric)
         den_mat.set_values(np.load(npyfile))
         
         ## compute Fock matrix
         fock_drv = FockDriver()
-        #fock_mat = fock_drv.compute(bas, mol, den_mat, "2jk", 0.0, 0.0)
+        fock_mat = fock_drv.compute(bas, mol, den_mat, "2jk", 0.0, 0.0)
 
         # load reference Fock matrix
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'co.qzvp.fock.2j-k.npy')
+        npyfile = str(here / 'data' / 'co.svp.jk.npy')
         ref_mat = np.load(npyfile)
         
         # dimension of molecular basis
-        indexes = np.triu_indices(5)
-        basdims = [0, 14, 38, 68, 96, 114]
+        indexes = np.triu_indices(3)
+        basdims = [0, 6, 18, 28]
 
         # check individual overlap submatrices
         for i, j in zip(indexes[0], indexes[1]):
@@ -120,7 +120,7 @@ class TestFockDriver:
 
         # check full Fock matrix
         fmat = fock_mat.full_matrix()
-        fref = SubMatrix([0, 0, 114, 114])
+        fref = SubMatrix([0, 0, 28, 28])
         fref.set_values(np.ascontiguousarray(ref_mat))
         
         print(np.max(fmat.to_numpy() - fref.to_numpy()))

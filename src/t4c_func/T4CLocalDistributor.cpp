@@ -204,6 +204,11 @@ local_distribute_rest_jk(CMatrices&                       focks,
 
                         auto fval = curr_buffer[m - ket_range.first];
                         
+                        if ((a_angmom == 2) && (b_angmom == 2) && (c_angmom == 2) && (d_angmom == 2))
+                        {
+                            std::cout << "(" << p << "," <<  q << "|" << r << ", " << s  << ") = " << fval << std::endl;
+                        }
+                        
                        // std::cout << "local(" << loc_p << "," <<  loc_q << "," << loc_r << ", " << loc_s  << ") = ";
                         
                        // std::cout << "global(" << p << "," <<  q << "," << r << ", " << s  << ") = " << fval << std::endl;
@@ -458,7 +463,10 @@ local_distribute_rest_j(CMatrices&                       focks,
                         
                        // std::cout << "global(" << p << "," <<  q << "," << r << ", " << s  << ") = " << fval << std::endl;
                         
-                        // std::cout << "(" << p << "," <<  q << "|" << r << ", " << s  << ") = " << fval << std::endl;
+                        if ((a_angmom == 0) && (b_angmom == 0) && (c_angmom == 0) && (d_angmom == 2))
+                        {
+                            std::cout << "(" << p << "," <<  q << "|" << r << ", " << s  << ") = " << fval << std::endl;
+                        }
 
                         if (p == q) fval *= 0.5;
 

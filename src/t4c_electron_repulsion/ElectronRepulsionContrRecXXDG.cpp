@@ -7,7 +7,6 @@ namespace erirec { // erirec namespace
 auto
 comp_ket_hrr_electron_repulsion_xxdg(CSimdArray<double>& cbuffer,
                                      const size_t idx_xxdg,
-                                     CSimdArray<double>& pbuffer,
                                      const size_t idx_xxpg,
                                      const size_t idx_xxph,
                                      const CSimdArray<double>& factors,
@@ -37,211 +36,211 @@ comp_ket_hrr_electron_repulsion_xxdg(CSimdArray<double>& cbuffer,
 
             const auto pg_off = idx_xxpg + (i * bcomps + j) * 45;
 
-            auto g_x_xxxx = pbuffer.data(pg_off + 0);
+            auto g_x_xxxx = cbuffer.data(pg_off + 0);
 
-            auto g_x_xxxy = pbuffer.data(pg_off + 1);
+            auto g_x_xxxy = cbuffer.data(pg_off + 1);
 
-            auto g_x_xxxz = pbuffer.data(pg_off + 2);
+            auto g_x_xxxz = cbuffer.data(pg_off + 2);
 
-            auto g_x_xxyy = pbuffer.data(pg_off + 3);
+            auto g_x_xxyy = cbuffer.data(pg_off + 3);
 
-            auto g_x_xxyz = pbuffer.data(pg_off + 4);
+            auto g_x_xxyz = cbuffer.data(pg_off + 4);
 
-            auto g_x_xxzz = pbuffer.data(pg_off + 5);
+            auto g_x_xxzz = cbuffer.data(pg_off + 5);
 
-            auto g_x_xyyy = pbuffer.data(pg_off + 6);
+            auto g_x_xyyy = cbuffer.data(pg_off + 6);
 
-            auto g_x_xyyz = pbuffer.data(pg_off + 7);
+            auto g_x_xyyz = cbuffer.data(pg_off + 7);
 
-            auto g_x_xyzz = pbuffer.data(pg_off + 8);
+            auto g_x_xyzz = cbuffer.data(pg_off + 8);
 
-            auto g_x_xzzz = pbuffer.data(pg_off + 9);
+            auto g_x_xzzz = cbuffer.data(pg_off + 9);
 
-            auto g_x_yyyy = pbuffer.data(pg_off + 10);
+            auto g_x_yyyy = cbuffer.data(pg_off + 10);
 
-            auto g_x_yyyz = pbuffer.data(pg_off + 11);
+            auto g_x_yyyz = cbuffer.data(pg_off + 11);
 
-            auto g_x_yyzz = pbuffer.data(pg_off + 12);
+            auto g_x_yyzz = cbuffer.data(pg_off + 12);
 
-            auto g_x_yzzz = pbuffer.data(pg_off + 13);
+            auto g_x_yzzz = cbuffer.data(pg_off + 13);
 
-            auto g_x_zzzz = pbuffer.data(pg_off + 14);
+            auto g_x_zzzz = cbuffer.data(pg_off + 14);
 
-            auto g_y_xxxx = pbuffer.data(pg_off + 15);
+            auto g_y_xxxx = cbuffer.data(pg_off + 15);
 
-            auto g_y_xxxy = pbuffer.data(pg_off + 16);
+            auto g_y_xxxy = cbuffer.data(pg_off + 16);
 
-            auto g_y_xxxz = pbuffer.data(pg_off + 17);
+            auto g_y_xxxz = cbuffer.data(pg_off + 17);
 
-            auto g_y_xxyy = pbuffer.data(pg_off + 18);
+            auto g_y_xxyy = cbuffer.data(pg_off + 18);
 
-            auto g_y_xxyz = pbuffer.data(pg_off + 19);
+            auto g_y_xxyz = cbuffer.data(pg_off + 19);
 
-            auto g_y_xxzz = pbuffer.data(pg_off + 20);
+            auto g_y_xxzz = cbuffer.data(pg_off + 20);
 
-            auto g_y_xyyy = pbuffer.data(pg_off + 21);
+            auto g_y_xyyy = cbuffer.data(pg_off + 21);
 
-            auto g_y_xyyz = pbuffer.data(pg_off + 22);
+            auto g_y_xyyz = cbuffer.data(pg_off + 22);
 
-            auto g_y_xyzz = pbuffer.data(pg_off + 23);
+            auto g_y_xyzz = cbuffer.data(pg_off + 23);
 
-            auto g_y_xzzz = pbuffer.data(pg_off + 24);
+            auto g_y_xzzz = cbuffer.data(pg_off + 24);
 
-            auto g_y_yyyy = pbuffer.data(pg_off + 25);
+            auto g_y_yyyy = cbuffer.data(pg_off + 25);
 
-            auto g_y_yyyz = pbuffer.data(pg_off + 26);
+            auto g_y_yyyz = cbuffer.data(pg_off + 26);
 
-            auto g_y_yyzz = pbuffer.data(pg_off + 27);
+            auto g_y_yyzz = cbuffer.data(pg_off + 27);
 
-            auto g_y_yzzz = pbuffer.data(pg_off + 28);
+            auto g_y_yzzz = cbuffer.data(pg_off + 28);
 
-            auto g_y_zzzz = pbuffer.data(pg_off + 29);
+            auto g_y_zzzz = cbuffer.data(pg_off + 29);
 
-            auto g_z_xxxx = pbuffer.data(pg_off + 30);
+            auto g_z_xxxx = cbuffer.data(pg_off + 30);
 
-            auto g_z_xxxy = pbuffer.data(pg_off + 31);
+            auto g_z_xxxy = cbuffer.data(pg_off + 31);
 
-            auto g_z_xxxz = pbuffer.data(pg_off + 32);
+            auto g_z_xxxz = cbuffer.data(pg_off + 32);
 
-            auto g_z_xxyy = pbuffer.data(pg_off + 33);
+            auto g_z_xxyy = cbuffer.data(pg_off + 33);
 
-            auto g_z_xxyz = pbuffer.data(pg_off + 34);
+            auto g_z_xxyz = cbuffer.data(pg_off + 34);
 
-            auto g_z_xxzz = pbuffer.data(pg_off + 35);
+            auto g_z_xxzz = cbuffer.data(pg_off + 35);
 
-            auto g_z_xyyy = pbuffer.data(pg_off + 36);
+            auto g_z_xyyy = cbuffer.data(pg_off + 36);
 
-            auto g_z_xyyz = pbuffer.data(pg_off + 37);
+            auto g_z_xyyz = cbuffer.data(pg_off + 37);
 
-            auto g_z_xyzz = pbuffer.data(pg_off + 38);
+            auto g_z_xyzz = cbuffer.data(pg_off + 38);
 
-            auto g_z_xzzz = pbuffer.data(pg_off + 39);
+            auto g_z_xzzz = cbuffer.data(pg_off + 39);
 
-            auto g_z_yyyy = pbuffer.data(pg_off + 40);
+            auto g_z_yyyy = cbuffer.data(pg_off + 40);
 
-            auto g_z_yyyz = pbuffer.data(pg_off + 41);
+            auto g_z_yyyz = cbuffer.data(pg_off + 41);
 
-            auto g_z_yyzz = pbuffer.data(pg_off + 42);
+            auto g_z_yyzz = cbuffer.data(pg_off + 42);
 
-            auto g_z_yzzz = pbuffer.data(pg_off + 43);
+            auto g_z_yzzz = cbuffer.data(pg_off + 43);
 
-            auto g_z_zzzz = pbuffer.data(pg_off + 44);
+            auto g_z_zzzz = cbuffer.data(pg_off + 44);
 
             /// Set up components of auxilary buffer : SSPH
 
             const auto ph_off = idx_xxph + (i * bcomps + j) * 63;
 
-            auto g_x_xxxxx = pbuffer.data(ph_off + 0);
+            auto g_x_xxxxx = cbuffer.data(ph_off + 0);
 
-            auto g_x_xxxxy = pbuffer.data(ph_off + 1);
+            auto g_x_xxxxy = cbuffer.data(ph_off + 1);
 
-            auto g_x_xxxxz = pbuffer.data(ph_off + 2);
+            auto g_x_xxxxz = cbuffer.data(ph_off + 2);
 
-            auto g_x_xxxyy = pbuffer.data(ph_off + 3);
+            auto g_x_xxxyy = cbuffer.data(ph_off + 3);
 
-            auto g_x_xxxyz = pbuffer.data(ph_off + 4);
+            auto g_x_xxxyz = cbuffer.data(ph_off + 4);
 
-            auto g_x_xxxzz = pbuffer.data(ph_off + 5);
+            auto g_x_xxxzz = cbuffer.data(ph_off + 5);
 
-            auto g_x_xxyyy = pbuffer.data(ph_off + 6);
+            auto g_x_xxyyy = cbuffer.data(ph_off + 6);
 
-            auto g_x_xxyyz = pbuffer.data(ph_off + 7);
+            auto g_x_xxyyz = cbuffer.data(ph_off + 7);
 
-            auto g_x_xxyzz = pbuffer.data(ph_off + 8);
+            auto g_x_xxyzz = cbuffer.data(ph_off + 8);
 
-            auto g_x_xxzzz = pbuffer.data(ph_off + 9);
+            auto g_x_xxzzz = cbuffer.data(ph_off + 9);
 
-            auto g_x_xyyyy = pbuffer.data(ph_off + 10);
+            auto g_x_xyyyy = cbuffer.data(ph_off + 10);
 
-            auto g_x_xyyyz = pbuffer.data(ph_off + 11);
+            auto g_x_xyyyz = cbuffer.data(ph_off + 11);
 
-            auto g_x_xyyzz = pbuffer.data(ph_off + 12);
+            auto g_x_xyyzz = cbuffer.data(ph_off + 12);
 
-            auto g_x_xyzzz = pbuffer.data(ph_off + 13);
+            auto g_x_xyzzz = cbuffer.data(ph_off + 13);
 
-            auto g_x_xzzzz = pbuffer.data(ph_off + 14);
+            auto g_x_xzzzz = cbuffer.data(ph_off + 14);
 
-            auto g_y_xxxxx = pbuffer.data(ph_off + 21);
+            auto g_y_xxxxx = cbuffer.data(ph_off + 21);
 
-            auto g_y_xxxxy = pbuffer.data(ph_off + 22);
+            auto g_y_xxxxy = cbuffer.data(ph_off + 22);
 
-            auto g_y_xxxxz = pbuffer.data(ph_off + 23);
+            auto g_y_xxxxz = cbuffer.data(ph_off + 23);
 
-            auto g_y_xxxyy = pbuffer.data(ph_off + 24);
+            auto g_y_xxxyy = cbuffer.data(ph_off + 24);
 
-            auto g_y_xxxyz = pbuffer.data(ph_off + 25);
+            auto g_y_xxxyz = cbuffer.data(ph_off + 25);
 
-            auto g_y_xxxzz = pbuffer.data(ph_off + 26);
+            auto g_y_xxxzz = cbuffer.data(ph_off + 26);
 
-            auto g_y_xxyyy = pbuffer.data(ph_off + 27);
+            auto g_y_xxyyy = cbuffer.data(ph_off + 27);
 
-            auto g_y_xxyyz = pbuffer.data(ph_off + 28);
+            auto g_y_xxyyz = cbuffer.data(ph_off + 28);
 
-            auto g_y_xxyzz = pbuffer.data(ph_off + 29);
+            auto g_y_xxyzz = cbuffer.data(ph_off + 29);
 
-            auto g_y_xxzzz = pbuffer.data(ph_off + 30);
+            auto g_y_xxzzz = cbuffer.data(ph_off + 30);
 
-            auto g_y_xyyyy = pbuffer.data(ph_off + 31);
+            auto g_y_xyyyy = cbuffer.data(ph_off + 31);
 
-            auto g_y_xyyyz = pbuffer.data(ph_off + 32);
+            auto g_y_xyyyz = cbuffer.data(ph_off + 32);
 
-            auto g_y_xyyzz = pbuffer.data(ph_off + 33);
+            auto g_y_xyyzz = cbuffer.data(ph_off + 33);
 
-            auto g_y_xyzzz = pbuffer.data(ph_off + 34);
+            auto g_y_xyzzz = cbuffer.data(ph_off + 34);
 
-            auto g_y_xzzzz = pbuffer.data(ph_off + 35);
+            auto g_y_xzzzz = cbuffer.data(ph_off + 35);
 
-            auto g_y_yyyyy = pbuffer.data(ph_off + 36);
+            auto g_y_yyyyy = cbuffer.data(ph_off + 36);
 
-            auto g_y_yyyyz = pbuffer.data(ph_off + 37);
+            auto g_y_yyyyz = cbuffer.data(ph_off + 37);
 
-            auto g_y_yyyzz = pbuffer.data(ph_off + 38);
+            auto g_y_yyyzz = cbuffer.data(ph_off + 38);
 
-            auto g_y_yyzzz = pbuffer.data(ph_off + 39);
+            auto g_y_yyzzz = cbuffer.data(ph_off + 39);
 
-            auto g_y_yzzzz = pbuffer.data(ph_off + 40);
+            auto g_y_yzzzz = cbuffer.data(ph_off + 40);
 
-            auto g_z_xxxxx = pbuffer.data(ph_off + 42);
+            auto g_z_xxxxx = cbuffer.data(ph_off + 42);
 
-            auto g_z_xxxxy = pbuffer.data(ph_off + 43);
+            auto g_z_xxxxy = cbuffer.data(ph_off + 43);
 
-            auto g_z_xxxxz = pbuffer.data(ph_off + 44);
+            auto g_z_xxxxz = cbuffer.data(ph_off + 44);
 
-            auto g_z_xxxyy = pbuffer.data(ph_off + 45);
+            auto g_z_xxxyy = cbuffer.data(ph_off + 45);
 
-            auto g_z_xxxyz = pbuffer.data(ph_off + 46);
+            auto g_z_xxxyz = cbuffer.data(ph_off + 46);
 
-            auto g_z_xxxzz = pbuffer.data(ph_off + 47);
+            auto g_z_xxxzz = cbuffer.data(ph_off + 47);
 
-            auto g_z_xxyyy = pbuffer.data(ph_off + 48);
+            auto g_z_xxyyy = cbuffer.data(ph_off + 48);
 
-            auto g_z_xxyyz = pbuffer.data(ph_off + 49);
+            auto g_z_xxyyz = cbuffer.data(ph_off + 49);
 
-            auto g_z_xxyzz = pbuffer.data(ph_off + 50);
+            auto g_z_xxyzz = cbuffer.data(ph_off + 50);
 
-            auto g_z_xxzzz = pbuffer.data(ph_off + 51);
+            auto g_z_xxzzz = cbuffer.data(ph_off + 51);
 
-            auto g_z_xyyyy = pbuffer.data(ph_off + 52);
+            auto g_z_xyyyy = cbuffer.data(ph_off + 52);
 
-            auto g_z_xyyyz = pbuffer.data(ph_off + 53);
+            auto g_z_xyyyz = cbuffer.data(ph_off + 53);
 
-            auto g_z_xyyzz = pbuffer.data(ph_off + 54);
+            auto g_z_xyyzz = cbuffer.data(ph_off + 54);
 
-            auto g_z_xyzzz = pbuffer.data(ph_off + 55);
+            auto g_z_xyzzz = cbuffer.data(ph_off + 55);
 
-            auto g_z_xzzzz = pbuffer.data(ph_off + 56);
+            auto g_z_xzzzz = cbuffer.data(ph_off + 56);
 
-            auto g_z_yyyyy = pbuffer.data(ph_off + 57);
+            auto g_z_yyyyy = cbuffer.data(ph_off + 57);
 
-            auto g_z_yyyyz = pbuffer.data(ph_off + 58);
+            auto g_z_yyyyz = cbuffer.data(ph_off + 58);
 
-            auto g_z_yyyzz = pbuffer.data(ph_off + 59);
+            auto g_z_yyyzz = cbuffer.data(ph_off + 59);
 
-            auto g_z_yyzzz = pbuffer.data(ph_off + 60);
+            auto g_z_yyzzz = cbuffer.data(ph_off + 60);
 
-            auto g_z_yzzzz = pbuffer.data(ph_off + 61);
+            auto g_z_yzzzz = cbuffer.data(ph_off + 61);
 
-            auto g_z_zzzzz = pbuffer.data(ph_off + 62);
+            auto g_z_zzzzz = cbuffer.data(ph_off + 62);
 
             /// set up bra offset for contr_buffer_xxdg
 
