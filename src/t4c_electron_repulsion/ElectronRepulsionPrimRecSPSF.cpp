@@ -1,18 +1,18 @@
 #include "ElectronRepulsionPrimRecSPSF.hpp"
 
-namespace erirec { // erirec namespace
+namespace erirec {  // erirec namespace
 
 auto
-comp_prim_electron_repulsion_spsf(CSimdArray<double>& pbuffer,
-                                  const size_t idx_eri_0_spsf,
-                                  size_t idx_eri_1_sssd,
-                                  size_t idx_eri_0_sssf,
-                                  size_t idx_eri_1_sssf,
-                                  CSimdArray<double>& factors,
-                                  const size_t idx_wp,
+comp_prim_electron_repulsion_spsf(CSimdArray<double>&   pbuffer,
+                                  const size_t          idx_eri_0_spsf,
+                                  size_t                idx_eri_1_sssd,
+                                  size_t                idx_eri_0_sssf,
+                                  size_t                idx_eri_1_sssf,
+                                  CSimdArray<double>&   factors,
+                                  const size_t          idx_wp,
                                   const TPoint<double>& r_pb,
-                                  const double a_exp,
-                                  const double b_exp) -> void
+                                  const double          a_exp,
+                                  const double          b_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -120,7 +120,43 @@ comp_prim_electron_repulsion_spsf(CSimdArray<double>& pbuffer,
 
     auto g_0_x_0_zzz_0 = pbuffer.data(idx_eri_0_spsf + 9);
 
-    #pragma omp simd aligned(g_0_0_0_xx_1, g_0_0_0_xxx_0, g_0_0_0_xxx_1, g_0_0_0_xxy_0, g_0_0_0_xxy_1, g_0_0_0_xxz_0, g_0_0_0_xxz_1, g_0_0_0_xy_1, g_0_0_0_xyy_0, g_0_0_0_xyy_1, g_0_0_0_xyz_0, g_0_0_0_xyz_1, g_0_0_0_xz_1, g_0_0_0_xzz_0, g_0_0_0_xzz_1, g_0_0_0_yy_1, g_0_0_0_yyy_0, g_0_0_0_yyy_1, g_0_0_0_yyz_0, g_0_0_0_yyz_1, g_0_0_0_yz_1, g_0_0_0_yzz_0, g_0_0_0_yzz_1, g_0_0_0_zz_1, g_0_0_0_zzz_0, g_0_0_0_zzz_1, g_0_x_0_xxx_0, g_0_x_0_xxy_0, g_0_x_0_xxz_0, g_0_x_0_xyy_0, g_0_x_0_xyz_0, g_0_x_0_xzz_0, g_0_x_0_yyy_0, g_0_x_0_yyz_0, g_0_x_0_yzz_0, g_0_x_0_zzz_0, wp_x  : 64)
+#pragma omp simd aligned(g_0_0_0_xx_1,      \
+                             g_0_0_0_xxx_0, \
+                             g_0_0_0_xxx_1, \
+                             g_0_0_0_xxy_0, \
+                             g_0_0_0_xxy_1, \
+                             g_0_0_0_xxz_0, \
+                             g_0_0_0_xxz_1, \
+                             g_0_0_0_xy_1,  \
+                             g_0_0_0_xyy_0, \
+                             g_0_0_0_xyy_1, \
+                             g_0_0_0_xyz_0, \
+                             g_0_0_0_xyz_1, \
+                             g_0_0_0_xz_1,  \
+                             g_0_0_0_xzz_0, \
+                             g_0_0_0_xzz_1, \
+                             g_0_0_0_yy_1,  \
+                             g_0_0_0_yyy_0, \
+                             g_0_0_0_yyy_1, \
+                             g_0_0_0_yyz_0, \
+                             g_0_0_0_yyz_1, \
+                             g_0_0_0_yz_1,  \
+                             g_0_0_0_yzz_0, \
+                             g_0_0_0_yzz_1, \
+                             g_0_0_0_zz_1,  \
+                             g_0_0_0_zzz_0, \
+                             g_0_0_0_zzz_1, \
+                             g_0_x_0_xxx_0, \
+                             g_0_x_0_xxy_0, \
+                             g_0_x_0_xxz_0, \
+                             g_0_x_0_xyy_0, \
+                             g_0_x_0_xyz_0, \
+                             g_0_x_0_xzz_0, \
+                             g_0_x_0_yyy_0, \
+                             g_0_x_0_yyz_0, \
+                             g_0_x_0_yzz_0, \
+                             g_0_x_0_zzz_0, \
+                             wp_x : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -168,7 +204,43 @@ comp_prim_electron_repulsion_spsf(CSimdArray<double>& pbuffer,
 
     auto g_0_y_0_zzz_0 = pbuffer.data(idx_eri_0_spsf + 19);
 
-    #pragma omp simd aligned(g_0_0_0_xx_1, g_0_0_0_xxx_0, g_0_0_0_xxx_1, g_0_0_0_xxy_0, g_0_0_0_xxy_1, g_0_0_0_xxz_0, g_0_0_0_xxz_1, g_0_0_0_xy_1, g_0_0_0_xyy_0, g_0_0_0_xyy_1, g_0_0_0_xyz_0, g_0_0_0_xyz_1, g_0_0_0_xz_1, g_0_0_0_xzz_0, g_0_0_0_xzz_1, g_0_0_0_yy_1, g_0_0_0_yyy_0, g_0_0_0_yyy_1, g_0_0_0_yyz_0, g_0_0_0_yyz_1, g_0_0_0_yz_1, g_0_0_0_yzz_0, g_0_0_0_yzz_1, g_0_0_0_zz_1, g_0_0_0_zzz_0, g_0_0_0_zzz_1, g_0_y_0_xxx_0, g_0_y_0_xxy_0, g_0_y_0_xxz_0, g_0_y_0_xyy_0, g_0_y_0_xyz_0, g_0_y_0_xzz_0, g_0_y_0_yyy_0, g_0_y_0_yyz_0, g_0_y_0_yzz_0, g_0_y_0_zzz_0, wp_y  : 64)
+#pragma omp simd aligned(g_0_0_0_xx_1,      \
+                             g_0_0_0_xxx_0, \
+                             g_0_0_0_xxx_1, \
+                             g_0_0_0_xxy_0, \
+                             g_0_0_0_xxy_1, \
+                             g_0_0_0_xxz_0, \
+                             g_0_0_0_xxz_1, \
+                             g_0_0_0_xy_1,  \
+                             g_0_0_0_xyy_0, \
+                             g_0_0_0_xyy_1, \
+                             g_0_0_0_xyz_0, \
+                             g_0_0_0_xyz_1, \
+                             g_0_0_0_xz_1,  \
+                             g_0_0_0_xzz_0, \
+                             g_0_0_0_xzz_1, \
+                             g_0_0_0_yy_1,  \
+                             g_0_0_0_yyy_0, \
+                             g_0_0_0_yyy_1, \
+                             g_0_0_0_yyz_0, \
+                             g_0_0_0_yyz_1, \
+                             g_0_0_0_yz_1,  \
+                             g_0_0_0_yzz_0, \
+                             g_0_0_0_yzz_1, \
+                             g_0_0_0_zz_1,  \
+                             g_0_0_0_zzz_0, \
+                             g_0_0_0_zzz_1, \
+                             g_0_y_0_xxx_0, \
+                             g_0_y_0_xxy_0, \
+                             g_0_y_0_xxz_0, \
+                             g_0_y_0_xyy_0, \
+                             g_0_y_0_xyz_0, \
+                             g_0_y_0_xzz_0, \
+                             g_0_y_0_yyy_0, \
+                             g_0_y_0_yyz_0, \
+                             g_0_y_0_yzz_0, \
+                             g_0_y_0_zzz_0, \
+                             wp_y : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -216,7 +288,43 @@ comp_prim_electron_repulsion_spsf(CSimdArray<double>& pbuffer,
 
     auto g_0_z_0_zzz_0 = pbuffer.data(idx_eri_0_spsf + 29);
 
-    #pragma omp simd aligned(g_0_0_0_xx_1, g_0_0_0_xxx_0, g_0_0_0_xxx_1, g_0_0_0_xxy_0, g_0_0_0_xxy_1, g_0_0_0_xxz_0, g_0_0_0_xxz_1, g_0_0_0_xy_1, g_0_0_0_xyy_0, g_0_0_0_xyy_1, g_0_0_0_xyz_0, g_0_0_0_xyz_1, g_0_0_0_xz_1, g_0_0_0_xzz_0, g_0_0_0_xzz_1, g_0_0_0_yy_1, g_0_0_0_yyy_0, g_0_0_0_yyy_1, g_0_0_0_yyz_0, g_0_0_0_yyz_1, g_0_0_0_yz_1, g_0_0_0_yzz_0, g_0_0_0_yzz_1, g_0_0_0_zz_1, g_0_0_0_zzz_0, g_0_0_0_zzz_1, g_0_z_0_xxx_0, g_0_z_0_xxy_0, g_0_z_0_xxz_0, g_0_z_0_xyy_0, g_0_z_0_xyz_0, g_0_z_0_xzz_0, g_0_z_0_yyy_0, g_0_z_0_yyz_0, g_0_z_0_yzz_0, g_0_z_0_zzz_0, wp_z  : 64)
+#pragma omp simd aligned(g_0_0_0_xx_1,      \
+                             g_0_0_0_xxx_0, \
+                             g_0_0_0_xxx_1, \
+                             g_0_0_0_xxy_0, \
+                             g_0_0_0_xxy_1, \
+                             g_0_0_0_xxz_0, \
+                             g_0_0_0_xxz_1, \
+                             g_0_0_0_xy_1,  \
+                             g_0_0_0_xyy_0, \
+                             g_0_0_0_xyy_1, \
+                             g_0_0_0_xyz_0, \
+                             g_0_0_0_xyz_1, \
+                             g_0_0_0_xz_1,  \
+                             g_0_0_0_xzz_0, \
+                             g_0_0_0_xzz_1, \
+                             g_0_0_0_yy_1,  \
+                             g_0_0_0_yyy_0, \
+                             g_0_0_0_yyy_1, \
+                             g_0_0_0_yyz_0, \
+                             g_0_0_0_yyz_1, \
+                             g_0_0_0_yz_1,  \
+                             g_0_0_0_yzz_0, \
+                             g_0_0_0_yzz_1, \
+                             g_0_0_0_zz_1,  \
+                             g_0_0_0_zzz_0, \
+                             g_0_0_0_zzz_1, \
+                             g_0_z_0_xxx_0, \
+                             g_0_z_0_xxy_0, \
+                             g_0_z_0_xxz_0, \
+                             g_0_z_0_xyy_0, \
+                             g_0_z_0_xyz_0, \
+                             g_0_z_0_xzz_0, \
+                             g_0_z_0_yyy_0, \
+                             g_0_z_0_yyz_0, \
+                             g_0_z_0_yzz_0, \
+                             g_0_z_0_zzz_0, \
+                             wp_z : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -243,5 +351,4 @@ comp_prim_electron_repulsion_spsf(CSimdArray<double>& pbuffer,
     }
 }
 
-} // erirec namespace
-
+}  // namespace erirec

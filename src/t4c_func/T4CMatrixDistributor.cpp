@@ -1,11 +1,11 @@
 #include "T4CMatrixDistributor.hpp"
 
+#include <iostream>
+
 #include "StringFormat.hpp"
+#include "T4CLocalDistributor.hpp"
 #include "T4CUtils.hpp"
 #include "TensorComponents.hpp"
-#include "T4CLocalDistributor.hpp"
-
-#include <iostream>
 
 CT4CMatrixDistributor::CT4CMatrixDistributor(CMatrix*           fock,
                                              const CMatrix*     density,
@@ -43,7 +43,7 @@ CT4CMatrixDistributor::CT4CMatrixDistributor(CMatrix*           fock,
 {
 }
 
-auto 
+auto
 CT4CMatrixDistributor::get_omega() const -> double
 {
     return _omega;
@@ -61,7 +61,7 @@ CT4CMatrixDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, cons
     _c_loc_indices = t4cfunc::masked_indices(ket_gto_pair_block.bra_orbital_indices());
 
     _d_loc_indices = t4cfunc::masked_indices(ket_gto_pair_block.ket_orbital_indices());
-    
+
     // set up global indices
 
     _a_glob_indices = t4cfunc::compresed_indices(bra_gto_pair_block.bra_orbital_indices());
@@ -71,7 +71,7 @@ CT4CMatrixDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, cons
     _c_glob_indices = t4cfunc::compresed_indices(ket_gto_pair_block.bra_orbital_indices());
 
     _d_glob_indices = t4cfunc::compresed_indices(ket_gto_pair_block.ket_orbital_indices());
-    
+
     // set up local matrices
 
     const auto bra_ang_moms = bra_gto_pair_block.angular_momentums();
@@ -85,56 +85,6 @@ CT4CMatrixDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, cons
     const auto c_dims = _c_loc_indices[0] * tensor::number_of_spherical_components(std::array<int, 1>{ket_ang_moms.first});
 
     const auto d_dims = _d_loc_indices[0] * tensor::number_of_spherical_components(std::array<int, 1>{ket_ang_moms.second});
-    
-//    std::cout << " *** DISTRIBUTOR(" << bra_ang_moms.first << "," << bra_ang_moms.second << "|" << ket_ang_moms.first << "," << ket_ang_moms.second << ") ***" << std::endl;
-//    
-//    std::cout << "A local indices:" << std::endl;
-//    
-//    for (const auto idx : _a_loc_indices) std::cout << idx << " ";
-//    
-//    std::cout << std::endl;
-//    
-//    std::cout << "B local indices:" << std::endl;
-//    
-//    for (const auto idx : _b_loc_indices) std::cout << idx << " ";
-//    
-//    std::cout << std::endl;
-//    
-//    std::cout << "C local indices:" << std::endl;
-//    
-//    for (const auto idx : _c_loc_indices) std::cout << idx << " ";
-//    
-//    std::cout << std::endl;
-//    
-//    std::cout << "D local indices:" << std::endl;
-//    
-//    for (const auto idx : _d_loc_indices) std::cout << idx << " ";
-//    
-//    std::cout << std::endl;
-//    
-//    std::cout << "A global indices:" << std::endl;
-//    
-//    for (const auto idx : _a_glob_indices) std::cout << idx << " ";
-//    
-//    std::cout << std::endl;
-//    
-//    std::cout << "B global indices:" << std::endl;
-//    
-//    for (const auto idx : _b_glob_indices) std::cout << idx << " ";
-//    
-//    std::cout << std::endl;
-//    
-//    std::cout << "C global indices:" << std::endl;
-//    
-//    for (const auto idx : _c_glob_indices) std::cout << idx << " ";
-//    
-//    std::cout << std::endl;
-//    
-//    std::cout << "D global indices:" << std::endl;
-//    
-//    for (const auto idx : _d_glob_indices) std::cout << idx << " ";
-//    
-//    std::cout << std::endl;
 
     // adds submatrices storage
 
@@ -275,7 +225,7 @@ CT4CMatrixDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, cons
                           "SQ");
         }
     }
-    
+
     _matrices.zero();
 }
 
@@ -318,36 +268,84 @@ CT4CMatrixDistributor::distribute(const CSimdArray<double>&        buffer,
                                               ket_range,
                                               diagonal);
         }
-        
+
+        if (_label == "2jkx")
+        {
+            t4cfunc::local_distribute_rest_jkx(_matrices,
+                                               _density,
+                                               buffer,
+                                               offset,
+                                               _exchange_factor,
+                                               a_indices,
+                                               b_indices,
+                                               c_indices,
+                                               d_indices,
+                                               _a_loc_indices,
+                                               _b_loc_indices,
+                                               _c_loc_indices,
+                                               _d_loc_indices,
+                                               a_angmom,
+                                               b_angmom,
+                                               c_angmom,
+                                               d_angmom,
+                                               ibra_gto,
+                                               ket_range,
+                                               diagonal);
+        }
+
         if (_label == "j")
         {
             t4cfunc::local_distribute_rest_j(_matrices,
-                                              _density,
-                                              buffer,
-                                              offset,
-                                              a_indices,
-                                              b_indices,
-                                              c_indices,
-                                              d_indices,
-                                              _a_loc_indices,
-                                              _b_loc_indices,
-                                              _c_loc_indices,
-                                              _d_loc_indices,
-                                              a_angmom,
-                                              b_angmom,
-                                              c_angmom,
-                                              d_angmom,
-                                              ibra_gto,
-                                              ket_range,
-                                              diagonal);
+                                             _density,
+                                             buffer,
+                                             offset,
+                                             a_indices,
+                                             b_indices,
+                                             c_indices,
+                                             d_indices,
+                                             _a_loc_indices,
+                                             _b_loc_indices,
+                                             _c_loc_indices,
+                                             _d_loc_indices,
+                                             a_angmom,
+                                             b_angmom,
+                                             c_angmom,
+                                             d_angmom,
+                                             ibra_gto,
+                                             ket_range,
+                                             diagonal);
         }
-        
+
         if (_label == "k")
         {
             t4cfunc::local_distribute_rest_k(_matrices,
+                                             _density,
+                                             buffer,
+                                             offset,
+                                             a_indices,
+                                             b_indices,
+                                             c_indices,
+                                             d_indices,
+                                             _a_loc_indices,
+                                             _b_loc_indices,
+                                             _c_loc_indices,
+                                             _d_loc_indices,
+                                             a_angmom,
+                                             b_angmom,
+                                             c_angmom,
+                                             d_angmom,
+                                             ibra_gto,
+                                             ket_range,
+                                             diagonal);
+        }
+
+        if (_label == "kx")
+        {
+            t4cfunc::local_distribute_rest_kx(_matrices,
                                               _density,
                                               buffer,
                                               offset,
+                                              _exchange_factor,
                                               a_indices,
                                               b_indices,
                                               c_indices,
@@ -367,7 +365,7 @@ CT4CMatrixDistributor::distribute(const CSimdArray<double>&        buffer,
     }
 }
 
-auto 
+auto
 CT4CMatrixDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, const CGtoPairBlock& ket_gto_pair_block) -> void
 {
 #pragma omp critical
@@ -399,53 +397,7 @@ CT4CMatrixDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, const
                 const auto angord_pq = _fock->is_angular_order(bra_ang_moms);
 
                 const auto angord_rs = _fock->is_angular_order(ket_ang_moms);
-                
-//                // debug setup
-//                
-//                std::cout.precision(12);
-//                
-//                std::cout.setf(std::ios::fixed, std:: ios::floatfield);
-//                
-//                // debug PQ matrix
-//                
-//                auto rmat = _matrices.matrix("PQ")->sub_matrix({0, 0});
-//                
-//                auto rdims = rmat->get_dimensions();
-//                
-//                std::cout << "PQ matrix : " << rdims[0] << "," <<rdims[1] << "," << rdims[2] <<"," << rdims[3] << std::endl;
-//                
-//                for (size_t i = 0; i < rdims[2]; i++)
-//                {
-//                    for (size_t j = 0; j < rdims[3]; j++)
-//                    {
-//                        std::cout << " " << rmat->at({i, j});
-//                    }
-//                    
-//                    std::cout << std::endl;
-//                }
-//                
-//                std::cout << std::endl;
-//                
-//                // debug RS matrix
-//                
-//                rmat = _matrices.matrix("RS")->sub_matrix({0, 0});
-//                
-//                rdims = rmat->get_dimensions();
-//                
-//                std::cout << "RS matrix : " << rdims[0] << "," <<rdims[1] << "," << rdims[2] <<"," << rdims[3] << std::endl;
-//                
-//                for (size_t i = 0; i < rdims[2]; i++)
-//                {
-//                    for (size_t j = 0; j < rdims[3]; j++)
-//                    {
-//                        std::cout << " " << rmat->at({i, j});
-//                    }
-//                    
-//                    std::cout << std::endl;
-//                }
-//                
-//                std::cout << std::endl;
-                
+
                 // acummulate contributions to Fock matrix
 
                 t4cfunc::accumulate(submat_pq,
@@ -500,86 +452,6 @@ CT4CMatrixDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, const
                 const auto angord_qr = _fock->is_angular_order(qr_pair);
 
                 const auto angord_qs = _fock->is_angular_order(qs_pair);
-                
-//                // debug PR matrix
-//                
-//                auto rmat = _matrices.matrix("PR")->sub_matrix({0, 0});
-//                
-//                auto rdims = rmat->get_dimensions();
-//                
-//                std::cout << "PR matrix : " << rdims[0] << "," <<rdims[1] << "," << rdims[2] <<"," << rdims[3] << std::endl;
-//                
-//                for (size_t i = 0; i < rdims[2]; i++)
-//                {
-//                    for (size_t j = 0; j < rdims[3]; j++)
-//                    {
-//                        std::cout << " " << rmat->at({i, j});
-//                    }
-//                    
-//                    std::cout << std::endl;
-//                }
-//                
-//                std::cout << std::endl;
-//                
-//                // debug PS matrix
-//                
-//                rmat = _matrices.matrix("PS")->sub_matrix({0, 0});
-//                
-//                rdims = rmat->get_dimensions();
-//                
-//                std::cout << "PS matrix : " << rdims[0] << "," <<rdims[1] << "," << rdims[2] <<"," << rdims[3] << std::endl;
-//                
-//                for (size_t i = 0; i < rdims[2]; i++)
-//                {
-//                    for (size_t j = 0; j < rdims[3]; j++)
-//                    {
-//                        std::cout << " " << rmat->at({i, j});
-//                    }
-//                    
-//                    std::cout << std::endl;
-//                }
-//                
-//                std::cout << std::endl;
-//                
-//                // debug QR matrix
-//                
-//                rmat = _matrices.matrix("QR")->sub_matrix({0, 0});
-//                
-//                rdims = rmat->get_dimensions();
-//                
-//                std::cout << "QR matrix : " << rdims[0] << "," <<rdims[1] << "," << rdims[2] <<"," << rdims[3] << std::endl;
-//                
-//                for (size_t i = 0; i < rdims[2]; i++)
-//                {
-//                    for (size_t j = 0; j < rdims[3]; j++)
-//                    {
-//                        std::cout << " " << rmat->at({i, j});
-//                    }
-//                    
-//                    std::cout << std::endl;
-//                }
-//                
-//                std::cout << std::endl;
-//                
-//                // debug QS matrix
-//                
-//                rmat = _matrices.matrix("QS")->sub_matrix({0, 0});
-//                
-//                rdims = rmat->get_dimensions();
-//                
-//                std::cout << "QS matrix : " << rdims[0] << "," <<rdims[1] << "," << rdims[2] <<"," << rdims[3] << std::endl;
-//                
-//                for (size_t i = 0; i < rdims[2]; i++)
-//                {
-//                    for (size_t j = 0; j < rdims[3]; j++)
-//                    {
-//                        std::cout << " " << rmat->at({i, j});
-//                    }
-//                    
-//                    std::cout << std::endl;
-//                }
-//                
-//                std::cout << std::endl;
 
                 // acummulate contributions to Fock matrix
 
@@ -612,7 +484,7 @@ CT4CMatrixDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, const
                                     b_comps,
                                     c_comps,
                                     angord_qr);
-                
+
                 t4cfunc::accumulate(submat_qs,
                                     _matrices.matrix("QS")->sub_matrix({0, 0}),
                                     _b_loc_indices,
