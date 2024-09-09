@@ -145,14 +145,14 @@ class SymmetryAnalyzer:
         tolerance = tolerance.lower()
 
         if tolerance == 'very loose':
-            self._tolerance_eig = 0.8
+            self._tolerance_eig = 0.6
             self._tolerance_ang = np.radians(5.0)
         elif tolerance == 'loose':
             self._tolerance_eig = 0.4
             self._tolerance_ang = np.radians(4.0)
         elif tolerance == 'tight':
-            self._tolerance_eig = 0.1
-            self._tolerance_ang = np.radians(3.0)
+            self._tolerance_eig = 0.05
+            self._tolerance_ang = np.radians(1.5)
         elif tolerance == 'very tight':
             self._tolerance_eig = 0.008
             self._tolerance_ang = np.radians(0.2)
@@ -187,7 +187,7 @@ class SymmetryAnalyzer:
                                                   self._tolerance_eig)
 
             # Linear groups
-            if np.min(abs(self._Ivals)) < self._tolerance_eig:
+            if np.min(np.abs(self._Ivals)) < self._tolerance_eig:
                 self._handle_linear()
                 symmetry_analysis["degeneracy"] = "Molecule is linear."
 
@@ -340,6 +340,187 @@ class SymmetryAnalyzer:
 
         return reordered_symmetry_elements
 
+    @staticmethod
+    def _get_highest_order_rotation_axes(symmetry_operations):
+        """
+        Get highest order rotation axes.
+
+        :param symmetry_operations:
+            The list of symmetry operations.
+
+        :return:
+            The highest order rotation axes.
+        """
+
+        max_rot_order = 0
+        for op in symmetry_operations:
+            if isinstance(op, Rotation) and op._order > max_rot_order:
+                max_rot_order = op._order
+
+        rot_axes = []
+        for op in symmetry_operations:
+            if (isinstance(op, Rotation) and op._order == max_rot_order and
+                    op._power == 1):
+                rot_axes.append(np.array(op._axis))
+
+        return rot_axes
+
+    @staticmethod
+    def _get_idealized_rotation_axes_T(rot_axes):
+        """
+        Get idealized rotation axes for tetrahedral (T) symmetry.
+
+        :para rot_axes:
+            The highest order rotation axes for T symmetry.
+
+        :return:
+            The idealized rotation axes.
+        """
+
+        v_axis = np.cross(rot_axes[1], rot_axes[0])
+        v_axis /= np.linalg.norm(v_axis)
+
+        angle_T = safe_arccos(-1.0 / 3.0)  # ~109.5 degree
+        dihedral_T = 2.0 * np.pi / 3.0  # 120 degree
+
+        ideal_rot_axes = [np.array(rot_axes[0])]
+
+        ideal_rot_axes.append(
+            np.dot(ideal_rot_axes[0], rotation_matrix(v_axis, angle_T)))
+
+        ideal_rot_axes.append(
+            np.dot(ideal_rot_axes[1],
+                   rotation_matrix(ideal_rot_axes[0], -dihedral_T)))
+
+        ideal_rot_axes.append(
+            np.dot(ideal_rot_axes[1],
+                   rotation_matrix(ideal_rot_axes[0], dihedral_T)))
+
+        num_rot_axes = len(ideal_rot_axes)
+
+        for i in range(num_rot_axes):
+            for j in range(i + 1, num_rot_axes):
+                ave_axis = 0.5 * (ideal_rot_axes[i] + ideal_rot_axes[j])
+                ave_axis /= np.linalg.norm(ave_axis)
+                ideal_rot_axes.append(ave_axis)
+
+        return ideal_rot_axes
+
+    @staticmethod
+    def _get_idealized_rotation_axes_O(rot_axes):
+        """
+        Get idealized rotation axes for octahedral (O) symmetry.
+
+        :para rot_axes:
+            The highest order rotation axes for O symmetry.
+
+        :return:
+            The idealized rotation axes.
+        """
+
+        ax_0 = rot_axes[0]
+
+        ax_1 = None
+        for i in range(1, len(rot_axes)):
+            dot = np.dot(ax_0, rot_axes[i])
+            if abs(dot) < np.cos(np.radians(45)):
+                ax_1 = rot_axes[1]
+
+        v_axis = np.cross(ax_1, ax_0)
+        v_axis /= np.linalg.norm(v_axis)
+
+        angle_O = np.pi / 2.0  # 90 degree
+        dihedral_O = np.pi / 2.0  # 90 degree
+
+        ideal_rot_axes = [np.array(ax_0)]
+
+        ideal_rot_axes.append(
+            np.dot(ideal_rot_axes[0], rotation_matrix(v_axis, angle_O)))
+
+        ideal_rot_axes.append(
+            np.dot(ideal_rot_axes[1],
+                   rotation_matrix(ideal_rot_axes[0], dihedral_O)))
+
+        num_rot_axes = len(ideal_rot_axes)
+
+        # go through combinations of +/- axis
+        factors_ij = [f_i * f_j for f_i in [-1.0, 1.0] for f_j in [-1.0, 1.0]]
+
+        for i in range(num_rot_axes):
+            for j in range(i + 1, num_rot_axes):
+                for fij in factors_ij:
+                    ave_axis = fij * 0.5 * (ideal_rot_axes[i] +
+                                            ideal_rot_axes[j])
+                    ave_axis /= np.linalg.norm(ave_axis)
+                    ideal_rot_axes.append(ave_axis)
+
+        return ideal_rot_axes
+
+    @staticmethod
+    def _get_idealized_rotation_axes_I(rot_axes):
+        """
+        Get idealized rotation axes for icosahedral (I) symmetry.
+
+        :para rot_axes:
+            The highest order rotation axes for I symmetry.
+
+        :return:
+            The idealized rotation axes.
+        """
+
+        new_rot_axes = [np.array(ax) for ax in rot_axes]
+
+        # make sure that new_rot_axes[0] is the center of new_rot_axes
+        for i in range(1, len(new_rot_axes)):
+            if np.dot(new_rot_axes[0], new_rot_axes[i]) < 0.0:
+                new_rot_axes[i] *= -1.0
+
+        ax_0 = new_rot_axes[0]
+        ax_1 = new_rot_axes[1]
+
+        v_axis = np.cross(ax_1, ax_0)
+        v_axis /= np.linalg.norm(v_axis)
+
+        angle = safe_arcsin((np.sqrt(5.0) + 1) / (2 * np.sqrt(3.0)))
+        angle_I = 2 * np.arctan(1.0 / (np.sqrt(3.0) / (3.0 * np.cos(angle))))
+        dihedral_I = 2 * np.pi / 5.0
+
+        ideal_rot_axes = [np.array(ax_0)]
+
+        ideal_rot_axes.append(
+            np.dot(ideal_rot_axes[0], rotation_matrix(v_axis, angle_I)))
+
+        ideal_rot_axes.append(
+            np.dot(ideal_rot_axes[1],
+                   rotation_matrix(ideal_rot_axes[0], -2.0 * dihedral_I)))
+
+        ideal_rot_axes.append(
+            np.dot(ideal_rot_axes[1],
+                   rotation_matrix(ideal_rot_axes[0], -dihedral_I)))
+
+        ideal_rot_axes.append(
+            np.dot(ideal_rot_axes[1],
+                   rotation_matrix(ideal_rot_axes[0], dihedral_I)))
+
+        ideal_rot_axes.append(
+            np.dot(ideal_rot_axes[1],
+                   rotation_matrix(ideal_rot_axes[0], 2.0 * dihedral_I)))
+
+        num_rot_axes = len(ideal_rot_axes)
+
+        # go through combinations of +/- axis
+        factors_ij = [f_i * f_j for f_i in [-1.0, 1.0] for f_j in [-1.0, 1.0]]
+
+        for i in range(num_rot_axes):
+            for j in range(i + 1, num_rot_axes):
+                for fij in factors_ij:
+                    ave_axis = fij * 0.5 * (ideal_rot_axes[i] +
+                                            ideal_rot_axes[j])
+                    ave_axis /= np.linalg.norm(ave_axis)
+                    ideal_rot_axes.append(ave_axis)
+
+        return ideal_rot_axes
+
     def symmetrize_pointgroup(self, symmetry_data, point_group=None):
         """
         Symmetrize and reorient molecule.
@@ -353,6 +534,18 @@ class SymmetryAnalyzer:
         :return:
             The symmetrized molecule.
         """
+
+        def is_spherical(point_group):
+            return point_group[0] in ['T', 'O', 'I']
+
+        def is_tetrahedral(point_group):
+            return point_group[0] == 'T'
+
+        def is_octahedral(point_group):
+            return point_group[0] == 'O'
+
+        def is_icosahedral(point_group):
+            return point_group[0] == 'I'
 
         if point_group is None:
             point_group = symmetry_data['point_group']
@@ -370,11 +563,10 @@ class SymmetryAnalyzer:
         symmetry_mapping = set()
         symmetry_operations = []
 
-        mol_grid_points = self._get_mol_grid_points()
-
-        # note: special ordering of checks for spherical case
-        if point_group[0] in ['T', 'O', 'I']:
-            mol_grid_points = list(reversed(mol_grid_points))
+        if is_spherical(point_group):
+            mol_grid_points = self._get_mol_grid_points('spherical')
+        else:
+            mol_grid_points = self._get_mol_grid_points()
 
         for sym_elem in symmetry_elements_list:
             if sym_elem == 'E':
@@ -402,13 +594,10 @@ class SymmetryAnalyzer:
                         sym_op_exists = self._check_symmetry_operation(
                             sym_op, sym_op_name, mapping=True)
 
-                        # if Cn does not exist, skip Cn^2 etc.
-                        if power == 1 and not sym_op_exists:
-                            break
-
-                        for pair in self._mapping:
-                            symmetry_mapping.add(pair)
-                        symmetry_operations.append(sym_op)
+                        if sym_op_exists:
+                            for pair in self._mapping:
+                                symmetry_mapping.add(pair)
+                            symmetry_operations.append(sym_op)
 
             # find reflection planes
             elif sym_op_name.startswith('sigma') or sym_op_name == 'Cs':
@@ -439,50 +628,60 @@ class SymmetryAnalyzer:
                         symmetry_mapping.add(pair)
                     symmetry_operations.append(sym_op)
 
-        # average rotation axes
+        # idealize symmetry elements for spherical case
 
-        symmetry_axes = []
-        symmetry_indices = []
+        is_idealized = [False for i in range(len(symmetry_operations))]
 
-        for sym_idx, sym_op in enumerate(symmetry_operations):
-            if isinstance(sym_op, (Rotation, ImproperRotation)):
-                symmetry_axes.append(np.array(sym_op._axis))
-                symmetry_indices.append(sym_idx)
-        symmetry_axes = np.array(symmetry_axes)
+        if is_spherical(point_group):
+            rot_axes = self._get_highest_order_rotation_axes(
+                symmetry_operations)
 
-        for i in range(symmetry_axes.shape[0]):
-            sum_axis = np.array(symmetry_axes[i])
-            count_axis = 1
+            if is_tetrahedral(point_group):
+                ideal_rot_axes = self._get_idealized_rotation_axes_T(rot_axes)
+            elif is_octahedral(point_group):
+                ideal_rot_axes = self._get_idealized_rotation_axes_O(rot_axes)
+            elif is_icosahedral(point_group):
+                ideal_rot_axes = self._get_idealized_rotation_axes_I(rot_axes)
 
-            for sym_op in symmetry_operations:
-                if isinstance(sym_op, (Rotation, ImproperRotation)):
-                    op_axes = np.matmul(symmetry_axes, sym_op.get_matrix())
+            for i in range(len(symmetry_operations)):
+                if isinstance(symmetry_operations[i], Inversion):
+                    continue
+                ax_i = np.array(symmetry_operations[i]._axis)
 
-                    for j in range(op_axes.shape[0]):
-                        dot = np.dot(symmetry_axes[i], op_axes[j])
-                        factor = 1.0 if dot > 0.0 else -1.0
-                        angle_radian = safe_arccos(abs(dot))
+                for ax_j in ideal_rot_axes:
 
-                        if abs(angle_radian) < self._tolerance_ang:
-                            sum_axis += factor * op_axes[j]
-                            count_axis += 1
+                    dot = np.dot(ax_i, ax_j)
+                    factor = 1.0 if dot > 0.0 else -1.0
+                    angle_radian = safe_arccos(abs(dot))
 
-            sym_idx = symmetry_indices[i]
-            symmetry_operations[sym_idx]._axis = sum_axis / count_axis
+                    # note: only idealize parallel axis
+                    if abs(angle_radian) < self._tolerance_ang:
+                        symmetry_operations[i]._axis = np.array(factor * ax_j)
+                        is_idealized[i] = True
+                        break
+
+        else:
+            for i in range(len(symmetry_operations)):
+                if not isinstance(symmetry_operations[i], Inversion):
+                    is_idealized[i] = True
+                    break
 
         # update parallel and perpendicular symmetry elements
-
-        # TODO: idealize symmetry elements for spherical case
 
         for i in range(len(symmetry_operations)):
             if isinstance(symmetry_operations[i], Inversion):
                 continue
+            if is_idealized[i]:
+                continue
+
+            ax_i = np.array(symmetry_operations[i]._axis)
 
             for j in range(len(symmetry_operations)):
                 if isinstance(symmetry_operations[j], Inversion):
                     continue
+                if not is_idealized[j]:
+                    continue
 
-                ax_i = np.array(symmetry_operations[i]._axis)
                 ax_j = np.array(symmetry_operations[j]._axis)
 
                 dot = np.dot(ax_i, ax_j)
@@ -494,11 +693,13 @@ class SymmetryAnalyzer:
                     y_axis = np.cross(ax_j, ax_i)
                     y_axis /= np.linalg.norm(y_axis)
                     symmetry_operations[i]._axis = np.cross(y_axis, ax_j)
+                    is_idealized[i] = True
                     break
 
                 # parallel
                 elif abs(angle_radian) < self._tolerance_ang:
                     symmetry_operations[i]._axis = np.array(factor * ax_j)
+                    is_idealized[i] = True
                     break
 
         # find unique atoms
@@ -540,7 +741,10 @@ class SymmetryAnalyzer:
             vec_a_norm = np.linalg.norm(vec_a)
             u_vec_a = vec_a / vec_a_norm
 
-            for sym_op in symmetry_operations:
+            for sym_idx, sym_op in enumerate(symmetry_operations):
+                if not is_idealized[sym_idx]:
+                    continue
+
                 if isinstance(sym_op, (Rotation, ImproperRotation)):
                     axis = np.array(sym_op._axis)
 
@@ -566,7 +770,10 @@ class SymmetryAnalyzer:
 
         # generate molecule from unique atoms
 
-        for sym_op in symmetry_operations:
+        for sym_idx, sym_op in enumerate(symmetry_operations):
+            if not is_idealized[sym_idx]:
+                continue
+
             sym_mat = sym_op.get_matrix()
             op_coords = np.matmul(np.array(atoms), sym_mat)
 
@@ -593,29 +800,31 @@ class SymmetryAnalyzer:
 
         # reorient molecule
 
-        z_axis = None
-        for sym_op in symmetry_operations:
-            if isinstance(sym_op, (Rotation, ImproperRotation)):
-                z_axis = np.array(sym_op._axis)
-                break
-        if z_axis is not None:
-            min_dot, min_idx = None, None
-            for i in range(self._natoms):
-                if np.linalg.norm(atoms[i]) < 1e-8:
-                    continue
-                u_vec_i = atoms[i] / np.linalg.norm(atoms[i])
-                dot = abs(np.dot(z_axis, u_vec_i))
-                if min_dot is None or min_dot > dot:
-                    min_dot = dot
-                    min_idx = i
-            y_axis = np.cross(z_axis, atoms[min_idx])
+        rot_mat = None
+
+        if is_spherical(point_group):
+            rot_axes = self._get_highest_order_rotation_axes(
+                symmetry_operations)
+            z_axis = np.array(rot_axes[0])
+            v_axis = np.cross(rot_axes[1], z_axis)
+            y_axis = np.cross(z_axis, v_axis)
             y_axis /= np.linalg.norm(y_axis)
-            x_axis = np.cross(y_axis, z_axis)
-            rot_mat = np.array([x_axis, y_axis, z_axis])
-            rot_coords = np.matmul(centered_mol.get_coordinates_in_bohr(),
-                                   rot_mat.T)
-            for i in range(self._natoms):
-                centered_mol.set_atom_coordinates(i, rot_coords[i])
+
+        else:
+            Ivals, Ivecs = centered_mol.moments_of_inertia(principal_axes=True)
+            z_axis = np.array(Ivecs[2])
+            v_axis = np.cross(Ivecs[1], z_axis)
+            y_axis = np.cross(z_axis, v_axis)
+            y_axis /= np.linalg.norm(y_axis)
+
+        x_axis = np.cross(y_axis, z_axis)
+        rot_mat = np.array([x_axis, y_axis, z_axis])
+
+        rot_coords = np.matmul(centered_mol.get_coordinates_in_bohr(),
+                               rot_mat.T)
+
+        for i in range(self._natoms):
+            centered_mol.set_atom_coordinates(i, rot_coords[i])
 
         return centered_mol
 
@@ -679,8 +888,8 @@ class SymmetryAnalyzer:
                 break
 
         p_axis = self._get_perpendicular(principal_axis)
-        for angle in np.arange(0, np.pi + 0.1 * self._tolerance_ang,
-                               0.1 * self._tolerance_ang):
+        angle_incr = max(0.1 * self._tolerance_ang, np.radians(0.1))
+        for angle in np.arange(0, np.pi + angle_incr, angle_incr):
             axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
             c2 = Rotation(axis, order=2)
             if self._check_symmetry_operation(c2, "C2_p"):
@@ -718,8 +927,8 @@ class SymmetryAnalyzer:
         # Get the perpendicualar axis to principal axis and check for C2 rotation axis
         # along p_axis by rotating p_axis along the principal axis
         p_axis = self._get_perpendicular(principal_axis)
-        for angle in np.arange(0, np.pi + 0.1 * self._tolerance_ang,
-                               0.1 * self._tolerance_ang):
+        angle_incr = max(0.1 * self._tolerance_ang, np.radians(0.1))
+        for angle in np.arange(0, np.pi + angle_incr, angle_incr):
             axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
             c2 = Rotation(axis, order=2)
             if self._check_symmetry_operation(c2, "C2_p"):
@@ -803,8 +1012,8 @@ class SymmetryAnalyzer:
                 axis = np.dot(principal_axis, r_matrix.T)
 
                 # set molecule orientation in I
-                for angle in np.arange(0, 2 * np.pi + 0.1 * self._tolerance_ang,
-                                       0.1 * self._tolerance_ang):
+                angle_incr = max(0.1 * self._tolerance_ang, np.radians(0.1))
+                for angle in np.arange(0, 2 * np.pi + angle_incr, angle_incr):
                     rot_matrix = rotation_matrix(principal_axis, angle)
 
                     c5_axis = np.dot(axis, rot_matrix.T)
@@ -838,8 +1047,8 @@ class SymmetryAnalyzer:
 
             # Check for a C2 axis perpendicular to the first one (for reorientation)
             C2_p_axis = self._get_perpendicular(another_axis)
-            for angle in np.arange(0, np.pi + 0.1 * self._tolerance_ang,
-                                   0.1 * self._tolerance_ang):
+            angle_incr = max(0.1 * self._tolerance_ang, np.radians(0.1))
+            for angle in np.arange(0, np.pi + angle_incr, angle_incr):
                 h_axis = np.dot(C2_p_axis, rotation_matrix(another_axis, angle))
                 if self._check_symmetry_operation(Rotation(h_axis, order=2),
                                                   "C2_p"):
@@ -864,8 +1073,8 @@ class SymmetryAnalyzer:
                 r_matrix = rotation_matrix(p_axis_base, np.pi / 2)
                 axis = np.dot(principal_axis, r_matrix.T)
 
-                for angle in np.arange(0, 2 * np.pi + 0.1 * self._tolerance_ang,
-                                       0.1 * self._tolerance_ang):
+                angle_incr = max(0.1 * self._tolerance_ang, np.radians(0.1))
+                for angle in np.arange(0, 2 * np.pi + angle_incr, angle_incr):
                     rot_matrix = rotation_matrix(principal_axis, angle)
 
                     c4_axis = np.dot(axis, rot_matrix.T)
@@ -896,8 +1105,8 @@ class SymmetryAnalyzer:
 
             # Check for a C2 axis perpendicular to the first one (for reorientation)
             C2_p_axis = self._get_perpendicular(principal_axis)
-            for angle in np.arange(0, np.pi + 0.1 * self._tolerance_ang,
-                                   0.1 * self._tolerance_ang):
+            angle_incr = max(0.1 * self._tolerance_ang, np.radians(0.1))
+            for angle in np.arange(0, np.pi + angle_incr, angle_incr):
                 h_axis = np.dot(C2_p_axis,
                                 rotation_matrix(principal_axis, angle))
                 if self._check_symmetry_operation(Rotation(h_axis, order=2),
@@ -922,8 +1131,8 @@ class SymmetryAnalyzer:
                 r_matrix = rotation_matrix(p_axis_base, -np.arccos(-1 / 3))
                 axis = np.dot(principal_axis, r_matrix.T)
 
-                for angle in np.arange(0, 2 * np.pi + 0.1 * self._tolerance_ang,
-                                       0.1 * self._tolerance_ang):
+                angle_incr = max(0.1 * self._tolerance_ang, np.radians(0.1))
+                for angle in np.arange(0, 2 * np.pi + angle_incr, angle_incr):
                     rot_matrix = rotation_matrix(principal_axis, angle)
 
                     c3_axis = np.dot(axis, rot_matrix.T)
@@ -948,8 +1157,8 @@ class SymmetryAnalyzer:
 
             # Check for a C2 axis perpendicular to the first one (for reorientation)
             C2_p_axis = self._get_perpendicular(principal_axis)
-            for angle in np.arange(0, np.pi + 0.1 * self._tolerance_ang,
-                                   0.1 * self._tolerance_ang):
+            angle_incr = max(0.1 * self._tolerance_ang, np.radians(0.1))
+            for angle in np.arange(0, np.pi + angle_incr, angle_incr):
                 h_axis = np.dot(C2_p_axis,
                                 rotation_matrix(principal_axis, angle))
                 if self._check_symmetry_operation(Rotation(h_axis, order=2),
@@ -964,8 +1173,8 @@ class SymmetryAnalyzer:
 
             # Check for any reflexion plane
             # C2_p_axis = self._get_perpendicular(principal_axis)
-            for angle in np.arange(0, np.pi + 0.1 * self._tolerance_ang,
-                                   0.1 * self._tolerance_ang):
+            angle_incr = max(0.1 * self._tolerance_ang, np.radians(0.1))
+            for angle in np.arange(0, np.pi + angle_incr, angle_incr):
                 h_axis = np.dot(C2_p_axis,
                                 rotation_matrix(principal_axis, angle))
                 if self._check_symmetry_operation(Reflection(h_axis),
@@ -1027,8 +1236,8 @@ class SymmetryAnalyzer:
 
         # Check for reflexion planes containing the principal axis
         v_symbol = set()
-        for angle in np.arange(0, np.pi + 0.1 * self._tolerance_ang,
-                               0.1 * self._tolerance_ang):
+        angle_incr = max(0.1 * self._tolerance_ang, np.radians(0.1))
+        for angle in np.arange(0, np.pi + angle_incr, angle_incr):
             axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
             if self._check_symmetry_operation(Reflection(axis),
                                               "sigma_v") and not h_symbols:
@@ -1081,13 +1290,15 @@ class SymmetryAnalyzer:
 
         # Check for reflexion planes containing the principal axis
         d_symbol = False
-        for angle in np.arange(0, np.pi + 0.1 * self._tolerance_ang,
-                               0.1 * self._tolerance_ang):
+        angle_incr = max(0.1 * self._tolerance_ang, np.radians(0.1))
+        for angle in np.arange(0, np.pi + angle_incr, angle_incr):
             axis = np.dot(p_axis, rotation_matrix(principal_axis, angle))
-            if self._check_symmetry_operation(
-                    Reflection(axis),
-                    "sigma_v") and not h_symbols and not d_symbol:
-                self._schoenflies_symbol += 'd'
+            if (self._check_symmetry_operation(Reflection(axis), "sigma_v") and
+                    not h_symbols and not d_symbol):
+                if self._schoenflies_symbol == 'C2':
+                    self._schoenflies_symbol += 'v'
+                else:
+                    self._schoenflies_symbol += 'd'
                 d_symbol = True
 
     def _get_axis_rot_order(self, axis, n_max):
@@ -1217,14 +1428,15 @@ class SymmetryAnalyzer:
             The degree of degeneracy.
         """
 
-        for ev1 in Ivals:
-            single_deg = 0
-            for ev2 in Ivals:
-                if abs(ev1 - ev2) < tolerance:
-                    single_deg += 1
-            if single_deg > 1:
-                return single_deg
-        return 1
+        deg = 1
+
+        if abs(Ivals[1] - Ivals[0]) < tolerance:
+            deg += 1
+
+        if abs(Ivals[1] - Ivals[2]) < tolerance:
+            deg += 1
+
+        return deg
 
     @staticmethod
     def _get_nondegenerate(Ivals, tolerance):
@@ -1234,7 +1446,6 @@ class SymmetryAnalyzer:
 
         :param Ivals:
             The array of eigenvalues.
-
         :param tolerance:
             The tolerance parameter on the eigenvalues.
 
@@ -1242,19 +1453,13 @@ class SymmetryAnalyzer:
             The index of the nondegenerate eigenvalue.
         """
 
-        for i, ev1 in enumerate(Ivals):
-            single_deg = 0
-            index = 0
-            for ev2 in Ivals:
-                if not abs(ev1 - ev2) < tolerance:
-                    single_deg += 1
-                    index = i
-            if single_deg == 2:
-                return index
+        if abs(Ivals[1] - Ivals[0]) < tolerance:
+            return 2
 
-        assert_msg_critical(False, "SymmetryAnalyzer: Nondegenerate not found.")
+        if abs(Ivals[1] - Ivals[2]) < tolerance:
+            return 0
 
-    def _get_mol_grid_points(self):
+    def _get_mol_grid_points(self, symmetry_type='unknown'):
         """
         Generate points surrounding the molecule.
 
@@ -1276,20 +1481,22 @@ class SymmetryAnalyzer:
                 points.append(vec / norm)
 
         # principal axes
+        pr_axes_points = []
         for i in range(3):
             vec = np.array(Ivecs[i])
             norm = np.linalg.norm(vec)
             if norm > 1e-8:
-                points.append(vec / norm)
+                pr_axes_points.append(vec / norm)
 
         # centers of rings
+        ring_points = []
         graph = nx.Graph()
         for i in range(self._natoms):
             graph.add_node(i)
             for j in range(i + 1, self._natoms):
                 if connectivity_matrix[i][j] == 1:
                     graph.add_edge(i, j)
-        cycles = list(nx.simple_cycles(graph, length_bound=8))
+        cycles = list(nx.simple_cycles(graph, length_bound=6))
         for cycle in cycles:
             vec = np.zeros(3)
             for i in cycle:
@@ -1297,7 +1504,13 @@ class SymmetryAnalyzer:
             vec /= len(cycle)
             norm = np.linalg.norm(vec)
             if norm > 1e-8:
-                points.append(vec / norm)
+                ring_points.append(vec / norm)
+
+        # note: prioritize center-of-ring points for spherical case
+        if symmetry_type == 'spherical':
+            points += ring_points + pr_axes_points
+        else:
+            points += pr_axes_points + ring_points
 
         # centers of bonds between same elements
         # only used for small molecule
