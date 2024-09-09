@@ -27,6 +27,7 @@ Contributors
 * Xiaoyu Chen
 * Lukas Lampe
 * Manuel Hodecker
+* Noah Deveaux
 * Magnus Ringholm
 * Thomas Fransson
 * Bastiaan van Hoorn
@@ -37,4 +38,4 @@ Contributors
 * Michael F. Herbst
 * Joe Jordan
 
-The list of contributors was obtained 2024-08-26 by ``git shortlog -sn``
+The list of contributors was obtained 2024-09-09 by ``git shortlog -sn``
