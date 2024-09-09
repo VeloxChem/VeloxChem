@@ -2,22 +2,26 @@
 
 #include "TensorComponents.hpp"
 
-namespace erirec { // erirec namespace
+namespace erirec {  // erirec namespace
 
 auto
-comp_bra_hrr_electron_repulsion_pdxx(CSimdArray<double>& cbuffer,
-                                     const size_t idx_pdxx,
-                                     const size_t idx_sdxx,
-                                     const size_t idx_sfxx,
+comp_bra_hrr_electron_repulsion_pdxx(CSimdArray<double>&   cbuffer,
+                                     const size_t          idx_pdxx,
+                                     const size_t          idx_sdxx,
+                                     const size_t          idx_sfxx,
                                      const TPoint<double>& r_ab,
-                                     const int c_angmom,
-                                     const int d_angmom) -> void
+                                     const int             c_angmom,
+                                     const int             d_angmom) -> void
 {
     const auto nelems = cbuffer.number_of_active_elements();
 
-    const auto ccomps = tensor::number_of_spherical_components(std::array<int, 1>{c_angmom,});
+    const auto ccomps = tensor::number_of_spherical_components(std::array<int, 1>{
+        c_angmom,
+    });
 
-    const auto dcomps = tensor::number_of_spherical_components(std::array<int, 1>{d_angmom,});
+    const auto dcomps = tensor::number_of_spherical_components(std::array<int, 1>{
+        d_angmom,
+    });
 
     // set up R(AB) distances
 
@@ -91,7 +95,24 @@ comp_bra_hrr_electron_repulsion_pdxx(CSimdArray<double>& cbuffer,
 
             auto g_x_zz = cbuffer.data(pd_off + 5 * ccomps * dcomps);
 
-            #pragma omp simd aligned(g_0_xx, g_0_xxx, g_0_xxy, g_0_xxz, g_0_xy, g_0_xyy, g_0_xyz, g_0_xz, g_0_xzz, g_0_yy, g_0_yz, g_0_zz, g_x_xx, g_x_xy, g_x_xz, g_x_yy, g_x_yz, g_x_zz  : 64)
+#pragma omp simd aligned(g_0_xx,      \
+                             g_0_xxx, \
+                             g_0_xxy, \
+                             g_0_xxz, \
+                             g_0_xy,  \
+                             g_0_xyy, \
+                             g_0_xyz, \
+                             g_0_xz,  \
+                             g_0_xzz, \
+                             g_0_yy,  \
+                             g_0_yz,  \
+                             g_0_zz,  \
+                             g_x_xx,  \
+                             g_x_xy,  \
+                             g_x_xz,  \
+                             g_x_yy,  \
+                             g_x_yz,  \
+                             g_x_zz : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_x_xx[k] = -g_0_xx[k] * ab_x + g_0_xxx[k];
@@ -121,7 +142,24 @@ comp_bra_hrr_electron_repulsion_pdxx(CSimdArray<double>& cbuffer,
 
             auto g_y_zz = cbuffer.data(pd_off + 11 * ccomps * dcomps);
 
-            #pragma omp simd aligned(g_0_xx, g_0_xxy, g_0_xy, g_0_xyy, g_0_xyz, g_0_xz, g_0_yy, g_0_yyy, g_0_yyz, g_0_yz, g_0_yzz, g_0_zz, g_y_xx, g_y_xy, g_y_xz, g_y_yy, g_y_yz, g_y_zz  : 64)
+#pragma omp simd aligned(g_0_xx,      \
+                             g_0_xxy, \
+                             g_0_xy,  \
+                             g_0_xyy, \
+                             g_0_xyz, \
+                             g_0_xz,  \
+                             g_0_yy,  \
+                             g_0_yyy, \
+                             g_0_yyz, \
+                             g_0_yz,  \
+                             g_0_yzz, \
+                             g_0_zz,  \
+                             g_y_xx,  \
+                             g_y_xy,  \
+                             g_y_xz,  \
+                             g_y_yy,  \
+                             g_y_yz,  \
+                             g_y_zz : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_y_xx[k] = -g_0_xx[k] * ab_y + g_0_xxy[k];
@@ -151,7 +189,24 @@ comp_bra_hrr_electron_repulsion_pdxx(CSimdArray<double>& cbuffer,
 
             auto g_z_zz = cbuffer.data(pd_off + 17 * ccomps * dcomps);
 
-            #pragma omp simd aligned(g_0_xx, g_0_xxz, g_0_xy, g_0_xyz, g_0_xz, g_0_xzz, g_0_yy, g_0_yyz, g_0_yz, g_0_yzz, g_0_zz, g_0_zzz, g_z_xx, g_z_xy, g_z_xz, g_z_yy, g_z_yz, g_z_zz  : 64)
+#pragma omp simd aligned(g_0_xx,      \
+                             g_0_xxz, \
+                             g_0_xy,  \
+                             g_0_xyz, \
+                             g_0_xz,  \
+                             g_0_xzz, \
+                             g_0_yy,  \
+                             g_0_yyz, \
+                             g_0_yz,  \
+                             g_0_yzz, \
+                             g_0_zz,  \
+                             g_0_zzz, \
+                             g_z_xx,  \
+                             g_z_xy,  \
+                             g_z_xz,  \
+                             g_z_yy,  \
+                             g_z_yz,  \
+                             g_z_zz : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_z_xx[k] = -g_0_xx[k] * ab_z + g_0_xxz[k];
@@ -170,5 +225,4 @@ comp_bra_hrr_electron_repulsion_pdxx(CSimdArray<double>& cbuffer,
     }
 }
 
-} // erirec namespace
-
+}  // namespace erirec

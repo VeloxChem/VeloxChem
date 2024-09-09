@@ -6,7 +6,7 @@
 #include "Point.hpp"
 #include "SimdArray.hpp"
 
-namespace erirec { // erirec namespace
+namespace erirec {  // erirec namespace
 
 /// Computes [SP|1/|r-r'||SS]  integrals for set of data buffers.
 /// @param pbuffer The primitive integrals buffer.
@@ -16,14 +16,13 @@ namespace erirec { // erirec namespace
 /// @param factors The primitive factors buffer.
 /// @param idx_wp The vector of distances R(WP) = W - P.
 /// @param r_pb The Cartesiandistances R(PB) = P - B.
-auto
-comp_prim_electron_repulsion_spss(CSimdArray<double>& pbuffer,
-                                  const size_t idx_eri_0_spss,
-                                  size_t idx_eri_0_ssss,
-                                  size_t idx_eri_1_ssss,
-                                  CSimdArray<double>& factors,
-                                  const size_t idx_wp,
-                                  const TPoint<double>& r_pb) -> void;
-} // erirec namespace
+auto comp_prim_electron_repulsion_spss(CSimdArray<double>&   pbuffer,
+                                       const size_t          idx_eri_0_spss,
+                                       size_t                idx_eri_0_ssss,
+                                       size_t                idx_eri_1_ssss,
+                                       CSimdArray<double>&   factors,
+                                       const size_t          idx_wp,
+                                       const TPoint<double>& r_pb) -> void;
+}  // namespace erirec
 
 #endif /* ElectronRepulsionPrimRecSPSS_hpp */

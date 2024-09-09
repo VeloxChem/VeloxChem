@@ -3,20 +3,19 @@
 
 #include <string>
 
+#include "Matrices.hpp"
+#include "Matrix.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
-#include "Matrix.hpp"
-#include "Matrices.hpp"
 
 /// Class CFockDriver provides methods for computing Fock matrices
 /// using four center electron repulsion integrals..
 class CFockDriver
 {
    public:
-    
     /// Creates a Fock matrices  driver.
     CFockDriver() = default;
-    
+
     /// @brief The default copy constructor.
     /// @param other The Fock matrices driver to be copied.
     CFockDriver(const CFockDriver &other) = delete;
@@ -56,10 +55,10 @@ class CFockDriver
     /// @param exchange_factor The exchange-correlation factors.
     /// @param omega The range separation factor.
     /// @return The Fock matrix.
-    auto compute(const CMolecularBasis& basis,
-                 const CMolecule&       molecule,
-                 const CMatrix&         density,
-                 const std::string&     label,
+    auto compute(const CMolecularBasis &basis,
+                 const CMolecule       &molecule,
+                 const CMatrix         &density,
+                 const std::string     &label,
                  const double           exchange_factor,
                  const double           omega) const -> CMatrix;
 };

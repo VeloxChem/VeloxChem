@@ -2,24 +2,28 @@
 
 #include "TensorComponents.hpp"
 
-namespace erirec { // erirec namespace
+namespace erirec {  // erirec namespace
 
 auto
-comp_ket_hrr_electron_repulsion_xxpp(CSimdArray<double>& cbuffer,
-                                     const size_t idx_xxpp,
-                                     CSimdArray<double>& pbuffer,
-                                     const size_t idx_xxsp,
-                                     const size_t idx_xxsd,
+comp_ket_hrr_electron_repulsion_xxpp(CSimdArray<double>&       cbuffer,
+                                     const size_t              idx_xxpp,
+                                     CSimdArray<double>&       pbuffer,
+                                     const size_t              idx_xxsp,
+                                     const size_t              idx_xxsd,
                                      const CSimdArray<double>& factors,
-                                     const size_t idx_cd,
-                                     const int a_angmom,
-                                     const int b_angmom) -> void
+                                     const size_t              idx_cd,
+                                     const int                 a_angmom,
+                                     const int                 b_angmom) -> void
 {
     const auto nelems = cbuffer.number_of_active_elements();
 
-    const auto acomps = tensor::number_of_cartesian_components(std::array<int, 1>{a_angmom,});
+    const auto acomps = tensor::number_of_cartesian_components(std::array<int, 1>{
+        a_angmom,
+    });
 
-    const auto bcomps = tensor::number_of_cartesian_components(std::array<int, 1>{b_angmom,});
+    const auto bcomps = tensor::number_of_cartesian_components(std::array<int, 1>{
+        b_angmom,
+    });
 
     // Set up R(CD) distances
 
@@ -71,7 +75,7 @@ comp_ket_hrr_electron_repulsion_xxpp(CSimdArray<double>& cbuffer,
 
             auto g_x_z = cbuffer.data(pp_off + 2);
 
-            #pragma omp simd aligned(cd_x, g_0_x, g_0_xx, g_0_xy, g_0_xz, g_0_y, g_0_z, g_x_x, g_x_y, g_x_z  : 64)
+#pragma omp simd aligned(cd_x, g_0_x, g_0_xx, g_0_xy, g_0_xz, g_0_y, g_0_z, g_x_x, g_x_y, g_x_z : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_x_x[k] = -g_0_x[k] * cd_x[k] + g_0_xx[k];
@@ -89,7 +93,7 @@ comp_ket_hrr_electron_repulsion_xxpp(CSimdArray<double>& cbuffer,
 
             auto g_y_z = cbuffer.data(pp_off + 5);
 
-            #pragma omp simd aligned(cd_y, g_0_x, g_0_xy, g_0_y, g_0_yy, g_0_yz, g_0_z, g_y_x, g_y_y, g_y_z  : 64)
+#pragma omp simd aligned(cd_y, g_0_x, g_0_xy, g_0_y, g_0_yy, g_0_yz, g_0_z, g_y_x, g_y_y, g_y_z : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_y_x[k] = -g_0_x[k] * cd_y[k] + g_0_xy[k];
@@ -107,7 +111,7 @@ comp_ket_hrr_electron_repulsion_xxpp(CSimdArray<double>& cbuffer,
 
             auto g_z_z = cbuffer.data(pp_off + 8);
 
-            #pragma omp simd aligned(cd_z, g_0_x, g_0_xz, g_0_y, g_0_yz, g_0_z, g_0_zz, g_z_x, g_z_y, g_z_z  : 64)
+#pragma omp simd aligned(cd_z, g_0_x, g_0_xz, g_0_y, g_0_yz, g_0_z, g_0_zz, g_z_x, g_z_y, g_z_z : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_z_x[k] = -g_0_x[k] * cd_z[k] + g_0_xz[k];
@@ -120,5 +124,4 @@ comp_ket_hrr_electron_repulsion_xxpp(CSimdArray<double>& cbuffer,
     }
 }
 
-} // erirec namespace
-
+}  // namespace erirec

@@ -28,11 +28,11 @@ class TestFockDriver:
     def get_data_co(self):
 
         costr = """
-            C 0.0000 0.0000 0.0000
-            O 0.1000 0.3400 1.3100
+            C   0.100  -0.400  -1.000
+            O   0.300   1.400  -2.100
         """
         mol = Molecule.read_str(costr, 'au')
-        bas = MolecularBasis.read(mol, 'def2-svp')
+        bas = MolecularBasis.read(mol, 'def2-QZVP')
 
         return mol, bas
         
@@ -81,7 +81,7 @@ class TestFockDriver:
 
         # load density matrix
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'co.svp.density.npy')
+        npyfile = str(here / 'data' / 'co.qzvp.density.npy')
         den_mat = make_matrix(bas, mat_t.symmetric)
         den_mat.set_values(np.load(npyfile))
         
@@ -91,12 +91,12 @@ class TestFockDriver:
 
         # load reference Fock matrix
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'co.svp.jk.npy')
+        npyfile = str(here / 'data' / 'co.qzvp.fock.2j-k.npy')
         ref_mat = np.load(npyfile)
         
         # dimension of molecular basis
-        indexes = np.triu_indices(3)
-        basdims = [0, 6, 18, 28]
+        indexes = np.triu_indices(5)
+        basdims = [0, 14, 38, 68, 96, 114]
 
         # check individual overlap submatrices
         for i, j in zip(indexes[0], indexes[1]):
@@ -112,20 +112,15 @@ class TestFockDriver:
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
             rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
                                                          sket:eket]))
-            print(i,j)
-            print(cmat.to_numpy())
-            print(rmat.to_numpy())
             # compare submatrices
             assert cmat == rmat
 
         # check full Fock matrix
         fmat = fock_mat.full_matrix()
-        fref = SubMatrix([0, 0, 28, 28])
+        fref = SubMatrix([0, 0, 114, 114])
         fref.set_values(np.ascontiguousarray(ref_mat))
-        
-        print(np.max(fmat.to_numpy() - fref.to_numpy()))
 
-        #assert fmat == fref
+        assert fmat == fref
         
     def test_h2o_fock_2jk_sto3g(self):
 
@@ -145,6 +140,58 @@ class TestFockDriver:
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.sto3g.2jk.npy')
         ref_mat = np.load(npyfile)
+        
+        # dimension of molecular basis
+        indexes = np.triu_indices(2)
+        basdims = [0, 4, 7]
+
+        # check individual overlap submatrices
+        for i, j in zip(indexes[0], indexes[1]):
+            # bra side
+            sbra = basdims[i]
+            ebra = basdims[i + 1]
+            # ket side
+            sket = basdims[j]
+            eket = basdims[j + 1]
+            # load computed submatrix
+            cmat = fock_mat.submatrix((i, j))
+            # load reference submatrix
+            rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
+                                                         sket:eket]))
+            # compare submatrices
+            assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat.full_matrix()
+        fref = SubMatrix([0, 0, 7, 7])
+        fref.set_values(np.ascontiguousarray(ref_mat))
+        
+        assert fmat == fref
+        
+    def test_h2o_fock_2jkx_sto3g(self):
+
+        mol_h2o, bas_sto3g = self.get_data_h2o()
+
+        # load density matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.sto3g.density.npy')
+        den_mat = make_matrix(bas_sto3g, mat_t.symmetric)
+        den_mat.set_values(np.load(npyfile))
+
+        # compute Fock matrix
+        fock_drv = FockDriver()
+        fock_mat = fock_drv.compute(bas_sto3g, mol_h2o, den_mat, "2jkx", 0.68, 0.0)
+
+        # load reference Fock matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.sto3g.j.npy')
+        ref_mat = 2.0 * np.load(npyfile)
+        
+        # load reference Fock matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.sto3g.k.npy')
+        ref_mat -= 0.68 * np.load(npyfile)
         
         # dimension of molecular basis
         indexes = np.triu_indices(2)
@@ -239,6 +286,53 @@ class TestFockDriver:
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.sto3g.k.npy')
         ref_mat = np.load(npyfile)
+        
+        # dimension of molecular basis
+        indexes = np.triu_indices(2)
+        basdims = [0, 4, 7]
+
+        # check individual overlap submatrices
+        for i, j in zip(indexes[0], indexes[1]):
+            # bra side
+            sbra = basdims[i]
+            ebra = basdims[i + 1]
+            # ket side
+            sket = basdims[j]
+            eket = basdims[j + 1]
+            # load computed submatrix
+            cmat = fock_mat.submatrix((i, j))
+            # load reference submatrix
+            rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
+                                                         sket:eket]))
+            # compare submatrices
+            assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat.full_matrix()
+        fref = SubMatrix([0, 0, 7, 7])
+        fref.set_values(np.ascontiguousarray(ref_mat))
+        
+        assert fmat == fref
+        
+    def test_h2o_fock_kx_sto3g(self):
+
+        mol_h2o, bas_sto3g = self.get_data_h2o()
+
+        # load density matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.sto3g.density.npy')
+        den_mat = make_matrix(bas_sto3g, mat_t.symmetric)
+        den_mat.set_values(np.load(npyfile))
+
+        # compute Fock matrix
+        fock_drv = FockDriver()
+        fock_mat = fock_drv.compute(bas_sto3g, mol_h2o, den_mat, "kx", 0.68, 0.0)
+
+        # load reference Fock matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.sto3g.k.npy')
+        ref_mat = 0.68 * np.load(npyfile)
         
         # dimension of molecular basis
         indexes = np.triu_indices(2)

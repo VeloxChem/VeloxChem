@@ -152,14 +152,14 @@ auto comp_boys_args(CSimdArray<double>&       bf_data,
 /// @param bra_norm The normalization factor on bra side.
 /// @param a_exp The exponent on A center.
 /// @param b_exp The exponent on B center.
-auto comp_ovl_factors(      CSimdArray<double>& buffer,
-                      const size_t              index_ovl,
-                      const size_t              index_ket_ovl,
-                      const size_t              index_ket_norm,
-                      const double              bra_ovl,
-                      const double              bra_norm,
-                      const double              a_exp,
-                      const double              b_exp) -> void;
+auto comp_ovl_factors(CSimdArray<double>& buffer,
+                      const size_t        index_ovl,
+                      const size_t        index_ket_ovl,
+                      const size_t        index_ket_norm,
+                      const double        bra_ovl,
+                      const double        bra_norm,
+                      const double        a_exp,
+                      const double        b_exp) -> void;
 
 /// Updates maximum values .
 /// - Parameter max_values : the vector of maximum values of integral shells.
@@ -183,22 +183,27 @@ auto store_values(CSimdArray<double>& buffer, const CSimdArray<double>& values, 
 /// - Parameter bra_comps : the number of angular components on bra side.
 /// - Parameter ket_comps : the number of angular components on bra side.
 /// - Parameter ang_order : the angular order of local/global matrix.
-auto accumulate(CSubMatrix*             glob_matrix,
-                const CSubMatrix*       loc_matrix,
+auto accumulate(CSubMatrix*                glob_matrix,
+                const CSubMatrix*          loc_matrix,
                 const std::vector<size_t>& bra_loc_indices,
                 const std::vector<size_t>& ket_loc_indices,
                 const std::vector<size_t>& bra_glob_indices,
                 const std::vector<size_t>& ket_glob_indices,
-                const int               bra_comps,
-                const int               ket_comps,
-                const bool              ang_order) -> void;
+                const int                  bra_comps,
+                const int                  ket_comps,
+                const bool                 ang_order) -> void;
 
 /// Transforms Cartesian integrals buffer to half-transformed integrals buffer.
 /// - Parameter sbuffer: the spherical  integrals array.
 /// - Parameter cbuffer: the Cartesian integrals array.
 template <int N, int M>
 inline auto
-ket_transform(CSimdArray<double>& sbuffer, const size_t sposition, const CSimdArray<double>& cbuffer, const size_t cposition, const int a_angmom, const int b_angmom) -> void
+ket_transform(CSimdArray<double>&       sbuffer,
+              const size_t              sposition,
+              const CSimdArray<double>& cbuffer,
+              const size_t              cposition,
+              const int                 a_angmom,
+              const int                 b_angmom) -> void
 {
     const auto ndims = sbuffer.number_of_active_elements();
 
@@ -254,7 +259,12 @@ ket_transform(CSimdArray<double>& sbuffer, const size_t sposition, const CSimdAr
 /// - Parameter cbuffer: the Cartesian integrals array.
 template <int N, int M>
 inline auto
-bra_transform(CSimdArray<double>& sbuffer, const size_t sposition, const CSimdArray<double>& cbuffer, const size_t cposition, const int c_angmom, const int d_angmom) -> void
+bra_transform(CSimdArray<double>&       sbuffer,
+              const size_t              sposition,
+              const CSimdArray<double>& cbuffer,
+              const size_t              cposition,
+              const int                 c_angmom,
+              const int                 d_angmom) -> void
 {
     const auto ndims = sbuffer.number_of_active_elements();
 
