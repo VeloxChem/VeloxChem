@@ -1,5 +1,9 @@
 #include "FockDriver.hpp"
 
+#include <algorithm>
+#include <ranges>
+
+#include "CustomViews.hpp"
 #include "ElectronRepulsionFunc.hpp"
 #include "GtoBlock.hpp"
 #include "GtoPairBlock.hpp"
@@ -43,30 +47,21 @@ CFockDriver::compute(const CMolecularBasis& basis,
 
             auto ptr_gto_pairs_data = ptr_gto_pair_blocks->data();
 
-            for (size_t i = 0; i < nblocks; i++)
-            {
-                for (size_t j = i; j < nblocks; j++)
-                {
+            std::ranges::for_each(views::triangular(nblocks) | std::views::reverse, [&](const auto& index) {
+                const size_t i = index.first;
+                const size_t j = index.second;
 #pragma omp task firstprivate(i, j)
-                    {
-                        auto bra_gpairs = ptr_gto_pairs_data[i];
-
-                        auto ket_gpairs = ptr_gto_pairs_data[j];
-
-                        CT4CMatrixDistributor distributor(ptr_fock, ptr_density, label, exchange_factor, omega);
-
-                        distributor.set_indices(bra_gpairs, ket_gpairs);
-
-                        auto bra_range = std::pair<size_t, size_t>(0, bra_gpairs.number_of_contracted_pairs());
-
-                        auto ket_range = std::pair<size_t, size_t>(0, ket_gpairs.number_of_contracted_pairs());
-
-                        erifunc::compute<CT4CMatrixDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range, i == j);
-
-                        distributor.accumulate(bra_gpairs, ket_gpairs);
-                    }
+                {
+                    auto                  bra_gpairs = ptr_gto_pairs_data[i];
+                    auto                  ket_gpairs = ptr_gto_pairs_data[j];
+                    CT4CMatrixDistributor distributor(ptr_fock, ptr_density, label, exchange_factor, omega);
+                    distributor.set_indices(bra_gpairs, ket_gpairs);
+                    auto bra_range = std::pair<size_t, size_t>(0, bra_gpairs.number_of_contracted_pairs());
+                    auto ket_range = std::pair<size_t, size_t>(0, ket_gpairs.number_of_contracted_pairs());
+                    erifunc::compute<CT4CMatrixDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range, i == j);
+                    distributor.accumulate(bra_gpairs, ket_gpairs);
                 }
-            }
+            });
         }
     }
 

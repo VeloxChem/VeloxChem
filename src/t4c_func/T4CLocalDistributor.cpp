@@ -1,5 +1,6 @@
 #include "T4CLocalDistributor.hpp"
 
+#include <iomanip>
 #include <iostream>
 
 #include "TensorComponents.hpp"
@@ -727,10 +728,12 @@ local_distribute_rest_j(CMatrices&                       focks,
 
                         auto fval = curr_buffer[m - ket_range.first];
 
-                        if ((a_angmom == 0) && (b_angmom == 0) && (c_angmom == 0) && (d_angmom == 2))
-                        {
-                            std::cout << "(" << p << "," << q << "|" << r << ", " << s << ") = " << fval << std::endl;
-                        }
+                        //                        if ((a_angmom == 3) && (b_angmom == 3) && (c_angmom == 3) && (d_angmom == 3))
+                        //                        {
+                        //                            std::cout << std::setprecision(15);
+                        //
+                        //                            std::cout  << p << " " << q << " " << r << " " << s << " " << fval << std::endl;
+                        //                        }
 
                         if (p == q) fval *= 0.5;
 

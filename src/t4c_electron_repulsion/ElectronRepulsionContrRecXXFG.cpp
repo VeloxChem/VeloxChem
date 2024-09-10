@@ -2,27 +2,23 @@
 
 #include "TensorComponents.hpp"
 
-namespace erirec {  // erirec namespace
+namespace erirec { // erirec namespace
 
 auto
-comp_ket_hrr_electron_repulsion_xxfg(CSimdArray<double>&       cbuffer,
-                                     const size_t              idx_xxfg,
-                                     const size_t              idx_xxdg,
-                                     const size_t              idx_xxdh,
+comp_ket_hrr_electron_repulsion_xxfg(CSimdArray<double>& cbuffer,
+                                     const size_t idx_xxfg,
+                                     const size_t idx_xxdg,
+                                     const size_t idx_xxdh,
                                      const CSimdArray<double>& factors,
-                                     const size_t              idx_cd,
-                                     const int                 a_angmom,
-                                     const int                 b_angmom) -> void
+                                     const size_t idx_cd,
+                                     const int a_angmom,
+                                     const int b_angmom) -> void
 {
     const auto nelems = cbuffer.number_of_active_elements();
 
-    const auto acomps = tensor::number_of_cartesian_components(std::array<int, 1>{
-        a_angmom,
-    });
+    const auto acomps = tensor::number_of_cartesian_components(std::array<int, 1>{a_angmom,});
 
-    const auto bcomps = tensor::number_of_cartesian_components(std::array<int, 1>{
-        b_angmom,
-    });
+    const auto bcomps = tensor::number_of_cartesian_components(std::array<int, 1>{b_angmom,});
 
     // Set up R(CD) distances
 
@@ -472,52 +468,7 @@ comp_ket_hrr_electron_repulsion_xxfg(CSimdArray<double>&       cbuffer,
 
             auto g_xxx_zzzz = cbuffer.data(fg_off + 14);
 
-#pragma omp simd aligned(cd_x,           \
-                             g_xx_xxxx,  \
-                             g_xx_xxxxx, \
-                             g_xx_xxxxy, \
-                             g_xx_xxxxz, \
-                             g_xx_xxxy,  \
-                             g_xx_xxxyy, \
-                             g_xx_xxxyz, \
-                             g_xx_xxxz,  \
-                             g_xx_xxxzz, \
-                             g_xx_xxyy,  \
-                             g_xx_xxyyy, \
-                             g_xx_xxyyz, \
-                             g_xx_xxyz,  \
-                             g_xx_xxyzz, \
-                             g_xx_xxzz,  \
-                             g_xx_xxzzz, \
-                             g_xx_xyyy,  \
-                             g_xx_xyyyy, \
-                             g_xx_xyyyz, \
-                             g_xx_xyyz,  \
-                             g_xx_xyyzz, \
-                             g_xx_xyzz,  \
-                             g_xx_xyzzz, \
-                             g_xx_xzzz,  \
-                             g_xx_xzzzz, \
-                             g_xx_yyyy,  \
-                             g_xx_yyyz,  \
-                             g_xx_yyzz,  \
-                             g_xx_yzzz,  \
-                             g_xx_zzzz,  \
-                             g_xxx_xxxx, \
-                             g_xxx_xxxy, \
-                             g_xxx_xxxz, \
-                             g_xxx_xxyy, \
-                             g_xxx_xxyz, \
-                             g_xxx_xxzz, \
-                             g_xxx_xyyy, \
-                             g_xxx_xyyz, \
-                             g_xxx_xyzz, \
-                             g_xxx_xzzz, \
-                             g_xxx_yyyy, \
-                             g_xxx_yyyz, \
-                             g_xxx_yyzz, \
-                             g_xxx_yzzz, \
-                             g_xxx_zzzz : 64)
+            #pragma omp simd aligned(cd_x, g_xx_xxxx, g_xx_xxxxx, g_xx_xxxxy, g_xx_xxxxz, g_xx_xxxy, g_xx_xxxyy, g_xx_xxxyz, g_xx_xxxz, g_xx_xxxzz, g_xx_xxyy, g_xx_xxyyy, g_xx_xxyyz, g_xx_xxyz, g_xx_xxyzz, g_xx_xxzz, g_xx_xxzzz, g_xx_xyyy, g_xx_xyyyy, g_xx_xyyyz, g_xx_xyyz, g_xx_xyyzz, g_xx_xyzz, g_xx_xyzzz, g_xx_xzzz, g_xx_xzzzz, g_xx_yyyy, g_xx_yyyz, g_xx_yyzz, g_xx_yzzz, g_xx_zzzz, g_xxx_xxxx, g_xxx_xxxy, g_xxx_xxxz, g_xxx_xxyy, g_xxx_xxyz, g_xxx_xxzz, g_xxx_xyyy, g_xxx_xyyz, g_xxx_xyzz, g_xxx_xzzz, g_xxx_yyyy, g_xxx_yyyz, g_xxx_yyzz, g_xxx_yzzz, g_xxx_zzzz  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_xxx_xxxx[k] = -g_xx_xxxx[k] * cd_x[k] + g_xx_xxxxx[k];
@@ -583,52 +534,7 @@ comp_ket_hrr_electron_repulsion_xxfg(CSimdArray<double>&       cbuffer,
 
             auto g_xxy_zzzz = cbuffer.data(fg_off + 29);
 
-#pragma omp simd aligned(cd_x,           \
-                             g_xxy_xxxx, \
-                             g_xxy_xxxy, \
-                             g_xxy_xxxz, \
-                             g_xxy_xxyy, \
-                             g_xxy_xxyz, \
-                             g_xxy_xxzz, \
-                             g_xxy_xyyy, \
-                             g_xxy_xyyz, \
-                             g_xxy_xyzz, \
-                             g_xxy_xzzz, \
-                             g_xxy_yyyy, \
-                             g_xxy_yyyz, \
-                             g_xxy_yyzz, \
-                             g_xxy_yzzz, \
-                             g_xxy_zzzz, \
-                             g_xy_xxxx,  \
-                             g_xy_xxxxx, \
-                             g_xy_xxxxy, \
-                             g_xy_xxxxz, \
-                             g_xy_xxxy,  \
-                             g_xy_xxxyy, \
-                             g_xy_xxxyz, \
-                             g_xy_xxxz,  \
-                             g_xy_xxxzz, \
-                             g_xy_xxyy,  \
-                             g_xy_xxyyy, \
-                             g_xy_xxyyz, \
-                             g_xy_xxyz,  \
-                             g_xy_xxyzz, \
-                             g_xy_xxzz,  \
-                             g_xy_xxzzz, \
-                             g_xy_xyyy,  \
-                             g_xy_xyyyy, \
-                             g_xy_xyyyz, \
-                             g_xy_xyyz,  \
-                             g_xy_xyyzz, \
-                             g_xy_xyzz,  \
-                             g_xy_xyzzz, \
-                             g_xy_xzzz,  \
-                             g_xy_xzzzz, \
-                             g_xy_yyyy,  \
-                             g_xy_yyyz,  \
-                             g_xy_yyzz,  \
-                             g_xy_yzzz,  \
-                             g_xy_zzzz : 64)
+            #pragma omp simd aligned(cd_x, g_xxy_xxxx, g_xxy_xxxy, g_xxy_xxxz, g_xxy_xxyy, g_xxy_xxyz, g_xxy_xxzz, g_xxy_xyyy, g_xxy_xyyz, g_xxy_xyzz, g_xxy_xzzz, g_xxy_yyyy, g_xxy_yyyz, g_xxy_yyzz, g_xxy_yzzz, g_xxy_zzzz, g_xy_xxxx, g_xy_xxxxx, g_xy_xxxxy, g_xy_xxxxz, g_xy_xxxy, g_xy_xxxyy, g_xy_xxxyz, g_xy_xxxz, g_xy_xxxzz, g_xy_xxyy, g_xy_xxyyy, g_xy_xxyyz, g_xy_xxyz, g_xy_xxyzz, g_xy_xxzz, g_xy_xxzzz, g_xy_xyyy, g_xy_xyyyy, g_xy_xyyyz, g_xy_xyyz, g_xy_xyyzz, g_xy_xyzz, g_xy_xyzzz, g_xy_xzzz, g_xy_xzzzz, g_xy_yyyy, g_xy_yyyz, g_xy_yyzz, g_xy_yzzz, g_xy_zzzz  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_xxy_xxxx[k] = -g_xy_xxxx[k] * cd_x[k] + g_xy_xxxxx[k];
@@ -694,52 +600,7 @@ comp_ket_hrr_electron_repulsion_xxfg(CSimdArray<double>&       cbuffer,
 
             auto g_xxz_zzzz = cbuffer.data(fg_off + 44);
 
-#pragma omp simd aligned(cd_x,           \
-                             g_xxz_xxxx, \
-                             g_xxz_xxxy, \
-                             g_xxz_xxxz, \
-                             g_xxz_xxyy, \
-                             g_xxz_xxyz, \
-                             g_xxz_xxzz, \
-                             g_xxz_xyyy, \
-                             g_xxz_xyyz, \
-                             g_xxz_xyzz, \
-                             g_xxz_xzzz, \
-                             g_xxz_yyyy, \
-                             g_xxz_yyyz, \
-                             g_xxz_yyzz, \
-                             g_xxz_yzzz, \
-                             g_xxz_zzzz, \
-                             g_xz_xxxx,  \
-                             g_xz_xxxxx, \
-                             g_xz_xxxxy, \
-                             g_xz_xxxxz, \
-                             g_xz_xxxy,  \
-                             g_xz_xxxyy, \
-                             g_xz_xxxyz, \
-                             g_xz_xxxz,  \
-                             g_xz_xxxzz, \
-                             g_xz_xxyy,  \
-                             g_xz_xxyyy, \
-                             g_xz_xxyyz, \
-                             g_xz_xxyz,  \
-                             g_xz_xxyzz, \
-                             g_xz_xxzz,  \
-                             g_xz_xxzzz, \
-                             g_xz_xyyy,  \
-                             g_xz_xyyyy, \
-                             g_xz_xyyyz, \
-                             g_xz_xyyz,  \
-                             g_xz_xyyzz, \
-                             g_xz_xyzz,  \
-                             g_xz_xyzzz, \
-                             g_xz_xzzz,  \
-                             g_xz_xzzzz, \
-                             g_xz_yyyy,  \
-                             g_xz_yyyz,  \
-                             g_xz_yyzz,  \
-                             g_xz_yzzz,  \
-                             g_xz_zzzz : 64)
+            #pragma omp simd aligned(cd_x, g_xxz_xxxx, g_xxz_xxxy, g_xxz_xxxz, g_xxz_xxyy, g_xxz_xxyz, g_xxz_xxzz, g_xxz_xyyy, g_xxz_xyyz, g_xxz_xyzz, g_xxz_xzzz, g_xxz_yyyy, g_xxz_yyyz, g_xxz_yyzz, g_xxz_yzzz, g_xxz_zzzz, g_xz_xxxx, g_xz_xxxxx, g_xz_xxxxy, g_xz_xxxxz, g_xz_xxxy, g_xz_xxxyy, g_xz_xxxyz, g_xz_xxxz, g_xz_xxxzz, g_xz_xxyy, g_xz_xxyyy, g_xz_xxyyz, g_xz_xxyz, g_xz_xxyzz, g_xz_xxzz, g_xz_xxzzz, g_xz_xyyy, g_xz_xyyyy, g_xz_xyyyz, g_xz_xyyz, g_xz_xyyzz, g_xz_xyzz, g_xz_xyzzz, g_xz_xzzz, g_xz_xzzzz, g_xz_yyyy, g_xz_yyyz, g_xz_yyzz, g_xz_yzzz, g_xz_zzzz  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_xxz_xxxx[k] = -g_xz_xxxx[k] * cd_x[k] + g_xz_xxxxx[k];
@@ -805,52 +666,7 @@ comp_ket_hrr_electron_repulsion_xxfg(CSimdArray<double>&       cbuffer,
 
             auto g_xyy_zzzz = cbuffer.data(fg_off + 59);
 
-#pragma omp simd aligned(cd_x,           \
-                             g_xyy_xxxx, \
-                             g_xyy_xxxy, \
-                             g_xyy_xxxz, \
-                             g_xyy_xxyy, \
-                             g_xyy_xxyz, \
-                             g_xyy_xxzz, \
-                             g_xyy_xyyy, \
-                             g_xyy_xyyz, \
-                             g_xyy_xyzz, \
-                             g_xyy_xzzz, \
-                             g_xyy_yyyy, \
-                             g_xyy_yyyz, \
-                             g_xyy_yyzz, \
-                             g_xyy_yzzz, \
-                             g_xyy_zzzz, \
-                             g_yy_xxxx,  \
-                             g_yy_xxxxx, \
-                             g_yy_xxxxy, \
-                             g_yy_xxxxz, \
-                             g_yy_xxxy,  \
-                             g_yy_xxxyy, \
-                             g_yy_xxxyz, \
-                             g_yy_xxxz,  \
-                             g_yy_xxxzz, \
-                             g_yy_xxyy,  \
-                             g_yy_xxyyy, \
-                             g_yy_xxyyz, \
-                             g_yy_xxyz,  \
-                             g_yy_xxyzz, \
-                             g_yy_xxzz,  \
-                             g_yy_xxzzz, \
-                             g_yy_xyyy,  \
-                             g_yy_xyyyy, \
-                             g_yy_xyyyz, \
-                             g_yy_xyyz,  \
-                             g_yy_xyyzz, \
-                             g_yy_xyzz,  \
-                             g_yy_xyzzz, \
-                             g_yy_xzzz,  \
-                             g_yy_xzzzz, \
-                             g_yy_yyyy,  \
-                             g_yy_yyyz,  \
-                             g_yy_yyzz,  \
-                             g_yy_yzzz,  \
-                             g_yy_zzzz : 64)
+            #pragma omp simd aligned(cd_x, g_xyy_xxxx, g_xyy_xxxy, g_xyy_xxxz, g_xyy_xxyy, g_xyy_xxyz, g_xyy_xxzz, g_xyy_xyyy, g_xyy_xyyz, g_xyy_xyzz, g_xyy_xzzz, g_xyy_yyyy, g_xyy_yyyz, g_xyy_yyzz, g_xyy_yzzz, g_xyy_zzzz, g_yy_xxxx, g_yy_xxxxx, g_yy_xxxxy, g_yy_xxxxz, g_yy_xxxy, g_yy_xxxyy, g_yy_xxxyz, g_yy_xxxz, g_yy_xxxzz, g_yy_xxyy, g_yy_xxyyy, g_yy_xxyyz, g_yy_xxyz, g_yy_xxyzz, g_yy_xxzz, g_yy_xxzzz, g_yy_xyyy, g_yy_xyyyy, g_yy_xyyyz, g_yy_xyyz, g_yy_xyyzz, g_yy_xyzz, g_yy_xyzzz, g_yy_xzzz, g_yy_xzzzz, g_yy_yyyy, g_yy_yyyz, g_yy_yyzz, g_yy_yzzz, g_yy_zzzz  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_xyy_xxxx[k] = -g_yy_xxxx[k] * cd_x[k] + g_yy_xxxxx[k];
@@ -916,52 +732,7 @@ comp_ket_hrr_electron_repulsion_xxfg(CSimdArray<double>&       cbuffer,
 
             auto g_xyz_zzzz = cbuffer.data(fg_off + 74);
 
-#pragma omp simd aligned(cd_x,           \
-                             g_xyz_xxxx, \
-                             g_xyz_xxxy, \
-                             g_xyz_xxxz, \
-                             g_xyz_xxyy, \
-                             g_xyz_xxyz, \
-                             g_xyz_xxzz, \
-                             g_xyz_xyyy, \
-                             g_xyz_xyyz, \
-                             g_xyz_xyzz, \
-                             g_xyz_xzzz, \
-                             g_xyz_yyyy, \
-                             g_xyz_yyyz, \
-                             g_xyz_yyzz, \
-                             g_xyz_yzzz, \
-                             g_xyz_zzzz, \
-                             g_yz_xxxx,  \
-                             g_yz_xxxxx, \
-                             g_yz_xxxxy, \
-                             g_yz_xxxxz, \
-                             g_yz_xxxy,  \
-                             g_yz_xxxyy, \
-                             g_yz_xxxyz, \
-                             g_yz_xxxz,  \
-                             g_yz_xxxzz, \
-                             g_yz_xxyy,  \
-                             g_yz_xxyyy, \
-                             g_yz_xxyyz, \
-                             g_yz_xxyz,  \
-                             g_yz_xxyzz, \
-                             g_yz_xxzz,  \
-                             g_yz_xxzzz, \
-                             g_yz_xyyy,  \
-                             g_yz_xyyyy, \
-                             g_yz_xyyyz, \
-                             g_yz_xyyz,  \
-                             g_yz_xyyzz, \
-                             g_yz_xyzz,  \
-                             g_yz_xyzzz, \
-                             g_yz_xzzz,  \
-                             g_yz_xzzzz, \
-                             g_yz_yyyy,  \
-                             g_yz_yyyz,  \
-                             g_yz_yyzz,  \
-                             g_yz_yzzz,  \
-                             g_yz_zzzz : 64)
+            #pragma omp simd aligned(cd_x, g_xyz_xxxx, g_xyz_xxxy, g_xyz_xxxz, g_xyz_xxyy, g_xyz_xxyz, g_xyz_xxzz, g_xyz_xyyy, g_xyz_xyyz, g_xyz_xyzz, g_xyz_xzzz, g_xyz_yyyy, g_xyz_yyyz, g_xyz_yyzz, g_xyz_yzzz, g_xyz_zzzz, g_yz_xxxx, g_yz_xxxxx, g_yz_xxxxy, g_yz_xxxxz, g_yz_xxxy, g_yz_xxxyy, g_yz_xxxyz, g_yz_xxxz, g_yz_xxxzz, g_yz_xxyy, g_yz_xxyyy, g_yz_xxyyz, g_yz_xxyz, g_yz_xxyzz, g_yz_xxzz, g_yz_xxzzz, g_yz_xyyy, g_yz_xyyyy, g_yz_xyyyz, g_yz_xyyz, g_yz_xyyzz, g_yz_xyzz, g_yz_xyzzz, g_yz_xzzz, g_yz_xzzzz, g_yz_yyyy, g_yz_yyyz, g_yz_yyzz, g_yz_yzzz, g_yz_zzzz  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_xyz_xxxx[k] = -g_yz_xxxx[k] * cd_x[k] + g_yz_xxxxx[k];
@@ -1027,52 +798,7 @@ comp_ket_hrr_electron_repulsion_xxfg(CSimdArray<double>&       cbuffer,
 
             auto g_xzz_zzzz = cbuffer.data(fg_off + 89);
 
-#pragma omp simd aligned(cd_x,           \
-                             g_xzz_xxxx, \
-                             g_xzz_xxxy, \
-                             g_xzz_xxxz, \
-                             g_xzz_xxyy, \
-                             g_xzz_xxyz, \
-                             g_xzz_xxzz, \
-                             g_xzz_xyyy, \
-                             g_xzz_xyyz, \
-                             g_xzz_xyzz, \
-                             g_xzz_xzzz, \
-                             g_xzz_yyyy, \
-                             g_xzz_yyyz, \
-                             g_xzz_yyzz, \
-                             g_xzz_yzzz, \
-                             g_xzz_zzzz, \
-                             g_zz_xxxx,  \
-                             g_zz_xxxxx, \
-                             g_zz_xxxxy, \
-                             g_zz_xxxxz, \
-                             g_zz_xxxy,  \
-                             g_zz_xxxyy, \
-                             g_zz_xxxyz, \
-                             g_zz_xxxz,  \
-                             g_zz_xxxzz, \
-                             g_zz_xxyy,  \
-                             g_zz_xxyyy, \
-                             g_zz_xxyyz, \
-                             g_zz_xxyz,  \
-                             g_zz_xxyzz, \
-                             g_zz_xxzz,  \
-                             g_zz_xxzzz, \
-                             g_zz_xyyy,  \
-                             g_zz_xyyyy, \
-                             g_zz_xyyyz, \
-                             g_zz_xyyz,  \
-                             g_zz_xyyzz, \
-                             g_zz_xyzz,  \
-                             g_zz_xyzzz, \
-                             g_zz_xzzz,  \
-                             g_zz_xzzzz, \
-                             g_zz_yyyy,  \
-                             g_zz_yyyz,  \
-                             g_zz_yyzz,  \
-                             g_zz_yzzz,  \
-                             g_zz_zzzz : 64)
+            #pragma omp simd aligned(cd_x, g_xzz_xxxx, g_xzz_xxxy, g_xzz_xxxz, g_xzz_xxyy, g_xzz_xxyz, g_xzz_xxzz, g_xzz_xyyy, g_xzz_xyyz, g_xzz_xyzz, g_xzz_xzzz, g_xzz_yyyy, g_xzz_yyyz, g_xzz_yyzz, g_xzz_yzzz, g_xzz_zzzz, g_zz_xxxx, g_zz_xxxxx, g_zz_xxxxy, g_zz_xxxxz, g_zz_xxxy, g_zz_xxxyy, g_zz_xxxyz, g_zz_xxxz, g_zz_xxxzz, g_zz_xxyy, g_zz_xxyyy, g_zz_xxyyz, g_zz_xxyz, g_zz_xxyzz, g_zz_xxzz, g_zz_xxzzz, g_zz_xyyy, g_zz_xyyyy, g_zz_xyyyz, g_zz_xyyz, g_zz_xyyzz, g_zz_xyzz, g_zz_xyzzz, g_zz_xzzz, g_zz_xzzzz, g_zz_yyyy, g_zz_yyyz, g_zz_yyzz, g_zz_yzzz, g_zz_zzzz  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_xzz_xxxx[k] = -g_zz_xxxx[k] * cd_x[k] + g_zz_xxxxx[k];
@@ -1138,52 +864,7 @@ comp_ket_hrr_electron_repulsion_xxfg(CSimdArray<double>&       cbuffer,
 
             auto g_yyy_zzzz = cbuffer.data(fg_off + 104);
 
-#pragma omp simd aligned(cd_y,           \
-                             g_yy_xxxx,  \
-                             g_yy_xxxxy, \
-                             g_yy_xxxy,  \
-                             g_yy_xxxyy, \
-                             g_yy_xxxyz, \
-                             g_yy_xxxz,  \
-                             g_yy_xxyy,  \
-                             g_yy_xxyyy, \
-                             g_yy_xxyyz, \
-                             g_yy_xxyz,  \
-                             g_yy_xxyzz, \
-                             g_yy_xxzz,  \
-                             g_yy_xyyy,  \
-                             g_yy_xyyyy, \
-                             g_yy_xyyyz, \
-                             g_yy_xyyz,  \
-                             g_yy_xyyzz, \
-                             g_yy_xyzz,  \
-                             g_yy_xyzzz, \
-                             g_yy_xzzz,  \
-                             g_yy_yyyy,  \
-                             g_yy_yyyyy, \
-                             g_yy_yyyyz, \
-                             g_yy_yyyz,  \
-                             g_yy_yyyzz, \
-                             g_yy_yyzz,  \
-                             g_yy_yyzzz, \
-                             g_yy_yzzz,  \
-                             g_yy_yzzzz, \
-                             g_yy_zzzz,  \
-                             g_yyy_xxxx, \
-                             g_yyy_xxxy, \
-                             g_yyy_xxxz, \
-                             g_yyy_xxyy, \
-                             g_yyy_xxyz, \
-                             g_yyy_xxzz, \
-                             g_yyy_xyyy, \
-                             g_yyy_xyyz, \
-                             g_yyy_xyzz, \
-                             g_yyy_xzzz, \
-                             g_yyy_yyyy, \
-                             g_yyy_yyyz, \
-                             g_yyy_yyzz, \
-                             g_yyy_yzzz, \
-                             g_yyy_zzzz : 64)
+            #pragma omp simd aligned(cd_y, g_yy_xxxx, g_yy_xxxxy, g_yy_xxxy, g_yy_xxxyy, g_yy_xxxyz, g_yy_xxxz, g_yy_xxyy, g_yy_xxyyy, g_yy_xxyyz, g_yy_xxyz, g_yy_xxyzz, g_yy_xxzz, g_yy_xyyy, g_yy_xyyyy, g_yy_xyyyz, g_yy_xyyz, g_yy_xyyzz, g_yy_xyzz, g_yy_xyzzz, g_yy_xzzz, g_yy_yyyy, g_yy_yyyyy, g_yy_yyyyz, g_yy_yyyz, g_yy_yyyzz, g_yy_yyzz, g_yy_yyzzz, g_yy_yzzz, g_yy_yzzzz, g_yy_zzzz, g_yyy_xxxx, g_yyy_xxxy, g_yyy_xxxz, g_yyy_xxyy, g_yyy_xxyz, g_yyy_xxzz, g_yyy_xyyy, g_yyy_xyyz, g_yyy_xyzz, g_yyy_xzzz, g_yyy_yyyy, g_yyy_yyyz, g_yyy_yyzz, g_yyy_yzzz, g_yyy_zzzz  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_yyy_xxxx[k] = -g_yy_xxxx[k] * cd_y[k] + g_yy_xxxxy[k];
@@ -1249,52 +930,7 @@ comp_ket_hrr_electron_repulsion_xxfg(CSimdArray<double>&       cbuffer,
 
             auto g_yyz_zzzz = cbuffer.data(fg_off + 119);
 
-#pragma omp simd aligned(cd_y,           \
-                             g_yyz_xxxx, \
-                             g_yyz_xxxy, \
-                             g_yyz_xxxz, \
-                             g_yyz_xxyy, \
-                             g_yyz_xxyz, \
-                             g_yyz_xxzz, \
-                             g_yyz_xyyy, \
-                             g_yyz_xyyz, \
-                             g_yyz_xyzz, \
-                             g_yyz_xzzz, \
-                             g_yyz_yyyy, \
-                             g_yyz_yyyz, \
-                             g_yyz_yyzz, \
-                             g_yyz_yzzz, \
-                             g_yyz_zzzz, \
-                             g_yz_xxxx,  \
-                             g_yz_xxxxy, \
-                             g_yz_xxxy,  \
-                             g_yz_xxxyy, \
-                             g_yz_xxxyz, \
-                             g_yz_xxxz,  \
-                             g_yz_xxyy,  \
-                             g_yz_xxyyy, \
-                             g_yz_xxyyz, \
-                             g_yz_xxyz,  \
-                             g_yz_xxyzz, \
-                             g_yz_xxzz,  \
-                             g_yz_xyyy,  \
-                             g_yz_xyyyy, \
-                             g_yz_xyyyz, \
-                             g_yz_xyyz,  \
-                             g_yz_xyyzz, \
-                             g_yz_xyzz,  \
-                             g_yz_xyzzz, \
-                             g_yz_xzzz,  \
-                             g_yz_yyyy,  \
-                             g_yz_yyyyy, \
-                             g_yz_yyyyz, \
-                             g_yz_yyyz,  \
-                             g_yz_yyyzz, \
-                             g_yz_yyzz,  \
-                             g_yz_yyzzz, \
-                             g_yz_yzzz,  \
-                             g_yz_yzzzz, \
-                             g_yz_zzzz : 64)
+            #pragma omp simd aligned(cd_y, g_yyz_xxxx, g_yyz_xxxy, g_yyz_xxxz, g_yyz_xxyy, g_yyz_xxyz, g_yyz_xxzz, g_yyz_xyyy, g_yyz_xyyz, g_yyz_xyzz, g_yyz_xzzz, g_yyz_yyyy, g_yyz_yyyz, g_yyz_yyzz, g_yyz_yzzz, g_yyz_zzzz, g_yz_xxxx, g_yz_xxxxy, g_yz_xxxy, g_yz_xxxyy, g_yz_xxxyz, g_yz_xxxz, g_yz_xxyy, g_yz_xxyyy, g_yz_xxyyz, g_yz_xxyz, g_yz_xxyzz, g_yz_xxzz, g_yz_xyyy, g_yz_xyyyy, g_yz_xyyyz, g_yz_xyyz, g_yz_xyyzz, g_yz_xyzz, g_yz_xyzzz, g_yz_xzzz, g_yz_yyyy, g_yz_yyyyy, g_yz_yyyyz, g_yz_yyyz, g_yz_yyyzz, g_yz_yyzz, g_yz_yyzzz, g_yz_yzzz, g_yz_yzzzz, g_yz_zzzz  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_yyz_xxxx[k] = -g_yz_xxxx[k] * cd_y[k] + g_yz_xxxxy[k];
@@ -1360,52 +996,7 @@ comp_ket_hrr_electron_repulsion_xxfg(CSimdArray<double>&       cbuffer,
 
             auto g_yzz_zzzz = cbuffer.data(fg_off + 134);
 
-#pragma omp simd aligned(cd_y,           \
-                             g_yzz_xxxx, \
-                             g_yzz_xxxy, \
-                             g_yzz_xxxz, \
-                             g_yzz_xxyy, \
-                             g_yzz_xxyz, \
-                             g_yzz_xxzz, \
-                             g_yzz_xyyy, \
-                             g_yzz_xyyz, \
-                             g_yzz_xyzz, \
-                             g_yzz_xzzz, \
-                             g_yzz_yyyy, \
-                             g_yzz_yyyz, \
-                             g_yzz_yyzz, \
-                             g_yzz_yzzz, \
-                             g_yzz_zzzz, \
-                             g_zz_xxxx,  \
-                             g_zz_xxxxy, \
-                             g_zz_xxxy,  \
-                             g_zz_xxxyy, \
-                             g_zz_xxxyz, \
-                             g_zz_xxxz,  \
-                             g_zz_xxyy,  \
-                             g_zz_xxyyy, \
-                             g_zz_xxyyz, \
-                             g_zz_xxyz,  \
-                             g_zz_xxyzz, \
-                             g_zz_xxzz,  \
-                             g_zz_xyyy,  \
-                             g_zz_xyyyy, \
-                             g_zz_xyyyz, \
-                             g_zz_xyyz,  \
-                             g_zz_xyyzz, \
-                             g_zz_xyzz,  \
-                             g_zz_xyzzz, \
-                             g_zz_xzzz,  \
-                             g_zz_yyyy,  \
-                             g_zz_yyyyy, \
-                             g_zz_yyyyz, \
-                             g_zz_yyyz,  \
-                             g_zz_yyyzz, \
-                             g_zz_yyzz,  \
-                             g_zz_yyzzz, \
-                             g_zz_yzzz,  \
-                             g_zz_yzzzz, \
-                             g_zz_zzzz : 64)
+            #pragma omp simd aligned(cd_y, g_yzz_xxxx, g_yzz_xxxy, g_yzz_xxxz, g_yzz_xxyy, g_yzz_xxyz, g_yzz_xxzz, g_yzz_xyyy, g_yzz_xyyz, g_yzz_xyzz, g_yzz_xzzz, g_yzz_yyyy, g_yzz_yyyz, g_yzz_yyzz, g_yzz_yzzz, g_yzz_zzzz, g_zz_xxxx, g_zz_xxxxy, g_zz_xxxy, g_zz_xxxyy, g_zz_xxxyz, g_zz_xxxz, g_zz_xxyy, g_zz_xxyyy, g_zz_xxyyz, g_zz_xxyz, g_zz_xxyzz, g_zz_xxzz, g_zz_xyyy, g_zz_xyyyy, g_zz_xyyyz, g_zz_xyyz, g_zz_xyyzz, g_zz_xyzz, g_zz_xyzzz, g_zz_xzzz, g_zz_yyyy, g_zz_yyyyy, g_zz_yyyyz, g_zz_yyyz, g_zz_yyyzz, g_zz_yyzz, g_zz_yyzzz, g_zz_yzzz, g_zz_yzzzz, g_zz_zzzz  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_yzz_xxxx[k] = -g_zz_xxxx[k] * cd_y[k] + g_zz_xxxxy[k];
@@ -1471,52 +1062,7 @@ comp_ket_hrr_electron_repulsion_xxfg(CSimdArray<double>&       cbuffer,
 
             auto g_zzz_zzzz = cbuffer.data(fg_off + 149);
 
-#pragma omp simd aligned(cd_z,           \
-                             g_zz_xxxx,  \
-                             g_zz_xxxxz, \
-                             g_zz_xxxy,  \
-                             g_zz_xxxyz, \
-                             g_zz_xxxz,  \
-                             g_zz_xxxzz, \
-                             g_zz_xxyy,  \
-                             g_zz_xxyyz, \
-                             g_zz_xxyz,  \
-                             g_zz_xxyzz, \
-                             g_zz_xxzz,  \
-                             g_zz_xxzzz, \
-                             g_zz_xyyy,  \
-                             g_zz_xyyyz, \
-                             g_zz_xyyz,  \
-                             g_zz_xyyzz, \
-                             g_zz_xyzz,  \
-                             g_zz_xyzzz, \
-                             g_zz_xzzz,  \
-                             g_zz_xzzzz, \
-                             g_zz_yyyy,  \
-                             g_zz_yyyyz, \
-                             g_zz_yyyz,  \
-                             g_zz_yyyzz, \
-                             g_zz_yyzz,  \
-                             g_zz_yyzzz, \
-                             g_zz_yzzz,  \
-                             g_zz_yzzzz, \
-                             g_zz_zzzz,  \
-                             g_zz_zzzzz, \
-                             g_zzz_xxxx, \
-                             g_zzz_xxxy, \
-                             g_zzz_xxxz, \
-                             g_zzz_xxyy, \
-                             g_zzz_xxyz, \
-                             g_zzz_xxzz, \
-                             g_zzz_xyyy, \
-                             g_zzz_xyyz, \
-                             g_zzz_xyzz, \
-                             g_zzz_xzzz, \
-                             g_zzz_yyyy, \
-                             g_zzz_yyyz, \
-                             g_zzz_yyzz, \
-                             g_zzz_yzzz, \
-                             g_zzz_zzzz : 64)
+            #pragma omp simd aligned(cd_z, g_zz_xxxx, g_zz_xxxxz, g_zz_xxxy, g_zz_xxxyz, g_zz_xxxz, g_zz_xxxzz, g_zz_xxyy, g_zz_xxyyz, g_zz_xxyz, g_zz_xxyzz, g_zz_xxzz, g_zz_xxzzz, g_zz_xyyy, g_zz_xyyyz, g_zz_xyyz, g_zz_xyyzz, g_zz_xyzz, g_zz_xyzzz, g_zz_xzzz, g_zz_xzzzz, g_zz_yyyy, g_zz_yyyyz, g_zz_yyyz, g_zz_yyyzz, g_zz_yyzz, g_zz_yyzzz, g_zz_yzzz, g_zz_yzzzz, g_zz_zzzz, g_zz_zzzzz, g_zzz_xxxx, g_zzz_xxxy, g_zzz_xxxz, g_zzz_xxyy, g_zzz_xxyz, g_zzz_xxzz, g_zzz_xyyy, g_zzz_xyyz, g_zzz_xyzz, g_zzz_xzzz, g_zzz_yyyy, g_zzz_yyyz, g_zzz_yyzz, g_zzz_yzzz, g_zzz_zzzz  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_zzz_xxxx[k] = -g_zz_xxxx[k] * cd_z[k] + g_zz_xxxxz[k];
@@ -1553,4 +1099,5 @@ comp_ket_hrr_electron_repulsion_xxfg(CSimdArray<double>&       cbuffer,
     }
 }
 
-}  // namespace erirec
+} // erirec namespace
+
