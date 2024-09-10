@@ -27,19 +27,20 @@ class TestOverlapGeom100Driver:
         # compute nuclear potential gradient matrix
         grad_drv = NuclearPotentialGeom100Driver()
         grad_mats = grad_drv.compute(mol, bas, 0)
-        
+
         # load reference overlap gradient for C atom
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'co.qzvp.nuclear.potential.geom.100.c.npy')
+        npyfile = str(here / 'data' /
+                      'co.qzvp.nuclear.potential.geom.100.c.npy')
         ref_mat = np.load(npyfile)
-        ref_mat = -ref_mat;
-        
+        ref_mat = -ref_mat
+
         # dimension of molecular basis
         basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
         labels = ['X', 'Y', 'Z']
-        
+
         for k, label in enumerate(labels):
             fmat = grad_mats.matrix(label)
             for i in range(0, 5):
@@ -70,19 +71,20 @@ class TestOverlapGeom100Driver:
         # compute nuclear potential gradient matrix
         grad_drv = NuclearPotentialGeom100Driver()
         grad_mats = grad_drv.compute(mol, bas, 1)
-        
+
         # load reference overlap gradient for O atom
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'co.qzvp.nuclear.potential.geom.100.o.npy')
+        npyfile = str(here / 'data' /
+                      'co.qzvp.nuclear.potential.geom.100.o.npy')
         ref_mat = np.load(npyfile)
-        ref_mat = -ref_mat;
-        
+        ref_mat = -ref_mat
+
         # dimension of molecular basis
         basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
         labels = ['X', 'Y', 'Z']
-        
+
         for k, label in enumerate(labels):
             fmat = grad_mats.matrix(label)
             for i in range(0, 5):

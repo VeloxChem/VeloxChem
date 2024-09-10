@@ -36,10 +36,10 @@ class TestElectricDipoleMomentDriver:
         # dimension of molecular basis
         indexes = np.triu_indices(5)
         basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
         labels = ['X', 'Y', 'Z']
-        
+
         for k, label in enumerate(labels):
             fmat = dip_mats.matrix(label)
             for i, j in zip(indexes[0], indexes[1]):

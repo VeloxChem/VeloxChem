@@ -3,7 +3,9 @@ from veloxchem import Molecule
 from veloxchem import set_number_of_threads
 from veloxchem import get_number_of_threads
 from veloxchem import make_gto_blocks
+from veloxchem import make_gto_pair_blocks
 from veloxchem import make_work_tasks
+from veloxchem import make_diag_work_tasks
 
 
 class TestOpenMPFunc:
@@ -61,6 +63,23 @@ class TestOpenMPFunc:
                   [4, 3, 0, 1, 0, 3], [4, 4, 0, 1, 0, 1], [4, 5, 0, 1, 0, 1],
                   [5, 0, 0, 1, 0, 4], [5, 1, 0, 1, 0, 2], [5, 2, 0, 1, 0, 1],
                   [5, 3, 0, 1, 0, 3], [5, 4, 0, 1, 0, 1], [5, 5, 0, 1, 0, 1]]
+        assert wtasks == rtasks
+
+        set_number_of_threads(nthreads)
+
+    def test_make_diag_work_tasks_for_gto_pair_blocks(self):
+
+        nthreads = get_number_of_threads()
+        mol_h2o, bas_svp = self.get_data()
+        set_number_of_threads(3)
+
+        gpairs = make_gto_pair_blocks(bas_svp, mol_h2o)
+        wtasks = make_diag_work_tasks(gpairs)
+        rtasks = [[0, 0, 10], [1, 0, 8], [2, 0, 4], [3, 0, 12], [4, 0, 4],
+                  [5, 0, 4], [6, 0, 3], [7, 0, 2], [8, 0, 6], [9, 0, 2],
+                  [10, 0, 2], [11, 0, 1], [12, 0, 3], [13, 0, 1], [14, 0, 1],
+                  [15, 0, 6], [16, 0, 3], [17, 0, 3], [18, 0, 1], [19, 0, 1],
+                  [20, 0, 1]]
         assert wtasks == rtasks
 
         set_number_of_threads(nthreads)

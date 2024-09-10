@@ -5,6 +5,7 @@ from veloxchem import GtoPairBlock
 from veloxchem import make_gto_blocks
 from veloxchem import make_gto_pair_blocks
 
+
 class TestGtoFunc:
 
     def get_data(self):
@@ -57,7 +58,7 @@ class TestGtoFunc:
         assert len(a_blocks) == len(b_blocks)
         for a_blk, b_blk in zip(a_blocks, b_blocks):
             assert a_blk == b_blk
-            
+
     def test_make_gto_pair_blocks(self):
 
         mol_h2o, bas_svp = self.get_data()

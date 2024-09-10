@@ -27,18 +27,18 @@ class TestKineticEnergyGeom100Driver:
         # compute kinetic energy gradient matrix
         grad_drv = KineticEnergyGeom100Driver()
         grad_mats = grad_drv.compute(mol, bas, 0)
-        
+
         # load reference kinetic energy gradient for C atom
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'co.qzvp.kinetic.energy.geom.100.c.npy')
         ref_mat = np.load(npyfile)
-        
+
         # dimension of molecular basis
         basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
         labels = ['X', 'Y', 'Z']
-        
+
         for k, label in enumerate(labels):
             fmat = grad_mats.matrix(label)
             for i in range(0, 5):
@@ -71,18 +71,18 @@ class TestKineticEnergyGeom100Driver:
         # compute kinetic energy gradient matrix
         grad_drv = KineticEnergyGeom100Driver()
         grad_mats = grad_drv.compute(mol, bas, 1)
-        
+
         # load reference kinetic energy gradient for O atom
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'co.qzvp.kinetic.energy.geom.100.o.npy')
         ref_mat = np.load(npyfile)
-        
+
         # dimension of molecular basis
         basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
         labels = ['X', 'Y', 'Z']
-        
+
         for k, label in enumerate(labels):
             fmat = grad_mats.matrix(label)
             for i in range(0, 5):
