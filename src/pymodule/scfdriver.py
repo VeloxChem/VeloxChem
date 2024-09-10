@@ -108,7 +108,6 @@ class ScfDriver:
         - dipole_origin: The origin of the dipole operator.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
-        - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation using
         - program_end_time: The end time of the program.
         - filename: The filename.
@@ -161,14 +160,6 @@ class ScfDriver:
         # output stream
         self._ostream = ostream
 
-        # restart information
-        self.restart = True
-        self.checkpoint_file = None
-        self._ref_mol_orbs = None
-
-        # Maximum overlap constraint
-        self._mom = None
-
         # closed shell?
         self._scf_type = 'restricted'
 
@@ -182,7 +173,6 @@ class ScfDriver:
         # timing and profiling
         self.timing = False
         self.profiling = False
-        self.memory_profiling = False
         self.memory_tracing = False
 
         # verbosity of output (1-3)
@@ -210,7 +200,6 @@ class ScfDriver:
                 'checkpoint_file': ('str', 'name of checkpoint file'),
                 'timing': ('bool', 'print timing information'),
                 'profiling': ('bool', 'print profiling information'),
-                'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
                 'print_level': ('int', 'verbosity of output (1-3)'),
                 'guess_unpaired_electrons':
@@ -430,9 +419,6 @@ class ScfDriver:
         if self.print_level > 2:
             self.print_level = 3
 
-        if self.restart:
-            self.acc_type = 'DIIS'
-
         # nuclear repulsion energy
         self._nuc_energy = molecule.nuclear_repulsion_energy()
 
@@ -630,62 +616,6 @@ class ScfDriver:
 
         return proj_mo.get_density(molecule, self.scf_type)
 
-    def maximum_overlap(self, molecule, basis, orbitals, alpha_list, beta_list):
-        """
-        Constraint the SCF calculation to find orbitals that maximize overlap
-        with a reference set.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param orbitals:
-            The reference MolecularOrbital object.
-        :param alpha_list:
-            The list of alpha occupied orbitals.
-        :param beta_list:
-            The list of beta occupied orbitals.
-        """
-
-        C_start_a, C_start_b = None, None
-
-        if self.rank == mpi_master():
-            n_alpha = molecule.number_of_alpha_electrons()
-            n_beta = molecule.number_of_beta_electrons()
-
-            # Reorder alpha to match beta
-            if self.scf_type == 'restricted_openshell':
-                alpha_list = beta_list + [
-                    x for x in alpha_list if x not in beta_list
-                ]
-
-            err_excitations = 'ScfDriver.maximum_overlap: '
-            err_excitations += 'incorrect definition of occupation lists'
-            assert_msg_critical(len(alpha_list) == n_alpha, err_excitations)
-            assert_msg_critical(len(beta_list) == n_beta, err_excitations)
-            if self.scf_type == 'restricted':
-                assert_msg_critical(alpha_list == beta_list, err_excitations)
-
-            n_mo = orbitals.number_of_mos()
-            mo_a = orbitals.alpha_to_numpy()
-            mo_b = orbitals.beta_to_numpy()
-
-            C_a = mo_a[:, alpha_list]
-            C_b = mo_b[:, beta_list]
-            self._mom = (C_a, C_b)
-
-            # Create guess orbitals
-            virtual_alpha = [x for x in range(n_mo) if x not in alpha_list]
-            C_start_a = mo_a[:, alpha_list + virtual_alpha]
-            if self.scf_type == 'unrestricted':
-                virtual_beta = [x for x in range(n_mo) if x not in beta_list]
-                C_start_b = mo_b[:, beta_list + virtual_beta]
-
-        if self.scf_type == 'unrestricted':
-            self.set_start_orbitals(molecule, basis, (C_start_a, C_start_b))
-        else:
-            self.set_start_orbitals(molecule, basis, C_start_a)
-
     def _get_num_gpus_per_node(self):
         """
         Gets number of GPUs per MPI process.
@@ -727,7 +657,6 @@ class ScfDriver:
         profiler.begin({
             'timing': self.timing,
             'profiling': self.profiling,
-            'memory_profiling': self.memory_profiling,
             'memory_tracing': self.memory_tracing,
         })
 
@@ -804,8 +733,6 @@ class ScfDriver:
 
         self._density = den_mat.copy()
 
-        profiler.check_memory_usage('Initial guess')
-
         e_grad = None
 
         if self.rank == mpi_master():
@@ -813,12 +740,7 @@ class ScfDriver:
 
         for i in self._get_scf_range():
 
-            # set the current number of SCF iterations
-            # (note the extra SCF cycle when starting from scratch)
-            if self.restart:
-                self._num_iter = i + 1
-            else:
-                self._num_iter = i
+            self._num_iter = i
 
             profiler.set_timing_key(f'Iteration {self._num_iter:d}')
 
@@ -863,8 +785,6 @@ class ScfDriver:
             self._scf_energy = e_scf
 
             profiler.stop_timer('ErrVec')
-            profiler.check_memory_usage('Iteration {:d} Fock build'.format(
-                self._num_iter))
 
             # print iteration and check convergence
 
@@ -892,11 +812,6 @@ class ScfDriver:
                 molecule, eff_fock_mat, oao_mat,
                 screener.get_num_gpus_per_node())
 
-            if self._mom is not None:
-                self._apply_mom(molecule, ovl_mat)
-
-            self._update_mol_orbs_phase()
-
             if self.rank == mpi_master():
                 # TODO unrestricted and restricted open-shell
                 mo = self.molecular_orbitals.alpha_to_numpy()
@@ -914,9 +829,6 @@ class ScfDriver:
             self.comm.Bcast(den_mat, root=mpi_master())
 
             profiler.stop_timer('FockDiag')
-
-            profiler.check_memory_usage('Iteration {:d} Fock diag.'.format(
-                self._num_iter))
 
         if self.rank == mpi_master():
             acc_diis.clear()
@@ -954,7 +866,6 @@ class ScfDriver:
                     # scf info
                     'scf_type': self.scf_type,
                     'scf_energy': self.scf_energy,
-                    'restart': self.restart,
                     # scf tensors
                     'S': S,
                     'C_alpha': C_alpha,
@@ -973,8 +884,6 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self._print_scf_finish(diis_start_time)
-
-        profiler.check_memory_usage('End of SCF')
 
     def _comp_one_ints(self, molecule, basis, screener):
         """
@@ -1244,111 +1153,6 @@ class ScfDriver:
 
         return MolecularOrbitals()
 
-    def _apply_mom(self, molecule, ovl_mat):
-        """
-        Apply the maximum overlap constraint.
-
-        :param molecule:
-            The molecule.
-        :param ovl_mat:
-            The overlap matrix..
-        """
-
-        if self.rank == mpi_master():
-            smat = ovl_mat
-
-            mo_a = self.molecular_orbitals.alpha_to_numpy()
-            ea = self.molecular_orbitals.ea_to_numpy()
-            occ_a = self.molecular_orbitals.occa_to_numpy()
-            n_alpha = molecule.number_of_alpha_electrons()
-
-            ovl = np.linalg.multi_dot([self._mom[0].T, smat, mo_a])
-            argsort = np.argsort(np.sum(np.abs(ovl), 0))[::-1]
-            # restore energy ordering
-            argsort[:n_alpha] = np.sort(argsort[:n_alpha])
-            argsort[n_alpha:] = np.sort(argsort[n_alpha:])
-            mo_a = mo_a[:, argsort]
-            ea = ea[argsort]
-
-            if self.scf_type == 'restricted':
-                self._molecular_orbitals = MolecularOrbitals([mo_a], [ea],
-                                                             [occ_a],
-                                                             molorb.rest)
-
-            else:
-                n_beta = molecule.number_of_beta_electrons()
-                occ_b = self.molecular_orbitals.occb_to_numpy()
-
-                if self.scf_type == 'unrestricted':
-                    mo_b = self.molecular_orbitals.beta_to_numpy()
-                    eb = self.molecular_orbitals.eb_to_numpy()
-                elif self.scf_type == 'restricted_openshell':
-                    # For ROHF, the beta orbitals have to be a subset of the alpha
-                    mo_b = mo_a[:, :n_alpha]
-
-                ovl = np.linalg.multi_dot([self._mom[1].T, smat, mo_b])
-                argsort_b = np.argsort(np.sum(np.abs(ovl), 0))[::-1]
-                # restore energy ordering
-                argsort_b[:n_beta] = np.sort(argsort_b[:n_beta])
-                argsort_b[n_beta:] = np.sort(argsort_b[n_beta:])
-
-                if self.scf_type == 'unrestricted':
-                    mo_b = mo_b[:, argsort_b]
-                    eb = eb[argsort_b]
-                    self._molecular_orbitals = MolecularOrbitals([mo_a, mo_b],
-                                                                 [ea, eb],
-                                                                 [occ_a, occ_b],
-                                                                 molorb.unrest)
-                elif self.scf_type == 'restricted_openshell':
-                    mo_a[:, :n_alpha] = mo_a[:, argsort_b]
-                    ea[:n_alpha] = ea[argsort_b]
-                    self._molecular_orbitals = MolecularOrbitals(
-                        [mo_a], [ea], [occ_a, occ_b], molorb.restopen)
-
-    def _update_mol_orbs_phase(self):
-        """
-        Updates phase of molecular orbitals.
-        """
-
-        if self.rank == mpi_master():
-            if self._ref_mol_orbs is None:
-                return
-
-            ref_mo_a = self._ref_mol_orbs.alpha_to_numpy()
-            mo_a = self.molecular_orbitals.alpha_to_numpy()
-            e_a = self.molecular_orbitals.ea_to_numpy()
-            occ_a = self.molecular_orbitals.occa_to_numpy()
-
-            for col in range(mo_a.shape[1]):
-                if np.dot(mo_a[:, col], ref_mo_a[:, col]) < 0.0:
-                    mo_a[:, col] *= -1.0
-
-            if self.molecular_orbitals.get_orbitals_type() == molorb.rest:
-                self._molecular_orbitals = MolecularOrbitals([mo_a], [e_a],
-                                                             [occ_a],
-                                                             molorb.rest)
-
-            elif self.molecular_orbitals.get_orbitals_type() == molorb.unrest:
-                ref_mo_b = self._ref_mol_orbs.beta_to_numpy()
-                mo_b = self.molecular_orbitals.beta_to_numpy()
-                e_b = self.molecular_orbitals.eb_to_numpy()
-                occ_b = self.molecular_orbitals.occb_to_numpy()
-
-                for col in range(mo_b.shape[1]):
-                    if np.dot(mo_b[:, col], ref_mo_b[:, col]) < 0.0:
-                        mo_b[:, col] *= -1.0
-
-                self._molecular_orbitals = MolecularOrbitals([mo_a, mo_b],
-                                                             [e_a, e_b],
-                                                             [occ_a, occ_b],
-                                                             molorb.unrest)
-
-            elif self.molecular_orbitals.get_orbitals_type() == molorb.restopen:
-                occ_b = self.molecular_orbitals.occb_to_numpy()
-                self._molecular_orbitals = MolecularOrbitals([mo_a], [e_a],
-                                                             [occ_a, occ_b],
-                                                             molorb.restopen)
-
     def _get_dyn_threshold(self, e_grad):
         """
         Computes screening threshold for electron repulsion integrals based on
@@ -1394,17 +1198,7 @@ class ScfDriver:
             e_grad = self._iter_data['gradient_norm']
 
             if e_grad < self.conv_thresh:
-                if self.restart:
-                    # Note: when restarting from checkpoint, double check that the
-                    # number of electrons are reasonable
-                    nalpha = molecule.number_of_alpha_electrons()
-                    nbeta = molecule.number_of_beta_electrons()
-                    calc_nelec = self._comp_number_of_electrons(ovl_mat)
-                    if (abs(calc_nelec[0] - nalpha) < 1.0e-3 and
-                            abs(calc_nelec[1] - nbeta) < 1.0e-3):
-                        self._is_converged = True
-                else:
-                    self._is_converged = True
+                self._is_converged = True
 
     def _comp_number_of_electrons(self, ovl_mat):
         """
@@ -1441,12 +1235,7 @@ class ScfDriver:
             The range of SCF iterations.
         """
 
-        # set the maximum number of SCF iterations
-        # (note the extra SCF cycle when starting from scratch)
-        if self.restart:
-            return range(self.max_iter)
-        else:
-            return range(self.max_iter + 1)
+        return range(self.max_iter + 1)
 
     def _print_scf_energy(self):
         """
@@ -1604,10 +1393,7 @@ class ScfDriver:
             The string with type of initial guess.
         """
 
-        if self.restart:
-            return 'Restart from Checkpoint'
-        else:
-            return 'Superposition of Atomic Densities'
+        return 'Superposition of Atomic Densities'
 
     def _get_acc_type(self):
         """
