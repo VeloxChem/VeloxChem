@@ -5,8 +5,6 @@
 #include <cstddef>
 #include <utility>
 
-#include "BatchFunc.hpp"
-#include "BoysFunc.hpp"
 #include "ElectronRepulsionContrRecPPXX.hpp"
 #include "ElectronRepulsionContrRecXXPG.hpp"
 #include "ElectronRepulsionPrimRecSDSG.hpp"
@@ -20,12 +18,14 @@
 #include "ElectronRepulsionPrimRecSSSH.hpp"
 #include "ElectronRepulsionPrimRecSSSP.hpp"
 #include "ElectronRepulsionPrimRecSSSS.hpp"
-#include "GtoPairBlock.hpp"
 #include "SimdArray.hpp"
-#include "T2CUtils.hpp"
+#include "BoysFunc.hpp"
 #include "T4CUtils.hpp"
+#include "T2CUtils.hpp"
+#include "GtoPairBlock.hpp"
+#include "BatchFunc.hpp"
 
-namespace erirec {  // erirec namespace
+namespace erirec { // erirec namespace
 
 /// @brief Computes (PP|1/|r-r'||PG)  integrals for two basis function pairs blocks.
 /// @param distributor The pointer to Fock matrix/matrices distributor.
@@ -36,12 +36,12 @@ namespace erirec {  // erirec namespace
 /// @param bra_eq_ket True if basis function pairs blocks on bra and ket are the same, False otherwise.
 template <class T>
 inline auto
-comp_electron_repulsion_pppg(T&                               distributor,
-                             const CGtoPairBlock&             bra_gto_pair_block,
-                             const CGtoPairBlock&             ket_gto_pair_block,
+comp_electron_repulsion_pppg(T& distributor,
+                             const CGtoPairBlock& bra_gto_pair_block,
+                             const CGtoPairBlock& ket_gto_pair_block,
                              const std::pair<size_t, size_t>& bra_indices,
                              const std::pair<size_t, size_t>& ket_indices,
-                             const bool                       bra_eq_ket) -> void
+                             const bool bra_eq_ket) -> void
 {
     // intialize GTOs pair data on bra side
 
@@ -318,6 +318,7 @@ comp_electron_repulsion_pppg(T&                               distributor,
                 t2cfunc::reduce(cbuffer, 108, pbuffer, 484, 90, ket_width, ket_npgtos);
 
                 t2cfunc::reduce(cbuffer, 198, pbuffer, 574, 126, ket_width, ket_npgtos);
+
             }
 
             erirec::comp_ket_hrr_electron_repulsion_xxpg(ckbuffer, 0, cbuffer, 0, 45, cfactors, 6, 0, 1);
@@ -332,13 +333,12 @@ comp_electron_repulsion_pppg(T&                               distributor,
 
             t4cfunc::bra_transform<1, 1>(sbuffer, 0, skbuffer, 243, 1, 4);
 
-            const bool diagonal = bra_eq_ket && (j >= ket_range.first) && (j < ket_range.second);
-
-            distributor.distribute(sbuffer, 0, a_indices, b_indices, c_indices, d_indices, 1, 1, 1, 4, j, ket_range, diagonal);
+            distributor.distribute(sbuffer, 0, a_indices, b_indices, c_indices, d_indices, 1, 1, 1, 4, j, ket_range, bra_eq_ket);
         }
     }
+
 }
 
-}  // namespace erirec
+} // erirec namespace
 
 #endif /* ElectronRepulsionRecPPPG_hpp */

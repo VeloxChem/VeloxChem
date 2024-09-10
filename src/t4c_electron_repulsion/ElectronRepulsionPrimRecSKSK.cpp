@@ -1,20 +1,20 @@
 #include "ElectronRepulsionPrimRecSKSK.hpp"
 
-namespace erirec {  // erirec namespace
+namespace erirec { // erirec namespace
 
 auto
-comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
-                                  const size_t          idx_eri_0_sksk,
-                                  size_t                idx_eri_0_shsk,
-                                  size_t                idx_eri_1_shsk,
-                                  size_t                idx_eri_1_sisi,
-                                  size_t                idx_eri_0_sisk,
-                                  size_t                idx_eri_1_sisk,
-                                  CSimdArray<double>&   factors,
-                                  const size_t          idx_wp,
+comp_prim_electron_repulsion_sksk(CSimdArray<double>& pbuffer,
+                                  const size_t idx_eri_0_sksk,
+                                  size_t idx_eri_0_shsk,
+                                  size_t idx_eri_1_shsk,
+                                  size_t idx_eri_1_sisi,
+                                  size_t idx_eri_0_sisk,
+                                  size_t idx_eri_1_sisk,
+                                  CSimdArray<double>& factors,
+                                  const size_t idx_wp,
                                   const TPoint<double>& r_pb,
-                                  const double          a_exp,
-                                  const double          b_exp) -> void
+                                  const double a_exp,
+                                  const double b_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -5862,217 +5862,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxxxxxx_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 35);
 
-#pragma omp simd aligned(g_0_xxxxx_0_xxxxxxx_0,       \
-                             g_0_xxxxx_0_xxxxxxx_1,   \
-                             g_0_xxxxx_0_xxxxxxy_0,   \
-                             g_0_xxxxx_0_xxxxxxy_1,   \
-                             g_0_xxxxx_0_xxxxxxz_0,   \
-                             g_0_xxxxx_0_xxxxxxz_1,   \
-                             g_0_xxxxx_0_xxxxxyy_0,   \
-                             g_0_xxxxx_0_xxxxxyy_1,   \
-                             g_0_xxxxx_0_xxxxxyz_0,   \
-                             g_0_xxxxx_0_xxxxxyz_1,   \
-                             g_0_xxxxx_0_xxxxxzz_0,   \
-                             g_0_xxxxx_0_xxxxxzz_1,   \
-                             g_0_xxxxx_0_xxxxyyy_0,   \
-                             g_0_xxxxx_0_xxxxyyy_1,   \
-                             g_0_xxxxx_0_xxxxyyz_0,   \
-                             g_0_xxxxx_0_xxxxyyz_1,   \
-                             g_0_xxxxx_0_xxxxyzz_0,   \
-                             g_0_xxxxx_0_xxxxyzz_1,   \
-                             g_0_xxxxx_0_xxxxzzz_0,   \
-                             g_0_xxxxx_0_xxxxzzz_1,   \
-                             g_0_xxxxx_0_xxxyyyy_0,   \
-                             g_0_xxxxx_0_xxxyyyy_1,   \
-                             g_0_xxxxx_0_xxxyyyz_0,   \
-                             g_0_xxxxx_0_xxxyyyz_1,   \
-                             g_0_xxxxx_0_xxxyyzz_0,   \
-                             g_0_xxxxx_0_xxxyyzz_1,   \
-                             g_0_xxxxx_0_xxxyzzz_0,   \
-                             g_0_xxxxx_0_xxxyzzz_1,   \
-                             g_0_xxxxx_0_xxxzzzz_0,   \
-                             g_0_xxxxx_0_xxxzzzz_1,   \
-                             g_0_xxxxx_0_xxyyyyy_0,   \
-                             g_0_xxxxx_0_xxyyyyy_1,   \
-                             g_0_xxxxx_0_xxyyyyz_0,   \
-                             g_0_xxxxx_0_xxyyyyz_1,   \
-                             g_0_xxxxx_0_xxyyyzz_0,   \
-                             g_0_xxxxx_0_xxyyyzz_1,   \
-                             g_0_xxxxx_0_xxyyzzz_0,   \
-                             g_0_xxxxx_0_xxyyzzz_1,   \
-                             g_0_xxxxx_0_xxyzzzz_0,   \
-                             g_0_xxxxx_0_xxyzzzz_1,   \
-                             g_0_xxxxx_0_xxzzzzz_0,   \
-                             g_0_xxxxx_0_xxzzzzz_1,   \
-                             g_0_xxxxx_0_xyyyyyy_0,   \
-                             g_0_xxxxx_0_xyyyyyy_1,   \
-                             g_0_xxxxx_0_xyyyyyz_0,   \
-                             g_0_xxxxx_0_xyyyyyz_1,   \
-                             g_0_xxxxx_0_xyyyyzz_0,   \
-                             g_0_xxxxx_0_xyyyyzz_1,   \
-                             g_0_xxxxx_0_xyyyzzz_0,   \
-                             g_0_xxxxx_0_xyyyzzz_1,   \
-                             g_0_xxxxx_0_xyyzzzz_0,   \
-                             g_0_xxxxx_0_xyyzzzz_1,   \
-                             g_0_xxxxx_0_xyzzzzz_0,   \
-                             g_0_xxxxx_0_xyzzzzz_1,   \
-                             g_0_xxxxx_0_xzzzzzz_0,   \
-                             g_0_xxxxx_0_xzzzzzz_1,   \
-                             g_0_xxxxx_0_yyyyyyy_0,   \
-                             g_0_xxxxx_0_yyyyyyy_1,   \
-                             g_0_xxxxx_0_yyyyyyz_0,   \
-                             g_0_xxxxx_0_yyyyyyz_1,   \
-                             g_0_xxxxx_0_yyyyyzz_0,   \
-                             g_0_xxxxx_0_yyyyyzz_1,   \
-                             g_0_xxxxx_0_yyyyzzz_0,   \
-                             g_0_xxxxx_0_yyyyzzz_1,   \
-                             g_0_xxxxx_0_yyyzzzz_0,   \
-                             g_0_xxxxx_0_yyyzzzz_1,   \
-                             g_0_xxxxx_0_yyzzzzz_0,   \
-                             g_0_xxxxx_0_yyzzzzz_1,   \
-                             g_0_xxxxx_0_yzzzzzz_0,   \
-                             g_0_xxxxx_0_yzzzzzz_1,   \
-                             g_0_xxxxx_0_zzzzzzz_0,   \
-                             g_0_xxxxx_0_zzzzzzz_1,   \
-                             g_0_xxxxxx_0_xxxxxx_1,   \
-                             g_0_xxxxxx_0_xxxxxxx_0,  \
-                             g_0_xxxxxx_0_xxxxxxx_1,  \
-                             g_0_xxxxxx_0_xxxxxxy_0,  \
-                             g_0_xxxxxx_0_xxxxxxy_1,  \
-                             g_0_xxxxxx_0_xxxxxxz_0,  \
-                             g_0_xxxxxx_0_xxxxxxz_1,  \
-                             g_0_xxxxxx_0_xxxxxy_1,   \
-                             g_0_xxxxxx_0_xxxxxyy_0,  \
-                             g_0_xxxxxx_0_xxxxxyy_1,  \
-                             g_0_xxxxxx_0_xxxxxyz_0,  \
-                             g_0_xxxxxx_0_xxxxxyz_1,  \
-                             g_0_xxxxxx_0_xxxxxz_1,   \
-                             g_0_xxxxxx_0_xxxxxzz_0,  \
-                             g_0_xxxxxx_0_xxxxxzz_1,  \
-                             g_0_xxxxxx_0_xxxxyy_1,   \
-                             g_0_xxxxxx_0_xxxxyyy_0,  \
-                             g_0_xxxxxx_0_xxxxyyy_1,  \
-                             g_0_xxxxxx_0_xxxxyyz_0,  \
-                             g_0_xxxxxx_0_xxxxyyz_1,  \
-                             g_0_xxxxxx_0_xxxxyz_1,   \
-                             g_0_xxxxxx_0_xxxxyzz_0,  \
-                             g_0_xxxxxx_0_xxxxyzz_1,  \
-                             g_0_xxxxxx_0_xxxxzz_1,   \
-                             g_0_xxxxxx_0_xxxxzzz_0,  \
-                             g_0_xxxxxx_0_xxxxzzz_1,  \
-                             g_0_xxxxxx_0_xxxyyy_1,   \
-                             g_0_xxxxxx_0_xxxyyyy_0,  \
-                             g_0_xxxxxx_0_xxxyyyy_1,  \
-                             g_0_xxxxxx_0_xxxyyyz_0,  \
-                             g_0_xxxxxx_0_xxxyyyz_1,  \
-                             g_0_xxxxxx_0_xxxyyz_1,   \
-                             g_0_xxxxxx_0_xxxyyzz_0,  \
-                             g_0_xxxxxx_0_xxxyyzz_1,  \
-                             g_0_xxxxxx_0_xxxyzz_1,   \
-                             g_0_xxxxxx_0_xxxyzzz_0,  \
-                             g_0_xxxxxx_0_xxxyzzz_1,  \
-                             g_0_xxxxxx_0_xxxzzz_1,   \
-                             g_0_xxxxxx_0_xxxzzzz_0,  \
-                             g_0_xxxxxx_0_xxxzzzz_1,  \
-                             g_0_xxxxxx_0_xxyyyy_1,   \
-                             g_0_xxxxxx_0_xxyyyyy_0,  \
-                             g_0_xxxxxx_0_xxyyyyy_1,  \
-                             g_0_xxxxxx_0_xxyyyyz_0,  \
-                             g_0_xxxxxx_0_xxyyyyz_1,  \
-                             g_0_xxxxxx_0_xxyyyz_1,   \
-                             g_0_xxxxxx_0_xxyyyzz_0,  \
-                             g_0_xxxxxx_0_xxyyyzz_1,  \
-                             g_0_xxxxxx_0_xxyyzz_1,   \
-                             g_0_xxxxxx_0_xxyyzzz_0,  \
-                             g_0_xxxxxx_0_xxyyzzz_1,  \
-                             g_0_xxxxxx_0_xxyzzz_1,   \
-                             g_0_xxxxxx_0_xxyzzzz_0,  \
-                             g_0_xxxxxx_0_xxyzzzz_1,  \
-                             g_0_xxxxxx_0_xxzzzz_1,   \
-                             g_0_xxxxxx_0_xxzzzzz_0,  \
-                             g_0_xxxxxx_0_xxzzzzz_1,  \
-                             g_0_xxxxxx_0_xyyyyy_1,   \
-                             g_0_xxxxxx_0_xyyyyyy_0,  \
-                             g_0_xxxxxx_0_xyyyyyy_1,  \
-                             g_0_xxxxxx_0_xyyyyyz_0,  \
-                             g_0_xxxxxx_0_xyyyyyz_1,  \
-                             g_0_xxxxxx_0_xyyyyz_1,   \
-                             g_0_xxxxxx_0_xyyyyzz_0,  \
-                             g_0_xxxxxx_0_xyyyyzz_1,  \
-                             g_0_xxxxxx_0_xyyyzz_1,   \
-                             g_0_xxxxxx_0_xyyyzzz_0,  \
-                             g_0_xxxxxx_0_xyyyzzz_1,  \
-                             g_0_xxxxxx_0_xyyzzz_1,   \
-                             g_0_xxxxxx_0_xyyzzzz_0,  \
-                             g_0_xxxxxx_0_xyyzzzz_1,  \
-                             g_0_xxxxxx_0_xyzzzz_1,   \
-                             g_0_xxxxxx_0_xyzzzzz_0,  \
-                             g_0_xxxxxx_0_xyzzzzz_1,  \
-                             g_0_xxxxxx_0_xzzzzz_1,   \
-                             g_0_xxxxxx_0_xzzzzzz_0,  \
-                             g_0_xxxxxx_0_xzzzzzz_1,  \
-                             g_0_xxxxxx_0_yyyyyy_1,   \
-                             g_0_xxxxxx_0_yyyyyyy_0,  \
-                             g_0_xxxxxx_0_yyyyyyy_1,  \
-                             g_0_xxxxxx_0_yyyyyyz_0,  \
-                             g_0_xxxxxx_0_yyyyyyz_1,  \
-                             g_0_xxxxxx_0_yyyyyz_1,   \
-                             g_0_xxxxxx_0_yyyyyzz_0,  \
-                             g_0_xxxxxx_0_yyyyyzz_1,  \
-                             g_0_xxxxxx_0_yyyyzz_1,   \
-                             g_0_xxxxxx_0_yyyyzzz_0,  \
-                             g_0_xxxxxx_0_yyyyzzz_1,  \
-                             g_0_xxxxxx_0_yyyzzz_1,   \
-                             g_0_xxxxxx_0_yyyzzzz_0,  \
-                             g_0_xxxxxx_0_yyyzzzz_1,  \
-                             g_0_xxxxxx_0_yyzzzz_1,   \
-                             g_0_xxxxxx_0_yyzzzzz_0,  \
-                             g_0_xxxxxx_0_yyzzzzz_1,  \
-                             g_0_xxxxxx_0_yzzzzz_1,   \
-                             g_0_xxxxxx_0_yzzzzzz_0,  \
-                             g_0_xxxxxx_0_yzzzzzz_1,  \
-                             g_0_xxxxxx_0_zzzzzz_1,   \
-                             g_0_xxxxxx_0_zzzzzzz_0,  \
-                             g_0_xxxxxx_0_zzzzzzz_1,  \
-                             g_0_xxxxxxx_0_xxxxxxx_0, \
-                             g_0_xxxxxxx_0_xxxxxxy_0, \
-                             g_0_xxxxxxx_0_xxxxxxz_0, \
-                             g_0_xxxxxxx_0_xxxxxyy_0, \
-                             g_0_xxxxxxx_0_xxxxxyz_0, \
-                             g_0_xxxxxxx_0_xxxxxzz_0, \
-                             g_0_xxxxxxx_0_xxxxyyy_0, \
-                             g_0_xxxxxxx_0_xxxxyyz_0, \
-                             g_0_xxxxxxx_0_xxxxyzz_0, \
-                             g_0_xxxxxxx_0_xxxxzzz_0, \
-                             g_0_xxxxxxx_0_xxxyyyy_0, \
-                             g_0_xxxxxxx_0_xxxyyyz_0, \
-                             g_0_xxxxxxx_0_xxxyyzz_0, \
-                             g_0_xxxxxxx_0_xxxyzzz_0, \
-                             g_0_xxxxxxx_0_xxxzzzz_0, \
-                             g_0_xxxxxxx_0_xxyyyyy_0, \
-                             g_0_xxxxxxx_0_xxyyyyz_0, \
-                             g_0_xxxxxxx_0_xxyyyzz_0, \
-                             g_0_xxxxxxx_0_xxyyzzz_0, \
-                             g_0_xxxxxxx_0_xxyzzzz_0, \
-                             g_0_xxxxxxx_0_xxzzzzz_0, \
-                             g_0_xxxxxxx_0_xyyyyyy_0, \
-                             g_0_xxxxxxx_0_xyyyyyz_0, \
-                             g_0_xxxxxxx_0_xyyyyzz_0, \
-                             g_0_xxxxxxx_0_xyyyzzz_0, \
-                             g_0_xxxxxxx_0_xyyzzzz_0, \
-                             g_0_xxxxxxx_0_xyzzzzz_0, \
-                             g_0_xxxxxxx_0_xzzzzzz_0, \
-                             g_0_xxxxxxx_0_yyyyyyy_0, \
-                             g_0_xxxxxxx_0_yyyyyyz_0, \
-                             g_0_xxxxxxx_0_yyyyyzz_0, \
-                             g_0_xxxxxxx_0_yyyyzzz_0, \
-                             g_0_xxxxxxx_0_yyyzzzz_0, \
-                             g_0_xxxxxxx_0_yyzzzzz_0, \
-                             g_0_xxxxxxx_0_yzzzzzz_0, \
-                             g_0_xxxxxxx_0_zzzzzzz_0, \
-                             wp_x,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxxxx_0_xxxxxxx_0, g_0_xxxxx_0_xxxxxxx_1, g_0_xxxxx_0_xxxxxxy_0, g_0_xxxxx_0_xxxxxxy_1, g_0_xxxxx_0_xxxxxxz_0, g_0_xxxxx_0_xxxxxxz_1, g_0_xxxxx_0_xxxxxyy_0, g_0_xxxxx_0_xxxxxyy_1, g_0_xxxxx_0_xxxxxyz_0, g_0_xxxxx_0_xxxxxyz_1, g_0_xxxxx_0_xxxxxzz_0, g_0_xxxxx_0_xxxxxzz_1, g_0_xxxxx_0_xxxxyyy_0, g_0_xxxxx_0_xxxxyyy_1, g_0_xxxxx_0_xxxxyyz_0, g_0_xxxxx_0_xxxxyyz_1, g_0_xxxxx_0_xxxxyzz_0, g_0_xxxxx_0_xxxxyzz_1, g_0_xxxxx_0_xxxxzzz_0, g_0_xxxxx_0_xxxxzzz_1, g_0_xxxxx_0_xxxyyyy_0, g_0_xxxxx_0_xxxyyyy_1, g_0_xxxxx_0_xxxyyyz_0, g_0_xxxxx_0_xxxyyyz_1, g_0_xxxxx_0_xxxyyzz_0, g_0_xxxxx_0_xxxyyzz_1, g_0_xxxxx_0_xxxyzzz_0, g_0_xxxxx_0_xxxyzzz_1, g_0_xxxxx_0_xxxzzzz_0, g_0_xxxxx_0_xxxzzzz_1, g_0_xxxxx_0_xxyyyyy_0, g_0_xxxxx_0_xxyyyyy_1, g_0_xxxxx_0_xxyyyyz_0, g_0_xxxxx_0_xxyyyyz_1, g_0_xxxxx_0_xxyyyzz_0, g_0_xxxxx_0_xxyyyzz_1, g_0_xxxxx_0_xxyyzzz_0, g_0_xxxxx_0_xxyyzzz_1, g_0_xxxxx_0_xxyzzzz_0, g_0_xxxxx_0_xxyzzzz_1, g_0_xxxxx_0_xxzzzzz_0, g_0_xxxxx_0_xxzzzzz_1, g_0_xxxxx_0_xyyyyyy_0, g_0_xxxxx_0_xyyyyyy_1, g_0_xxxxx_0_xyyyyyz_0, g_0_xxxxx_0_xyyyyyz_1, g_0_xxxxx_0_xyyyyzz_0, g_0_xxxxx_0_xyyyyzz_1, g_0_xxxxx_0_xyyyzzz_0, g_0_xxxxx_0_xyyyzzz_1, g_0_xxxxx_0_xyyzzzz_0, g_0_xxxxx_0_xyyzzzz_1, g_0_xxxxx_0_xyzzzzz_0, g_0_xxxxx_0_xyzzzzz_1, g_0_xxxxx_0_xzzzzzz_0, g_0_xxxxx_0_xzzzzzz_1, g_0_xxxxx_0_yyyyyyy_0, g_0_xxxxx_0_yyyyyyy_1, g_0_xxxxx_0_yyyyyyz_0, g_0_xxxxx_0_yyyyyyz_1, g_0_xxxxx_0_yyyyyzz_0, g_0_xxxxx_0_yyyyyzz_1, g_0_xxxxx_0_yyyyzzz_0, g_0_xxxxx_0_yyyyzzz_1, g_0_xxxxx_0_yyyzzzz_0, g_0_xxxxx_0_yyyzzzz_1, g_0_xxxxx_0_yyzzzzz_0, g_0_xxxxx_0_yyzzzzz_1, g_0_xxxxx_0_yzzzzzz_0, g_0_xxxxx_0_yzzzzzz_1, g_0_xxxxx_0_zzzzzzz_0, g_0_xxxxx_0_zzzzzzz_1, g_0_xxxxxx_0_xxxxxx_1, g_0_xxxxxx_0_xxxxxxx_0, g_0_xxxxxx_0_xxxxxxx_1, g_0_xxxxxx_0_xxxxxxy_0, g_0_xxxxxx_0_xxxxxxy_1, g_0_xxxxxx_0_xxxxxxz_0, g_0_xxxxxx_0_xxxxxxz_1, g_0_xxxxxx_0_xxxxxy_1, g_0_xxxxxx_0_xxxxxyy_0, g_0_xxxxxx_0_xxxxxyy_1, g_0_xxxxxx_0_xxxxxyz_0, g_0_xxxxxx_0_xxxxxyz_1, g_0_xxxxxx_0_xxxxxz_1, g_0_xxxxxx_0_xxxxxzz_0, g_0_xxxxxx_0_xxxxxzz_1, g_0_xxxxxx_0_xxxxyy_1, g_0_xxxxxx_0_xxxxyyy_0, g_0_xxxxxx_0_xxxxyyy_1, g_0_xxxxxx_0_xxxxyyz_0, g_0_xxxxxx_0_xxxxyyz_1, g_0_xxxxxx_0_xxxxyz_1, g_0_xxxxxx_0_xxxxyzz_0, g_0_xxxxxx_0_xxxxyzz_1, g_0_xxxxxx_0_xxxxzz_1, g_0_xxxxxx_0_xxxxzzz_0, g_0_xxxxxx_0_xxxxzzz_1, g_0_xxxxxx_0_xxxyyy_1, g_0_xxxxxx_0_xxxyyyy_0, g_0_xxxxxx_0_xxxyyyy_1, g_0_xxxxxx_0_xxxyyyz_0, g_0_xxxxxx_0_xxxyyyz_1, g_0_xxxxxx_0_xxxyyz_1, g_0_xxxxxx_0_xxxyyzz_0, g_0_xxxxxx_0_xxxyyzz_1, g_0_xxxxxx_0_xxxyzz_1, g_0_xxxxxx_0_xxxyzzz_0, g_0_xxxxxx_0_xxxyzzz_1, g_0_xxxxxx_0_xxxzzz_1, g_0_xxxxxx_0_xxxzzzz_0, g_0_xxxxxx_0_xxxzzzz_1, g_0_xxxxxx_0_xxyyyy_1, g_0_xxxxxx_0_xxyyyyy_0, g_0_xxxxxx_0_xxyyyyy_1, g_0_xxxxxx_0_xxyyyyz_0, g_0_xxxxxx_0_xxyyyyz_1, g_0_xxxxxx_0_xxyyyz_1, g_0_xxxxxx_0_xxyyyzz_0, g_0_xxxxxx_0_xxyyyzz_1, g_0_xxxxxx_0_xxyyzz_1, g_0_xxxxxx_0_xxyyzzz_0, g_0_xxxxxx_0_xxyyzzz_1, g_0_xxxxxx_0_xxyzzz_1, g_0_xxxxxx_0_xxyzzzz_0, g_0_xxxxxx_0_xxyzzzz_1, g_0_xxxxxx_0_xxzzzz_1, g_0_xxxxxx_0_xxzzzzz_0, g_0_xxxxxx_0_xxzzzzz_1, g_0_xxxxxx_0_xyyyyy_1, g_0_xxxxxx_0_xyyyyyy_0, g_0_xxxxxx_0_xyyyyyy_1, g_0_xxxxxx_0_xyyyyyz_0, g_0_xxxxxx_0_xyyyyyz_1, g_0_xxxxxx_0_xyyyyz_1, g_0_xxxxxx_0_xyyyyzz_0, g_0_xxxxxx_0_xyyyyzz_1, g_0_xxxxxx_0_xyyyzz_1, g_0_xxxxxx_0_xyyyzzz_0, g_0_xxxxxx_0_xyyyzzz_1, g_0_xxxxxx_0_xyyzzz_1, g_0_xxxxxx_0_xyyzzzz_0, g_0_xxxxxx_0_xyyzzzz_1, g_0_xxxxxx_0_xyzzzz_1, g_0_xxxxxx_0_xyzzzzz_0, g_0_xxxxxx_0_xyzzzzz_1, g_0_xxxxxx_0_xzzzzz_1, g_0_xxxxxx_0_xzzzzzz_0, g_0_xxxxxx_0_xzzzzzz_1, g_0_xxxxxx_0_yyyyyy_1, g_0_xxxxxx_0_yyyyyyy_0, g_0_xxxxxx_0_yyyyyyy_1, g_0_xxxxxx_0_yyyyyyz_0, g_0_xxxxxx_0_yyyyyyz_1, g_0_xxxxxx_0_yyyyyz_1, g_0_xxxxxx_0_yyyyyzz_0, g_0_xxxxxx_0_yyyyyzz_1, g_0_xxxxxx_0_yyyyzz_1, g_0_xxxxxx_0_yyyyzzz_0, g_0_xxxxxx_0_yyyyzzz_1, g_0_xxxxxx_0_yyyzzz_1, g_0_xxxxxx_0_yyyzzzz_0, g_0_xxxxxx_0_yyyzzzz_1, g_0_xxxxxx_0_yyzzzz_1, g_0_xxxxxx_0_yyzzzzz_0, g_0_xxxxxx_0_yyzzzzz_1, g_0_xxxxxx_0_yzzzzz_1, g_0_xxxxxx_0_yzzzzzz_0, g_0_xxxxxx_0_yzzzzzz_1, g_0_xxxxxx_0_zzzzzz_1, g_0_xxxxxx_0_zzzzzzz_0, g_0_xxxxxx_0_zzzzzzz_1, g_0_xxxxxxx_0_xxxxxxx_0, g_0_xxxxxxx_0_xxxxxxy_0, g_0_xxxxxxx_0_xxxxxxz_0, g_0_xxxxxxx_0_xxxxxyy_0, g_0_xxxxxxx_0_xxxxxyz_0, g_0_xxxxxxx_0_xxxxxzz_0, g_0_xxxxxxx_0_xxxxyyy_0, g_0_xxxxxxx_0_xxxxyyz_0, g_0_xxxxxxx_0_xxxxyzz_0, g_0_xxxxxxx_0_xxxxzzz_0, g_0_xxxxxxx_0_xxxyyyy_0, g_0_xxxxxxx_0_xxxyyyz_0, g_0_xxxxxxx_0_xxxyyzz_0, g_0_xxxxxxx_0_xxxyzzz_0, g_0_xxxxxxx_0_xxxzzzz_0, g_0_xxxxxxx_0_xxyyyyy_0, g_0_xxxxxxx_0_xxyyyyz_0, g_0_xxxxxxx_0_xxyyyzz_0, g_0_xxxxxxx_0_xxyyzzz_0, g_0_xxxxxxx_0_xxyzzzz_0, g_0_xxxxxxx_0_xxzzzzz_0, g_0_xxxxxxx_0_xyyyyyy_0, g_0_xxxxxxx_0_xyyyyyz_0, g_0_xxxxxxx_0_xyyyyzz_0, g_0_xxxxxxx_0_xyyyzzz_0, g_0_xxxxxxx_0_xyyzzzz_0, g_0_xxxxxxx_0_xyzzzzz_0, g_0_xxxxxxx_0_xzzzzzz_0, g_0_xxxxxxx_0_yyyyyyy_0, g_0_xxxxxxx_0_yyyyyyz_0, g_0_xxxxxxx_0_yyyyyzz_0, g_0_xxxxxxx_0_yyyyzzz_0, g_0_xxxxxxx_0_yyyzzzz_0, g_0_xxxxxxx_0_yyzzzzz_0, g_0_xxxxxxx_0_yzzzzzz_0, g_0_xxxxxxx_0_zzzzzzz_0, wp_x, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -6081,134 +5871,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxxxxxx_0_xxxxxxx_0[i] = 6.0 * g_0_xxxxx_0_xxxxxxx_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxxxx_1[i] * fti_ab_0 +
-                                     7.0 * g_0_xxxxxx_0_xxxxxx_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxxx_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxxxxxx_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxxxxxx_0[i] = 6.0 * g_0_xxxxx_0_xxxxxxx_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxxxx_1[i] * fti_ab_0 + 7.0 * g_0_xxxxxx_0_xxxxxx_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxxx_0[i] * pb_x + g_0_xxxxxx_0_xxxxxxx_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxxxxxy_0[i] = 6.0 * g_0_xxxxx_0_xxxxxxy_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxxxy_1[i] * fti_ab_0 +
-                                     6.0 * g_0_xxxxxx_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxxy_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxxxxxy_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxxxxxy_0[i] = 6.0 * g_0_xxxxx_0_xxxxxxy_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxxxy_1[i] * fti_ab_0 + 6.0 * g_0_xxxxxx_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxxy_0[i] * pb_x + g_0_xxxxxx_0_xxxxxxy_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxxxxxz_0[i] = 6.0 * g_0_xxxxx_0_xxxxxxz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxxxz_1[i] * fti_ab_0 +
-                                     6.0 * g_0_xxxxxx_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxxz_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxxxxxz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxxxxxz_0[i] = 6.0 * g_0_xxxxx_0_xxxxxxz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxxxz_1[i] * fti_ab_0 + 6.0 * g_0_xxxxxx_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxxz_0[i] * pb_x + g_0_xxxxxx_0_xxxxxxz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxxxxyy_0[i] = 6.0 * g_0_xxxxx_0_xxxxxyy_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxxyy_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xxxxxx_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxyy_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxxxxyy_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxxxxyy_0[i] = 6.0 * g_0_xxxxx_0_xxxxxyy_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxxyy_1[i] * fti_ab_0 + 5.0 * g_0_xxxxxx_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxyy_0[i] * pb_x + g_0_xxxxxx_0_xxxxxyy_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxxxxyz_0[i] = 6.0 * g_0_xxxxx_0_xxxxxyz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xxxxxx_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxyz_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxxxxyz_0[i] = 6.0 * g_0_xxxxx_0_xxxxxyz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxxyz_1[i] * fti_ab_0 + 5.0 * g_0_xxxxxx_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxyz_0[i] * pb_x + g_0_xxxxxx_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxxxxzz_0[i] = 6.0 * g_0_xxxxx_0_xxxxxzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxxzz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xxxxxx_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxzz_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxxxxzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxxxxzz_0[i] = 6.0 * g_0_xxxxx_0_xxxxxzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxxzz_1[i] * fti_ab_0 + 5.0 * g_0_xxxxxx_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxzz_0[i] * pb_x + g_0_xxxxxx_0_xxxxxzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxxxyyy_0[i] = 6.0 * g_0_xxxxx_0_xxxxyyy_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxyyy_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxxxxx_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxyyy_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxxxyyy_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxxxyyy_0[i] = 6.0 * g_0_xxxxx_0_xxxxyyy_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxyyy_1[i] * fti_ab_0 + 4.0 * g_0_xxxxxx_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxyyy_0[i] * pb_x + g_0_xxxxxx_0_xxxxyyy_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxxxyyz_0[i] = 6.0 * g_0_xxxxx_0_xxxxyyz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxxxxx_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxyyz_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxxxyyz_0[i] = 6.0 * g_0_xxxxx_0_xxxxyyz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxyyz_1[i] * fti_ab_0 + 4.0 * g_0_xxxxxx_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxyyz_0[i] * pb_x + g_0_xxxxxx_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxxxyzz_0[i] = 6.0 * g_0_xxxxx_0_xxxxyzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxxxxx_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxyzz_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxxxyzz_0[i] = 6.0 * g_0_xxxxx_0_xxxxyzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxyzz_1[i] * fti_ab_0 + 4.0 * g_0_xxxxxx_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxyzz_0[i] * pb_x + g_0_xxxxxx_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxxxzzz_0[i] = 6.0 * g_0_xxxxx_0_xxxxzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxzzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxxxxx_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxzzz_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxxxzzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxxxzzz_0[i] = 6.0 * g_0_xxxxx_0_xxxxzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxxzzz_1[i] * fti_ab_0 + 4.0 * g_0_xxxxxx_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxzzz_0[i] * pb_x + g_0_xxxxxx_0_xxxxzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxxyyyy_0[i] = 6.0 * g_0_xxxxx_0_xxxyyyy_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxyyyy_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxxxx_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyyyy_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxxyyyy_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxxyyyy_0[i] = 6.0 * g_0_xxxxx_0_xxxyyyy_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxyyyy_1[i] * fti_ab_0 + 3.0 * g_0_xxxxxx_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyyyy_0[i] * pb_x + g_0_xxxxxx_0_xxxyyyy_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxxyyyz_0[i] = 6.0 * g_0_xxxxx_0_xxxyyyz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxxxx_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyyyz_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxxyyyz_0[i] = 6.0 * g_0_xxxxx_0_xxxyyyz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_xxxxxx_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyyyz_0[i] * pb_x + g_0_xxxxxx_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxxyyzz_0[i] = 6.0 * g_0_xxxxx_0_xxxyyzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxxxx_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyyzz_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxxyyzz_0[i] = 6.0 * g_0_xxxxx_0_xxxyyzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxyyzz_1[i] * fti_ab_0 + 3.0 * g_0_xxxxxx_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyyzz_0[i] * pb_x + g_0_xxxxxx_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxxyzzz_0[i] = 6.0 * g_0_xxxxx_0_xxxyzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxxxx_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyzzz_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxxyzzz_0[i] = 6.0 * g_0_xxxxx_0_xxxyzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxyzzz_1[i] * fti_ab_0 + 3.0 * g_0_xxxxxx_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyzzz_0[i] * pb_x + g_0_xxxxxx_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxxzzzz_0[i] = 6.0 * g_0_xxxxx_0_xxxzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxzzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxxxx_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxzzzz_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxxzzzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxxzzzz_0[i] = 6.0 * g_0_xxxxx_0_xxxzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxxzzzz_1[i] * fti_ab_0 + 3.0 * g_0_xxxxxx_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxzzzz_0[i] * pb_x + g_0_xxxxxx_0_xxxzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxyyyyy_0[i] = 6.0 * g_0_xxxxx_0_xxyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxyyyyy_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxxxx_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyyyy_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxyyyyy_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxyyyyy_0[i] = 6.0 * g_0_xxxxx_0_xxyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxyyyyy_1[i] * fti_ab_0 + 2.0 * g_0_xxxxxx_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyyyy_0[i] * pb_x + g_0_xxxxxx_0_xxyyyyy_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxyyyyz_0[i] = 6.0 * g_0_xxxxx_0_xxyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxxxx_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyyyz_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxyyyyz_0[i] = 6.0 * g_0_xxxxx_0_xxyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxyyyyz_1[i] * fti_ab_0 + 2.0 * g_0_xxxxxx_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyyyz_0[i] * pb_x + g_0_xxxxxx_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxyyyzz_0[i] = 6.0 * g_0_xxxxx_0_xxyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxxxx_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyyzz_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxyyyzz_0[i] = 6.0 * g_0_xxxxx_0_xxyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxyyyzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxxxx_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyyzz_0[i] * pb_x + g_0_xxxxxx_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxyyzzz_0[i] = 6.0 * g_0_xxxxx_0_xxyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxxxx_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyzzz_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxyyzzz_0[i] = 6.0 * g_0_xxxxx_0_xxyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxxxx_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyzzz_0[i] * pb_x + g_0_xxxxxx_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxyzzzz_0[i] = 6.0 * g_0_xxxxx_0_xxyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxxxx_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyzzzz_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxyzzzz_0[i] = 6.0 * g_0_xxxxx_0_xxyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxxxx_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyzzzz_0[i] * pb_x + g_0_xxxxxx_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xxzzzzz_0[i] = 6.0 * g_0_xxxxx_0_xxzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxzzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxxxx_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxzzzzz_0[i] * pb_x +
-                                     g_0_xxxxxx_0_xxzzzzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xxzzzzz_0[i] = 6.0 * g_0_xxxxx_0_xxzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xxzzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxxxx_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxzzzzz_0[i] * pb_x + g_0_xxxxxx_0_xxzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xyyyyyy_0[i] = 6.0 * g_0_xxxxx_0_xyyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxxxxx_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyyyy_0[i] * pb_x + g_0_xxxxxx_0_xyyyyyy_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xyyyyyy_0[i] = 6.0 * g_0_xxxxx_0_xyyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xyyyyyy_1[i] * fti_ab_0 + g_0_xxxxxx_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyyyy_0[i] * pb_x + g_0_xxxxxx_0_xyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xyyyyyz_0[i] = 6.0 * g_0_xxxxx_0_xyyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_xxxxxx_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyyyz_0[i] * pb_x + g_0_xxxxxx_0_xyyyyyz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xyyyyyz_0[i] = 6.0 * g_0_xxxxx_0_xyyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xyyyyyz_1[i] * fti_ab_0 + g_0_xxxxxx_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyyyz_0[i] * pb_x + g_0_xxxxxx_0_xyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xyyyyzz_0[i] = 6.0 * g_0_xxxxx_0_xyyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xyyyyzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxxx_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyyzz_0[i] * pb_x + g_0_xxxxxx_0_xyyyyzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xyyyyzz_0[i] = 6.0 * g_0_xxxxx_0_xyyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xyyyyzz_1[i] * fti_ab_0 + g_0_xxxxxx_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyyzz_0[i] * pb_x + g_0_xxxxxx_0_xyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xyyyzzz_0[i] = 6.0 * g_0_xxxxx_0_xyyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xyyyzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxxx_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyzzz_0[i] * pb_x + g_0_xxxxxx_0_xyyyzzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xyyyzzz_0[i] = 6.0 * g_0_xxxxx_0_xyyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xyyyzzz_1[i] * fti_ab_0 + g_0_xxxxxx_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyzzz_0[i] * pb_x + g_0_xxxxxx_0_xyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xyyzzzz_0[i] = 6.0 * g_0_xxxxx_0_xyyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xyyzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxxx_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyzzzz_0[i] * pb_x + g_0_xxxxxx_0_xyyzzzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xyyzzzz_0[i] = 6.0 * g_0_xxxxx_0_xyyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xyyzzzz_1[i] * fti_ab_0 + g_0_xxxxxx_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyzzzz_0[i] * pb_x + g_0_xxxxxx_0_xyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xyzzzzz_0[i] = 6.0 * g_0_xxxxx_0_xyzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxxx_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyzzzzz_0[i] * pb_x + g_0_xxxxxx_0_xyzzzzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xyzzzzz_0[i] = 6.0 * g_0_xxxxx_0_xyzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xyzzzzz_1[i] * fti_ab_0 + g_0_xxxxxx_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyzzzzz_0[i] * pb_x + g_0_xxxxxx_0_xyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_xzzzzzz_0[i] = 6.0 * g_0_xxxxx_0_xzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxxx_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xzzzzzz_0[i] * pb_x + g_0_xxxxxx_0_xzzzzzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_xzzzzzz_0[i] = 6.0 * g_0_xxxxx_0_xzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_xzzzzzz_1[i] * fti_ab_0 + g_0_xxxxxx_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xzzzzzz_0[i] * pb_x + g_0_xxxxxx_0_xzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_yyyyyyy_0[i] = 6.0 * g_0_xxxxx_0_yyyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_yyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxxxxx_0_yyyyyyy_0[i] * pb_x + g_0_xxxxxx_0_yyyyyyy_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_yyyyyyy_0[i] = 6.0 * g_0_xxxxx_0_yyyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_yyyyyyy_1[i] * fti_ab_0 + g_0_xxxxxx_0_yyyyyyy_0[i] * pb_x + g_0_xxxxxx_0_yyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_yyyyyyz_0[i] = 6.0 * g_0_xxxxx_0_yyyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_yyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_xxxxxx_0_yyyyyyz_0[i] * pb_x + g_0_xxxxxx_0_yyyyyyz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_yyyyyyz_0[i] = 6.0 * g_0_xxxxx_0_yyyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_yyyyyyz_1[i] * fti_ab_0 + g_0_xxxxxx_0_yyyyyyz_0[i] * pb_x + g_0_xxxxxx_0_yyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_yyyyyzz_0[i] = 6.0 * g_0_xxxxx_0_yyyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_yyyyyzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxxx_0_yyyyyzz_0[i] * pb_x + g_0_xxxxxx_0_yyyyyzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_yyyyyzz_0[i] = 6.0 * g_0_xxxxx_0_yyyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_yyyyyzz_1[i] * fti_ab_0 + g_0_xxxxxx_0_yyyyyzz_0[i] * pb_x + g_0_xxxxxx_0_yyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_yyyyzzz_0[i] = 6.0 * g_0_xxxxx_0_yyyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_yyyyzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxxx_0_yyyyzzz_0[i] * pb_x + g_0_xxxxxx_0_yyyyzzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_yyyyzzz_0[i] = 6.0 * g_0_xxxxx_0_yyyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_yyyyzzz_1[i] * fti_ab_0 + g_0_xxxxxx_0_yyyyzzz_0[i] * pb_x + g_0_xxxxxx_0_yyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_yyyzzzz_0[i] = 6.0 * g_0_xxxxx_0_yyyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_yyyzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxxx_0_yyyzzzz_0[i] * pb_x + g_0_xxxxxx_0_yyyzzzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_yyyzzzz_0[i] = 6.0 * g_0_xxxxx_0_yyyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_yyyzzzz_1[i] * fti_ab_0 + g_0_xxxxxx_0_yyyzzzz_0[i] * pb_x + g_0_xxxxxx_0_yyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_yyzzzzz_0[i] = 6.0 * g_0_xxxxx_0_yyzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_yyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxxx_0_yyzzzzz_0[i] * pb_x + g_0_xxxxxx_0_yyzzzzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_yyzzzzz_0[i] = 6.0 * g_0_xxxxx_0_yyzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_yyzzzzz_1[i] * fti_ab_0 + g_0_xxxxxx_0_yyzzzzz_0[i] * pb_x + g_0_xxxxxx_0_yyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_yzzzzzz_0[i] = 6.0 * g_0_xxxxx_0_yzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_yzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxxx_0_yzzzzzz_0[i] * pb_x + g_0_xxxxxx_0_yzzzzzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_yzzzzzz_0[i] = 6.0 * g_0_xxxxx_0_yzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_yzzzzzz_1[i] * fti_ab_0 + g_0_xxxxxx_0_yzzzzzz_0[i] * pb_x + g_0_xxxxxx_0_yzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxxx_0_zzzzzzz_0[i] = 6.0 * g_0_xxxxx_0_zzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_zzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxxx_0_zzzzzzz_0[i] * pb_x + g_0_xxxxxx_0_zzzzzzz_1[i] * wp_x[i];
+        g_0_xxxxxxx_0_zzzzzzz_0[i] = 6.0 * g_0_xxxxx_0_zzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_xxxxx_0_zzzzzzz_1[i] * fti_ab_0 + g_0_xxxxxx_0_zzzzzzz_0[i] * pb_x + g_0_xxxxxx_0_zzzzzzz_1[i] * wp_x[i];
     }
 
     /// Set up 36-72 components of targeted buffer : SKSK
@@ -6285,145 +6018,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxxxxxy_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 71);
 
-#pragma omp simd aligned(g_0_xxxxxx_0_xxxxxx_1,       \
-                             g_0_xxxxxx_0_xxxxxxx_0,  \
-                             g_0_xxxxxx_0_xxxxxxx_1,  \
-                             g_0_xxxxxx_0_xxxxxxy_0,  \
-                             g_0_xxxxxx_0_xxxxxxy_1,  \
-                             g_0_xxxxxx_0_xxxxxxz_0,  \
-                             g_0_xxxxxx_0_xxxxxxz_1,  \
-                             g_0_xxxxxx_0_xxxxxy_1,   \
-                             g_0_xxxxxx_0_xxxxxyy_0,  \
-                             g_0_xxxxxx_0_xxxxxyy_1,  \
-                             g_0_xxxxxx_0_xxxxxyz_0,  \
-                             g_0_xxxxxx_0_xxxxxyz_1,  \
-                             g_0_xxxxxx_0_xxxxxz_1,   \
-                             g_0_xxxxxx_0_xxxxxzz_0,  \
-                             g_0_xxxxxx_0_xxxxxzz_1,  \
-                             g_0_xxxxxx_0_xxxxyy_1,   \
-                             g_0_xxxxxx_0_xxxxyyy_0,  \
-                             g_0_xxxxxx_0_xxxxyyy_1,  \
-                             g_0_xxxxxx_0_xxxxyyz_0,  \
-                             g_0_xxxxxx_0_xxxxyyz_1,  \
-                             g_0_xxxxxx_0_xxxxyz_1,   \
-                             g_0_xxxxxx_0_xxxxyzz_0,  \
-                             g_0_xxxxxx_0_xxxxyzz_1,  \
-                             g_0_xxxxxx_0_xxxxzz_1,   \
-                             g_0_xxxxxx_0_xxxxzzz_0,  \
-                             g_0_xxxxxx_0_xxxxzzz_1,  \
-                             g_0_xxxxxx_0_xxxyyy_1,   \
-                             g_0_xxxxxx_0_xxxyyyy_0,  \
-                             g_0_xxxxxx_0_xxxyyyy_1,  \
-                             g_0_xxxxxx_0_xxxyyyz_0,  \
-                             g_0_xxxxxx_0_xxxyyyz_1,  \
-                             g_0_xxxxxx_0_xxxyyz_1,   \
-                             g_0_xxxxxx_0_xxxyyzz_0,  \
-                             g_0_xxxxxx_0_xxxyyzz_1,  \
-                             g_0_xxxxxx_0_xxxyzz_1,   \
-                             g_0_xxxxxx_0_xxxyzzz_0,  \
-                             g_0_xxxxxx_0_xxxyzzz_1,  \
-                             g_0_xxxxxx_0_xxxzzz_1,   \
-                             g_0_xxxxxx_0_xxxzzzz_0,  \
-                             g_0_xxxxxx_0_xxxzzzz_1,  \
-                             g_0_xxxxxx_0_xxyyyy_1,   \
-                             g_0_xxxxxx_0_xxyyyyy_0,  \
-                             g_0_xxxxxx_0_xxyyyyy_1,  \
-                             g_0_xxxxxx_0_xxyyyyz_0,  \
-                             g_0_xxxxxx_0_xxyyyyz_1,  \
-                             g_0_xxxxxx_0_xxyyyz_1,   \
-                             g_0_xxxxxx_0_xxyyyzz_0,  \
-                             g_0_xxxxxx_0_xxyyyzz_1,  \
-                             g_0_xxxxxx_0_xxyyzz_1,   \
-                             g_0_xxxxxx_0_xxyyzzz_0,  \
-                             g_0_xxxxxx_0_xxyyzzz_1,  \
-                             g_0_xxxxxx_0_xxyzzz_1,   \
-                             g_0_xxxxxx_0_xxyzzzz_0,  \
-                             g_0_xxxxxx_0_xxyzzzz_1,  \
-                             g_0_xxxxxx_0_xxzzzz_1,   \
-                             g_0_xxxxxx_0_xxzzzzz_0,  \
-                             g_0_xxxxxx_0_xxzzzzz_1,  \
-                             g_0_xxxxxx_0_xyyyyy_1,   \
-                             g_0_xxxxxx_0_xyyyyyy_0,  \
-                             g_0_xxxxxx_0_xyyyyyy_1,  \
-                             g_0_xxxxxx_0_xyyyyyz_0,  \
-                             g_0_xxxxxx_0_xyyyyyz_1,  \
-                             g_0_xxxxxx_0_xyyyyz_1,   \
-                             g_0_xxxxxx_0_xyyyyzz_0,  \
-                             g_0_xxxxxx_0_xyyyyzz_1,  \
-                             g_0_xxxxxx_0_xyyyzz_1,   \
-                             g_0_xxxxxx_0_xyyyzzz_0,  \
-                             g_0_xxxxxx_0_xyyyzzz_1,  \
-                             g_0_xxxxxx_0_xyyzzz_1,   \
-                             g_0_xxxxxx_0_xyyzzzz_0,  \
-                             g_0_xxxxxx_0_xyyzzzz_1,  \
-                             g_0_xxxxxx_0_xyzzzz_1,   \
-                             g_0_xxxxxx_0_xyzzzzz_0,  \
-                             g_0_xxxxxx_0_xyzzzzz_1,  \
-                             g_0_xxxxxx_0_xzzzzz_1,   \
-                             g_0_xxxxxx_0_xzzzzzz_0,  \
-                             g_0_xxxxxx_0_xzzzzzz_1,  \
-                             g_0_xxxxxx_0_yyyyyy_1,   \
-                             g_0_xxxxxx_0_yyyyyyy_0,  \
-                             g_0_xxxxxx_0_yyyyyyy_1,  \
-                             g_0_xxxxxx_0_yyyyyyz_0,  \
-                             g_0_xxxxxx_0_yyyyyyz_1,  \
-                             g_0_xxxxxx_0_yyyyyz_1,   \
-                             g_0_xxxxxx_0_yyyyyzz_0,  \
-                             g_0_xxxxxx_0_yyyyyzz_1,  \
-                             g_0_xxxxxx_0_yyyyzz_1,   \
-                             g_0_xxxxxx_0_yyyyzzz_0,  \
-                             g_0_xxxxxx_0_yyyyzzz_1,  \
-                             g_0_xxxxxx_0_yyyzzz_1,   \
-                             g_0_xxxxxx_0_yyyzzzz_0,  \
-                             g_0_xxxxxx_0_yyyzzzz_1,  \
-                             g_0_xxxxxx_0_yyzzzz_1,   \
-                             g_0_xxxxxx_0_yyzzzzz_0,  \
-                             g_0_xxxxxx_0_yyzzzzz_1,  \
-                             g_0_xxxxxx_0_yzzzzz_1,   \
-                             g_0_xxxxxx_0_yzzzzzz_0,  \
-                             g_0_xxxxxx_0_yzzzzzz_1,  \
-                             g_0_xxxxxx_0_zzzzzz_1,   \
-                             g_0_xxxxxx_0_zzzzzzz_0,  \
-                             g_0_xxxxxx_0_zzzzzzz_1,  \
-                             g_0_xxxxxxy_0_xxxxxxx_0, \
-                             g_0_xxxxxxy_0_xxxxxxy_0, \
-                             g_0_xxxxxxy_0_xxxxxxz_0, \
-                             g_0_xxxxxxy_0_xxxxxyy_0, \
-                             g_0_xxxxxxy_0_xxxxxyz_0, \
-                             g_0_xxxxxxy_0_xxxxxzz_0, \
-                             g_0_xxxxxxy_0_xxxxyyy_0, \
-                             g_0_xxxxxxy_0_xxxxyyz_0, \
-                             g_0_xxxxxxy_0_xxxxyzz_0, \
-                             g_0_xxxxxxy_0_xxxxzzz_0, \
-                             g_0_xxxxxxy_0_xxxyyyy_0, \
-                             g_0_xxxxxxy_0_xxxyyyz_0, \
-                             g_0_xxxxxxy_0_xxxyyzz_0, \
-                             g_0_xxxxxxy_0_xxxyzzz_0, \
-                             g_0_xxxxxxy_0_xxxzzzz_0, \
-                             g_0_xxxxxxy_0_xxyyyyy_0, \
-                             g_0_xxxxxxy_0_xxyyyyz_0, \
-                             g_0_xxxxxxy_0_xxyyyzz_0, \
-                             g_0_xxxxxxy_0_xxyyzzz_0, \
-                             g_0_xxxxxxy_0_xxyzzzz_0, \
-                             g_0_xxxxxxy_0_xxzzzzz_0, \
-                             g_0_xxxxxxy_0_xyyyyyy_0, \
-                             g_0_xxxxxxy_0_xyyyyyz_0, \
-                             g_0_xxxxxxy_0_xyyyyzz_0, \
-                             g_0_xxxxxxy_0_xyyyzzz_0, \
-                             g_0_xxxxxxy_0_xyyzzzz_0, \
-                             g_0_xxxxxxy_0_xyzzzzz_0, \
-                             g_0_xxxxxxy_0_xzzzzzz_0, \
-                             g_0_xxxxxxy_0_yyyyyyy_0, \
-                             g_0_xxxxxxy_0_yyyyyyz_0, \
-                             g_0_xxxxxxy_0_yyyyyzz_0, \
-                             g_0_xxxxxxy_0_yyyyzzz_0, \
-                             g_0_xxxxxxy_0_yyyzzzz_0, \
-                             g_0_xxxxxxy_0_yyzzzzz_0, \
-                             g_0_xxxxxxy_0_yzzzzzz_0, \
-                             g_0_xxxxxxy_0_zzzzzzz_0, \
-                             wp_y,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxxxxx_0_xxxxxx_1, g_0_xxxxxx_0_xxxxxxx_0, g_0_xxxxxx_0_xxxxxxx_1, g_0_xxxxxx_0_xxxxxxy_0, g_0_xxxxxx_0_xxxxxxy_1, g_0_xxxxxx_0_xxxxxxz_0, g_0_xxxxxx_0_xxxxxxz_1, g_0_xxxxxx_0_xxxxxy_1, g_0_xxxxxx_0_xxxxxyy_0, g_0_xxxxxx_0_xxxxxyy_1, g_0_xxxxxx_0_xxxxxyz_0, g_0_xxxxxx_0_xxxxxyz_1, g_0_xxxxxx_0_xxxxxz_1, g_0_xxxxxx_0_xxxxxzz_0, g_0_xxxxxx_0_xxxxxzz_1, g_0_xxxxxx_0_xxxxyy_1, g_0_xxxxxx_0_xxxxyyy_0, g_0_xxxxxx_0_xxxxyyy_1, g_0_xxxxxx_0_xxxxyyz_0, g_0_xxxxxx_0_xxxxyyz_1, g_0_xxxxxx_0_xxxxyz_1, g_0_xxxxxx_0_xxxxyzz_0, g_0_xxxxxx_0_xxxxyzz_1, g_0_xxxxxx_0_xxxxzz_1, g_0_xxxxxx_0_xxxxzzz_0, g_0_xxxxxx_0_xxxxzzz_1, g_0_xxxxxx_0_xxxyyy_1, g_0_xxxxxx_0_xxxyyyy_0, g_0_xxxxxx_0_xxxyyyy_1, g_0_xxxxxx_0_xxxyyyz_0, g_0_xxxxxx_0_xxxyyyz_1, g_0_xxxxxx_0_xxxyyz_1, g_0_xxxxxx_0_xxxyyzz_0, g_0_xxxxxx_0_xxxyyzz_1, g_0_xxxxxx_0_xxxyzz_1, g_0_xxxxxx_0_xxxyzzz_0, g_0_xxxxxx_0_xxxyzzz_1, g_0_xxxxxx_0_xxxzzz_1, g_0_xxxxxx_0_xxxzzzz_0, g_0_xxxxxx_0_xxxzzzz_1, g_0_xxxxxx_0_xxyyyy_1, g_0_xxxxxx_0_xxyyyyy_0, g_0_xxxxxx_0_xxyyyyy_1, g_0_xxxxxx_0_xxyyyyz_0, g_0_xxxxxx_0_xxyyyyz_1, g_0_xxxxxx_0_xxyyyz_1, g_0_xxxxxx_0_xxyyyzz_0, g_0_xxxxxx_0_xxyyyzz_1, g_0_xxxxxx_0_xxyyzz_1, g_0_xxxxxx_0_xxyyzzz_0, g_0_xxxxxx_0_xxyyzzz_1, g_0_xxxxxx_0_xxyzzz_1, g_0_xxxxxx_0_xxyzzzz_0, g_0_xxxxxx_0_xxyzzzz_1, g_0_xxxxxx_0_xxzzzz_1, g_0_xxxxxx_0_xxzzzzz_0, g_0_xxxxxx_0_xxzzzzz_1, g_0_xxxxxx_0_xyyyyy_1, g_0_xxxxxx_0_xyyyyyy_0, g_0_xxxxxx_0_xyyyyyy_1, g_0_xxxxxx_0_xyyyyyz_0, g_0_xxxxxx_0_xyyyyyz_1, g_0_xxxxxx_0_xyyyyz_1, g_0_xxxxxx_0_xyyyyzz_0, g_0_xxxxxx_0_xyyyyzz_1, g_0_xxxxxx_0_xyyyzz_1, g_0_xxxxxx_0_xyyyzzz_0, g_0_xxxxxx_0_xyyyzzz_1, g_0_xxxxxx_0_xyyzzz_1, g_0_xxxxxx_0_xyyzzzz_0, g_0_xxxxxx_0_xyyzzzz_1, g_0_xxxxxx_0_xyzzzz_1, g_0_xxxxxx_0_xyzzzzz_0, g_0_xxxxxx_0_xyzzzzz_1, g_0_xxxxxx_0_xzzzzz_1, g_0_xxxxxx_0_xzzzzzz_0, g_0_xxxxxx_0_xzzzzzz_1, g_0_xxxxxx_0_yyyyyy_1, g_0_xxxxxx_0_yyyyyyy_0, g_0_xxxxxx_0_yyyyyyy_1, g_0_xxxxxx_0_yyyyyyz_0, g_0_xxxxxx_0_yyyyyyz_1, g_0_xxxxxx_0_yyyyyz_1, g_0_xxxxxx_0_yyyyyzz_0, g_0_xxxxxx_0_yyyyyzz_1, g_0_xxxxxx_0_yyyyzz_1, g_0_xxxxxx_0_yyyyzzz_0, g_0_xxxxxx_0_yyyyzzz_1, g_0_xxxxxx_0_yyyzzz_1, g_0_xxxxxx_0_yyyzzzz_0, g_0_xxxxxx_0_yyyzzzz_1, g_0_xxxxxx_0_yyzzzz_1, g_0_xxxxxx_0_yyzzzzz_0, g_0_xxxxxx_0_yyzzzzz_1, g_0_xxxxxx_0_yzzzzz_1, g_0_xxxxxx_0_yzzzzzz_0, g_0_xxxxxx_0_yzzzzzz_1, g_0_xxxxxx_0_zzzzzz_1, g_0_xxxxxx_0_zzzzzzz_0, g_0_xxxxxx_0_zzzzzzz_1, g_0_xxxxxxy_0_xxxxxxx_0, g_0_xxxxxxy_0_xxxxxxy_0, g_0_xxxxxxy_0_xxxxxxz_0, g_0_xxxxxxy_0_xxxxxyy_0, g_0_xxxxxxy_0_xxxxxyz_0, g_0_xxxxxxy_0_xxxxxzz_0, g_0_xxxxxxy_0_xxxxyyy_0, g_0_xxxxxxy_0_xxxxyyz_0, g_0_xxxxxxy_0_xxxxyzz_0, g_0_xxxxxxy_0_xxxxzzz_0, g_0_xxxxxxy_0_xxxyyyy_0, g_0_xxxxxxy_0_xxxyyyz_0, g_0_xxxxxxy_0_xxxyyzz_0, g_0_xxxxxxy_0_xxxyzzz_0, g_0_xxxxxxy_0_xxxzzzz_0, g_0_xxxxxxy_0_xxyyyyy_0, g_0_xxxxxxy_0_xxyyyyz_0, g_0_xxxxxxy_0_xxyyyzz_0, g_0_xxxxxxy_0_xxyyzzz_0, g_0_xxxxxxy_0_xxyzzzz_0, g_0_xxxxxxy_0_xxzzzzz_0, g_0_xxxxxxy_0_xyyyyyy_0, g_0_xxxxxxy_0_xyyyyyz_0, g_0_xxxxxxy_0_xyyyyzz_0, g_0_xxxxxxy_0_xyyyzzz_0, g_0_xxxxxxy_0_xyyzzzz_0, g_0_xxxxxxy_0_xyzzzzz_0, g_0_xxxxxxy_0_xzzzzzz_0, g_0_xxxxxxy_0_yyyyyyy_0, g_0_xxxxxxy_0_yyyyyyz_0, g_0_xxxxxxy_0_yyyyyzz_0, g_0_xxxxxxy_0_yyyyzzz_0, g_0_xxxxxxy_0_yyyzzzz_0, g_0_xxxxxxy_0_yyzzzzz_0, g_0_xxxxxxy_0_yzzzzzz_0, g_0_xxxxxxy_0_zzzzzzz_0, wp_y, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -6434,88 +6029,67 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         g_0_xxxxxxy_0_xxxxxxz_0[i] = g_0_xxxxxx_0_xxxxxxz_0[i] * pb_y + g_0_xxxxxx_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_xxxxxyy_0[i] =
-            2.0 * g_0_xxxxxx_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxyy_0[i] * pb_y + g_0_xxxxxx_0_xxxxxyy_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_xxxxxyy_0[i] = 2.0 * g_0_xxxxxx_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxyy_0[i] * pb_y + g_0_xxxxxx_0_xxxxxyy_1[i] * wp_y[i];
 
         g_0_xxxxxxy_0_xxxxxyz_0[i] = g_0_xxxxxx_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxyz_0[i] * pb_y + g_0_xxxxxx_0_xxxxxyz_1[i] * wp_y[i];
 
         g_0_xxxxxxy_0_xxxxxzz_0[i] = g_0_xxxxxx_0_xxxxxzz_0[i] * pb_y + g_0_xxxxxx_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_xxxxyyy_0[i] =
-            3.0 * g_0_xxxxxx_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxyyy_0[i] * pb_y + g_0_xxxxxx_0_xxxxyyy_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_xxxxyyy_0[i] = 3.0 * g_0_xxxxxx_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxyyy_0[i] * pb_y + g_0_xxxxxx_0_xxxxyyy_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_xxxxyyz_0[i] =
-            2.0 * g_0_xxxxxx_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxyyz_0[i] * pb_y + g_0_xxxxxx_0_xxxxyyz_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_xxxxyyz_0[i] = 2.0 * g_0_xxxxxx_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxyyz_0[i] * pb_y + g_0_xxxxxx_0_xxxxyyz_1[i] * wp_y[i];
 
         g_0_xxxxxxy_0_xxxxyzz_0[i] = g_0_xxxxxx_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxyzz_0[i] * pb_y + g_0_xxxxxx_0_xxxxyzz_1[i] * wp_y[i];
 
         g_0_xxxxxxy_0_xxxxzzz_0[i] = g_0_xxxxxx_0_xxxxzzz_0[i] * pb_y + g_0_xxxxxx_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_xxxyyyy_0[i] =
-            4.0 * g_0_xxxxxx_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyyyy_0[i] * pb_y + g_0_xxxxxx_0_xxxyyyy_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_xxxyyyy_0[i] = 4.0 * g_0_xxxxxx_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyyyy_0[i] * pb_y + g_0_xxxxxx_0_xxxyyyy_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_xxxyyyz_0[i] =
-            3.0 * g_0_xxxxxx_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyyyz_0[i] * pb_y + g_0_xxxxxx_0_xxxyyyz_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_xxxyyyz_0[i] = 3.0 * g_0_xxxxxx_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyyyz_0[i] * pb_y + g_0_xxxxxx_0_xxxyyyz_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_xxxyyzz_0[i] =
-            2.0 * g_0_xxxxxx_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyyzz_0[i] * pb_y + g_0_xxxxxx_0_xxxyyzz_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_xxxyyzz_0[i] = 2.0 * g_0_xxxxxx_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyyzz_0[i] * pb_y + g_0_xxxxxx_0_xxxyyzz_1[i] * wp_y[i];
 
         g_0_xxxxxxy_0_xxxyzzz_0[i] = g_0_xxxxxx_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyzzz_0[i] * pb_y + g_0_xxxxxx_0_xxxyzzz_1[i] * wp_y[i];
 
         g_0_xxxxxxy_0_xxxzzzz_0[i] = g_0_xxxxxx_0_xxxzzzz_0[i] * pb_y + g_0_xxxxxx_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_xxyyyyy_0[i] =
-            5.0 * g_0_xxxxxx_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyyyy_0[i] * pb_y + g_0_xxxxxx_0_xxyyyyy_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_xxyyyyy_0[i] = 5.0 * g_0_xxxxxx_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyyyy_0[i] * pb_y + g_0_xxxxxx_0_xxyyyyy_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_xxyyyyz_0[i] =
-            4.0 * g_0_xxxxxx_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyyyz_0[i] * pb_y + g_0_xxxxxx_0_xxyyyyz_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_xxyyyyz_0[i] = 4.0 * g_0_xxxxxx_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyyyz_0[i] * pb_y + g_0_xxxxxx_0_xxyyyyz_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_xxyyyzz_0[i] =
-            3.0 * g_0_xxxxxx_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyyzz_0[i] * pb_y + g_0_xxxxxx_0_xxyyyzz_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_xxyyyzz_0[i] = 3.0 * g_0_xxxxxx_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyyzz_0[i] * pb_y + g_0_xxxxxx_0_xxyyyzz_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_xxyyzzz_0[i] =
-            2.0 * g_0_xxxxxx_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyzzz_0[i] * pb_y + g_0_xxxxxx_0_xxyyzzz_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_xxyyzzz_0[i] = 2.0 * g_0_xxxxxx_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyzzz_0[i] * pb_y + g_0_xxxxxx_0_xxyyzzz_1[i] * wp_y[i];
 
         g_0_xxxxxxy_0_xxyzzzz_0[i] = g_0_xxxxxx_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyzzzz_0[i] * pb_y + g_0_xxxxxx_0_xxyzzzz_1[i] * wp_y[i];
 
         g_0_xxxxxxy_0_xxzzzzz_0[i] = g_0_xxxxxx_0_xxzzzzz_0[i] * pb_y + g_0_xxxxxx_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_xyyyyyy_0[i] =
-            6.0 * g_0_xxxxxx_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyyyy_0[i] * pb_y + g_0_xxxxxx_0_xyyyyyy_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_xyyyyyy_0[i] = 6.0 * g_0_xxxxxx_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyyyy_0[i] * pb_y + g_0_xxxxxx_0_xyyyyyy_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_xyyyyyz_0[i] =
-            5.0 * g_0_xxxxxx_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyyyz_0[i] * pb_y + g_0_xxxxxx_0_xyyyyyz_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_xyyyyyz_0[i] = 5.0 * g_0_xxxxxx_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyyyz_0[i] * pb_y + g_0_xxxxxx_0_xyyyyyz_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_xyyyyzz_0[i] =
-            4.0 * g_0_xxxxxx_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyyzz_0[i] * pb_y + g_0_xxxxxx_0_xyyyyzz_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_xyyyyzz_0[i] = 4.0 * g_0_xxxxxx_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyyzz_0[i] * pb_y + g_0_xxxxxx_0_xyyyyzz_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_xyyyzzz_0[i] =
-            3.0 * g_0_xxxxxx_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyzzz_0[i] * pb_y + g_0_xxxxxx_0_xyyyzzz_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_xyyyzzz_0[i] = 3.0 * g_0_xxxxxx_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyzzz_0[i] * pb_y + g_0_xxxxxx_0_xyyyzzz_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_xyyzzzz_0[i] =
-            2.0 * g_0_xxxxxx_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyzzzz_0[i] * pb_y + g_0_xxxxxx_0_xyyzzzz_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_xyyzzzz_0[i] = 2.0 * g_0_xxxxxx_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyzzzz_0[i] * pb_y + g_0_xxxxxx_0_xyyzzzz_1[i] * wp_y[i];
 
         g_0_xxxxxxy_0_xyzzzzz_0[i] = g_0_xxxxxx_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyzzzzz_0[i] * pb_y + g_0_xxxxxx_0_xyzzzzz_1[i] * wp_y[i];
 
         g_0_xxxxxxy_0_xzzzzzz_0[i] = g_0_xxxxxx_0_xzzzzzz_0[i] * pb_y + g_0_xxxxxx_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_yyyyyyy_0[i] =
-            7.0 * g_0_xxxxxx_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyyyyy_0[i] * pb_y + g_0_xxxxxx_0_yyyyyyy_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_yyyyyyy_0[i] = 7.0 * g_0_xxxxxx_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyyyyy_0[i] * pb_y + g_0_xxxxxx_0_yyyyyyy_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_yyyyyyz_0[i] =
-            6.0 * g_0_xxxxxx_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyyyyz_0[i] * pb_y + g_0_xxxxxx_0_yyyyyyz_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_yyyyyyz_0[i] = 6.0 * g_0_xxxxxx_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyyyyz_0[i] * pb_y + g_0_xxxxxx_0_yyyyyyz_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_yyyyyzz_0[i] =
-            5.0 * g_0_xxxxxx_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyyyzz_0[i] * pb_y + g_0_xxxxxx_0_yyyyyzz_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_yyyyyzz_0[i] = 5.0 * g_0_xxxxxx_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyyyzz_0[i] * pb_y + g_0_xxxxxx_0_yyyyyzz_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_yyyyzzz_0[i] =
-            4.0 * g_0_xxxxxx_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyyzzz_0[i] * pb_y + g_0_xxxxxx_0_yyyyzzz_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_yyyyzzz_0[i] = 4.0 * g_0_xxxxxx_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyyzzz_0[i] * pb_y + g_0_xxxxxx_0_yyyyzzz_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_yyyzzzz_0[i] =
-            3.0 * g_0_xxxxxx_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyzzzz_0[i] * pb_y + g_0_xxxxxx_0_yyyzzzz_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_yyyzzzz_0[i] = 3.0 * g_0_xxxxxx_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyzzzz_0[i] * pb_y + g_0_xxxxxx_0_yyyzzzz_1[i] * wp_y[i];
 
-        g_0_xxxxxxy_0_yyzzzzz_0[i] =
-            2.0 * g_0_xxxxxx_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyzzzzz_0[i] * pb_y + g_0_xxxxxx_0_yyzzzzz_1[i] * wp_y[i];
+        g_0_xxxxxxy_0_yyzzzzz_0[i] = 2.0 * g_0_xxxxxx_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyzzzzz_0[i] * pb_y + g_0_xxxxxx_0_yyzzzzz_1[i] * wp_y[i];
 
         g_0_xxxxxxy_0_yzzzzzz_0[i] = g_0_xxxxxx_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yzzzzzz_0[i] * pb_y + g_0_xxxxxx_0_yzzzzzz_1[i] * wp_y[i];
 
@@ -6596,145 +6170,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxxxxxz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 107);
 
-#pragma omp simd aligned(g_0_xxxxxx_0_xxxxxx_1,       \
-                             g_0_xxxxxx_0_xxxxxxx_0,  \
-                             g_0_xxxxxx_0_xxxxxxx_1,  \
-                             g_0_xxxxxx_0_xxxxxxy_0,  \
-                             g_0_xxxxxx_0_xxxxxxy_1,  \
-                             g_0_xxxxxx_0_xxxxxxz_0,  \
-                             g_0_xxxxxx_0_xxxxxxz_1,  \
-                             g_0_xxxxxx_0_xxxxxy_1,   \
-                             g_0_xxxxxx_0_xxxxxyy_0,  \
-                             g_0_xxxxxx_0_xxxxxyy_1,  \
-                             g_0_xxxxxx_0_xxxxxyz_0,  \
-                             g_0_xxxxxx_0_xxxxxyz_1,  \
-                             g_0_xxxxxx_0_xxxxxz_1,   \
-                             g_0_xxxxxx_0_xxxxxzz_0,  \
-                             g_0_xxxxxx_0_xxxxxzz_1,  \
-                             g_0_xxxxxx_0_xxxxyy_1,   \
-                             g_0_xxxxxx_0_xxxxyyy_0,  \
-                             g_0_xxxxxx_0_xxxxyyy_1,  \
-                             g_0_xxxxxx_0_xxxxyyz_0,  \
-                             g_0_xxxxxx_0_xxxxyyz_1,  \
-                             g_0_xxxxxx_0_xxxxyz_1,   \
-                             g_0_xxxxxx_0_xxxxyzz_0,  \
-                             g_0_xxxxxx_0_xxxxyzz_1,  \
-                             g_0_xxxxxx_0_xxxxzz_1,   \
-                             g_0_xxxxxx_0_xxxxzzz_0,  \
-                             g_0_xxxxxx_0_xxxxzzz_1,  \
-                             g_0_xxxxxx_0_xxxyyy_1,   \
-                             g_0_xxxxxx_0_xxxyyyy_0,  \
-                             g_0_xxxxxx_0_xxxyyyy_1,  \
-                             g_0_xxxxxx_0_xxxyyyz_0,  \
-                             g_0_xxxxxx_0_xxxyyyz_1,  \
-                             g_0_xxxxxx_0_xxxyyz_1,   \
-                             g_0_xxxxxx_0_xxxyyzz_0,  \
-                             g_0_xxxxxx_0_xxxyyzz_1,  \
-                             g_0_xxxxxx_0_xxxyzz_1,   \
-                             g_0_xxxxxx_0_xxxyzzz_0,  \
-                             g_0_xxxxxx_0_xxxyzzz_1,  \
-                             g_0_xxxxxx_0_xxxzzz_1,   \
-                             g_0_xxxxxx_0_xxxzzzz_0,  \
-                             g_0_xxxxxx_0_xxxzzzz_1,  \
-                             g_0_xxxxxx_0_xxyyyy_1,   \
-                             g_0_xxxxxx_0_xxyyyyy_0,  \
-                             g_0_xxxxxx_0_xxyyyyy_1,  \
-                             g_0_xxxxxx_0_xxyyyyz_0,  \
-                             g_0_xxxxxx_0_xxyyyyz_1,  \
-                             g_0_xxxxxx_0_xxyyyz_1,   \
-                             g_0_xxxxxx_0_xxyyyzz_0,  \
-                             g_0_xxxxxx_0_xxyyyzz_1,  \
-                             g_0_xxxxxx_0_xxyyzz_1,   \
-                             g_0_xxxxxx_0_xxyyzzz_0,  \
-                             g_0_xxxxxx_0_xxyyzzz_1,  \
-                             g_0_xxxxxx_0_xxyzzz_1,   \
-                             g_0_xxxxxx_0_xxyzzzz_0,  \
-                             g_0_xxxxxx_0_xxyzzzz_1,  \
-                             g_0_xxxxxx_0_xxzzzz_1,   \
-                             g_0_xxxxxx_0_xxzzzzz_0,  \
-                             g_0_xxxxxx_0_xxzzzzz_1,  \
-                             g_0_xxxxxx_0_xyyyyy_1,   \
-                             g_0_xxxxxx_0_xyyyyyy_0,  \
-                             g_0_xxxxxx_0_xyyyyyy_1,  \
-                             g_0_xxxxxx_0_xyyyyyz_0,  \
-                             g_0_xxxxxx_0_xyyyyyz_1,  \
-                             g_0_xxxxxx_0_xyyyyz_1,   \
-                             g_0_xxxxxx_0_xyyyyzz_0,  \
-                             g_0_xxxxxx_0_xyyyyzz_1,  \
-                             g_0_xxxxxx_0_xyyyzz_1,   \
-                             g_0_xxxxxx_0_xyyyzzz_0,  \
-                             g_0_xxxxxx_0_xyyyzzz_1,  \
-                             g_0_xxxxxx_0_xyyzzz_1,   \
-                             g_0_xxxxxx_0_xyyzzzz_0,  \
-                             g_0_xxxxxx_0_xyyzzzz_1,  \
-                             g_0_xxxxxx_0_xyzzzz_1,   \
-                             g_0_xxxxxx_0_xyzzzzz_0,  \
-                             g_0_xxxxxx_0_xyzzzzz_1,  \
-                             g_0_xxxxxx_0_xzzzzz_1,   \
-                             g_0_xxxxxx_0_xzzzzzz_0,  \
-                             g_0_xxxxxx_0_xzzzzzz_1,  \
-                             g_0_xxxxxx_0_yyyyyy_1,   \
-                             g_0_xxxxxx_0_yyyyyyy_0,  \
-                             g_0_xxxxxx_0_yyyyyyy_1,  \
-                             g_0_xxxxxx_0_yyyyyyz_0,  \
-                             g_0_xxxxxx_0_yyyyyyz_1,  \
-                             g_0_xxxxxx_0_yyyyyz_1,   \
-                             g_0_xxxxxx_0_yyyyyzz_0,  \
-                             g_0_xxxxxx_0_yyyyyzz_1,  \
-                             g_0_xxxxxx_0_yyyyzz_1,   \
-                             g_0_xxxxxx_0_yyyyzzz_0,  \
-                             g_0_xxxxxx_0_yyyyzzz_1,  \
-                             g_0_xxxxxx_0_yyyzzz_1,   \
-                             g_0_xxxxxx_0_yyyzzzz_0,  \
-                             g_0_xxxxxx_0_yyyzzzz_1,  \
-                             g_0_xxxxxx_0_yyzzzz_1,   \
-                             g_0_xxxxxx_0_yyzzzzz_0,  \
-                             g_0_xxxxxx_0_yyzzzzz_1,  \
-                             g_0_xxxxxx_0_yzzzzz_1,   \
-                             g_0_xxxxxx_0_yzzzzzz_0,  \
-                             g_0_xxxxxx_0_yzzzzzz_1,  \
-                             g_0_xxxxxx_0_zzzzzz_1,   \
-                             g_0_xxxxxx_0_zzzzzzz_0,  \
-                             g_0_xxxxxx_0_zzzzzzz_1,  \
-                             g_0_xxxxxxz_0_xxxxxxx_0, \
-                             g_0_xxxxxxz_0_xxxxxxy_0, \
-                             g_0_xxxxxxz_0_xxxxxxz_0, \
-                             g_0_xxxxxxz_0_xxxxxyy_0, \
-                             g_0_xxxxxxz_0_xxxxxyz_0, \
-                             g_0_xxxxxxz_0_xxxxxzz_0, \
-                             g_0_xxxxxxz_0_xxxxyyy_0, \
-                             g_0_xxxxxxz_0_xxxxyyz_0, \
-                             g_0_xxxxxxz_0_xxxxyzz_0, \
-                             g_0_xxxxxxz_0_xxxxzzz_0, \
-                             g_0_xxxxxxz_0_xxxyyyy_0, \
-                             g_0_xxxxxxz_0_xxxyyyz_0, \
-                             g_0_xxxxxxz_0_xxxyyzz_0, \
-                             g_0_xxxxxxz_0_xxxyzzz_0, \
-                             g_0_xxxxxxz_0_xxxzzzz_0, \
-                             g_0_xxxxxxz_0_xxyyyyy_0, \
-                             g_0_xxxxxxz_0_xxyyyyz_0, \
-                             g_0_xxxxxxz_0_xxyyyzz_0, \
-                             g_0_xxxxxxz_0_xxyyzzz_0, \
-                             g_0_xxxxxxz_0_xxyzzzz_0, \
-                             g_0_xxxxxxz_0_xxzzzzz_0, \
-                             g_0_xxxxxxz_0_xyyyyyy_0, \
-                             g_0_xxxxxxz_0_xyyyyyz_0, \
-                             g_0_xxxxxxz_0_xyyyyzz_0, \
-                             g_0_xxxxxxz_0_xyyyzzz_0, \
-                             g_0_xxxxxxz_0_xyyzzzz_0, \
-                             g_0_xxxxxxz_0_xyzzzzz_0, \
-                             g_0_xxxxxxz_0_xzzzzzz_0, \
-                             g_0_xxxxxxz_0_yyyyyyy_0, \
-                             g_0_xxxxxxz_0_yyyyyyz_0, \
-                             g_0_xxxxxxz_0_yyyyyzz_0, \
-                             g_0_xxxxxxz_0_yyyyzzz_0, \
-                             g_0_xxxxxxz_0_yyyzzzz_0, \
-                             g_0_xxxxxxz_0_yyzzzzz_0, \
-                             g_0_xxxxxxz_0_yzzzzzz_0, \
-                             g_0_xxxxxxz_0_zzzzzzz_0, \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxxxxx_0_xxxxxx_1, g_0_xxxxxx_0_xxxxxxx_0, g_0_xxxxxx_0_xxxxxxx_1, g_0_xxxxxx_0_xxxxxxy_0, g_0_xxxxxx_0_xxxxxxy_1, g_0_xxxxxx_0_xxxxxxz_0, g_0_xxxxxx_0_xxxxxxz_1, g_0_xxxxxx_0_xxxxxy_1, g_0_xxxxxx_0_xxxxxyy_0, g_0_xxxxxx_0_xxxxxyy_1, g_0_xxxxxx_0_xxxxxyz_0, g_0_xxxxxx_0_xxxxxyz_1, g_0_xxxxxx_0_xxxxxz_1, g_0_xxxxxx_0_xxxxxzz_0, g_0_xxxxxx_0_xxxxxzz_1, g_0_xxxxxx_0_xxxxyy_1, g_0_xxxxxx_0_xxxxyyy_0, g_0_xxxxxx_0_xxxxyyy_1, g_0_xxxxxx_0_xxxxyyz_0, g_0_xxxxxx_0_xxxxyyz_1, g_0_xxxxxx_0_xxxxyz_1, g_0_xxxxxx_0_xxxxyzz_0, g_0_xxxxxx_0_xxxxyzz_1, g_0_xxxxxx_0_xxxxzz_1, g_0_xxxxxx_0_xxxxzzz_0, g_0_xxxxxx_0_xxxxzzz_1, g_0_xxxxxx_0_xxxyyy_1, g_0_xxxxxx_0_xxxyyyy_0, g_0_xxxxxx_0_xxxyyyy_1, g_0_xxxxxx_0_xxxyyyz_0, g_0_xxxxxx_0_xxxyyyz_1, g_0_xxxxxx_0_xxxyyz_1, g_0_xxxxxx_0_xxxyyzz_0, g_0_xxxxxx_0_xxxyyzz_1, g_0_xxxxxx_0_xxxyzz_1, g_0_xxxxxx_0_xxxyzzz_0, g_0_xxxxxx_0_xxxyzzz_1, g_0_xxxxxx_0_xxxzzz_1, g_0_xxxxxx_0_xxxzzzz_0, g_0_xxxxxx_0_xxxzzzz_1, g_0_xxxxxx_0_xxyyyy_1, g_0_xxxxxx_0_xxyyyyy_0, g_0_xxxxxx_0_xxyyyyy_1, g_0_xxxxxx_0_xxyyyyz_0, g_0_xxxxxx_0_xxyyyyz_1, g_0_xxxxxx_0_xxyyyz_1, g_0_xxxxxx_0_xxyyyzz_0, g_0_xxxxxx_0_xxyyyzz_1, g_0_xxxxxx_0_xxyyzz_1, g_0_xxxxxx_0_xxyyzzz_0, g_0_xxxxxx_0_xxyyzzz_1, g_0_xxxxxx_0_xxyzzz_1, g_0_xxxxxx_0_xxyzzzz_0, g_0_xxxxxx_0_xxyzzzz_1, g_0_xxxxxx_0_xxzzzz_1, g_0_xxxxxx_0_xxzzzzz_0, g_0_xxxxxx_0_xxzzzzz_1, g_0_xxxxxx_0_xyyyyy_1, g_0_xxxxxx_0_xyyyyyy_0, g_0_xxxxxx_0_xyyyyyy_1, g_0_xxxxxx_0_xyyyyyz_0, g_0_xxxxxx_0_xyyyyyz_1, g_0_xxxxxx_0_xyyyyz_1, g_0_xxxxxx_0_xyyyyzz_0, g_0_xxxxxx_0_xyyyyzz_1, g_0_xxxxxx_0_xyyyzz_1, g_0_xxxxxx_0_xyyyzzz_0, g_0_xxxxxx_0_xyyyzzz_1, g_0_xxxxxx_0_xyyzzz_1, g_0_xxxxxx_0_xyyzzzz_0, g_0_xxxxxx_0_xyyzzzz_1, g_0_xxxxxx_0_xyzzzz_1, g_0_xxxxxx_0_xyzzzzz_0, g_0_xxxxxx_0_xyzzzzz_1, g_0_xxxxxx_0_xzzzzz_1, g_0_xxxxxx_0_xzzzzzz_0, g_0_xxxxxx_0_xzzzzzz_1, g_0_xxxxxx_0_yyyyyy_1, g_0_xxxxxx_0_yyyyyyy_0, g_0_xxxxxx_0_yyyyyyy_1, g_0_xxxxxx_0_yyyyyyz_0, g_0_xxxxxx_0_yyyyyyz_1, g_0_xxxxxx_0_yyyyyz_1, g_0_xxxxxx_0_yyyyyzz_0, g_0_xxxxxx_0_yyyyyzz_1, g_0_xxxxxx_0_yyyyzz_1, g_0_xxxxxx_0_yyyyzzz_0, g_0_xxxxxx_0_yyyyzzz_1, g_0_xxxxxx_0_yyyzzz_1, g_0_xxxxxx_0_yyyzzzz_0, g_0_xxxxxx_0_yyyzzzz_1, g_0_xxxxxx_0_yyzzzz_1, g_0_xxxxxx_0_yyzzzzz_0, g_0_xxxxxx_0_yyzzzzz_1, g_0_xxxxxx_0_yzzzzz_1, g_0_xxxxxx_0_yzzzzzz_0, g_0_xxxxxx_0_yzzzzzz_1, g_0_xxxxxx_0_zzzzzz_1, g_0_xxxxxx_0_zzzzzzz_0, g_0_xxxxxx_0_zzzzzzz_1, g_0_xxxxxxz_0_xxxxxxx_0, g_0_xxxxxxz_0_xxxxxxy_0, g_0_xxxxxxz_0_xxxxxxz_0, g_0_xxxxxxz_0_xxxxxyy_0, g_0_xxxxxxz_0_xxxxxyz_0, g_0_xxxxxxz_0_xxxxxzz_0, g_0_xxxxxxz_0_xxxxyyy_0, g_0_xxxxxxz_0_xxxxyyz_0, g_0_xxxxxxz_0_xxxxyzz_0, g_0_xxxxxxz_0_xxxxzzz_0, g_0_xxxxxxz_0_xxxyyyy_0, g_0_xxxxxxz_0_xxxyyyz_0, g_0_xxxxxxz_0_xxxyyzz_0, g_0_xxxxxxz_0_xxxyzzz_0, g_0_xxxxxxz_0_xxxzzzz_0, g_0_xxxxxxz_0_xxyyyyy_0, g_0_xxxxxxz_0_xxyyyyz_0, g_0_xxxxxxz_0_xxyyyzz_0, g_0_xxxxxxz_0_xxyyzzz_0, g_0_xxxxxxz_0_xxyzzzz_0, g_0_xxxxxxz_0_xxzzzzz_0, g_0_xxxxxxz_0_xyyyyyy_0, g_0_xxxxxxz_0_xyyyyyz_0, g_0_xxxxxxz_0_xyyyyzz_0, g_0_xxxxxxz_0_xyyyzzz_0, g_0_xxxxxxz_0_xyyzzzz_0, g_0_xxxxxxz_0_xyzzzzz_0, g_0_xxxxxxz_0_xzzzzzz_0, g_0_xxxxxxz_0_yyyyyyy_0, g_0_xxxxxxz_0_yyyyyyz_0, g_0_xxxxxxz_0_yyyyyzz_0, g_0_xxxxxxz_0_yyyyzzz_0, g_0_xxxxxxz_0_yyyzzzz_0, g_0_xxxxxxz_0_yyzzzzz_0, g_0_xxxxxxz_0_yzzzzzz_0, g_0_xxxxxxz_0_zzzzzzz_0, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -6749,88 +6185,67 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         g_0_xxxxxxz_0_xxxxxyz_0[i] = g_0_xxxxxx_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxyz_0[i] * pb_z + g_0_xxxxxx_0_xxxxxyz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_xxxxxzz_0[i] =
-            2.0 * g_0_xxxxxx_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxzz_0[i] * pb_z + g_0_xxxxxx_0_xxxxxzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_xxxxxzz_0[i] = 2.0 * g_0_xxxxxx_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxxzz_0[i] * pb_z + g_0_xxxxxx_0_xxxxxzz_1[i] * wp_z[i];
 
         g_0_xxxxxxz_0_xxxxyyy_0[i] = g_0_xxxxxx_0_xxxxyyy_0[i] * pb_z + g_0_xxxxxx_0_xxxxyyy_1[i] * wp_z[i];
 
         g_0_xxxxxxz_0_xxxxyyz_0[i] = g_0_xxxxxx_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxyyz_0[i] * pb_z + g_0_xxxxxx_0_xxxxyyz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_xxxxyzz_0[i] =
-            2.0 * g_0_xxxxxx_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxyzz_0[i] * pb_z + g_0_xxxxxx_0_xxxxyzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_xxxxyzz_0[i] = 2.0 * g_0_xxxxxx_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxyzz_0[i] * pb_z + g_0_xxxxxx_0_xxxxyzz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_xxxxzzz_0[i] =
-            3.0 * g_0_xxxxxx_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxzzz_0[i] * pb_z + g_0_xxxxxx_0_xxxxzzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_xxxxzzz_0[i] = 3.0 * g_0_xxxxxx_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxxzzz_0[i] * pb_z + g_0_xxxxxx_0_xxxxzzz_1[i] * wp_z[i];
 
         g_0_xxxxxxz_0_xxxyyyy_0[i] = g_0_xxxxxx_0_xxxyyyy_0[i] * pb_z + g_0_xxxxxx_0_xxxyyyy_1[i] * wp_z[i];
 
         g_0_xxxxxxz_0_xxxyyyz_0[i] = g_0_xxxxxx_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyyyz_0[i] * pb_z + g_0_xxxxxx_0_xxxyyyz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_xxxyyzz_0[i] =
-            2.0 * g_0_xxxxxx_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyyzz_0[i] * pb_z + g_0_xxxxxx_0_xxxyyzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_xxxyyzz_0[i] = 2.0 * g_0_xxxxxx_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyyzz_0[i] * pb_z + g_0_xxxxxx_0_xxxyyzz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_xxxyzzz_0[i] =
-            3.0 * g_0_xxxxxx_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyzzz_0[i] * pb_z + g_0_xxxxxx_0_xxxyzzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_xxxyzzz_0[i] = 3.0 * g_0_xxxxxx_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxyzzz_0[i] * pb_z + g_0_xxxxxx_0_xxxyzzz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_xxxzzzz_0[i] =
-            4.0 * g_0_xxxxxx_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxzzzz_0[i] * pb_z + g_0_xxxxxx_0_xxxzzzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_xxxzzzz_0[i] = 4.0 * g_0_xxxxxx_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxxzzzz_0[i] * pb_z + g_0_xxxxxx_0_xxxzzzz_1[i] * wp_z[i];
 
         g_0_xxxxxxz_0_xxyyyyy_0[i] = g_0_xxxxxx_0_xxyyyyy_0[i] * pb_z + g_0_xxxxxx_0_xxyyyyy_1[i] * wp_z[i];
 
         g_0_xxxxxxz_0_xxyyyyz_0[i] = g_0_xxxxxx_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyyyz_0[i] * pb_z + g_0_xxxxxx_0_xxyyyyz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_xxyyyzz_0[i] =
-            2.0 * g_0_xxxxxx_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyyzz_0[i] * pb_z + g_0_xxxxxx_0_xxyyyzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_xxyyyzz_0[i] = 2.0 * g_0_xxxxxx_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyyzz_0[i] * pb_z + g_0_xxxxxx_0_xxyyyzz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_xxyyzzz_0[i] =
-            3.0 * g_0_xxxxxx_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyzzz_0[i] * pb_z + g_0_xxxxxx_0_xxyyzzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_xxyyzzz_0[i] = 3.0 * g_0_xxxxxx_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyyzzz_0[i] * pb_z + g_0_xxxxxx_0_xxyyzzz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_xxyzzzz_0[i] =
-            4.0 * g_0_xxxxxx_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyzzzz_0[i] * pb_z + g_0_xxxxxx_0_xxyzzzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_xxyzzzz_0[i] = 4.0 * g_0_xxxxxx_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxyzzzz_0[i] * pb_z + g_0_xxxxxx_0_xxyzzzz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_xxzzzzz_0[i] =
-            5.0 * g_0_xxxxxx_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxzzzzz_0[i] * pb_z + g_0_xxxxxx_0_xxzzzzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_xxzzzzz_0[i] = 5.0 * g_0_xxxxxx_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xxzzzzz_0[i] * pb_z + g_0_xxxxxx_0_xxzzzzz_1[i] * wp_z[i];
 
         g_0_xxxxxxz_0_xyyyyyy_0[i] = g_0_xxxxxx_0_xyyyyyy_0[i] * pb_z + g_0_xxxxxx_0_xyyyyyy_1[i] * wp_z[i];
 
         g_0_xxxxxxz_0_xyyyyyz_0[i] = g_0_xxxxxx_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyyyz_0[i] * pb_z + g_0_xxxxxx_0_xyyyyyz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_xyyyyzz_0[i] =
-            2.0 * g_0_xxxxxx_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyyzz_0[i] * pb_z + g_0_xxxxxx_0_xyyyyzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_xyyyyzz_0[i] = 2.0 * g_0_xxxxxx_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyyzz_0[i] * pb_z + g_0_xxxxxx_0_xyyyyzz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_xyyyzzz_0[i] =
-            3.0 * g_0_xxxxxx_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyzzz_0[i] * pb_z + g_0_xxxxxx_0_xyyyzzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_xyyyzzz_0[i] = 3.0 * g_0_xxxxxx_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyyzzz_0[i] * pb_z + g_0_xxxxxx_0_xyyyzzz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_xyyzzzz_0[i] =
-            4.0 * g_0_xxxxxx_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyzzzz_0[i] * pb_z + g_0_xxxxxx_0_xyyzzzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_xyyzzzz_0[i] = 4.0 * g_0_xxxxxx_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyyzzzz_0[i] * pb_z + g_0_xxxxxx_0_xyyzzzz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_xyzzzzz_0[i] =
-            5.0 * g_0_xxxxxx_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyzzzzz_0[i] * pb_z + g_0_xxxxxx_0_xyzzzzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_xyzzzzz_0[i] = 5.0 * g_0_xxxxxx_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xyzzzzz_0[i] * pb_z + g_0_xxxxxx_0_xyzzzzz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_xzzzzzz_0[i] =
-            6.0 * g_0_xxxxxx_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xzzzzzz_0[i] * pb_z + g_0_xxxxxx_0_xzzzzzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_xzzzzzz_0[i] = 6.0 * g_0_xxxxxx_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_xzzzzzz_0[i] * pb_z + g_0_xxxxxx_0_xzzzzzz_1[i] * wp_z[i];
 
         g_0_xxxxxxz_0_yyyyyyy_0[i] = g_0_xxxxxx_0_yyyyyyy_0[i] * pb_z + g_0_xxxxxx_0_yyyyyyy_1[i] * wp_z[i];
 
         g_0_xxxxxxz_0_yyyyyyz_0[i] = g_0_xxxxxx_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyyyyz_0[i] * pb_z + g_0_xxxxxx_0_yyyyyyz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_yyyyyzz_0[i] =
-            2.0 * g_0_xxxxxx_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyyyzz_0[i] * pb_z + g_0_xxxxxx_0_yyyyyzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_yyyyyzz_0[i] = 2.0 * g_0_xxxxxx_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyyyzz_0[i] * pb_z + g_0_xxxxxx_0_yyyyyzz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_yyyyzzz_0[i] =
-            3.0 * g_0_xxxxxx_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyyzzz_0[i] * pb_z + g_0_xxxxxx_0_yyyyzzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_yyyyzzz_0[i] = 3.0 * g_0_xxxxxx_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyyzzz_0[i] * pb_z + g_0_xxxxxx_0_yyyyzzz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_yyyzzzz_0[i] =
-            4.0 * g_0_xxxxxx_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyzzzz_0[i] * pb_z + g_0_xxxxxx_0_yyyzzzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_yyyzzzz_0[i] = 4.0 * g_0_xxxxxx_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyyzzzz_0[i] * pb_z + g_0_xxxxxx_0_yyyzzzz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_yyzzzzz_0[i] =
-            5.0 * g_0_xxxxxx_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyzzzzz_0[i] * pb_z + g_0_xxxxxx_0_yyzzzzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_yyzzzzz_0[i] = 5.0 * g_0_xxxxxx_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yyzzzzz_0[i] * pb_z + g_0_xxxxxx_0_yyzzzzz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_yzzzzzz_0[i] =
-            6.0 * g_0_xxxxxx_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yzzzzzz_0[i] * pb_z + g_0_xxxxxx_0_yzzzzzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_yzzzzzz_0[i] = 6.0 * g_0_xxxxxx_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_yzzzzzz_0[i] * pb_z + g_0_xxxxxx_0_yzzzzzz_1[i] * wp_z[i];
 
-        g_0_xxxxxxz_0_zzzzzzz_0[i] =
-            7.0 * g_0_xxxxxx_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_zzzzzzz_0[i] * pb_z + g_0_xxxxxx_0_zzzzzzz_1[i] * wp_z[i];
+        g_0_xxxxxxz_0_zzzzzzz_0[i] = 7.0 * g_0_xxxxxx_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxx_0_zzzzzzz_0[i] * pb_z + g_0_xxxxxx_0_zzzzzzz_1[i] * wp_z[i];
     }
 
     /// Set up 108-144 components of targeted buffer : SKSK
@@ -6907,211 +6322,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxxxxyy_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 143);
 
-#pragma omp simd aligned(g_0_xxxxx_0_xxxxxxx_0,       \
-                             g_0_xxxxx_0_xxxxxxx_1,   \
-                             g_0_xxxxx_0_xxxxxxz_0,   \
-                             g_0_xxxxx_0_xxxxxxz_1,   \
-                             g_0_xxxxx_0_xxxxxzz_0,   \
-                             g_0_xxxxx_0_xxxxxzz_1,   \
-                             g_0_xxxxx_0_xxxxzzz_0,   \
-                             g_0_xxxxx_0_xxxxzzz_1,   \
-                             g_0_xxxxx_0_xxxzzzz_0,   \
-                             g_0_xxxxx_0_xxxzzzz_1,   \
-                             g_0_xxxxx_0_xxzzzzz_0,   \
-                             g_0_xxxxx_0_xxzzzzz_1,   \
-                             g_0_xxxxx_0_xzzzzzz_0,   \
-                             g_0_xxxxx_0_xzzzzzz_1,   \
-                             g_0_xxxxxy_0_xxxxxxx_0,  \
-                             g_0_xxxxxy_0_xxxxxxx_1,  \
-                             g_0_xxxxxy_0_xxxxxxz_0,  \
-                             g_0_xxxxxy_0_xxxxxxz_1,  \
-                             g_0_xxxxxy_0_xxxxxzz_0,  \
-                             g_0_xxxxxy_0_xxxxxzz_1,  \
-                             g_0_xxxxxy_0_xxxxzzz_0,  \
-                             g_0_xxxxxy_0_xxxxzzz_1,  \
-                             g_0_xxxxxy_0_xxxzzzz_0,  \
-                             g_0_xxxxxy_0_xxxzzzz_1,  \
-                             g_0_xxxxxy_0_xxzzzzz_0,  \
-                             g_0_xxxxxy_0_xxzzzzz_1,  \
-                             g_0_xxxxxy_0_xzzzzzz_0,  \
-                             g_0_xxxxxy_0_xzzzzzz_1,  \
-                             g_0_xxxxxyy_0_xxxxxxx_0, \
-                             g_0_xxxxxyy_0_xxxxxxy_0, \
-                             g_0_xxxxxyy_0_xxxxxxz_0, \
-                             g_0_xxxxxyy_0_xxxxxyy_0, \
-                             g_0_xxxxxyy_0_xxxxxyz_0, \
-                             g_0_xxxxxyy_0_xxxxxzz_0, \
-                             g_0_xxxxxyy_0_xxxxyyy_0, \
-                             g_0_xxxxxyy_0_xxxxyyz_0, \
-                             g_0_xxxxxyy_0_xxxxyzz_0, \
-                             g_0_xxxxxyy_0_xxxxzzz_0, \
-                             g_0_xxxxxyy_0_xxxyyyy_0, \
-                             g_0_xxxxxyy_0_xxxyyyz_0, \
-                             g_0_xxxxxyy_0_xxxyyzz_0, \
-                             g_0_xxxxxyy_0_xxxyzzz_0, \
-                             g_0_xxxxxyy_0_xxxzzzz_0, \
-                             g_0_xxxxxyy_0_xxyyyyy_0, \
-                             g_0_xxxxxyy_0_xxyyyyz_0, \
-                             g_0_xxxxxyy_0_xxyyyzz_0, \
-                             g_0_xxxxxyy_0_xxyyzzz_0, \
-                             g_0_xxxxxyy_0_xxyzzzz_0, \
-                             g_0_xxxxxyy_0_xxzzzzz_0, \
-                             g_0_xxxxxyy_0_xyyyyyy_0, \
-                             g_0_xxxxxyy_0_xyyyyyz_0, \
-                             g_0_xxxxxyy_0_xyyyyzz_0, \
-                             g_0_xxxxxyy_0_xyyyzzz_0, \
-                             g_0_xxxxxyy_0_xyyzzzz_0, \
-                             g_0_xxxxxyy_0_xyzzzzz_0, \
-                             g_0_xxxxxyy_0_xzzzzzz_0, \
-                             g_0_xxxxxyy_0_yyyyyyy_0, \
-                             g_0_xxxxxyy_0_yyyyyyz_0, \
-                             g_0_xxxxxyy_0_yyyyyzz_0, \
-                             g_0_xxxxxyy_0_yyyyzzz_0, \
-                             g_0_xxxxxyy_0_yyyzzzz_0, \
-                             g_0_xxxxxyy_0_yyzzzzz_0, \
-                             g_0_xxxxxyy_0_yzzzzzz_0, \
-                             g_0_xxxxxyy_0_zzzzzzz_0, \
-                             g_0_xxxxyy_0_xxxxxxy_0,  \
-                             g_0_xxxxyy_0_xxxxxxy_1,  \
-                             g_0_xxxxyy_0_xxxxxy_1,   \
-                             g_0_xxxxyy_0_xxxxxyy_0,  \
-                             g_0_xxxxyy_0_xxxxxyy_1,  \
-                             g_0_xxxxyy_0_xxxxxyz_0,  \
-                             g_0_xxxxyy_0_xxxxxyz_1,  \
-                             g_0_xxxxyy_0_xxxxyy_1,   \
-                             g_0_xxxxyy_0_xxxxyyy_0,  \
-                             g_0_xxxxyy_0_xxxxyyy_1,  \
-                             g_0_xxxxyy_0_xxxxyyz_0,  \
-                             g_0_xxxxyy_0_xxxxyyz_1,  \
-                             g_0_xxxxyy_0_xxxxyz_1,   \
-                             g_0_xxxxyy_0_xxxxyzz_0,  \
-                             g_0_xxxxyy_0_xxxxyzz_1,  \
-                             g_0_xxxxyy_0_xxxyyy_1,   \
-                             g_0_xxxxyy_0_xxxyyyy_0,  \
-                             g_0_xxxxyy_0_xxxyyyy_1,  \
-                             g_0_xxxxyy_0_xxxyyyz_0,  \
-                             g_0_xxxxyy_0_xxxyyyz_1,  \
-                             g_0_xxxxyy_0_xxxyyz_1,   \
-                             g_0_xxxxyy_0_xxxyyzz_0,  \
-                             g_0_xxxxyy_0_xxxyyzz_1,  \
-                             g_0_xxxxyy_0_xxxyzz_1,   \
-                             g_0_xxxxyy_0_xxxyzzz_0,  \
-                             g_0_xxxxyy_0_xxxyzzz_1,  \
-                             g_0_xxxxyy_0_xxyyyy_1,   \
-                             g_0_xxxxyy_0_xxyyyyy_0,  \
-                             g_0_xxxxyy_0_xxyyyyy_1,  \
-                             g_0_xxxxyy_0_xxyyyyz_0,  \
-                             g_0_xxxxyy_0_xxyyyyz_1,  \
-                             g_0_xxxxyy_0_xxyyyz_1,   \
-                             g_0_xxxxyy_0_xxyyyzz_0,  \
-                             g_0_xxxxyy_0_xxyyyzz_1,  \
-                             g_0_xxxxyy_0_xxyyzz_1,   \
-                             g_0_xxxxyy_0_xxyyzzz_0,  \
-                             g_0_xxxxyy_0_xxyyzzz_1,  \
-                             g_0_xxxxyy_0_xxyzzz_1,   \
-                             g_0_xxxxyy_0_xxyzzzz_0,  \
-                             g_0_xxxxyy_0_xxyzzzz_1,  \
-                             g_0_xxxxyy_0_xyyyyy_1,   \
-                             g_0_xxxxyy_0_xyyyyyy_0,  \
-                             g_0_xxxxyy_0_xyyyyyy_1,  \
-                             g_0_xxxxyy_0_xyyyyyz_0,  \
-                             g_0_xxxxyy_0_xyyyyyz_1,  \
-                             g_0_xxxxyy_0_xyyyyz_1,   \
-                             g_0_xxxxyy_0_xyyyyzz_0,  \
-                             g_0_xxxxyy_0_xyyyyzz_1,  \
-                             g_0_xxxxyy_0_xyyyzz_1,   \
-                             g_0_xxxxyy_0_xyyyzzz_0,  \
-                             g_0_xxxxyy_0_xyyyzzz_1,  \
-                             g_0_xxxxyy_0_xyyzzz_1,   \
-                             g_0_xxxxyy_0_xyyzzzz_0,  \
-                             g_0_xxxxyy_0_xyyzzzz_1,  \
-                             g_0_xxxxyy_0_xyzzzz_1,   \
-                             g_0_xxxxyy_0_xyzzzzz_0,  \
-                             g_0_xxxxyy_0_xyzzzzz_1,  \
-                             g_0_xxxxyy_0_yyyyyy_1,   \
-                             g_0_xxxxyy_0_yyyyyyy_0,  \
-                             g_0_xxxxyy_0_yyyyyyy_1,  \
-                             g_0_xxxxyy_0_yyyyyyz_0,  \
-                             g_0_xxxxyy_0_yyyyyyz_1,  \
-                             g_0_xxxxyy_0_yyyyyz_1,   \
-                             g_0_xxxxyy_0_yyyyyzz_0,  \
-                             g_0_xxxxyy_0_yyyyyzz_1,  \
-                             g_0_xxxxyy_0_yyyyzz_1,   \
-                             g_0_xxxxyy_0_yyyyzzz_0,  \
-                             g_0_xxxxyy_0_yyyyzzz_1,  \
-                             g_0_xxxxyy_0_yyyzzz_1,   \
-                             g_0_xxxxyy_0_yyyzzzz_0,  \
-                             g_0_xxxxyy_0_yyyzzzz_1,  \
-                             g_0_xxxxyy_0_yyzzzz_1,   \
-                             g_0_xxxxyy_0_yyzzzzz_0,  \
-                             g_0_xxxxyy_0_yyzzzzz_1,  \
-                             g_0_xxxxyy_0_yzzzzz_1,   \
-                             g_0_xxxxyy_0_yzzzzzz_0,  \
-                             g_0_xxxxyy_0_yzzzzzz_1,  \
-                             g_0_xxxxyy_0_zzzzzzz_0,  \
-                             g_0_xxxxyy_0_zzzzzzz_1,  \
-                             g_0_xxxyy_0_xxxxxxy_0,   \
-                             g_0_xxxyy_0_xxxxxxy_1,   \
-                             g_0_xxxyy_0_xxxxxyy_0,   \
-                             g_0_xxxyy_0_xxxxxyy_1,   \
-                             g_0_xxxyy_0_xxxxxyz_0,   \
-                             g_0_xxxyy_0_xxxxxyz_1,   \
-                             g_0_xxxyy_0_xxxxyyy_0,   \
-                             g_0_xxxyy_0_xxxxyyy_1,   \
-                             g_0_xxxyy_0_xxxxyyz_0,   \
-                             g_0_xxxyy_0_xxxxyyz_1,   \
-                             g_0_xxxyy_0_xxxxyzz_0,   \
-                             g_0_xxxyy_0_xxxxyzz_1,   \
-                             g_0_xxxyy_0_xxxyyyy_0,   \
-                             g_0_xxxyy_0_xxxyyyy_1,   \
-                             g_0_xxxyy_0_xxxyyyz_0,   \
-                             g_0_xxxyy_0_xxxyyyz_1,   \
-                             g_0_xxxyy_0_xxxyyzz_0,   \
-                             g_0_xxxyy_0_xxxyyzz_1,   \
-                             g_0_xxxyy_0_xxxyzzz_0,   \
-                             g_0_xxxyy_0_xxxyzzz_1,   \
-                             g_0_xxxyy_0_xxyyyyy_0,   \
-                             g_0_xxxyy_0_xxyyyyy_1,   \
-                             g_0_xxxyy_0_xxyyyyz_0,   \
-                             g_0_xxxyy_0_xxyyyyz_1,   \
-                             g_0_xxxyy_0_xxyyyzz_0,   \
-                             g_0_xxxyy_0_xxyyyzz_1,   \
-                             g_0_xxxyy_0_xxyyzzz_0,   \
-                             g_0_xxxyy_0_xxyyzzz_1,   \
-                             g_0_xxxyy_0_xxyzzzz_0,   \
-                             g_0_xxxyy_0_xxyzzzz_1,   \
-                             g_0_xxxyy_0_xyyyyyy_0,   \
-                             g_0_xxxyy_0_xyyyyyy_1,   \
-                             g_0_xxxyy_0_xyyyyyz_0,   \
-                             g_0_xxxyy_0_xyyyyyz_1,   \
-                             g_0_xxxyy_0_xyyyyzz_0,   \
-                             g_0_xxxyy_0_xyyyyzz_1,   \
-                             g_0_xxxyy_0_xyyyzzz_0,   \
-                             g_0_xxxyy_0_xyyyzzz_1,   \
-                             g_0_xxxyy_0_xyyzzzz_0,   \
-                             g_0_xxxyy_0_xyyzzzz_1,   \
-                             g_0_xxxyy_0_xyzzzzz_0,   \
-                             g_0_xxxyy_0_xyzzzzz_1,   \
-                             g_0_xxxyy_0_yyyyyyy_0,   \
-                             g_0_xxxyy_0_yyyyyyy_1,   \
-                             g_0_xxxyy_0_yyyyyyz_0,   \
-                             g_0_xxxyy_0_yyyyyyz_1,   \
-                             g_0_xxxyy_0_yyyyyzz_0,   \
-                             g_0_xxxyy_0_yyyyyzz_1,   \
-                             g_0_xxxyy_0_yyyyzzz_0,   \
-                             g_0_xxxyy_0_yyyyzzz_1,   \
-                             g_0_xxxyy_0_yyyzzzz_0,   \
-                             g_0_xxxyy_0_yyyzzzz_1,   \
-                             g_0_xxxyy_0_yyzzzzz_0,   \
-                             g_0_xxxyy_0_yyzzzzz_1,   \
-                             g_0_xxxyy_0_yzzzzzz_0,   \
-                             g_0_xxxyy_0_yzzzzzz_1,   \
-                             g_0_xxxyy_0_zzzzzzz_0,   \
-                             g_0_xxxyy_0_zzzzzzz_1,   \
-                             wp_x,                    \
-                             wp_y,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxxxx_0_xxxxxxx_0, g_0_xxxxx_0_xxxxxxx_1, g_0_xxxxx_0_xxxxxxz_0, g_0_xxxxx_0_xxxxxxz_1, g_0_xxxxx_0_xxxxxzz_0, g_0_xxxxx_0_xxxxxzz_1, g_0_xxxxx_0_xxxxzzz_0, g_0_xxxxx_0_xxxxzzz_1, g_0_xxxxx_0_xxxzzzz_0, g_0_xxxxx_0_xxxzzzz_1, g_0_xxxxx_0_xxzzzzz_0, g_0_xxxxx_0_xxzzzzz_1, g_0_xxxxx_0_xzzzzzz_0, g_0_xxxxx_0_xzzzzzz_1, g_0_xxxxxy_0_xxxxxxx_0, g_0_xxxxxy_0_xxxxxxx_1, g_0_xxxxxy_0_xxxxxxz_0, g_0_xxxxxy_0_xxxxxxz_1, g_0_xxxxxy_0_xxxxxzz_0, g_0_xxxxxy_0_xxxxxzz_1, g_0_xxxxxy_0_xxxxzzz_0, g_0_xxxxxy_0_xxxxzzz_1, g_0_xxxxxy_0_xxxzzzz_0, g_0_xxxxxy_0_xxxzzzz_1, g_0_xxxxxy_0_xxzzzzz_0, g_0_xxxxxy_0_xxzzzzz_1, g_0_xxxxxy_0_xzzzzzz_0, g_0_xxxxxy_0_xzzzzzz_1, g_0_xxxxxyy_0_xxxxxxx_0, g_0_xxxxxyy_0_xxxxxxy_0, g_0_xxxxxyy_0_xxxxxxz_0, g_0_xxxxxyy_0_xxxxxyy_0, g_0_xxxxxyy_0_xxxxxyz_0, g_0_xxxxxyy_0_xxxxxzz_0, g_0_xxxxxyy_0_xxxxyyy_0, g_0_xxxxxyy_0_xxxxyyz_0, g_0_xxxxxyy_0_xxxxyzz_0, g_0_xxxxxyy_0_xxxxzzz_0, g_0_xxxxxyy_0_xxxyyyy_0, g_0_xxxxxyy_0_xxxyyyz_0, g_0_xxxxxyy_0_xxxyyzz_0, g_0_xxxxxyy_0_xxxyzzz_0, g_0_xxxxxyy_0_xxxzzzz_0, g_0_xxxxxyy_0_xxyyyyy_0, g_0_xxxxxyy_0_xxyyyyz_0, g_0_xxxxxyy_0_xxyyyzz_0, g_0_xxxxxyy_0_xxyyzzz_0, g_0_xxxxxyy_0_xxyzzzz_0, g_0_xxxxxyy_0_xxzzzzz_0, g_0_xxxxxyy_0_xyyyyyy_0, g_0_xxxxxyy_0_xyyyyyz_0, g_0_xxxxxyy_0_xyyyyzz_0, g_0_xxxxxyy_0_xyyyzzz_0, g_0_xxxxxyy_0_xyyzzzz_0, g_0_xxxxxyy_0_xyzzzzz_0, g_0_xxxxxyy_0_xzzzzzz_0, g_0_xxxxxyy_0_yyyyyyy_0, g_0_xxxxxyy_0_yyyyyyz_0, g_0_xxxxxyy_0_yyyyyzz_0, g_0_xxxxxyy_0_yyyyzzz_0, g_0_xxxxxyy_0_yyyzzzz_0, g_0_xxxxxyy_0_yyzzzzz_0, g_0_xxxxxyy_0_yzzzzzz_0, g_0_xxxxxyy_0_zzzzzzz_0, g_0_xxxxyy_0_xxxxxxy_0, g_0_xxxxyy_0_xxxxxxy_1, g_0_xxxxyy_0_xxxxxy_1, g_0_xxxxyy_0_xxxxxyy_0, g_0_xxxxyy_0_xxxxxyy_1, g_0_xxxxyy_0_xxxxxyz_0, g_0_xxxxyy_0_xxxxxyz_1, g_0_xxxxyy_0_xxxxyy_1, g_0_xxxxyy_0_xxxxyyy_0, g_0_xxxxyy_0_xxxxyyy_1, g_0_xxxxyy_0_xxxxyyz_0, g_0_xxxxyy_0_xxxxyyz_1, g_0_xxxxyy_0_xxxxyz_1, g_0_xxxxyy_0_xxxxyzz_0, g_0_xxxxyy_0_xxxxyzz_1, g_0_xxxxyy_0_xxxyyy_1, g_0_xxxxyy_0_xxxyyyy_0, g_0_xxxxyy_0_xxxyyyy_1, g_0_xxxxyy_0_xxxyyyz_0, g_0_xxxxyy_0_xxxyyyz_1, g_0_xxxxyy_0_xxxyyz_1, g_0_xxxxyy_0_xxxyyzz_0, g_0_xxxxyy_0_xxxyyzz_1, g_0_xxxxyy_0_xxxyzz_1, g_0_xxxxyy_0_xxxyzzz_0, g_0_xxxxyy_0_xxxyzzz_1, g_0_xxxxyy_0_xxyyyy_1, g_0_xxxxyy_0_xxyyyyy_0, g_0_xxxxyy_0_xxyyyyy_1, g_0_xxxxyy_0_xxyyyyz_0, g_0_xxxxyy_0_xxyyyyz_1, g_0_xxxxyy_0_xxyyyz_1, g_0_xxxxyy_0_xxyyyzz_0, g_0_xxxxyy_0_xxyyyzz_1, g_0_xxxxyy_0_xxyyzz_1, g_0_xxxxyy_0_xxyyzzz_0, g_0_xxxxyy_0_xxyyzzz_1, g_0_xxxxyy_0_xxyzzz_1, g_0_xxxxyy_0_xxyzzzz_0, g_0_xxxxyy_0_xxyzzzz_1, g_0_xxxxyy_0_xyyyyy_1, g_0_xxxxyy_0_xyyyyyy_0, g_0_xxxxyy_0_xyyyyyy_1, g_0_xxxxyy_0_xyyyyyz_0, g_0_xxxxyy_0_xyyyyyz_1, g_0_xxxxyy_0_xyyyyz_1, g_0_xxxxyy_0_xyyyyzz_0, g_0_xxxxyy_0_xyyyyzz_1, g_0_xxxxyy_0_xyyyzz_1, g_0_xxxxyy_0_xyyyzzz_0, g_0_xxxxyy_0_xyyyzzz_1, g_0_xxxxyy_0_xyyzzz_1, g_0_xxxxyy_0_xyyzzzz_0, g_0_xxxxyy_0_xyyzzzz_1, g_0_xxxxyy_0_xyzzzz_1, g_0_xxxxyy_0_xyzzzzz_0, g_0_xxxxyy_0_xyzzzzz_1, g_0_xxxxyy_0_yyyyyy_1, g_0_xxxxyy_0_yyyyyyy_0, g_0_xxxxyy_0_yyyyyyy_1, g_0_xxxxyy_0_yyyyyyz_0, g_0_xxxxyy_0_yyyyyyz_1, g_0_xxxxyy_0_yyyyyz_1, g_0_xxxxyy_0_yyyyyzz_0, g_0_xxxxyy_0_yyyyyzz_1, g_0_xxxxyy_0_yyyyzz_1, g_0_xxxxyy_0_yyyyzzz_0, g_0_xxxxyy_0_yyyyzzz_1, g_0_xxxxyy_0_yyyzzz_1, g_0_xxxxyy_0_yyyzzzz_0, g_0_xxxxyy_0_yyyzzzz_1, g_0_xxxxyy_0_yyzzzz_1, g_0_xxxxyy_0_yyzzzzz_0, g_0_xxxxyy_0_yyzzzzz_1, g_0_xxxxyy_0_yzzzzz_1, g_0_xxxxyy_0_yzzzzzz_0, g_0_xxxxyy_0_yzzzzzz_1, g_0_xxxxyy_0_zzzzzzz_0, g_0_xxxxyy_0_zzzzzzz_1, g_0_xxxyy_0_xxxxxxy_0, g_0_xxxyy_0_xxxxxxy_1, g_0_xxxyy_0_xxxxxyy_0, g_0_xxxyy_0_xxxxxyy_1, g_0_xxxyy_0_xxxxxyz_0, g_0_xxxyy_0_xxxxxyz_1, g_0_xxxyy_0_xxxxyyy_0, g_0_xxxyy_0_xxxxyyy_1, g_0_xxxyy_0_xxxxyyz_0, g_0_xxxyy_0_xxxxyyz_1, g_0_xxxyy_0_xxxxyzz_0, g_0_xxxyy_0_xxxxyzz_1, g_0_xxxyy_0_xxxyyyy_0, g_0_xxxyy_0_xxxyyyy_1, g_0_xxxyy_0_xxxyyyz_0, g_0_xxxyy_0_xxxyyyz_1, g_0_xxxyy_0_xxxyyzz_0, g_0_xxxyy_0_xxxyyzz_1, g_0_xxxyy_0_xxxyzzz_0, g_0_xxxyy_0_xxxyzzz_1, g_0_xxxyy_0_xxyyyyy_0, g_0_xxxyy_0_xxyyyyy_1, g_0_xxxyy_0_xxyyyyz_0, g_0_xxxyy_0_xxyyyyz_1, g_0_xxxyy_0_xxyyyzz_0, g_0_xxxyy_0_xxyyyzz_1, g_0_xxxyy_0_xxyyzzz_0, g_0_xxxyy_0_xxyyzzz_1, g_0_xxxyy_0_xxyzzzz_0, g_0_xxxyy_0_xxyzzzz_1, g_0_xxxyy_0_xyyyyyy_0, g_0_xxxyy_0_xyyyyyy_1, g_0_xxxyy_0_xyyyyyz_0, g_0_xxxyy_0_xyyyyyz_1, g_0_xxxyy_0_xyyyyzz_0, g_0_xxxyy_0_xyyyyzz_1, g_0_xxxyy_0_xyyyzzz_0, g_0_xxxyy_0_xyyyzzz_1, g_0_xxxyy_0_xyyzzzz_0, g_0_xxxyy_0_xyyzzzz_1, g_0_xxxyy_0_xyzzzzz_0, g_0_xxxyy_0_xyzzzzz_1, g_0_xxxyy_0_yyyyyyy_0, g_0_xxxyy_0_yyyyyyy_1, g_0_xxxyy_0_yyyyyyz_0, g_0_xxxyy_0_yyyyyyz_1, g_0_xxxyy_0_yyyyyzz_0, g_0_xxxyy_0_yyyyyzz_1, g_0_xxxyy_0_yyyyzzz_0, g_0_xxxyy_0_yyyyzzz_1, g_0_xxxyy_0_yyyzzzz_0, g_0_xxxyy_0_yyyzzzz_1, g_0_xxxyy_0_yyzzzzz_0, g_0_xxxyy_0_yyzzzzz_1, g_0_xxxyy_0_yzzzzzz_0, g_0_xxxyy_0_yzzzzzz_1, g_0_xxxyy_0_zzzzzzz_0, g_0_xxxyy_0_zzzzzzz_1, wp_x, wp_y, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -7120,128 +6331,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxxxxyy_0_xxxxxxx_0[i] = g_0_xxxxx_0_xxxxxxx_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxxxxx_1[i] * fti_ab_0 + g_0_xxxxxy_0_xxxxxxx_0[i] * pb_y +
-                                     g_0_xxxxxy_0_xxxxxxx_1[i] * wp_y[i];
+        g_0_xxxxxyy_0_xxxxxxx_0[i] = g_0_xxxxx_0_xxxxxxx_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxxxxx_1[i] * fti_ab_0 + g_0_xxxxxy_0_xxxxxxx_0[i] * pb_y + g_0_xxxxxy_0_xxxxxxx_1[i] * wp_y[i];
 
-        g_0_xxxxxyy_0_xxxxxxy_0[i] = 4.0 * g_0_xxxyy_0_xxxxxxy_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxxxxy_1[i] * fti_ab_0 +
-                                     6.0 * g_0_xxxxyy_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxxxy_0[i] * pb_x +
-                                     g_0_xxxxyy_0_xxxxxxy_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xxxxxxy_0[i] = 4.0 * g_0_xxxyy_0_xxxxxxy_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxxxxy_1[i] * fti_ab_0 + 6.0 * g_0_xxxxyy_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxxxy_0[i] * pb_x + g_0_xxxxyy_0_xxxxxxy_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xxxxxxz_0[i] = g_0_xxxxx_0_xxxxxxz_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxxxxz_1[i] * fti_ab_0 + g_0_xxxxxy_0_xxxxxxz_0[i] * pb_y +
-                                     g_0_xxxxxy_0_xxxxxxz_1[i] * wp_y[i];
+        g_0_xxxxxyy_0_xxxxxxz_0[i] = g_0_xxxxx_0_xxxxxxz_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxxxxz_1[i] * fti_ab_0 + g_0_xxxxxy_0_xxxxxxz_0[i] * pb_y + g_0_xxxxxy_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_xxxxxyy_0_xxxxxyy_0[i] = 4.0 * g_0_xxxyy_0_xxxxxyy_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxxxyy_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xxxxyy_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxxyy_0[i] * pb_x +
-                                     g_0_xxxxyy_0_xxxxxyy_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xxxxxyy_0[i] = 4.0 * g_0_xxxyy_0_xxxxxyy_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxxxyy_1[i] * fti_ab_0 + 5.0 * g_0_xxxxyy_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxxyy_0[i] * pb_x + g_0_xxxxyy_0_xxxxxyy_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xxxxxyz_0[i] = 4.0 * g_0_xxxyy_0_xxxxxyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xxxxyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxxyz_0[i] * pb_x +
-                                     g_0_xxxxyy_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xxxxxyz_0[i] = 4.0 * g_0_xxxyy_0_xxxxxyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxxxyz_1[i] * fti_ab_0 + 5.0 * g_0_xxxxyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxxyz_0[i] * pb_x + g_0_xxxxyy_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xxxxxzz_0[i] = g_0_xxxxx_0_xxxxxzz_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxxxzz_1[i] * fti_ab_0 + g_0_xxxxxy_0_xxxxxzz_0[i] * pb_y +
-                                     g_0_xxxxxy_0_xxxxxzz_1[i] * wp_y[i];
+        g_0_xxxxxyy_0_xxxxxzz_0[i] = g_0_xxxxx_0_xxxxxzz_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxxxzz_1[i] * fti_ab_0 + g_0_xxxxxy_0_xxxxxzz_0[i] * pb_y + g_0_xxxxxy_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_xxxxxyy_0_xxxxyyy_0[i] = 4.0 * g_0_xxxyy_0_xxxxyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxxyyy_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxxxyy_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxyyy_0[i] * pb_x +
-                                     g_0_xxxxyy_0_xxxxyyy_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xxxxyyy_0[i] = 4.0 * g_0_xxxyy_0_xxxxyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxxyyy_1[i] * fti_ab_0 + 4.0 * g_0_xxxxyy_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxyyy_0[i] * pb_x + g_0_xxxxyy_0_xxxxyyy_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xxxxyyz_0[i] = 4.0 * g_0_xxxyy_0_xxxxyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxxxyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxyyz_0[i] * pb_x +
-                                     g_0_xxxxyy_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xxxxyyz_0[i] = 4.0 * g_0_xxxyy_0_xxxxyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxxyyz_1[i] * fti_ab_0 + 4.0 * g_0_xxxxyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxyyz_0[i] * pb_x + g_0_xxxxyy_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xxxxyzz_0[i] = 4.0 * g_0_xxxyy_0_xxxxyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxxxyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxyzz_0[i] * pb_x +
-                                     g_0_xxxxyy_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xxxxyzz_0[i] = 4.0 * g_0_xxxyy_0_xxxxyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxxyzz_1[i] * fti_ab_0 + 4.0 * g_0_xxxxyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxyzz_0[i] * pb_x + g_0_xxxxyy_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xxxxzzz_0[i] = g_0_xxxxx_0_xxxxzzz_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxxzzz_1[i] * fti_ab_0 + g_0_xxxxxy_0_xxxxzzz_0[i] * pb_y +
-                                     g_0_xxxxxy_0_xxxxzzz_1[i] * wp_y[i];
+        g_0_xxxxxyy_0_xxxxzzz_0[i] = g_0_xxxxx_0_xxxxzzz_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxxzzz_1[i] * fti_ab_0 + g_0_xxxxxy_0_xxxxzzz_0[i] * pb_y + g_0_xxxxxy_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_xxxxxyy_0_xxxyyyy_0[i] = 4.0 * g_0_xxxyy_0_xxxyyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxyyyy_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxxyy_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxyyyy_0[i] * pb_x +
-                                     g_0_xxxxyy_0_xxxyyyy_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xxxyyyy_0[i] = 4.0 * g_0_xxxyy_0_xxxyyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxyyyy_1[i] * fti_ab_0 + 3.0 * g_0_xxxxyy_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxyyyy_0[i] * pb_x + g_0_xxxxyy_0_xxxyyyy_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xxxyyyz_0[i] = 4.0 * g_0_xxxyy_0_xxxyyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxxyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxyyyz_0[i] * pb_x +
-                                     g_0_xxxxyy_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xxxyyyz_0[i] = 4.0 * g_0_xxxyy_0_xxxyyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_xxxxyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxyyyz_0[i] * pb_x + g_0_xxxxyy_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xxxyyzz_0[i] = 4.0 * g_0_xxxyy_0_xxxyyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxxyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxyyzz_0[i] * pb_x +
-                                     g_0_xxxxyy_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xxxyyzz_0[i] = 4.0 * g_0_xxxyy_0_xxxyyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxyyzz_1[i] * fti_ab_0 + 3.0 * g_0_xxxxyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxyyzz_0[i] * pb_x + g_0_xxxxyy_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xxxyzzz_0[i] = 4.0 * g_0_xxxyy_0_xxxyzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxxyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxyzzz_0[i] * pb_x +
-                                     g_0_xxxxyy_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xxxyzzz_0[i] = 4.0 * g_0_xxxyy_0_xxxyzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxxyzzz_1[i] * fti_ab_0 + 3.0 * g_0_xxxxyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxyzzz_0[i] * pb_x + g_0_xxxxyy_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xxxzzzz_0[i] = g_0_xxxxx_0_xxxzzzz_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxzzzz_1[i] * fti_ab_0 + g_0_xxxxxy_0_xxxzzzz_0[i] * pb_y +
-                                     g_0_xxxxxy_0_xxxzzzz_1[i] * wp_y[i];
+        g_0_xxxxxyy_0_xxxzzzz_0[i] = g_0_xxxxx_0_xxxzzzz_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxzzzz_1[i] * fti_ab_0 + g_0_xxxxxy_0_xxxzzzz_0[i] * pb_y + g_0_xxxxxy_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_xxxxxyy_0_xxyyyyy_0[i] = 4.0 * g_0_xxxyy_0_xxyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxyyyyy_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxxyy_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyyyyy_0[i] * pb_x +
-                                     g_0_xxxxyy_0_xxyyyyy_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xxyyyyy_0[i] = 4.0 * g_0_xxxyy_0_xxyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxyyyyy_1[i] * fti_ab_0 + 2.0 * g_0_xxxxyy_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyyyyy_0[i] * pb_x + g_0_xxxxyy_0_xxyyyyy_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xxyyyyz_0[i] = 4.0 * g_0_xxxyy_0_xxyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxxyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyyyyz_0[i] * pb_x +
-                                     g_0_xxxxyy_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xxyyyyz_0[i] = 4.0 * g_0_xxxyy_0_xxyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxyyyyz_1[i] * fti_ab_0 + 2.0 * g_0_xxxxyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyyyyz_0[i] * pb_x + g_0_xxxxyy_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xxyyyzz_0[i] = 4.0 * g_0_xxxyy_0_xxyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxxyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyyyzz_0[i] * pb_x +
-                                     g_0_xxxxyy_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xxyyyzz_0[i] = 4.0 * g_0_xxxyy_0_xxyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxyyyzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxxyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyyyzz_0[i] * pb_x + g_0_xxxxyy_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xxyyzzz_0[i] = 4.0 * g_0_xxxyy_0_xxyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxxyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyyzzz_0[i] * pb_x +
-                                     g_0_xxxxyy_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xxyyzzz_0[i] = 4.0 * g_0_xxxyy_0_xxyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxxyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyyzzz_0[i] * pb_x + g_0_xxxxyy_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xxyzzzz_0[i] = 4.0 * g_0_xxxyy_0_xxyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxxyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyzzzz_0[i] * pb_x +
-                                     g_0_xxxxyy_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xxyzzzz_0[i] = 4.0 * g_0_xxxyy_0_xxyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xxyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxxyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyzzzz_0[i] * pb_x + g_0_xxxxyy_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xxzzzzz_0[i] = g_0_xxxxx_0_xxzzzzz_0[i] * fi_ab_0 - g_0_xxxxx_0_xxzzzzz_1[i] * fti_ab_0 + g_0_xxxxxy_0_xxzzzzz_0[i] * pb_y +
-                                     g_0_xxxxxy_0_xxzzzzz_1[i] * wp_y[i];
+        g_0_xxxxxyy_0_xxzzzzz_0[i] = g_0_xxxxx_0_xxzzzzz_0[i] * fi_ab_0 - g_0_xxxxx_0_xxzzzzz_1[i] * fti_ab_0 + g_0_xxxxxy_0_xxzzzzz_0[i] * pb_y + g_0_xxxxxy_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_xxxxxyy_0_xyyyyyy_0[i] = 4.0 * g_0_xxxyy_0_xyyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyyyyy_0[i] * pb_x + g_0_xxxxyy_0_xyyyyyy_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xyyyyyy_0[i] = 4.0 * g_0_xxxyy_0_xyyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xyyyyyy_1[i] * fti_ab_0 + g_0_xxxxyy_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyyyyy_0[i] * pb_x + g_0_xxxxyy_0_xyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xyyyyyz_0[i] = 4.0 * g_0_xxxyy_0_xyyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyyyyz_0[i] * pb_x + g_0_xxxxyy_0_xyyyyyz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xyyyyyz_0[i] = 4.0 * g_0_xxxyy_0_xyyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xyyyyyz_1[i] * fti_ab_0 + g_0_xxxxyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyyyyz_0[i] * pb_x + g_0_xxxxyy_0_xyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xyyyyzz_0[i] = 4.0 * g_0_xxxyy_0_xyyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xyyyyzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyyyzz_0[i] * pb_x + g_0_xxxxyy_0_xyyyyzz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xyyyyzz_0[i] = 4.0 * g_0_xxxyy_0_xyyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xyyyyzz_1[i] * fti_ab_0 + g_0_xxxxyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyyyzz_0[i] * pb_x + g_0_xxxxyy_0_xyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xyyyzzz_0[i] = 4.0 * g_0_xxxyy_0_xyyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xyyyzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyyzzz_0[i] * pb_x + g_0_xxxxyy_0_xyyyzzz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xyyyzzz_0[i] = 4.0 * g_0_xxxyy_0_xyyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xyyyzzz_1[i] * fti_ab_0 + g_0_xxxxyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyyzzz_0[i] * pb_x + g_0_xxxxyy_0_xyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xyyzzzz_0[i] = 4.0 * g_0_xxxyy_0_xyyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xyyzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyzzzz_0[i] * pb_x + g_0_xxxxyy_0_xyyzzzz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xyyzzzz_0[i] = 4.0 * g_0_xxxyy_0_xyyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xyyzzzz_1[i] * fti_ab_0 + g_0_xxxxyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyzzzz_0[i] * pb_x + g_0_xxxxyy_0_xyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xyzzzzz_0[i] = 4.0 * g_0_xxxyy_0_xyzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyzzzzz_0[i] * pb_x + g_0_xxxxyy_0_xyzzzzz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_xyzzzzz_0[i] = 4.0 * g_0_xxxyy_0_xyzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_xyzzzzz_1[i] * fti_ab_0 + g_0_xxxxyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyzzzzz_0[i] * pb_x + g_0_xxxxyy_0_xyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_xzzzzzz_0[i] = g_0_xxxxx_0_xzzzzzz_0[i] * fi_ab_0 - g_0_xxxxx_0_xzzzzzz_1[i] * fti_ab_0 + g_0_xxxxxy_0_xzzzzzz_0[i] * pb_y +
-                                     g_0_xxxxxy_0_xzzzzzz_1[i] * wp_y[i];
+        g_0_xxxxxyy_0_xzzzzzz_0[i] = g_0_xxxxx_0_xzzzzzz_0[i] * fi_ab_0 - g_0_xxxxx_0_xzzzzzz_1[i] * fti_ab_0 + g_0_xxxxxy_0_xzzzzzz_0[i] * pb_y + g_0_xxxxxy_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_xxxxxyy_0_yyyyyyy_0[i] = 4.0 * g_0_xxxyy_0_yyyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_yyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_yyyyyyy_0[i] * pb_x + g_0_xxxxyy_0_yyyyyyy_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_yyyyyyy_0[i] = 4.0 * g_0_xxxyy_0_yyyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_yyyyyyy_1[i] * fti_ab_0 + g_0_xxxxyy_0_yyyyyyy_0[i] * pb_x + g_0_xxxxyy_0_yyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_yyyyyyz_0[i] = 4.0 * g_0_xxxyy_0_yyyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_yyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_yyyyyyz_0[i] * pb_x + g_0_xxxxyy_0_yyyyyyz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_yyyyyyz_0[i] = 4.0 * g_0_xxxyy_0_yyyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_yyyyyyz_1[i] * fti_ab_0 + g_0_xxxxyy_0_yyyyyyz_0[i] * pb_x + g_0_xxxxyy_0_yyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_yyyyyzz_0[i] = 4.0 * g_0_xxxyy_0_yyyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_yyyyyzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_yyyyyzz_0[i] * pb_x + g_0_xxxxyy_0_yyyyyzz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_yyyyyzz_0[i] = 4.0 * g_0_xxxyy_0_yyyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_yyyyyzz_1[i] * fti_ab_0 + g_0_xxxxyy_0_yyyyyzz_0[i] * pb_x + g_0_xxxxyy_0_yyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_yyyyzzz_0[i] = 4.0 * g_0_xxxyy_0_yyyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_yyyyzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_yyyyzzz_0[i] * pb_x + g_0_xxxxyy_0_yyyyzzz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_yyyyzzz_0[i] = 4.0 * g_0_xxxyy_0_yyyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_yyyyzzz_1[i] * fti_ab_0 + g_0_xxxxyy_0_yyyyzzz_0[i] * pb_x + g_0_xxxxyy_0_yyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_yyyzzzz_0[i] = 4.0 * g_0_xxxyy_0_yyyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_yyyzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_yyyzzzz_0[i] * pb_x + g_0_xxxxyy_0_yyyzzzz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_yyyzzzz_0[i] = 4.0 * g_0_xxxyy_0_yyyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_yyyzzzz_1[i] * fti_ab_0 + g_0_xxxxyy_0_yyyzzzz_0[i] * pb_x + g_0_xxxxyy_0_yyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_yyzzzzz_0[i] = 4.0 * g_0_xxxyy_0_yyzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_yyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_yyzzzzz_0[i] * pb_x + g_0_xxxxyy_0_yyzzzzz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_yyzzzzz_0[i] = 4.0 * g_0_xxxyy_0_yyzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_yyzzzzz_1[i] * fti_ab_0 + g_0_xxxxyy_0_yyzzzzz_0[i] * pb_x + g_0_xxxxyy_0_yyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_yzzzzzz_0[i] = 4.0 * g_0_xxxyy_0_yzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_yzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_yzzzzzz_0[i] * pb_x + g_0_xxxxyy_0_yzzzzzz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_yzzzzzz_0[i] = 4.0 * g_0_xxxyy_0_yzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_yzzzzzz_1[i] * fti_ab_0 + g_0_xxxxyy_0_yzzzzzz_0[i] * pb_x + g_0_xxxxyy_0_yzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxyy_0_zzzzzzz_0[i] = 4.0 * g_0_xxxyy_0_zzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_zzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_zzzzzzz_0[i] * pb_x + g_0_xxxxyy_0_zzzzzzz_1[i] * wp_x[i];
+        g_0_xxxxxyy_0_zzzzzzz_0[i] = 4.0 * g_0_xxxyy_0_zzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxyy_0_zzzzzzz_1[i] * fti_ab_0 + g_0_xxxxyy_0_zzzzzzz_0[i] * pb_x + g_0_xxxxyy_0_zzzzzzz_1[i] * wp_x[i];
     }
 
     /// Set up 144-180 components of targeted buffer : SKSK
@@ -7318,139 +6478,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxxxxyz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 179);
 
-#pragma omp simd aligned(g_0_xxxxxy_0_xxxxxxy_0,      \
-                             g_0_xxxxxy_0_xxxxxxy_1,  \
-                             g_0_xxxxxy_0_xxxxxyy_0,  \
-                             g_0_xxxxxy_0_xxxxxyy_1,  \
-                             g_0_xxxxxy_0_xxxxyyy_0,  \
-                             g_0_xxxxxy_0_xxxxyyy_1,  \
-                             g_0_xxxxxy_0_xxxyyyy_0,  \
-                             g_0_xxxxxy_0_xxxyyyy_1,  \
-                             g_0_xxxxxy_0_xxyyyyy_0,  \
-                             g_0_xxxxxy_0_xxyyyyy_1,  \
-                             g_0_xxxxxy_0_xyyyyyy_0,  \
-                             g_0_xxxxxy_0_xyyyyyy_1,  \
-                             g_0_xxxxxy_0_yyyyyyy_0,  \
-                             g_0_xxxxxy_0_yyyyyyy_1,  \
-                             g_0_xxxxxyz_0_xxxxxxx_0, \
-                             g_0_xxxxxyz_0_xxxxxxy_0, \
-                             g_0_xxxxxyz_0_xxxxxxz_0, \
-                             g_0_xxxxxyz_0_xxxxxyy_0, \
-                             g_0_xxxxxyz_0_xxxxxyz_0, \
-                             g_0_xxxxxyz_0_xxxxxzz_0, \
-                             g_0_xxxxxyz_0_xxxxyyy_0, \
-                             g_0_xxxxxyz_0_xxxxyyz_0, \
-                             g_0_xxxxxyz_0_xxxxyzz_0, \
-                             g_0_xxxxxyz_0_xxxxzzz_0, \
-                             g_0_xxxxxyz_0_xxxyyyy_0, \
-                             g_0_xxxxxyz_0_xxxyyyz_0, \
-                             g_0_xxxxxyz_0_xxxyyzz_0, \
-                             g_0_xxxxxyz_0_xxxyzzz_0, \
-                             g_0_xxxxxyz_0_xxxzzzz_0, \
-                             g_0_xxxxxyz_0_xxyyyyy_0, \
-                             g_0_xxxxxyz_0_xxyyyyz_0, \
-                             g_0_xxxxxyz_0_xxyyyzz_0, \
-                             g_0_xxxxxyz_0_xxyyzzz_0, \
-                             g_0_xxxxxyz_0_xxyzzzz_0, \
-                             g_0_xxxxxyz_0_xxzzzzz_0, \
-                             g_0_xxxxxyz_0_xyyyyyy_0, \
-                             g_0_xxxxxyz_0_xyyyyyz_0, \
-                             g_0_xxxxxyz_0_xyyyyzz_0, \
-                             g_0_xxxxxyz_0_xyyyzzz_0, \
-                             g_0_xxxxxyz_0_xyyzzzz_0, \
-                             g_0_xxxxxyz_0_xyzzzzz_0, \
-                             g_0_xxxxxyz_0_xzzzzzz_0, \
-                             g_0_xxxxxyz_0_yyyyyyy_0, \
-                             g_0_xxxxxyz_0_yyyyyyz_0, \
-                             g_0_xxxxxyz_0_yyyyyzz_0, \
-                             g_0_xxxxxyz_0_yyyyzzz_0, \
-                             g_0_xxxxxyz_0_yyyzzzz_0, \
-                             g_0_xxxxxyz_0_yyzzzzz_0, \
-                             g_0_xxxxxyz_0_yzzzzzz_0, \
-                             g_0_xxxxxyz_0_zzzzzzz_0, \
-                             g_0_xxxxxz_0_xxxxxxx_0,  \
-                             g_0_xxxxxz_0_xxxxxxx_1,  \
-                             g_0_xxxxxz_0_xxxxxxz_0,  \
-                             g_0_xxxxxz_0_xxxxxxz_1,  \
-                             g_0_xxxxxz_0_xxxxxyz_0,  \
-                             g_0_xxxxxz_0_xxxxxyz_1,  \
-                             g_0_xxxxxz_0_xxxxxz_1,   \
-                             g_0_xxxxxz_0_xxxxxzz_0,  \
-                             g_0_xxxxxz_0_xxxxxzz_1,  \
-                             g_0_xxxxxz_0_xxxxyyz_0,  \
-                             g_0_xxxxxz_0_xxxxyyz_1,  \
-                             g_0_xxxxxz_0_xxxxyz_1,   \
-                             g_0_xxxxxz_0_xxxxyzz_0,  \
-                             g_0_xxxxxz_0_xxxxyzz_1,  \
-                             g_0_xxxxxz_0_xxxxzz_1,   \
-                             g_0_xxxxxz_0_xxxxzzz_0,  \
-                             g_0_xxxxxz_0_xxxxzzz_1,  \
-                             g_0_xxxxxz_0_xxxyyyz_0,  \
-                             g_0_xxxxxz_0_xxxyyyz_1,  \
-                             g_0_xxxxxz_0_xxxyyz_1,   \
-                             g_0_xxxxxz_0_xxxyyzz_0,  \
-                             g_0_xxxxxz_0_xxxyyzz_1,  \
-                             g_0_xxxxxz_0_xxxyzz_1,   \
-                             g_0_xxxxxz_0_xxxyzzz_0,  \
-                             g_0_xxxxxz_0_xxxyzzz_1,  \
-                             g_0_xxxxxz_0_xxxzzz_1,   \
-                             g_0_xxxxxz_0_xxxzzzz_0,  \
-                             g_0_xxxxxz_0_xxxzzzz_1,  \
-                             g_0_xxxxxz_0_xxyyyyz_0,  \
-                             g_0_xxxxxz_0_xxyyyyz_1,  \
-                             g_0_xxxxxz_0_xxyyyz_1,   \
-                             g_0_xxxxxz_0_xxyyyzz_0,  \
-                             g_0_xxxxxz_0_xxyyyzz_1,  \
-                             g_0_xxxxxz_0_xxyyzz_1,   \
-                             g_0_xxxxxz_0_xxyyzzz_0,  \
-                             g_0_xxxxxz_0_xxyyzzz_1,  \
-                             g_0_xxxxxz_0_xxyzzz_1,   \
-                             g_0_xxxxxz_0_xxyzzzz_0,  \
-                             g_0_xxxxxz_0_xxyzzzz_1,  \
-                             g_0_xxxxxz_0_xxzzzz_1,   \
-                             g_0_xxxxxz_0_xxzzzzz_0,  \
-                             g_0_xxxxxz_0_xxzzzzz_1,  \
-                             g_0_xxxxxz_0_xyyyyyz_0,  \
-                             g_0_xxxxxz_0_xyyyyyz_1,  \
-                             g_0_xxxxxz_0_xyyyyz_1,   \
-                             g_0_xxxxxz_0_xyyyyzz_0,  \
-                             g_0_xxxxxz_0_xyyyyzz_1,  \
-                             g_0_xxxxxz_0_xyyyzz_1,   \
-                             g_0_xxxxxz_0_xyyyzzz_0,  \
-                             g_0_xxxxxz_0_xyyyzzz_1,  \
-                             g_0_xxxxxz_0_xyyzzz_1,   \
-                             g_0_xxxxxz_0_xyyzzzz_0,  \
-                             g_0_xxxxxz_0_xyyzzzz_1,  \
-                             g_0_xxxxxz_0_xyzzzz_1,   \
-                             g_0_xxxxxz_0_xyzzzzz_0,  \
-                             g_0_xxxxxz_0_xyzzzzz_1,  \
-                             g_0_xxxxxz_0_xzzzzz_1,   \
-                             g_0_xxxxxz_0_xzzzzzz_0,  \
-                             g_0_xxxxxz_0_xzzzzzz_1,  \
-                             g_0_xxxxxz_0_yyyyyyz_0,  \
-                             g_0_xxxxxz_0_yyyyyyz_1,  \
-                             g_0_xxxxxz_0_yyyyyz_1,   \
-                             g_0_xxxxxz_0_yyyyyzz_0,  \
-                             g_0_xxxxxz_0_yyyyyzz_1,  \
-                             g_0_xxxxxz_0_yyyyzz_1,   \
-                             g_0_xxxxxz_0_yyyyzzz_0,  \
-                             g_0_xxxxxz_0_yyyyzzz_1,  \
-                             g_0_xxxxxz_0_yyyzzz_1,   \
-                             g_0_xxxxxz_0_yyyzzzz_0,  \
-                             g_0_xxxxxz_0_yyyzzzz_1,  \
-                             g_0_xxxxxz_0_yyzzzz_1,   \
-                             g_0_xxxxxz_0_yyzzzzz_0,  \
-                             g_0_xxxxxz_0_yyzzzzz_1,  \
-                             g_0_xxxxxz_0_yzzzzz_1,   \
-                             g_0_xxxxxz_0_yzzzzzz_0,  \
-                             g_0_xxxxxz_0_yzzzzzz_1,  \
-                             g_0_xxxxxz_0_zzzzzz_1,   \
-                             g_0_xxxxxz_0_zzzzzzz_0,  \
-                             g_0_xxxxxz_0_zzzzzzz_1,  \
-                             wp_y,                    \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxxxxy_0_xxxxxxy_0, g_0_xxxxxy_0_xxxxxxy_1, g_0_xxxxxy_0_xxxxxyy_0, g_0_xxxxxy_0_xxxxxyy_1, g_0_xxxxxy_0_xxxxyyy_0, g_0_xxxxxy_0_xxxxyyy_1, g_0_xxxxxy_0_xxxyyyy_0, g_0_xxxxxy_0_xxxyyyy_1, g_0_xxxxxy_0_xxyyyyy_0, g_0_xxxxxy_0_xxyyyyy_1, g_0_xxxxxy_0_xyyyyyy_0, g_0_xxxxxy_0_xyyyyyy_1, g_0_xxxxxy_0_yyyyyyy_0, g_0_xxxxxy_0_yyyyyyy_1, g_0_xxxxxyz_0_xxxxxxx_0, g_0_xxxxxyz_0_xxxxxxy_0, g_0_xxxxxyz_0_xxxxxxz_0, g_0_xxxxxyz_0_xxxxxyy_0, g_0_xxxxxyz_0_xxxxxyz_0, g_0_xxxxxyz_0_xxxxxzz_0, g_0_xxxxxyz_0_xxxxyyy_0, g_0_xxxxxyz_0_xxxxyyz_0, g_0_xxxxxyz_0_xxxxyzz_0, g_0_xxxxxyz_0_xxxxzzz_0, g_0_xxxxxyz_0_xxxyyyy_0, g_0_xxxxxyz_0_xxxyyyz_0, g_0_xxxxxyz_0_xxxyyzz_0, g_0_xxxxxyz_0_xxxyzzz_0, g_0_xxxxxyz_0_xxxzzzz_0, g_0_xxxxxyz_0_xxyyyyy_0, g_0_xxxxxyz_0_xxyyyyz_0, g_0_xxxxxyz_0_xxyyyzz_0, g_0_xxxxxyz_0_xxyyzzz_0, g_0_xxxxxyz_0_xxyzzzz_0, g_0_xxxxxyz_0_xxzzzzz_0, g_0_xxxxxyz_0_xyyyyyy_0, g_0_xxxxxyz_0_xyyyyyz_0, g_0_xxxxxyz_0_xyyyyzz_0, g_0_xxxxxyz_0_xyyyzzz_0, g_0_xxxxxyz_0_xyyzzzz_0, g_0_xxxxxyz_0_xyzzzzz_0, g_0_xxxxxyz_0_xzzzzzz_0, g_0_xxxxxyz_0_yyyyyyy_0, g_0_xxxxxyz_0_yyyyyyz_0, g_0_xxxxxyz_0_yyyyyzz_0, g_0_xxxxxyz_0_yyyyzzz_0, g_0_xxxxxyz_0_yyyzzzz_0, g_0_xxxxxyz_0_yyzzzzz_0, g_0_xxxxxyz_0_yzzzzzz_0, g_0_xxxxxyz_0_zzzzzzz_0, g_0_xxxxxz_0_xxxxxxx_0, g_0_xxxxxz_0_xxxxxxx_1, g_0_xxxxxz_0_xxxxxxz_0, g_0_xxxxxz_0_xxxxxxz_1, g_0_xxxxxz_0_xxxxxyz_0, g_0_xxxxxz_0_xxxxxyz_1, g_0_xxxxxz_0_xxxxxz_1, g_0_xxxxxz_0_xxxxxzz_0, g_0_xxxxxz_0_xxxxxzz_1, g_0_xxxxxz_0_xxxxyyz_0, g_0_xxxxxz_0_xxxxyyz_1, g_0_xxxxxz_0_xxxxyz_1, g_0_xxxxxz_0_xxxxyzz_0, g_0_xxxxxz_0_xxxxyzz_1, g_0_xxxxxz_0_xxxxzz_1, g_0_xxxxxz_0_xxxxzzz_0, g_0_xxxxxz_0_xxxxzzz_1, g_0_xxxxxz_0_xxxyyyz_0, g_0_xxxxxz_0_xxxyyyz_1, g_0_xxxxxz_0_xxxyyz_1, g_0_xxxxxz_0_xxxyyzz_0, g_0_xxxxxz_0_xxxyyzz_1, g_0_xxxxxz_0_xxxyzz_1, g_0_xxxxxz_0_xxxyzzz_0, g_0_xxxxxz_0_xxxyzzz_1, g_0_xxxxxz_0_xxxzzz_1, g_0_xxxxxz_0_xxxzzzz_0, g_0_xxxxxz_0_xxxzzzz_1, g_0_xxxxxz_0_xxyyyyz_0, g_0_xxxxxz_0_xxyyyyz_1, g_0_xxxxxz_0_xxyyyz_1, g_0_xxxxxz_0_xxyyyzz_0, g_0_xxxxxz_0_xxyyyzz_1, g_0_xxxxxz_0_xxyyzz_1, g_0_xxxxxz_0_xxyyzzz_0, g_0_xxxxxz_0_xxyyzzz_1, g_0_xxxxxz_0_xxyzzz_1, g_0_xxxxxz_0_xxyzzzz_0, g_0_xxxxxz_0_xxyzzzz_1, g_0_xxxxxz_0_xxzzzz_1, g_0_xxxxxz_0_xxzzzzz_0, g_0_xxxxxz_0_xxzzzzz_1, g_0_xxxxxz_0_xyyyyyz_0, g_0_xxxxxz_0_xyyyyyz_1, g_0_xxxxxz_0_xyyyyz_1, g_0_xxxxxz_0_xyyyyzz_0, g_0_xxxxxz_0_xyyyyzz_1, g_0_xxxxxz_0_xyyyzz_1, g_0_xxxxxz_0_xyyyzzz_0, g_0_xxxxxz_0_xyyyzzz_1, g_0_xxxxxz_0_xyyzzz_1, g_0_xxxxxz_0_xyyzzzz_0, g_0_xxxxxz_0_xyyzzzz_1, g_0_xxxxxz_0_xyzzzz_1, g_0_xxxxxz_0_xyzzzzz_0, g_0_xxxxxz_0_xyzzzzz_1, g_0_xxxxxz_0_xzzzzz_1, g_0_xxxxxz_0_xzzzzzz_0, g_0_xxxxxz_0_xzzzzzz_1, g_0_xxxxxz_0_yyyyyyz_0, g_0_xxxxxz_0_yyyyyyz_1, g_0_xxxxxz_0_yyyyyz_1, g_0_xxxxxz_0_yyyyyzz_0, g_0_xxxxxz_0_yyyyyzz_1, g_0_xxxxxz_0_yyyyzz_1, g_0_xxxxxz_0_yyyyzzz_0, g_0_xxxxxz_0_yyyyzzz_1, g_0_xxxxxz_0_yyyzzz_1, g_0_xxxxxz_0_yyyzzzz_0, g_0_xxxxxz_0_yyyzzzz_1, g_0_xxxxxz_0_yyzzzz_1, g_0_xxxxxz_0_yyzzzzz_0, g_0_xxxxxz_0_yyzzzzz_1, g_0_xxxxxz_0_yzzzzz_1, g_0_xxxxxz_0_yzzzzzz_0, g_0_xxxxxz_0_yzzzzzz_1, g_0_xxxxxz_0_zzzzzz_1, g_0_xxxxxz_0_zzzzzzz_0, g_0_xxxxxz_0_zzzzzzz_1, wp_y, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -7469,8 +6497,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         g_0_xxxxxyz_0_xxxxyyy_0[i] = g_0_xxxxxy_0_xxxxyyy_0[i] * pb_z + g_0_xxxxxy_0_xxxxyyy_1[i] * wp_z[i];
 
-        g_0_xxxxxyz_0_xxxxyyz_0[i] =
-            2.0 * g_0_xxxxxz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xxxxyyz_0[i] * pb_y + g_0_xxxxxz_0_xxxxyyz_1[i] * wp_y[i];
+        g_0_xxxxxyz_0_xxxxyyz_0[i] = 2.0 * g_0_xxxxxz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xxxxyyz_0[i] * pb_y + g_0_xxxxxz_0_xxxxyyz_1[i] * wp_y[i];
 
         g_0_xxxxxyz_0_xxxxyzz_0[i] = g_0_xxxxxz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xxxxyzz_0[i] * pb_y + g_0_xxxxxz_0_xxxxyzz_1[i] * wp_y[i];
 
@@ -7478,11 +6505,9 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         g_0_xxxxxyz_0_xxxyyyy_0[i] = g_0_xxxxxy_0_xxxyyyy_0[i] * pb_z + g_0_xxxxxy_0_xxxyyyy_1[i] * wp_z[i];
 
-        g_0_xxxxxyz_0_xxxyyyz_0[i] =
-            3.0 * g_0_xxxxxz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xxxyyyz_0[i] * pb_y + g_0_xxxxxz_0_xxxyyyz_1[i] * wp_y[i];
+        g_0_xxxxxyz_0_xxxyyyz_0[i] = 3.0 * g_0_xxxxxz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xxxyyyz_0[i] * pb_y + g_0_xxxxxz_0_xxxyyyz_1[i] * wp_y[i];
 
-        g_0_xxxxxyz_0_xxxyyzz_0[i] =
-            2.0 * g_0_xxxxxz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xxxyyzz_0[i] * pb_y + g_0_xxxxxz_0_xxxyyzz_1[i] * wp_y[i];
+        g_0_xxxxxyz_0_xxxyyzz_0[i] = 2.0 * g_0_xxxxxz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xxxyyzz_0[i] * pb_y + g_0_xxxxxz_0_xxxyyzz_1[i] * wp_y[i];
 
         g_0_xxxxxyz_0_xxxyzzz_0[i] = g_0_xxxxxz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xxxyzzz_0[i] * pb_y + g_0_xxxxxz_0_xxxyzzz_1[i] * wp_y[i];
 
@@ -7490,14 +6515,11 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         g_0_xxxxxyz_0_xxyyyyy_0[i] = g_0_xxxxxy_0_xxyyyyy_0[i] * pb_z + g_0_xxxxxy_0_xxyyyyy_1[i] * wp_z[i];
 
-        g_0_xxxxxyz_0_xxyyyyz_0[i] =
-            4.0 * g_0_xxxxxz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xxyyyyz_0[i] * pb_y + g_0_xxxxxz_0_xxyyyyz_1[i] * wp_y[i];
+        g_0_xxxxxyz_0_xxyyyyz_0[i] = 4.0 * g_0_xxxxxz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xxyyyyz_0[i] * pb_y + g_0_xxxxxz_0_xxyyyyz_1[i] * wp_y[i];
 
-        g_0_xxxxxyz_0_xxyyyzz_0[i] =
-            3.0 * g_0_xxxxxz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xxyyyzz_0[i] * pb_y + g_0_xxxxxz_0_xxyyyzz_1[i] * wp_y[i];
+        g_0_xxxxxyz_0_xxyyyzz_0[i] = 3.0 * g_0_xxxxxz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xxyyyzz_0[i] * pb_y + g_0_xxxxxz_0_xxyyyzz_1[i] * wp_y[i];
 
-        g_0_xxxxxyz_0_xxyyzzz_0[i] =
-            2.0 * g_0_xxxxxz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xxyyzzz_0[i] * pb_y + g_0_xxxxxz_0_xxyyzzz_1[i] * wp_y[i];
+        g_0_xxxxxyz_0_xxyyzzz_0[i] = 2.0 * g_0_xxxxxz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xxyyzzz_0[i] * pb_y + g_0_xxxxxz_0_xxyyzzz_1[i] * wp_y[i];
 
         g_0_xxxxxyz_0_xxyzzzz_0[i] = g_0_xxxxxz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xxyzzzz_0[i] * pb_y + g_0_xxxxxz_0_xxyzzzz_1[i] * wp_y[i];
 
@@ -7505,17 +6527,13 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         g_0_xxxxxyz_0_xyyyyyy_0[i] = g_0_xxxxxy_0_xyyyyyy_0[i] * pb_z + g_0_xxxxxy_0_xyyyyyy_1[i] * wp_z[i];
 
-        g_0_xxxxxyz_0_xyyyyyz_0[i] =
-            5.0 * g_0_xxxxxz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xyyyyyz_0[i] * pb_y + g_0_xxxxxz_0_xyyyyyz_1[i] * wp_y[i];
+        g_0_xxxxxyz_0_xyyyyyz_0[i] = 5.0 * g_0_xxxxxz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xyyyyyz_0[i] * pb_y + g_0_xxxxxz_0_xyyyyyz_1[i] * wp_y[i];
 
-        g_0_xxxxxyz_0_xyyyyzz_0[i] =
-            4.0 * g_0_xxxxxz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xyyyyzz_0[i] * pb_y + g_0_xxxxxz_0_xyyyyzz_1[i] * wp_y[i];
+        g_0_xxxxxyz_0_xyyyyzz_0[i] = 4.0 * g_0_xxxxxz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xyyyyzz_0[i] * pb_y + g_0_xxxxxz_0_xyyyyzz_1[i] * wp_y[i];
 
-        g_0_xxxxxyz_0_xyyyzzz_0[i] =
-            3.0 * g_0_xxxxxz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xyyyzzz_0[i] * pb_y + g_0_xxxxxz_0_xyyyzzz_1[i] * wp_y[i];
+        g_0_xxxxxyz_0_xyyyzzz_0[i] = 3.0 * g_0_xxxxxz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xyyyzzz_0[i] * pb_y + g_0_xxxxxz_0_xyyyzzz_1[i] * wp_y[i];
 
-        g_0_xxxxxyz_0_xyyzzzz_0[i] =
-            2.0 * g_0_xxxxxz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xyyzzzz_0[i] * pb_y + g_0_xxxxxz_0_xyyzzzz_1[i] * wp_y[i];
+        g_0_xxxxxyz_0_xyyzzzz_0[i] = 2.0 * g_0_xxxxxz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xyyzzzz_0[i] * pb_y + g_0_xxxxxz_0_xyyzzzz_1[i] * wp_y[i];
 
         g_0_xxxxxyz_0_xyzzzzz_0[i] = g_0_xxxxxz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_xyzzzzz_0[i] * pb_y + g_0_xxxxxz_0_xyzzzzz_1[i] * wp_y[i];
 
@@ -7523,20 +6541,15 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         g_0_xxxxxyz_0_yyyyyyy_0[i] = g_0_xxxxxy_0_yyyyyyy_0[i] * pb_z + g_0_xxxxxy_0_yyyyyyy_1[i] * wp_z[i];
 
-        g_0_xxxxxyz_0_yyyyyyz_0[i] =
-            6.0 * g_0_xxxxxz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_yyyyyyz_0[i] * pb_y + g_0_xxxxxz_0_yyyyyyz_1[i] * wp_y[i];
+        g_0_xxxxxyz_0_yyyyyyz_0[i] = 6.0 * g_0_xxxxxz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_yyyyyyz_0[i] * pb_y + g_0_xxxxxz_0_yyyyyyz_1[i] * wp_y[i];
 
-        g_0_xxxxxyz_0_yyyyyzz_0[i] =
-            5.0 * g_0_xxxxxz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_yyyyyzz_0[i] * pb_y + g_0_xxxxxz_0_yyyyyzz_1[i] * wp_y[i];
+        g_0_xxxxxyz_0_yyyyyzz_0[i] = 5.0 * g_0_xxxxxz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_yyyyyzz_0[i] * pb_y + g_0_xxxxxz_0_yyyyyzz_1[i] * wp_y[i];
 
-        g_0_xxxxxyz_0_yyyyzzz_0[i] =
-            4.0 * g_0_xxxxxz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_yyyyzzz_0[i] * pb_y + g_0_xxxxxz_0_yyyyzzz_1[i] * wp_y[i];
+        g_0_xxxxxyz_0_yyyyzzz_0[i] = 4.0 * g_0_xxxxxz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_yyyyzzz_0[i] * pb_y + g_0_xxxxxz_0_yyyyzzz_1[i] * wp_y[i];
 
-        g_0_xxxxxyz_0_yyyzzzz_0[i] =
-            3.0 * g_0_xxxxxz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_yyyzzzz_0[i] * pb_y + g_0_xxxxxz_0_yyyzzzz_1[i] * wp_y[i];
+        g_0_xxxxxyz_0_yyyzzzz_0[i] = 3.0 * g_0_xxxxxz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_yyyzzzz_0[i] * pb_y + g_0_xxxxxz_0_yyyzzzz_1[i] * wp_y[i];
 
-        g_0_xxxxxyz_0_yyzzzzz_0[i] =
-            2.0 * g_0_xxxxxz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_yyzzzzz_0[i] * pb_y + g_0_xxxxxz_0_yyzzzzz_1[i] * wp_y[i];
+        g_0_xxxxxyz_0_yyzzzzz_0[i] = 2.0 * g_0_xxxxxz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_yyzzzzz_0[i] * pb_y + g_0_xxxxxz_0_yyzzzzz_1[i] * wp_y[i];
 
         g_0_xxxxxyz_0_yzzzzzz_0[i] = g_0_xxxxxz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxxxxz_0_yzzzzzz_0[i] * pb_y + g_0_xxxxxz_0_yzzzzzz_1[i] * wp_y[i];
 
@@ -7617,211 +6630,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxxxxzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 215);
 
-#pragma omp simd aligned(g_0_xxxxx_0_xxxxxxx_0,       \
-                             g_0_xxxxx_0_xxxxxxx_1,   \
-                             g_0_xxxxx_0_xxxxxxy_0,   \
-                             g_0_xxxxx_0_xxxxxxy_1,   \
-                             g_0_xxxxx_0_xxxxxyy_0,   \
-                             g_0_xxxxx_0_xxxxxyy_1,   \
-                             g_0_xxxxx_0_xxxxyyy_0,   \
-                             g_0_xxxxx_0_xxxxyyy_1,   \
-                             g_0_xxxxx_0_xxxyyyy_0,   \
-                             g_0_xxxxx_0_xxxyyyy_1,   \
-                             g_0_xxxxx_0_xxyyyyy_0,   \
-                             g_0_xxxxx_0_xxyyyyy_1,   \
-                             g_0_xxxxx_0_xyyyyyy_0,   \
-                             g_0_xxxxx_0_xyyyyyy_1,   \
-                             g_0_xxxxxz_0_xxxxxxx_0,  \
-                             g_0_xxxxxz_0_xxxxxxx_1,  \
-                             g_0_xxxxxz_0_xxxxxxy_0,  \
-                             g_0_xxxxxz_0_xxxxxxy_1,  \
-                             g_0_xxxxxz_0_xxxxxyy_0,  \
-                             g_0_xxxxxz_0_xxxxxyy_1,  \
-                             g_0_xxxxxz_0_xxxxyyy_0,  \
-                             g_0_xxxxxz_0_xxxxyyy_1,  \
-                             g_0_xxxxxz_0_xxxyyyy_0,  \
-                             g_0_xxxxxz_0_xxxyyyy_1,  \
-                             g_0_xxxxxz_0_xxyyyyy_0,  \
-                             g_0_xxxxxz_0_xxyyyyy_1,  \
-                             g_0_xxxxxz_0_xyyyyyy_0,  \
-                             g_0_xxxxxz_0_xyyyyyy_1,  \
-                             g_0_xxxxxzz_0_xxxxxxx_0, \
-                             g_0_xxxxxzz_0_xxxxxxy_0, \
-                             g_0_xxxxxzz_0_xxxxxxz_0, \
-                             g_0_xxxxxzz_0_xxxxxyy_0, \
-                             g_0_xxxxxzz_0_xxxxxyz_0, \
-                             g_0_xxxxxzz_0_xxxxxzz_0, \
-                             g_0_xxxxxzz_0_xxxxyyy_0, \
-                             g_0_xxxxxzz_0_xxxxyyz_0, \
-                             g_0_xxxxxzz_0_xxxxyzz_0, \
-                             g_0_xxxxxzz_0_xxxxzzz_0, \
-                             g_0_xxxxxzz_0_xxxyyyy_0, \
-                             g_0_xxxxxzz_0_xxxyyyz_0, \
-                             g_0_xxxxxzz_0_xxxyyzz_0, \
-                             g_0_xxxxxzz_0_xxxyzzz_0, \
-                             g_0_xxxxxzz_0_xxxzzzz_0, \
-                             g_0_xxxxxzz_0_xxyyyyy_0, \
-                             g_0_xxxxxzz_0_xxyyyyz_0, \
-                             g_0_xxxxxzz_0_xxyyyzz_0, \
-                             g_0_xxxxxzz_0_xxyyzzz_0, \
-                             g_0_xxxxxzz_0_xxyzzzz_0, \
-                             g_0_xxxxxzz_0_xxzzzzz_0, \
-                             g_0_xxxxxzz_0_xyyyyyy_0, \
-                             g_0_xxxxxzz_0_xyyyyyz_0, \
-                             g_0_xxxxxzz_0_xyyyyzz_0, \
-                             g_0_xxxxxzz_0_xyyyzzz_0, \
-                             g_0_xxxxxzz_0_xyyzzzz_0, \
-                             g_0_xxxxxzz_0_xyzzzzz_0, \
-                             g_0_xxxxxzz_0_xzzzzzz_0, \
-                             g_0_xxxxxzz_0_yyyyyyy_0, \
-                             g_0_xxxxxzz_0_yyyyyyz_0, \
-                             g_0_xxxxxzz_0_yyyyyzz_0, \
-                             g_0_xxxxxzz_0_yyyyzzz_0, \
-                             g_0_xxxxxzz_0_yyyzzzz_0, \
-                             g_0_xxxxxzz_0_yyzzzzz_0, \
-                             g_0_xxxxxzz_0_yzzzzzz_0, \
-                             g_0_xxxxxzz_0_zzzzzzz_0, \
-                             g_0_xxxxzz_0_xxxxxxz_0,  \
-                             g_0_xxxxzz_0_xxxxxxz_1,  \
-                             g_0_xxxxzz_0_xxxxxyz_0,  \
-                             g_0_xxxxzz_0_xxxxxyz_1,  \
-                             g_0_xxxxzz_0_xxxxxz_1,   \
-                             g_0_xxxxzz_0_xxxxxzz_0,  \
-                             g_0_xxxxzz_0_xxxxxzz_1,  \
-                             g_0_xxxxzz_0_xxxxyyz_0,  \
-                             g_0_xxxxzz_0_xxxxyyz_1,  \
-                             g_0_xxxxzz_0_xxxxyz_1,   \
-                             g_0_xxxxzz_0_xxxxyzz_0,  \
-                             g_0_xxxxzz_0_xxxxyzz_1,  \
-                             g_0_xxxxzz_0_xxxxzz_1,   \
-                             g_0_xxxxzz_0_xxxxzzz_0,  \
-                             g_0_xxxxzz_0_xxxxzzz_1,  \
-                             g_0_xxxxzz_0_xxxyyyz_0,  \
-                             g_0_xxxxzz_0_xxxyyyz_1,  \
-                             g_0_xxxxzz_0_xxxyyz_1,   \
-                             g_0_xxxxzz_0_xxxyyzz_0,  \
-                             g_0_xxxxzz_0_xxxyyzz_1,  \
-                             g_0_xxxxzz_0_xxxyzz_1,   \
-                             g_0_xxxxzz_0_xxxyzzz_0,  \
-                             g_0_xxxxzz_0_xxxyzzz_1,  \
-                             g_0_xxxxzz_0_xxxzzz_1,   \
-                             g_0_xxxxzz_0_xxxzzzz_0,  \
-                             g_0_xxxxzz_0_xxxzzzz_1,  \
-                             g_0_xxxxzz_0_xxyyyyz_0,  \
-                             g_0_xxxxzz_0_xxyyyyz_1,  \
-                             g_0_xxxxzz_0_xxyyyz_1,   \
-                             g_0_xxxxzz_0_xxyyyzz_0,  \
-                             g_0_xxxxzz_0_xxyyyzz_1,  \
-                             g_0_xxxxzz_0_xxyyzz_1,   \
-                             g_0_xxxxzz_0_xxyyzzz_0,  \
-                             g_0_xxxxzz_0_xxyyzzz_1,  \
-                             g_0_xxxxzz_0_xxyzzz_1,   \
-                             g_0_xxxxzz_0_xxyzzzz_0,  \
-                             g_0_xxxxzz_0_xxyzzzz_1,  \
-                             g_0_xxxxzz_0_xxzzzz_1,   \
-                             g_0_xxxxzz_0_xxzzzzz_0,  \
-                             g_0_xxxxzz_0_xxzzzzz_1,  \
-                             g_0_xxxxzz_0_xyyyyyz_0,  \
-                             g_0_xxxxzz_0_xyyyyyz_1,  \
-                             g_0_xxxxzz_0_xyyyyz_1,   \
-                             g_0_xxxxzz_0_xyyyyzz_0,  \
-                             g_0_xxxxzz_0_xyyyyzz_1,  \
-                             g_0_xxxxzz_0_xyyyzz_1,   \
-                             g_0_xxxxzz_0_xyyyzzz_0,  \
-                             g_0_xxxxzz_0_xyyyzzz_1,  \
-                             g_0_xxxxzz_0_xyyzzz_1,   \
-                             g_0_xxxxzz_0_xyyzzzz_0,  \
-                             g_0_xxxxzz_0_xyyzzzz_1,  \
-                             g_0_xxxxzz_0_xyzzzz_1,   \
-                             g_0_xxxxzz_0_xyzzzzz_0,  \
-                             g_0_xxxxzz_0_xyzzzzz_1,  \
-                             g_0_xxxxzz_0_xzzzzz_1,   \
-                             g_0_xxxxzz_0_xzzzzzz_0,  \
-                             g_0_xxxxzz_0_xzzzzzz_1,  \
-                             g_0_xxxxzz_0_yyyyyyy_0,  \
-                             g_0_xxxxzz_0_yyyyyyy_1,  \
-                             g_0_xxxxzz_0_yyyyyyz_0,  \
-                             g_0_xxxxzz_0_yyyyyyz_1,  \
-                             g_0_xxxxzz_0_yyyyyz_1,   \
-                             g_0_xxxxzz_0_yyyyyzz_0,  \
-                             g_0_xxxxzz_0_yyyyyzz_1,  \
-                             g_0_xxxxzz_0_yyyyzz_1,   \
-                             g_0_xxxxzz_0_yyyyzzz_0,  \
-                             g_0_xxxxzz_0_yyyyzzz_1,  \
-                             g_0_xxxxzz_0_yyyzzz_1,   \
-                             g_0_xxxxzz_0_yyyzzzz_0,  \
-                             g_0_xxxxzz_0_yyyzzzz_1,  \
-                             g_0_xxxxzz_0_yyzzzz_1,   \
-                             g_0_xxxxzz_0_yyzzzzz_0,  \
-                             g_0_xxxxzz_0_yyzzzzz_1,  \
-                             g_0_xxxxzz_0_yzzzzz_1,   \
-                             g_0_xxxxzz_0_yzzzzzz_0,  \
-                             g_0_xxxxzz_0_yzzzzzz_1,  \
-                             g_0_xxxxzz_0_zzzzzz_1,   \
-                             g_0_xxxxzz_0_zzzzzzz_0,  \
-                             g_0_xxxxzz_0_zzzzzzz_1,  \
-                             g_0_xxxzz_0_xxxxxxz_0,   \
-                             g_0_xxxzz_0_xxxxxxz_1,   \
-                             g_0_xxxzz_0_xxxxxyz_0,   \
-                             g_0_xxxzz_0_xxxxxyz_1,   \
-                             g_0_xxxzz_0_xxxxxzz_0,   \
-                             g_0_xxxzz_0_xxxxxzz_1,   \
-                             g_0_xxxzz_0_xxxxyyz_0,   \
-                             g_0_xxxzz_0_xxxxyyz_1,   \
-                             g_0_xxxzz_0_xxxxyzz_0,   \
-                             g_0_xxxzz_0_xxxxyzz_1,   \
-                             g_0_xxxzz_0_xxxxzzz_0,   \
-                             g_0_xxxzz_0_xxxxzzz_1,   \
-                             g_0_xxxzz_0_xxxyyyz_0,   \
-                             g_0_xxxzz_0_xxxyyyz_1,   \
-                             g_0_xxxzz_0_xxxyyzz_0,   \
-                             g_0_xxxzz_0_xxxyyzz_1,   \
-                             g_0_xxxzz_0_xxxyzzz_0,   \
-                             g_0_xxxzz_0_xxxyzzz_1,   \
-                             g_0_xxxzz_0_xxxzzzz_0,   \
-                             g_0_xxxzz_0_xxxzzzz_1,   \
-                             g_0_xxxzz_0_xxyyyyz_0,   \
-                             g_0_xxxzz_0_xxyyyyz_1,   \
-                             g_0_xxxzz_0_xxyyyzz_0,   \
-                             g_0_xxxzz_0_xxyyyzz_1,   \
-                             g_0_xxxzz_0_xxyyzzz_0,   \
-                             g_0_xxxzz_0_xxyyzzz_1,   \
-                             g_0_xxxzz_0_xxyzzzz_0,   \
-                             g_0_xxxzz_0_xxyzzzz_1,   \
-                             g_0_xxxzz_0_xxzzzzz_0,   \
-                             g_0_xxxzz_0_xxzzzzz_1,   \
-                             g_0_xxxzz_0_xyyyyyz_0,   \
-                             g_0_xxxzz_0_xyyyyyz_1,   \
-                             g_0_xxxzz_0_xyyyyzz_0,   \
-                             g_0_xxxzz_0_xyyyyzz_1,   \
-                             g_0_xxxzz_0_xyyyzzz_0,   \
-                             g_0_xxxzz_0_xyyyzzz_1,   \
-                             g_0_xxxzz_0_xyyzzzz_0,   \
-                             g_0_xxxzz_0_xyyzzzz_1,   \
-                             g_0_xxxzz_0_xyzzzzz_0,   \
-                             g_0_xxxzz_0_xyzzzzz_1,   \
-                             g_0_xxxzz_0_xzzzzzz_0,   \
-                             g_0_xxxzz_0_xzzzzzz_1,   \
-                             g_0_xxxzz_0_yyyyyyy_0,   \
-                             g_0_xxxzz_0_yyyyyyy_1,   \
-                             g_0_xxxzz_0_yyyyyyz_0,   \
-                             g_0_xxxzz_0_yyyyyyz_1,   \
-                             g_0_xxxzz_0_yyyyyzz_0,   \
-                             g_0_xxxzz_0_yyyyyzz_1,   \
-                             g_0_xxxzz_0_yyyyzzz_0,   \
-                             g_0_xxxzz_0_yyyyzzz_1,   \
-                             g_0_xxxzz_0_yyyzzzz_0,   \
-                             g_0_xxxzz_0_yyyzzzz_1,   \
-                             g_0_xxxzz_0_yyzzzzz_0,   \
-                             g_0_xxxzz_0_yyzzzzz_1,   \
-                             g_0_xxxzz_0_yzzzzzz_0,   \
-                             g_0_xxxzz_0_yzzzzzz_1,   \
-                             g_0_xxxzz_0_zzzzzzz_0,   \
-                             g_0_xxxzz_0_zzzzzzz_1,   \
-                             wp_x,                    \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxxxx_0_xxxxxxx_0, g_0_xxxxx_0_xxxxxxx_1, g_0_xxxxx_0_xxxxxxy_0, g_0_xxxxx_0_xxxxxxy_1, g_0_xxxxx_0_xxxxxyy_0, g_0_xxxxx_0_xxxxxyy_1, g_0_xxxxx_0_xxxxyyy_0, g_0_xxxxx_0_xxxxyyy_1, g_0_xxxxx_0_xxxyyyy_0, g_0_xxxxx_0_xxxyyyy_1, g_0_xxxxx_0_xxyyyyy_0, g_0_xxxxx_0_xxyyyyy_1, g_0_xxxxx_0_xyyyyyy_0, g_0_xxxxx_0_xyyyyyy_1, g_0_xxxxxz_0_xxxxxxx_0, g_0_xxxxxz_0_xxxxxxx_1, g_0_xxxxxz_0_xxxxxxy_0, g_0_xxxxxz_0_xxxxxxy_1, g_0_xxxxxz_0_xxxxxyy_0, g_0_xxxxxz_0_xxxxxyy_1, g_0_xxxxxz_0_xxxxyyy_0, g_0_xxxxxz_0_xxxxyyy_1, g_0_xxxxxz_0_xxxyyyy_0, g_0_xxxxxz_0_xxxyyyy_1, g_0_xxxxxz_0_xxyyyyy_0, g_0_xxxxxz_0_xxyyyyy_1, g_0_xxxxxz_0_xyyyyyy_0, g_0_xxxxxz_0_xyyyyyy_1, g_0_xxxxxzz_0_xxxxxxx_0, g_0_xxxxxzz_0_xxxxxxy_0, g_0_xxxxxzz_0_xxxxxxz_0, g_0_xxxxxzz_0_xxxxxyy_0, g_0_xxxxxzz_0_xxxxxyz_0, g_0_xxxxxzz_0_xxxxxzz_0, g_0_xxxxxzz_0_xxxxyyy_0, g_0_xxxxxzz_0_xxxxyyz_0, g_0_xxxxxzz_0_xxxxyzz_0, g_0_xxxxxzz_0_xxxxzzz_0, g_0_xxxxxzz_0_xxxyyyy_0, g_0_xxxxxzz_0_xxxyyyz_0, g_0_xxxxxzz_0_xxxyyzz_0, g_0_xxxxxzz_0_xxxyzzz_0, g_0_xxxxxzz_0_xxxzzzz_0, g_0_xxxxxzz_0_xxyyyyy_0, g_0_xxxxxzz_0_xxyyyyz_0, g_0_xxxxxzz_0_xxyyyzz_0, g_0_xxxxxzz_0_xxyyzzz_0, g_0_xxxxxzz_0_xxyzzzz_0, g_0_xxxxxzz_0_xxzzzzz_0, g_0_xxxxxzz_0_xyyyyyy_0, g_0_xxxxxzz_0_xyyyyyz_0, g_0_xxxxxzz_0_xyyyyzz_0, g_0_xxxxxzz_0_xyyyzzz_0, g_0_xxxxxzz_0_xyyzzzz_0, g_0_xxxxxzz_0_xyzzzzz_0, g_0_xxxxxzz_0_xzzzzzz_0, g_0_xxxxxzz_0_yyyyyyy_0, g_0_xxxxxzz_0_yyyyyyz_0, g_0_xxxxxzz_0_yyyyyzz_0, g_0_xxxxxzz_0_yyyyzzz_0, g_0_xxxxxzz_0_yyyzzzz_0, g_0_xxxxxzz_0_yyzzzzz_0, g_0_xxxxxzz_0_yzzzzzz_0, g_0_xxxxxzz_0_zzzzzzz_0, g_0_xxxxzz_0_xxxxxxz_0, g_0_xxxxzz_0_xxxxxxz_1, g_0_xxxxzz_0_xxxxxyz_0, g_0_xxxxzz_0_xxxxxyz_1, g_0_xxxxzz_0_xxxxxz_1, g_0_xxxxzz_0_xxxxxzz_0, g_0_xxxxzz_0_xxxxxzz_1, g_0_xxxxzz_0_xxxxyyz_0, g_0_xxxxzz_0_xxxxyyz_1, g_0_xxxxzz_0_xxxxyz_1, g_0_xxxxzz_0_xxxxyzz_0, g_0_xxxxzz_0_xxxxyzz_1, g_0_xxxxzz_0_xxxxzz_1, g_0_xxxxzz_0_xxxxzzz_0, g_0_xxxxzz_0_xxxxzzz_1, g_0_xxxxzz_0_xxxyyyz_0, g_0_xxxxzz_0_xxxyyyz_1, g_0_xxxxzz_0_xxxyyz_1, g_0_xxxxzz_0_xxxyyzz_0, g_0_xxxxzz_0_xxxyyzz_1, g_0_xxxxzz_0_xxxyzz_1, g_0_xxxxzz_0_xxxyzzz_0, g_0_xxxxzz_0_xxxyzzz_1, g_0_xxxxzz_0_xxxzzz_1, g_0_xxxxzz_0_xxxzzzz_0, g_0_xxxxzz_0_xxxzzzz_1, g_0_xxxxzz_0_xxyyyyz_0, g_0_xxxxzz_0_xxyyyyz_1, g_0_xxxxzz_0_xxyyyz_1, g_0_xxxxzz_0_xxyyyzz_0, g_0_xxxxzz_0_xxyyyzz_1, g_0_xxxxzz_0_xxyyzz_1, g_0_xxxxzz_0_xxyyzzz_0, g_0_xxxxzz_0_xxyyzzz_1, g_0_xxxxzz_0_xxyzzz_1, g_0_xxxxzz_0_xxyzzzz_0, g_0_xxxxzz_0_xxyzzzz_1, g_0_xxxxzz_0_xxzzzz_1, g_0_xxxxzz_0_xxzzzzz_0, g_0_xxxxzz_0_xxzzzzz_1, g_0_xxxxzz_0_xyyyyyz_0, g_0_xxxxzz_0_xyyyyyz_1, g_0_xxxxzz_0_xyyyyz_1, g_0_xxxxzz_0_xyyyyzz_0, g_0_xxxxzz_0_xyyyyzz_1, g_0_xxxxzz_0_xyyyzz_1, g_0_xxxxzz_0_xyyyzzz_0, g_0_xxxxzz_0_xyyyzzz_1, g_0_xxxxzz_0_xyyzzz_1, g_0_xxxxzz_0_xyyzzzz_0, g_0_xxxxzz_0_xyyzzzz_1, g_0_xxxxzz_0_xyzzzz_1, g_0_xxxxzz_0_xyzzzzz_0, g_0_xxxxzz_0_xyzzzzz_1, g_0_xxxxzz_0_xzzzzz_1, g_0_xxxxzz_0_xzzzzzz_0, g_0_xxxxzz_0_xzzzzzz_1, g_0_xxxxzz_0_yyyyyyy_0, g_0_xxxxzz_0_yyyyyyy_1, g_0_xxxxzz_0_yyyyyyz_0, g_0_xxxxzz_0_yyyyyyz_1, g_0_xxxxzz_0_yyyyyz_1, g_0_xxxxzz_0_yyyyyzz_0, g_0_xxxxzz_0_yyyyyzz_1, g_0_xxxxzz_0_yyyyzz_1, g_0_xxxxzz_0_yyyyzzz_0, g_0_xxxxzz_0_yyyyzzz_1, g_0_xxxxzz_0_yyyzzz_1, g_0_xxxxzz_0_yyyzzzz_0, g_0_xxxxzz_0_yyyzzzz_1, g_0_xxxxzz_0_yyzzzz_1, g_0_xxxxzz_0_yyzzzzz_0, g_0_xxxxzz_0_yyzzzzz_1, g_0_xxxxzz_0_yzzzzz_1, g_0_xxxxzz_0_yzzzzzz_0, g_0_xxxxzz_0_yzzzzzz_1, g_0_xxxxzz_0_zzzzzz_1, g_0_xxxxzz_0_zzzzzzz_0, g_0_xxxxzz_0_zzzzzzz_1, g_0_xxxzz_0_xxxxxxz_0, g_0_xxxzz_0_xxxxxxz_1, g_0_xxxzz_0_xxxxxyz_0, g_0_xxxzz_0_xxxxxyz_1, g_0_xxxzz_0_xxxxxzz_0, g_0_xxxzz_0_xxxxxzz_1, g_0_xxxzz_0_xxxxyyz_0, g_0_xxxzz_0_xxxxyyz_1, g_0_xxxzz_0_xxxxyzz_0, g_0_xxxzz_0_xxxxyzz_1, g_0_xxxzz_0_xxxxzzz_0, g_0_xxxzz_0_xxxxzzz_1, g_0_xxxzz_0_xxxyyyz_0, g_0_xxxzz_0_xxxyyyz_1, g_0_xxxzz_0_xxxyyzz_0, g_0_xxxzz_0_xxxyyzz_1, g_0_xxxzz_0_xxxyzzz_0, g_0_xxxzz_0_xxxyzzz_1, g_0_xxxzz_0_xxxzzzz_0, g_0_xxxzz_0_xxxzzzz_1, g_0_xxxzz_0_xxyyyyz_0, g_0_xxxzz_0_xxyyyyz_1, g_0_xxxzz_0_xxyyyzz_0, g_0_xxxzz_0_xxyyyzz_1, g_0_xxxzz_0_xxyyzzz_0, g_0_xxxzz_0_xxyyzzz_1, g_0_xxxzz_0_xxyzzzz_0, g_0_xxxzz_0_xxyzzzz_1, g_0_xxxzz_0_xxzzzzz_0, g_0_xxxzz_0_xxzzzzz_1, g_0_xxxzz_0_xyyyyyz_0, g_0_xxxzz_0_xyyyyyz_1, g_0_xxxzz_0_xyyyyzz_0, g_0_xxxzz_0_xyyyyzz_1, g_0_xxxzz_0_xyyyzzz_0, g_0_xxxzz_0_xyyyzzz_1, g_0_xxxzz_0_xyyzzzz_0, g_0_xxxzz_0_xyyzzzz_1, g_0_xxxzz_0_xyzzzzz_0, g_0_xxxzz_0_xyzzzzz_1, g_0_xxxzz_0_xzzzzzz_0, g_0_xxxzz_0_xzzzzzz_1, g_0_xxxzz_0_yyyyyyy_0, g_0_xxxzz_0_yyyyyyy_1, g_0_xxxzz_0_yyyyyyz_0, g_0_xxxzz_0_yyyyyyz_1, g_0_xxxzz_0_yyyyyzz_0, g_0_xxxzz_0_yyyyyzz_1, g_0_xxxzz_0_yyyyzzz_0, g_0_xxxzz_0_yyyyzzz_1, g_0_xxxzz_0_yyyzzzz_0, g_0_xxxzz_0_yyyzzzz_1, g_0_xxxzz_0_yyzzzzz_0, g_0_xxxzz_0_yyzzzzz_1, g_0_xxxzz_0_yzzzzzz_0, g_0_xxxzz_0_yzzzzzz_1, g_0_xxxzz_0_zzzzzzz_0, g_0_xxxzz_0_zzzzzzz_1, wp_x, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -7830,128 +6639,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxxxxzz_0_xxxxxxx_0[i] = g_0_xxxxx_0_xxxxxxx_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxxxxx_1[i] * fti_ab_0 + g_0_xxxxxz_0_xxxxxxx_0[i] * pb_z +
-                                     g_0_xxxxxz_0_xxxxxxx_1[i] * wp_z[i];
+        g_0_xxxxxzz_0_xxxxxxx_0[i] = g_0_xxxxx_0_xxxxxxx_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxxxxx_1[i] * fti_ab_0 + g_0_xxxxxz_0_xxxxxxx_0[i] * pb_z + g_0_xxxxxz_0_xxxxxxx_1[i] * wp_z[i];
 
-        g_0_xxxxxzz_0_xxxxxxy_0[i] = g_0_xxxxx_0_xxxxxxy_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxxxxy_1[i] * fti_ab_0 + g_0_xxxxxz_0_xxxxxxy_0[i] * pb_z +
-                                     g_0_xxxxxz_0_xxxxxxy_1[i] * wp_z[i];
+        g_0_xxxxxzz_0_xxxxxxy_0[i] = g_0_xxxxx_0_xxxxxxy_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxxxxy_1[i] * fti_ab_0 + g_0_xxxxxz_0_xxxxxxy_0[i] * pb_z + g_0_xxxxxz_0_xxxxxxy_1[i] * wp_z[i];
 
-        g_0_xxxxxzz_0_xxxxxxz_0[i] = 4.0 * g_0_xxxzz_0_xxxxxxz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxxxxz_1[i] * fti_ab_0 +
-                                     6.0 * g_0_xxxxzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxxxz_0[i] * pb_x +
-                                     g_0_xxxxzz_0_xxxxxxz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xxxxxxz_0[i] = 4.0 * g_0_xxxzz_0_xxxxxxz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxxxxz_1[i] * fti_ab_0 + 6.0 * g_0_xxxxzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxxxz_0[i] * pb_x + g_0_xxxxzz_0_xxxxxxz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xxxxxyy_0[i] = g_0_xxxxx_0_xxxxxyy_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxxxyy_1[i] * fti_ab_0 + g_0_xxxxxz_0_xxxxxyy_0[i] * pb_z +
-                                     g_0_xxxxxz_0_xxxxxyy_1[i] * wp_z[i];
+        g_0_xxxxxzz_0_xxxxxyy_0[i] = g_0_xxxxx_0_xxxxxyy_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxxxyy_1[i] * fti_ab_0 + g_0_xxxxxz_0_xxxxxyy_0[i] * pb_z + g_0_xxxxxz_0_xxxxxyy_1[i] * wp_z[i];
 
-        g_0_xxxxxzz_0_xxxxxyz_0[i] = 4.0 * g_0_xxxzz_0_xxxxxyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xxxxzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxxyz_0[i] * pb_x +
-                                     g_0_xxxxzz_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xxxxxyz_0[i] = 4.0 * g_0_xxxzz_0_xxxxxyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxxxyz_1[i] * fti_ab_0 + 5.0 * g_0_xxxxzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxxyz_0[i] * pb_x + g_0_xxxxzz_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xxxxxzz_0[i] = 4.0 * g_0_xxxzz_0_xxxxxzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxxxzz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xxxxzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxxzz_0[i] * pb_x +
-                                     g_0_xxxxzz_0_xxxxxzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xxxxxzz_0[i] = 4.0 * g_0_xxxzz_0_xxxxxzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxxxzz_1[i] * fti_ab_0 + 5.0 * g_0_xxxxzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxxzz_0[i] * pb_x + g_0_xxxxzz_0_xxxxxzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xxxxyyy_0[i] = g_0_xxxxx_0_xxxxyyy_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxxyyy_1[i] * fti_ab_0 + g_0_xxxxxz_0_xxxxyyy_0[i] * pb_z +
-                                     g_0_xxxxxz_0_xxxxyyy_1[i] * wp_z[i];
+        g_0_xxxxxzz_0_xxxxyyy_0[i] = g_0_xxxxx_0_xxxxyyy_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxxyyy_1[i] * fti_ab_0 + g_0_xxxxxz_0_xxxxyyy_0[i] * pb_z + g_0_xxxxxz_0_xxxxyyy_1[i] * wp_z[i];
 
-        g_0_xxxxxzz_0_xxxxyyz_0[i] = 4.0 * g_0_xxxzz_0_xxxxyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxxxzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxyyz_0[i] * pb_x +
-                                     g_0_xxxxzz_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xxxxyyz_0[i] = 4.0 * g_0_xxxzz_0_xxxxyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxxyyz_1[i] * fti_ab_0 + 4.0 * g_0_xxxxzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxyyz_0[i] * pb_x + g_0_xxxxzz_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xxxxyzz_0[i] = 4.0 * g_0_xxxzz_0_xxxxyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxxxzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxyzz_0[i] * pb_x +
-                                     g_0_xxxxzz_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xxxxyzz_0[i] = 4.0 * g_0_xxxzz_0_xxxxyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxxyzz_1[i] * fti_ab_0 + 4.0 * g_0_xxxxzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxyzz_0[i] * pb_x + g_0_xxxxzz_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xxxxzzz_0[i] = 4.0 * g_0_xxxzz_0_xxxxzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxxzzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxxxzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxzzz_0[i] * pb_x +
-                                     g_0_xxxxzz_0_xxxxzzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xxxxzzz_0[i] = 4.0 * g_0_xxxzz_0_xxxxzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxxzzz_1[i] * fti_ab_0 + 4.0 * g_0_xxxxzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxzzz_0[i] * pb_x + g_0_xxxxzz_0_xxxxzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xxxyyyy_0[i] = g_0_xxxxx_0_xxxyyyy_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxyyyy_1[i] * fti_ab_0 + g_0_xxxxxz_0_xxxyyyy_0[i] * pb_z +
-                                     g_0_xxxxxz_0_xxxyyyy_1[i] * wp_z[i];
+        g_0_xxxxxzz_0_xxxyyyy_0[i] = g_0_xxxxx_0_xxxyyyy_0[i] * fi_ab_0 - g_0_xxxxx_0_xxxyyyy_1[i] * fti_ab_0 + g_0_xxxxxz_0_xxxyyyy_0[i] * pb_z + g_0_xxxxxz_0_xxxyyyy_1[i] * wp_z[i];
 
-        g_0_xxxxxzz_0_xxxyyyz_0[i] = 4.0 * g_0_xxxzz_0_xxxyyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxxzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxyyyz_0[i] * pb_x +
-                                     g_0_xxxxzz_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xxxyyyz_0[i] = 4.0 * g_0_xxxzz_0_xxxyyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_xxxxzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxyyyz_0[i] * pb_x + g_0_xxxxzz_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xxxyyzz_0[i] = 4.0 * g_0_xxxzz_0_xxxyyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxxzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxyyzz_0[i] * pb_x +
-                                     g_0_xxxxzz_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xxxyyzz_0[i] = 4.0 * g_0_xxxzz_0_xxxyyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxyyzz_1[i] * fti_ab_0 + 3.0 * g_0_xxxxzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxyyzz_0[i] * pb_x + g_0_xxxxzz_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xxxyzzz_0[i] = 4.0 * g_0_xxxzz_0_xxxyzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxxzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxyzzz_0[i] * pb_x +
-                                     g_0_xxxxzz_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xxxyzzz_0[i] = 4.0 * g_0_xxxzz_0_xxxyzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxyzzz_1[i] * fti_ab_0 + 3.0 * g_0_xxxxzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxyzzz_0[i] * pb_x + g_0_xxxxzz_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xxxzzzz_0[i] = 4.0 * g_0_xxxzz_0_xxxzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxzzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxxzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxzzzz_0[i] * pb_x +
-                                     g_0_xxxxzz_0_xxxzzzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xxxzzzz_0[i] = 4.0 * g_0_xxxzz_0_xxxzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxxzzzz_1[i] * fti_ab_0 + 3.0 * g_0_xxxxzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxzzzz_0[i] * pb_x + g_0_xxxxzz_0_xxxzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xxyyyyy_0[i] = g_0_xxxxx_0_xxyyyyy_0[i] * fi_ab_0 - g_0_xxxxx_0_xxyyyyy_1[i] * fti_ab_0 + g_0_xxxxxz_0_xxyyyyy_0[i] * pb_z +
-                                     g_0_xxxxxz_0_xxyyyyy_1[i] * wp_z[i];
+        g_0_xxxxxzz_0_xxyyyyy_0[i] = g_0_xxxxx_0_xxyyyyy_0[i] * fi_ab_0 - g_0_xxxxx_0_xxyyyyy_1[i] * fti_ab_0 + g_0_xxxxxz_0_xxyyyyy_0[i] * pb_z + g_0_xxxxxz_0_xxyyyyy_1[i] * wp_z[i];
 
-        g_0_xxxxxzz_0_xxyyyyz_0[i] = 4.0 * g_0_xxxzz_0_xxyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxxzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyyyyz_0[i] * pb_x +
-                                     g_0_xxxxzz_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xxyyyyz_0[i] = 4.0 * g_0_xxxzz_0_xxyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxyyyyz_1[i] * fti_ab_0 + 2.0 * g_0_xxxxzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyyyyz_0[i] * pb_x + g_0_xxxxzz_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xxyyyzz_0[i] = 4.0 * g_0_xxxzz_0_xxyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxxzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyyyzz_0[i] * pb_x +
-                                     g_0_xxxxzz_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xxyyyzz_0[i] = 4.0 * g_0_xxxzz_0_xxyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxyyyzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxxzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyyyzz_0[i] * pb_x + g_0_xxxxzz_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xxyyzzz_0[i] = 4.0 * g_0_xxxzz_0_xxyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxxzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyyzzz_0[i] * pb_x +
-                                     g_0_xxxxzz_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xxyyzzz_0[i] = 4.0 * g_0_xxxzz_0_xxyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxxzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyyzzz_0[i] * pb_x + g_0_xxxxzz_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xxyzzzz_0[i] = 4.0 * g_0_xxxzz_0_xxyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxxzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyzzzz_0[i] * pb_x +
-                                     g_0_xxxxzz_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xxyzzzz_0[i] = 4.0 * g_0_xxxzz_0_xxyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxxzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyzzzz_0[i] * pb_x + g_0_xxxxzz_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xxzzzzz_0[i] = 4.0 * g_0_xxxzz_0_xxzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxzzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxxzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxzzzzz_0[i] * pb_x +
-                                     g_0_xxxxzz_0_xxzzzzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xxzzzzz_0[i] = 4.0 * g_0_xxxzz_0_xxzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xxzzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxxzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxzzzzz_0[i] * pb_x + g_0_xxxxzz_0_xxzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xyyyyyy_0[i] = g_0_xxxxx_0_xyyyyyy_0[i] * fi_ab_0 - g_0_xxxxx_0_xyyyyyy_1[i] * fti_ab_0 + g_0_xxxxxz_0_xyyyyyy_0[i] * pb_z +
-                                     g_0_xxxxxz_0_xyyyyyy_1[i] * wp_z[i];
+        g_0_xxxxxzz_0_xyyyyyy_0[i] = g_0_xxxxx_0_xyyyyyy_0[i] * fi_ab_0 - g_0_xxxxx_0_xyyyyyy_1[i] * fti_ab_0 + g_0_xxxxxz_0_xyyyyyy_0[i] * pb_z + g_0_xxxxxz_0_xyyyyyy_1[i] * wp_z[i];
 
-        g_0_xxxxxzz_0_xyyyyyz_0[i] = 4.0 * g_0_xxxzz_0_xyyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyyyyz_0[i] * pb_x + g_0_xxxxzz_0_xyyyyyz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xyyyyyz_0[i] = 4.0 * g_0_xxxzz_0_xyyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xyyyyyz_1[i] * fti_ab_0 + g_0_xxxxzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyyyyz_0[i] * pb_x + g_0_xxxxzz_0_xyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xyyyyzz_0[i] = 4.0 * g_0_xxxzz_0_xyyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xyyyyzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyyyzz_0[i] * pb_x + g_0_xxxxzz_0_xyyyyzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xyyyyzz_0[i] = 4.0 * g_0_xxxzz_0_xyyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xyyyyzz_1[i] * fti_ab_0 + g_0_xxxxzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyyyzz_0[i] * pb_x + g_0_xxxxzz_0_xyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xyyyzzz_0[i] = 4.0 * g_0_xxxzz_0_xyyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xyyyzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyyzzz_0[i] * pb_x + g_0_xxxxzz_0_xyyyzzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xyyyzzz_0[i] = 4.0 * g_0_xxxzz_0_xyyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xyyyzzz_1[i] * fti_ab_0 + g_0_xxxxzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyyzzz_0[i] * pb_x + g_0_xxxxzz_0_xyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xyyzzzz_0[i] = 4.0 * g_0_xxxzz_0_xyyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xyyzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyzzzz_0[i] * pb_x + g_0_xxxxzz_0_xyyzzzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xyyzzzz_0[i] = 4.0 * g_0_xxxzz_0_xyyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xyyzzzz_1[i] * fti_ab_0 + g_0_xxxxzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyzzzz_0[i] * pb_x + g_0_xxxxzz_0_xyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xyzzzzz_0[i] = 4.0 * g_0_xxxzz_0_xyzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyzzzzz_0[i] * pb_x + g_0_xxxxzz_0_xyzzzzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xyzzzzz_0[i] = 4.0 * g_0_xxxzz_0_xyzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xyzzzzz_1[i] * fti_ab_0 + g_0_xxxxzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyzzzzz_0[i] * pb_x + g_0_xxxxzz_0_xyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_xzzzzzz_0[i] = 4.0 * g_0_xxxzz_0_xzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xzzzzzz_0[i] * pb_x + g_0_xxxxzz_0_xzzzzzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_xzzzzzz_0[i] = 4.0 * g_0_xxxzz_0_xzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_xzzzzzz_1[i] * fti_ab_0 + g_0_xxxxzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xzzzzzz_0[i] * pb_x + g_0_xxxxzz_0_xzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_yyyyyyy_0[i] = 4.0 * g_0_xxxzz_0_yyyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_yyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_yyyyyyy_0[i] * pb_x + g_0_xxxxzz_0_yyyyyyy_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_yyyyyyy_0[i] = 4.0 * g_0_xxxzz_0_yyyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_yyyyyyy_1[i] * fti_ab_0 + g_0_xxxxzz_0_yyyyyyy_0[i] * pb_x + g_0_xxxxzz_0_yyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_yyyyyyz_0[i] = 4.0 * g_0_xxxzz_0_yyyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_yyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_yyyyyyz_0[i] * pb_x + g_0_xxxxzz_0_yyyyyyz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_yyyyyyz_0[i] = 4.0 * g_0_xxxzz_0_yyyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_yyyyyyz_1[i] * fti_ab_0 + g_0_xxxxzz_0_yyyyyyz_0[i] * pb_x + g_0_xxxxzz_0_yyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_yyyyyzz_0[i] = 4.0 * g_0_xxxzz_0_yyyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_yyyyyzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_yyyyyzz_0[i] * pb_x + g_0_xxxxzz_0_yyyyyzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_yyyyyzz_0[i] = 4.0 * g_0_xxxzz_0_yyyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_yyyyyzz_1[i] * fti_ab_0 + g_0_xxxxzz_0_yyyyyzz_0[i] * pb_x + g_0_xxxxzz_0_yyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_yyyyzzz_0[i] = 4.0 * g_0_xxxzz_0_yyyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_yyyyzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_yyyyzzz_0[i] * pb_x + g_0_xxxxzz_0_yyyyzzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_yyyyzzz_0[i] = 4.0 * g_0_xxxzz_0_yyyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_yyyyzzz_1[i] * fti_ab_0 + g_0_xxxxzz_0_yyyyzzz_0[i] * pb_x + g_0_xxxxzz_0_yyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_yyyzzzz_0[i] = 4.0 * g_0_xxxzz_0_yyyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_yyyzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_yyyzzzz_0[i] * pb_x + g_0_xxxxzz_0_yyyzzzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_yyyzzzz_0[i] = 4.0 * g_0_xxxzz_0_yyyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_yyyzzzz_1[i] * fti_ab_0 + g_0_xxxxzz_0_yyyzzzz_0[i] * pb_x + g_0_xxxxzz_0_yyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_yyzzzzz_0[i] = 4.0 * g_0_xxxzz_0_yyzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_yyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_yyzzzzz_0[i] * pb_x + g_0_xxxxzz_0_yyzzzzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_yyzzzzz_0[i] = 4.0 * g_0_xxxzz_0_yyzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_yyzzzzz_1[i] * fti_ab_0 + g_0_xxxxzz_0_yyzzzzz_0[i] * pb_x + g_0_xxxxzz_0_yyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_yzzzzzz_0[i] = 4.0 * g_0_xxxzz_0_yzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_yzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_yzzzzzz_0[i] * pb_x + g_0_xxxxzz_0_yzzzzzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_yzzzzzz_0[i] = 4.0 * g_0_xxxzz_0_yzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_yzzzzzz_1[i] * fti_ab_0 + g_0_xxxxzz_0_yzzzzzz_0[i] * pb_x + g_0_xxxxzz_0_yzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxxzz_0_zzzzzzz_0[i] = 4.0 * g_0_xxxzz_0_zzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_zzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_zzzzzzz_0[i] * pb_x + g_0_xxxxzz_0_zzzzzzz_1[i] * wp_x[i];
+        g_0_xxxxxzz_0_zzzzzzz_0[i] = 4.0 * g_0_xxxzz_0_zzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxxzz_0_zzzzzzz_1[i] * fti_ab_0 + g_0_xxxxzz_0_zzzzzzz_0[i] * pb_x + g_0_xxxxzz_0_zzzzzzz_1[i] * wp_x[i];
     }
 
     /// Set up 216-252 components of targeted buffer : SKSK
@@ -8028,211 +6786,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxxxyyy_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 251);
 
-#pragma omp simd aligned(g_0_xxxxy_0_xxxxxxx_0,       \
-                             g_0_xxxxy_0_xxxxxxx_1,   \
-                             g_0_xxxxy_0_xxxxxxz_0,   \
-                             g_0_xxxxy_0_xxxxxxz_1,   \
-                             g_0_xxxxy_0_xxxxxzz_0,   \
-                             g_0_xxxxy_0_xxxxxzz_1,   \
-                             g_0_xxxxy_0_xxxxzzz_0,   \
-                             g_0_xxxxy_0_xxxxzzz_1,   \
-                             g_0_xxxxy_0_xxxzzzz_0,   \
-                             g_0_xxxxy_0_xxxzzzz_1,   \
-                             g_0_xxxxy_0_xxzzzzz_0,   \
-                             g_0_xxxxy_0_xxzzzzz_1,   \
-                             g_0_xxxxy_0_xzzzzzz_0,   \
-                             g_0_xxxxy_0_xzzzzzz_1,   \
-                             g_0_xxxxyy_0_xxxxxxx_0,  \
-                             g_0_xxxxyy_0_xxxxxxx_1,  \
-                             g_0_xxxxyy_0_xxxxxxz_0,  \
-                             g_0_xxxxyy_0_xxxxxxz_1,  \
-                             g_0_xxxxyy_0_xxxxxzz_0,  \
-                             g_0_xxxxyy_0_xxxxxzz_1,  \
-                             g_0_xxxxyy_0_xxxxzzz_0,  \
-                             g_0_xxxxyy_0_xxxxzzz_1,  \
-                             g_0_xxxxyy_0_xxxzzzz_0,  \
-                             g_0_xxxxyy_0_xxxzzzz_1,  \
-                             g_0_xxxxyy_0_xxzzzzz_0,  \
-                             g_0_xxxxyy_0_xxzzzzz_1,  \
-                             g_0_xxxxyy_0_xzzzzzz_0,  \
-                             g_0_xxxxyy_0_xzzzzzz_1,  \
-                             g_0_xxxxyyy_0_xxxxxxx_0, \
-                             g_0_xxxxyyy_0_xxxxxxy_0, \
-                             g_0_xxxxyyy_0_xxxxxxz_0, \
-                             g_0_xxxxyyy_0_xxxxxyy_0, \
-                             g_0_xxxxyyy_0_xxxxxyz_0, \
-                             g_0_xxxxyyy_0_xxxxxzz_0, \
-                             g_0_xxxxyyy_0_xxxxyyy_0, \
-                             g_0_xxxxyyy_0_xxxxyyz_0, \
-                             g_0_xxxxyyy_0_xxxxyzz_0, \
-                             g_0_xxxxyyy_0_xxxxzzz_0, \
-                             g_0_xxxxyyy_0_xxxyyyy_0, \
-                             g_0_xxxxyyy_0_xxxyyyz_0, \
-                             g_0_xxxxyyy_0_xxxyyzz_0, \
-                             g_0_xxxxyyy_0_xxxyzzz_0, \
-                             g_0_xxxxyyy_0_xxxzzzz_0, \
-                             g_0_xxxxyyy_0_xxyyyyy_0, \
-                             g_0_xxxxyyy_0_xxyyyyz_0, \
-                             g_0_xxxxyyy_0_xxyyyzz_0, \
-                             g_0_xxxxyyy_0_xxyyzzz_0, \
-                             g_0_xxxxyyy_0_xxyzzzz_0, \
-                             g_0_xxxxyyy_0_xxzzzzz_0, \
-                             g_0_xxxxyyy_0_xyyyyyy_0, \
-                             g_0_xxxxyyy_0_xyyyyyz_0, \
-                             g_0_xxxxyyy_0_xyyyyzz_0, \
-                             g_0_xxxxyyy_0_xyyyzzz_0, \
-                             g_0_xxxxyyy_0_xyyzzzz_0, \
-                             g_0_xxxxyyy_0_xyzzzzz_0, \
-                             g_0_xxxxyyy_0_xzzzzzz_0, \
-                             g_0_xxxxyyy_0_yyyyyyy_0, \
-                             g_0_xxxxyyy_0_yyyyyyz_0, \
-                             g_0_xxxxyyy_0_yyyyyzz_0, \
-                             g_0_xxxxyyy_0_yyyyzzz_0, \
-                             g_0_xxxxyyy_0_yyyzzzz_0, \
-                             g_0_xxxxyyy_0_yyzzzzz_0, \
-                             g_0_xxxxyyy_0_yzzzzzz_0, \
-                             g_0_xxxxyyy_0_zzzzzzz_0, \
-                             g_0_xxxyyy_0_xxxxxxy_0,  \
-                             g_0_xxxyyy_0_xxxxxxy_1,  \
-                             g_0_xxxyyy_0_xxxxxy_1,   \
-                             g_0_xxxyyy_0_xxxxxyy_0,  \
-                             g_0_xxxyyy_0_xxxxxyy_1,  \
-                             g_0_xxxyyy_0_xxxxxyz_0,  \
-                             g_0_xxxyyy_0_xxxxxyz_1,  \
-                             g_0_xxxyyy_0_xxxxyy_1,   \
-                             g_0_xxxyyy_0_xxxxyyy_0,  \
-                             g_0_xxxyyy_0_xxxxyyy_1,  \
-                             g_0_xxxyyy_0_xxxxyyz_0,  \
-                             g_0_xxxyyy_0_xxxxyyz_1,  \
-                             g_0_xxxyyy_0_xxxxyz_1,   \
-                             g_0_xxxyyy_0_xxxxyzz_0,  \
-                             g_0_xxxyyy_0_xxxxyzz_1,  \
-                             g_0_xxxyyy_0_xxxyyy_1,   \
-                             g_0_xxxyyy_0_xxxyyyy_0,  \
-                             g_0_xxxyyy_0_xxxyyyy_1,  \
-                             g_0_xxxyyy_0_xxxyyyz_0,  \
-                             g_0_xxxyyy_0_xxxyyyz_1,  \
-                             g_0_xxxyyy_0_xxxyyz_1,   \
-                             g_0_xxxyyy_0_xxxyyzz_0,  \
-                             g_0_xxxyyy_0_xxxyyzz_1,  \
-                             g_0_xxxyyy_0_xxxyzz_1,   \
-                             g_0_xxxyyy_0_xxxyzzz_0,  \
-                             g_0_xxxyyy_0_xxxyzzz_1,  \
-                             g_0_xxxyyy_0_xxyyyy_1,   \
-                             g_0_xxxyyy_0_xxyyyyy_0,  \
-                             g_0_xxxyyy_0_xxyyyyy_1,  \
-                             g_0_xxxyyy_0_xxyyyyz_0,  \
-                             g_0_xxxyyy_0_xxyyyyz_1,  \
-                             g_0_xxxyyy_0_xxyyyz_1,   \
-                             g_0_xxxyyy_0_xxyyyzz_0,  \
-                             g_0_xxxyyy_0_xxyyyzz_1,  \
-                             g_0_xxxyyy_0_xxyyzz_1,   \
-                             g_0_xxxyyy_0_xxyyzzz_0,  \
-                             g_0_xxxyyy_0_xxyyzzz_1,  \
-                             g_0_xxxyyy_0_xxyzzz_1,   \
-                             g_0_xxxyyy_0_xxyzzzz_0,  \
-                             g_0_xxxyyy_0_xxyzzzz_1,  \
-                             g_0_xxxyyy_0_xyyyyy_1,   \
-                             g_0_xxxyyy_0_xyyyyyy_0,  \
-                             g_0_xxxyyy_0_xyyyyyy_1,  \
-                             g_0_xxxyyy_0_xyyyyyz_0,  \
-                             g_0_xxxyyy_0_xyyyyyz_1,  \
-                             g_0_xxxyyy_0_xyyyyz_1,   \
-                             g_0_xxxyyy_0_xyyyyzz_0,  \
-                             g_0_xxxyyy_0_xyyyyzz_1,  \
-                             g_0_xxxyyy_0_xyyyzz_1,   \
-                             g_0_xxxyyy_0_xyyyzzz_0,  \
-                             g_0_xxxyyy_0_xyyyzzz_1,  \
-                             g_0_xxxyyy_0_xyyzzz_1,   \
-                             g_0_xxxyyy_0_xyyzzzz_0,  \
-                             g_0_xxxyyy_0_xyyzzzz_1,  \
-                             g_0_xxxyyy_0_xyzzzz_1,   \
-                             g_0_xxxyyy_0_xyzzzzz_0,  \
-                             g_0_xxxyyy_0_xyzzzzz_1,  \
-                             g_0_xxxyyy_0_yyyyyy_1,   \
-                             g_0_xxxyyy_0_yyyyyyy_0,  \
-                             g_0_xxxyyy_0_yyyyyyy_1,  \
-                             g_0_xxxyyy_0_yyyyyyz_0,  \
-                             g_0_xxxyyy_0_yyyyyyz_1,  \
-                             g_0_xxxyyy_0_yyyyyz_1,   \
-                             g_0_xxxyyy_0_yyyyyzz_0,  \
-                             g_0_xxxyyy_0_yyyyyzz_1,  \
-                             g_0_xxxyyy_0_yyyyzz_1,   \
-                             g_0_xxxyyy_0_yyyyzzz_0,  \
-                             g_0_xxxyyy_0_yyyyzzz_1,  \
-                             g_0_xxxyyy_0_yyyzzz_1,   \
-                             g_0_xxxyyy_0_yyyzzzz_0,  \
-                             g_0_xxxyyy_0_yyyzzzz_1,  \
-                             g_0_xxxyyy_0_yyzzzz_1,   \
-                             g_0_xxxyyy_0_yyzzzzz_0,  \
-                             g_0_xxxyyy_0_yyzzzzz_1,  \
-                             g_0_xxxyyy_0_yzzzzz_1,   \
-                             g_0_xxxyyy_0_yzzzzzz_0,  \
-                             g_0_xxxyyy_0_yzzzzzz_1,  \
-                             g_0_xxxyyy_0_zzzzzzz_0,  \
-                             g_0_xxxyyy_0_zzzzzzz_1,  \
-                             g_0_xxyyy_0_xxxxxxy_0,   \
-                             g_0_xxyyy_0_xxxxxxy_1,   \
-                             g_0_xxyyy_0_xxxxxyy_0,   \
-                             g_0_xxyyy_0_xxxxxyy_1,   \
-                             g_0_xxyyy_0_xxxxxyz_0,   \
-                             g_0_xxyyy_0_xxxxxyz_1,   \
-                             g_0_xxyyy_0_xxxxyyy_0,   \
-                             g_0_xxyyy_0_xxxxyyy_1,   \
-                             g_0_xxyyy_0_xxxxyyz_0,   \
-                             g_0_xxyyy_0_xxxxyyz_1,   \
-                             g_0_xxyyy_0_xxxxyzz_0,   \
-                             g_0_xxyyy_0_xxxxyzz_1,   \
-                             g_0_xxyyy_0_xxxyyyy_0,   \
-                             g_0_xxyyy_0_xxxyyyy_1,   \
-                             g_0_xxyyy_0_xxxyyyz_0,   \
-                             g_0_xxyyy_0_xxxyyyz_1,   \
-                             g_0_xxyyy_0_xxxyyzz_0,   \
-                             g_0_xxyyy_0_xxxyyzz_1,   \
-                             g_0_xxyyy_0_xxxyzzz_0,   \
-                             g_0_xxyyy_0_xxxyzzz_1,   \
-                             g_0_xxyyy_0_xxyyyyy_0,   \
-                             g_0_xxyyy_0_xxyyyyy_1,   \
-                             g_0_xxyyy_0_xxyyyyz_0,   \
-                             g_0_xxyyy_0_xxyyyyz_1,   \
-                             g_0_xxyyy_0_xxyyyzz_0,   \
-                             g_0_xxyyy_0_xxyyyzz_1,   \
-                             g_0_xxyyy_0_xxyyzzz_0,   \
-                             g_0_xxyyy_0_xxyyzzz_1,   \
-                             g_0_xxyyy_0_xxyzzzz_0,   \
-                             g_0_xxyyy_0_xxyzzzz_1,   \
-                             g_0_xxyyy_0_xyyyyyy_0,   \
-                             g_0_xxyyy_0_xyyyyyy_1,   \
-                             g_0_xxyyy_0_xyyyyyz_0,   \
-                             g_0_xxyyy_0_xyyyyyz_1,   \
-                             g_0_xxyyy_0_xyyyyzz_0,   \
-                             g_0_xxyyy_0_xyyyyzz_1,   \
-                             g_0_xxyyy_0_xyyyzzz_0,   \
-                             g_0_xxyyy_0_xyyyzzz_1,   \
-                             g_0_xxyyy_0_xyyzzzz_0,   \
-                             g_0_xxyyy_0_xyyzzzz_1,   \
-                             g_0_xxyyy_0_xyzzzzz_0,   \
-                             g_0_xxyyy_0_xyzzzzz_1,   \
-                             g_0_xxyyy_0_yyyyyyy_0,   \
-                             g_0_xxyyy_0_yyyyyyy_1,   \
-                             g_0_xxyyy_0_yyyyyyz_0,   \
-                             g_0_xxyyy_0_yyyyyyz_1,   \
-                             g_0_xxyyy_0_yyyyyzz_0,   \
-                             g_0_xxyyy_0_yyyyyzz_1,   \
-                             g_0_xxyyy_0_yyyyzzz_0,   \
-                             g_0_xxyyy_0_yyyyzzz_1,   \
-                             g_0_xxyyy_0_yyyzzzz_0,   \
-                             g_0_xxyyy_0_yyyzzzz_1,   \
-                             g_0_xxyyy_0_yyzzzzz_0,   \
-                             g_0_xxyyy_0_yyzzzzz_1,   \
-                             g_0_xxyyy_0_yzzzzzz_0,   \
-                             g_0_xxyyy_0_yzzzzzz_1,   \
-                             g_0_xxyyy_0_zzzzzzz_0,   \
-                             g_0_xxyyy_0_zzzzzzz_1,   \
-                             wp_x,                    \
-                             wp_y,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxxxy_0_xxxxxxx_0, g_0_xxxxy_0_xxxxxxx_1, g_0_xxxxy_0_xxxxxxz_0, g_0_xxxxy_0_xxxxxxz_1, g_0_xxxxy_0_xxxxxzz_0, g_0_xxxxy_0_xxxxxzz_1, g_0_xxxxy_0_xxxxzzz_0, g_0_xxxxy_0_xxxxzzz_1, g_0_xxxxy_0_xxxzzzz_0, g_0_xxxxy_0_xxxzzzz_1, g_0_xxxxy_0_xxzzzzz_0, g_0_xxxxy_0_xxzzzzz_1, g_0_xxxxy_0_xzzzzzz_0, g_0_xxxxy_0_xzzzzzz_1, g_0_xxxxyy_0_xxxxxxx_0, g_0_xxxxyy_0_xxxxxxx_1, g_0_xxxxyy_0_xxxxxxz_0, g_0_xxxxyy_0_xxxxxxz_1, g_0_xxxxyy_0_xxxxxzz_0, g_0_xxxxyy_0_xxxxxzz_1, g_0_xxxxyy_0_xxxxzzz_0, g_0_xxxxyy_0_xxxxzzz_1, g_0_xxxxyy_0_xxxzzzz_0, g_0_xxxxyy_0_xxxzzzz_1, g_0_xxxxyy_0_xxzzzzz_0, g_0_xxxxyy_0_xxzzzzz_1, g_0_xxxxyy_0_xzzzzzz_0, g_0_xxxxyy_0_xzzzzzz_1, g_0_xxxxyyy_0_xxxxxxx_0, g_0_xxxxyyy_0_xxxxxxy_0, g_0_xxxxyyy_0_xxxxxxz_0, g_0_xxxxyyy_0_xxxxxyy_0, g_0_xxxxyyy_0_xxxxxyz_0, g_0_xxxxyyy_0_xxxxxzz_0, g_0_xxxxyyy_0_xxxxyyy_0, g_0_xxxxyyy_0_xxxxyyz_0, g_0_xxxxyyy_0_xxxxyzz_0, g_0_xxxxyyy_0_xxxxzzz_0, g_0_xxxxyyy_0_xxxyyyy_0, g_0_xxxxyyy_0_xxxyyyz_0, g_0_xxxxyyy_0_xxxyyzz_0, g_0_xxxxyyy_0_xxxyzzz_0, g_0_xxxxyyy_0_xxxzzzz_0, g_0_xxxxyyy_0_xxyyyyy_0, g_0_xxxxyyy_0_xxyyyyz_0, g_0_xxxxyyy_0_xxyyyzz_0, g_0_xxxxyyy_0_xxyyzzz_0, g_0_xxxxyyy_0_xxyzzzz_0, g_0_xxxxyyy_0_xxzzzzz_0, g_0_xxxxyyy_0_xyyyyyy_0, g_0_xxxxyyy_0_xyyyyyz_0, g_0_xxxxyyy_0_xyyyyzz_0, g_0_xxxxyyy_0_xyyyzzz_0, g_0_xxxxyyy_0_xyyzzzz_0, g_0_xxxxyyy_0_xyzzzzz_0, g_0_xxxxyyy_0_xzzzzzz_0, g_0_xxxxyyy_0_yyyyyyy_0, g_0_xxxxyyy_0_yyyyyyz_0, g_0_xxxxyyy_0_yyyyyzz_0, g_0_xxxxyyy_0_yyyyzzz_0, g_0_xxxxyyy_0_yyyzzzz_0, g_0_xxxxyyy_0_yyzzzzz_0, g_0_xxxxyyy_0_yzzzzzz_0, g_0_xxxxyyy_0_zzzzzzz_0, g_0_xxxyyy_0_xxxxxxy_0, g_0_xxxyyy_0_xxxxxxy_1, g_0_xxxyyy_0_xxxxxy_1, g_0_xxxyyy_0_xxxxxyy_0, g_0_xxxyyy_0_xxxxxyy_1, g_0_xxxyyy_0_xxxxxyz_0, g_0_xxxyyy_0_xxxxxyz_1, g_0_xxxyyy_0_xxxxyy_1, g_0_xxxyyy_0_xxxxyyy_0, g_0_xxxyyy_0_xxxxyyy_1, g_0_xxxyyy_0_xxxxyyz_0, g_0_xxxyyy_0_xxxxyyz_1, g_0_xxxyyy_0_xxxxyz_1, g_0_xxxyyy_0_xxxxyzz_0, g_0_xxxyyy_0_xxxxyzz_1, g_0_xxxyyy_0_xxxyyy_1, g_0_xxxyyy_0_xxxyyyy_0, g_0_xxxyyy_0_xxxyyyy_1, g_0_xxxyyy_0_xxxyyyz_0, g_0_xxxyyy_0_xxxyyyz_1, g_0_xxxyyy_0_xxxyyz_1, g_0_xxxyyy_0_xxxyyzz_0, g_0_xxxyyy_0_xxxyyzz_1, g_0_xxxyyy_0_xxxyzz_1, g_0_xxxyyy_0_xxxyzzz_0, g_0_xxxyyy_0_xxxyzzz_1, g_0_xxxyyy_0_xxyyyy_1, g_0_xxxyyy_0_xxyyyyy_0, g_0_xxxyyy_0_xxyyyyy_1, g_0_xxxyyy_0_xxyyyyz_0, g_0_xxxyyy_0_xxyyyyz_1, g_0_xxxyyy_0_xxyyyz_1, g_0_xxxyyy_0_xxyyyzz_0, g_0_xxxyyy_0_xxyyyzz_1, g_0_xxxyyy_0_xxyyzz_1, g_0_xxxyyy_0_xxyyzzz_0, g_0_xxxyyy_0_xxyyzzz_1, g_0_xxxyyy_0_xxyzzz_1, g_0_xxxyyy_0_xxyzzzz_0, g_0_xxxyyy_0_xxyzzzz_1, g_0_xxxyyy_0_xyyyyy_1, g_0_xxxyyy_0_xyyyyyy_0, g_0_xxxyyy_0_xyyyyyy_1, g_0_xxxyyy_0_xyyyyyz_0, g_0_xxxyyy_0_xyyyyyz_1, g_0_xxxyyy_0_xyyyyz_1, g_0_xxxyyy_0_xyyyyzz_0, g_0_xxxyyy_0_xyyyyzz_1, g_0_xxxyyy_0_xyyyzz_1, g_0_xxxyyy_0_xyyyzzz_0, g_0_xxxyyy_0_xyyyzzz_1, g_0_xxxyyy_0_xyyzzz_1, g_0_xxxyyy_0_xyyzzzz_0, g_0_xxxyyy_0_xyyzzzz_1, g_0_xxxyyy_0_xyzzzz_1, g_0_xxxyyy_0_xyzzzzz_0, g_0_xxxyyy_0_xyzzzzz_1, g_0_xxxyyy_0_yyyyyy_1, g_0_xxxyyy_0_yyyyyyy_0, g_0_xxxyyy_0_yyyyyyy_1, g_0_xxxyyy_0_yyyyyyz_0, g_0_xxxyyy_0_yyyyyyz_1, g_0_xxxyyy_0_yyyyyz_1, g_0_xxxyyy_0_yyyyyzz_0, g_0_xxxyyy_0_yyyyyzz_1, g_0_xxxyyy_0_yyyyzz_1, g_0_xxxyyy_0_yyyyzzz_0, g_0_xxxyyy_0_yyyyzzz_1, g_0_xxxyyy_0_yyyzzz_1, g_0_xxxyyy_0_yyyzzzz_0, g_0_xxxyyy_0_yyyzzzz_1, g_0_xxxyyy_0_yyzzzz_1, g_0_xxxyyy_0_yyzzzzz_0, g_0_xxxyyy_0_yyzzzzz_1, g_0_xxxyyy_0_yzzzzz_1, g_0_xxxyyy_0_yzzzzzz_0, g_0_xxxyyy_0_yzzzzzz_1, g_0_xxxyyy_0_zzzzzzz_0, g_0_xxxyyy_0_zzzzzzz_1, g_0_xxyyy_0_xxxxxxy_0, g_0_xxyyy_0_xxxxxxy_1, g_0_xxyyy_0_xxxxxyy_0, g_0_xxyyy_0_xxxxxyy_1, g_0_xxyyy_0_xxxxxyz_0, g_0_xxyyy_0_xxxxxyz_1, g_0_xxyyy_0_xxxxyyy_0, g_0_xxyyy_0_xxxxyyy_1, g_0_xxyyy_0_xxxxyyz_0, g_0_xxyyy_0_xxxxyyz_1, g_0_xxyyy_0_xxxxyzz_0, g_0_xxyyy_0_xxxxyzz_1, g_0_xxyyy_0_xxxyyyy_0, g_0_xxyyy_0_xxxyyyy_1, g_0_xxyyy_0_xxxyyyz_0, g_0_xxyyy_0_xxxyyyz_1, g_0_xxyyy_0_xxxyyzz_0, g_0_xxyyy_0_xxxyyzz_1, g_0_xxyyy_0_xxxyzzz_0, g_0_xxyyy_0_xxxyzzz_1, g_0_xxyyy_0_xxyyyyy_0, g_0_xxyyy_0_xxyyyyy_1, g_0_xxyyy_0_xxyyyyz_0, g_0_xxyyy_0_xxyyyyz_1, g_0_xxyyy_0_xxyyyzz_0, g_0_xxyyy_0_xxyyyzz_1, g_0_xxyyy_0_xxyyzzz_0, g_0_xxyyy_0_xxyyzzz_1, g_0_xxyyy_0_xxyzzzz_0, g_0_xxyyy_0_xxyzzzz_1, g_0_xxyyy_0_xyyyyyy_0, g_0_xxyyy_0_xyyyyyy_1, g_0_xxyyy_0_xyyyyyz_0, g_0_xxyyy_0_xyyyyyz_1, g_0_xxyyy_0_xyyyyzz_0, g_0_xxyyy_0_xyyyyzz_1, g_0_xxyyy_0_xyyyzzz_0, g_0_xxyyy_0_xyyyzzz_1, g_0_xxyyy_0_xyyzzzz_0, g_0_xxyyy_0_xyyzzzz_1, g_0_xxyyy_0_xyzzzzz_0, g_0_xxyyy_0_xyzzzzz_1, g_0_xxyyy_0_yyyyyyy_0, g_0_xxyyy_0_yyyyyyy_1, g_0_xxyyy_0_yyyyyyz_0, g_0_xxyyy_0_yyyyyyz_1, g_0_xxyyy_0_yyyyyzz_0, g_0_xxyyy_0_yyyyyzz_1, g_0_xxyyy_0_yyyyzzz_0, g_0_xxyyy_0_yyyyzzz_1, g_0_xxyyy_0_yyyzzzz_0, g_0_xxyyy_0_yyyzzzz_1, g_0_xxyyy_0_yyzzzzz_0, g_0_xxyyy_0_yyzzzzz_1, g_0_xxyyy_0_yzzzzzz_0, g_0_xxyyy_0_yzzzzzz_1, g_0_xxyyy_0_zzzzzzz_0, g_0_xxyyy_0_zzzzzzz_1, wp_x, wp_y, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -8241,128 +6795,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxxxyyy_0_xxxxxxx_0[i] = 2.0 * g_0_xxxxy_0_xxxxxxx_0[i] * fi_ab_0 - 2.0 * g_0_xxxxy_0_xxxxxxx_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_xxxxxxx_0[i] * pb_y + g_0_xxxxyy_0_xxxxxxx_1[i] * wp_y[i];
+        g_0_xxxxyyy_0_xxxxxxx_0[i] = 2.0 * g_0_xxxxy_0_xxxxxxx_0[i] * fi_ab_0 - 2.0 * g_0_xxxxy_0_xxxxxxx_1[i] * fti_ab_0 + g_0_xxxxyy_0_xxxxxxx_0[i] * pb_y + g_0_xxxxyy_0_xxxxxxx_1[i] * wp_y[i];
 
-        g_0_xxxxyyy_0_xxxxxxy_0[i] = 3.0 * g_0_xxyyy_0_xxxxxxy_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxxxxy_1[i] * fti_ab_0 +
-                                     6.0 * g_0_xxxyyy_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxxxy_0[i] * pb_x +
-                                     g_0_xxxyyy_0_xxxxxxy_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xxxxxxy_0[i] = 3.0 * g_0_xxyyy_0_xxxxxxy_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxxxxy_1[i] * fti_ab_0 + 6.0 * g_0_xxxyyy_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxxxy_0[i] * pb_x + g_0_xxxyyy_0_xxxxxxy_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xxxxxxz_0[i] = 2.0 * g_0_xxxxy_0_xxxxxxz_0[i] * fi_ab_0 - 2.0 * g_0_xxxxy_0_xxxxxxz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_xxxxxxz_0[i] * pb_y + g_0_xxxxyy_0_xxxxxxz_1[i] * wp_y[i];
+        g_0_xxxxyyy_0_xxxxxxz_0[i] = 2.0 * g_0_xxxxy_0_xxxxxxz_0[i] * fi_ab_0 - 2.0 * g_0_xxxxy_0_xxxxxxz_1[i] * fti_ab_0 + g_0_xxxxyy_0_xxxxxxz_0[i] * pb_y + g_0_xxxxyy_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_xxxxyyy_0_xxxxxyy_0[i] = 3.0 * g_0_xxyyy_0_xxxxxyy_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxxxyy_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xxxyyy_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxxyy_0[i] * pb_x +
-                                     g_0_xxxyyy_0_xxxxxyy_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xxxxxyy_0[i] = 3.0 * g_0_xxyyy_0_xxxxxyy_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxxxyy_1[i] * fti_ab_0 + 5.0 * g_0_xxxyyy_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxxyy_0[i] * pb_x + g_0_xxxyyy_0_xxxxxyy_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xxxxxyz_0[i] = 3.0 * g_0_xxyyy_0_xxxxxyz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xxxyyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxxyz_0[i] * pb_x +
-                                     g_0_xxxyyy_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xxxxxyz_0[i] = 3.0 * g_0_xxyyy_0_xxxxxyz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxxxyz_1[i] * fti_ab_0 + 5.0 * g_0_xxxyyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxxyz_0[i] * pb_x + g_0_xxxyyy_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xxxxxzz_0[i] = 2.0 * g_0_xxxxy_0_xxxxxzz_0[i] * fi_ab_0 - 2.0 * g_0_xxxxy_0_xxxxxzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_xxxxxzz_0[i] * pb_y + g_0_xxxxyy_0_xxxxxzz_1[i] * wp_y[i];
+        g_0_xxxxyyy_0_xxxxxzz_0[i] = 2.0 * g_0_xxxxy_0_xxxxxzz_0[i] * fi_ab_0 - 2.0 * g_0_xxxxy_0_xxxxxzz_1[i] * fti_ab_0 + g_0_xxxxyy_0_xxxxxzz_0[i] * pb_y + g_0_xxxxyy_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_xxxxyyy_0_xxxxyyy_0[i] = 3.0 * g_0_xxyyy_0_xxxxyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxxyyy_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxxyyy_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxyyy_0[i] * pb_x +
-                                     g_0_xxxyyy_0_xxxxyyy_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xxxxyyy_0[i] = 3.0 * g_0_xxyyy_0_xxxxyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxxyyy_1[i] * fti_ab_0 + 4.0 * g_0_xxxyyy_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxyyy_0[i] * pb_x + g_0_xxxyyy_0_xxxxyyy_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xxxxyyz_0[i] = 3.0 * g_0_xxyyy_0_xxxxyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxxyyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxyyz_0[i] * pb_x +
-                                     g_0_xxxyyy_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xxxxyyz_0[i] = 3.0 * g_0_xxyyy_0_xxxxyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxxyyz_1[i] * fti_ab_0 + 4.0 * g_0_xxxyyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxyyz_0[i] * pb_x + g_0_xxxyyy_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xxxxyzz_0[i] = 3.0 * g_0_xxyyy_0_xxxxyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxxyyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxyzz_0[i] * pb_x +
-                                     g_0_xxxyyy_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xxxxyzz_0[i] = 3.0 * g_0_xxyyy_0_xxxxyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxxyzz_1[i] * fti_ab_0 + 4.0 * g_0_xxxyyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxyzz_0[i] * pb_x + g_0_xxxyyy_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xxxxzzz_0[i] = 2.0 * g_0_xxxxy_0_xxxxzzz_0[i] * fi_ab_0 - 2.0 * g_0_xxxxy_0_xxxxzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_xxxxzzz_0[i] * pb_y + g_0_xxxxyy_0_xxxxzzz_1[i] * wp_y[i];
+        g_0_xxxxyyy_0_xxxxzzz_0[i] = 2.0 * g_0_xxxxy_0_xxxxzzz_0[i] * fi_ab_0 - 2.0 * g_0_xxxxy_0_xxxxzzz_1[i] * fti_ab_0 + g_0_xxxxyy_0_xxxxzzz_0[i] * pb_y + g_0_xxxxyy_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_xxxxyyy_0_xxxyyyy_0[i] = 3.0 * g_0_xxyyy_0_xxxyyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxyyyy_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxyyy_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxyyyy_0[i] * pb_x +
-                                     g_0_xxxyyy_0_xxxyyyy_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xxxyyyy_0[i] = 3.0 * g_0_xxyyy_0_xxxyyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxyyyy_1[i] * fti_ab_0 + 3.0 * g_0_xxxyyy_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxyyyy_0[i] * pb_x + g_0_xxxyyy_0_xxxyyyy_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xxxyyyz_0[i] = 3.0 * g_0_xxyyy_0_xxxyyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxyyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxyyyz_0[i] * pb_x +
-                                     g_0_xxxyyy_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xxxyyyz_0[i] = 3.0 * g_0_xxyyy_0_xxxyyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_xxxyyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxyyyz_0[i] * pb_x + g_0_xxxyyy_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xxxyyzz_0[i] = 3.0 * g_0_xxyyy_0_xxxyyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxyyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxyyzz_0[i] * pb_x +
-                                     g_0_xxxyyy_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xxxyyzz_0[i] = 3.0 * g_0_xxyyy_0_xxxyyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxyyzz_1[i] * fti_ab_0 + 3.0 * g_0_xxxyyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxyyzz_0[i] * pb_x + g_0_xxxyyy_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xxxyzzz_0[i] = 3.0 * g_0_xxyyy_0_xxxyzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxyyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxyzzz_0[i] * pb_x +
-                                     g_0_xxxyyy_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xxxyzzz_0[i] = 3.0 * g_0_xxyyy_0_xxxyzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxxyzzz_1[i] * fti_ab_0 + 3.0 * g_0_xxxyyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxyzzz_0[i] * pb_x + g_0_xxxyyy_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xxxzzzz_0[i] = 2.0 * g_0_xxxxy_0_xxxzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xxxxy_0_xxxzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_xxxzzzz_0[i] * pb_y + g_0_xxxxyy_0_xxxzzzz_1[i] * wp_y[i];
+        g_0_xxxxyyy_0_xxxzzzz_0[i] = 2.0 * g_0_xxxxy_0_xxxzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xxxxy_0_xxxzzzz_1[i] * fti_ab_0 + g_0_xxxxyy_0_xxxzzzz_0[i] * pb_y + g_0_xxxxyy_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_xxxxyyy_0_xxyyyyy_0[i] = 3.0 * g_0_xxyyy_0_xxyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxyyyyy_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxyyy_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyyyyy_0[i] * pb_x +
-                                     g_0_xxxyyy_0_xxyyyyy_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xxyyyyy_0[i] = 3.0 * g_0_xxyyy_0_xxyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxyyyyy_1[i] * fti_ab_0 + 2.0 * g_0_xxxyyy_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyyyyy_0[i] * pb_x + g_0_xxxyyy_0_xxyyyyy_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xxyyyyz_0[i] = 3.0 * g_0_xxyyy_0_xxyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxyyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyyyyz_0[i] * pb_x +
-                                     g_0_xxxyyy_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xxyyyyz_0[i] = 3.0 * g_0_xxyyy_0_xxyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxyyyyz_1[i] * fti_ab_0 + 2.0 * g_0_xxxyyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyyyyz_0[i] * pb_x + g_0_xxxyyy_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xxyyyzz_0[i] = 3.0 * g_0_xxyyy_0_xxyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxyyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyyyzz_0[i] * pb_x +
-                                     g_0_xxxyyy_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xxyyyzz_0[i] = 3.0 * g_0_xxyyy_0_xxyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxyyyzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxyyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyyyzz_0[i] * pb_x + g_0_xxxyyy_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xxyyzzz_0[i] = 3.0 * g_0_xxyyy_0_xxyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxyyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyyzzz_0[i] * pb_x +
-                                     g_0_xxxyyy_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xxyyzzz_0[i] = 3.0 * g_0_xxyyy_0_xxyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxyyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyyzzz_0[i] * pb_x + g_0_xxxyyy_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xxyzzzz_0[i] = 3.0 * g_0_xxyyy_0_xxyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxyyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyzzzz_0[i] * pb_x +
-                                     g_0_xxxyyy_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xxyzzzz_0[i] = 3.0 * g_0_xxyyy_0_xxyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xxyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxyyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyzzzz_0[i] * pb_x + g_0_xxxyyy_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xxzzzzz_0[i] = 2.0 * g_0_xxxxy_0_xxzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xxxxy_0_xxzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_xxzzzzz_0[i] * pb_y + g_0_xxxxyy_0_xxzzzzz_1[i] * wp_y[i];
+        g_0_xxxxyyy_0_xxzzzzz_0[i] = 2.0 * g_0_xxxxy_0_xxzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xxxxy_0_xxzzzzz_1[i] * fti_ab_0 + g_0_xxxxyy_0_xxzzzzz_0[i] * pb_y + g_0_xxxxyy_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_xxxxyyy_0_xyyyyyy_0[i] = 3.0 * g_0_xxyyy_0_xyyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyyyyy_0[i] * pb_x + g_0_xxxyyy_0_xyyyyyy_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xyyyyyy_0[i] = 3.0 * g_0_xxyyy_0_xyyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xyyyyyy_1[i] * fti_ab_0 + g_0_xxxyyy_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyyyyy_0[i] * pb_x + g_0_xxxyyy_0_xyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xyyyyyz_0[i] = 3.0 * g_0_xxyyy_0_xyyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyyyyz_0[i] * pb_x + g_0_xxxyyy_0_xyyyyyz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xyyyyyz_0[i] = 3.0 * g_0_xxyyy_0_xyyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xyyyyyz_1[i] * fti_ab_0 + g_0_xxxyyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyyyyz_0[i] * pb_x + g_0_xxxyyy_0_xyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xyyyyzz_0[i] = 3.0 * g_0_xxyyy_0_xyyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xyyyyzz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyyyzz_0[i] * pb_x + g_0_xxxyyy_0_xyyyyzz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xyyyyzz_0[i] = 3.0 * g_0_xxyyy_0_xyyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xyyyyzz_1[i] * fti_ab_0 + g_0_xxxyyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyyyzz_0[i] * pb_x + g_0_xxxyyy_0_xyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xyyyzzz_0[i] = 3.0 * g_0_xxyyy_0_xyyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xyyyzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyyzzz_0[i] * pb_x + g_0_xxxyyy_0_xyyyzzz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xyyyzzz_0[i] = 3.0 * g_0_xxyyy_0_xyyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xyyyzzz_1[i] * fti_ab_0 + g_0_xxxyyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyyzzz_0[i] * pb_x + g_0_xxxyyy_0_xyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xyyzzzz_0[i] = 3.0 * g_0_xxyyy_0_xyyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xyyzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyzzzz_0[i] * pb_x + g_0_xxxyyy_0_xyyzzzz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xyyzzzz_0[i] = 3.0 * g_0_xxyyy_0_xyyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xyyzzzz_1[i] * fti_ab_0 + g_0_xxxyyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyzzzz_0[i] * pb_x + g_0_xxxyyy_0_xyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xyzzzzz_0[i] = 3.0 * g_0_xxyyy_0_xyzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyzzzzz_0[i] * pb_x + g_0_xxxyyy_0_xyzzzzz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_xyzzzzz_0[i] = 3.0 * g_0_xxyyy_0_xyzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_xyzzzzz_1[i] * fti_ab_0 + g_0_xxxyyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyzzzzz_0[i] * pb_x + g_0_xxxyyy_0_xyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_xzzzzzz_0[i] = 2.0 * g_0_xxxxy_0_xzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xxxxy_0_xzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxxyy_0_xzzzzzz_0[i] * pb_y + g_0_xxxxyy_0_xzzzzzz_1[i] * wp_y[i];
+        g_0_xxxxyyy_0_xzzzzzz_0[i] = 2.0 * g_0_xxxxy_0_xzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xxxxy_0_xzzzzzz_1[i] * fti_ab_0 + g_0_xxxxyy_0_xzzzzzz_0[i] * pb_y + g_0_xxxxyy_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_xxxxyyy_0_yyyyyyy_0[i] = 3.0 * g_0_xxyyy_0_yyyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_yyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_yyyyyyy_0[i] * pb_x + g_0_xxxyyy_0_yyyyyyy_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_yyyyyyy_0[i] = 3.0 * g_0_xxyyy_0_yyyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_yyyyyyy_1[i] * fti_ab_0 + g_0_xxxyyy_0_yyyyyyy_0[i] * pb_x + g_0_xxxyyy_0_yyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_yyyyyyz_0[i] = 3.0 * g_0_xxyyy_0_yyyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_yyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_yyyyyyz_0[i] * pb_x + g_0_xxxyyy_0_yyyyyyz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_yyyyyyz_0[i] = 3.0 * g_0_xxyyy_0_yyyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_yyyyyyz_1[i] * fti_ab_0 + g_0_xxxyyy_0_yyyyyyz_0[i] * pb_x + g_0_xxxyyy_0_yyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_yyyyyzz_0[i] = 3.0 * g_0_xxyyy_0_yyyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_yyyyyzz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_yyyyyzz_0[i] * pb_x + g_0_xxxyyy_0_yyyyyzz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_yyyyyzz_0[i] = 3.0 * g_0_xxyyy_0_yyyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_yyyyyzz_1[i] * fti_ab_0 + g_0_xxxyyy_0_yyyyyzz_0[i] * pb_x + g_0_xxxyyy_0_yyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_yyyyzzz_0[i] = 3.0 * g_0_xxyyy_0_yyyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_yyyyzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_yyyyzzz_0[i] * pb_x + g_0_xxxyyy_0_yyyyzzz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_yyyyzzz_0[i] = 3.0 * g_0_xxyyy_0_yyyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_yyyyzzz_1[i] * fti_ab_0 + g_0_xxxyyy_0_yyyyzzz_0[i] * pb_x + g_0_xxxyyy_0_yyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_yyyzzzz_0[i] = 3.0 * g_0_xxyyy_0_yyyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_yyyzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_yyyzzzz_0[i] * pb_x + g_0_xxxyyy_0_yyyzzzz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_yyyzzzz_0[i] = 3.0 * g_0_xxyyy_0_yyyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_yyyzzzz_1[i] * fti_ab_0 + g_0_xxxyyy_0_yyyzzzz_0[i] * pb_x + g_0_xxxyyy_0_yyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_yyzzzzz_0[i] = 3.0 * g_0_xxyyy_0_yyzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_yyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_yyzzzzz_0[i] * pb_x + g_0_xxxyyy_0_yyzzzzz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_yyzzzzz_0[i] = 3.0 * g_0_xxyyy_0_yyzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_yyzzzzz_1[i] * fti_ab_0 + g_0_xxxyyy_0_yyzzzzz_0[i] * pb_x + g_0_xxxyyy_0_yyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_yzzzzzz_0[i] = 3.0 * g_0_xxyyy_0_yzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_yzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_yzzzzzz_0[i] * pb_x + g_0_xxxyyy_0_yzzzzzz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_yzzzzzz_0[i] = 3.0 * g_0_xxyyy_0_yzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_yzzzzzz_1[i] * fti_ab_0 + g_0_xxxyyy_0_yzzzzzz_0[i] * pb_x + g_0_xxxyyy_0_yzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxyyy_0_zzzzzzz_0[i] = 3.0 * g_0_xxyyy_0_zzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_zzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_zzzzzzz_0[i] * pb_x + g_0_xxxyyy_0_zzzzzzz_1[i] * wp_x[i];
+        g_0_xxxxyyy_0_zzzzzzz_0[i] = 3.0 * g_0_xxyyy_0_zzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyyy_0_zzzzzzz_1[i] * fti_ab_0 + g_0_xxxyyy_0_zzzzzzz_0[i] * pb_x + g_0_xxxyyy_0_zzzzzzz_1[i] * wp_x[i];
     }
 
     /// Set up 252-288 components of targeted buffer : SKSK
@@ -8439,145 +6942,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxxxyyz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 287);
 
-#pragma omp simd aligned(g_0_xxxxyy_0_xxxxxx_1,       \
-                             g_0_xxxxyy_0_xxxxxxx_0,  \
-                             g_0_xxxxyy_0_xxxxxxx_1,  \
-                             g_0_xxxxyy_0_xxxxxxy_0,  \
-                             g_0_xxxxyy_0_xxxxxxy_1,  \
-                             g_0_xxxxyy_0_xxxxxxz_0,  \
-                             g_0_xxxxyy_0_xxxxxxz_1,  \
-                             g_0_xxxxyy_0_xxxxxy_1,   \
-                             g_0_xxxxyy_0_xxxxxyy_0,  \
-                             g_0_xxxxyy_0_xxxxxyy_1,  \
-                             g_0_xxxxyy_0_xxxxxyz_0,  \
-                             g_0_xxxxyy_0_xxxxxyz_1,  \
-                             g_0_xxxxyy_0_xxxxxz_1,   \
-                             g_0_xxxxyy_0_xxxxxzz_0,  \
-                             g_0_xxxxyy_0_xxxxxzz_1,  \
-                             g_0_xxxxyy_0_xxxxyy_1,   \
-                             g_0_xxxxyy_0_xxxxyyy_0,  \
-                             g_0_xxxxyy_0_xxxxyyy_1,  \
-                             g_0_xxxxyy_0_xxxxyyz_0,  \
-                             g_0_xxxxyy_0_xxxxyyz_1,  \
-                             g_0_xxxxyy_0_xxxxyz_1,   \
-                             g_0_xxxxyy_0_xxxxyzz_0,  \
-                             g_0_xxxxyy_0_xxxxyzz_1,  \
-                             g_0_xxxxyy_0_xxxxzz_1,   \
-                             g_0_xxxxyy_0_xxxxzzz_0,  \
-                             g_0_xxxxyy_0_xxxxzzz_1,  \
-                             g_0_xxxxyy_0_xxxyyy_1,   \
-                             g_0_xxxxyy_0_xxxyyyy_0,  \
-                             g_0_xxxxyy_0_xxxyyyy_1,  \
-                             g_0_xxxxyy_0_xxxyyyz_0,  \
-                             g_0_xxxxyy_0_xxxyyyz_1,  \
-                             g_0_xxxxyy_0_xxxyyz_1,   \
-                             g_0_xxxxyy_0_xxxyyzz_0,  \
-                             g_0_xxxxyy_0_xxxyyzz_1,  \
-                             g_0_xxxxyy_0_xxxyzz_1,   \
-                             g_0_xxxxyy_0_xxxyzzz_0,  \
-                             g_0_xxxxyy_0_xxxyzzz_1,  \
-                             g_0_xxxxyy_0_xxxzzz_1,   \
-                             g_0_xxxxyy_0_xxxzzzz_0,  \
-                             g_0_xxxxyy_0_xxxzzzz_1,  \
-                             g_0_xxxxyy_0_xxyyyy_1,   \
-                             g_0_xxxxyy_0_xxyyyyy_0,  \
-                             g_0_xxxxyy_0_xxyyyyy_1,  \
-                             g_0_xxxxyy_0_xxyyyyz_0,  \
-                             g_0_xxxxyy_0_xxyyyyz_1,  \
-                             g_0_xxxxyy_0_xxyyyz_1,   \
-                             g_0_xxxxyy_0_xxyyyzz_0,  \
-                             g_0_xxxxyy_0_xxyyyzz_1,  \
-                             g_0_xxxxyy_0_xxyyzz_1,   \
-                             g_0_xxxxyy_0_xxyyzzz_0,  \
-                             g_0_xxxxyy_0_xxyyzzz_1,  \
-                             g_0_xxxxyy_0_xxyzzz_1,   \
-                             g_0_xxxxyy_0_xxyzzzz_0,  \
-                             g_0_xxxxyy_0_xxyzzzz_1,  \
-                             g_0_xxxxyy_0_xxzzzz_1,   \
-                             g_0_xxxxyy_0_xxzzzzz_0,  \
-                             g_0_xxxxyy_0_xxzzzzz_1,  \
-                             g_0_xxxxyy_0_xyyyyy_1,   \
-                             g_0_xxxxyy_0_xyyyyyy_0,  \
-                             g_0_xxxxyy_0_xyyyyyy_1,  \
-                             g_0_xxxxyy_0_xyyyyyz_0,  \
-                             g_0_xxxxyy_0_xyyyyyz_1,  \
-                             g_0_xxxxyy_0_xyyyyz_1,   \
-                             g_0_xxxxyy_0_xyyyyzz_0,  \
-                             g_0_xxxxyy_0_xyyyyzz_1,  \
-                             g_0_xxxxyy_0_xyyyzz_1,   \
-                             g_0_xxxxyy_0_xyyyzzz_0,  \
-                             g_0_xxxxyy_0_xyyyzzz_1,  \
-                             g_0_xxxxyy_0_xyyzzz_1,   \
-                             g_0_xxxxyy_0_xyyzzzz_0,  \
-                             g_0_xxxxyy_0_xyyzzzz_1,  \
-                             g_0_xxxxyy_0_xyzzzz_1,   \
-                             g_0_xxxxyy_0_xyzzzzz_0,  \
-                             g_0_xxxxyy_0_xyzzzzz_1,  \
-                             g_0_xxxxyy_0_xzzzzz_1,   \
-                             g_0_xxxxyy_0_xzzzzzz_0,  \
-                             g_0_xxxxyy_0_xzzzzzz_1,  \
-                             g_0_xxxxyy_0_yyyyyy_1,   \
-                             g_0_xxxxyy_0_yyyyyyy_0,  \
-                             g_0_xxxxyy_0_yyyyyyy_1,  \
-                             g_0_xxxxyy_0_yyyyyyz_0,  \
-                             g_0_xxxxyy_0_yyyyyyz_1,  \
-                             g_0_xxxxyy_0_yyyyyz_1,   \
-                             g_0_xxxxyy_0_yyyyyzz_0,  \
-                             g_0_xxxxyy_0_yyyyyzz_1,  \
-                             g_0_xxxxyy_0_yyyyzz_1,   \
-                             g_0_xxxxyy_0_yyyyzzz_0,  \
-                             g_0_xxxxyy_0_yyyyzzz_1,  \
-                             g_0_xxxxyy_0_yyyzzz_1,   \
-                             g_0_xxxxyy_0_yyyzzzz_0,  \
-                             g_0_xxxxyy_0_yyyzzzz_1,  \
-                             g_0_xxxxyy_0_yyzzzz_1,   \
-                             g_0_xxxxyy_0_yyzzzzz_0,  \
-                             g_0_xxxxyy_0_yyzzzzz_1,  \
-                             g_0_xxxxyy_0_yzzzzz_1,   \
-                             g_0_xxxxyy_0_yzzzzzz_0,  \
-                             g_0_xxxxyy_0_yzzzzzz_1,  \
-                             g_0_xxxxyy_0_zzzzzz_1,   \
-                             g_0_xxxxyy_0_zzzzzzz_0,  \
-                             g_0_xxxxyy_0_zzzzzzz_1,  \
-                             g_0_xxxxyyz_0_xxxxxxx_0, \
-                             g_0_xxxxyyz_0_xxxxxxy_0, \
-                             g_0_xxxxyyz_0_xxxxxxz_0, \
-                             g_0_xxxxyyz_0_xxxxxyy_0, \
-                             g_0_xxxxyyz_0_xxxxxyz_0, \
-                             g_0_xxxxyyz_0_xxxxxzz_0, \
-                             g_0_xxxxyyz_0_xxxxyyy_0, \
-                             g_0_xxxxyyz_0_xxxxyyz_0, \
-                             g_0_xxxxyyz_0_xxxxyzz_0, \
-                             g_0_xxxxyyz_0_xxxxzzz_0, \
-                             g_0_xxxxyyz_0_xxxyyyy_0, \
-                             g_0_xxxxyyz_0_xxxyyyz_0, \
-                             g_0_xxxxyyz_0_xxxyyzz_0, \
-                             g_0_xxxxyyz_0_xxxyzzz_0, \
-                             g_0_xxxxyyz_0_xxxzzzz_0, \
-                             g_0_xxxxyyz_0_xxyyyyy_0, \
-                             g_0_xxxxyyz_0_xxyyyyz_0, \
-                             g_0_xxxxyyz_0_xxyyyzz_0, \
-                             g_0_xxxxyyz_0_xxyyzzz_0, \
-                             g_0_xxxxyyz_0_xxyzzzz_0, \
-                             g_0_xxxxyyz_0_xxzzzzz_0, \
-                             g_0_xxxxyyz_0_xyyyyyy_0, \
-                             g_0_xxxxyyz_0_xyyyyyz_0, \
-                             g_0_xxxxyyz_0_xyyyyzz_0, \
-                             g_0_xxxxyyz_0_xyyyzzz_0, \
-                             g_0_xxxxyyz_0_xyyzzzz_0, \
-                             g_0_xxxxyyz_0_xyzzzzz_0, \
-                             g_0_xxxxyyz_0_xzzzzzz_0, \
-                             g_0_xxxxyyz_0_yyyyyyy_0, \
-                             g_0_xxxxyyz_0_yyyyyyz_0, \
-                             g_0_xxxxyyz_0_yyyyyzz_0, \
-                             g_0_xxxxyyz_0_yyyyzzz_0, \
-                             g_0_xxxxyyz_0_yyyzzzz_0, \
-                             g_0_xxxxyyz_0_yyzzzzz_0, \
-                             g_0_xxxxyyz_0_yzzzzzz_0, \
-                             g_0_xxxxyyz_0_zzzzzzz_0, \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxxxyy_0_xxxxxx_1, g_0_xxxxyy_0_xxxxxxx_0, g_0_xxxxyy_0_xxxxxxx_1, g_0_xxxxyy_0_xxxxxxy_0, g_0_xxxxyy_0_xxxxxxy_1, g_0_xxxxyy_0_xxxxxxz_0, g_0_xxxxyy_0_xxxxxxz_1, g_0_xxxxyy_0_xxxxxy_1, g_0_xxxxyy_0_xxxxxyy_0, g_0_xxxxyy_0_xxxxxyy_1, g_0_xxxxyy_0_xxxxxyz_0, g_0_xxxxyy_0_xxxxxyz_1, g_0_xxxxyy_0_xxxxxz_1, g_0_xxxxyy_0_xxxxxzz_0, g_0_xxxxyy_0_xxxxxzz_1, g_0_xxxxyy_0_xxxxyy_1, g_0_xxxxyy_0_xxxxyyy_0, g_0_xxxxyy_0_xxxxyyy_1, g_0_xxxxyy_0_xxxxyyz_0, g_0_xxxxyy_0_xxxxyyz_1, g_0_xxxxyy_0_xxxxyz_1, g_0_xxxxyy_0_xxxxyzz_0, g_0_xxxxyy_0_xxxxyzz_1, g_0_xxxxyy_0_xxxxzz_1, g_0_xxxxyy_0_xxxxzzz_0, g_0_xxxxyy_0_xxxxzzz_1, g_0_xxxxyy_0_xxxyyy_1, g_0_xxxxyy_0_xxxyyyy_0, g_0_xxxxyy_0_xxxyyyy_1, g_0_xxxxyy_0_xxxyyyz_0, g_0_xxxxyy_0_xxxyyyz_1, g_0_xxxxyy_0_xxxyyz_1, g_0_xxxxyy_0_xxxyyzz_0, g_0_xxxxyy_0_xxxyyzz_1, g_0_xxxxyy_0_xxxyzz_1, g_0_xxxxyy_0_xxxyzzz_0, g_0_xxxxyy_0_xxxyzzz_1, g_0_xxxxyy_0_xxxzzz_1, g_0_xxxxyy_0_xxxzzzz_0, g_0_xxxxyy_0_xxxzzzz_1, g_0_xxxxyy_0_xxyyyy_1, g_0_xxxxyy_0_xxyyyyy_0, g_0_xxxxyy_0_xxyyyyy_1, g_0_xxxxyy_0_xxyyyyz_0, g_0_xxxxyy_0_xxyyyyz_1, g_0_xxxxyy_0_xxyyyz_1, g_0_xxxxyy_0_xxyyyzz_0, g_0_xxxxyy_0_xxyyyzz_1, g_0_xxxxyy_0_xxyyzz_1, g_0_xxxxyy_0_xxyyzzz_0, g_0_xxxxyy_0_xxyyzzz_1, g_0_xxxxyy_0_xxyzzz_1, g_0_xxxxyy_0_xxyzzzz_0, g_0_xxxxyy_0_xxyzzzz_1, g_0_xxxxyy_0_xxzzzz_1, g_0_xxxxyy_0_xxzzzzz_0, g_0_xxxxyy_0_xxzzzzz_1, g_0_xxxxyy_0_xyyyyy_1, g_0_xxxxyy_0_xyyyyyy_0, g_0_xxxxyy_0_xyyyyyy_1, g_0_xxxxyy_0_xyyyyyz_0, g_0_xxxxyy_0_xyyyyyz_1, g_0_xxxxyy_0_xyyyyz_1, g_0_xxxxyy_0_xyyyyzz_0, g_0_xxxxyy_0_xyyyyzz_1, g_0_xxxxyy_0_xyyyzz_1, g_0_xxxxyy_0_xyyyzzz_0, g_0_xxxxyy_0_xyyyzzz_1, g_0_xxxxyy_0_xyyzzz_1, g_0_xxxxyy_0_xyyzzzz_0, g_0_xxxxyy_0_xyyzzzz_1, g_0_xxxxyy_0_xyzzzz_1, g_0_xxxxyy_0_xyzzzzz_0, g_0_xxxxyy_0_xyzzzzz_1, g_0_xxxxyy_0_xzzzzz_1, g_0_xxxxyy_0_xzzzzzz_0, g_0_xxxxyy_0_xzzzzzz_1, g_0_xxxxyy_0_yyyyyy_1, g_0_xxxxyy_0_yyyyyyy_0, g_0_xxxxyy_0_yyyyyyy_1, g_0_xxxxyy_0_yyyyyyz_0, g_0_xxxxyy_0_yyyyyyz_1, g_0_xxxxyy_0_yyyyyz_1, g_0_xxxxyy_0_yyyyyzz_0, g_0_xxxxyy_0_yyyyyzz_1, g_0_xxxxyy_0_yyyyzz_1, g_0_xxxxyy_0_yyyyzzz_0, g_0_xxxxyy_0_yyyyzzz_1, g_0_xxxxyy_0_yyyzzz_1, g_0_xxxxyy_0_yyyzzzz_0, g_0_xxxxyy_0_yyyzzzz_1, g_0_xxxxyy_0_yyzzzz_1, g_0_xxxxyy_0_yyzzzzz_0, g_0_xxxxyy_0_yyzzzzz_1, g_0_xxxxyy_0_yzzzzz_1, g_0_xxxxyy_0_yzzzzzz_0, g_0_xxxxyy_0_yzzzzzz_1, g_0_xxxxyy_0_zzzzzz_1, g_0_xxxxyy_0_zzzzzzz_0, g_0_xxxxyy_0_zzzzzzz_1, g_0_xxxxyyz_0_xxxxxxx_0, g_0_xxxxyyz_0_xxxxxxy_0, g_0_xxxxyyz_0_xxxxxxz_0, g_0_xxxxyyz_0_xxxxxyy_0, g_0_xxxxyyz_0_xxxxxyz_0, g_0_xxxxyyz_0_xxxxxzz_0, g_0_xxxxyyz_0_xxxxyyy_0, g_0_xxxxyyz_0_xxxxyyz_0, g_0_xxxxyyz_0_xxxxyzz_0, g_0_xxxxyyz_0_xxxxzzz_0, g_0_xxxxyyz_0_xxxyyyy_0, g_0_xxxxyyz_0_xxxyyyz_0, g_0_xxxxyyz_0_xxxyyzz_0, g_0_xxxxyyz_0_xxxyzzz_0, g_0_xxxxyyz_0_xxxzzzz_0, g_0_xxxxyyz_0_xxyyyyy_0, g_0_xxxxyyz_0_xxyyyyz_0, g_0_xxxxyyz_0_xxyyyzz_0, g_0_xxxxyyz_0_xxyyzzz_0, g_0_xxxxyyz_0_xxyzzzz_0, g_0_xxxxyyz_0_xxzzzzz_0, g_0_xxxxyyz_0_xyyyyyy_0, g_0_xxxxyyz_0_xyyyyyz_0, g_0_xxxxyyz_0_xyyyyzz_0, g_0_xxxxyyz_0_xyyyzzz_0, g_0_xxxxyyz_0_xyyzzzz_0, g_0_xxxxyyz_0_xyzzzzz_0, g_0_xxxxyyz_0_xzzzzzz_0, g_0_xxxxyyz_0_yyyyyyy_0, g_0_xxxxyyz_0_yyyyyyz_0, g_0_xxxxyyz_0_yyyyyzz_0, g_0_xxxxyyz_0_yyyyzzz_0, g_0_xxxxyyz_0_yyyzzzz_0, g_0_xxxxyyz_0_yyzzzzz_0, g_0_xxxxyyz_0_yzzzzzz_0, g_0_xxxxyyz_0_zzzzzzz_0, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -8592,88 +6957,67 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         g_0_xxxxyyz_0_xxxxxyz_0[i] = g_0_xxxxyy_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxxyz_0[i] * pb_z + g_0_xxxxyy_0_xxxxxyz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_xxxxxzz_0[i] =
-            2.0 * g_0_xxxxyy_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxxzz_0[i] * pb_z + g_0_xxxxyy_0_xxxxxzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_xxxxxzz_0[i] = 2.0 * g_0_xxxxyy_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxxzz_0[i] * pb_z + g_0_xxxxyy_0_xxxxxzz_1[i] * wp_z[i];
 
         g_0_xxxxyyz_0_xxxxyyy_0[i] = g_0_xxxxyy_0_xxxxyyy_0[i] * pb_z + g_0_xxxxyy_0_xxxxyyy_1[i] * wp_z[i];
 
         g_0_xxxxyyz_0_xxxxyyz_0[i] = g_0_xxxxyy_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxyyz_0[i] * pb_z + g_0_xxxxyy_0_xxxxyyz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_xxxxyzz_0[i] =
-            2.0 * g_0_xxxxyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxyzz_0[i] * pb_z + g_0_xxxxyy_0_xxxxyzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_xxxxyzz_0[i] = 2.0 * g_0_xxxxyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxyzz_0[i] * pb_z + g_0_xxxxyy_0_xxxxyzz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_xxxxzzz_0[i] =
-            3.0 * g_0_xxxxyy_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxzzz_0[i] * pb_z + g_0_xxxxyy_0_xxxxzzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_xxxxzzz_0[i] = 3.0 * g_0_xxxxyy_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxxzzz_0[i] * pb_z + g_0_xxxxyy_0_xxxxzzz_1[i] * wp_z[i];
 
         g_0_xxxxyyz_0_xxxyyyy_0[i] = g_0_xxxxyy_0_xxxyyyy_0[i] * pb_z + g_0_xxxxyy_0_xxxyyyy_1[i] * wp_z[i];
 
         g_0_xxxxyyz_0_xxxyyyz_0[i] = g_0_xxxxyy_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxyyyz_0[i] * pb_z + g_0_xxxxyy_0_xxxyyyz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_xxxyyzz_0[i] =
-            2.0 * g_0_xxxxyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxyyzz_0[i] * pb_z + g_0_xxxxyy_0_xxxyyzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_xxxyyzz_0[i] = 2.0 * g_0_xxxxyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxyyzz_0[i] * pb_z + g_0_xxxxyy_0_xxxyyzz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_xxxyzzz_0[i] =
-            3.0 * g_0_xxxxyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxyzzz_0[i] * pb_z + g_0_xxxxyy_0_xxxyzzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_xxxyzzz_0[i] = 3.0 * g_0_xxxxyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxyzzz_0[i] * pb_z + g_0_xxxxyy_0_xxxyzzz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_xxxzzzz_0[i] =
-            4.0 * g_0_xxxxyy_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxzzzz_0[i] * pb_z + g_0_xxxxyy_0_xxxzzzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_xxxzzzz_0[i] = 4.0 * g_0_xxxxyy_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxxzzzz_0[i] * pb_z + g_0_xxxxyy_0_xxxzzzz_1[i] * wp_z[i];
 
         g_0_xxxxyyz_0_xxyyyyy_0[i] = g_0_xxxxyy_0_xxyyyyy_0[i] * pb_z + g_0_xxxxyy_0_xxyyyyy_1[i] * wp_z[i];
 
         g_0_xxxxyyz_0_xxyyyyz_0[i] = g_0_xxxxyy_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyyyyz_0[i] * pb_z + g_0_xxxxyy_0_xxyyyyz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_xxyyyzz_0[i] =
-            2.0 * g_0_xxxxyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyyyzz_0[i] * pb_z + g_0_xxxxyy_0_xxyyyzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_xxyyyzz_0[i] = 2.0 * g_0_xxxxyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyyyzz_0[i] * pb_z + g_0_xxxxyy_0_xxyyyzz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_xxyyzzz_0[i] =
-            3.0 * g_0_xxxxyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyyzzz_0[i] * pb_z + g_0_xxxxyy_0_xxyyzzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_xxyyzzz_0[i] = 3.0 * g_0_xxxxyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyyzzz_0[i] * pb_z + g_0_xxxxyy_0_xxyyzzz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_xxyzzzz_0[i] =
-            4.0 * g_0_xxxxyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyzzzz_0[i] * pb_z + g_0_xxxxyy_0_xxyzzzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_xxyzzzz_0[i] = 4.0 * g_0_xxxxyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxyzzzz_0[i] * pb_z + g_0_xxxxyy_0_xxyzzzz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_xxzzzzz_0[i] =
-            5.0 * g_0_xxxxyy_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxzzzzz_0[i] * pb_z + g_0_xxxxyy_0_xxzzzzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_xxzzzzz_0[i] = 5.0 * g_0_xxxxyy_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xxzzzzz_0[i] * pb_z + g_0_xxxxyy_0_xxzzzzz_1[i] * wp_z[i];
 
         g_0_xxxxyyz_0_xyyyyyy_0[i] = g_0_xxxxyy_0_xyyyyyy_0[i] * pb_z + g_0_xxxxyy_0_xyyyyyy_1[i] * wp_z[i];
 
         g_0_xxxxyyz_0_xyyyyyz_0[i] = g_0_xxxxyy_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyyyyz_0[i] * pb_z + g_0_xxxxyy_0_xyyyyyz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_xyyyyzz_0[i] =
-            2.0 * g_0_xxxxyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyyyzz_0[i] * pb_z + g_0_xxxxyy_0_xyyyyzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_xyyyyzz_0[i] = 2.0 * g_0_xxxxyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyyyzz_0[i] * pb_z + g_0_xxxxyy_0_xyyyyzz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_xyyyzzz_0[i] =
-            3.0 * g_0_xxxxyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyyzzz_0[i] * pb_z + g_0_xxxxyy_0_xyyyzzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_xyyyzzz_0[i] = 3.0 * g_0_xxxxyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyyzzz_0[i] * pb_z + g_0_xxxxyy_0_xyyyzzz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_xyyzzzz_0[i] =
-            4.0 * g_0_xxxxyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyzzzz_0[i] * pb_z + g_0_xxxxyy_0_xyyzzzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_xyyzzzz_0[i] = 4.0 * g_0_xxxxyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyyzzzz_0[i] * pb_z + g_0_xxxxyy_0_xyyzzzz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_xyzzzzz_0[i] =
-            5.0 * g_0_xxxxyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyzzzzz_0[i] * pb_z + g_0_xxxxyy_0_xyzzzzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_xyzzzzz_0[i] = 5.0 * g_0_xxxxyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xyzzzzz_0[i] * pb_z + g_0_xxxxyy_0_xyzzzzz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_xzzzzzz_0[i] =
-            6.0 * g_0_xxxxyy_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xzzzzzz_0[i] * pb_z + g_0_xxxxyy_0_xzzzzzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_xzzzzzz_0[i] = 6.0 * g_0_xxxxyy_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_xzzzzzz_0[i] * pb_z + g_0_xxxxyy_0_xzzzzzz_1[i] * wp_z[i];
 
         g_0_xxxxyyz_0_yyyyyyy_0[i] = g_0_xxxxyy_0_yyyyyyy_0[i] * pb_z + g_0_xxxxyy_0_yyyyyyy_1[i] * wp_z[i];
 
         g_0_xxxxyyz_0_yyyyyyz_0[i] = g_0_xxxxyy_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxxxyy_0_yyyyyyz_0[i] * pb_z + g_0_xxxxyy_0_yyyyyyz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_yyyyyzz_0[i] =
-            2.0 * g_0_xxxxyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_yyyyyzz_0[i] * pb_z + g_0_xxxxyy_0_yyyyyzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_yyyyyzz_0[i] = 2.0 * g_0_xxxxyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_yyyyyzz_0[i] * pb_z + g_0_xxxxyy_0_yyyyyzz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_yyyyzzz_0[i] =
-            3.0 * g_0_xxxxyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_yyyyzzz_0[i] * pb_z + g_0_xxxxyy_0_yyyyzzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_yyyyzzz_0[i] = 3.0 * g_0_xxxxyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_yyyyzzz_0[i] * pb_z + g_0_xxxxyy_0_yyyyzzz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_yyyzzzz_0[i] =
-            4.0 * g_0_xxxxyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_yyyzzzz_0[i] * pb_z + g_0_xxxxyy_0_yyyzzzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_yyyzzzz_0[i] = 4.0 * g_0_xxxxyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_yyyzzzz_0[i] * pb_z + g_0_xxxxyy_0_yyyzzzz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_yyzzzzz_0[i] =
-            5.0 * g_0_xxxxyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_yyzzzzz_0[i] * pb_z + g_0_xxxxyy_0_yyzzzzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_yyzzzzz_0[i] = 5.0 * g_0_xxxxyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_yyzzzzz_0[i] * pb_z + g_0_xxxxyy_0_yyzzzzz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_yzzzzzz_0[i] =
-            6.0 * g_0_xxxxyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_yzzzzzz_0[i] * pb_z + g_0_xxxxyy_0_yzzzzzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_yzzzzzz_0[i] = 6.0 * g_0_xxxxyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_yzzzzzz_0[i] * pb_z + g_0_xxxxyy_0_yzzzzzz_1[i] * wp_z[i];
 
-        g_0_xxxxyyz_0_zzzzzzz_0[i] =
-            7.0 * g_0_xxxxyy_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_zzzzzzz_0[i] * pb_z + g_0_xxxxyy_0_zzzzzzz_1[i] * wp_z[i];
+        g_0_xxxxyyz_0_zzzzzzz_0[i] = 7.0 * g_0_xxxxyy_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxxxyy_0_zzzzzzz_0[i] * pb_z + g_0_xxxxyy_0_zzzzzzz_1[i] * wp_z[i];
     }
 
     /// Set up 288-324 components of targeted buffer : SKSK
@@ -8750,145 +7094,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxxxyzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 323);
 
-#pragma omp simd aligned(g_0_xxxxyzz_0_xxxxxxx_0,     \
-                             g_0_xxxxyzz_0_xxxxxxy_0, \
-                             g_0_xxxxyzz_0_xxxxxxz_0, \
-                             g_0_xxxxyzz_0_xxxxxyy_0, \
-                             g_0_xxxxyzz_0_xxxxxyz_0, \
-                             g_0_xxxxyzz_0_xxxxxzz_0, \
-                             g_0_xxxxyzz_0_xxxxyyy_0, \
-                             g_0_xxxxyzz_0_xxxxyyz_0, \
-                             g_0_xxxxyzz_0_xxxxyzz_0, \
-                             g_0_xxxxyzz_0_xxxxzzz_0, \
-                             g_0_xxxxyzz_0_xxxyyyy_0, \
-                             g_0_xxxxyzz_0_xxxyyyz_0, \
-                             g_0_xxxxyzz_0_xxxyyzz_0, \
-                             g_0_xxxxyzz_0_xxxyzzz_0, \
-                             g_0_xxxxyzz_0_xxxzzzz_0, \
-                             g_0_xxxxyzz_0_xxyyyyy_0, \
-                             g_0_xxxxyzz_0_xxyyyyz_0, \
-                             g_0_xxxxyzz_0_xxyyyzz_0, \
-                             g_0_xxxxyzz_0_xxyyzzz_0, \
-                             g_0_xxxxyzz_0_xxyzzzz_0, \
-                             g_0_xxxxyzz_0_xxzzzzz_0, \
-                             g_0_xxxxyzz_0_xyyyyyy_0, \
-                             g_0_xxxxyzz_0_xyyyyyz_0, \
-                             g_0_xxxxyzz_0_xyyyyzz_0, \
-                             g_0_xxxxyzz_0_xyyyzzz_0, \
-                             g_0_xxxxyzz_0_xyyzzzz_0, \
-                             g_0_xxxxyzz_0_xyzzzzz_0, \
-                             g_0_xxxxyzz_0_xzzzzzz_0, \
-                             g_0_xxxxyzz_0_yyyyyyy_0, \
-                             g_0_xxxxyzz_0_yyyyyyz_0, \
-                             g_0_xxxxyzz_0_yyyyyzz_0, \
-                             g_0_xxxxyzz_0_yyyyzzz_0, \
-                             g_0_xxxxyzz_0_yyyzzzz_0, \
-                             g_0_xxxxyzz_0_yyzzzzz_0, \
-                             g_0_xxxxyzz_0_yzzzzzz_0, \
-                             g_0_xxxxyzz_0_zzzzzzz_0, \
-                             g_0_xxxxzz_0_xxxxxx_1,   \
-                             g_0_xxxxzz_0_xxxxxxx_0,  \
-                             g_0_xxxxzz_0_xxxxxxx_1,  \
-                             g_0_xxxxzz_0_xxxxxxy_0,  \
-                             g_0_xxxxzz_0_xxxxxxy_1,  \
-                             g_0_xxxxzz_0_xxxxxxz_0,  \
-                             g_0_xxxxzz_0_xxxxxxz_1,  \
-                             g_0_xxxxzz_0_xxxxxy_1,   \
-                             g_0_xxxxzz_0_xxxxxyy_0,  \
-                             g_0_xxxxzz_0_xxxxxyy_1,  \
-                             g_0_xxxxzz_0_xxxxxyz_0,  \
-                             g_0_xxxxzz_0_xxxxxyz_1,  \
-                             g_0_xxxxzz_0_xxxxxz_1,   \
-                             g_0_xxxxzz_0_xxxxxzz_0,  \
-                             g_0_xxxxzz_0_xxxxxzz_1,  \
-                             g_0_xxxxzz_0_xxxxyy_1,   \
-                             g_0_xxxxzz_0_xxxxyyy_0,  \
-                             g_0_xxxxzz_0_xxxxyyy_1,  \
-                             g_0_xxxxzz_0_xxxxyyz_0,  \
-                             g_0_xxxxzz_0_xxxxyyz_1,  \
-                             g_0_xxxxzz_0_xxxxyz_1,   \
-                             g_0_xxxxzz_0_xxxxyzz_0,  \
-                             g_0_xxxxzz_0_xxxxyzz_1,  \
-                             g_0_xxxxzz_0_xxxxzz_1,   \
-                             g_0_xxxxzz_0_xxxxzzz_0,  \
-                             g_0_xxxxzz_0_xxxxzzz_1,  \
-                             g_0_xxxxzz_0_xxxyyy_1,   \
-                             g_0_xxxxzz_0_xxxyyyy_0,  \
-                             g_0_xxxxzz_0_xxxyyyy_1,  \
-                             g_0_xxxxzz_0_xxxyyyz_0,  \
-                             g_0_xxxxzz_0_xxxyyyz_1,  \
-                             g_0_xxxxzz_0_xxxyyz_1,   \
-                             g_0_xxxxzz_0_xxxyyzz_0,  \
-                             g_0_xxxxzz_0_xxxyyzz_1,  \
-                             g_0_xxxxzz_0_xxxyzz_1,   \
-                             g_0_xxxxzz_0_xxxyzzz_0,  \
-                             g_0_xxxxzz_0_xxxyzzz_1,  \
-                             g_0_xxxxzz_0_xxxzzz_1,   \
-                             g_0_xxxxzz_0_xxxzzzz_0,  \
-                             g_0_xxxxzz_0_xxxzzzz_1,  \
-                             g_0_xxxxzz_0_xxyyyy_1,   \
-                             g_0_xxxxzz_0_xxyyyyy_0,  \
-                             g_0_xxxxzz_0_xxyyyyy_1,  \
-                             g_0_xxxxzz_0_xxyyyyz_0,  \
-                             g_0_xxxxzz_0_xxyyyyz_1,  \
-                             g_0_xxxxzz_0_xxyyyz_1,   \
-                             g_0_xxxxzz_0_xxyyyzz_0,  \
-                             g_0_xxxxzz_0_xxyyyzz_1,  \
-                             g_0_xxxxzz_0_xxyyzz_1,   \
-                             g_0_xxxxzz_0_xxyyzzz_0,  \
-                             g_0_xxxxzz_0_xxyyzzz_1,  \
-                             g_0_xxxxzz_0_xxyzzz_1,   \
-                             g_0_xxxxzz_0_xxyzzzz_0,  \
-                             g_0_xxxxzz_0_xxyzzzz_1,  \
-                             g_0_xxxxzz_0_xxzzzz_1,   \
-                             g_0_xxxxzz_0_xxzzzzz_0,  \
-                             g_0_xxxxzz_0_xxzzzzz_1,  \
-                             g_0_xxxxzz_0_xyyyyy_1,   \
-                             g_0_xxxxzz_0_xyyyyyy_0,  \
-                             g_0_xxxxzz_0_xyyyyyy_1,  \
-                             g_0_xxxxzz_0_xyyyyyz_0,  \
-                             g_0_xxxxzz_0_xyyyyyz_1,  \
-                             g_0_xxxxzz_0_xyyyyz_1,   \
-                             g_0_xxxxzz_0_xyyyyzz_0,  \
-                             g_0_xxxxzz_0_xyyyyzz_1,  \
-                             g_0_xxxxzz_0_xyyyzz_1,   \
-                             g_0_xxxxzz_0_xyyyzzz_0,  \
-                             g_0_xxxxzz_0_xyyyzzz_1,  \
-                             g_0_xxxxzz_0_xyyzzz_1,   \
-                             g_0_xxxxzz_0_xyyzzzz_0,  \
-                             g_0_xxxxzz_0_xyyzzzz_1,  \
-                             g_0_xxxxzz_0_xyzzzz_1,   \
-                             g_0_xxxxzz_0_xyzzzzz_0,  \
-                             g_0_xxxxzz_0_xyzzzzz_1,  \
-                             g_0_xxxxzz_0_xzzzzz_1,   \
-                             g_0_xxxxzz_0_xzzzzzz_0,  \
-                             g_0_xxxxzz_0_xzzzzzz_1,  \
-                             g_0_xxxxzz_0_yyyyyy_1,   \
-                             g_0_xxxxzz_0_yyyyyyy_0,  \
-                             g_0_xxxxzz_0_yyyyyyy_1,  \
-                             g_0_xxxxzz_0_yyyyyyz_0,  \
-                             g_0_xxxxzz_0_yyyyyyz_1,  \
-                             g_0_xxxxzz_0_yyyyyz_1,   \
-                             g_0_xxxxzz_0_yyyyyzz_0,  \
-                             g_0_xxxxzz_0_yyyyyzz_1,  \
-                             g_0_xxxxzz_0_yyyyzz_1,   \
-                             g_0_xxxxzz_0_yyyyzzz_0,  \
-                             g_0_xxxxzz_0_yyyyzzz_1,  \
-                             g_0_xxxxzz_0_yyyzzz_1,   \
-                             g_0_xxxxzz_0_yyyzzzz_0,  \
-                             g_0_xxxxzz_0_yyyzzzz_1,  \
-                             g_0_xxxxzz_0_yyzzzz_1,   \
-                             g_0_xxxxzz_0_yyzzzzz_0,  \
-                             g_0_xxxxzz_0_yyzzzzz_1,  \
-                             g_0_xxxxzz_0_yzzzzz_1,   \
-                             g_0_xxxxzz_0_yzzzzzz_0,  \
-                             g_0_xxxxzz_0_yzzzzzz_1,  \
-                             g_0_xxxxzz_0_zzzzzz_1,   \
-                             g_0_xxxxzz_0_zzzzzzz_0,  \
-                             g_0_xxxxzz_0_zzzzzzz_1,  \
-                             wp_y,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxxxyzz_0_xxxxxxx_0, g_0_xxxxyzz_0_xxxxxxy_0, g_0_xxxxyzz_0_xxxxxxz_0, g_0_xxxxyzz_0_xxxxxyy_0, g_0_xxxxyzz_0_xxxxxyz_0, g_0_xxxxyzz_0_xxxxxzz_0, g_0_xxxxyzz_0_xxxxyyy_0, g_0_xxxxyzz_0_xxxxyyz_0, g_0_xxxxyzz_0_xxxxyzz_0, g_0_xxxxyzz_0_xxxxzzz_0, g_0_xxxxyzz_0_xxxyyyy_0, g_0_xxxxyzz_0_xxxyyyz_0, g_0_xxxxyzz_0_xxxyyzz_0, g_0_xxxxyzz_0_xxxyzzz_0, g_0_xxxxyzz_0_xxxzzzz_0, g_0_xxxxyzz_0_xxyyyyy_0, g_0_xxxxyzz_0_xxyyyyz_0, g_0_xxxxyzz_0_xxyyyzz_0, g_0_xxxxyzz_0_xxyyzzz_0, g_0_xxxxyzz_0_xxyzzzz_0, g_0_xxxxyzz_0_xxzzzzz_0, g_0_xxxxyzz_0_xyyyyyy_0, g_0_xxxxyzz_0_xyyyyyz_0, g_0_xxxxyzz_0_xyyyyzz_0, g_0_xxxxyzz_0_xyyyzzz_0, g_0_xxxxyzz_0_xyyzzzz_0, g_0_xxxxyzz_0_xyzzzzz_0, g_0_xxxxyzz_0_xzzzzzz_0, g_0_xxxxyzz_0_yyyyyyy_0, g_0_xxxxyzz_0_yyyyyyz_0, g_0_xxxxyzz_0_yyyyyzz_0, g_0_xxxxyzz_0_yyyyzzz_0, g_0_xxxxyzz_0_yyyzzzz_0, g_0_xxxxyzz_0_yyzzzzz_0, g_0_xxxxyzz_0_yzzzzzz_0, g_0_xxxxyzz_0_zzzzzzz_0, g_0_xxxxzz_0_xxxxxx_1, g_0_xxxxzz_0_xxxxxxx_0, g_0_xxxxzz_0_xxxxxxx_1, g_0_xxxxzz_0_xxxxxxy_0, g_0_xxxxzz_0_xxxxxxy_1, g_0_xxxxzz_0_xxxxxxz_0, g_0_xxxxzz_0_xxxxxxz_1, g_0_xxxxzz_0_xxxxxy_1, g_0_xxxxzz_0_xxxxxyy_0, g_0_xxxxzz_0_xxxxxyy_1, g_0_xxxxzz_0_xxxxxyz_0, g_0_xxxxzz_0_xxxxxyz_1, g_0_xxxxzz_0_xxxxxz_1, g_0_xxxxzz_0_xxxxxzz_0, g_0_xxxxzz_0_xxxxxzz_1, g_0_xxxxzz_0_xxxxyy_1, g_0_xxxxzz_0_xxxxyyy_0, g_0_xxxxzz_0_xxxxyyy_1, g_0_xxxxzz_0_xxxxyyz_0, g_0_xxxxzz_0_xxxxyyz_1, g_0_xxxxzz_0_xxxxyz_1, g_0_xxxxzz_0_xxxxyzz_0, g_0_xxxxzz_0_xxxxyzz_1, g_0_xxxxzz_0_xxxxzz_1, g_0_xxxxzz_0_xxxxzzz_0, g_0_xxxxzz_0_xxxxzzz_1, g_0_xxxxzz_0_xxxyyy_1, g_0_xxxxzz_0_xxxyyyy_0, g_0_xxxxzz_0_xxxyyyy_1, g_0_xxxxzz_0_xxxyyyz_0, g_0_xxxxzz_0_xxxyyyz_1, g_0_xxxxzz_0_xxxyyz_1, g_0_xxxxzz_0_xxxyyzz_0, g_0_xxxxzz_0_xxxyyzz_1, g_0_xxxxzz_0_xxxyzz_1, g_0_xxxxzz_0_xxxyzzz_0, g_0_xxxxzz_0_xxxyzzz_1, g_0_xxxxzz_0_xxxzzz_1, g_0_xxxxzz_0_xxxzzzz_0, g_0_xxxxzz_0_xxxzzzz_1, g_0_xxxxzz_0_xxyyyy_1, g_0_xxxxzz_0_xxyyyyy_0, g_0_xxxxzz_0_xxyyyyy_1, g_0_xxxxzz_0_xxyyyyz_0, g_0_xxxxzz_0_xxyyyyz_1, g_0_xxxxzz_0_xxyyyz_1, g_0_xxxxzz_0_xxyyyzz_0, g_0_xxxxzz_0_xxyyyzz_1, g_0_xxxxzz_0_xxyyzz_1, g_0_xxxxzz_0_xxyyzzz_0, g_0_xxxxzz_0_xxyyzzz_1, g_0_xxxxzz_0_xxyzzz_1, g_0_xxxxzz_0_xxyzzzz_0, g_0_xxxxzz_0_xxyzzzz_1, g_0_xxxxzz_0_xxzzzz_1, g_0_xxxxzz_0_xxzzzzz_0, g_0_xxxxzz_0_xxzzzzz_1, g_0_xxxxzz_0_xyyyyy_1, g_0_xxxxzz_0_xyyyyyy_0, g_0_xxxxzz_0_xyyyyyy_1, g_0_xxxxzz_0_xyyyyyz_0, g_0_xxxxzz_0_xyyyyyz_1, g_0_xxxxzz_0_xyyyyz_1, g_0_xxxxzz_0_xyyyyzz_0, g_0_xxxxzz_0_xyyyyzz_1, g_0_xxxxzz_0_xyyyzz_1, g_0_xxxxzz_0_xyyyzzz_0, g_0_xxxxzz_0_xyyyzzz_1, g_0_xxxxzz_0_xyyzzz_1, g_0_xxxxzz_0_xyyzzzz_0, g_0_xxxxzz_0_xyyzzzz_1, g_0_xxxxzz_0_xyzzzz_1, g_0_xxxxzz_0_xyzzzzz_0, g_0_xxxxzz_0_xyzzzzz_1, g_0_xxxxzz_0_xzzzzz_1, g_0_xxxxzz_0_xzzzzzz_0, g_0_xxxxzz_0_xzzzzzz_1, g_0_xxxxzz_0_yyyyyy_1, g_0_xxxxzz_0_yyyyyyy_0, g_0_xxxxzz_0_yyyyyyy_1, g_0_xxxxzz_0_yyyyyyz_0, g_0_xxxxzz_0_yyyyyyz_1, g_0_xxxxzz_0_yyyyyz_1, g_0_xxxxzz_0_yyyyyzz_0, g_0_xxxxzz_0_yyyyyzz_1, g_0_xxxxzz_0_yyyyzz_1, g_0_xxxxzz_0_yyyyzzz_0, g_0_xxxxzz_0_yyyyzzz_1, g_0_xxxxzz_0_yyyzzz_1, g_0_xxxxzz_0_yyyzzzz_0, g_0_xxxxzz_0_yyyzzzz_1, g_0_xxxxzz_0_yyzzzz_1, g_0_xxxxzz_0_yyzzzzz_0, g_0_xxxxzz_0_yyzzzzz_1, g_0_xxxxzz_0_yzzzzz_1, g_0_xxxxzz_0_yzzzzzz_0, g_0_xxxxzz_0_yzzzzzz_1, g_0_xxxxzz_0_zzzzzz_1, g_0_xxxxzz_0_zzzzzzz_0, g_0_xxxxzz_0_zzzzzzz_1, wp_y, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -8899,88 +7105,67 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         g_0_xxxxyzz_0_xxxxxxz_0[i] = g_0_xxxxzz_0_xxxxxxz_0[i] * pb_y + g_0_xxxxzz_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_xxxxxyy_0[i] =
-            2.0 * g_0_xxxxzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxxyy_0[i] * pb_y + g_0_xxxxzz_0_xxxxxyy_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_xxxxxyy_0[i] = 2.0 * g_0_xxxxzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxxyy_0[i] * pb_y + g_0_xxxxzz_0_xxxxxyy_1[i] * wp_y[i];
 
         g_0_xxxxyzz_0_xxxxxyz_0[i] = g_0_xxxxzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxxyz_0[i] * pb_y + g_0_xxxxzz_0_xxxxxyz_1[i] * wp_y[i];
 
         g_0_xxxxyzz_0_xxxxxzz_0[i] = g_0_xxxxzz_0_xxxxxzz_0[i] * pb_y + g_0_xxxxzz_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_xxxxyyy_0[i] =
-            3.0 * g_0_xxxxzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxyyy_0[i] * pb_y + g_0_xxxxzz_0_xxxxyyy_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_xxxxyyy_0[i] = 3.0 * g_0_xxxxzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxyyy_0[i] * pb_y + g_0_xxxxzz_0_xxxxyyy_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_xxxxyyz_0[i] =
-            2.0 * g_0_xxxxzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxyyz_0[i] * pb_y + g_0_xxxxzz_0_xxxxyyz_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_xxxxyyz_0[i] = 2.0 * g_0_xxxxzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxyyz_0[i] * pb_y + g_0_xxxxzz_0_xxxxyyz_1[i] * wp_y[i];
 
         g_0_xxxxyzz_0_xxxxyzz_0[i] = g_0_xxxxzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxxyzz_0[i] * pb_y + g_0_xxxxzz_0_xxxxyzz_1[i] * wp_y[i];
 
         g_0_xxxxyzz_0_xxxxzzz_0[i] = g_0_xxxxzz_0_xxxxzzz_0[i] * pb_y + g_0_xxxxzz_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_xxxyyyy_0[i] =
-            4.0 * g_0_xxxxzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxyyyy_0[i] * pb_y + g_0_xxxxzz_0_xxxyyyy_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_xxxyyyy_0[i] = 4.0 * g_0_xxxxzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxyyyy_0[i] * pb_y + g_0_xxxxzz_0_xxxyyyy_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_xxxyyyz_0[i] =
-            3.0 * g_0_xxxxzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxyyyz_0[i] * pb_y + g_0_xxxxzz_0_xxxyyyz_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_xxxyyyz_0[i] = 3.0 * g_0_xxxxzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxyyyz_0[i] * pb_y + g_0_xxxxzz_0_xxxyyyz_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_xxxyyzz_0[i] =
-            2.0 * g_0_xxxxzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxyyzz_0[i] * pb_y + g_0_xxxxzz_0_xxxyyzz_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_xxxyyzz_0[i] = 2.0 * g_0_xxxxzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxyyzz_0[i] * pb_y + g_0_xxxxzz_0_xxxyyzz_1[i] * wp_y[i];
 
         g_0_xxxxyzz_0_xxxyzzz_0[i] = g_0_xxxxzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxxyzzz_0[i] * pb_y + g_0_xxxxzz_0_xxxyzzz_1[i] * wp_y[i];
 
         g_0_xxxxyzz_0_xxxzzzz_0[i] = g_0_xxxxzz_0_xxxzzzz_0[i] * pb_y + g_0_xxxxzz_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_xxyyyyy_0[i] =
-            5.0 * g_0_xxxxzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyyyyy_0[i] * pb_y + g_0_xxxxzz_0_xxyyyyy_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_xxyyyyy_0[i] = 5.0 * g_0_xxxxzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyyyyy_0[i] * pb_y + g_0_xxxxzz_0_xxyyyyy_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_xxyyyyz_0[i] =
-            4.0 * g_0_xxxxzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyyyyz_0[i] * pb_y + g_0_xxxxzz_0_xxyyyyz_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_xxyyyyz_0[i] = 4.0 * g_0_xxxxzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyyyyz_0[i] * pb_y + g_0_xxxxzz_0_xxyyyyz_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_xxyyyzz_0[i] =
-            3.0 * g_0_xxxxzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyyyzz_0[i] * pb_y + g_0_xxxxzz_0_xxyyyzz_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_xxyyyzz_0[i] = 3.0 * g_0_xxxxzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyyyzz_0[i] * pb_y + g_0_xxxxzz_0_xxyyyzz_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_xxyyzzz_0[i] =
-            2.0 * g_0_xxxxzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyyzzz_0[i] * pb_y + g_0_xxxxzz_0_xxyyzzz_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_xxyyzzz_0[i] = 2.0 * g_0_xxxxzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyyzzz_0[i] * pb_y + g_0_xxxxzz_0_xxyyzzz_1[i] * wp_y[i];
 
         g_0_xxxxyzz_0_xxyzzzz_0[i] = g_0_xxxxzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xxyzzzz_0[i] * pb_y + g_0_xxxxzz_0_xxyzzzz_1[i] * wp_y[i];
 
         g_0_xxxxyzz_0_xxzzzzz_0[i] = g_0_xxxxzz_0_xxzzzzz_0[i] * pb_y + g_0_xxxxzz_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_xyyyyyy_0[i] =
-            6.0 * g_0_xxxxzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyyyyy_0[i] * pb_y + g_0_xxxxzz_0_xyyyyyy_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_xyyyyyy_0[i] = 6.0 * g_0_xxxxzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyyyyy_0[i] * pb_y + g_0_xxxxzz_0_xyyyyyy_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_xyyyyyz_0[i] =
-            5.0 * g_0_xxxxzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyyyyz_0[i] * pb_y + g_0_xxxxzz_0_xyyyyyz_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_xyyyyyz_0[i] = 5.0 * g_0_xxxxzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyyyyz_0[i] * pb_y + g_0_xxxxzz_0_xyyyyyz_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_xyyyyzz_0[i] =
-            4.0 * g_0_xxxxzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyyyzz_0[i] * pb_y + g_0_xxxxzz_0_xyyyyzz_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_xyyyyzz_0[i] = 4.0 * g_0_xxxxzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyyyzz_0[i] * pb_y + g_0_xxxxzz_0_xyyyyzz_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_xyyyzzz_0[i] =
-            3.0 * g_0_xxxxzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyyzzz_0[i] * pb_y + g_0_xxxxzz_0_xyyyzzz_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_xyyyzzz_0[i] = 3.0 * g_0_xxxxzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyyzzz_0[i] * pb_y + g_0_xxxxzz_0_xyyyzzz_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_xyyzzzz_0[i] =
-            2.0 * g_0_xxxxzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyzzzz_0[i] * pb_y + g_0_xxxxzz_0_xyyzzzz_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_xyyzzzz_0[i] = 2.0 * g_0_xxxxzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyyzzzz_0[i] * pb_y + g_0_xxxxzz_0_xyyzzzz_1[i] * wp_y[i];
 
         g_0_xxxxyzz_0_xyzzzzz_0[i] = g_0_xxxxzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_xyzzzzz_0[i] * pb_y + g_0_xxxxzz_0_xyzzzzz_1[i] * wp_y[i];
 
         g_0_xxxxyzz_0_xzzzzzz_0[i] = g_0_xxxxzz_0_xzzzzzz_0[i] * pb_y + g_0_xxxxzz_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_yyyyyyy_0[i] =
-            7.0 * g_0_xxxxzz_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxxxzz_0_yyyyyyy_0[i] * pb_y + g_0_xxxxzz_0_yyyyyyy_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_yyyyyyy_0[i] = 7.0 * g_0_xxxxzz_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxxxzz_0_yyyyyyy_0[i] * pb_y + g_0_xxxxzz_0_yyyyyyy_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_yyyyyyz_0[i] =
-            6.0 * g_0_xxxxzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_yyyyyyz_0[i] * pb_y + g_0_xxxxzz_0_yyyyyyz_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_yyyyyyz_0[i] = 6.0 * g_0_xxxxzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_yyyyyyz_0[i] * pb_y + g_0_xxxxzz_0_yyyyyyz_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_yyyyyzz_0[i] =
-            5.0 * g_0_xxxxzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_yyyyyzz_0[i] * pb_y + g_0_xxxxzz_0_yyyyyzz_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_yyyyyzz_0[i] = 5.0 * g_0_xxxxzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_yyyyyzz_0[i] * pb_y + g_0_xxxxzz_0_yyyyyzz_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_yyyyzzz_0[i] =
-            4.0 * g_0_xxxxzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_yyyyzzz_0[i] * pb_y + g_0_xxxxzz_0_yyyyzzz_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_yyyyzzz_0[i] = 4.0 * g_0_xxxxzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_yyyyzzz_0[i] * pb_y + g_0_xxxxzz_0_yyyyzzz_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_yyyzzzz_0[i] =
-            3.0 * g_0_xxxxzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_yyyzzzz_0[i] * pb_y + g_0_xxxxzz_0_yyyzzzz_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_yyyzzzz_0[i] = 3.0 * g_0_xxxxzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_yyyzzzz_0[i] * pb_y + g_0_xxxxzz_0_yyyzzzz_1[i] * wp_y[i];
 
-        g_0_xxxxyzz_0_yyzzzzz_0[i] =
-            2.0 * g_0_xxxxzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_yyzzzzz_0[i] * pb_y + g_0_xxxxzz_0_yyzzzzz_1[i] * wp_y[i];
+        g_0_xxxxyzz_0_yyzzzzz_0[i] = 2.0 * g_0_xxxxzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_yyzzzzz_0[i] * pb_y + g_0_xxxxzz_0_yyzzzzz_1[i] * wp_y[i];
 
         g_0_xxxxyzz_0_yzzzzzz_0[i] = g_0_xxxxzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxxxzz_0_yzzzzzz_0[i] * pb_y + g_0_xxxxzz_0_yzzzzzz_1[i] * wp_y[i];
 
@@ -9061,211 +7246,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxxxzzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 359);
 
-#pragma omp simd aligned(g_0_xxxxz_0_xxxxxxx_0,       \
-                             g_0_xxxxz_0_xxxxxxx_1,   \
-                             g_0_xxxxz_0_xxxxxxy_0,   \
-                             g_0_xxxxz_0_xxxxxxy_1,   \
-                             g_0_xxxxz_0_xxxxxyy_0,   \
-                             g_0_xxxxz_0_xxxxxyy_1,   \
-                             g_0_xxxxz_0_xxxxyyy_0,   \
-                             g_0_xxxxz_0_xxxxyyy_1,   \
-                             g_0_xxxxz_0_xxxyyyy_0,   \
-                             g_0_xxxxz_0_xxxyyyy_1,   \
-                             g_0_xxxxz_0_xxyyyyy_0,   \
-                             g_0_xxxxz_0_xxyyyyy_1,   \
-                             g_0_xxxxz_0_xyyyyyy_0,   \
-                             g_0_xxxxz_0_xyyyyyy_1,   \
-                             g_0_xxxxzz_0_xxxxxxx_0,  \
-                             g_0_xxxxzz_0_xxxxxxx_1,  \
-                             g_0_xxxxzz_0_xxxxxxy_0,  \
-                             g_0_xxxxzz_0_xxxxxxy_1,  \
-                             g_0_xxxxzz_0_xxxxxyy_0,  \
-                             g_0_xxxxzz_0_xxxxxyy_1,  \
-                             g_0_xxxxzz_0_xxxxyyy_0,  \
-                             g_0_xxxxzz_0_xxxxyyy_1,  \
-                             g_0_xxxxzz_0_xxxyyyy_0,  \
-                             g_0_xxxxzz_0_xxxyyyy_1,  \
-                             g_0_xxxxzz_0_xxyyyyy_0,  \
-                             g_0_xxxxzz_0_xxyyyyy_1,  \
-                             g_0_xxxxzz_0_xyyyyyy_0,  \
-                             g_0_xxxxzz_0_xyyyyyy_1,  \
-                             g_0_xxxxzzz_0_xxxxxxx_0, \
-                             g_0_xxxxzzz_0_xxxxxxy_0, \
-                             g_0_xxxxzzz_0_xxxxxxz_0, \
-                             g_0_xxxxzzz_0_xxxxxyy_0, \
-                             g_0_xxxxzzz_0_xxxxxyz_0, \
-                             g_0_xxxxzzz_0_xxxxxzz_0, \
-                             g_0_xxxxzzz_0_xxxxyyy_0, \
-                             g_0_xxxxzzz_0_xxxxyyz_0, \
-                             g_0_xxxxzzz_0_xxxxyzz_0, \
-                             g_0_xxxxzzz_0_xxxxzzz_0, \
-                             g_0_xxxxzzz_0_xxxyyyy_0, \
-                             g_0_xxxxzzz_0_xxxyyyz_0, \
-                             g_0_xxxxzzz_0_xxxyyzz_0, \
-                             g_0_xxxxzzz_0_xxxyzzz_0, \
-                             g_0_xxxxzzz_0_xxxzzzz_0, \
-                             g_0_xxxxzzz_0_xxyyyyy_0, \
-                             g_0_xxxxzzz_0_xxyyyyz_0, \
-                             g_0_xxxxzzz_0_xxyyyzz_0, \
-                             g_0_xxxxzzz_0_xxyyzzz_0, \
-                             g_0_xxxxzzz_0_xxyzzzz_0, \
-                             g_0_xxxxzzz_0_xxzzzzz_0, \
-                             g_0_xxxxzzz_0_xyyyyyy_0, \
-                             g_0_xxxxzzz_0_xyyyyyz_0, \
-                             g_0_xxxxzzz_0_xyyyyzz_0, \
-                             g_0_xxxxzzz_0_xyyyzzz_0, \
-                             g_0_xxxxzzz_0_xyyzzzz_0, \
-                             g_0_xxxxzzz_0_xyzzzzz_0, \
-                             g_0_xxxxzzz_0_xzzzzzz_0, \
-                             g_0_xxxxzzz_0_yyyyyyy_0, \
-                             g_0_xxxxzzz_0_yyyyyyz_0, \
-                             g_0_xxxxzzz_0_yyyyyzz_0, \
-                             g_0_xxxxzzz_0_yyyyzzz_0, \
-                             g_0_xxxxzzz_0_yyyzzzz_0, \
-                             g_0_xxxxzzz_0_yyzzzzz_0, \
-                             g_0_xxxxzzz_0_yzzzzzz_0, \
-                             g_0_xxxxzzz_0_zzzzzzz_0, \
-                             g_0_xxxzzz_0_xxxxxxz_0,  \
-                             g_0_xxxzzz_0_xxxxxxz_1,  \
-                             g_0_xxxzzz_0_xxxxxyz_0,  \
-                             g_0_xxxzzz_0_xxxxxyz_1,  \
-                             g_0_xxxzzz_0_xxxxxz_1,   \
-                             g_0_xxxzzz_0_xxxxxzz_0,  \
-                             g_0_xxxzzz_0_xxxxxzz_1,  \
-                             g_0_xxxzzz_0_xxxxyyz_0,  \
-                             g_0_xxxzzz_0_xxxxyyz_1,  \
-                             g_0_xxxzzz_0_xxxxyz_1,   \
-                             g_0_xxxzzz_0_xxxxyzz_0,  \
-                             g_0_xxxzzz_0_xxxxyzz_1,  \
-                             g_0_xxxzzz_0_xxxxzz_1,   \
-                             g_0_xxxzzz_0_xxxxzzz_0,  \
-                             g_0_xxxzzz_0_xxxxzzz_1,  \
-                             g_0_xxxzzz_0_xxxyyyz_0,  \
-                             g_0_xxxzzz_0_xxxyyyz_1,  \
-                             g_0_xxxzzz_0_xxxyyz_1,   \
-                             g_0_xxxzzz_0_xxxyyzz_0,  \
-                             g_0_xxxzzz_0_xxxyyzz_1,  \
-                             g_0_xxxzzz_0_xxxyzz_1,   \
-                             g_0_xxxzzz_0_xxxyzzz_0,  \
-                             g_0_xxxzzz_0_xxxyzzz_1,  \
-                             g_0_xxxzzz_0_xxxzzz_1,   \
-                             g_0_xxxzzz_0_xxxzzzz_0,  \
-                             g_0_xxxzzz_0_xxxzzzz_1,  \
-                             g_0_xxxzzz_0_xxyyyyz_0,  \
-                             g_0_xxxzzz_0_xxyyyyz_1,  \
-                             g_0_xxxzzz_0_xxyyyz_1,   \
-                             g_0_xxxzzz_0_xxyyyzz_0,  \
-                             g_0_xxxzzz_0_xxyyyzz_1,  \
-                             g_0_xxxzzz_0_xxyyzz_1,   \
-                             g_0_xxxzzz_0_xxyyzzz_0,  \
-                             g_0_xxxzzz_0_xxyyzzz_1,  \
-                             g_0_xxxzzz_0_xxyzzz_1,   \
-                             g_0_xxxzzz_0_xxyzzzz_0,  \
-                             g_0_xxxzzz_0_xxyzzzz_1,  \
-                             g_0_xxxzzz_0_xxzzzz_1,   \
-                             g_0_xxxzzz_0_xxzzzzz_0,  \
-                             g_0_xxxzzz_0_xxzzzzz_1,  \
-                             g_0_xxxzzz_0_xyyyyyz_0,  \
-                             g_0_xxxzzz_0_xyyyyyz_1,  \
-                             g_0_xxxzzz_0_xyyyyz_1,   \
-                             g_0_xxxzzz_0_xyyyyzz_0,  \
-                             g_0_xxxzzz_0_xyyyyzz_1,  \
-                             g_0_xxxzzz_0_xyyyzz_1,   \
-                             g_0_xxxzzz_0_xyyyzzz_0,  \
-                             g_0_xxxzzz_0_xyyyzzz_1,  \
-                             g_0_xxxzzz_0_xyyzzz_1,   \
-                             g_0_xxxzzz_0_xyyzzzz_0,  \
-                             g_0_xxxzzz_0_xyyzzzz_1,  \
-                             g_0_xxxzzz_0_xyzzzz_1,   \
-                             g_0_xxxzzz_0_xyzzzzz_0,  \
-                             g_0_xxxzzz_0_xyzzzzz_1,  \
-                             g_0_xxxzzz_0_xzzzzz_1,   \
-                             g_0_xxxzzz_0_xzzzzzz_0,  \
-                             g_0_xxxzzz_0_xzzzzzz_1,  \
-                             g_0_xxxzzz_0_yyyyyyy_0,  \
-                             g_0_xxxzzz_0_yyyyyyy_1,  \
-                             g_0_xxxzzz_0_yyyyyyz_0,  \
-                             g_0_xxxzzz_0_yyyyyyz_1,  \
-                             g_0_xxxzzz_0_yyyyyz_1,   \
-                             g_0_xxxzzz_0_yyyyyzz_0,  \
-                             g_0_xxxzzz_0_yyyyyzz_1,  \
-                             g_0_xxxzzz_0_yyyyzz_1,   \
-                             g_0_xxxzzz_0_yyyyzzz_0,  \
-                             g_0_xxxzzz_0_yyyyzzz_1,  \
-                             g_0_xxxzzz_0_yyyzzz_1,   \
-                             g_0_xxxzzz_0_yyyzzzz_0,  \
-                             g_0_xxxzzz_0_yyyzzzz_1,  \
-                             g_0_xxxzzz_0_yyzzzz_1,   \
-                             g_0_xxxzzz_0_yyzzzzz_0,  \
-                             g_0_xxxzzz_0_yyzzzzz_1,  \
-                             g_0_xxxzzz_0_yzzzzz_1,   \
-                             g_0_xxxzzz_0_yzzzzzz_0,  \
-                             g_0_xxxzzz_0_yzzzzzz_1,  \
-                             g_0_xxxzzz_0_zzzzzz_1,   \
-                             g_0_xxxzzz_0_zzzzzzz_0,  \
-                             g_0_xxxzzz_0_zzzzzzz_1,  \
-                             g_0_xxzzz_0_xxxxxxz_0,   \
-                             g_0_xxzzz_0_xxxxxxz_1,   \
-                             g_0_xxzzz_0_xxxxxyz_0,   \
-                             g_0_xxzzz_0_xxxxxyz_1,   \
-                             g_0_xxzzz_0_xxxxxzz_0,   \
-                             g_0_xxzzz_0_xxxxxzz_1,   \
-                             g_0_xxzzz_0_xxxxyyz_0,   \
-                             g_0_xxzzz_0_xxxxyyz_1,   \
-                             g_0_xxzzz_0_xxxxyzz_0,   \
-                             g_0_xxzzz_0_xxxxyzz_1,   \
-                             g_0_xxzzz_0_xxxxzzz_0,   \
-                             g_0_xxzzz_0_xxxxzzz_1,   \
-                             g_0_xxzzz_0_xxxyyyz_0,   \
-                             g_0_xxzzz_0_xxxyyyz_1,   \
-                             g_0_xxzzz_0_xxxyyzz_0,   \
-                             g_0_xxzzz_0_xxxyyzz_1,   \
-                             g_0_xxzzz_0_xxxyzzz_0,   \
-                             g_0_xxzzz_0_xxxyzzz_1,   \
-                             g_0_xxzzz_0_xxxzzzz_0,   \
-                             g_0_xxzzz_0_xxxzzzz_1,   \
-                             g_0_xxzzz_0_xxyyyyz_0,   \
-                             g_0_xxzzz_0_xxyyyyz_1,   \
-                             g_0_xxzzz_0_xxyyyzz_0,   \
-                             g_0_xxzzz_0_xxyyyzz_1,   \
-                             g_0_xxzzz_0_xxyyzzz_0,   \
-                             g_0_xxzzz_0_xxyyzzz_1,   \
-                             g_0_xxzzz_0_xxyzzzz_0,   \
-                             g_0_xxzzz_0_xxyzzzz_1,   \
-                             g_0_xxzzz_0_xxzzzzz_0,   \
-                             g_0_xxzzz_0_xxzzzzz_1,   \
-                             g_0_xxzzz_0_xyyyyyz_0,   \
-                             g_0_xxzzz_0_xyyyyyz_1,   \
-                             g_0_xxzzz_0_xyyyyzz_0,   \
-                             g_0_xxzzz_0_xyyyyzz_1,   \
-                             g_0_xxzzz_0_xyyyzzz_0,   \
-                             g_0_xxzzz_0_xyyyzzz_1,   \
-                             g_0_xxzzz_0_xyyzzzz_0,   \
-                             g_0_xxzzz_0_xyyzzzz_1,   \
-                             g_0_xxzzz_0_xyzzzzz_0,   \
-                             g_0_xxzzz_0_xyzzzzz_1,   \
-                             g_0_xxzzz_0_xzzzzzz_0,   \
-                             g_0_xxzzz_0_xzzzzzz_1,   \
-                             g_0_xxzzz_0_yyyyyyy_0,   \
-                             g_0_xxzzz_0_yyyyyyy_1,   \
-                             g_0_xxzzz_0_yyyyyyz_0,   \
-                             g_0_xxzzz_0_yyyyyyz_1,   \
-                             g_0_xxzzz_0_yyyyyzz_0,   \
-                             g_0_xxzzz_0_yyyyyzz_1,   \
-                             g_0_xxzzz_0_yyyyzzz_0,   \
-                             g_0_xxzzz_0_yyyyzzz_1,   \
-                             g_0_xxzzz_0_yyyzzzz_0,   \
-                             g_0_xxzzz_0_yyyzzzz_1,   \
-                             g_0_xxzzz_0_yyzzzzz_0,   \
-                             g_0_xxzzz_0_yyzzzzz_1,   \
-                             g_0_xxzzz_0_yzzzzzz_0,   \
-                             g_0_xxzzz_0_yzzzzzz_1,   \
-                             g_0_xxzzz_0_zzzzzzz_0,   \
-                             g_0_xxzzz_0_zzzzzzz_1,   \
-                             wp_x,                    \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxxxz_0_xxxxxxx_0, g_0_xxxxz_0_xxxxxxx_1, g_0_xxxxz_0_xxxxxxy_0, g_0_xxxxz_0_xxxxxxy_1, g_0_xxxxz_0_xxxxxyy_0, g_0_xxxxz_0_xxxxxyy_1, g_0_xxxxz_0_xxxxyyy_0, g_0_xxxxz_0_xxxxyyy_1, g_0_xxxxz_0_xxxyyyy_0, g_0_xxxxz_0_xxxyyyy_1, g_0_xxxxz_0_xxyyyyy_0, g_0_xxxxz_0_xxyyyyy_1, g_0_xxxxz_0_xyyyyyy_0, g_0_xxxxz_0_xyyyyyy_1, g_0_xxxxzz_0_xxxxxxx_0, g_0_xxxxzz_0_xxxxxxx_1, g_0_xxxxzz_0_xxxxxxy_0, g_0_xxxxzz_0_xxxxxxy_1, g_0_xxxxzz_0_xxxxxyy_0, g_0_xxxxzz_0_xxxxxyy_1, g_0_xxxxzz_0_xxxxyyy_0, g_0_xxxxzz_0_xxxxyyy_1, g_0_xxxxzz_0_xxxyyyy_0, g_0_xxxxzz_0_xxxyyyy_1, g_0_xxxxzz_0_xxyyyyy_0, g_0_xxxxzz_0_xxyyyyy_1, g_0_xxxxzz_0_xyyyyyy_0, g_0_xxxxzz_0_xyyyyyy_1, g_0_xxxxzzz_0_xxxxxxx_0, g_0_xxxxzzz_0_xxxxxxy_0, g_0_xxxxzzz_0_xxxxxxz_0, g_0_xxxxzzz_0_xxxxxyy_0, g_0_xxxxzzz_0_xxxxxyz_0, g_0_xxxxzzz_0_xxxxxzz_0, g_0_xxxxzzz_0_xxxxyyy_0, g_0_xxxxzzz_0_xxxxyyz_0, g_0_xxxxzzz_0_xxxxyzz_0, g_0_xxxxzzz_0_xxxxzzz_0, g_0_xxxxzzz_0_xxxyyyy_0, g_0_xxxxzzz_0_xxxyyyz_0, g_0_xxxxzzz_0_xxxyyzz_0, g_0_xxxxzzz_0_xxxyzzz_0, g_0_xxxxzzz_0_xxxzzzz_0, g_0_xxxxzzz_0_xxyyyyy_0, g_0_xxxxzzz_0_xxyyyyz_0, g_0_xxxxzzz_0_xxyyyzz_0, g_0_xxxxzzz_0_xxyyzzz_0, g_0_xxxxzzz_0_xxyzzzz_0, g_0_xxxxzzz_0_xxzzzzz_0, g_0_xxxxzzz_0_xyyyyyy_0, g_0_xxxxzzz_0_xyyyyyz_0, g_0_xxxxzzz_0_xyyyyzz_0, g_0_xxxxzzz_0_xyyyzzz_0, g_0_xxxxzzz_0_xyyzzzz_0, g_0_xxxxzzz_0_xyzzzzz_0, g_0_xxxxzzz_0_xzzzzzz_0, g_0_xxxxzzz_0_yyyyyyy_0, g_0_xxxxzzz_0_yyyyyyz_0, g_0_xxxxzzz_0_yyyyyzz_0, g_0_xxxxzzz_0_yyyyzzz_0, g_0_xxxxzzz_0_yyyzzzz_0, g_0_xxxxzzz_0_yyzzzzz_0, g_0_xxxxzzz_0_yzzzzzz_0, g_0_xxxxzzz_0_zzzzzzz_0, g_0_xxxzzz_0_xxxxxxz_0, g_0_xxxzzz_0_xxxxxxz_1, g_0_xxxzzz_0_xxxxxyz_0, g_0_xxxzzz_0_xxxxxyz_1, g_0_xxxzzz_0_xxxxxz_1, g_0_xxxzzz_0_xxxxxzz_0, g_0_xxxzzz_0_xxxxxzz_1, g_0_xxxzzz_0_xxxxyyz_0, g_0_xxxzzz_0_xxxxyyz_1, g_0_xxxzzz_0_xxxxyz_1, g_0_xxxzzz_0_xxxxyzz_0, g_0_xxxzzz_0_xxxxyzz_1, g_0_xxxzzz_0_xxxxzz_1, g_0_xxxzzz_0_xxxxzzz_0, g_0_xxxzzz_0_xxxxzzz_1, g_0_xxxzzz_0_xxxyyyz_0, g_0_xxxzzz_0_xxxyyyz_1, g_0_xxxzzz_0_xxxyyz_1, g_0_xxxzzz_0_xxxyyzz_0, g_0_xxxzzz_0_xxxyyzz_1, g_0_xxxzzz_0_xxxyzz_1, g_0_xxxzzz_0_xxxyzzz_0, g_0_xxxzzz_0_xxxyzzz_1, g_0_xxxzzz_0_xxxzzz_1, g_0_xxxzzz_0_xxxzzzz_0, g_0_xxxzzz_0_xxxzzzz_1, g_0_xxxzzz_0_xxyyyyz_0, g_0_xxxzzz_0_xxyyyyz_1, g_0_xxxzzz_0_xxyyyz_1, g_0_xxxzzz_0_xxyyyzz_0, g_0_xxxzzz_0_xxyyyzz_1, g_0_xxxzzz_0_xxyyzz_1, g_0_xxxzzz_0_xxyyzzz_0, g_0_xxxzzz_0_xxyyzzz_1, g_0_xxxzzz_0_xxyzzz_1, g_0_xxxzzz_0_xxyzzzz_0, g_0_xxxzzz_0_xxyzzzz_1, g_0_xxxzzz_0_xxzzzz_1, g_0_xxxzzz_0_xxzzzzz_0, g_0_xxxzzz_0_xxzzzzz_1, g_0_xxxzzz_0_xyyyyyz_0, g_0_xxxzzz_0_xyyyyyz_1, g_0_xxxzzz_0_xyyyyz_1, g_0_xxxzzz_0_xyyyyzz_0, g_0_xxxzzz_0_xyyyyzz_1, g_0_xxxzzz_0_xyyyzz_1, g_0_xxxzzz_0_xyyyzzz_0, g_0_xxxzzz_0_xyyyzzz_1, g_0_xxxzzz_0_xyyzzz_1, g_0_xxxzzz_0_xyyzzzz_0, g_0_xxxzzz_0_xyyzzzz_1, g_0_xxxzzz_0_xyzzzz_1, g_0_xxxzzz_0_xyzzzzz_0, g_0_xxxzzz_0_xyzzzzz_1, g_0_xxxzzz_0_xzzzzz_1, g_0_xxxzzz_0_xzzzzzz_0, g_0_xxxzzz_0_xzzzzzz_1, g_0_xxxzzz_0_yyyyyyy_0, g_0_xxxzzz_0_yyyyyyy_1, g_0_xxxzzz_0_yyyyyyz_0, g_0_xxxzzz_0_yyyyyyz_1, g_0_xxxzzz_0_yyyyyz_1, g_0_xxxzzz_0_yyyyyzz_0, g_0_xxxzzz_0_yyyyyzz_1, g_0_xxxzzz_0_yyyyzz_1, g_0_xxxzzz_0_yyyyzzz_0, g_0_xxxzzz_0_yyyyzzz_1, g_0_xxxzzz_0_yyyzzz_1, g_0_xxxzzz_0_yyyzzzz_0, g_0_xxxzzz_0_yyyzzzz_1, g_0_xxxzzz_0_yyzzzz_1, g_0_xxxzzz_0_yyzzzzz_0, g_0_xxxzzz_0_yyzzzzz_1, g_0_xxxzzz_0_yzzzzz_1, g_0_xxxzzz_0_yzzzzzz_0, g_0_xxxzzz_0_yzzzzzz_1, g_0_xxxzzz_0_zzzzzz_1, g_0_xxxzzz_0_zzzzzzz_0, g_0_xxxzzz_0_zzzzzzz_1, g_0_xxzzz_0_xxxxxxz_0, g_0_xxzzz_0_xxxxxxz_1, g_0_xxzzz_0_xxxxxyz_0, g_0_xxzzz_0_xxxxxyz_1, g_0_xxzzz_0_xxxxxzz_0, g_0_xxzzz_0_xxxxxzz_1, g_0_xxzzz_0_xxxxyyz_0, g_0_xxzzz_0_xxxxyyz_1, g_0_xxzzz_0_xxxxyzz_0, g_0_xxzzz_0_xxxxyzz_1, g_0_xxzzz_0_xxxxzzz_0, g_0_xxzzz_0_xxxxzzz_1, g_0_xxzzz_0_xxxyyyz_0, g_0_xxzzz_0_xxxyyyz_1, g_0_xxzzz_0_xxxyyzz_0, g_0_xxzzz_0_xxxyyzz_1, g_0_xxzzz_0_xxxyzzz_0, g_0_xxzzz_0_xxxyzzz_1, g_0_xxzzz_0_xxxzzzz_0, g_0_xxzzz_0_xxxzzzz_1, g_0_xxzzz_0_xxyyyyz_0, g_0_xxzzz_0_xxyyyyz_1, g_0_xxzzz_0_xxyyyzz_0, g_0_xxzzz_0_xxyyyzz_1, g_0_xxzzz_0_xxyyzzz_0, g_0_xxzzz_0_xxyyzzz_1, g_0_xxzzz_0_xxyzzzz_0, g_0_xxzzz_0_xxyzzzz_1, g_0_xxzzz_0_xxzzzzz_0, g_0_xxzzz_0_xxzzzzz_1, g_0_xxzzz_0_xyyyyyz_0, g_0_xxzzz_0_xyyyyyz_1, g_0_xxzzz_0_xyyyyzz_0, g_0_xxzzz_0_xyyyyzz_1, g_0_xxzzz_0_xyyyzzz_0, g_0_xxzzz_0_xyyyzzz_1, g_0_xxzzz_0_xyyzzzz_0, g_0_xxzzz_0_xyyzzzz_1, g_0_xxzzz_0_xyzzzzz_0, g_0_xxzzz_0_xyzzzzz_1, g_0_xxzzz_0_xzzzzzz_0, g_0_xxzzz_0_xzzzzzz_1, g_0_xxzzz_0_yyyyyyy_0, g_0_xxzzz_0_yyyyyyy_1, g_0_xxzzz_0_yyyyyyz_0, g_0_xxzzz_0_yyyyyyz_1, g_0_xxzzz_0_yyyyyzz_0, g_0_xxzzz_0_yyyyyzz_1, g_0_xxzzz_0_yyyyzzz_0, g_0_xxzzz_0_yyyyzzz_1, g_0_xxzzz_0_yyyzzzz_0, g_0_xxzzz_0_yyyzzzz_1, g_0_xxzzz_0_yyzzzzz_0, g_0_xxzzz_0_yyzzzzz_1, g_0_xxzzz_0_yzzzzzz_0, g_0_xxzzz_0_yzzzzzz_1, g_0_xxzzz_0_zzzzzzz_0, g_0_xxzzz_0_zzzzzzz_1, wp_x, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -9274,128 +7255,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxxxzzz_0_xxxxxxx_0[i] = 2.0 * g_0_xxxxz_0_xxxxxxx_0[i] * fi_ab_0 - 2.0 * g_0_xxxxz_0_xxxxxxx_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_xxxxxxx_0[i] * pb_z + g_0_xxxxzz_0_xxxxxxx_1[i] * wp_z[i];
+        g_0_xxxxzzz_0_xxxxxxx_0[i] = 2.0 * g_0_xxxxz_0_xxxxxxx_0[i] * fi_ab_0 - 2.0 * g_0_xxxxz_0_xxxxxxx_1[i] * fti_ab_0 + g_0_xxxxzz_0_xxxxxxx_0[i] * pb_z + g_0_xxxxzz_0_xxxxxxx_1[i] * wp_z[i];
 
-        g_0_xxxxzzz_0_xxxxxxy_0[i] = 2.0 * g_0_xxxxz_0_xxxxxxy_0[i] * fi_ab_0 - 2.0 * g_0_xxxxz_0_xxxxxxy_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_xxxxxxy_0[i] * pb_z + g_0_xxxxzz_0_xxxxxxy_1[i] * wp_z[i];
+        g_0_xxxxzzz_0_xxxxxxy_0[i] = 2.0 * g_0_xxxxz_0_xxxxxxy_0[i] * fi_ab_0 - 2.0 * g_0_xxxxz_0_xxxxxxy_1[i] * fti_ab_0 + g_0_xxxxzz_0_xxxxxxy_0[i] * pb_z + g_0_xxxxzz_0_xxxxxxy_1[i] * wp_z[i];
 
-        g_0_xxxxzzz_0_xxxxxxz_0[i] = 3.0 * g_0_xxzzz_0_xxxxxxz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxxxxz_1[i] * fti_ab_0 +
-                                     6.0 * g_0_xxxzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxxxz_0[i] * pb_x +
-                                     g_0_xxxzzz_0_xxxxxxz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xxxxxxz_0[i] = 3.0 * g_0_xxzzz_0_xxxxxxz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxxxxz_1[i] * fti_ab_0 + 6.0 * g_0_xxxzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxxxz_0[i] * pb_x + g_0_xxxzzz_0_xxxxxxz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xxxxxyy_0[i] = 2.0 * g_0_xxxxz_0_xxxxxyy_0[i] * fi_ab_0 - 2.0 * g_0_xxxxz_0_xxxxxyy_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_xxxxxyy_0[i] * pb_z + g_0_xxxxzz_0_xxxxxyy_1[i] * wp_z[i];
+        g_0_xxxxzzz_0_xxxxxyy_0[i] = 2.0 * g_0_xxxxz_0_xxxxxyy_0[i] * fi_ab_0 - 2.0 * g_0_xxxxz_0_xxxxxyy_1[i] * fti_ab_0 + g_0_xxxxzz_0_xxxxxyy_0[i] * pb_z + g_0_xxxxzz_0_xxxxxyy_1[i] * wp_z[i];
 
-        g_0_xxxxzzz_0_xxxxxyz_0[i] = 3.0 * g_0_xxzzz_0_xxxxxyz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xxxzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxxyz_0[i] * pb_x +
-                                     g_0_xxxzzz_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xxxxxyz_0[i] = 3.0 * g_0_xxzzz_0_xxxxxyz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxxxyz_1[i] * fti_ab_0 + 5.0 * g_0_xxxzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxxyz_0[i] * pb_x + g_0_xxxzzz_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xxxxxzz_0[i] = 3.0 * g_0_xxzzz_0_xxxxxzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxxxzz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xxxzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxxzz_0[i] * pb_x +
-                                     g_0_xxxzzz_0_xxxxxzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xxxxxzz_0[i] = 3.0 * g_0_xxzzz_0_xxxxxzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxxxzz_1[i] * fti_ab_0 + 5.0 * g_0_xxxzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxxzz_0[i] * pb_x + g_0_xxxzzz_0_xxxxxzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xxxxyyy_0[i] = 2.0 * g_0_xxxxz_0_xxxxyyy_0[i] * fi_ab_0 - 2.0 * g_0_xxxxz_0_xxxxyyy_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_xxxxyyy_0[i] * pb_z + g_0_xxxxzz_0_xxxxyyy_1[i] * wp_z[i];
+        g_0_xxxxzzz_0_xxxxyyy_0[i] = 2.0 * g_0_xxxxz_0_xxxxyyy_0[i] * fi_ab_0 - 2.0 * g_0_xxxxz_0_xxxxyyy_1[i] * fti_ab_0 + g_0_xxxxzz_0_xxxxyyy_0[i] * pb_z + g_0_xxxxzz_0_xxxxyyy_1[i] * wp_z[i];
 
-        g_0_xxxxzzz_0_xxxxyyz_0[i] = 3.0 * g_0_xxzzz_0_xxxxyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxxzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxyyz_0[i] * pb_x +
-                                     g_0_xxxzzz_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xxxxyyz_0[i] = 3.0 * g_0_xxzzz_0_xxxxyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxxyyz_1[i] * fti_ab_0 + 4.0 * g_0_xxxzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxyyz_0[i] * pb_x + g_0_xxxzzz_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xxxxyzz_0[i] = 3.0 * g_0_xxzzz_0_xxxxyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxxzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxyzz_0[i] * pb_x +
-                                     g_0_xxxzzz_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xxxxyzz_0[i] = 3.0 * g_0_xxzzz_0_xxxxyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxxyzz_1[i] * fti_ab_0 + 4.0 * g_0_xxxzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxyzz_0[i] * pb_x + g_0_xxxzzz_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xxxxzzz_0[i] = 3.0 * g_0_xxzzz_0_xxxxzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxxzzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxxzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxzzz_0[i] * pb_x +
-                                     g_0_xxxzzz_0_xxxxzzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xxxxzzz_0[i] = 3.0 * g_0_xxzzz_0_xxxxzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxxzzz_1[i] * fti_ab_0 + 4.0 * g_0_xxxzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxzzz_0[i] * pb_x + g_0_xxxzzz_0_xxxxzzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xxxyyyy_0[i] = 2.0 * g_0_xxxxz_0_xxxyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xxxxz_0_xxxyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_xxxyyyy_0[i] * pb_z + g_0_xxxxzz_0_xxxyyyy_1[i] * wp_z[i];
+        g_0_xxxxzzz_0_xxxyyyy_0[i] = 2.0 * g_0_xxxxz_0_xxxyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xxxxz_0_xxxyyyy_1[i] * fti_ab_0 + g_0_xxxxzz_0_xxxyyyy_0[i] * pb_z + g_0_xxxxzz_0_xxxyyyy_1[i] * wp_z[i];
 
-        g_0_xxxxzzz_0_xxxyyyz_0[i] = 3.0 * g_0_xxzzz_0_xxxyyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxyyyz_0[i] * pb_x +
-                                     g_0_xxxzzz_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xxxyyyz_0[i] = 3.0 * g_0_xxzzz_0_xxxyyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_xxxzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxyyyz_0[i] * pb_x + g_0_xxxzzz_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xxxyyzz_0[i] = 3.0 * g_0_xxzzz_0_xxxyyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxyyzz_0[i] * pb_x +
-                                     g_0_xxxzzz_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xxxyyzz_0[i] = 3.0 * g_0_xxzzz_0_xxxyyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxyyzz_1[i] * fti_ab_0 + 3.0 * g_0_xxxzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxyyzz_0[i] * pb_x + g_0_xxxzzz_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xxxyzzz_0[i] = 3.0 * g_0_xxzzz_0_xxxyzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxyzzz_0[i] * pb_x +
-                                     g_0_xxxzzz_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xxxyzzz_0[i] = 3.0 * g_0_xxzzz_0_xxxyzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxyzzz_1[i] * fti_ab_0 + 3.0 * g_0_xxxzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxyzzz_0[i] * pb_x + g_0_xxxzzz_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xxxzzzz_0[i] = 3.0 * g_0_xxzzz_0_xxxzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxzzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxxzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxzzzz_0[i] * pb_x +
-                                     g_0_xxxzzz_0_xxxzzzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xxxzzzz_0[i] = 3.0 * g_0_xxzzz_0_xxxzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxxzzzz_1[i] * fti_ab_0 + 3.0 * g_0_xxxzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxzzzz_0[i] * pb_x + g_0_xxxzzz_0_xxxzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xxyyyyy_0[i] = 2.0 * g_0_xxxxz_0_xxyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xxxxz_0_xxyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_xxyyyyy_0[i] * pb_z + g_0_xxxxzz_0_xxyyyyy_1[i] * wp_z[i];
+        g_0_xxxxzzz_0_xxyyyyy_0[i] = 2.0 * g_0_xxxxz_0_xxyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xxxxz_0_xxyyyyy_1[i] * fti_ab_0 + g_0_xxxxzz_0_xxyyyyy_0[i] * pb_z + g_0_xxxxzz_0_xxyyyyy_1[i] * wp_z[i];
 
-        g_0_xxxxzzz_0_xxyyyyz_0[i] = 3.0 * g_0_xxzzz_0_xxyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyyyyz_0[i] * pb_x +
-                                     g_0_xxxzzz_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xxyyyyz_0[i] = 3.0 * g_0_xxzzz_0_xxyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxyyyyz_1[i] * fti_ab_0 + 2.0 * g_0_xxxzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyyyyz_0[i] * pb_x + g_0_xxxzzz_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xxyyyzz_0[i] = 3.0 * g_0_xxzzz_0_xxyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyyyzz_0[i] * pb_x +
-                                     g_0_xxxzzz_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xxyyyzz_0[i] = 3.0 * g_0_xxzzz_0_xxyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxyyyzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyyyzz_0[i] * pb_x + g_0_xxxzzz_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xxyyzzz_0[i] = 3.0 * g_0_xxzzz_0_xxyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyyzzz_0[i] * pb_x +
-                                     g_0_xxxzzz_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xxyyzzz_0[i] = 3.0 * g_0_xxzzz_0_xxyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyyzzz_0[i] * pb_x + g_0_xxxzzz_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xxyzzzz_0[i] = 3.0 * g_0_xxzzz_0_xxyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyzzzz_0[i] * pb_x +
-                                     g_0_xxxzzz_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xxyzzzz_0[i] = 3.0 * g_0_xxzzz_0_xxyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyzzzz_0[i] * pb_x + g_0_xxxzzz_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xxzzzzz_0[i] = 3.0 * g_0_xxzzz_0_xxzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxzzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxxzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxzzzzz_0[i] * pb_x +
-                                     g_0_xxxzzz_0_xxzzzzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xxzzzzz_0[i] = 3.0 * g_0_xxzzz_0_xxzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xxzzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxxzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxzzzzz_0[i] * pb_x + g_0_xxxzzz_0_xxzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xyyyyyy_0[i] = 2.0 * g_0_xxxxz_0_xyyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xxxxz_0_xyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxxxzz_0_xyyyyyy_0[i] * pb_z + g_0_xxxxzz_0_xyyyyyy_1[i] * wp_z[i];
+        g_0_xxxxzzz_0_xyyyyyy_0[i] = 2.0 * g_0_xxxxz_0_xyyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xxxxz_0_xyyyyyy_1[i] * fti_ab_0 + g_0_xxxxzz_0_xyyyyyy_0[i] * pb_z + g_0_xxxxzz_0_xyyyyyy_1[i] * wp_z[i];
 
-        g_0_xxxxzzz_0_xyyyyyz_0[i] = 3.0 * g_0_xxzzz_0_xyyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyyyyz_0[i] * pb_x + g_0_xxxzzz_0_xyyyyyz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xyyyyyz_0[i] = 3.0 * g_0_xxzzz_0_xyyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xyyyyyz_1[i] * fti_ab_0 + g_0_xxxzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyyyyz_0[i] * pb_x + g_0_xxxzzz_0_xyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xyyyyzz_0[i] = 3.0 * g_0_xxzzz_0_xyyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xyyyyzz_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyyyzz_0[i] * pb_x + g_0_xxxzzz_0_xyyyyzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xyyyyzz_0[i] = 3.0 * g_0_xxzzz_0_xyyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xyyyyzz_1[i] * fti_ab_0 + g_0_xxxzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyyyzz_0[i] * pb_x + g_0_xxxzzz_0_xyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xyyyzzz_0[i] = 3.0 * g_0_xxzzz_0_xyyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xyyyzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyyzzz_0[i] * pb_x + g_0_xxxzzz_0_xyyyzzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xyyyzzz_0[i] = 3.0 * g_0_xxzzz_0_xyyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xyyyzzz_1[i] * fti_ab_0 + g_0_xxxzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyyzzz_0[i] * pb_x + g_0_xxxzzz_0_xyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xyyzzzz_0[i] = 3.0 * g_0_xxzzz_0_xyyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xyyzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyzzzz_0[i] * pb_x + g_0_xxxzzz_0_xyyzzzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xyyzzzz_0[i] = 3.0 * g_0_xxzzz_0_xyyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xyyzzzz_1[i] * fti_ab_0 + g_0_xxxzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyzzzz_0[i] * pb_x + g_0_xxxzzz_0_xyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xyzzzzz_0[i] = 3.0 * g_0_xxzzz_0_xyzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyzzzzz_0[i] * pb_x + g_0_xxxzzz_0_xyzzzzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xyzzzzz_0[i] = 3.0 * g_0_xxzzz_0_xyzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xyzzzzz_1[i] * fti_ab_0 + g_0_xxxzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyzzzzz_0[i] * pb_x + g_0_xxxzzz_0_xyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_xzzzzzz_0[i] = 3.0 * g_0_xxzzz_0_xzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xzzzzzz_0[i] * pb_x + g_0_xxxzzz_0_xzzzzzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_xzzzzzz_0[i] = 3.0 * g_0_xxzzz_0_xzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_xzzzzzz_1[i] * fti_ab_0 + g_0_xxxzzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xzzzzzz_0[i] * pb_x + g_0_xxxzzz_0_xzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_yyyyyyy_0[i] = 3.0 * g_0_xxzzz_0_yyyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_yyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_yyyyyyy_0[i] * pb_x + g_0_xxxzzz_0_yyyyyyy_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_yyyyyyy_0[i] = 3.0 * g_0_xxzzz_0_yyyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_yyyyyyy_1[i] * fti_ab_0 + g_0_xxxzzz_0_yyyyyyy_0[i] * pb_x + g_0_xxxzzz_0_yyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_yyyyyyz_0[i] = 3.0 * g_0_xxzzz_0_yyyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_yyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_yyyyyyz_0[i] * pb_x + g_0_xxxzzz_0_yyyyyyz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_yyyyyyz_0[i] = 3.0 * g_0_xxzzz_0_yyyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_yyyyyyz_1[i] * fti_ab_0 + g_0_xxxzzz_0_yyyyyyz_0[i] * pb_x + g_0_xxxzzz_0_yyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_yyyyyzz_0[i] = 3.0 * g_0_xxzzz_0_yyyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_yyyyyzz_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_yyyyyzz_0[i] * pb_x + g_0_xxxzzz_0_yyyyyzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_yyyyyzz_0[i] = 3.0 * g_0_xxzzz_0_yyyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_yyyyyzz_1[i] * fti_ab_0 + g_0_xxxzzz_0_yyyyyzz_0[i] * pb_x + g_0_xxxzzz_0_yyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_yyyyzzz_0[i] = 3.0 * g_0_xxzzz_0_yyyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_yyyyzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_yyyyzzz_0[i] * pb_x + g_0_xxxzzz_0_yyyyzzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_yyyyzzz_0[i] = 3.0 * g_0_xxzzz_0_yyyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_yyyyzzz_1[i] * fti_ab_0 + g_0_xxxzzz_0_yyyyzzz_0[i] * pb_x + g_0_xxxzzz_0_yyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_yyyzzzz_0[i] = 3.0 * g_0_xxzzz_0_yyyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_yyyzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_yyyzzzz_0[i] * pb_x + g_0_xxxzzz_0_yyyzzzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_yyyzzzz_0[i] = 3.0 * g_0_xxzzz_0_yyyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_yyyzzzz_1[i] * fti_ab_0 + g_0_xxxzzz_0_yyyzzzz_0[i] * pb_x + g_0_xxxzzz_0_yyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_yyzzzzz_0[i] = 3.0 * g_0_xxzzz_0_yyzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_yyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_yyzzzzz_0[i] * pb_x + g_0_xxxzzz_0_yyzzzzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_yyzzzzz_0[i] = 3.0 * g_0_xxzzz_0_yyzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_yyzzzzz_1[i] * fti_ab_0 + g_0_xxxzzz_0_yyzzzzz_0[i] * pb_x + g_0_xxxzzz_0_yyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_yzzzzzz_0[i] = 3.0 * g_0_xxzzz_0_yzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_yzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_yzzzzzz_0[i] * pb_x + g_0_xxxzzz_0_yzzzzzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_yzzzzzz_0[i] = 3.0 * g_0_xxzzz_0_yzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_yzzzzzz_1[i] * fti_ab_0 + g_0_xxxzzz_0_yzzzzzz_0[i] * pb_x + g_0_xxxzzz_0_yzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxxzzz_0_zzzzzzz_0[i] = 3.0 * g_0_xxzzz_0_zzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_zzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_zzzzzzz_0[i] * pb_x + g_0_xxxzzz_0_zzzzzzz_1[i] * wp_x[i];
+        g_0_xxxxzzz_0_zzzzzzz_0[i] = 3.0 * g_0_xxzzz_0_zzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzzz_0_zzzzzzz_1[i] * fti_ab_0 + g_0_xxxzzz_0_zzzzzzz_0[i] * pb_x + g_0_xxxzzz_0_zzzzzzz_1[i] * wp_x[i];
     }
 
     /// Set up 360-396 components of targeted buffer : SKSK
@@ -9472,211 +7402,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxxyyyy_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 395);
 
-#pragma omp simd aligned(g_0_xxxyy_0_xxxxxxx_0,       \
-                             g_0_xxxyy_0_xxxxxxx_1,   \
-                             g_0_xxxyy_0_xxxxxxz_0,   \
-                             g_0_xxxyy_0_xxxxxxz_1,   \
-                             g_0_xxxyy_0_xxxxxzz_0,   \
-                             g_0_xxxyy_0_xxxxxzz_1,   \
-                             g_0_xxxyy_0_xxxxzzz_0,   \
-                             g_0_xxxyy_0_xxxxzzz_1,   \
-                             g_0_xxxyy_0_xxxzzzz_0,   \
-                             g_0_xxxyy_0_xxxzzzz_1,   \
-                             g_0_xxxyy_0_xxzzzzz_0,   \
-                             g_0_xxxyy_0_xxzzzzz_1,   \
-                             g_0_xxxyy_0_xzzzzzz_0,   \
-                             g_0_xxxyy_0_xzzzzzz_1,   \
-                             g_0_xxxyyy_0_xxxxxxx_0,  \
-                             g_0_xxxyyy_0_xxxxxxx_1,  \
-                             g_0_xxxyyy_0_xxxxxxz_0,  \
-                             g_0_xxxyyy_0_xxxxxxz_1,  \
-                             g_0_xxxyyy_0_xxxxxzz_0,  \
-                             g_0_xxxyyy_0_xxxxxzz_1,  \
-                             g_0_xxxyyy_0_xxxxzzz_0,  \
-                             g_0_xxxyyy_0_xxxxzzz_1,  \
-                             g_0_xxxyyy_0_xxxzzzz_0,  \
-                             g_0_xxxyyy_0_xxxzzzz_1,  \
-                             g_0_xxxyyy_0_xxzzzzz_0,  \
-                             g_0_xxxyyy_0_xxzzzzz_1,  \
-                             g_0_xxxyyy_0_xzzzzzz_0,  \
-                             g_0_xxxyyy_0_xzzzzzz_1,  \
-                             g_0_xxxyyyy_0_xxxxxxx_0, \
-                             g_0_xxxyyyy_0_xxxxxxy_0, \
-                             g_0_xxxyyyy_0_xxxxxxz_0, \
-                             g_0_xxxyyyy_0_xxxxxyy_0, \
-                             g_0_xxxyyyy_0_xxxxxyz_0, \
-                             g_0_xxxyyyy_0_xxxxxzz_0, \
-                             g_0_xxxyyyy_0_xxxxyyy_0, \
-                             g_0_xxxyyyy_0_xxxxyyz_0, \
-                             g_0_xxxyyyy_0_xxxxyzz_0, \
-                             g_0_xxxyyyy_0_xxxxzzz_0, \
-                             g_0_xxxyyyy_0_xxxyyyy_0, \
-                             g_0_xxxyyyy_0_xxxyyyz_0, \
-                             g_0_xxxyyyy_0_xxxyyzz_0, \
-                             g_0_xxxyyyy_0_xxxyzzz_0, \
-                             g_0_xxxyyyy_0_xxxzzzz_0, \
-                             g_0_xxxyyyy_0_xxyyyyy_0, \
-                             g_0_xxxyyyy_0_xxyyyyz_0, \
-                             g_0_xxxyyyy_0_xxyyyzz_0, \
-                             g_0_xxxyyyy_0_xxyyzzz_0, \
-                             g_0_xxxyyyy_0_xxyzzzz_0, \
-                             g_0_xxxyyyy_0_xxzzzzz_0, \
-                             g_0_xxxyyyy_0_xyyyyyy_0, \
-                             g_0_xxxyyyy_0_xyyyyyz_0, \
-                             g_0_xxxyyyy_0_xyyyyzz_0, \
-                             g_0_xxxyyyy_0_xyyyzzz_0, \
-                             g_0_xxxyyyy_0_xyyzzzz_0, \
-                             g_0_xxxyyyy_0_xyzzzzz_0, \
-                             g_0_xxxyyyy_0_xzzzzzz_0, \
-                             g_0_xxxyyyy_0_yyyyyyy_0, \
-                             g_0_xxxyyyy_0_yyyyyyz_0, \
-                             g_0_xxxyyyy_0_yyyyyzz_0, \
-                             g_0_xxxyyyy_0_yyyyzzz_0, \
-                             g_0_xxxyyyy_0_yyyzzzz_0, \
-                             g_0_xxxyyyy_0_yyzzzzz_0, \
-                             g_0_xxxyyyy_0_yzzzzzz_0, \
-                             g_0_xxxyyyy_0_zzzzzzz_0, \
-                             g_0_xxyyyy_0_xxxxxxy_0,  \
-                             g_0_xxyyyy_0_xxxxxxy_1,  \
-                             g_0_xxyyyy_0_xxxxxy_1,   \
-                             g_0_xxyyyy_0_xxxxxyy_0,  \
-                             g_0_xxyyyy_0_xxxxxyy_1,  \
-                             g_0_xxyyyy_0_xxxxxyz_0,  \
-                             g_0_xxyyyy_0_xxxxxyz_1,  \
-                             g_0_xxyyyy_0_xxxxyy_1,   \
-                             g_0_xxyyyy_0_xxxxyyy_0,  \
-                             g_0_xxyyyy_0_xxxxyyy_1,  \
-                             g_0_xxyyyy_0_xxxxyyz_0,  \
-                             g_0_xxyyyy_0_xxxxyyz_1,  \
-                             g_0_xxyyyy_0_xxxxyz_1,   \
-                             g_0_xxyyyy_0_xxxxyzz_0,  \
-                             g_0_xxyyyy_0_xxxxyzz_1,  \
-                             g_0_xxyyyy_0_xxxyyy_1,   \
-                             g_0_xxyyyy_0_xxxyyyy_0,  \
-                             g_0_xxyyyy_0_xxxyyyy_1,  \
-                             g_0_xxyyyy_0_xxxyyyz_0,  \
-                             g_0_xxyyyy_0_xxxyyyz_1,  \
-                             g_0_xxyyyy_0_xxxyyz_1,   \
-                             g_0_xxyyyy_0_xxxyyzz_0,  \
-                             g_0_xxyyyy_0_xxxyyzz_1,  \
-                             g_0_xxyyyy_0_xxxyzz_1,   \
-                             g_0_xxyyyy_0_xxxyzzz_0,  \
-                             g_0_xxyyyy_0_xxxyzzz_1,  \
-                             g_0_xxyyyy_0_xxyyyy_1,   \
-                             g_0_xxyyyy_0_xxyyyyy_0,  \
-                             g_0_xxyyyy_0_xxyyyyy_1,  \
-                             g_0_xxyyyy_0_xxyyyyz_0,  \
-                             g_0_xxyyyy_0_xxyyyyz_1,  \
-                             g_0_xxyyyy_0_xxyyyz_1,   \
-                             g_0_xxyyyy_0_xxyyyzz_0,  \
-                             g_0_xxyyyy_0_xxyyyzz_1,  \
-                             g_0_xxyyyy_0_xxyyzz_1,   \
-                             g_0_xxyyyy_0_xxyyzzz_0,  \
-                             g_0_xxyyyy_0_xxyyzzz_1,  \
-                             g_0_xxyyyy_0_xxyzzz_1,   \
-                             g_0_xxyyyy_0_xxyzzzz_0,  \
-                             g_0_xxyyyy_0_xxyzzzz_1,  \
-                             g_0_xxyyyy_0_xyyyyy_1,   \
-                             g_0_xxyyyy_0_xyyyyyy_0,  \
-                             g_0_xxyyyy_0_xyyyyyy_1,  \
-                             g_0_xxyyyy_0_xyyyyyz_0,  \
-                             g_0_xxyyyy_0_xyyyyyz_1,  \
-                             g_0_xxyyyy_0_xyyyyz_1,   \
-                             g_0_xxyyyy_0_xyyyyzz_0,  \
-                             g_0_xxyyyy_0_xyyyyzz_1,  \
-                             g_0_xxyyyy_0_xyyyzz_1,   \
-                             g_0_xxyyyy_0_xyyyzzz_0,  \
-                             g_0_xxyyyy_0_xyyyzzz_1,  \
-                             g_0_xxyyyy_0_xyyzzz_1,   \
-                             g_0_xxyyyy_0_xyyzzzz_0,  \
-                             g_0_xxyyyy_0_xyyzzzz_1,  \
-                             g_0_xxyyyy_0_xyzzzz_1,   \
-                             g_0_xxyyyy_0_xyzzzzz_0,  \
-                             g_0_xxyyyy_0_xyzzzzz_1,  \
-                             g_0_xxyyyy_0_yyyyyy_1,   \
-                             g_0_xxyyyy_0_yyyyyyy_0,  \
-                             g_0_xxyyyy_0_yyyyyyy_1,  \
-                             g_0_xxyyyy_0_yyyyyyz_0,  \
-                             g_0_xxyyyy_0_yyyyyyz_1,  \
-                             g_0_xxyyyy_0_yyyyyz_1,   \
-                             g_0_xxyyyy_0_yyyyyzz_0,  \
-                             g_0_xxyyyy_0_yyyyyzz_1,  \
-                             g_0_xxyyyy_0_yyyyzz_1,   \
-                             g_0_xxyyyy_0_yyyyzzz_0,  \
-                             g_0_xxyyyy_0_yyyyzzz_1,  \
-                             g_0_xxyyyy_0_yyyzzz_1,   \
-                             g_0_xxyyyy_0_yyyzzzz_0,  \
-                             g_0_xxyyyy_0_yyyzzzz_1,  \
-                             g_0_xxyyyy_0_yyzzzz_1,   \
-                             g_0_xxyyyy_0_yyzzzzz_0,  \
-                             g_0_xxyyyy_0_yyzzzzz_1,  \
-                             g_0_xxyyyy_0_yzzzzz_1,   \
-                             g_0_xxyyyy_0_yzzzzzz_0,  \
-                             g_0_xxyyyy_0_yzzzzzz_1,  \
-                             g_0_xxyyyy_0_zzzzzzz_0,  \
-                             g_0_xxyyyy_0_zzzzzzz_1,  \
-                             g_0_xyyyy_0_xxxxxxy_0,   \
-                             g_0_xyyyy_0_xxxxxxy_1,   \
-                             g_0_xyyyy_0_xxxxxyy_0,   \
-                             g_0_xyyyy_0_xxxxxyy_1,   \
-                             g_0_xyyyy_0_xxxxxyz_0,   \
-                             g_0_xyyyy_0_xxxxxyz_1,   \
-                             g_0_xyyyy_0_xxxxyyy_0,   \
-                             g_0_xyyyy_0_xxxxyyy_1,   \
-                             g_0_xyyyy_0_xxxxyyz_0,   \
-                             g_0_xyyyy_0_xxxxyyz_1,   \
-                             g_0_xyyyy_0_xxxxyzz_0,   \
-                             g_0_xyyyy_0_xxxxyzz_1,   \
-                             g_0_xyyyy_0_xxxyyyy_0,   \
-                             g_0_xyyyy_0_xxxyyyy_1,   \
-                             g_0_xyyyy_0_xxxyyyz_0,   \
-                             g_0_xyyyy_0_xxxyyyz_1,   \
-                             g_0_xyyyy_0_xxxyyzz_0,   \
-                             g_0_xyyyy_0_xxxyyzz_1,   \
-                             g_0_xyyyy_0_xxxyzzz_0,   \
-                             g_0_xyyyy_0_xxxyzzz_1,   \
-                             g_0_xyyyy_0_xxyyyyy_0,   \
-                             g_0_xyyyy_0_xxyyyyy_1,   \
-                             g_0_xyyyy_0_xxyyyyz_0,   \
-                             g_0_xyyyy_0_xxyyyyz_1,   \
-                             g_0_xyyyy_0_xxyyyzz_0,   \
-                             g_0_xyyyy_0_xxyyyzz_1,   \
-                             g_0_xyyyy_0_xxyyzzz_0,   \
-                             g_0_xyyyy_0_xxyyzzz_1,   \
-                             g_0_xyyyy_0_xxyzzzz_0,   \
-                             g_0_xyyyy_0_xxyzzzz_1,   \
-                             g_0_xyyyy_0_xyyyyyy_0,   \
-                             g_0_xyyyy_0_xyyyyyy_1,   \
-                             g_0_xyyyy_0_xyyyyyz_0,   \
-                             g_0_xyyyy_0_xyyyyyz_1,   \
-                             g_0_xyyyy_0_xyyyyzz_0,   \
-                             g_0_xyyyy_0_xyyyyzz_1,   \
-                             g_0_xyyyy_0_xyyyzzz_0,   \
-                             g_0_xyyyy_0_xyyyzzz_1,   \
-                             g_0_xyyyy_0_xyyzzzz_0,   \
-                             g_0_xyyyy_0_xyyzzzz_1,   \
-                             g_0_xyyyy_0_xyzzzzz_0,   \
-                             g_0_xyyyy_0_xyzzzzz_1,   \
-                             g_0_xyyyy_0_yyyyyyy_0,   \
-                             g_0_xyyyy_0_yyyyyyy_1,   \
-                             g_0_xyyyy_0_yyyyyyz_0,   \
-                             g_0_xyyyy_0_yyyyyyz_1,   \
-                             g_0_xyyyy_0_yyyyyzz_0,   \
-                             g_0_xyyyy_0_yyyyyzz_1,   \
-                             g_0_xyyyy_0_yyyyzzz_0,   \
-                             g_0_xyyyy_0_yyyyzzz_1,   \
-                             g_0_xyyyy_0_yyyzzzz_0,   \
-                             g_0_xyyyy_0_yyyzzzz_1,   \
-                             g_0_xyyyy_0_yyzzzzz_0,   \
-                             g_0_xyyyy_0_yyzzzzz_1,   \
-                             g_0_xyyyy_0_yzzzzzz_0,   \
-                             g_0_xyyyy_0_yzzzzzz_1,   \
-                             g_0_xyyyy_0_zzzzzzz_0,   \
-                             g_0_xyyyy_0_zzzzzzz_1,   \
-                             wp_x,                    \
-                             wp_y,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxxyy_0_xxxxxxx_0, g_0_xxxyy_0_xxxxxxx_1, g_0_xxxyy_0_xxxxxxz_0, g_0_xxxyy_0_xxxxxxz_1, g_0_xxxyy_0_xxxxxzz_0, g_0_xxxyy_0_xxxxxzz_1, g_0_xxxyy_0_xxxxzzz_0, g_0_xxxyy_0_xxxxzzz_1, g_0_xxxyy_0_xxxzzzz_0, g_0_xxxyy_0_xxxzzzz_1, g_0_xxxyy_0_xxzzzzz_0, g_0_xxxyy_0_xxzzzzz_1, g_0_xxxyy_0_xzzzzzz_0, g_0_xxxyy_0_xzzzzzz_1, g_0_xxxyyy_0_xxxxxxx_0, g_0_xxxyyy_0_xxxxxxx_1, g_0_xxxyyy_0_xxxxxxz_0, g_0_xxxyyy_0_xxxxxxz_1, g_0_xxxyyy_0_xxxxxzz_0, g_0_xxxyyy_0_xxxxxzz_1, g_0_xxxyyy_0_xxxxzzz_0, g_0_xxxyyy_0_xxxxzzz_1, g_0_xxxyyy_0_xxxzzzz_0, g_0_xxxyyy_0_xxxzzzz_1, g_0_xxxyyy_0_xxzzzzz_0, g_0_xxxyyy_0_xxzzzzz_1, g_0_xxxyyy_0_xzzzzzz_0, g_0_xxxyyy_0_xzzzzzz_1, g_0_xxxyyyy_0_xxxxxxx_0, g_0_xxxyyyy_0_xxxxxxy_0, g_0_xxxyyyy_0_xxxxxxz_0, g_0_xxxyyyy_0_xxxxxyy_0, g_0_xxxyyyy_0_xxxxxyz_0, g_0_xxxyyyy_0_xxxxxzz_0, g_0_xxxyyyy_0_xxxxyyy_0, g_0_xxxyyyy_0_xxxxyyz_0, g_0_xxxyyyy_0_xxxxyzz_0, g_0_xxxyyyy_0_xxxxzzz_0, g_0_xxxyyyy_0_xxxyyyy_0, g_0_xxxyyyy_0_xxxyyyz_0, g_0_xxxyyyy_0_xxxyyzz_0, g_0_xxxyyyy_0_xxxyzzz_0, g_0_xxxyyyy_0_xxxzzzz_0, g_0_xxxyyyy_0_xxyyyyy_0, g_0_xxxyyyy_0_xxyyyyz_0, g_0_xxxyyyy_0_xxyyyzz_0, g_0_xxxyyyy_0_xxyyzzz_0, g_0_xxxyyyy_0_xxyzzzz_0, g_0_xxxyyyy_0_xxzzzzz_0, g_0_xxxyyyy_0_xyyyyyy_0, g_0_xxxyyyy_0_xyyyyyz_0, g_0_xxxyyyy_0_xyyyyzz_0, g_0_xxxyyyy_0_xyyyzzz_0, g_0_xxxyyyy_0_xyyzzzz_0, g_0_xxxyyyy_0_xyzzzzz_0, g_0_xxxyyyy_0_xzzzzzz_0, g_0_xxxyyyy_0_yyyyyyy_0, g_0_xxxyyyy_0_yyyyyyz_0, g_0_xxxyyyy_0_yyyyyzz_0, g_0_xxxyyyy_0_yyyyzzz_0, g_0_xxxyyyy_0_yyyzzzz_0, g_0_xxxyyyy_0_yyzzzzz_0, g_0_xxxyyyy_0_yzzzzzz_0, g_0_xxxyyyy_0_zzzzzzz_0, g_0_xxyyyy_0_xxxxxxy_0, g_0_xxyyyy_0_xxxxxxy_1, g_0_xxyyyy_0_xxxxxy_1, g_0_xxyyyy_0_xxxxxyy_0, g_0_xxyyyy_0_xxxxxyy_1, g_0_xxyyyy_0_xxxxxyz_0, g_0_xxyyyy_0_xxxxxyz_1, g_0_xxyyyy_0_xxxxyy_1, g_0_xxyyyy_0_xxxxyyy_0, g_0_xxyyyy_0_xxxxyyy_1, g_0_xxyyyy_0_xxxxyyz_0, g_0_xxyyyy_0_xxxxyyz_1, g_0_xxyyyy_0_xxxxyz_1, g_0_xxyyyy_0_xxxxyzz_0, g_0_xxyyyy_0_xxxxyzz_1, g_0_xxyyyy_0_xxxyyy_1, g_0_xxyyyy_0_xxxyyyy_0, g_0_xxyyyy_0_xxxyyyy_1, g_0_xxyyyy_0_xxxyyyz_0, g_0_xxyyyy_0_xxxyyyz_1, g_0_xxyyyy_0_xxxyyz_1, g_0_xxyyyy_0_xxxyyzz_0, g_0_xxyyyy_0_xxxyyzz_1, g_0_xxyyyy_0_xxxyzz_1, g_0_xxyyyy_0_xxxyzzz_0, g_0_xxyyyy_0_xxxyzzz_1, g_0_xxyyyy_0_xxyyyy_1, g_0_xxyyyy_0_xxyyyyy_0, g_0_xxyyyy_0_xxyyyyy_1, g_0_xxyyyy_0_xxyyyyz_0, g_0_xxyyyy_0_xxyyyyz_1, g_0_xxyyyy_0_xxyyyz_1, g_0_xxyyyy_0_xxyyyzz_0, g_0_xxyyyy_0_xxyyyzz_1, g_0_xxyyyy_0_xxyyzz_1, g_0_xxyyyy_0_xxyyzzz_0, g_0_xxyyyy_0_xxyyzzz_1, g_0_xxyyyy_0_xxyzzz_1, g_0_xxyyyy_0_xxyzzzz_0, g_0_xxyyyy_0_xxyzzzz_1, g_0_xxyyyy_0_xyyyyy_1, g_0_xxyyyy_0_xyyyyyy_0, g_0_xxyyyy_0_xyyyyyy_1, g_0_xxyyyy_0_xyyyyyz_0, g_0_xxyyyy_0_xyyyyyz_1, g_0_xxyyyy_0_xyyyyz_1, g_0_xxyyyy_0_xyyyyzz_0, g_0_xxyyyy_0_xyyyyzz_1, g_0_xxyyyy_0_xyyyzz_1, g_0_xxyyyy_0_xyyyzzz_0, g_0_xxyyyy_0_xyyyzzz_1, g_0_xxyyyy_0_xyyzzz_1, g_0_xxyyyy_0_xyyzzzz_0, g_0_xxyyyy_0_xyyzzzz_1, g_0_xxyyyy_0_xyzzzz_1, g_0_xxyyyy_0_xyzzzzz_0, g_0_xxyyyy_0_xyzzzzz_1, g_0_xxyyyy_0_yyyyyy_1, g_0_xxyyyy_0_yyyyyyy_0, g_0_xxyyyy_0_yyyyyyy_1, g_0_xxyyyy_0_yyyyyyz_0, g_0_xxyyyy_0_yyyyyyz_1, g_0_xxyyyy_0_yyyyyz_1, g_0_xxyyyy_0_yyyyyzz_0, g_0_xxyyyy_0_yyyyyzz_1, g_0_xxyyyy_0_yyyyzz_1, g_0_xxyyyy_0_yyyyzzz_0, g_0_xxyyyy_0_yyyyzzz_1, g_0_xxyyyy_0_yyyzzz_1, g_0_xxyyyy_0_yyyzzzz_0, g_0_xxyyyy_0_yyyzzzz_1, g_0_xxyyyy_0_yyzzzz_1, g_0_xxyyyy_0_yyzzzzz_0, g_0_xxyyyy_0_yyzzzzz_1, g_0_xxyyyy_0_yzzzzz_1, g_0_xxyyyy_0_yzzzzzz_0, g_0_xxyyyy_0_yzzzzzz_1, g_0_xxyyyy_0_zzzzzzz_0, g_0_xxyyyy_0_zzzzzzz_1, g_0_xyyyy_0_xxxxxxy_0, g_0_xyyyy_0_xxxxxxy_1, g_0_xyyyy_0_xxxxxyy_0, g_0_xyyyy_0_xxxxxyy_1, g_0_xyyyy_0_xxxxxyz_0, g_0_xyyyy_0_xxxxxyz_1, g_0_xyyyy_0_xxxxyyy_0, g_0_xyyyy_0_xxxxyyy_1, g_0_xyyyy_0_xxxxyyz_0, g_0_xyyyy_0_xxxxyyz_1, g_0_xyyyy_0_xxxxyzz_0, g_0_xyyyy_0_xxxxyzz_1, g_0_xyyyy_0_xxxyyyy_0, g_0_xyyyy_0_xxxyyyy_1, g_0_xyyyy_0_xxxyyyz_0, g_0_xyyyy_0_xxxyyyz_1, g_0_xyyyy_0_xxxyyzz_0, g_0_xyyyy_0_xxxyyzz_1, g_0_xyyyy_0_xxxyzzz_0, g_0_xyyyy_0_xxxyzzz_1, g_0_xyyyy_0_xxyyyyy_0, g_0_xyyyy_0_xxyyyyy_1, g_0_xyyyy_0_xxyyyyz_0, g_0_xyyyy_0_xxyyyyz_1, g_0_xyyyy_0_xxyyyzz_0, g_0_xyyyy_0_xxyyyzz_1, g_0_xyyyy_0_xxyyzzz_0, g_0_xyyyy_0_xxyyzzz_1, g_0_xyyyy_0_xxyzzzz_0, g_0_xyyyy_0_xxyzzzz_1, g_0_xyyyy_0_xyyyyyy_0, g_0_xyyyy_0_xyyyyyy_1, g_0_xyyyy_0_xyyyyyz_0, g_0_xyyyy_0_xyyyyyz_1, g_0_xyyyy_0_xyyyyzz_0, g_0_xyyyy_0_xyyyyzz_1, g_0_xyyyy_0_xyyyzzz_0, g_0_xyyyy_0_xyyyzzz_1, g_0_xyyyy_0_xyyzzzz_0, g_0_xyyyy_0_xyyzzzz_1, g_0_xyyyy_0_xyzzzzz_0, g_0_xyyyy_0_xyzzzzz_1, g_0_xyyyy_0_yyyyyyy_0, g_0_xyyyy_0_yyyyyyy_1, g_0_xyyyy_0_yyyyyyz_0, g_0_xyyyy_0_yyyyyyz_1, g_0_xyyyy_0_yyyyyzz_0, g_0_xyyyy_0_yyyyyzz_1, g_0_xyyyy_0_yyyyzzz_0, g_0_xyyyy_0_yyyyzzz_1, g_0_xyyyy_0_yyyzzzz_0, g_0_xyyyy_0_yyyzzzz_1, g_0_xyyyy_0_yyzzzzz_0, g_0_xyyyy_0_yyzzzzz_1, g_0_xyyyy_0_yzzzzzz_0, g_0_xyyyy_0_yzzzzzz_1, g_0_xyyyy_0_zzzzzzz_0, g_0_xyyyy_0_zzzzzzz_1, wp_x, wp_y, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -9685,128 +7411,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxxyyyy_0_xxxxxxx_0[i] = 3.0 * g_0_xxxyy_0_xxxxxxx_0[i] * fi_ab_0 - 3.0 * g_0_xxxyy_0_xxxxxxx_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_xxxxxxx_0[i] * pb_y + g_0_xxxyyy_0_xxxxxxx_1[i] * wp_y[i];
+        g_0_xxxyyyy_0_xxxxxxx_0[i] = 3.0 * g_0_xxxyy_0_xxxxxxx_0[i] * fi_ab_0 - 3.0 * g_0_xxxyy_0_xxxxxxx_1[i] * fti_ab_0 + g_0_xxxyyy_0_xxxxxxx_0[i] * pb_y + g_0_xxxyyy_0_xxxxxxx_1[i] * wp_y[i];
 
-        g_0_xxxyyyy_0_xxxxxxy_0[i] = 2.0 * g_0_xyyyy_0_xxxxxxy_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxxxxy_1[i] * fti_ab_0 +
-                                     6.0 * g_0_xxyyyy_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxxxy_0[i] * pb_x +
-                                     g_0_xxyyyy_0_xxxxxxy_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xxxxxxy_0[i] = 2.0 * g_0_xyyyy_0_xxxxxxy_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxxxxy_1[i] * fti_ab_0 + 6.0 * g_0_xxyyyy_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxxxy_0[i] * pb_x + g_0_xxyyyy_0_xxxxxxy_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xxxxxxz_0[i] = 3.0 * g_0_xxxyy_0_xxxxxxz_0[i] * fi_ab_0 - 3.0 * g_0_xxxyy_0_xxxxxxz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_xxxxxxz_0[i] * pb_y + g_0_xxxyyy_0_xxxxxxz_1[i] * wp_y[i];
+        g_0_xxxyyyy_0_xxxxxxz_0[i] = 3.0 * g_0_xxxyy_0_xxxxxxz_0[i] * fi_ab_0 - 3.0 * g_0_xxxyy_0_xxxxxxz_1[i] * fti_ab_0 + g_0_xxxyyy_0_xxxxxxz_0[i] * pb_y + g_0_xxxyyy_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_xxxyyyy_0_xxxxxyy_0[i] = 2.0 * g_0_xyyyy_0_xxxxxyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxxxyy_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xxyyyy_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxxyy_0[i] * pb_x +
-                                     g_0_xxyyyy_0_xxxxxyy_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xxxxxyy_0[i] = 2.0 * g_0_xyyyy_0_xxxxxyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxxxyy_1[i] * fti_ab_0 + 5.0 * g_0_xxyyyy_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxxyy_0[i] * pb_x + g_0_xxyyyy_0_xxxxxyy_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xxxxxyz_0[i] = 2.0 * g_0_xyyyy_0_xxxxxyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xxyyyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxxyz_0[i] * pb_x +
-                                     g_0_xxyyyy_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xxxxxyz_0[i] = 2.0 * g_0_xyyyy_0_xxxxxyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxxxyz_1[i] * fti_ab_0 + 5.0 * g_0_xxyyyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxxyz_0[i] * pb_x + g_0_xxyyyy_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xxxxxzz_0[i] = 3.0 * g_0_xxxyy_0_xxxxxzz_0[i] * fi_ab_0 - 3.0 * g_0_xxxyy_0_xxxxxzz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_xxxxxzz_0[i] * pb_y + g_0_xxxyyy_0_xxxxxzz_1[i] * wp_y[i];
+        g_0_xxxyyyy_0_xxxxxzz_0[i] = 3.0 * g_0_xxxyy_0_xxxxxzz_0[i] * fi_ab_0 - 3.0 * g_0_xxxyy_0_xxxxxzz_1[i] * fti_ab_0 + g_0_xxxyyy_0_xxxxxzz_0[i] * pb_y + g_0_xxxyyy_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_xxxyyyy_0_xxxxyyy_0[i] = 2.0 * g_0_xyyyy_0_xxxxyyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxxyyy_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxyyyy_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxyyy_0[i] * pb_x +
-                                     g_0_xxyyyy_0_xxxxyyy_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xxxxyyy_0[i] = 2.0 * g_0_xyyyy_0_xxxxyyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxxyyy_1[i] * fti_ab_0 + 4.0 * g_0_xxyyyy_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxyyy_0[i] * pb_x + g_0_xxyyyy_0_xxxxyyy_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xxxxyyz_0[i] = 2.0 * g_0_xyyyy_0_xxxxyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxyyyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxyyz_0[i] * pb_x +
-                                     g_0_xxyyyy_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xxxxyyz_0[i] = 2.0 * g_0_xyyyy_0_xxxxyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxxyyz_1[i] * fti_ab_0 + 4.0 * g_0_xxyyyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxyyz_0[i] * pb_x + g_0_xxyyyy_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xxxxyzz_0[i] = 2.0 * g_0_xyyyy_0_xxxxyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxyyyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxyzz_0[i] * pb_x +
-                                     g_0_xxyyyy_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xxxxyzz_0[i] = 2.0 * g_0_xyyyy_0_xxxxyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxxyzz_1[i] * fti_ab_0 + 4.0 * g_0_xxyyyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxyzz_0[i] * pb_x + g_0_xxyyyy_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xxxxzzz_0[i] = 3.0 * g_0_xxxyy_0_xxxxzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxxyy_0_xxxxzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_xxxxzzz_0[i] * pb_y + g_0_xxxyyy_0_xxxxzzz_1[i] * wp_y[i];
+        g_0_xxxyyyy_0_xxxxzzz_0[i] = 3.0 * g_0_xxxyy_0_xxxxzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxxyy_0_xxxxzzz_1[i] * fti_ab_0 + g_0_xxxyyy_0_xxxxzzz_0[i] * pb_y + g_0_xxxyyy_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_xxxyyyy_0_xxxyyyy_0[i] = 2.0 * g_0_xyyyy_0_xxxyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxyyyy_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxyyyy_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxyyyy_0[i] * pb_x +
-                                     g_0_xxyyyy_0_xxxyyyy_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xxxyyyy_0[i] = 2.0 * g_0_xyyyy_0_xxxyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxyyyy_1[i] * fti_ab_0 + 3.0 * g_0_xxyyyy_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxyyyy_0[i] * pb_x + g_0_xxyyyy_0_xxxyyyy_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xxxyyyz_0[i] = 2.0 * g_0_xyyyy_0_xxxyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxyyyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxyyyz_0[i] * pb_x +
-                                     g_0_xxyyyy_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xxxyyyz_0[i] = 2.0 * g_0_xyyyy_0_xxxyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_xxyyyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxyyyz_0[i] * pb_x + g_0_xxyyyy_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xxxyyzz_0[i] = 2.0 * g_0_xyyyy_0_xxxyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxyyyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxyyzz_0[i] * pb_x +
-                                     g_0_xxyyyy_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xxxyyzz_0[i] = 2.0 * g_0_xyyyy_0_xxxyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxyyzz_1[i] * fti_ab_0 + 3.0 * g_0_xxyyyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxyyzz_0[i] * pb_x + g_0_xxyyyy_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xxxyzzz_0[i] = 2.0 * g_0_xyyyy_0_xxxyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxyyyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxyzzz_0[i] * pb_x +
-                                     g_0_xxyyyy_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xxxyzzz_0[i] = 2.0 * g_0_xyyyy_0_xxxyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxxyzzz_1[i] * fti_ab_0 + 3.0 * g_0_xxyyyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxyzzz_0[i] * pb_x + g_0_xxyyyy_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xxxzzzz_0[i] = 3.0 * g_0_xxxyy_0_xxxzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxxyy_0_xxxzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_xxxzzzz_0[i] * pb_y + g_0_xxxyyy_0_xxxzzzz_1[i] * wp_y[i];
+        g_0_xxxyyyy_0_xxxzzzz_0[i] = 3.0 * g_0_xxxyy_0_xxxzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxxyy_0_xxxzzzz_1[i] * fti_ab_0 + g_0_xxxyyy_0_xxxzzzz_0[i] * pb_y + g_0_xxxyyy_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_xxxyyyy_0_xxyyyyy_0[i] = 2.0 * g_0_xyyyy_0_xxyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxyyyyy_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxyyyy_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyyyyy_0[i] * pb_x +
-                                     g_0_xxyyyy_0_xxyyyyy_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xxyyyyy_0[i] = 2.0 * g_0_xyyyy_0_xxyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxyyyyy_1[i] * fti_ab_0 + 2.0 * g_0_xxyyyy_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyyyyy_0[i] * pb_x + g_0_xxyyyy_0_xxyyyyy_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xxyyyyz_0[i] = 2.0 * g_0_xyyyy_0_xxyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxyyyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyyyyz_0[i] * pb_x +
-                                     g_0_xxyyyy_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xxyyyyz_0[i] = 2.0 * g_0_xyyyy_0_xxyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxyyyyz_1[i] * fti_ab_0 + 2.0 * g_0_xxyyyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyyyyz_0[i] * pb_x + g_0_xxyyyy_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xxyyyzz_0[i] = 2.0 * g_0_xyyyy_0_xxyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxyyyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyyyzz_0[i] * pb_x +
-                                     g_0_xxyyyy_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xxyyyzz_0[i] = 2.0 * g_0_xyyyy_0_xxyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxyyyzz_1[i] * fti_ab_0 + 2.0 * g_0_xxyyyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyyyzz_0[i] * pb_x + g_0_xxyyyy_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xxyyzzz_0[i] = 2.0 * g_0_xyyyy_0_xxyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxyyyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyyzzz_0[i] * pb_x +
-                                     g_0_xxyyyy_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xxyyzzz_0[i] = 2.0 * g_0_xyyyy_0_xxyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxyyyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyyzzz_0[i] * pb_x + g_0_xxyyyy_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xxyzzzz_0[i] = 2.0 * g_0_xyyyy_0_xxyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxyyyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyzzzz_0[i] * pb_x +
-                                     g_0_xxyyyy_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xxyzzzz_0[i] = 2.0 * g_0_xyyyy_0_xxyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xxyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxyyyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyzzzz_0[i] * pb_x + g_0_xxyyyy_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xxzzzzz_0[i] = 3.0 * g_0_xxxyy_0_xxzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxxyy_0_xxzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_xxzzzzz_0[i] * pb_y + g_0_xxxyyy_0_xxzzzzz_1[i] * wp_y[i];
+        g_0_xxxyyyy_0_xxzzzzz_0[i] = 3.0 * g_0_xxxyy_0_xxzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxxyy_0_xxzzzzz_1[i] * fti_ab_0 + g_0_xxxyyy_0_xxzzzzz_0[i] * pb_y + g_0_xxxyyy_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_xxxyyyy_0_xyyyyyy_0[i] = 2.0 * g_0_xyyyy_0_xyyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyyyyy_0[i] * pb_x + g_0_xxyyyy_0_xyyyyyy_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xyyyyyy_0[i] = 2.0 * g_0_xyyyy_0_xyyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xyyyyyy_1[i] * fti_ab_0 + g_0_xxyyyy_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyyyyy_0[i] * pb_x + g_0_xxyyyy_0_xyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xyyyyyz_0[i] = 2.0 * g_0_xyyyy_0_xyyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyyyyz_0[i] * pb_x + g_0_xxyyyy_0_xyyyyyz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xyyyyyz_0[i] = 2.0 * g_0_xyyyy_0_xyyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xyyyyyz_1[i] * fti_ab_0 + g_0_xxyyyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyyyyz_0[i] * pb_x + g_0_xxyyyy_0_xyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xyyyyzz_0[i] = 2.0 * g_0_xyyyy_0_xyyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xyyyyzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyyyzz_0[i] * pb_x + g_0_xxyyyy_0_xyyyyzz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xyyyyzz_0[i] = 2.0 * g_0_xyyyy_0_xyyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xyyyyzz_1[i] * fti_ab_0 + g_0_xxyyyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyyyzz_0[i] * pb_x + g_0_xxyyyy_0_xyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xyyyzzz_0[i] = 2.0 * g_0_xyyyy_0_xyyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xyyyzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyyzzz_0[i] * pb_x + g_0_xxyyyy_0_xyyyzzz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xyyyzzz_0[i] = 2.0 * g_0_xyyyy_0_xyyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xyyyzzz_1[i] * fti_ab_0 + g_0_xxyyyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyyzzz_0[i] * pb_x + g_0_xxyyyy_0_xyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xyyzzzz_0[i] = 2.0 * g_0_xyyyy_0_xyyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xyyzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyzzzz_0[i] * pb_x + g_0_xxyyyy_0_xyyzzzz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xyyzzzz_0[i] = 2.0 * g_0_xyyyy_0_xyyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xyyzzzz_1[i] * fti_ab_0 + g_0_xxyyyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyzzzz_0[i] * pb_x + g_0_xxyyyy_0_xyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xyzzzzz_0[i] = 2.0 * g_0_xyyyy_0_xyzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyzzzzz_0[i] * pb_x + g_0_xxyyyy_0_xyzzzzz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_xyzzzzz_0[i] = 2.0 * g_0_xyyyy_0_xyzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_xyzzzzz_1[i] * fti_ab_0 + g_0_xxyyyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyzzzzz_0[i] * pb_x + g_0_xxyyyy_0_xyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_xzzzzzz_0[i] = 3.0 * g_0_xxxyy_0_xzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxxyy_0_xzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxxyyy_0_xzzzzzz_0[i] * pb_y + g_0_xxxyyy_0_xzzzzzz_1[i] * wp_y[i];
+        g_0_xxxyyyy_0_xzzzzzz_0[i] = 3.0 * g_0_xxxyy_0_xzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_xxxyy_0_xzzzzzz_1[i] * fti_ab_0 + g_0_xxxyyy_0_xzzzzzz_0[i] * pb_y + g_0_xxxyyy_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_xxxyyyy_0_yyyyyyy_0[i] = 2.0 * g_0_xyyyy_0_yyyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_yyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_yyyyyyy_0[i] * pb_x + g_0_xxyyyy_0_yyyyyyy_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_yyyyyyy_0[i] = 2.0 * g_0_xyyyy_0_yyyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_yyyyyyy_1[i] * fti_ab_0 + g_0_xxyyyy_0_yyyyyyy_0[i] * pb_x + g_0_xxyyyy_0_yyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_yyyyyyz_0[i] = 2.0 * g_0_xyyyy_0_yyyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_yyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_yyyyyyz_0[i] * pb_x + g_0_xxyyyy_0_yyyyyyz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_yyyyyyz_0[i] = 2.0 * g_0_xyyyy_0_yyyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_yyyyyyz_1[i] * fti_ab_0 + g_0_xxyyyy_0_yyyyyyz_0[i] * pb_x + g_0_xxyyyy_0_yyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_yyyyyzz_0[i] = 2.0 * g_0_xyyyy_0_yyyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_yyyyyzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_yyyyyzz_0[i] * pb_x + g_0_xxyyyy_0_yyyyyzz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_yyyyyzz_0[i] = 2.0 * g_0_xyyyy_0_yyyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_yyyyyzz_1[i] * fti_ab_0 + g_0_xxyyyy_0_yyyyyzz_0[i] * pb_x + g_0_xxyyyy_0_yyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_yyyyzzz_0[i] = 2.0 * g_0_xyyyy_0_yyyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_yyyyzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_yyyyzzz_0[i] * pb_x + g_0_xxyyyy_0_yyyyzzz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_yyyyzzz_0[i] = 2.0 * g_0_xyyyy_0_yyyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_yyyyzzz_1[i] * fti_ab_0 + g_0_xxyyyy_0_yyyyzzz_0[i] * pb_x + g_0_xxyyyy_0_yyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_yyyzzzz_0[i] = 2.0 * g_0_xyyyy_0_yyyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_yyyzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_yyyzzzz_0[i] * pb_x + g_0_xxyyyy_0_yyyzzzz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_yyyzzzz_0[i] = 2.0 * g_0_xyyyy_0_yyyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_yyyzzzz_1[i] * fti_ab_0 + g_0_xxyyyy_0_yyyzzzz_0[i] * pb_x + g_0_xxyyyy_0_yyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_yyzzzzz_0[i] = 2.0 * g_0_xyyyy_0_yyzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_yyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_yyzzzzz_0[i] * pb_x + g_0_xxyyyy_0_yyzzzzz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_yyzzzzz_0[i] = 2.0 * g_0_xyyyy_0_yyzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_yyzzzzz_1[i] * fti_ab_0 + g_0_xxyyyy_0_yyzzzzz_0[i] * pb_x + g_0_xxyyyy_0_yyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_yzzzzzz_0[i] = 2.0 * g_0_xyyyy_0_yzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_yzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_yzzzzzz_0[i] * pb_x + g_0_xxyyyy_0_yzzzzzz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_yzzzzzz_0[i] = 2.0 * g_0_xyyyy_0_yzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_yzzzzzz_1[i] * fti_ab_0 + g_0_xxyyyy_0_yzzzzzz_0[i] * pb_x + g_0_xxyyyy_0_yzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyyy_0_zzzzzzz_0[i] = 2.0 * g_0_xyyyy_0_zzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_zzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_zzzzzzz_0[i] * pb_x + g_0_xxyyyy_0_zzzzzzz_1[i] * wp_x[i];
+        g_0_xxxyyyy_0_zzzzzzz_0[i] = 2.0 * g_0_xyyyy_0_zzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyyy_0_zzzzzzz_1[i] * fti_ab_0 + g_0_xxyyyy_0_zzzzzzz_0[i] * pb_x + g_0_xxyyyy_0_zzzzzzz_1[i] * wp_x[i];
     }
 
     /// Set up 396-432 components of targeted buffer : SKSK
@@ -9883,145 +7558,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxxyyyz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 431);
 
-#pragma omp simd aligned(g_0_xxxyyy_0_xxxxxx_1,       \
-                             g_0_xxxyyy_0_xxxxxxx_0,  \
-                             g_0_xxxyyy_0_xxxxxxx_1,  \
-                             g_0_xxxyyy_0_xxxxxxy_0,  \
-                             g_0_xxxyyy_0_xxxxxxy_1,  \
-                             g_0_xxxyyy_0_xxxxxxz_0,  \
-                             g_0_xxxyyy_0_xxxxxxz_1,  \
-                             g_0_xxxyyy_0_xxxxxy_1,   \
-                             g_0_xxxyyy_0_xxxxxyy_0,  \
-                             g_0_xxxyyy_0_xxxxxyy_1,  \
-                             g_0_xxxyyy_0_xxxxxyz_0,  \
-                             g_0_xxxyyy_0_xxxxxyz_1,  \
-                             g_0_xxxyyy_0_xxxxxz_1,   \
-                             g_0_xxxyyy_0_xxxxxzz_0,  \
-                             g_0_xxxyyy_0_xxxxxzz_1,  \
-                             g_0_xxxyyy_0_xxxxyy_1,   \
-                             g_0_xxxyyy_0_xxxxyyy_0,  \
-                             g_0_xxxyyy_0_xxxxyyy_1,  \
-                             g_0_xxxyyy_0_xxxxyyz_0,  \
-                             g_0_xxxyyy_0_xxxxyyz_1,  \
-                             g_0_xxxyyy_0_xxxxyz_1,   \
-                             g_0_xxxyyy_0_xxxxyzz_0,  \
-                             g_0_xxxyyy_0_xxxxyzz_1,  \
-                             g_0_xxxyyy_0_xxxxzz_1,   \
-                             g_0_xxxyyy_0_xxxxzzz_0,  \
-                             g_0_xxxyyy_0_xxxxzzz_1,  \
-                             g_0_xxxyyy_0_xxxyyy_1,   \
-                             g_0_xxxyyy_0_xxxyyyy_0,  \
-                             g_0_xxxyyy_0_xxxyyyy_1,  \
-                             g_0_xxxyyy_0_xxxyyyz_0,  \
-                             g_0_xxxyyy_0_xxxyyyz_1,  \
-                             g_0_xxxyyy_0_xxxyyz_1,   \
-                             g_0_xxxyyy_0_xxxyyzz_0,  \
-                             g_0_xxxyyy_0_xxxyyzz_1,  \
-                             g_0_xxxyyy_0_xxxyzz_1,   \
-                             g_0_xxxyyy_0_xxxyzzz_0,  \
-                             g_0_xxxyyy_0_xxxyzzz_1,  \
-                             g_0_xxxyyy_0_xxxzzz_1,   \
-                             g_0_xxxyyy_0_xxxzzzz_0,  \
-                             g_0_xxxyyy_0_xxxzzzz_1,  \
-                             g_0_xxxyyy_0_xxyyyy_1,   \
-                             g_0_xxxyyy_0_xxyyyyy_0,  \
-                             g_0_xxxyyy_0_xxyyyyy_1,  \
-                             g_0_xxxyyy_0_xxyyyyz_0,  \
-                             g_0_xxxyyy_0_xxyyyyz_1,  \
-                             g_0_xxxyyy_0_xxyyyz_1,   \
-                             g_0_xxxyyy_0_xxyyyzz_0,  \
-                             g_0_xxxyyy_0_xxyyyzz_1,  \
-                             g_0_xxxyyy_0_xxyyzz_1,   \
-                             g_0_xxxyyy_0_xxyyzzz_0,  \
-                             g_0_xxxyyy_0_xxyyzzz_1,  \
-                             g_0_xxxyyy_0_xxyzzz_1,   \
-                             g_0_xxxyyy_0_xxyzzzz_0,  \
-                             g_0_xxxyyy_0_xxyzzzz_1,  \
-                             g_0_xxxyyy_0_xxzzzz_1,   \
-                             g_0_xxxyyy_0_xxzzzzz_0,  \
-                             g_0_xxxyyy_0_xxzzzzz_1,  \
-                             g_0_xxxyyy_0_xyyyyy_1,   \
-                             g_0_xxxyyy_0_xyyyyyy_0,  \
-                             g_0_xxxyyy_0_xyyyyyy_1,  \
-                             g_0_xxxyyy_0_xyyyyyz_0,  \
-                             g_0_xxxyyy_0_xyyyyyz_1,  \
-                             g_0_xxxyyy_0_xyyyyz_1,   \
-                             g_0_xxxyyy_0_xyyyyzz_0,  \
-                             g_0_xxxyyy_0_xyyyyzz_1,  \
-                             g_0_xxxyyy_0_xyyyzz_1,   \
-                             g_0_xxxyyy_0_xyyyzzz_0,  \
-                             g_0_xxxyyy_0_xyyyzzz_1,  \
-                             g_0_xxxyyy_0_xyyzzz_1,   \
-                             g_0_xxxyyy_0_xyyzzzz_0,  \
-                             g_0_xxxyyy_0_xyyzzzz_1,  \
-                             g_0_xxxyyy_0_xyzzzz_1,   \
-                             g_0_xxxyyy_0_xyzzzzz_0,  \
-                             g_0_xxxyyy_0_xyzzzzz_1,  \
-                             g_0_xxxyyy_0_xzzzzz_1,   \
-                             g_0_xxxyyy_0_xzzzzzz_0,  \
-                             g_0_xxxyyy_0_xzzzzzz_1,  \
-                             g_0_xxxyyy_0_yyyyyy_1,   \
-                             g_0_xxxyyy_0_yyyyyyy_0,  \
-                             g_0_xxxyyy_0_yyyyyyy_1,  \
-                             g_0_xxxyyy_0_yyyyyyz_0,  \
-                             g_0_xxxyyy_0_yyyyyyz_1,  \
-                             g_0_xxxyyy_0_yyyyyz_1,   \
-                             g_0_xxxyyy_0_yyyyyzz_0,  \
-                             g_0_xxxyyy_0_yyyyyzz_1,  \
-                             g_0_xxxyyy_0_yyyyzz_1,   \
-                             g_0_xxxyyy_0_yyyyzzz_0,  \
-                             g_0_xxxyyy_0_yyyyzzz_1,  \
-                             g_0_xxxyyy_0_yyyzzz_1,   \
-                             g_0_xxxyyy_0_yyyzzzz_0,  \
-                             g_0_xxxyyy_0_yyyzzzz_1,  \
-                             g_0_xxxyyy_0_yyzzzz_1,   \
-                             g_0_xxxyyy_0_yyzzzzz_0,  \
-                             g_0_xxxyyy_0_yyzzzzz_1,  \
-                             g_0_xxxyyy_0_yzzzzz_1,   \
-                             g_0_xxxyyy_0_yzzzzzz_0,  \
-                             g_0_xxxyyy_0_yzzzzzz_1,  \
-                             g_0_xxxyyy_0_zzzzzz_1,   \
-                             g_0_xxxyyy_0_zzzzzzz_0,  \
-                             g_0_xxxyyy_0_zzzzzzz_1,  \
-                             g_0_xxxyyyz_0_xxxxxxx_0, \
-                             g_0_xxxyyyz_0_xxxxxxy_0, \
-                             g_0_xxxyyyz_0_xxxxxxz_0, \
-                             g_0_xxxyyyz_0_xxxxxyy_0, \
-                             g_0_xxxyyyz_0_xxxxxyz_0, \
-                             g_0_xxxyyyz_0_xxxxxzz_0, \
-                             g_0_xxxyyyz_0_xxxxyyy_0, \
-                             g_0_xxxyyyz_0_xxxxyyz_0, \
-                             g_0_xxxyyyz_0_xxxxyzz_0, \
-                             g_0_xxxyyyz_0_xxxxzzz_0, \
-                             g_0_xxxyyyz_0_xxxyyyy_0, \
-                             g_0_xxxyyyz_0_xxxyyyz_0, \
-                             g_0_xxxyyyz_0_xxxyyzz_0, \
-                             g_0_xxxyyyz_0_xxxyzzz_0, \
-                             g_0_xxxyyyz_0_xxxzzzz_0, \
-                             g_0_xxxyyyz_0_xxyyyyy_0, \
-                             g_0_xxxyyyz_0_xxyyyyz_0, \
-                             g_0_xxxyyyz_0_xxyyyzz_0, \
-                             g_0_xxxyyyz_0_xxyyzzz_0, \
-                             g_0_xxxyyyz_0_xxyzzzz_0, \
-                             g_0_xxxyyyz_0_xxzzzzz_0, \
-                             g_0_xxxyyyz_0_xyyyyyy_0, \
-                             g_0_xxxyyyz_0_xyyyyyz_0, \
-                             g_0_xxxyyyz_0_xyyyyzz_0, \
-                             g_0_xxxyyyz_0_xyyyzzz_0, \
-                             g_0_xxxyyyz_0_xyyzzzz_0, \
-                             g_0_xxxyyyz_0_xyzzzzz_0, \
-                             g_0_xxxyyyz_0_xzzzzzz_0, \
-                             g_0_xxxyyyz_0_yyyyyyy_0, \
-                             g_0_xxxyyyz_0_yyyyyyz_0, \
-                             g_0_xxxyyyz_0_yyyyyzz_0, \
-                             g_0_xxxyyyz_0_yyyyzzz_0, \
-                             g_0_xxxyyyz_0_yyyzzzz_0, \
-                             g_0_xxxyyyz_0_yyzzzzz_0, \
-                             g_0_xxxyyyz_0_yzzzzzz_0, \
-                             g_0_xxxyyyz_0_zzzzzzz_0, \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxxyyy_0_xxxxxx_1, g_0_xxxyyy_0_xxxxxxx_0, g_0_xxxyyy_0_xxxxxxx_1, g_0_xxxyyy_0_xxxxxxy_0, g_0_xxxyyy_0_xxxxxxy_1, g_0_xxxyyy_0_xxxxxxz_0, g_0_xxxyyy_0_xxxxxxz_1, g_0_xxxyyy_0_xxxxxy_1, g_0_xxxyyy_0_xxxxxyy_0, g_0_xxxyyy_0_xxxxxyy_1, g_0_xxxyyy_0_xxxxxyz_0, g_0_xxxyyy_0_xxxxxyz_1, g_0_xxxyyy_0_xxxxxz_1, g_0_xxxyyy_0_xxxxxzz_0, g_0_xxxyyy_0_xxxxxzz_1, g_0_xxxyyy_0_xxxxyy_1, g_0_xxxyyy_0_xxxxyyy_0, g_0_xxxyyy_0_xxxxyyy_1, g_0_xxxyyy_0_xxxxyyz_0, g_0_xxxyyy_0_xxxxyyz_1, g_0_xxxyyy_0_xxxxyz_1, g_0_xxxyyy_0_xxxxyzz_0, g_0_xxxyyy_0_xxxxyzz_1, g_0_xxxyyy_0_xxxxzz_1, g_0_xxxyyy_0_xxxxzzz_0, g_0_xxxyyy_0_xxxxzzz_1, g_0_xxxyyy_0_xxxyyy_1, g_0_xxxyyy_0_xxxyyyy_0, g_0_xxxyyy_0_xxxyyyy_1, g_0_xxxyyy_0_xxxyyyz_0, g_0_xxxyyy_0_xxxyyyz_1, g_0_xxxyyy_0_xxxyyz_1, g_0_xxxyyy_0_xxxyyzz_0, g_0_xxxyyy_0_xxxyyzz_1, g_0_xxxyyy_0_xxxyzz_1, g_0_xxxyyy_0_xxxyzzz_0, g_0_xxxyyy_0_xxxyzzz_1, g_0_xxxyyy_0_xxxzzz_1, g_0_xxxyyy_0_xxxzzzz_0, g_0_xxxyyy_0_xxxzzzz_1, g_0_xxxyyy_0_xxyyyy_1, g_0_xxxyyy_0_xxyyyyy_0, g_0_xxxyyy_0_xxyyyyy_1, g_0_xxxyyy_0_xxyyyyz_0, g_0_xxxyyy_0_xxyyyyz_1, g_0_xxxyyy_0_xxyyyz_1, g_0_xxxyyy_0_xxyyyzz_0, g_0_xxxyyy_0_xxyyyzz_1, g_0_xxxyyy_0_xxyyzz_1, g_0_xxxyyy_0_xxyyzzz_0, g_0_xxxyyy_0_xxyyzzz_1, g_0_xxxyyy_0_xxyzzz_1, g_0_xxxyyy_0_xxyzzzz_0, g_0_xxxyyy_0_xxyzzzz_1, g_0_xxxyyy_0_xxzzzz_1, g_0_xxxyyy_0_xxzzzzz_0, g_0_xxxyyy_0_xxzzzzz_1, g_0_xxxyyy_0_xyyyyy_1, g_0_xxxyyy_0_xyyyyyy_0, g_0_xxxyyy_0_xyyyyyy_1, g_0_xxxyyy_0_xyyyyyz_0, g_0_xxxyyy_0_xyyyyyz_1, g_0_xxxyyy_0_xyyyyz_1, g_0_xxxyyy_0_xyyyyzz_0, g_0_xxxyyy_0_xyyyyzz_1, g_0_xxxyyy_0_xyyyzz_1, g_0_xxxyyy_0_xyyyzzz_0, g_0_xxxyyy_0_xyyyzzz_1, g_0_xxxyyy_0_xyyzzz_1, g_0_xxxyyy_0_xyyzzzz_0, g_0_xxxyyy_0_xyyzzzz_1, g_0_xxxyyy_0_xyzzzz_1, g_0_xxxyyy_0_xyzzzzz_0, g_0_xxxyyy_0_xyzzzzz_1, g_0_xxxyyy_0_xzzzzz_1, g_0_xxxyyy_0_xzzzzzz_0, g_0_xxxyyy_0_xzzzzzz_1, g_0_xxxyyy_0_yyyyyy_1, g_0_xxxyyy_0_yyyyyyy_0, g_0_xxxyyy_0_yyyyyyy_1, g_0_xxxyyy_0_yyyyyyz_0, g_0_xxxyyy_0_yyyyyyz_1, g_0_xxxyyy_0_yyyyyz_1, g_0_xxxyyy_0_yyyyyzz_0, g_0_xxxyyy_0_yyyyyzz_1, g_0_xxxyyy_0_yyyyzz_1, g_0_xxxyyy_0_yyyyzzz_0, g_0_xxxyyy_0_yyyyzzz_1, g_0_xxxyyy_0_yyyzzz_1, g_0_xxxyyy_0_yyyzzzz_0, g_0_xxxyyy_0_yyyzzzz_1, g_0_xxxyyy_0_yyzzzz_1, g_0_xxxyyy_0_yyzzzzz_0, g_0_xxxyyy_0_yyzzzzz_1, g_0_xxxyyy_0_yzzzzz_1, g_0_xxxyyy_0_yzzzzzz_0, g_0_xxxyyy_0_yzzzzzz_1, g_0_xxxyyy_0_zzzzzz_1, g_0_xxxyyy_0_zzzzzzz_0, g_0_xxxyyy_0_zzzzzzz_1, g_0_xxxyyyz_0_xxxxxxx_0, g_0_xxxyyyz_0_xxxxxxy_0, g_0_xxxyyyz_0_xxxxxxz_0, g_0_xxxyyyz_0_xxxxxyy_0, g_0_xxxyyyz_0_xxxxxyz_0, g_0_xxxyyyz_0_xxxxxzz_0, g_0_xxxyyyz_0_xxxxyyy_0, g_0_xxxyyyz_0_xxxxyyz_0, g_0_xxxyyyz_0_xxxxyzz_0, g_0_xxxyyyz_0_xxxxzzz_0, g_0_xxxyyyz_0_xxxyyyy_0, g_0_xxxyyyz_0_xxxyyyz_0, g_0_xxxyyyz_0_xxxyyzz_0, g_0_xxxyyyz_0_xxxyzzz_0, g_0_xxxyyyz_0_xxxzzzz_0, g_0_xxxyyyz_0_xxyyyyy_0, g_0_xxxyyyz_0_xxyyyyz_0, g_0_xxxyyyz_0_xxyyyzz_0, g_0_xxxyyyz_0_xxyyzzz_0, g_0_xxxyyyz_0_xxyzzzz_0, g_0_xxxyyyz_0_xxzzzzz_0, g_0_xxxyyyz_0_xyyyyyy_0, g_0_xxxyyyz_0_xyyyyyz_0, g_0_xxxyyyz_0_xyyyyzz_0, g_0_xxxyyyz_0_xyyyzzz_0, g_0_xxxyyyz_0_xyyzzzz_0, g_0_xxxyyyz_0_xyzzzzz_0, g_0_xxxyyyz_0_xzzzzzz_0, g_0_xxxyyyz_0_yyyyyyy_0, g_0_xxxyyyz_0_yyyyyyz_0, g_0_xxxyyyz_0_yyyyyzz_0, g_0_xxxyyyz_0_yyyyzzz_0, g_0_xxxyyyz_0_yyyzzzz_0, g_0_xxxyyyz_0_yyzzzzz_0, g_0_xxxyyyz_0_yzzzzzz_0, g_0_xxxyyyz_0_zzzzzzz_0, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -10036,88 +7573,67 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         g_0_xxxyyyz_0_xxxxxyz_0[i] = g_0_xxxyyy_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxxyz_0[i] * pb_z + g_0_xxxyyy_0_xxxxxyz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_xxxxxzz_0[i] =
-            2.0 * g_0_xxxyyy_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxxzz_0[i] * pb_z + g_0_xxxyyy_0_xxxxxzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_xxxxxzz_0[i] = 2.0 * g_0_xxxyyy_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxxzz_0[i] * pb_z + g_0_xxxyyy_0_xxxxxzz_1[i] * wp_z[i];
 
         g_0_xxxyyyz_0_xxxxyyy_0[i] = g_0_xxxyyy_0_xxxxyyy_0[i] * pb_z + g_0_xxxyyy_0_xxxxyyy_1[i] * wp_z[i];
 
         g_0_xxxyyyz_0_xxxxyyz_0[i] = g_0_xxxyyy_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxyyz_0[i] * pb_z + g_0_xxxyyy_0_xxxxyyz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_xxxxyzz_0[i] =
-            2.0 * g_0_xxxyyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxyzz_0[i] * pb_z + g_0_xxxyyy_0_xxxxyzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_xxxxyzz_0[i] = 2.0 * g_0_xxxyyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxyzz_0[i] * pb_z + g_0_xxxyyy_0_xxxxyzz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_xxxxzzz_0[i] =
-            3.0 * g_0_xxxyyy_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxzzz_0[i] * pb_z + g_0_xxxyyy_0_xxxxzzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_xxxxzzz_0[i] = 3.0 * g_0_xxxyyy_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxxzzz_0[i] * pb_z + g_0_xxxyyy_0_xxxxzzz_1[i] * wp_z[i];
 
         g_0_xxxyyyz_0_xxxyyyy_0[i] = g_0_xxxyyy_0_xxxyyyy_0[i] * pb_z + g_0_xxxyyy_0_xxxyyyy_1[i] * wp_z[i];
 
         g_0_xxxyyyz_0_xxxyyyz_0[i] = g_0_xxxyyy_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxyyyz_0[i] * pb_z + g_0_xxxyyy_0_xxxyyyz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_xxxyyzz_0[i] =
-            2.0 * g_0_xxxyyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxyyzz_0[i] * pb_z + g_0_xxxyyy_0_xxxyyzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_xxxyyzz_0[i] = 2.0 * g_0_xxxyyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxyyzz_0[i] * pb_z + g_0_xxxyyy_0_xxxyyzz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_xxxyzzz_0[i] =
-            3.0 * g_0_xxxyyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxyzzz_0[i] * pb_z + g_0_xxxyyy_0_xxxyzzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_xxxyzzz_0[i] = 3.0 * g_0_xxxyyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxyzzz_0[i] * pb_z + g_0_xxxyyy_0_xxxyzzz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_xxxzzzz_0[i] =
-            4.0 * g_0_xxxyyy_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxzzzz_0[i] * pb_z + g_0_xxxyyy_0_xxxzzzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_xxxzzzz_0[i] = 4.0 * g_0_xxxyyy_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxxzzzz_0[i] * pb_z + g_0_xxxyyy_0_xxxzzzz_1[i] * wp_z[i];
 
         g_0_xxxyyyz_0_xxyyyyy_0[i] = g_0_xxxyyy_0_xxyyyyy_0[i] * pb_z + g_0_xxxyyy_0_xxyyyyy_1[i] * wp_z[i];
 
         g_0_xxxyyyz_0_xxyyyyz_0[i] = g_0_xxxyyy_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyyyyz_0[i] * pb_z + g_0_xxxyyy_0_xxyyyyz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_xxyyyzz_0[i] =
-            2.0 * g_0_xxxyyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyyyzz_0[i] * pb_z + g_0_xxxyyy_0_xxyyyzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_xxyyyzz_0[i] = 2.0 * g_0_xxxyyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyyyzz_0[i] * pb_z + g_0_xxxyyy_0_xxyyyzz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_xxyyzzz_0[i] =
-            3.0 * g_0_xxxyyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyyzzz_0[i] * pb_z + g_0_xxxyyy_0_xxyyzzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_xxyyzzz_0[i] = 3.0 * g_0_xxxyyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyyzzz_0[i] * pb_z + g_0_xxxyyy_0_xxyyzzz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_xxyzzzz_0[i] =
-            4.0 * g_0_xxxyyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyzzzz_0[i] * pb_z + g_0_xxxyyy_0_xxyzzzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_xxyzzzz_0[i] = 4.0 * g_0_xxxyyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxyzzzz_0[i] * pb_z + g_0_xxxyyy_0_xxyzzzz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_xxzzzzz_0[i] =
-            5.0 * g_0_xxxyyy_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxzzzzz_0[i] * pb_z + g_0_xxxyyy_0_xxzzzzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_xxzzzzz_0[i] = 5.0 * g_0_xxxyyy_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xxzzzzz_0[i] * pb_z + g_0_xxxyyy_0_xxzzzzz_1[i] * wp_z[i];
 
         g_0_xxxyyyz_0_xyyyyyy_0[i] = g_0_xxxyyy_0_xyyyyyy_0[i] * pb_z + g_0_xxxyyy_0_xyyyyyy_1[i] * wp_z[i];
 
         g_0_xxxyyyz_0_xyyyyyz_0[i] = g_0_xxxyyy_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyyyyz_0[i] * pb_z + g_0_xxxyyy_0_xyyyyyz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_xyyyyzz_0[i] =
-            2.0 * g_0_xxxyyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyyyzz_0[i] * pb_z + g_0_xxxyyy_0_xyyyyzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_xyyyyzz_0[i] = 2.0 * g_0_xxxyyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyyyzz_0[i] * pb_z + g_0_xxxyyy_0_xyyyyzz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_xyyyzzz_0[i] =
-            3.0 * g_0_xxxyyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyyzzz_0[i] * pb_z + g_0_xxxyyy_0_xyyyzzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_xyyyzzz_0[i] = 3.0 * g_0_xxxyyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyyzzz_0[i] * pb_z + g_0_xxxyyy_0_xyyyzzz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_xyyzzzz_0[i] =
-            4.0 * g_0_xxxyyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyzzzz_0[i] * pb_z + g_0_xxxyyy_0_xyyzzzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_xyyzzzz_0[i] = 4.0 * g_0_xxxyyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyyzzzz_0[i] * pb_z + g_0_xxxyyy_0_xyyzzzz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_xyzzzzz_0[i] =
-            5.0 * g_0_xxxyyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyzzzzz_0[i] * pb_z + g_0_xxxyyy_0_xyzzzzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_xyzzzzz_0[i] = 5.0 * g_0_xxxyyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xyzzzzz_0[i] * pb_z + g_0_xxxyyy_0_xyzzzzz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_xzzzzzz_0[i] =
-            6.0 * g_0_xxxyyy_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xzzzzzz_0[i] * pb_z + g_0_xxxyyy_0_xzzzzzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_xzzzzzz_0[i] = 6.0 * g_0_xxxyyy_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_xzzzzzz_0[i] * pb_z + g_0_xxxyyy_0_xzzzzzz_1[i] * wp_z[i];
 
         g_0_xxxyyyz_0_yyyyyyy_0[i] = g_0_xxxyyy_0_yyyyyyy_0[i] * pb_z + g_0_xxxyyy_0_yyyyyyy_1[i] * wp_z[i];
 
         g_0_xxxyyyz_0_yyyyyyz_0[i] = g_0_xxxyyy_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxxyyy_0_yyyyyyz_0[i] * pb_z + g_0_xxxyyy_0_yyyyyyz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_yyyyyzz_0[i] =
-            2.0 * g_0_xxxyyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_yyyyyzz_0[i] * pb_z + g_0_xxxyyy_0_yyyyyzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_yyyyyzz_0[i] = 2.0 * g_0_xxxyyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_yyyyyzz_0[i] * pb_z + g_0_xxxyyy_0_yyyyyzz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_yyyyzzz_0[i] =
-            3.0 * g_0_xxxyyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_yyyyzzz_0[i] * pb_z + g_0_xxxyyy_0_yyyyzzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_yyyyzzz_0[i] = 3.0 * g_0_xxxyyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_yyyyzzz_0[i] * pb_z + g_0_xxxyyy_0_yyyyzzz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_yyyzzzz_0[i] =
-            4.0 * g_0_xxxyyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_yyyzzzz_0[i] * pb_z + g_0_xxxyyy_0_yyyzzzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_yyyzzzz_0[i] = 4.0 * g_0_xxxyyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_yyyzzzz_0[i] * pb_z + g_0_xxxyyy_0_yyyzzzz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_yyzzzzz_0[i] =
-            5.0 * g_0_xxxyyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_yyzzzzz_0[i] * pb_z + g_0_xxxyyy_0_yyzzzzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_yyzzzzz_0[i] = 5.0 * g_0_xxxyyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_yyzzzzz_0[i] * pb_z + g_0_xxxyyy_0_yyzzzzz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_yzzzzzz_0[i] =
-            6.0 * g_0_xxxyyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_yzzzzzz_0[i] * pb_z + g_0_xxxyyy_0_yzzzzzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_yzzzzzz_0[i] = 6.0 * g_0_xxxyyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_yzzzzzz_0[i] * pb_z + g_0_xxxyyy_0_yzzzzzz_1[i] * wp_z[i];
 
-        g_0_xxxyyyz_0_zzzzzzz_0[i] =
-            7.0 * g_0_xxxyyy_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_zzzzzzz_0[i] * pb_z + g_0_xxxyyy_0_zzzzzzz_1[i] * wp_z[i];
+        g_0_xxxyyyz_0_zzzzzzz_0[i] = 7.0 * g_0_xxxyyy_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxxyyy_0_zzzzzzz_0[i] * pb_z + g_0_xxxyyy_0_zzzzzzz_1[i] * wp_z[i];
     }
 
     /// Set up 432-468 components of targeted buffer : SKSK
@@ -10194,206 +7710,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxxyyzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 467);
 
-#pragma omp simd aligned(g_0_xxxyy_0_xxxxxxy_0,       \
-                             g_0_xxxyy_0_xxxxxxy_1,   \
-                             g_0_xxxyy_0_xxxxxyy_0,   \
-                             g_0_xxxyy_0_xxxxxyy_1,   \
-                             g_0_xxxyy_0_xxxxyyy_0,   \
-                             g_0_xxxyy_0_xxxxyyy_1,   \
-                             g_0_xxxyy_0_xxxyyyy_0,   \
-                             g_0_xxxyy_0_xxxyyyy_1,   \
-                             g_0_xxxyy_0_xxyyyyy_0,   \
-                             g_0_xxxyy_0_xxyyyyy_1,   \
-                             g_0_xxxyy_0_xyyyyyy_0,   \
-                             g_0_xxxyy_0_xyyyyyy_1,   \
-                             g_0_xxxyyz_0_xxxxxxy_0,  \
-                             g_0_xxxyyz_0_xxxxxxy_1,  \
-                             g_0_xxxyyz_0_xxxxxyy_0,  \
-                             g_0_xxxyyz_0_xxxxxyy_1,  \
-                             g_0_xxxyyz_0_xxxxyyy_0,  \
-                             g_0_xxxyyz_0_xxxxyyy_1,  \
-                             g_0_xxxyyz_0_xxxyyyy_0,  \
-                             g_0_xxxyyz_0_xxxyyyy_1,  \
-                             g_0_xxxyyz_0_xxyyyyy_0,  \
-                             g_0_xxxyyz_0_xxyyyyy_1,  \
-                             g_0_xxxyyz_0_xyyyyyy_0,  \
-                             g_0_xxxyyz_0_xyyyyyy_1,  \
-                             g_0_xxxyyzz_0_xxxxxxx_0, \
-                             g_0_xxxyyzz_0_xxxxxxy_0, \
-                             g_0_xxxyyzz_0_xxxxxxz_0, \
-                             g_0_xxxyyzz_0_xxxxxyy_0, \
-                             g_0_xxxyyzz_0_xxxxxyz_0, \
-                             g_0_xxxyyzz_0_xxxxxzz_0, \
-                             g_0_xxxyyzz_0_xxxxyyy_0, \
-                             g_0_xxxyyzz_0_xxxxyyz_0, \
-                             g_0_xxxyyzz_0_xxxxyzz_0, \
-                             g_0_xxxyyzz_0_xxxxzzz_0, \
-                             g_0_xxxyyzz_0_xxxyyyy_0, \
-                             g_0_xxxyyzz_0_xxxyyyz_0, \
-                             g_0_xxxyyzz_0_xxxyyzz_0, \
-                             g_0_xxxyyzz_0_xxxyzzz_0, \
-                             g_0_xxxyyzz_0_xxxzzzz_0, \
-                             g_0_xxxyyzz_0_xxyyyyy_0, \
-                             g_0_xxxyyzz_0_xxyyyyz_0, \
-                             g_0_xxxyyzz_0_xxyyyzz_0, \
-                             g_0_xxxyyzz_0_xxyyzzz_0, \
-                             g_0_xxxyyzz_0_xxyzzzz_0, \
-                             g_0_xxxyyzz_0_xxzzzzz_0, \
-                             g_0_xxxyyzz_0_xyyyyyy_0, \
-                             g_0_xxxyyzz_0_xyyyyyz_0, \
-                             g_0_xxxyyzz_0_xyyyyzz_0, \
-                             g_0_xxxyyzz_0_xyyyzzz_0, \
-                             g_0_xxxyyzz_0_xyyzzzz_0, \
-                             g_0_xxxyyzz_0_xyzzzzz_0, \
-                             g_0_xxxyyzz_0_xzzzzzz_0, \
-                             g_0_xxxyyzz_0_yyyyyyy_0, \
-                             g_0_xxxyyzz_0_yyyyyyz_0, \
-                             g_0_xxxyyzz_0_yyyyyzz_0, \
-                             g_0_xxxyyzz_0_yyyyzzz_0, \
-                             g_0_xxxyyzz_0_yyyzzzz_0, \
-                             g_0_xxxyyzz_0_yyzzzzz_0, \
-                             g_0_xxxyyzz_0_yzzzzzz_0, \
-                             g_0_xxxyyzz_0_zzzzzzz_0, \
-                             g_0_xxxyzz_0_xxxxxxx_0,  \
-                             g_0_xxxyzz_0_xxxxxxx_1,  \
-                             g_0_xxxyzz_0_xxxxxxz_0,  \
-                             g_0_xxxyzz_0_xxxxxxz_1,  \
-                             g_0_xxxyzz_0_xxxxxzz_0,  \
-                             g_0_xxxyzz_0_xxxxxzz_1,  \
-                             g_0_xxxyzz_0_xxxxzzz_0,  \
-                             g_0_xxxyzz_0_xxxxzzz_1,  \
-                             g_0_xxxyzz_0_xxxzzzz_0,  \
-                             g_0_xxxyzz_0_xxxzzzz_1,  \
-                             g_0_xxxyzz_0_xxzzzzz_0,  \
-                             g_0_xxxyzz_0_xxzzzzz_1,  \
-                             g_0_xxxyzz_0_xzzzzzz_0,  \
-                             g_0_xxxyzz_0_xzzzzzz_1,  \
-                             g_0_xxxzz_0_xxxxxxx_0,   \
-                             g_0_xxxzz_0_xxxxxxx_1,   \
-                             g_0_xxxzz_0_xxxxxxz_0,   \
-                             g_0_xxxzz_0_xxxxxxz_1,   \
-                             g_0_xxxzz_0_xxxxxzz_0,   \
-                             g_0_xxxzz_0_xxxxxzz_1,   \
-                             g_0_xxxzz_0_xxxxzzz_0,   \
-                             g_0_xxxzz_0_xxxxzzz_1,   \
-                             g_0_xxxzz_0_xxxzzzz_0,   \
-                             g_0_xxxzz_0_xxxzzzz_1,   \
-                             g_0_xxxzz_0_xxzzzzz_0,   \
-                             g_0_xxxzz_0_xxzzzzz_1,   \
-                             g_0_xxxzz_0_xzzzzzz_0,   \
-                             g_0_xxxzz_0_xzzzzzz_1,   \
-                             g_0_xxyyzz_0_xxxxxyz_0,  \
-                             g_0_xxyyzz_0_xxxxxyz_1,  \
-                             g_0_xxyyzz_0_xxxxyyz_0,  \
-                             g_0_xxyyzz_0_xxxxyyz_1,  \
-                             g_0_xxyyzz_0_xxxxyz_1,   \
-                             g_0_xxyyzz_0_xxxxyzz_0,  \
-                             g_0_xxyyzz_0_xxxxyzz_1,  \
-                             g_0_xxyyzz_0_xxxyyyz_0,  \
-                             g_0_xxyyzz_0_xxxyyyz_1,  \
-                             g_0_xxyyzz_0_xxxyyz_1,   \
-                             g_0_xxyyzz_0_xxxyyzz_0,  \
-                             g_0_xxyyzz_0_xxxyyzz_1,  \
-                             g_0_xxyyzz_0_xxxyzz_1,   \
-                             g_0_xxyyzz_0_xxxyzzz_0,  \
-                             g_0_xxyyzz_0_xxxyzzz_1,  \
-                             g_0_xxyyzz_0_xxyyyyz_0,  \
-                             g_0_xxyyzz_0_xxyyyyz_1,  \
-                             g_0_xxyyzz_0_xxyyyz_1,   \
-                             g_0_xxyyzz_0_xxyyyzz_0,  \
-                             g_0_xxyyzz_0_xxyyyzz_1,  \
-                             g_0_xxyyzz_0_xxyyzz_1,   \
-                             g_0_xxyyzz_0_xxyyzzz_0,  \
-                             g_0_xxyyzz_0_xxyyzzz_1,  \
-                             g_0_xxyyzz_0_xxyzzz_1,   \
-                             g_0_xxyyzz_0_xxyzzzz_0,  \
-                             g_0_xxyyzz_0_xxyzzzz_1,  \
-                             g_0_xxyyzz_0_xyyyyyz_0,  \
-                             g_0_xxyyzz_0_xyyyyyz_1,  \
-                             g_0_xxyyzz_0_xyyyyz_1,   \
-                             g_0_xxyyzz_0_xyyyyzz_0,  \
-                             g_0_xxyyzz_0_xyyyyzz_1,  \
-                             g_0_xxyyzz_0_xyyyzz_1,   \
-                             g_0_xxyyzz_0_xyyyzzz_0,  \
-                             g_0_xxyyzz_0_xyyyzzz_1,  \
-                             g_0_xxyyzz_0_xyyzzz_1,   \
-                             g_0_xxyyzz_0_xyyzzzz_0,  \
-                             g_0_xxyyzz_0_xyyzzzz_1,  \
-                             g_0_xxyyzz_0_xyzzzz_1,   \
-                             g_0_xxyyzz_0_xyzzzzz_0,  \
-                             g_0_xxyyzz_0_xyzzzzz_1,  \
-                             g_0_xxyyzz_0_yyyyyyy_0,  \
-                             g_0_xxyyzz_0_yyyyyyy_1,  \
-                             g_0_xxyyzz_0_yyyyyyz_0,  \
-                             g_0_xxyyzz_0_yyyyyyz_1,  \
-                             g_0_xxyyzz_0_yyyyyz_1,   \
-                             g_0_xxyyzz_0_yyyyyzz_0,  \
-                             g_0_xxyyzz_0_yyyyyzz_1,  \
-                             g_0_xxyyzz_0_yyyyzz_1,   \
-                             g_0_xxyyzz_0_yyyyzzz_0,  \
-                             g_0_xxyyzz_0_yyyyzzz_1,  \
-                             g_0_xxyyzz_0_yyyzzz_1,   \
-                             g_0_xxyyzz_0_yyyzzzz_0,  \
-                             g_0_xxyyzz_0_yyyzzzz_1,  \
-                             g_0_xxyyzz_0_yyzzzz_1,   \
-                             g_0_xxyyzz_0_yyzzzzz_0,  \
-                             g_0_xxyyzz_0_yyzzzzz_1,  \
-                             g_0_xxyyzz_0_yzzzzz_1,   \
-                             g_0_xxyyzz_0_yzzzzzz_0,  \
-                             g_0_xxyyzz_0_yzzzzzz_1,  \
-                             g_0_xxyyzz_0_zzzzzzz_0,  \
-                             g_0_xxyyzz_0_zzzzzzz_1,  \
-                             g_0_xyyzz_0_xxxxxyz_0,   \
-                             g_0_xyyzz_0_xxxxxyz_1,   \
-                             g_0_xyyzz_0_xxxxyyz_0,   \
-                             g_0_xyyzz_0_xxxxyyz_1,   \
-                             g_0_xyyzz_0_xxxxyzz_0,   \
-                             g_0_xyyzz_0_xxxxyzz_1,   \
-                             g_0_xyyzz_0_xxxyyyz_0,   \
-                             g_0_xyyzz_0_xxxyyyz_1,   \
-                             g_0_xyyzz_0_xxxyyzz_0,   \
-                             g_0_xyyzz_0_xxxyyzz_1,   \
-                             g_0_xyyzz_0_xxxyzzz_0,   \
-                             g_0_xyyzz_0_xxxyzzz_1,   \
-                             g_0_xyyzz_0_xxyyyyz_0,   \
-                             g_0_xyyzz_0_xxyyyyz_1,   \
-                             g_0_xyyzz_0_xxyyyzz_0,   \
-                             g_0_xyyzz_0_xxyyyzz_1,   \
-                             g_0_xyyzz_0_xxyyzzz_0,   \
-                             g_0_xyyzz_0_xxyyzzz_1,   \
-                             g_0_xyyzz_0_xxyzzzz_0,   \
-                             g_0_xyyzz_0_xxyzzzz_1,   \
-                             g_0_xyyzz_0_xyyyyyz_0,   \
-                             g_0_xyyzz_0_xyyyyyz_1,   \
-                             g_0_xyyzz_0_xyyyyzz_0,   \
-                             g_0_xyyzz_0_xyyyyzz_1,   \
-                             g_0_xyyzz_0_xyyyzzz_0,   \
-                             g_0_xyyzz_0_xyyyzzz_1,   \
-                             g_0_xyyzz_0_xyyzzzz_0,   \
-                             g_0_xyyzz_0_xyyzzzz_1,   \
-                             g_0_xyyzz_0_xyzzzzz_0,   \
-                             g_0_xyyzz_0_xyzzzzz_1,   \
-                             g_0_xyyzz_0_yyyyyyy_0,   \
-                             g_0_xyyzz_0_yyyyyyy_1,   \
-                             g_0_xyyzz_0_yyyyyyz_0,   \
-                             g_0_xyyzz_0_yyyyyyz_1,   \
-                             g_0_xyyzz_0_yyyyyzz_0,   \
-                             g_0_xyyzz_0_yyyyyzz_1,   \
-                             g_0_xyyzz_0_yyyyzzz_0,   \
-                             g_0_xyyzz_0_yyyyzzz_1,   \
-                             g_0_xyyzz_0_yyyzzzz_0,   \
-                             g_0_xyyzz_0_yyyzzzz_1,   \
-                             g_0_xyyzz_0_yyzzzzz_0,   \
-                             g_0_xyyzz_0_yyzzzzz_1,   \
-                             g_0_xyyzz_0_yzzzzzz_0,   \
-                             g_0_xyyzz_0_yzzzzzz_1,   \
-                             g_0_xyyzz_0_zzzzzzz_0,   \
-                             g_0_xyyzz_0_zzzzzzz_1,   \
-                             wp_x,                    \
-                             wp_y,                    \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxxyy_0_xxxxxxy_0, g_0_xxxyy_0_xxxxxxy_1, g_0_xxxyy_0_xxxxxyy_0, g_0_xxxyy_0_xxxxxyy_1, g_0_xxxyy_0_xxxxyyy_0, g_0_xxxyy_0_xxxxyyy_1, g_0_xxxyy_0_xxxyyyy_0, g_0_xxxyy_0_xxxyyyy_1, g_0_xxxyy_0_xxyyyyy_0, g_0_xxxyy_0_xxyyyyy_1, g_0_xxxyy_0_xyyyyyy_0, g_0_xxxyy_0_xyyyyyy_1, g_0_xxxyyz_0_xxxxxxy_0, g_0_xxxyyz_0_xxxxxxy_1, g_0_xxxyyz_0_xxxxxyy_0, g_0_xxxyyz_0_xxxxxyy_1, g_0_xxxyyz_0_xxxxyyy_0, g_0_xxxyyz_0_xxxxyyy_1, g_0_xxxyyz_0_xxxyyyy_0, g_0_xxxyyz_0_xxxyyyy_1, g_0_xxxyyz_0_xxyyyyy_0, g_0_xxxyyz_0_xxyyyyy_1, g_0_xxxyyz_0_xyyyyyy_0, g_0_xxxyyz_0_xyyyyyy_1, g_0_xxxyyzz_0_xxxxxxx_0, g_0_xxxyyzz_0_xxxxxxy_0, g_0_xxxyyzz_0_xxxxxxz_0, g_0_xxxyyzz_0_xxxxxyy_0, g_0_xxxyyzz_0_xxxxxyz_0, g_0_xxxyyzz_0_xxxxxzz_0, g_0_xxxyyzz_0_xxxxyyy_0, g_0_xxxyyzz_0_xxxxyyz_0, g_0_xxxyyzz_0_xxxxyzz_0, g_0_xxxyyzz_0_xxxxzzz_0, g_0_xxxyyzz_0_xxxyyyy_0, g_0_xxxyyzz_0_xxxyyyz_0, g_0_xxxyyzz_0_xxxyyzz_0, g_0_xxxyyzz_0_xxxyzzz_0, g_0_xxxyyzz_0_xxxzzzz_0, g_0_xxxyyzz_0_xxyyyyy_0, g_0_xxxyyzz_0_xxyyyyz_0, g_0_xxxyyzz_0_xxyyyzz_0, g_0_xxxyyzz_0_xxyyzzz_0, g_0_xxxyyzz_0_xxyzzzz_0, g_0_xxxyyzz_0_xxzzzzz_0, g_0_xxxyyzz_0_xyyyyyy_0, g_0_xxxyyzz_0_xyyyyyz_0, g_0_xxxyyzz_0_xyyyyzz_0, g_0_xxxyyzz_0_xyyyzzz_0, g_0_xxxyyzz_0_xyyzzzz_0, g_0_xxxyyzz_0_xyzzzzz_0, g_0_xxxyyzz_0_xzzzzzz_0, g_0_xxxyyzz_0_yyyyyyy_0, g_0_xxxyyzz_0_yyyyyyz_0, g_0_xxxyyzz_0_yyyyyzz_0, g_0_xxxyyzz_0_yyyyzzz_0, g_0_xxxyyzz_0_yyyzzzz_0, g_0_xxxyyzz_0_yyzzzzz_0, g_0_xxxyyzz_0_yzzzzzz_0, g_0_xxxyyzz_0_zzzzzzz_0, g_0_xxxyzz_0_xxxxxxx_0, g_0_xxxyzz_0_xxxxxxx_1, g_0_xxxyzz_0_xxxxxxz_0, g_0_xxxyzz_0_xxxxxxz_1, g_0_xxxyzz_0_xxxxxzz_0, g_0_xxxyzz_0_xxxxxzz_1, g_0_xxxyzz_0_xxxxzzz_0, g_0_xxxyzz_0_xxxxzzz_1, g_0_xxxyzz_0_xxxzzzz_0, g_0_xxxyzz_0_xxxzzzz_1, g_0_xxxyzz_0_xxzzzzz_0, g_0_xxxyzz_0_xxzzzzz_1, g_0_xxxyzz_0_xzzzzzz_0, g_0_xxxyzz_0_xzzzzzz_1, g_0_xxxzz_0_xxxxxxx_0, g_0_xxxzz_0_xxxxxxx_1, g_0_xxxzz_0_xxxxxxz_0, g_0_xxxzz_0_xxxxxxz_1, g_0_xxxzz_0_xxxxxzz_0, g_0_xxxzz_0_xxxxxzz_1, g_0_xxxzz_0_xxxxzzz_0, g_0_xxxzz_0_xxxxzzz_1, g_0_xxxzz_0_xxxzzzz_0, g_0_xxxzz_0_xxxzzzz_1, g_0_xxxzz_0_xxzzzzz_0, g_0_xxxzz_0_xxzzzzz_1, g_0_xxxzz_0_xzzzzzz_0, g_0_xxxzz_0_xzzzzzz_1, g_0_xxyyzz_0_xxxxxyz_0, g_0_xxyyzz_0_xxxxxyz_1, g_0_xxyyzz_0_xxxxyyz_0, g_0_xxyyzz_0_xxxxyyz_1, g_0_xxyyzz_0_xxxxyz_1, g_0_xxyyzz_0_xxxxyzz_0, g_0_xxyyzz_0_xxxxyzz_1, g_0_xxyyzz_0_xxxyyyz_0, g_0_xxyyzz_0_xxxyyyz_1, g_0_xxyyzz_0_xxxyyz_1, g_0_xxyyzz_0_xxxyyzz_0, g_0_xxyyzz_0_xxxyyzz_1, g_0_xxyyzz_0_xxxyzz_1, g_0_xxyyzz_0_xxxyzzz_0, g_0_xxyyzz_0_xxxyzzz_1, g_0_xxyyzz_0_xxyyyyz_0, g_0_xxyyzz_0_xxyyyyz_1, g_0_xxyyzz_0_xxyyyz_1, g_0_xxyyzz_0_xxyyyzz_0, g_0_xxyyzz_0_xxyyyzz_1, g_0_xxyyzz_0_xxyyzz_1, g_0_xxyyzz_0_xxyyzzz_0, g_0_xxyyzz_0_xxyyzzz_1, g_0_xxyyzz_0_xxyzzz_1, g_0_xxyyzz_0_xxyzzzz_0, g_0_xxyyzz_0_xxyzzzz_1, g_0_xxyyzz_0_xyyyyyz_0, g_0_xxyyzz_0_xyyyyyz_1, g_0_xxyyzz_0_xyyyyz_1, g_0_xxyyzz_0_xyyyyzz_0, g_0_xxyyzz_0_xyyyyzz_1, g_0_xxyyzz_0_xyyyzz_1, g_0_xxyyzz_0_xyyyzzz_0, g_0_xxyyzz_0_xyyyzzz_1, g_0_xxyyzz_0_xyyzzz_1, g_0_xxyyzz_0_xyyzzzz_0, g_0_xxyyzz_0_xyyzzzz_1, g_0_xxyyzz_0_xyzzzz_1, g_0_xxyyzz_0_xyzzzzz_0, g_0_xxyyzz_0_xyzzzzz_1, g_0_xxyyzz_0_yyyyyyy_0, g_0_xxyyzz_0_yyyyyyy_1, g_0_xxyyzz_0_yyyyyyz_0, g_0_xxyyzz_0_yyyyyyz_1, g_0_xxyyzz_0_yyyyyz_1, g_0_xxyyzz_0_yyyyyzz_0, g_0_xxyyzz_0_yyyyyzz_1, g_0_xxyyzz_0_yyyyzz_1, g_0_xxyyzz_0_yyyyzzz_0, g_0_xxyyzz_0_yyyyzzz_1, g_0_xxyyzz_0_yyyzzz_1, g_0_xxyyzz_0_yyyzzzz_0, g_0_xxyyzz_0_yyyzzzz_1, g_0_xxyyzz_0_yyzzzz_1, g_0_xxyyzz_0_yyzzzzz_0, g_0_xxyyzz_0_yyzzzzz_1, g_0_xxyyzz_0_yzzzzz_1, g_0_xxyyzz_0_yzzzzzz_0, g_0_xxyyzz_0_yzzzzzz_1, g_0_xxyyzz_0_zzzzzzz_0, g_0_xxyyzz_0_zzzzzzz_1, g_0_xyyzz_0_xxxxxyz_0, g_0_xyyzz_0_xxxxxyz_1, g_0_xyyzz_0_xxxxyyz_0, g_0_xyyzz_0_xxxxyyz_1, g_0_xyyzz_0_xxxxyzz_0, g_0_xyyzz_0_xxxxyzz_1, g_0_xyyzz_0_xxxyyyz_0, g_0_xyyzz_0_xxxyyyz_1, g_0_xyyzz_0_xxxyyzz_0, g_0_xyyzz_0_xxxyyzz_1, g_0_xyyzz_0_xxxyzzz_0, g_0_xyyzz_0_xxxyzzz_1, g_0_xyyzz_0_xxyyyyz_0, g_0_xyyzz_0_xxyyyyz_1, g_0_xyyzz_0_xxyyyzz_0, g_0_xyyzz_0_xxyyyzz_1, g_0_xyyzz_0_xxyyzzz_0, g_0_xyyzz_0_xxyyzzz_1, g_0_xyyzz_0_xxyzzzz_0, g_0_xyyzz_0_xxyzzzz_1, g_0_xyyzz_0_xyyyyyz_0, g_0_xyyzz_0_xyyyyyz_1, g_0_xyyzz_0_xyyyyzz_0, g_0_xyyzz_0_xyyyyzz_1, g_0_xyyzz_0_xyyyzzz_0, g_0_xyyzz_0_xyyyzzz_1, g_0_xyyzz_0_xyyzzzz_0, g_0_xyyzz_0_xyyzzzz_1, g_0_xyyzz_0_xyzzzzz_0, g_0_xyyzz_0_xyzzzzz_1, g_0_xyyzz_0_yyyyyyy_0, g_0_xyyzz_0_yyyyyyy_1, g_0_xyyzz_0_yyyyyyz_0, g_0_xyyzz_0_yyyyyyz_1, g_0_xyyzz_0_yyyyyzz_0, g_0_xyyzz_0_yyyyyzz_1, g_0_xyyzz_0_yyyyzzz_0, g_0_xyyzz_0_yyyyzzz_1, g_0_xyyzz_0_yyyzzzz_0, g_0_xyyzz_0_yyyzzzz_1, g_0_xyyzz_0_yyzzzzz_0, g_0_xyyzz_0_yyzzzzz_1, g_0_xyyzz_0_yzzzzzz_0, g_0_xyyzz_0_yzzzzzz_1, g_0_xyyzz_0_zzzzzzz_0, g_0_xyyzz_0_zzzzzzz_1, wp_x, wp_y, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -10402,123 +7719,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxxyyzz_0_xxxxxxx_0[i] = g_0_xxxzz_0_xxxxxxx_0[i] * fi_ab_0 - g_0_xxxzz_0_xxxxxxx_1[i] * fti_ab_0 + g_0_xxxyzz_0_xxxxxxx_0[i] * pb_y +
-                                     g_0_xxxyzz_0_xxxxxxx_1[i] * wp_y[i];
+        g_0_xxxyyzz_0_xxxxxxx_0[i] = g_0_xxxzz_0_xxxxxxx_0[i] * fi_ab_0 - g_0_xxxzz_0_xxxxxxx_1[i] * fti_ab_0 + g_0_xxxyzz_0_xxxxxxx_0[i] * pb_y + g_0_xxxyzz_0_xxxxxxx_1[i] * wp_y[i];
 
-        g_0_xxxyyzz_0_xxxxxxy_0[i] = g_0_xxxyy_0_xxxxxxy_0[i] * fi_ab_0 - g_0_xxxyy_0_xxxxxxy_1[i] * fti_ab_0 + g_0_xxxyyz_0_xxxxxxy_0[i] * pb_z +
-                                     g_0_xxxyyz_0_xxxxxxy_1[i] * wp_z[i];
+        g_0_xxxyyzz_0_xxxxxxy_0[i] = g_0_xxxyy_0_xxxxxxy_0[i] * fi_ab_0 - g_0_xxxyy_0_xxxxxxy_1[i] * fti_ab_0 + g_0_xxxyyz_0_xxxxxxy_0[i] * pb_z + g_0_xxxyyz_0_xxxxxxy_1[i] * wp_z[i];
 
-        g_0_xxxyyzz_0_xxxxxxz_0[i] = g_0_xxxzz_0_xxxxxxz_0[i] * fi_ab_0 - g_0_xxxzz_0_xxxxxxz_1[i] * fti_ab_0 + g_0_xxxyzz_0_xxxxxxz_0[i] * pb_y +
-                                     g_0_xxxyzz_0_xxxxxxz_1[i] * wp_y[i];
+        g_0_xxxyyzz_0_xxxxxxz_0[i] = g_0_xxxzz_0_xxxxxxz_0[i] * fi_ab_0 - g_0_xxxzz_0_xxxxxxz_1[i] * fti_ab_0 + g_0_xxxyzz_0_xxxxxxz_0[i] * pb_y + g_0_xxxyzz_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_xxxyyzz_0_xxxxxyy_0[i] = g_0_xxxyy_0_xxxxxyy_0[i] * fi_ab_0 - g_0_xxxyy_0_xxxxxyy_1[i] * fti_ab_0 + g_0_xxxyyz_0_xxxxxyy_0[i] * pb_z +
-                                     g_0_xxxyyz_0_xxxxxyy_1[i] * wp_z[i];
+        g_0_xxxyyzz_0_xxxxxyy_0[i] = g_0_xxxyy_0_xxxxxyy_0[i] * fi_ab_0 - g_0_xxxyy_0_xxxxxyy_1[i] * fti_ab_0 + g_0_xxxyyz_0_xxxxxyy_0[i] * pb_z + g_0_xxxyyz_0_xxxxxyy_1[i] * wp_z[i];
 
-        g_0_xxxyyzz_0_xxxxxyz_0[i] = 2.0 * g_0_xyyzz_0_xxxxxyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xxyyzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxxxxyz_0[i] * pb_x +
-                                     g_0_xxyyzz_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_xxxxxyz_0[i] = 2.0 * g_0_xyyzz_0_xxxxxyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxxxxyz_1[i] * fti_ab_0 + 5.0 * g_0_xxyyzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxxxxyz_0[i] * pb_x + g_0_xxyyzz_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_xxxxxzz_0[i] = g_0_xxxzz_0_xxxxxzz_0[i] * fi_ab_0 - g_0_xxxzz_0_xxxxxzz_1[i] * fti_ab_0 + g_0_xxxyzz_0_xxxxxzz_0[i] * pb_y +
-                                     g_0_xxxyzz_0_xxxxxzz_1[i] * wp_y[i];
+        g_0_xxxyyzz_0_xxxxxzz_0[i] = g_0_xxxzz_0_xxxxxzz_0[i] * fi_ab_0 - g_0_xxxzz_0_xxxxxzz_1[i] * fti_ab_0 + g_0_xxxyzz_0_xxxxxzz_0[i] * pb_y + g_0_xxxyzz_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_xxxyyzz_0_xxxxyyy_0[i] = g_0_xxxyy_0_xxxxyyy_0[i] * fi_ab_0 - g_0_xxxyy_0_xxxxyyy_1[i] * fti_ab_0 + g_0_xxxyyz_0_xxxxyyy_0[i] * pb_z +
-                                     g_0_xxxyyz_0_xxxxyyy_1[i] * wp_z[i];
+        g_0_xxxyyzz_0_xxxxyyy_0[i] = g_0_xxxyy_0_xxxxyyy_0[i] * fi_ab_0 - g_0_xxxyy_0_xxxxyyy_1[i] * fti_ab_0 + g_0_xxxyyz_0_xxxxyyy_0[i] * pb_z + g_0_xxxyyz_0_xxxxyyy_1[i] * wp_z[i];
 
-        g_0_xxxyyzz_0_xxxxyyz_0[i] = 2.0 * g_0_xyyzz_0_xxxxyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxyyzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxxxyyz_0[i] * pb_x +
-                                     g_0_xxyyzz_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_xxxxyyz_0[i] = 2.0 * g_0_xyyzz_0_xxxxyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxxxyyz_1[i] * fti_ab_0 + 4.0 * g_0_xxyyzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxxxyyz_0[i] * pb_x + g_0_xxyyzz_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_xxxxyzz_0[i] = 2.0 * g_0_xyyzz_0_xxxxyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxyyzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxxxyzz_0[i] * pb_x +
-                                     g_0_xxyyzz_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_xxxxyzz_0[i] = 2.0 * g_0_xyyzz_0_xxxxyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxxxyzz_1[i] * fti_ab_0 + 4.0 * g_0_xxyyzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxxxyzz_0[i] * pb_x + g_0_xxyyzz_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_xxxxzzz_0[i] = g_0_xxxzz_0_xxxxzzz_0[i] * fi_ab_0 - g_0_xxxzz_0_xxxxzzz_1[i] * fti_ab_0 + g_0_xxxyzz_0_xxxxzzz_0[i] * pb_y +
-                                     g_0_xxxyzz_0_xxxxzzz_1[i] * wp_y[i];
+        g_0_xxxyyzz_0_xxxxzzz_0[i] = g_0_xxxzz_0_xxxxzzz_0[i] * fi_ab_0 - g_0_xxxzz_0_xxxxzzz_1[i] * fti_ab_0 + g_0_xxxyzz_0_xxxxzzz_0[i] * pb_y + g_0_xxxyzz_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_xxxyyzz_0_xxxyyyy_0[i] = g_0_xxxyy_0_xxxyyyy_0[i] * fi_ab_0 - g_0_xxxyy_0_xxxyyyy_1[i] * fti_ab_0 + g_0_xxxyyz_0_xxxyyyy_0[i] * pb_z +
-                                     g_0_xxxyyz_0_xxxyyyy_1[i] * wp_z[i];
+        g_0_xxxyyzz_0_xxxyyyy_0[i] = g_0_xxxyy_0_xxxyyyy_0[i] * fi_ab_0 - g_0_xxxyy_0_xxxyyyy_1[i] * fti_ab_0 + g_0_xxxyyz_0_xxxyyyy_0[i] * pb_z + g_0_xxxyyz_0_xxxyyyy_1[i] * wp_z[i];
 
-        g_0_xxxyyzz_0_xxxyyyz_0[i] = 2.0 * g_0_xyyzz_0_xxxyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxyyzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxxyyyz_0[i] * pb_x +
-                                     g_0_xxyyzz_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_xxxyyyz_0[i] = 2.0 * g_0_xyyzz_0_xxxyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_xxyyzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxxyyyz_0[i] * pb_x + g_0_xxyyzz_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_xxxyyzz_0[i] = 2.0 * g_0_xyyzz_0_xxxyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxyyzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxxyyzz_0[i] * pb_x +
-                                     g_0_xxyyzz_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_xxxyyzz_0[i] = 2.0 * g_0_xyyzz_0_xxxyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxxyyzz_1[i] * fti_ab_0 + 3.0 * g_0_xxyyzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxxyyzz_0[i] * pb_x + g_0_xxyyzz_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_xxxyzzz_0[i] = 2.0 * g_0_xyyzz_0_xxxyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxyyzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxxyzzz_0[i] * pb_x +
-                                     g_0_xxyyzz_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_xxxyzzz_0[i] = 2.0 * g_0_xyyzz_0_xxxyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxxyzzz_1[i] * fti_ab_0 + 3.0 * g_0_xxyyzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxxyzzz_0[i] * pb_x + g_0_xxyyzz_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_xxxzzzz_0[i] = g_0_xxxzz_0_xxxzzzz_0[i] * fi_ab_0 - g_0_xxxzz_0_xxxzzzz_1[i] * fti_ab_0 + g_0_xxxyzz_0_xxxzzzz_0[i] * pb_y +
-                                     g_0_xxxyzz_0_xxxzzzz_1[i] * wp_y[i];
+        g_0_xxxyyzz_0_xxxzzzz_0[i] = g_0_xxxzz_0_xxxzzzz_0[i] * fi_ab_0 - g_0_xxxzz_0_xxxzzzz_1[i] * fti_ab_0 + g_0_xxxyzz_0_xxxzzzz_0[i] * pb_y + g_0_xxxyzz_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_xxxyyzz_0_xxyyyyy_0[i] = g_0_xxxyy_0_xxyyyyy_0[i] * fi_ab_0 - g_0_xxxyy_0_xxyyyyy_1[i] * fti_ab_0 + g_0_xxxyyz_0_xxyyyyy_0[i] * pb_z +
-                                     g_0_xxxyyz_0_xxyyyyy_1[i] * wp_z[i];
+        g_0_xxxyyzz_0_xxyyyyy_0[i] = g_0_xxxyy_0_xxyyyyy_0[i] * fi_ab_0 - g_0_xxxyy_0_xxyyyyy_1[i] * fti_ab_0 + g_0_xxxyyz_0_xxyyyyy_0[i] * pb_z + g_0_xxxyyz_0_xxyyyyy_1[i] * wp_z[i];
 
-        g_0_xxxyyzz_0_xxyyyyz_0[i] = 2.0 * g_0_xyyzz_0_xxyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxyyzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxyyyyz_0[i] * pb_x +
-                                     g_0_xxyyzz_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_xxyyyyz_0[i] = 2.0 * g_0_xyyzz_0_xxyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxyyyyz_1[i] * fti_ab_0 + 2.0 * g_0_xxyyzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxyyyyz_0[i] * pb_x + g_0_xxyyzz_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_xxyyyzz_0[i] = 2.0 * g_0_xyyzz_0_xxyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxyyzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxyyyzz_0[i] * pb_x +
-                                     g_0_xxyyzz_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_xxyyyzz_0[i] = 2.0 * g_0_xyyzz_0_xxyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxyyyzz_1[i] * fti_ab_0 + 2.0 * g_0_xxyyzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxyyyzz_0[i] * pb_x + g_0_xxyyzz_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_xxyyzzz_0[i] = 2.0 * g_0_xyyzz_0_xxyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxyyzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxyyzzz_0[i] * pb_x +
-                                     g_0_xxyyzz_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_xxyyzzz_0[i] = 2.0 * g_0_xyyzz_0_xxyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxyyzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxyyzzz_0[i] * pb_x + g_0_xxyyzz_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_xxyzzzz_0[i] = 2.0 * g_0_xyyzz_0_xxyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxyyzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxyzzzz_0[i] * pb_x +
-                                     g_0_xxyyzz_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_xxyzzzz_0[i] = 2.0 * g_0_xyyzz_0_xxyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xxyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxyyzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xxyzzzz_0[i] * pb_x + g_0_xxyyzz_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_xxzzzzz_0[i] = g_0_xxxzz_0_xxzzzzz_0[i] * fi_ab_0 - g_0_xxxzz_0_xxzzzzz_1[i] * fti_ab_0 + g_0_xxxyzz_0_xxzzzzz_0[i] * pb_y +
-                                     g_0_xxxyzz_0_xxzzzzz_1[i] * wp_y[i];
+        g_0_xxxyyzz_0_xxzzzzz_0[i] = g_0_xxxzz_0_xxzzzzz_0[i] * fi_ab_0 - g_0_xxxzz_0_xxzzzzz_1[i] * fti_ab_0 + g_0_xxxyzz_0_xxzzzzz_0[i] * pb_y + g_0_xxxyzz_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_xxxyyzz_0_xyyyyyy_0[i] = g_0_xxxyy_0_xyyyyyy_0[i] * fi_ab_0 - g_0_xxxyy_0_xyyyyyy_1[i] * fti_ab_0 + g_0_xxxyyz_0_xyyyyyy_0[i] * pb_z +
-                                     g_0_xxxyyz_0_xyyyyyy_1[i] * wp_z[i];
+        g_0_xxxyyzz_0_xyyyyyy_0[i] = g_0_xxxyy_0_xyyyyyy_0[i] * fi_ab_0 - g_0_xxxyy_0_xyyyyyy_1[i] * fti_ab_0 + g_0_xxxyyz_0_xyyyyyy_0[i] * pb_z + g_0_xxxyyz_0_xyyyyyy_1[i] * wp_z[i];
 
-        g_0_xxxyyzz_0_xyyyyyz_0[i] = 2.0 * g_0_xyyzz_0_xyyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xyyyyyz_0[i] * pb_x + g_0_xxyyzz_0_xyyyyyz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_xyyyyyz_0[i] = 2.0 * g_0_xyyzz_0_xyyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xyyyyyz_1[i] * fti_ab_0 + g_0_xxyyzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xyyyyyz_0[i] * pb_x + g_0_xxyyzz_0_xyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_xyyyyzz_0[i] = 2.0 * g_0_xyyzz_0_xyyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xyyyyzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xyyyyzz_0[i] * pb_x + g_0_xxyyzz_0_xyyyyzz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_xyyyyzz_0[i] = 2.0 * g_0_xyyzz_0_xyyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xyyyyzz_1[i] * fti_ab_0 + g_0_xxyyzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xyyyyzz_0[i] * pb_x + g_0_xxyyzz_0_xyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_xyyyzzz_0[i] = 2.0 * g_0_xyyzz_0_xyyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xyyyzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xyyyzzz_0[i] * pb_x + g_0_xxyyzz_0_xyyyzzz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_xyyyzzz_0[i] = 2.0 * g_0_xyyzz_0_xyyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xyyyzzz_1[i] * fti_ab_0 + g_0_xxyyzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xyyyzzz_0[i] * pb_x + g_0_xxyyzz_0_xyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_xyyzzzz_0[i] = 2.0 * g_0_xyyzz_0_xyyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xyyzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xyyzzzz_0[i] * pb_x + g_0_xxyyzz_0_xyyzzzz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_xyyzzzz_0[i] = 2.0 * g_0_xyyzz_0_xyyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xyyzzzz_1[i] * fti_ab_0 + g_0_xxyyzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xyyzzzz_0[i] * pb_x + g_0_xxyyzz_0_xyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_xyzzzzz_0[i] = 2.0 * g_0_xyyzz_0_xyzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xyzzzzz_0[i] * pb_x + g_0_xxyyzz_0_xyzzzzz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_xyzzzzz_0[i] = 2.0 * g_0_xyyzz_0_xyzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_xyzzzzz_1[i] * fti_ab_0 + g_0_xxyyzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxyyzz_0_xyzzzzz_0[i] * pb_x + g_0_xxyyzz_0_xyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_xzzzzzz_0[i] = g_0_xxxzz_0_xzzzzzz_0[i] * fi_ab_0 - g_0_xxxzz_0_xzzzzzz_1[i] * fti_ab_0 + g_0_xxxyzz_0_xzzzzzz_0[i] * pb_y +
-                                     g_0_xxxyzz_0_xzzzzzz_1[i] * wp_y[i];
+        g_0_xxxyyzz_0_xzzzzzz_0[i] = g_0_xxxzz_0_xzzzzzz_0[i] * fi_ab_0 - g_0_xxxzz_0_xzzzzzz_1[i] * fti_ab_0 + g_0_xxxyzz_0_xzzzzzz_0[i] * pb_y + g_0_xxxyzz_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_xxxyyzz_0_yyyyyyy_0[i] = 2.0 * g_0_xyyzz_0_yyyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_yyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_yyyyyyy_0[i] * pb_x + g_0_xxyyzz_0_yyyyyyy_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_yyyyyyy_0[i] = 2.0 * g_0_xyyzz_0_yyyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_yyyyyyy_1[i] * fti_ab_0 + g_0_xxyyzz_0_yyyyyyy_0[i] * pb_x + g_0_xxyyzz_0_yyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_yyyyyyz_0[i] = 2.0 * g_0_xyyzz_0_yyyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_yyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_yyyyyyz_0[i] * pb_x + g_0_xxyyzz_0_yyyyyyz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_yyyyyyz_0[i] = 2.0 * g_0_xyyzz_0_yyyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_yyyyyyz_1[i] * fti_ab_0 + g_0_xxyyzz_0_yyyyyyz_0[i] * pb_x + g_0_xxyyzz_0_yyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_yyyyyzz_0[i] = 2.0 * g_0_xyyzz_0_yyyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_yyyyyzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_yyyyyzz_0[i] * pb_x + g_0_xxyyzz_0_yyyyyzz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_yyyyyzz_0[i] = 2.0 * g_0_xyyzz_0_yyyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_yyyyyzz_1[i] * fti_ab_0 + g_0_xxyyzz_0_yyyyyzz_0[i] * pb_x + g_0_xxyyzz_0_yyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_yyyyzzz_0[i] = 2.0 * g_0_xyyzz_0_yyyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_yyyyzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_yyyyzzz_0[i] * pb_x + g_0_xxyyzz_0_yyyyzzz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_yyyyzzz_0[i] = 2.0 * g_0_xyyzz_0_yyyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_yyyyzzz_1[i] * fti_ab_0 + g_0_xxyyzz_0_yyyyzzz_0[i] * pb_x + g_0_xxyyzz_0_yyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_yyyzzzz_0[i] = 2.0 * g_0_xyyzz_0_yyyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_yyyzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_yyyzzzz_0[i] * pb_x + g_0_xxyyzz_0_yyyzzzz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_yyyzzzz_0[i] = 2.0 * g_0_xyyzz_0_yyyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_yyyzzzz_1[i] * fti_ab_0 + g_0_xxyyzz_0_yyyzzzz_0[i] * pb_x + g_0_xxyyzz_0_yyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_yyzzzzz_0[i] = 2.0 * g_0_xyyzz_0_yyzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_yyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_yyzzzzz_0[i] * pb_x + g_0_xxyyzz_0_yyzzzzz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_yyzzzzz_0[i] = 2.0 * g_0_xyyzz_0_yyzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_yyzzzzz_1[i] * fti_ab_0 + g_0_xxyyzz_0_yyzzzzz_0[i] * pb_x + g_0_xxyyzz_0_yyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_yzzzzzz_0[i] = 2.0 * g_0_xyyzz_0_yzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_yzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_yzzzzzz_0[i] * pb_x + g_0_xxyyzz_0_yzzzzzz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_yzzzzzz_0[i] = 2.0 * g_0_xyyzz_0_yzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_yzzzzzz_1[i] * fti_ab_0 + g_0_xxyyzz_0_yzzzzzz_0[i] * pb_x + g_0_xxyyzz_0_yzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxyyzz_0_zzzzzzz_0[i] = 2.0 * g_0_xyyzz_0_zzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_zzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_zzzzzzz_0[i] * pb_x + g_0_xxyyzz_0_zzzzzzz_1[i] * wp_x[i];
+        g_0_xxxyyzz_0_zzzzzzz_0[i] = 2.0 * g_0_xyyzz_0_zzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyzz_0_zzzzzzz_1[i] * fti_ab_0 + g_0_xxyyzz_0_zzzzzzz_0[i] * pb_x + g_0_xxyyzz_0_zzzzzzz_1[i] * wp_x[i];
     }
 
     /// Set up 468-504 components of targeted buffer : SKSK
@@ -10595,145 +7866,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxxyzzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 503);
 
-#pragma omp simd aligned(g_0_xxxyzzz_0_xxxxxxx_0,     \
-                             g_0_xxxyzzz_0_xxxxxxy_0, \
-                             g_0_xxxyzzz_0_xxxxxxz_0, \
-                             g_0_xxxyzzz_0_xxxxxyy_0, \
-                             g_0_xxxyzzz_0_xxxxxyz_0, \
-                             g_0_xxxyzzz_0_xxxxxzz_0, \
-                             g_0_xxxyzzz_0_xxxxyyy_0, \
-                             g_0_xxxyzzz_0_xxxxyyz_0, \
-                             g_0_xxxyzzz_0_xxxxyzz_0, \
-                             g_0_xxxyzzz_0_xxxxzzz_0, \
-                             g_0_xxxyzzz_0_xxxyyyy_0, \
-                             g_0_xxxyzzz_0_xxxyyyz_0, \
-                             g_0_xxxyzzz_0_xxxyyzz_0, \
-                             g_0_xxxyzzz_0_xxxyzzz_0, \
-                             g_0_xxxyzzz_0_xxxzzzz_0, \
-                             g_0_xxxyzzz_0_xxyyyyy_0, \
-                             g_0_xxxyzzz_0_xxyyyyz_0, \
-                             g_0_xxxyzzz_0_xxyyyzz_0, \
-                             g_0_xxxyzzz_0_xxyyzzz_0, \
-                             g_0_xxxyzzz_0_xxyzzzz_0, \
-                             g_0_xxxyzzz_0_xxzzzzz_0, \
-                             g_0_xxxyzzz_0_xyyyyyy_0, \
-                             g_0_xxxyzzz_0_xyyyyyz_0, \
-                             g_0_xxxyzzz_0_xyyyyzz_0, \
-                             g_0_xxxyzzz_0_xyyyzzz_0, \
-                             g_0_xxxyzzz_0_xyyzzzz_0, \
-                             g_0_xxxyzzz_0_xyzzzzz_0, \
-                             g_0_xxxyzzz_0_xzzzzzz_0, \
-                             g_0_xxxyzzz_0_yyyyyyy_0, \
-                             g_0_xxxyzzz_0_yyyyyyz_0, \
-                             g_0_xxxyzzz_0_yyyyyzz_0, \
-                             g_0_xxxyzzz_0_yyyyzzz_0, \
-                             g_0_xxxyzzz_0_yyyzzzz_0, \
-                             g_0_xxxyzzz_0_yyzzzzz_0, \
-                             g_0_xxxyzzz_0_yzzzzzz_0, \
-                             g_0_xxxyzzz_0_zzzzzzz_0, \
-                             g_0_xxxzzz_0_xxxxxx_1,   \
-                             g_0_xxxzzz_0_xxxxxxx_0,  \
-                             g_0_xxxzzz_0_xxxxxxx_1,  \
-                             g_0_xxxzzz_0_xxxxxxy_0,  \
-                             g_0_xxxzzz_0_xxxxxxy_1,  \
-                             g_0_xxxzzz_0_xxxxxxz_0,  \
-                             g_0_xxxzzz_0_xxxxxxz_1,  \
-                             g_0_xxxzzz_0_xxxxxy_1,   \
-                             g_0_xxxzzz_0_xxxxxyy_0,  \
-                             g_0_xxxzzz_0_xxxxxyy_1,  \
-                             g_0_xxxzzz_0_xxxxxyz_0,  \
-                             g_0_xxxzzz_0_xxxxxyz_1,  \
-                             g_0_xxxzzz_0_xxxxxz_1,   \
-                             g_0_xxxzzz_0_xxxxxzz_0,  \
-                             g_0_xxxzzz_0_xxxxxzz_1,  \
-                             g_0_xxxzzz_0_xxxxyy_1,   \
-                             g_0_xxxzzz_0_xxxxyyy_0,  \
-                             g_0_xxxzzz_0_xxxxyyy_1,  \
-                             g_0_xxxzzz_0_xxxxyyz_0,  \
-                             g_0_xxxzzz_0_xxxxyyz_1,  \
-                             g_0_xxxzzz_0_xxxxyz_1,   \
-                             g_0_xxxzzz_0_xxxxyzz_0,  \
-                             g_0_xxxzzz_0_xxxxyzz_1,  \
-                             g_0_xxxzzz_0_xxxxzz_1,   \
-                             g_0_xxxzzz_0_xxxxzzz_0,  \
-                             g_0_xxxzzz_0_xxxxzzz_1,  \
-                             g_0_xxxzzz_0_xxxyyy_1,   \
-                             g_0_xxxzzz_0_xxxyyyy_0,  \
-                             g_0_xxxzzz_0_xxxyyyy_1,  \
-                             g_0_xxxzzz_0_xxxyyyz_0,  \
-                             g_0_xxxzzz_0_xxxyyyz_1,  \
-                             g_0_xxxzzz_0_xxxyyz_1,   \
-                             g_0_xxxzzz_0_xxxyyzz_0,  \
-                             g_0_xxxzzz_0_xxxyyzz_1,  \
-                             g_0_xxxzzz_0_xxxyzz_1,   \
-                             g_0_xxxzzz_0_xxxyzzz_0,  \
-                             g_0_xxxzzz_0_xxxyzzz_1,  \
-                             g_0_xxxzzz_0_xxxzzz_1,   \
-                             g_0_xxxzzz_0_xxxzzzz_0,  \
-                             g_0_xxxzzz_0_xxxzzzz_1,  \
-                             g_0_xxxzzz_0_xxyyyy_1,   \
-                             g_0_xxxzzz_0_xxyyyyy_0,  \
-                             g_0_xxxzzz_0_xxyyyyy_1,  \
-                             g_0_xxxzzz_0_xxyyyyz_0,  \
-                             g_0_xxxzzz_0_xxyyyyz_1,  \
-                             g_0_xxxzzz_0_xxyyyz_1,   \
-                             g_0_xxxzzz_0_xxyyyzz_0,  \
-                             g_0_xxxzzz_0_xxyyyzz_1,  \
-                             g_0_xxxzzz_0_xxyyzz_1,   \
-                             g_0_xxxzzz_0_xxyyzzz_0,  \
-                             g_0_xxxzzz_0_xxyyzzz_1,  \
-                             g_0_xxxzzz_0_xxyzzz_1,   \
-                             g_0_xxxzzz_0_xxyzzzz_0,  \
-                             g_0_xxxzzz_0_xxyzzzz_1,  \
-                             g_0_xxxzzz_0_xxzzzz_1,   \
-                             g_0_xxxzzz_0_xxzzzzz_0,  \
-                             g_0_xxxzzz_0_xxzzzzz_1,  \
-                             g_0_xxxzzz_0_xyyyyy_1,   \
-                             g_0_xxxzzz_0_xyyyyyy_0,  \
-                             g_0_xxxzzz_0_xyyyyyy_1,  \
-                             g_0_xxxzzz_0_xyyyyyz_0,  \
-                             g_0_xxxzzz_0_xyyyyyz_1,  \
-                             g_0_xxxzzz_0_xyyyyz_1,   \
-                             g_0_xxxzzz_0_xyyyyzz_0,  \
-                             g_0_xxxzzz_0_xyyyyzz_1,  \
-                             g_0_xxxzzz_0_xyyyzz_1,   \
-                             g_0_xxxzzz_0_xyyyzzz_0,  \
-                             g_0_xxxzzz_0_xyyyzzz_1,  \
-                             g_0_xxxzzz_0_xyyzzz_1,   \
-                             g_0_xxxzzz_0_xyyzzzz_0,  \
-                             g_0_xxxzzz_0_xyyzzzz_1,  \
-                             g_0_xxxzzz_0_xyzzzz_1,   \
-                             g_0_xxxzzz_0_xyzzzzz_0,  \
-                             g_0_xxxzzz_0_xyzzzzz_1,  \
-                             g_0_xxxzzz_0_xzzzzz_1,   \
-                             g_0_xxxzzz_0_xzzzzzz_0,  \
-                             g_0_xxxzzz_0_xzzzzzz_1,  \
-                             g_0_xxxzzz_0_yyyyyy_1,   \
-                             g_0_xxxzzz_0_yyyyyyy_0,  \
-                             g_0_xxxzzz_0_yyyyyyy_1,  \
-                             g_0_xxxzzz_0_yyyyyyz_0,  \
-                             g_0_xxxzzz_0_yyyyyyz_1,  \
-                             g_0_xxxzzz_0_yyyyyz_1,   \
-                             g_0_xxxzzz_0_yyyyyzz_0,  \
-                             g_0_xxxzzz_0_yyyyyzz_1,  \
-                             g_0_xxxzzz_0_yyyyzz_1,   \
-                             g_0_xxxzzz_0_yyyyzzz_0,  \
-                             g_0_xxxzzz_0_yyyyzzz_1,  \
-                             g_0_xxxzzz_0_yyyzzz_1,   \
-                             g_0_xxxzzz_0_yyyzzzz_0,  \
-                             g_0_xxxzzz_0_yyyzzzz_1,  \
-                             g_0_xxxzzz_0_yyzzzz_1,   \
-                             g_0_xxxzzz_0_yyzzzzz_0,  \
-                             g_0_xxxzzz_0_yyzzzzz_1,  \
-                             g_0_xxxzzz_0_yzzzzz_1,   \
-                             g_0_xxxzzz_0_yzzzzzz_0,  \
-                             g_0_xxxzzz_0_yzzzzzz_1,  \
-                             g_0_xxxzzz_0_zzzzzz_1,   \
-                             g_0_xxxzzz_0_zzzzzzz_0,  \
-                             g_0_xxxzzz_0_zzzzzzz_1,  \
-                             wp_y,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxxyzzz_0_xxxxxxx_0, g_0_xxxyzzz_0_xxxxxxy_0, g_0_xxxyzzz_0_xxxxxxz_0, g_0_xxxyzzz_0_xxxxxyy_0, g_0_xxxyzzz_0_xxxxxyz_0, g_0_xxxyzzz_0_xxxxxzz_0, g_0_xxxyzzz_0_xxxxyyy_0, g_0_xxxyzzz_0_xxxxyyz_0, g_0_xxxyzzz_0_xxxxyzz_0, g_0_xxxyzzz_0_xxxxzzz_0, g_0_xxxyzzz_0_xxxyyyy_0, g_0_xxxyzzz_0_xxxyyyz_0, g_0_xxxyzzz_0_xxxyyzz_0, g_0_xxxyzzz_0_xxxyzzz_0, g_0_xxxyzzz_0_xxxzzzz_0, g_0_xxxyzzz_0_xxyyyyy_0, g_0_xxxyzzz_0_xxyyyyz_0, g_0_xxxyzzz_0_xxyyyzz_0, g_0_xxxyzzz_0_xxyyzzz_0, g_0_xxxyzzz_0_xxyzzzz_0, g_0_xxxyzzz_0_xxzzzzz_0, g_0_xxxyzzz_0_xyyyyyy_0, g_0_xxxyzzz_0_xyyyyyz_0, g_0_xxxyzzz_0_xyyyyzz_0, g_0_xxxyzzz_0_xyyyzzz_0, g_0_xxxyzzz_0_xyyzzzz_0, g_0_xxxyzzz_0_xyzzzzz_0, g_0_xxxyzzz_0_xzzzzzz_0, g_0_xxxyzzz_0_yyyyyyy_0, g_0_xxxyzzz_0_yyyyyyz_0, g_0_xxxyzzz_0_yyyyyzz_0, g_0_xxxyzzz_0_yyyyzzz_0, g_0_xxxyzzz_0_yyyzzzz_0, g_0_xxxyzzz_0_yyzzzzz_0, g_0_xxxyzzz_0_yzzzzzz_0, g_0_xxxyzzz_0_zzzzzzz_0, g_0_xxxzzz_0_xxxxxx_1, g_0_xxxzzz_0_xxxxxxx_0, g_0_xxxzzz_0_xxxxxxx_1, g_0_xxxzzz_0_xxxxxxy_0, g_0_xxxzzz_0_xxxxxxy_1, g_0_xxxzzz_0_xxxxxxz_0, g_0_xxxzzz_0_xxxxxxz_1, g_0_xxxzzz_0_xxxxxy_1, g_0_xxxzzz_0_xxxxxyy_0, g_0_xxxzzz_0_xxxxxyy_1, g_0_xxxzzz_0_xxxxxyz_0, g_0_xxxzzz_0_xxxxxyz_1, g_0_xxxzzz_0_xxxxxz_1, g_0_xxxzzz_0_xxxxxzz_0, g_0_xxxzzz_0_xxxxxzz_1, g_0_xxxzzz_0_xxxxyy_1, g_0_xxxzzz_0_xxxxyyy_0, g_0_xxxzzz_0_xxxxyyy_1, g_0_xxxzzz_0_xxxxyyz_0, g_0_xxxzzz_0_xxxxyyz_1, g_0_xxxzzz_0_xxxxyz_1, g_0_xxxzzz_0_xxxxyzz_0, g_0_xxxzzz_0_xxxxyzz_1, g_0_xxxzzz_0_xxxxzz_1, g_0_xxxzzz_0_xxxxzzz_0, g_0_xxxzzz_0_xxxxzzz_1, g_0_xxxzzz_0_xxxyyy_1, g_0_xxxzzz_0_xxxyyyy_0, g_0_xxxzzz_0_xxxyyyy_1, g_0_xxxzzz_0_xxxyyyz_0, g_0_xxxzzz_0_xxxyyyz_1, g_0_xxxzzz_0_xxxyyz_1, g_0_xxxzzz_0_xxxyyzz_0, g_0_xxxzzz_0_xxxyyzz_1, g_0_xxxzzz_0_xxxyzz_1, g_0_xxxzzz_0_xxxyzzz_0, g_0_xxxzzz_0_xxxyzzz_1, g_0_xxxzzz_0_xxxzzz_1, g_0_xxxzzz_0_xxxzzzz_0, g_0_xxxzzz_0_xxxzzzz_1, g_0_xxxzzz_0_xxyyyy_1, g_0_xxxzzz_0_xxyyyyy_0, g_0_xxxzzz_0_xxyyyyy_1, g_0_xxxzzz_0_xxyyyyz_0, g_0_xxxzzz_0_xxyyyyz_1, g_0_xxxzzz_0_xxyyyz_1, g_0_xxxzzz_0_xxyyyzz_0, g_0_xxxzzz_0_xxyyyzz_1, g_0_xxxzzz_0_xxyyzz_1, g_0_xxxzzz_0_xxyyzzz_0, g_0_xxxzzz_0_xxyyzzz_1, g_0_xxxzzz_0_xxyzzz_1, g_0_xxxzzz_0_xxyzzzz_0, g_0_xxxzzz_0_xxyzzzz_1, g_0_xxxzzz_0_xxzzzz_1, g_0_xxxzzz_0_xxzzzzz_0, g_0_xxxzzz_0_xxzzzzz_1, g_0_xxxzzz_0_xyyyyy_1, g_0_xxxzzz_0_xyyyyyy_0, g_0_xxxzzz_0_xyyyyyy_1, g_0_xxxzzz_0_xyyyyyz_0, g_0_xxxzzz_0_xyyyyyz_1, g_0_xxxzzz_0_xyyyyz_1, g_0_xxxzzz_0_xyyyyzz_0, g_0_xxxzzz_0_xyyyyzz_1, g_0_xxxzzz_0_xyyyzz_1, g_0_xxxzzz_0_xyyyzzz_0, g_0_xxxzzz_0_xyyyzzz_1, g_0_xxxzzz_0_xyyzzz_1, g_0_xxxzzz_0_xyyzzzz_0, g_0_xxxzzz_0_xyyzzzz_1, g_0_xxxzzz_0_xyzzzz_1, g_0_xxxzzz_0_xyzzzzz_0, g_0_xxxzzz_0_xyzzzzz_1, g_0_xxxzzz_0_xzzzzz_1, g_0_xxxzzz_0_xzzzzzz_0, g_0_xxxzzz_0_xzzzzzz_1, g_0_xxxzzz_0_yyyyyy_1, g_0_xxxzzz_0_yyyyyyy_0, g_0_xxxzzz_0_yyyyyyy_1, g_0_xxxzzz_0_yyyyyyz_0, g_0_xxxzzz_0_yyyyyyz_1, g_0_xxxzzz_0_yyyyyz_1, g_0_xxxzzz_0_yyyyyzz_0, g_0_xxxzzz_0_yyyyyzz_1, g_0_xxxzzz_0_yyyyzz_1, g_0_xxxzzz_0_yyyyzzz_0, g_0_xxxzzz_0_yyyyzzz_1, g_0_xxxzzz_0_yyyzzz_1, g_0_xxxzzz_0_yyyzzzz_0, g_0_xxxzzz_0_yyyzzzz_1, g_0_xxxzzz_0_yyzzzz_1, g_0_xxxzzz_0_yyzzzzz_0, g_0_xxxzzz_0_yyzzzzz_1, g_0_xxxzzz_0_yzzzzz_1, g_0_xxxzzz_0_yzzzzzz_0, g_0_xxxzzz_0_yzzzzzz_1, g_0_xxxzzz_0_zzzzzz_1, g_0_xxxzzz_0_zzzzzzz_0, g_0_xxxzzz_0_zzzzzzz_1, wp_y, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -10744,88 +7877,67 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         g_0_xxxyzzz_0_xxxxxxz_0[i] = g_0_xxxzzz_0_xxxxxxz_0[i] * pb_y + g_0_xxxzzz_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_xxxxxyy_0[i] =
-            2.0 * g_0_xxxzzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxxyy_0[i] * pb_y + g_0_xxxzzz_0_xxxxxyy_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_xxxxxyy_0[i] = 2.0 * g_0_xxxzzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxxyy_0[i] * pb_y + g_0_xxxzzz_0_xxxxxyy_1[i] * wp_y[i];
 
         g_0_xxxyzzz_0_xxxxxyz_0[i] = g_0_xxxzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxxyz_0[i] * pb_y + g_0_xxxzzz_0_xxxxxyz_1[i] * wp_y[i];
 
         g_0_xxxyzzz_0_xxxxxzz_0[i] = g_0_xxxzzz_0_xxxxxzz_0[i] * pb_y + g_0_xxxzzz_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_xxxxyyy_0[i] =
-            3.0 * g_0_xxxzzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxyyy_0[i] * pb_y + g_0_xxxzzz_0_xxxxyyy_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_xxxxyyy_0[i] = 3.0 * g_0_xxxzzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxyyy_0[i] * pb_y + g_0_xxxzzz_0_xxxxyyy_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_xxxxyyz_0[i] =
-            2.0 * g_0_xxxzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxyyz_0[i] * pb_y + g_0_xxxzzz_0_xxxxyyz_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_xxxxyyz_0[i] = 2.0 * g_0_xxxzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxyyz_0[i] * pb_y + g_0_xxxzzz_0_xxxxyyz_1[i] * wp_y[i];
 
         g_0_xxxyzzz_0_xxxxyzz_0[i] = g_0_xxxzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxxyzz_0[i] * pb_y + g_0_xxxzzz_0_xxxxyzz_1[i] * wp_y[i];
 
         g_0_xxxyzzz_0_xxxxzzz_0[i] = g_0_xxxzzz_0_xxxxzzz_0[i] * pb_y + g_0_xxxzzz_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_xxxyyyy_0[i] =
-            4.0 * g_0_xxxzzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxyyyy_0[i] * pb_y + g_0_xxxzzz_0_xxxyyyy_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_xxxyyyy_0[i] = 4.0 * g_0_xxxzzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxyyyy_0[i] * pb_y + g_0_xxxzzz_0_xxxyyyy_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_xxxyyyz_0[i] =
-            3.0 * g_0_xxxzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxyyyz_0[i] * pb_y + g_0_xxxzzz_0_xxxyyyz_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_xxxyyyz_0[i] = 3.0 * g_0_xxxzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxyyyz_0[i] * pb_y + g_0_xxxzzz_0_xxxyyyz_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_xxxyyzz_0[i] =
-            2.0 * g_0_xxxzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxyyzz_0[i] * pb_y + g_0_xxxzzz_0_xxxyyzz_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_xxxyyzz_0[i] = 2.0 * g_0_xxxzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxyyzz_0[i] * pb_y + g_0_xxxzzz_0_xxxyyzz_1[i] * wp_y[i];
 
         g_0_xxxyzzz_0_xxxyzzz_0[i] = g_0_xxxzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxxyzzz_0[i] * pb_y + g_0_xxxzzz_0_xxxyzzz_1[i] * wp_y[i];
 
         g_0_xxxyzzz_0_xxxzzzz_0[i] = g_0_xxxzzz_0_xxxzzzz_0[i] * pb_y + g_0_xxxzzz_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_xxyyyyy_0[i] =
-            5.0 * g_0_xxxzzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyyyyy_0[i] * pb_y + g_0_xxxzzz_0_xxyyyyy_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_xxyyyyy_0[i] = 5.0 * g_0_xxxzzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyyyyy_0[i] * pb_y + g_0_xxxzzz_0_xxyyyyy_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_xxyyyyz_0[i] =
-            4.0 * g_0_xxxzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyyyyz_0[i] * pb_y + g_0_xxxzzz_0_xxyyyyz_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_xxyyyyz_0[i] = 4.0 * g_0_xxxzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyyyyz_0[i] * pb_y + g_0_xxxzzz_0_xxyyyyz_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_xxyyyzz_0[i] =
-            3.0 * g_0_xxxzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyyyzz_0[i] * pb_y + g_0_xxxzzz_0_xxyyyzz_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_xxyyyzz_0[i] = 3.0 * g_0_xxxzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyyyzz_0[i] * pb_y + g_0_xxxzzz_0_xxyyyzz_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_xxyyzzz_0[i] =
-            2.0 * g_0_xxxzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyyzzz_0[i] * pb_y + g_0_xxxzzz_0_xxyyzzz_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_xxyyzzz_0[i] = 2.0 * g_0_xxxzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyyzzz_0[i] * pb_y + g_0_xxxzzz_0_xxyyzzz_1[i] * wp_y[i];
 
         g_0_xxxyzzz_0_xxyzzzz_0[i] = g_0_xxxzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xxyzzzz_0[i] * pb_y + g_0_xxxzzz_0_xxyzzzz_1[i] * wp_y[i];
 
         g_0_xxxyzzz_0_xxzzzzz_0[i] = g_0_xxxzzz_0_xxzzzzz_0[i] * pb_y + g_0_xxxzzz_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_xyyyyyy_0[i] =
-            6.0 * g_0_xxxzzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyyyyy_0[i] * pb_y + g_0_xxxzzz_0_xyyyyyy_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_xyyyyyy_0[i] = 6.0 * g_0_xxxzzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyyyyy_0[i] * pb_y + g_0_xxxzzz_0_xyyyyyy_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_xyyyyyz_0[i] =
-            5.0 * g_0_xxxzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyyyyz_0[i] * pb_y + g_0_xxxzzz_0_xyyyyyz_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_xyyyyyz_0[i] = 5.0 * g_0_xxxzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyyyyz_0[i] * pb_y + g_0_xxxzzz_0_xyyyyyz_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_xyyyyzz_0[i] =
-            4.0 * g_0_xxxzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyyyzz_0[i] * pb_y + g_0_xxxzzz_0_xyyyyzz_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_xyyyyzz_0[i] = 4.0 * g_0_xxxzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyyyzz_0[i] * pb_y + g_0_xxxzzz_0_xyyyyzz_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_xyyyzzz_0[i] =
-            3.0 * g_0_xxxzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyyzzz_0[i] * pb_y + g_0_xxxzzz_0_xyyyzzz_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_xyyyzzz_0[i] = 3.0 * g_0_xxxzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyyzzz_0[i] * pb_y + g_0_xxxzzz_0_xyyyzzz_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_xyyzzzz_0[i] =
-            2.0 * g_0_xxxzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyzzzz_0[i] * pb_y + g_0_xxxzzz_0_xyyzzzz_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_xyyzzzz_0[i] = 2.0 * g_0_xxxzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyyzzzz_0[i] * pb_y + g_0_xxxzzz_0_xyyzzzz_1[i] * wp_y[i];
 
         g_0_xxxyzzz_0_xyzzzzz_0[i] = g_0_xxxzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_xyzzzzz_0[i] * pb_y + g_0_xxxzzz_0_xyzzzzz_1[i] * wp_y[i];
 
         g_0_xxxyzzz_0_xzzzzzz_0[i] = g_0_xxxzzz_0_xzzzzzz_0[i] * pb_y + g_0_xxxzzz_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_yyyyyyy_0[i] =
-            7.0 * g_0_xxxzzz_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxxzzz_0_yyyyyyy_0[i] * pb_y + g_0_xxxzzz_0_yyyyyyy_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_yyyyyyy_0[i] = 7.0 * g_0_xxxzzz_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxxzzz_0_yyyyyyy_0[i] * pb_y + g_0_xxxzzz_0_yyyyyyy_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_yyyyyyz_0[i] =
-            6.0 * g_0_xxxzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_yyyyyyz_0[i] * pb_y + g_0_xxxzzz_0_yyyyyyz_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_yyyyyyz_0[i] = 6.0 * g_0_xxxzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_yyyyyyz_0[i] * pb_y + g_0_xxxzzz_0_yyyyyyz_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_yyyyyzz_0[i] =
-            5.0 * g_0_xxxzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_yyyyyzz_0[i] * pb_y + g_0_xxxzzz_0_yyyyyzz_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_yyyyyzz_0[i] = 5.0 * g_0_xxxzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_yyyyyzz_0[i] * pb_y + g_0_xxxzzz_0_yyyyyzz_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_yyyyzzz_0[i] =
-            4.0 * g_0_xxxzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_yyyyzzz_0[i] * pb_y + g_0_xxxzzz_0_yyyyzzz_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_yyyyzzz_0[i] = 4.0 * g_0_xxxzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_yyyyzzz_0[i] * pb_y + g_0_xxxzzz_0_yyyyzzz_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_yyyzzzz_0[i] =
-            3.0 * g_0_xxxzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_yyyzzzz_0[i] * pb_y + g_0_xxxzzz_0_yyyzzzz_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_yyyzzzz_0[i] = 3.0 * g_0_xxxzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_yyyzzzz_0[i] * pb_y + g_0_xxxzzz_0_yyyzzzz_1[i] * wp_y[i];
 
-        g_0_xxxyzzz_0_yyzzzzz_0[i] =
-            2.0 * g_0_xxxzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_yyzzzzz_0[i] * pb_y + g_0_xxxzzz_0_yyzzzzz_1[i] * wp_y[i];
+        g_0_xxxyzzz_0_yyzzzzz_0[i] = 2.0 * g_0_xxxzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_yyzzzzz_0[i] * pb_y + g_0_xxxzzz_0_yyzzzzz_1[i] * wp_y[i];
 
         g_0_xxxyzzz_0_yzzzzzz_0[i] = g_0_xxxzzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxxzzz_0_yzzzzzz_0[i] * pb_y + g_0_xxxzzz_0_yzzzzzz_1[i] * wp_y[i];
 
@@ -10906,211 +8018,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxxzzzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 539);
 
-#pragma omp simd aligned(g_0_xxxzz_0_xxxxxxx_0,       \
-                             g_0_xxxzz_0_xxxxxxx_1,   \
-                             g_0_xxxzz_0_xxxxxxy_0,   \
-                             g_0_xxxzz_0_xxxxxxy_1,   \
-                             g_0_xxxzz_0_xxxxxyy_0,   \
-                             g_0_xxxzz_0_xxxxxyy_1,   \
-                             g_0_xxxzz_0_xxxxyyy_0,   \
-                             g_0_xxxzz_0_xxxxyyy_1,   \
-                             g_0_xxxzz_0_xxxyyyy_0,   \
-                             g_0_xxxzz_0_xxxyyyy_1,   \
-                             g_0_xxxzz_0_xxyyyyy_0,   \
-                             g_0_xxxzz_0_xxyyyyy_1,   \
-                             g_0_xxxzz_0_xyyyyyy_0,   \
-                             g_0_xxxzz_0_xyyyyyy_1,   \
-                             g_0_xxxzzz_0_xxxxxxx_0,  \
-                             g_0_xxxzzz_0_xxxxxxx_1,  \
-                             g_0_xxxzzz_0_xxxxxxy_0,  \
-                             g_0_xxxzzz_0_xxxxxxy_1,  \
-                             g_0_xxxzzz_0_xxxxxyy_0,  \
-                             g_0_xxxzzz_0_xxxxxyy_1,  \
-                             g_0_xxxzzz_0_xxxxyyy_0,  \
-                             g_0_xxxzzz_0_xxxxyyy_1,  \
-                             g_0_xxxzzz_0_xxxyyyy_0,  \
-                             g_0_xxxzzz_0_xxxyyyy_1,  \
-                             g_0_xxxzzz_0_xxyyyyy_0,  \
-                             g_0_xxxzzz_0_xxyyyyy_1,  \
-                             g_0_xxxzzz_0_xyyyyyy_0,  \
-                             g_0_xxxzzz_0_xyyyyyy_1,  \
-                             g_0_xxxzzzz_0_xxxxxxx_0, \
-                             g_0_xxxzzzz_0_xxxxxxy_0, \
-                             g_0_xxxzzzz_0_xxxxxxz_0, \
-                             g_0_xxxzzzz_0_xxxxxyy_0, \
-                             g_0_xxxzzzz_0_xxxxxyz_0, \
-                             g_0_xxxzzzz_0_xxxxxzz_0, \
-                             g_0_xxxzzzz_0_xxxxyyy_0, \
-                             g_0_xxxzzzz_0_xxxxyyz_0, \
-                             g_0_xxxzzzz_0_xxxxyzz_0, \
-                             g_0_xxxzzzz_0_xxxxzzz_0, \
-                             g_0_xxxzzzz_0_xxxyyyy_0, \
-                             g_0_xxxzzzz_0_xxxyyyz_0, \
-                             g_0_xxxzzzz_0_xxxyyzz_0, \
-                             g_0_xxxzzzz_0_xxxyzzz_0, \
-                             g_0_xxxzzzz_0_xxxzzzz_0, \
-                             g_0_xxxzzzz_0_xxyyyyy_0, \
-                             g_0_xxxzzzz_0_xxyyyyz_0, \
-                             g_0_xxxzzzz_0_xxyyyzz_0, \
-                             g_0_xxxzzzz_0_xxyyzzz_0, \
-                             g_0_xxxzzzz_0_xxyzzzz_0, \
-                             g_0_xxxzzzz_0_xxzzzzz_0, \
-                             g_0_xxxzzzz_0_xyyyyyy_0, \
-                             g_0_xxxzzzz_0_xyyyyyz_0, \
-                             g_0_xxxzzzz_0_xyyyyzz_0, \
-                             g_0_xxxzzzz_0_xyyyzzz_0, \
-                             g_0_xxxzzzz_0_xyyzzzz_0, \
-                             g_0_xxxzzzz_0_xyzzzzz_0, \
-                             g_0_xxxzzzz_0_xzzzzzz_0, \
-                             g_0_xxxzzzz_0_yyyyyyy_0, \
-                             g_0_xxxzzzz_0_yyyyyyz_0, \
-                             g_0_xxxzzzz_0_yyyyyzz_0, \
-                             g_0_xxxzzzz_0_yyyyzzz_0, \
-                             g_0_xxxzzzz_0_yyyzzzz_0, \
-                             g_0_xxxzzzz_0_yyzzzzz_0, \
-                             g_0_xxxzzzz_0_yzzzzzz_0, \
-                             g_0_xxxzzzz_0_zzzzzzz_0, \
-                             g_0_xxzzzz_0_xxxxxxz_0,  \
-                             g_0_xxzzzz_0_xxxxxxz_1,  \
-                             g_0_xxzzzz_0_xxxxxyz_0,  \
-                             g_0_xxzzzz_0_xxxxxyz_1,  \
-                             g_0_xxzzzz_0_xxxxxz_1,   \
-                             g_0_xxzzzz_0_xxxxxzz_0,  \
-                             g_0_xxzzzz_0_xxxxxzz_1,  \
-                             g_0_xxzzzz_0_xxxxyyz_0,  \
-                             g_0_xxzzzz_0_xxxxyyz_1,  \
-                             g_0_xxzzzz_0_xxxxyz_1,   \
-                             g_0_xxzzzz_0_xxxxyzz_0,  \
-                             g_0_xxzzzz_0_xxxxyzz_1,  \
-                             g_0_xxzzzz_0_xxxxzz_1,   \
-                             g_0_xxzzzz_0_xxxxzzz_0,  \
-                             g_0_xxzzzz_0_xxxxzzz_1,  \
-                             g_0_xxzzzz_0_xxxyyyz_0,  \
-                             g_0_xxzzzz_0_xxxyyyz_1,  \
-                             g_0_xxzzzz_0_xxxyyz_1,   \
-                             g_0_xxzzzz_0_xxxyyzz_0,  \
-                             g_0_xxzzzz_0_xxxyyzz_1,  \
-                             g_0_xxzzzz_0_xxxyzz_1,   \
-                             g_0_xxzzzz_0_xxxyzzz_0,  \
-                             g_0_xxzzzz_0_xxxyzzz_1,  \
-                             g_0_xxzzzz_0_xxxzzz_1,   \
-                             g_0_xxzzzz_0_xxxzzzz_0,  \
-                             g_0_xxzzzz_0_xxxzzzz_1,  \
-                             g_0_xxzzzz_0_xxyyyyz_0,  \
-                             g_0_xxzzzz_0_xxyyyyz_1,  \
-                             g_0_xxzzzz_0_xxyyyz_1,   \
-                             g_0_xxzzzz_0_xxyyyzz_0,  \
-                             g_0_xxzzzz_0_xxyyyzz_1,  \
-                             g_0_xxzzzz_0_xxyyzz_1,   \
-                             g_0_xxzzzz_0_xxyyzzz_0,  \
-                             g_0_xxzzzz_0_xxyyzzz_1,  \
-                             g_0_xxzzzz_0_xxyzzz_1,   \
-                             g_0_xxzzzz_0_xxyzzzz_0,  \
-                             g_0_xxzzzz_0_xxyzzzz_1,  \
-                             g_0_xxzzzz_0_xxzzzz_1,   \
-                             g_0_xxzzzz_0_xxzzzzz_0,  \
-                             g_0_xxzzzz_0_xxzzzzz_1,  \
-                             g_0_xxzzzz_0_xyyyyyz_0,  \
-                             g_0_xxzzzz_0_xyyyyyz_1,  \
-                             g_0_xxzzzz_0_xyyyyz_1,   \
-                             g_0_xxzzzz_0_xyyyyzz_0,  \
-                             g_0_xxzzzz_0_xyyyyzz_1,  \
-                             g_0_xxzzzz_0_xyyyzz_1,   \
-                             g_0_xxzzzz_0_xyyyzzz_0,  \
-                             g_0_xxzzzz_0_xyyyzzz_1,  \
-                             g_0_xxzzzz_0_xyyzzz_1,   \
-                             g_0_xxzzzz_0_xyyzzzz_0,  \
-                             g_0_xxzzzz_0_xyyzzzz_1,  \
-                             g_0_xxzzzz_0_xyzzzz_1,   \
-                             g_0_xxzzzz_0_xyzzzzz_0,  \
-                             g_0_xxzzzz_0_xyzzzzz_1,  \
-                             g_0_xxzzzz_0_xzzzzz_1,   \
-                             g_0_xxzzzz_0_xzzzzzz_0,  \
-                             g_0_xxzzzz_0_xzzzzzz_1,  \
-                             g_0_xxzzzz_0_yyyyyyy_0,  \
-                             g_0_xxzzzz_0_yyyyyyy_1,  \
-                             g_0_xxzzzz_0_yyyyyyz_0,  \
-                             g_0_xxzzzz_0_yyyyyyz_1,  \
-                             g_0_xxzzzz_0_yyyyyz_1,   \
-                             g_0_xxzzzz_0_yyyyyzz_0,  \
-                             g_0_xxzzzz_0_yyyyyzz_1,  \
-                             g_0_xxzzzz_0_yyyyzz_1,   \
-                             g_0_xxzzzz_0_yyyyzzz_0,  \
-                             g_0_xxzzzz_0_yyyyzzz_1,  \
-                             g_0_xxzzzz_0_yyyzzz_1,   \
-                             g_0_xxzzzz_0_yyyzzzz_0,  \
-                             g_0_xxzzzz_0_yyyzzzz_1,  \
-                             g_0_xxzzzz_0_yyzzzz_1,   \
-                             g_0_xxzzzz_0_yyzzzzz_0,  \
-                             g_0_xxzzzz_0_yyzzzzz_1,  \
-                             g_0_xxzzzz_0_yzzzzz_1,   \
-                             g_0_xxzzzz_0_yzzzzzz_0,  \
-                             g_0_xxzzzz_0_yzzzzzz_1,  \
-                             g_0_xxzzzz_0_zzzzzz_1,   \
-                             g_0_xxzzzz_0_zzzzzzz_0,  \
-                             g_0_xxzzzz_0_zzzzzzz_1,  \
-                             g_0_xzzzz_0_xxxxxxz_0,   \
-                             g_0_xzzzz_0_xxxxxxz_1,   \
-                             g_0_xzzzz_0_xxxxxyz_0,   \
-                             g_0_xzzzz_0_xxxxxyz_1,   \
-                             g_0_xzzzz_0_xxxxxzz_0,   \
-                             g_0_xzzzz_0_xxxxxzz_1,   \
-                             g_0_xzzzz_0_xxxxyyz_0,   \
-                             g_0_xzzzz_0_xxxxyyz_1,   \
-                             g_0_xzzzz_0_xxxxyzz_0,   \
-                             g_0_xzzzz_0_xxxxyzz_1,   \
-                             g_0_xzzzz_0_xxxxzzz_0,   \
-                             g_0_xzzzz_0_xxxxzzz_1,   \
-                             g_0_xzzzz_0_xxxyyyz_0,   \
-                             g_0_xzzzz_0_xxxyyyz_1,   \
-                             g_0_xzzzz_0_xxxyyzz_0,   \
-                             g_0_xzzzz_0_xxxyyzz_1,   \
-                             g_0_xzzzz_0_xxxyzzz_0,   \
-                             g_0_xzzzz_0_xxxyzzz_1,   \
-                             g_0_xzzzz_0_xxxzzzz_0,   \
-                             g_0_xzzzz_0_xxxzzzz_1,   \
-                             g_0_xzzzz_0_xxyyyyz_0,   \
-                             g_0_xzzzz_0_xxyyyyz_1,   \
-                             g_0_xzzzz_0_xxyyyzz_0,   \
-                             g_0_xzzzz_0_xxyyyzz_1,   \
-                             g_0_xzzzz_0_xxyyzzz_0,   \
-                             g_0_xzzzz_0_xxyyzzz_1,   \
-                             g_0_xzzzz_0_xxyzzzz_0,   \
-                             g_0_xzzzz_0_xxyzzzz_1,   \
-                             g_0_xzzzz_0_xxzzzzz_0,   \
-                             g_0_xzzzz_0_xxzzzzz_1,   \
-                             g_0_xzzzz_0_xyyyyyz_0,   \
-                             g_0_xzzzz_0_xyyyyyz_1,   \
-                             g_0_xzzzz_0_xyyyyzz_0,   \
-                             g_0_xzzzz_0_xyyyyzz_1,   \
-                             g_0_xzzzz_0_xyyyzzz_0,   \
-                             g_0_xzzzz_0_xyyyzzz_1,   \
-                             g_0_xzzzz_0_xyyzzzz_0,   \
-                             g_0_xzzzz_0_xyyzzzz_1,   \
-                             g_0_xzzzz_0_xyzzzzz_0,   \
-                             g_0_xzzzz_0_xyzzzzz_1,   \
-                             g_0_xzzzz_0_xzzzzzz_0,   \
-                             g_0_xzzzz_0_xzzzzzz_1,   \
-                             g_0_xzzzz_0_yyyyyyy_0,   \
-                             g_0_xzzzz_0_yyyyyyy_1,   \
-                             g_0_xzzzz_0_yyyyyyz_0,   \
-                             g_0_xzzzz_0_yyyyyyz_1,   \
-                             g_0_xzzzz_0_yyyyyzz_0,   \
-                             g_0_xzzzz_0_yyyyyzz_1,   \
-                             g_0_xzzzz_0_yyyyzzz_0,   \
-                             g_0_xzzzz_0_yyyyzzz_1,   \
-                             g_0_xzzzz_0_yyyzzzz_0,   \
-                             g_0_xzzzz_0_yyyzzzz_1,   \
-                             g_0_xzzzz_0_yyzzzzz_0,   \
-                             g_0_xzzzz_0_yyzzzzz_1,   \
-                             g_0_xzzzz_0_yzzzzzz_0,   \
-                             g_0_xzzzz_0_yzzzzzz_1,   \
-                             g_0_xzzzz_0_zzzzzzz_0,   \
-                             g_0_xzzzz_0_zzzzzzz_1,   \
-                             wp_x,                    \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxxzz_0_xxxxxxx_0, g_0_xxxzz_0_xxxxxxx_1, g_0_xxxzz_0_xxxxxxy_0, g_0_xxxzz_0_xxxxxxy_1, g_0_xxxzz_0_xxxxxyy_0, g_0_xxxzz_0_xxxxxyy_1, g_0_xxxzz_0_xxxxyyy_0, g_0_xxxzz_0_xxxxyyy_1, g_0_xxxzz_0_xxxyyyy_0, g_0_xxxzz_0_xxxyyyy_1, g_0_xxxzz_0_xxyyyyy_0, g_0_xxxzz_0_xxyyyyy_1, g_0_xxxzz_0_xyyyyyy_0, g_0_xxxzz_0_xyyyyyy_1, g_0_xxxzzz_0_xxxxxxx_0, g_0_xxxzzz_0_xxxxxxx_1, g_0_xxxzzz_0_xxxxxxy_0, g_0_xxxzzz_0_xxxxxxy_1, g_0_xxxzzz_0_xxxxxyy_0, g_0_xxxzzz_0_xxxxxyy_1, g_0_xxxzzz_0_xxxxyyy_0, g_0_xxxzzz_0_xxxxyyy_1, g_0_xxxzzz_0_xxxyyyy_0, g_0_xxxzzz_0_xxxyyyy_1, g_0_xxxzzz_0_xxyyyyy_0, g_0_xxxzzz_0_xxyyyyy_1, g_0_xxxzzz_0_xyyyyyy_0, g_0_xxxzzz_0_xyyyyyy_1, g_0_xxxzzzz_0_xxxxxxx_0, g_0_xxxzzzz_0_xxxxxxy_0, g_0_xxxzzzz_0_xxxxxxz_0, g_0_xxxzzzz_0_xxxxxyy_0, g_0_xxxzzzz_0_xxxxxyz_0, g_0_xxxzzzz_0_xxxxxzz_0, g_0_xxxzzzz_0_xxxxyyy_0, g_0_xxxzzzz_0_xxxxyyz_0, g_0_xxxzzzz_0_xxxxyzz_0, g_0_xxxzzzz_0_xxxxzzz_0, g_0_xxxzzzz_0_xxxyyyy_0, g_0_xxxzzzz_0_xxxyyyz_0, g_0_xxxzzzz_0_xxxyyzz_0, g_0_xxxzzzz_0_xxxyzzz_0, g_0_xxxzzzz_0_xxxzzzz_0, g_0_xxxzzzz_0_xxyyyyy_0, g_0_xxxzzzz_0_xxyyyyz_0, g_0_xxxzzzz_0_xxyyyzz_0, g_0_xxxzzzz_0_xxyyzzz_0, g_0_xxxzzzz_0_xxyzzzz_0, g_0_xxxzzzz_0_xxzzzzz_0, g_0_xxxzzzz_0_xyyyyyy_0, g_0_xxxzzzz_0_xyyyyyz_0, g_0_xxxzzzz_0_xyyyyzz_0, g_0_xxxzzzz_0_xyyyzzz_0, g_0_xxxzzzz_0_xyyzzzz_0, g_0_xxxzzzz_0_xyzzzzz_0, g_0_xxxzzzz_0_xzzzzzz_0, g_0_xxxzzzz_0_yyyyyyy_0, g_0_xxxzzzz_0_yyyyyyz_0, g_0_xxxzzzz_0_yyyyyzz_0, g_0_xxxzzzz_0_yyyyzzz_0, g_0_xxxzzzz_0_yyyzzzz_0, g_0_xxxzzzz_0_yyzzzzz_0, g_0_xxxzzzz_0_yzzzzzz_0, g_0_xxxzzzz_0_zzzzzzz_0, g_0_xxzzzz_0_xxxxxxz_0, g_0_xxzzzz_0_xxxxxxz_1, g_0_xxzzzz_0_xxxxxyz_0, g_0_xxzzzz_0_xxxxxyz_1, g_0_xxzzzz_0_xxxxxz_1, g_0_xxzzzz_0_xxxxxzz_0, g_0_xxzzzz_0_xxxxxzz_1, g_0_xxzzzz_0_xxxxyyz_0, g_0_xxzzzz_0_xxxxyyz_1, g_0_xxzzzz_0_xxxxyz_1, g_0_xxzzzz_0_xxxxyzz_0, g_0_xxzzzz_0_xxxxyzz_1, g_0_xxzzzz_0_xxxxzz_1, g_0_xxzzzz_0_xxxxzzz_0, g_0_xxzzzz_0_xxxxzzz_1, g_0_xxzzzz_0_xxxyyyz_0, g_0_xxzzzz_0_xxxyyyz_1, g_0_xxzzzz_0_xxxyyz_1, g_0_xxzzzz_0_xxxyyzz_0, g_0_xxzzzz_0_xxxyyzz_1, g_0_xxzzzz_0_xxxyzz_1, g_0_xxzzzz_0_xxxyzzz_0, g_0_xxzzzz_0_xxxyzzz_1, g_0_xxzzzz_0_xxxzzz_1, g_0_xxzzzz_0_xxxzzzz_0, g_0_xxzzzz_0_xxxzzzz_1, g_0_xxzzzz_0_xxyyyyz_0, g_0_xxzzzz_0_xxyyyyz_1, g_0_xxzzzz_0_xxyyyz_1, g_0_xxzzzz_0_xxyyyzz_0, g_0_xxzzzz_0_xxyyyzz_1, g_0_xxzzzz_0_xxyyzz_1, g_0_xxzzzz_0_xxyyzzz_0, g_0_xxzzzz_0_xxyyzzz_1, g_0_xxzzzz_0_xxyzzz_1, g_0_xxzzzz_0_xxyzzzz_0, g_0_xxzzzz_0_xxyzzzz_1, g_0_xxzzzz_0_xxzzzz_1, g_0_xxzzzz_0_xxzzzzz_0, g_0_xxzzzz_0_xxzzzzz_1, g_0_xxzzzz_0_xyyyyyz_0, g_0_xxzzzz_0_xyyyyyz_1, g_0_xxzzzz_0_xyyyyz_1, g_0_xxzzzz_0_xyyyyzz_0, g_0_xxzzzz_0_xyyyyzz_1, g_0_xxzzzz_0_xyyyzz_1, g_0_xxzzzz_0_xyyyzzz_0, g_0_xxzzzz_0_xyyyzzz_1, g_0_xxzzzz_0_xyyzzz_1, g_0_xxzzzz_0_xyyzzzz_0, g_0_xxzzzz_0_xyyzzzz_1, g_0_xxzzzz_0_xyzzzz_1, g_0_xxzzzz_0_xyzzzzz_0, g_0_xxzzzz_0_xyzzzzz_1, g_0_xxzzzz_0_xzzzzz_1, g_0_xxzzzz_0_xzzzzzz_0, g_0_xxzzzz_0_xzzzzzz_1, g_0_xxzzzz_0_yyyyyyy_0, g_0_xxzzzz_0_yyyyyyy_1, g_0_xxzzzz_0_yyyyyyz_0, g_0_xxzzzz_0_yyyyyyz_1, g_0_xxzzzz_0_yyyyyz_1, g_0_xxzzzz_0_yyyyyzz_0, g_0_xxzzzz_0_yyyyyzz_1, g_0_xxzzzz_0_yyyyzz_1, g_0_xxzzzz_0_yyyyzzz_0, g_0_xxzzzz_0_yyyyzzz_1, g_0_xxzzzz_0_yyyzzz_1, g_0_xxzzzz_0_yyyzzzz_0, g_0_xxzzzz_0_yyyzzzz_1, g_0_xxzzzz_0_yyzzzz_1, g_0_xxzzzz_0_yyzzzzz_0, g_0_xxzzzz_0_yyzzzzz_1, g_0_xxzzzz_0_yzzzzz_1, g_0_xxzzzz_0_yzzzzzz_0, g_0_xxzzzz_0_yzzzzzz_1, g_0_xxzzzz_0_zzzzzz_1, g_0_xxzzzz_0_zzzzzzz_0, g_0_xxzzzz_0_zzzzzzz_1, g_0_xzzzz_0_xxxxxxz_0, g_0_xzzzz_0_xxxxxxz_1, g_0_xzzzz_0_xxxxxyz_0, g_0_xzzzz_0_xxxxxyz_1, g_0_xzzzz_0_xxxxxzz_0, g_0_xzzzz_0_xxxxxzz_1, g_0_xzzzz_0_xxxxyyz_0, g_0_xzzzz_0_xxxxyyz_1, g_0_xzzzz_0_xxxxyzz_0, g_0_xzzzz_0_xxxxyzz_1, g_0_xzzzz_0_xxxxzzz_0, g_0_xzzzz_0_xxxxzzz_1, g_0_xzzzz_0_xxxyyyz_0, g_0_xzzzz_0_xxxyyyz_1, g_0_xzzzz_0_xxxyyzz_0, g_0_xzzzz_0_xxxyyzz_1, g_0_xzzzz_0_xxxyzzz_0, g_0_xzzzz_0_xxxyzzz_1, g_0_xzzzz_0_xxxzzzz_0, g_0_xzzzz_0_xxxzzzz_1, g_0_xzzzz_0_xxyyyyz_0, g_0_xzzzz_0_xxyyyyz_1, g_0_xzzzz_0_xxyyyzz_0, g_0_xzzzz_0_xxyyyzz_1, g_0_xzzzz_0_xxyyzzz_0, g_0_xzzzz_0_xxyyzzz_1, g_0_xzzzz_0_xxyzzzz_0, g_0_xzzzz_0_xxyzzzz_1, g_0_xzzzz_0_xxzzzzz_0, g_0_xzzzz_0_xxzzzzz_1, g_0_xzzzz_0_xyyyyyz_0, g_0_xzzzz_0_xyyyyyz_1, g_0_xzzzz_0_xyyyyzz_0, g_0_xzzzz_0_xyyyyzz_1, g_0_xzzzz_0_xyyyzzz_0, g_0_xzzzz_0_xyyyzzz_1, g_0_xzzzz_0_xyyzzzz_0, g_0_xzzzz_0_xyyzzzz_1, g_0_xzzzz_0_xyzzzzz_0, g_0_xzzzz_0_xyzzzzz_1, g_0_xzzzz_0_xzzzzzz_0, g_0_xzzzz_0_xzzzzzz_1, g_0_xzzzz_0_yyyyyyy_0, g_0_xzzzz_0_yyyyyyy_1, g_0_xzzzz_0_yyyyyyz_0, g_0_xzzzz_0_yyyyyyz_1, g_0_xzzzz_0_yyyyyzz_0, g_0_xzzzz_0_yyyyyzz_1, g_0_xzzzz_0_yyyyzzz_0, g_0_xzzzz_0_yyyyzzz_1, g_0_xzzzz_0_yyyzzzz_0, g_0_xzzzz_0_yyyzzzz_1, g_0_xzzzz_0_yyzzzzz_0, g_0_xzzzz_0_yyzzzzz_1, g_0_xzzzz_0_yzzzzzz_0, g_0_xzzzz_0_yzzzzzz_1, g_0_xzzzz_0_zzzzzzz_0, g_0_xzzzz_0_zzzzzzz_1, wp_x, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -11119,128 +8027,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxxzzzz_0_xxxxxxx_0[i] = 3.0 * g_0_xxxzz_0_xxxxxxx_0[i] * fi_ab_0 - 3.0 * g_0_xxxzz_0_xxxxxxx_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_xxxxxxx_0[i] * pb_z + g_0_xxxzzz_0_xxxxxxx_1[i] * wp_z[i];
+        g_0_xxxzzzz_0_xxxxxxx_0[i] = 3.0 * g_0_xxxzz_0_xxxxxxx_0[i] * fi_ab_0 - 3.0 * g_0_xxxzz_0_xxxxxxx_1[i] * fti_ab_0 + g_0_xxxzzz_0_xxxxxxx_0[i] * pb_z + g_0_xxxzzz_0_xxxxxxx_1[i] * wp_z[i];
 
-        g_0_xxxzzzz_0_xxxxxxy_0[i] = 3.0 * g_0_xxxzz_0_xxxxxxy_0[i] * fi_ab_0 - 3.0 * g_0_xxxzz_0_xxxxxxy_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_xxxxxxy_0[i] * pb_z + g_0_xxxzzz_0_xxxxxxy_1[i] * wp_z[i];
+        g_0_xxxzzzz_0_xxxxxxy_0[i] = 3.0 * g_0_xxxzz_0_xxxxxxy_0[i] * fi_ab_0 - 3.0 * g_0_xxxzz_0_xxxxxxy_1[i] * fti_ab_0 + g_0_xxxzzz_0_xxxxxxy_0[i] * pb_z + g_0_xxxzzz_0_xxxxxxy_1[i] * wp_z[i];
 
-        g_0_xxxzzzz_0_xxxxxxz_0[i] = 2.0 * g_0_xzzzz_0_xxxxxxz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxxxxz_1[i] * fti_ab_0 +
-                                     6.0 * g_0_xxzzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxxxz_0[i] * pb_x +
-                                     g_0_xxzzzz_0_xxxxxxz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xxxxxxz_0[i] = 2.0 * g_0_xzzzz_0_xxxxxxz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxxxxz_1[i] * fti_ab_0 + 6.0 * g_0_xxzzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxxxz_0[i] * pb_x + g_0_xxzzzz_0_xxxxxxz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xxxxxyy_0[i] = 3.0 * g_0_xxxzz_0_xxxxxyy_0[i] * fi_ab_0 - 3.0 * g_0_xxxzz_0_xxxxxyy_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_xxxxxyy_0[i] * pb_z + g_0_xxxzzz_0_xxxxxyy_1[i] * wp_z[i];
+        g_0_xxxzzzz_0_xxxxxyy_0[i] = 3.0 * g_0_xxxzz_0_xxxxxyy_0[i] * fi_ab_0 - 3.0 * g_0_xxxzz_0_xxxxxyy_1[i] * fti_ab_0 + g_0_xxxzzz_0_xxxxxyy_0[i] * pb_z + g_0_xxxzzz_0_xxxxxyy_1[i] * wp_z[i];
 
-        g_0_xxxzzzz_0_xxxxxyz_0[i] = 2.0 * g_0_xzzzz_0_xxxxxyz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xxzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxxyz_0[i] * pb_x +
-                                     g_0_xxzzzz_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xxxxxyz_0[i] = 2.0 * g_0_xzzzz_0_xxxxxyz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxxxyz_1[i] * fti_ab_0 + 5.0 * g_0_xxzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxxyz_0[i] * pb_x + g_0_xxzzzz_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xxxxxzz_0[i] = 2.0 * g_0_xzzzz_0_xxxxxzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxxxzz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xxzzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxxzz_0[i] * pb_x +
-                                     g_0_xxzzzz_0_xxxxxzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xxxxxzz_0[i] = 2.0 * g_0_xzzzz_0_xxxxxzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxxxzz_1[i] * fti_ab_0 + 5.0 * g_0_xxzzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxxzz_0[i] * pb_x + g_0_xxzzzz_0_xxxxxzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xxxxyyy_0[i] = 3.0 * g_0_xxxzz_0_xxxxyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxxzz_0_xxxxyyy_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_xxxxyyy_0[i] * pb_z + g_0_xxxzzz_0_xxxxyyy_1[i] * wp_z[i];
+        g_0_xxxzzzz_0_xxxxyyy_0[i] = 3.0 * g_0_xxxzz_0_xxxxyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxxzz_0_xxxxyyy_1[i] * fti_ab_0 + g_0_xxxzzz_0_xxxxyyy_0[i] * pb_z + g_0_xxxzzz_0_xxxxyyy_1[i] * wp_z[i];
 
-        g_0_xxxzzzz_0_xxxxyyz_0[i] = 2.0 * g_0_xzzzz_0_xxxxyyz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxyyz_0[i] * pb_x +
-                                     g_0_xxzzzz_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xxxxyyz_0[i] = 2.0 * g_0_xzzzz_0_xxxxyyz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxxyyz_1[i] * fti_ab_0 + 4.0 * g_0_xxzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxyyz_0[i] * pb_x + g_0_xxzzzz_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xxxxyzz_0[i] = 2.0 * g_0_xzzzz_0_xxxxyzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxyzz_0[i] * pb_x +
-                                     g_0_xxzzzz_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xxxxyzz_0[i] = 2.0 * g_0_xzzzz_0_xxxxyzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxxyzz_1[i] * fti_ab_0 + 4.0 * g_0_xxzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxyzz_0[i] * pb_x + g_0_xxzzzz_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xxxxzzz_0[i] = 2.0 * g_0_xzzzz_0_xxxxzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxxzzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xxzzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxzzz_0[i] * pb_x +
-                                     g_0_xxzzzz_0_xxxxzzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xxxxzzz_0[i] = 2.0 * g_0_xzzzz_0_xxxxzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxxzzz_1[i] * fti_ab_0 + 4.0 * g_0_xxzzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxzzz_0[i] * pb_x + g_0_xxzzzz_0_xxxxzzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xxxyyyy_0[i] = 3.0 * g_0_xxxzz_0_xxxyyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxxzz_0_xxxyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_xxxyyyy_0[i] * pb_z + g_0_xxxzzz_0_xxxyyyy_1[i] * wp_z[i];
+        g_0_xxxzzzz_0_xxxyyyy_0[i] = 3.0 * g_0_xxxzz_0_xxxyyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxxzz_0_xxxyyyy_1[i] * fti_ab_0 + g_0_xxxzzz_0_xxxyyyy_0[i] * pb_z + g_0_xxxzzz_0_xxxyyyy_1[i] * wp_z[i];
 
-        g_0_xxxzzzz_0_xxxyyyz_0[i] = 2.0 * g_0_xzzzz_0_xxxyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxyyyz_0[i] * pb_x +
-                                     g_0_xxzzzz_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xxxyyyz_0[i] = 2.0 * g_0_xzzzz_0_xxxyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_xxzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxyyyz_0[i] * pb_x + g_0_xxzzzz_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xxxyyzz_0[i] = 2.0 * g_0_xzzzz_0_xxxyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxyyzz_0[i] * pb_x +
-                                     g_0_xxzzzz_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xxxyyzz_0[i] = 2.0 * g_0_xzzzz_0_xxxyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxyyzz_1[i] * fti_ab_0 + 3.0 * g_0_xxzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxyyzz_0[i] * pb_x + g_0_xxzzzz_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xxxyzzz_0[i] = 2.0 * g_0_xzzzz_0_xxxyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxyzzz_0[i] * pb_x +
-                                     g_0_xxzzzz_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xxxyzzz_0[i] = 2.0 * g_0_xzzzz_0_xxxyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxyzzz_1[i] * fti_ab_0 + 3.0 * g_0_xxzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxyzzz_0[i] * pb_x + g_0_xxzzzz_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xxxzzzz_0[i] = 2.0 * g_0_xzzzz_0_xxxzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxzzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xxzzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxzzzz_0[i] * pb_x +
-                                     g_0_xxzzzz_0_xxxzzzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xxxzzzz_0[i] = 2.0 * g_0_xzzzz_0_xxxzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxxzzzz_1[i] * fti_ab_0 + 3.0 * g_0_xxzzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxzzzz_0[i] * pb_x + g_0_xxzzzz_0_xxxzzzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xxyyyyy_0[i] = 3.0 * g_0_xxxzz_0_xxyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxxzz_0_xxyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_xxyyyyy_0[i] * pb_z + g_0_xxxzzz_0_xxyyyyy_1[i] * wp_z[i];
+        g_0_xxxzzzz_0_xxyyyyy_0[i] = 3.0 * g_0_xxxzz_0_xxyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxxzz_0_xxyyyyy_1[i] * fti_ab_0 + g_0_xxxzzz_0_xxyyyyy_0[i] * pb_z + g_0_xxxzzz_0_xxyyyyy_1[i] * wp_z[i];
 
-        g_0_xxxzzzz_0_xxyyyyz_0[i] = 2.0 * g_0_xzzzz_0_xxyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyyyyz_0[i] * pb_x +
-                                     g_0_xxzzzz_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xxyyyyz_0[i] = 2.0 * g_0_xzzzz_0_xxyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxyyyyz_1[i] * fti_ab_0 + 2.0 * g_0_xxzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyyyyz_0[i] * pb_x + g_0_xxzzzz_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xxyyyzz_0[i] = 2.0 * g_0_xzzzz_0_xxyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyyyzz_0[i] * pb_x +
-                                     g_0_xxzzzz_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xxyyyzz_0[i] = 2.0 * g_0_xzzzz_0_xxyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxyyyzz_1[i] * fti_ab_0 + 2.0 * g_0_xxzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyyyzz_0[i] * pb_x + g_0_xxzzzz_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xxyyzzz_0[i] = 2.0 * g_0_xzzzz_0_xxyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyyzzz_0[i] * pb_x +
-                                     g_0_xxzzzz_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xxyyzzz_0[i] = 2.0 * g_0_xzzzz_0_xxyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyyzzz_0[i] * pb_x + g_0_xxzzzz_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xxyzzzz_0[i] = 2.0 * g_0_xzzzz_0_xxyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyzzzz_0[i] * pb_x +
-                                     g_0_xxzzzz_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xxyzzzz_0[i] = 2.0 * g_0_xzzzz_0_xxyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyzzzz_0[i] * pb_x + g_0_xxzzzz_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xxzzzzz_0[i] = 2.0 * g_0_xzzzz_0_xxzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxzzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xxzzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxzzzzz_0[i] * pb_x +
-                                     g_0_xxzzzz_0_xxzzzzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xxzzzzz_0[i] = 2.0 * g_0_xzzzz_0_xxzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xxzzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xxzzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxzzzzz_0[i] * pb_x + g_0_xxzzzz_0_xxzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xyyyyyy_0[i] = 3.0 * g_0_xxxzz_0_xyyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxxzz_0_xyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxxzzz_0_xyyyyyy_0[i] * pb_z + g_0_xxxzzz_0_xyyyyyy_1[i] * wp_z[i];
+        g_0_xxxzzzz_0_xyyyyyy_0[i] = 3.0 * g_0_xxxzz_0_xyyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_xxxzz_0_xyyyyyy_1[i] * fti_ab_0 + g_0_xxxzzz_0_xyyyyyy_0[i] * pb_z + g_0_xxxzzz_0_xyyyyyy_1[i] * wp_z[i];
 
-        g_0_xxxzzzz_0_xyyyyyz_0[i] = 2.0 * g_0_xzzzz_0_xyyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyyyyz_0[i] * pb_x + g_0_xxzzzz_0_xyyyyyz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xyyyyyz_0[i] = 2.0 * g_0_xzzzz_0_xyyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xyyyyyz_1[i] * fti_ab_0 + g_0_xxzzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyyyyz_0[i] * pb_x + g_0_xxzzzz_0_xyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xyyyyzz_0[i] = 2.0 * g_0_xzzzz_0_xyyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xyyyyzz_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyyyzz_0[i] * pb_x + g_0_xxzzzz_0_xyyyyzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xyyyyzz_0[i] = 2.0 * g_0_xzzzz_0_xyyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xyyyyzz_1[i] * fti_ab_0 + g_0_xxzzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyyyzz_0[i] * pb_x + g_0_xxzzzz_0_xyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xyyyzzz_0[i] = 2.0 * g_0_xzzzz_0_xyyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xyyyzzz_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyyzzz_0[i] * pb_x + g_0_xxzzzz_0_xyyyzzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xyyyzzz_0[i] = 2.0 * g_0_xzzzz_0_xyyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xyyyzzz_1[i] * fti_ab_0 + g_0_xxzzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyyzzz_0[i] * pb_x + g_0_xxzzzz_0_xyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xyyzzzz_0[i] = 2.0 * g_0_xzzzz_0_xyyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xyyzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyzzzz_0[i] * pb_x + g_0_xxzzzz_0_xyyzzzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xyyzzzz_0[i] = 2.0 * g_0_xzzzz_0_xyyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xyyzzzz_1[i] * fti_ab_0 + g_0_xxzzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyzzzz_0[i] * pb_x + g_0_xxzzzz_0_xyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xyzzzzz_0[i] = 2.0 * g_0_xzzzz_0_xyzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyzzzzz_0[i] * pb_x + g_0_xxzzzz_0_xyzzzzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xyzzzzz_0[i] = 2.0 * g_0_xzzzz_0_xyzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xyzzzzz_1[i] * fti_ab_0 + g_0_xxzzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyzzzzz_0[i] * pb_x + g_0_xxzzzz_0_xyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_xzzzzzz_0[i] = 2.0 * g_0_xzzzz_0_xzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xzzzzzz_0[i] * pb_x + g_0_xxzzzz_0_xzzzzzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_xzzzzzz_0[i] = 2.0 * g_0_xzzzz_0_xzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_xzzzzzz_1[i] * fti_ab_0 + g_0_xxzzzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xzzzzzz_0[i] * pb_x + g_0_xxzzzz_0_xzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_yyyyyyy_0[i] = 2.0 * g_0_xzzzz_0_yyyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_yyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_yyyyyyy_0[i] * pb_x + g_0_xxzzzz_0_yyyyyyy_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_yyyyyyy_0[i] = 2.0 * g_0_xzzzz_0_yyyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_yyyyyyy_1[i] * fti_ab_0 + g_0_xxzzzz_0_yyyyyyy_0[i] * pb_x + g_0_xxzzzz_0_yyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_yyyyyyz_0[i] = 2.0 * g_0_xzzzz_0_yyyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_yyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_yyyyyyz_0[i] * pb_x + g_0_xxzzzz_0_yyyyyyz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_yyyyyyz_0[i] = 2.0 * g_0_xzzzz_0_yyyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_yyyyyyz_1[i] * fti_ab_0 + g_0_xxzzzz_0_yyyyyyz_0[i] * pb_x + g_0_xxzzzz_0_yyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_yyyyyzz_0[i] = 2.0 * g_0_xzzzz_0_yyyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_yyyyyzz_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_yyyyyzz_0[i] * pb_x + g_0_xxzzzz_0_yyyyyzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_yyyyyzz_0[i] = 2.0 * g_0_xzzzz_0_yyyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_yyyyyzz_1[i] * fti_ab_0 + g_0_xxzzzz_0_yyyyyzz_0[i] * pb_x + g_0_xxzzzz_0_yyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_yyyyzzz_0[i] = 2.0 * g_0_xzzzz_0_yyyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_yyyyzzz_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_yyyyzzz_0[i] * pb_x + g_0_xxzzzz_0_yyyyzzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_yyyyzzz_0[i] = 2.0 * g_0_xzzzz_0_yyyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_yyyyzzz_1[i] * fti_ab_0 + g_0_xxzzzz_0_yyyyzzz_0[i] * pb_x + g_0_xxzzzz_0_yyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_yyyzzzz_0[i] = 2.0 * g_0_xzzzz_0_yyyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_yyyzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_yyyzzzz_0[i] * pb_x + g_0_xxzzzz_0_yyyzzzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_yyyzzzz_0[i] = 2.0 * g_0_xzzzz_0_yyyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_yyyzzzz_1[i] * fti_ab_0 + g_0_xxzzzz_0_yyyzzzz_0[i] * pb_x + g_0_xxzzzz_0_yyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_yyzzzzz_0[i] = 2.0 * g_0_xzzzz_0_yyzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_yyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_yyzzzzz_0[i] * pb_x + g_0_xxzzzz_0_yyzzzzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_yyzzzzz_0[i] = 2.0 * g_0_xzzzz_0_yyzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_yyzzzzz_1[i] * fti_ab_0 + g_0_xxzzzz_0_yyzzzzz_0[i] * pb_x + g_0_xxzzzz_0_yyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_yzzzzzz_0[i] = 2.0 * g_0_xzzzz_0_yzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_yzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_yzzzzzz_0[i] * pb_x + g_0_xxzzzz_0_yzzzzzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_yzzzzzz_0[i] = 2.0 * g_0_xzzzz_0_yzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_yzzzzzz_1[i] * fti_ab_0 + g_0_xxzzzz_0_yzzzzzz_0[i] * pb_x + g_0_xxzzzz_0_yzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxxzzzz_0_zzzzzzz_0[i] = 2.0 * g_0_xzzzz_0_zzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_zzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_zzzzzzz_0[i] * pb_x + g_0_xxzzzz_0_zzzzzzz_1[i] * wp_x[i];
+        g_0_xxxzzzz_0_zzzzzzz_0[i] = 2.0 * g_0_xzzzz_0_zzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzzz_0_zzzzzzz_1[i] * fti_ab_0 + g_0_xxzzzz_0_zzzzzzz_0[i] * pb_x + g_0_xxzzzz_0_zzzzzzz_1[i] * wp_x[i];
     }
 
     /// Set up 540-576 components of targeted buffer : SKSK
@@ -11317,211 +8174,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxyyyyy_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 575);
 
-#pragma omp simd aligned(g_0_xxyyy_0_xxxxxxx_0,       \
-                             g_0_xxyyy_0_xxxxxxx_1,   \
-                             g_0_xxyyy_0_xxxxxxz_0,   \
-                             g_0_xxyyy_0_xxxxxxz_1,   \
-                             g_0_xxyyy_0_xxxxxzz_0,   \
-                             g_0_xxyyy_0_xxxxxzz_1,   \
-                             g_0_xxyyy_0_xxxxzzz_0,   \
-                             g_0_xxyyy_0_xxxxzzz_1,   \
-                             g_0_xxyyy_0_xxxzzzz_0,   \
-                             g_0_xxyyy_0_xxxzzzz_1,   \
-                             g_0_xxyyy_0_xxzzzzz_0,   \
-                             g_0_xxyyy_0_xxzzzzz_1,   \
-                             g_0_xxyyy_0_xzzzzzz_0,   \
-                             g_0_xxyyy_0_xzzzzzz_1,   \
-                             g_0_xxyyyy_0_xxxxxxx_0,  \
-                             g_0_xxyyyy_0_xxxxxxx_1,  \
-                             g_0_xxyyyy_0_xxxxxxz_0,  \
-                             g_0_xxyyyy_0_xxxxxxz_1,  \
-                             g_0_xxyyyy_0_xxxxxzz_0,  \
-                             g_0_xxyyyy_0_xxxxxzz_1,  \
-                             g_0_xxyyyy_0_xxxxzzz_0,  \
-                             g_0_xxyyyy_0_xxxxzzz_1,  \
-                             g_0_xxyyyy_0_xxxzzzz_0,  \
-                             g_0_xxyyyy_0_xxxzzzz_1,  \
-                             g_0_xxyyyy_0_xxzzzzz_0,  \
-                             g_0_xxyyyy_0_xxzzzzz_1,  \
-                             g_0_xxyyyy_0_xzzzzzz_0,  \
-                             g_0_xxyyyy_0_xzzzzzz_1,  \
-                             g_0_xxyyyyy_0_xxxxxxx_0, \
-                             g_0_xxyyyyy_0_xxxxxxy_0, \
-                             g_0_xxyyyyy_0_xxxxxxz_0, \
-                             g_0_xxyyyyy_0_xxxxxyy_0, \
-                             g_0_xxyyyyy_0_xxxxxyz_0, \
-                             g_0_xxyyyyy_0_xxxxxzz_0, \
-                             g_0_xxyyyyy_0_xxxxyyy_0, \
-                             g_0_xxyyyyy_0_xxxxyyz_0, \
-                             g_0_xxyyyyy_0_xxxxyzz_0, \
-                             g_0_xxyyyyy_0_xxxxzzz_0, \
-                             g_0_xxyyyyy_0_xxxyyyy_0, \
-                             g_0_xxyyyyy_0_xxxyyyz_0, \
-                             g_0_xxyyyyy_0_xxxyyzz_0, \
-                             g_0_xxyyyyy_0_xxxyzzz_0, \
-                             g_0_xxyyyyy_0_xxxzzzz_0, \
-                             g_0_xxyyyyy_0_xxyyyyy_0, \
-                             g_0_xxyyyyy_0_xxyyyyz_0, \
-                             g_0_xxyyyyy_0_xxyyyzz_0, \
-                             g_0_xxyyyyy_0_xxyyzzz_0, \
-                             g_0_xxyyyyy_0_xxyzzzz_0, \
-                             g_0_xxyyyyy_0_xxzzzzz_0, \
-                             g_0_xxyyyyy_0_xyyyyyy_0, \
-                             g_0_xxyyyyy_0_xyyyyyz_0, \
-                             g_0_xxyyyyy_0_xyyyyzz_0, \
-                             g_0_xxyyyyy_0_xyyyzzz_0, \
-                             g_0_xxyyyyy_0_xyyzzzz_0, \
-                             g_0_xxyyyyy_0_xyzzzzz_0, \
-                             g_0_xxyyyyy_0_xzzzzzz_0, \
-                             g_0_xxyyyyy_0_yyyyyyy_0, \
-                             g_0_xxyyyyy_0_yyyyyyz_0, \
-                             g_0_xxyyyyy_0_yyyyyzz_0, \
-                             g_0_xxyyyyy_0_yyyyzzz_0, \
-                             g_0_xxyyyyy_0_yyyzzzz_0, \
-                             g_0_xxyyyyy_0_yyzzzzz_0, \
-                             g_0_xxyyyyy_0_yzzzzzz_0, \
-                             g_0_xxyyyyy_0_zzzzzzz_0, \
-                             g_0_xyyyyy_0_xxxxxxy_0,  \
-                             g_0_xyyyyy_0_xxxxxxy_1,  \
-                             g_0_xyyyyy_0_xxxxxy_1,   \
-                             g_0_xyyyyy_0_xxxxxyy_0,  \
-                             g_0_xyyyyy_0_xxxxxyy_1,  \
-                             g_0_xyyyyy_0_xxxxxyz_0,  \
-                             g_0_xyyyyy_0_xxxxxyz_1,  \
-                             g_0_xyyyyy_0_xxxxyy_1,   \
-                             g_0_xyyyyy_0_xxxxyyy_0,  \
-                             g_0_xyyyyy_0_xxxxyyy_1,  \
-                             g_0_xyyyyy_0_xxxxyyz_0,  \
-                             g_0_xyyyyy_0_xxxxyyz_1,  \
-                             g_0_xyyyyy_0_xxxxyz_1,   \
-                             g_0_xyyyyy_0_xxxxyzz_0,  \
-                             g_0_xyyyyy_0_xxxxyzz_1,  \
-                             g_0_xyyyyy_0_xxxyyy_1,   \
-                             g_0_xyyyyy_0_xxxyyyy_0,  \
-                             g_0_xyyyyy_0_xxxyyyy_1,  \
-                             g_0_xyyyyy_0_xxxyyyz_0,  \
-                             g_0_xyyyyy_0_xxxyyyz_1,  \
-                             g_0_xyyyyy_0_xxxyyz_1,   \
-                             g_0_xyyyyy_0_xxxyyzz_0,  \
-                             g_0_xyyyyy_0_xxxyyzz_1,  \
-                             g_0_xyyyyy_0_xxxyzz_1,   \
-                             g_0_xyyyyy_0_xxxyzzz_0,  \
-                             g_0_xyyyyy_0_xxxyzzz_1,  \
-                             g_0_xyyyyy_0_xxyyyy_1,   \
-                             g_0_xyyyyy_0_xxyyyyy_0,  \
-                             g_0_xyyyyy_0_xxyyyyy_1,  \
-                             g_0_xyyyyy_0_xxyyyyz_0,  \
-                             g_0_xyyyyy_0_xxyyyyz_1,  \
-                             g_0_xyyyyy_0_xxyyyz_1,   \
-                             g_0_xyyyyy_0_xxyyyzz_0,  \
-                             g_0_xyyyyy_0_xxyyyzz_1,  \
-                             g_0_xyyyyy_0_xxyyzz_1,   \
-                             g_0_xyyyyy_0_xxyyzzz_0,  \
-                             g_0_xyyyyy_0_xxyyzzz_1,  \
-                             g_0_xyyyyy_0_xxyzzz_1,   \
-                             g_0_xyyyyy_0_xxyzzzz_0,  \
-                             g_0_xyyyyy_0_xxyzzzz_1,  \
-                             g_0_xyyyyy_0_xyyyyy_1,   \
-                             g_0_xyyyyy_0_xyyyyyy_0,  \
-                             g_0_xyyyyy_0_xyyyyyy_1,  \
-                             g_0_xyyyyy_0_xyyyyyz_0,  \
-                             g_0_xyyyyy_0_xyyyyyz_1,  \
-                             g_0_xyyyyy_0_xyyyyz_1,   \
-                             g_0_xyyyyy_0_xyyyyzz_0,  \
-                             g_0_xyyyyy_0_xyyyyzz_1,  \
-                             g_0_xyyyyy_0_xyyyzz_1,   \
-                             g_0_xyyyyy_0_xyyyzzz_0,  \
-                             g_0_xyyyyy_0_xyyyzzz_1,  \
-                             g_0_xyyyyy_0_xyyzzz_1,   \
-                             g_0_xyyyyy_0_xyyzzzz_0,  \
-                             g_0_xyyyyy_0_xyyzzzz_1,  \
-                             g_0_xyyyyy_0_xyzzzz_1,   \
-                             g_0_xyyyyy_0_xyzzzzz_0,  \
-                             g_0_xyyyyy_0_xyzzzzz_1,  \
-                             g_0_xyyyyy_0_yyyyyy_1,   \
-                             g_0_xyyyyy_0_yyyyyyy_0,  \
-                             g_0_xyyyyy_0_yyyyyyy_1,  \
-                             g_0_xyyyyy_0_yyyyyyz_0,  \
-                             g_0_xyyyyy_0_yyyyyyz_1,  \
-                             g_0_xyyyyy_0_yyyyyz_1,   \
-                             g_0_xyyyyy_0_yyyyyzz_0,  \
-                             g_0_xyyyyy_0_yyyyyzz_1,  \
-                             g_0_xyyyyy_0_yyyyzz_1,   \
-                             g_0_xyyyyy_0_yyyyzzz_0,  \
-                             g_0_xyyyyy_0_yyyyzzz_1,  \
-                             g_0_xyyyyy_0_yyyzzz_1,   \
-                             g_0_xyyyyy_0_yyyzzzz_0,  \
-                             g_0_xyyyyy_0_yyyzzzz_1,  \
-                             g_0_xyyyyy_0_yyzzzz_1,   \
-                             g_0_xyyyyy_0_yyzzzzz_0,  \
-                             g_0_xyyyyy_0_yyzzzzz_1,  \
-                             g_0_xyyyyy_0_yzzzzz_1,   \
-                             g_0_xyyyyy_0_yzzzzzz_0,  \
-                             g_0_xyyyyy_0_yzzzzzz_1,  \
-                             g_0_xyyyyy_0_zzzzzzz_0,  \
-                             g_0_xyyyyy_0_zzzzzzz_1,  \
-                             g_0_yyyyy_0_xxxxxxy_0,   \
-                             g_0_yyyyy_0_xxxxxxy_1,   \
-                             g_0_yyyyy_0_xxxxxyy_0,   \
-                             g_0_yyyyy_0_xxxxxyy_1,   \
-                             g_0_yyyyy_0_xxxxxyz_0,   \
-                             g_0_yyyyy_0_xxxxxyz_1,   \
-                             g_0_yyyyy_0_xxxxyyy_0,   \
-                             g_0_yyyyy_0_xxxxyyy_1,   \
-                             g_0_yyyyy_0_xxxxyyz_0,   \
-                             g_0_yyyyy_0_xxxxyyz_1,   \
-                             g_0_yyyyy_0_xxxxyzz_0,   \
-                             g_0_yyyyy_0_xxxxyzz_1,   \
-                             g_0_yyyyy_0_xxxyyyy_0,   \
-                             g_0_yyyyy_0_xxxyyyy_1,   \
-                             g_0_yyyyy_0_xxxyyyz_0,   \
-                             g_0_yyyyy_0_xxxyyyz_1,   \
-                             g_0_yyyyy_0_xxxyyzz_0,   \
-                             g_0_yyyyy_0_xxxyyzz_1,   \
-                             g_0_yyyyy_0_xxxyzzz_0,   \
-                             g_0_yyyyy_0_xxxyzzz_1,   \
-                             g_0_yyyyy_0_xxyyyyy_0,   \
-                             g_0_yyyyy_0_xxyyyyy_1,   \
-                             g_0_yyyyy_0_xxyyyyz_0,   \
-                             g_0_yyyyy_0_xxyyyyz_1,   \
-                             g_0_yyyyy_0_xxyyyzz_0,   \
-                             g_0_yyyyy_0_xxyyyzz_1,   \
-                             g_0_yyyyy_0_xxyyzzz_0,   \
-                             g_0_yyyyy_0_xxyyzzz_1,   \
-                             g_0_yyyyy_0_xxyzzzz_0,   \
-                             g_0_yyyyy_0_xxyzzzz_1,   \
-                             g_0_yyyyy_0_xyyyyyy_0,   \
-                             g_0_yyyyy_0_xyyyyyy_1,   \
-                             g_0_yyyyy_0_xyyyyyz_0,   \
-                             g_0_yyyyy_0_xyyyyyz_1,   \
-                             g_0_yyyyy_0_xyyyyzz_0,   \
-                             g_0_yyyyy_0_xyyyyzz_1,   \
-                             g_0_yyyyy_0_xyyyzzz_0,   \
-                             g_0_yyyyy_0_xyyyzzz_1,   \
-                             g_0_yyyyy_0_xyyzzzz_0,   \
-                             g_0_yyyyy_0_xyyzzzz_1,   \
-                             g_0_yyyyy_0_xyzzzzz_0,   \
-                             g_0_yyyyy_0_xyzzzzz_1,   \
-                             g_0_yyyyy_0_yyyyyyy_0,   \
-                             g_0_yyyyy_0_yyyyyyy_1,   \
-                             g_0_yyyyy_0_yyyyyyz_0,   \
-                             g_0_yyyyy_0_yyyyyyz_1,   \
-                             g_0_yyyyy_0_yyyyyzz_0,   \
-                             g_0_yyyyy_0_yyyyyzz_1,   \
-                             g_0_yyyyy_0_yyyyzzz_0,   \
-                             g_0_yyyyy_0_yyyyzzz_1,   \
-                             g_0_yyyyy_0_yyyzzzz_0,   \
-                             g_0_yyyyy_0_yyyzzzz_1,   \
-                             g_0_yyyyy_0_yyzzzzz_0,   \
-                             g_0_yyyyy_0_yyzzzzz_1,   \
-                             g_0_yyyyy_0_yzzzzzz_0,   \
-                             g_0_yyyyy_0_yzzzzzz_1,   \
-                             g_0_yyyyy_0_zzzzzzz_0,   \
-                             g_0_yyyyy_0_zzzzzzz_1,   \
-                             wp_x,                    \
-                             wp_y,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxyyy_0_xxxxxxx_0, g_0_xxyyy_0_xxxxxxx_1, g_0_xxyyy_0_xxxxxxz_0, g_0_xxyyy_0_xxxxxxz_1, g_0_xxyyy_0_xxxxxzz_0, g_0_xxyyy_0_xxxxxzz_1, g_0_xxyyy_0_xxxxzzz_0, g_0_xxyyy_0_xxxxzzz_1, g_0_xxyyy_0_xxxzzzz_0, g_0_xxyyy_0_xxxzzzz_1, g_0_xxyyy_0_xxzzzzz_0, g_0_xxyyy_0_xxzzzzz_1, g_0_xxyyy_0_xzzzzzz_0, g_0_xxyyy_0_xzzzzzz_1, g_0_xxyyyy_0_xxxxxxx_0, g_0_xxyyyy_0_xxxxxxx_1, g_0_xxyyyy_0_xxxxxxz_0, g_0_xxyyyy_0_xxxxxxz_1, g_0_xxyyyy_0_xxxxxzz_0, g_0_xxyyyy_0_xxxxxzz_1, g_0_xxyyyy_0_xxxxzzz_0, g_0_xxyyyy_0_xxxxzzz_1, g_0_xxyyyy_0_xxxzzzz_0, g_0_xxyyyy_0_xxxzzzz_1, g_0_xxyyyy_0_xxzzzzz_0, g_0_xxyyyy_0_xxzzzzz_1, g_0_xxyyyy_0_xzzzzzz_0, g_0_xxyyyy_0_xzzzzzz_1, g_0_xxyyyyy_0_xxxxxxx_0, g_0_xxyyyyy_0_xxxxxxy_0, g_0_xxyyyyy_0_xxxxxxz_0, g_0_xxyyyyy_0_xxxxxyy_0, g_0_xxyyyyy_0_xxxxxyz_0, g_0_xxyyyyy_0_xxxxxzz_0, g_0_xxyyyyy_0_xxxxyyy_0, g_0_xxyyyyy_0_xxxxyyz_0, g_0_xxyyyyy_0_xxxxyzz_0, g_0_xxyyyyy_0_xxxxzzz_0, g_0_xxyyyyy_0_xxxyyyy_0, g_0_xxyyyyy_0_xxxyyyz_0, g_0_xxyyyyy_0_xxxyyzz_0, g_0_xxyyyyy_0_xxxyzzz_0, g_0_xxyyyyy_0_xxxzzzz_0, g_0_xxyyyyy_0_xxyyyyy_0, g_0_xxyyyyy_0_xxyyyyz_0, g_0_xxyyyyy_0_xxyyyzz_0, g_0_xxyyyyy_0_xxyyzzz_0, g_0_xxyyyyy_0_xxyzzzz_0, g_0_xxyyyyy_0_xxzzzzz_0, g_0_xxyyyyy_0_xyyyyyy_0, g_0_xxyyyyy_0_xyyyyyz_0, g_0_xxyyyyy_0_xyyyyzz_0, g_0_xxyyyyy_0_xyyyzzz_0, g_0_xxyyyyy_0_xyyzzzz_0, g_0_xxyyyyy_0_xyzzzzz_0, g_0_xxyyyyy_0_xzzzzzz_0, g_0_xxyyyyy_0_yyyyyyy_0, g_0_xxyyyyy_0_yyyyyyz_0, g_0_xxyyyyy_0_yyyyyzz_0, g_0_xxyyyyy_0_yyyyzzz_0, g_0_xxyyyyy_0_yyyzzzz_0, g_0_xxyyyyy_0_yyzzzzz_0, g_0_xxyyyyy_0_yzzzzzz_0, g_0_xxyyyyy_0_zzzzzzz_0, g_0_xyyyyy_0_xxxxxxy_0, g_0_xyyyyy_0_xxxxxxy_1, g_0_xyyyyy_0_xxxxxy_1, g_0_xyyyyy_0_xxxxxyy_0, g_0_xyyyyy_0_xxxxxyy_1, g_0_xyyyyy_0_xxxxxyz_0, g_0_xyyyyy_0_xxxxxyz_1, g_0_xyyyyy_0_xxxxyy_1, g_0_xyyyyy_0_xxxxyyy_0, g_0_xyyyyy_0_xxxxyyy_1, g_0_xyyyyy_0_xxxxyyz_0, g_0_xyyyyy_0_xxxxyyz_1, g_0_xyyyyy_0_xxxxyz_1, g_0_xyyyyy_0_xxxxyzz_0, g_0_xyyyyy_0_xxxxyzz_1, g_0_xyyyyy_0_xxxyyy_1, g_0_xyyyyy_0_xxxyyyy_0, g_0_xyyyyy_0_xxxyyyy_1, g_0_xyyyyy_0_xxxyyyz_0, g_0_xyyyyy_0_xxxyyyz_1, g_0_xyyyyy_0_xxxyyz_1, g_0_xyyyyy_0_xxxyyzz_0, g_0_xyyyyy_0_xxxyyzz_1, g_0_xyyyyy_0_xxxyzz_1, g_0_xyyyyy_0_xxxyzzz_0, g_0_xyyyyy_0_xxxyzzz_1, g_0_xyyyyy_0_xxyyyy_1, g_0_xyyyyy_0_xxyyyyy_0, g_0_xyyyyy_0_xxyyyyy_1, g_0_xyyyyy_0_xxyyyyz_0, g_0_xyyyyy_0_xxyyyyz_1, g_0_xyyyyy_0_xxyyyz_1, g_0_xyyyyy_0_xxyyyzz_0, g_0_xyyyyy_0_xxyyyzz_1, g_0_xyyyyy_0_xxyyzz_1, g_0_xyyyyy_0_xxyyzzz_0, g_0_xyyyyy_0_xxyyzzz_1, g_0_xyyyyy_0_xxyzzz_1, g_0_xyyyyy_0_xxyzzzz_0, g_0_xyyyyy_0_xxyzzzz_1, g_0_xyyyyy_0_xyyyyy_1, g_0_xyyyyy_0_xyyyyyy_0, g_0_xyyyyy_0_xyyyyyy_1, g_0_xyyyyy_0_xyyyyyz_0, g_0_xyyyyy_0_xyyyyyz_1, g_0_xyyyyy_0_xyyyyz_1, g_0_xyyyyy_0_xyyyyzz_0, g_0_xyyyyy_0_xyyyyzz_1, g_0_xyyyyy_0_xyyyzz_1, g_0_xyyyyy_0_xyyyzzz_0, g_0_xyyyyy_0_xyyyzzz_1, g_0_xyyyyy_0_xyyzzz_1, g_0_xyyyyy_0_xyyzzzz_0, g_0_xyyyyy_0_xyyzzzz_1, g_0_xyyyyy_0_xyzzzz_1, g_0_xyyyyy_0_xyzzzzz_0, g_0_xyyyyy_0_xyzzzzz_1, g_0_xyyyyy_0_yyyyyy_1, g_0_xyyyyy_0_yyyyyyy_0, g_0_xyyyyy_0_yyyyyyy_1, g_0_xyyyyy_0_yyyyyyz_0, g_0_xyyyyy_0_yyyyyyz_1, g_0_xyyyyy_0_yyyyyz_1, g_0_xyyyyy_0_yyyyyzz_0, g_0_xyyyyy_0_yyyyyzz_1, g_0_xyyyyy_0_yyyyzz_1, g_0_xyyyyy_0_yyyyzzz_0, g_0_xyyyyy_0_yyyyzzz_1, g_0_xyyyyy_0_yyyzzz_1, g_0_xyyyyy_0_yyyzzzz_0, g_0_xyyyyy_0_yyyzzzz_1, g_0_xyyyyy_0_yyzzzz_1, g_0_xyyyyy_0_yyzzzzz_0, g_0_xyyyyy_0_yyzzzzz_1, g_0_xyyyyy_0_yzzzzz_1, g_0_xyyyyy_0_yzzzzzz_0, g_0_xyyyyy_0_yzzzzzz_1, g_0_xyyyyy_0_zzzzzzz_0, g_0_xyyyyy_0_zzzzzzz_1, g_0_yyyyy_0_xxxxxxy_0, g_0_yyyyy_0_xxxxxxy_1, g_0_yyyyy_0_xxxxxyy_0, g_0_yyyyy_0_xxxxxyy_1, g_0_yyyyy_0_xxxxxyz_0, g_0_yyyyy_0_xxxxxyz_1, g_0_yyyyy_0_xxxxyyy_0, g_0_yyyyy_0_xxxxyyy_1, g_0_yyyyy_0_xxxxyyz_0, g_0_yyyyy_0_xxxxyyz_1, g_0_yyyyy_0_xxxxyzz_0, g_0_yyyyy_0_xxxxyzz_1, g_0_yyyyy_0_xxxyyyy_0, g_0_yyyyy_0_xxxyyyy_1, g_0_yyyyy_0_xxxyyyz_0, g_0_yyyyy_0_xxxyyyz_1, g_0_yyyyy_0_xxxyyzz_0, g_0_yyyyy_0_xxxyyzz_1, g_0_yyyyy_0_xxxyzzz_0, g_0_yyyyy_0_xxxyzzz_1, g_0_yyyyy_0_xxyyyyy_0, g_0_yyyyy_0_xxyyyyy_1, g_0_yyyyy_0_xxyyyyz_0, g_0_yyyyy_0_xxyyyyz_1, g_0_yyyyy_0_xxyyyzz_0, g_0_yyyyy_0_xxyyyzz_1, g_0_yyyyy_0_xxyyzzz_0, g_0_yyyyy_0_xxyyzzz_1, g_0_yyyyy_0_xxyzzzz_0, g_0_yyyyy_0_xxyzzzz_1, g_0_yyyyy_0_xyyyyyy_0, g_0_yyyyy_0_xyyyyyy_1, g_0_yyyyy_0_xyyyyyz_0, g_0_yyyyy_0_xyyyyyz_1, g_0_yyyyy_0_xyyyyzz_0, g_0_yyyyy_0_xyyyyzz_1, g_0_yyyyy_0_xyyyzzz_0, g_0_yyyyy_0_xyyyzzz_1, g_0_yyyyy_0_xyyzzzz_0, g_0_yyyyy_0_xyyzzzz_1, g_0_yyyyy_0_xyzzzzz_0, g_0_yyyyy_0_xyzzzzz_1, g_0_yyyyy_0_yyyyyyy_0, g_0_yyyyy_0_yyyyyyy_1, g_0_yyyyy_0_yyyyyyz_0, g_0_yyyyy_0_yyyyyyz_1, g_0_yyyyy_0_yyyyyzz_0, g_0_yyyyy_0_yyyyyzz_1, g_0_yyyyy_0_yyyyzzz_0, g_0_yyyyy_0_yyyyzzz_1, g_0_yyyyy_0_yyyzzzz_0, g_0_yyyyy_0_yyyzzzz_1, g_0_yyyyy_0_yyzzzzz_0, g_0_yyyyy_0_yyzzzzz_1, g_0_yyyyy_0_yzzzzzz_0, g_0_yyyyy_0_yzzzzzz_1, g_0_yyyyy_0_zzzzzzz_0, g_0_yyyyy_0_zzzzzzz_1, wp_x, wp_y, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -11530,128 +8183,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxyyyyy_0_xxxxxxx_0[i] = 4.0 * g_0_xxyyy_0_xxxxxxx_0[i] * fi_ab_0 - 4.0 * g_0_xxyyy_0_xxxxxxx_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_xxxxxxx_0[i] * pb_y + g_0_xxyyyy_0_xxxxxxx_1[i] * wp_y[i];
+        g_0_xxyyyyy_0_xxxxxxx_0[i] = 4.0 * g_0_xxyyy_0_xxxxxxx_0[i] * fi_ab_0 - 4.0 * g_0_xxyyy_0_xxxxxxx_1[i] * fti_ab_0 + g_0_xxyyyy_0_xxxxxxx_0[i] * pb_y + g_0_xxyyyy_0_xxxxxxx_1[i] * wp_y[i];
 
-        g_0_xxyyyyy_0_xxxxxxy_0[i] = g_0_yyyyy_0_xxxxxxy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxxxy_1[i] * fti_ab_0 +
-                                     6.0 * g_0_xyyyyy_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxxxxy_0[i] * pb_x +
-                                     g_0_xyyyyy_0_xxxxxxy_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xxxxxxy_0[i] = g_0_yyyyy_0_xxxxxxy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxxxy_1[i] * fti_ab_0 + 6.0 * g_0_xyyyyy_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxxxxy_0[i] * pb_x + g_0_xyyyyy_0_xxxxxxy_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xxxxxxz_0[i] = 4.0 * g_0_xxyyy_0_xxxxxxz_0[i] * fi_ab_0 - 4.0 * g_0_xxyyy_0_xxxxxxz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_xxxxxxz_0[i] * pb_y + g_0_xxyyyy_0_xxxxxxz_1[i] * wp_y[i];
+        g_0_xxyyyyy_0_xxxxxxz_0[i] = 4.0 * g_0_xxyyy_0_xxxxxxz_0[i] * fi_ab_0 - 4.0 * g_0_xxyyy_0_xxxxxxz_1[i] * fti_ab_0 + g_0_xxyyyy_0_xxxxxxz_0[i] * pb_y + g_0_xxyyyy_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_xxyyyyy_0_xxxxxyy_0[i] = g_0_yyyyy_0_xxxxxyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxxyy_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xyyyyy_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxxxyy_0[i] * pb_x +
-                                     g_0_xyyyyy_0_xxxxxyy_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xxxxxyy_0[i] = g_0_yyyyy_0_xxxxxyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxxyy_1[i] * fti_ab_0 + 5.0 * g_0_xyyyyy_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxxxyy_0[i] * pb_x + g_0_xyyyyy_0_xxxxxyy_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xxxxxyz_0[i] = g_0_yyyyy_0_xxxxxyz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xyyyyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxxxyz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xxxxxyz_0[i] = g_0_yyyyy_0_xxxxxyz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxxyz_1[i] * fti_ab_0 + 5.0 * g_0_xyyyyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxxxyz_0[i] * pb_x + g_0_xyyyyy_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xxxxxzz_0[i] = 4.0 * g_0_xxyyy_0_xxxxxzz_0[i] * fi_ab_0 - 4.0 * g_0_xxyyy_0_xxxxxzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_xxxxxzz_0[i] * pb_y + g_0_xxyyyy_0_xxxxxzz_1[i] * wp_y[i];
+        g_0_xxyyyyy_0_xxxxxzz_0[i] = 4.0 * g_0_xxyyy_0_xxxxxzz_0[i] * fi_ab_0 - 4.0 * g_0_xxyyy_0_xxxxxzz_1[i] * fti_ab_0 + g_0_xxyyyy_0_xxxxxzz_0[i] * pb_y + g_0_xxyyyy_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_xxyyyyy_0_xxxxyyy_0[i] = g_0_yyyyy_0_xxxxyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxyyy_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xyyyyy_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxxyyy_0[i] * pb_x +
-                                     g_0_xyyyyy_0_xxxxyyy_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xxxxyyy_0[i] = g_0_yyyyy_0_xxxxyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxyyy_1[i] * fti_ab_0 + 4.0 * g_0_xyyyyy_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxxyyy_0[i] * pb_x + g_0_xyyyyy_0_xxxxyyy_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xxxxyyz_0[i] = g_0_yyyyy_0_xxxxyyz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xyyyyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxxyyz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xxxxyyz_0[i] = g_0_yyyyy_0_xxxxyyz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxyyz_1[i] * fti_ab_0 + 4.0 * g_0_xyyyyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxxyyz_0[i] * pb_x + g_0_xyyyyy_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xxxxyzz_0[i] = g_0_yyyyy_0_xxxxyzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xyyyyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxxyzz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xxxxyzz_0[i] = g_0_yyyyy_0_xxxxyzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxyzz_1[i] * fti_ab_0 + 4.0 * g_0_xyyyyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxxyzz_0[i] * pb_x + g_0_xyyyyy_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xxxxzzz_0[i] = 4.0 * g_0_xxyyy_0_xxxxzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxyyy_0_xxxxzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_xxxxzzz_0[i] * pb_y + g_0_xxyyyy_0_xxxxzzz_1[i] * wp_y[i];
+        g_0_xxyyyyy_0_xxxxzzz_0[i] = 4.0 * g_0_xxyyy_0_xxxxzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxyyy_0_xxxxzzz_1[i] * fti_ab_0 + g_0_xxyyyy_0_xxxxzzz_0[i] * pb_y + g_0_xxyyyy_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_xxyyyyy_0_xxxyyyy_0[i] = g_0_yyyyy_0_xxxyyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxyyyy_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xyyyyy_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxyyyy_0[i] * pb_x +
-                                     g_0_xyyyyy_0_xxxyyyy_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xxxyyyy_0[i] = g_0_yyyyy_0_xxxyyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxyyyy_1[i] * fti_ab_0 + 3.0 * g_0_xyyyyy_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxyyyy_0[i] * pb_x + g_0_xyyyyy_0_xxxyyyy_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xxxyyyz_0[i] = g_0_yyyyy_0_xxxyyyz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xyyyyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxyyyz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xxxyyyz_0[i] = g_0_yyyyy_0_xxxyyyz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_xyyyyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxyyyz_0[i] * pb_x + g_0_xyyyyy_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xxxyyzz_0[i] = g_0_yyyyy_0_xxxyyzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xyyyyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxyyzz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xxxyyzz_0[i] = g_0_yyyyy_0_xxxyyzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxyyzz_1[i] * fti_ab_0 + 3.0 * g_0_xyyyyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxyyzz_0[i] * pb_x + g_0_xyyyyy_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xxxyzzz_0[i] = g_0_yyyyy_0_xxxyzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xyyyyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxyzzz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xxxyzzz_0[i] = g_0_yyyyy_0_xxxyzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxyzzz_1[i] * fti_ab_0 + 3.0 * g_0_xyyyyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxxyzzz_0[i] * pb_x + g_0_xyyyyy_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xxxzzzz_0[i] = 4.0 * g_0_xxyyy_0_xxxzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxyyy_0_xxxzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_xxxzzzz_0[i] * pb_y + g_0_xxyyyy_0_xxxzzzz_1[i] * wp_y[i];
+        g_0_xxyyyyy_0_xxxzzzz_0[i] = 4.0 * g_0_xxyyy_0_xxxzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxyyy_0_xxxzzzz_1[i] * fti_ab_0 + g_0_xxyyyy_0_xxxzzzz_0[i] * pb_y + g_0_xxyyyy_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_xxyyyyy_0_xxyyyyy_0[i] = g_0_yyyyy_0_xxyyyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxyyyyy_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xyyyyy_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxyyyyy_0[i] * pb_x +
-                                     g_0_xyyyyy_0_xxyyyyy_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xxyyyyy_0[i] = g_0_yyyyy_0_xxyyyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxyyyyy_1[i] * fti_ab_0 + 2.0 * g_0_xyyyyy_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxyyyyy_0[i] * pb_x + g_0_xyyyyy_0_xxyyyyy_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xxyyyyz_0[i] = g_0_yyyyy_0_xxyyyyz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xyyyyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxyyyyz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xxyyyyz_0[i] = g_0_yyyyy_0_xxyyyyz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxyyyyz_1[i] * fti_ab_0 + 2.0 * g_0_xyyyyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxyyyyz_0[i] * pb_x + g_0_xyyyyy_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xxyyyzz_0[i] = g_0_yyyyy_0_xxyyyzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xyyyyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxyyyzz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xxyyyzz_0[i] = g_0_yyyyy_0_xxyyyzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxyyyzz_1[i] * fti_ab_0 + 2.0 * g_0_xyyyyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxyyyzz_0[i] * pb_x + g_0_xyyyyy_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xxyyzzz_0[i] = g_0_yyyyy_0_xxyyzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xyyyyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxyyzzz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xxyyzzz_0[i] = g_0_yyyyy_0_xxyyzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_xyyyyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxyyzzz_0[i] * pb_x + g_0_xyyyyy_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xxyzzzz_0[i] = g_0_yyyyy_0_xxyzzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xyyyyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxyzzzz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xxyzzzz_0[i] = g_0_yyyyy_0_xxyzzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xxyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xyyyyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xxyzzzz_0[i] * pb_x + g_0_xyyyyy_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xxzzzzz_0[i] = 4.0 * g_0_xxyyy_0_xxzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxyyy_0_xxzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_xxzzzzz_0[i] * pb_y + g_0_xxyyyy_0_xxzzzzz_1[i] * wp_y[i];
+        g_0_xxyyyyy_0_xxzzzzz_0[i] = 4.0 * g_0_xxyyy_0_xxzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxyyy_0_xxzzzzz_1[i] * fti_ab_0 + g_0_xxyyyy_0_xxzzzzz_0[i] * pb_y + g_0_xxyyyy_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_xxyyyyy_0_xyyyyyy_0[i] = g_0_yyyyy_0_xyyyyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xyyyyyy_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyyyy_1[i] * fi_abcd_0 +
-                                     g_0_xyyyyy_0_xyyyyyy_0[i] * pb_x + g_0_xyyyyy_0_xyyyyyy_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xyyyyyy_0[i] = g_0_yyyyy_0_xyyyyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xyyyyyy_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xyyyyyy_0[i] * pb_x + g_0_xyyyyy_0_xyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xyyyyyz_0[i] = g_0_yyyyy_0_xyyyyyz_0[i] * fi_ab_0 - g_0_yyyyy_0_xyyyyyz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyyyz_1[i] * fi_abcd_0 +
-                                     g_0_xyyyyy_0_xyyyyyz_0[i] * pb_x + g_0_xyyyyy_0_xyyyyyz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xyyyyyz_0[i] = g_0_yyyyy_0_xyyyyyz_0[i] * fi_ab_0 - g_0_yyyyy_0_xyyyyyz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xyyyyyz_0[i] * pb_x + g_0_xyyyyy_0_xyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xyyyyzz_0[i] = g_0_yyyyy_0_xyyyyzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xyyyyzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyyzz_1[i] * fi_abcd_0 +
-                                     g_0_xyyyyy_0_xyyyyzz_0[i] * pb_x + g_0_xyyyyy_0_xyyyyzz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xyyyyzz_0[i] = g_0_yyyyy_0_xyyyyzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xyyyyzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xyyyyzz_0[i] * pb_x + g_0_xyyyyy_0_xyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xyyyzzz_0[i] = g_0_yyyyy_0_xyyyzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xyyyzzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyzzz_1[i] * fi_abcd_0 +
-                                     g_0_xyyyyy_0_xyyyzzz_0[i] * pb_x + g_0_xyyyyy_0_xyyyzzz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xyyyzzz_0[i] = g_0_yyyyy_0_xyyyzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xyyyzzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xyyyzzz_0[i] * pb_x + g_0_xyyyyy_0_xyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xyyzzzz_0[i] = g_0_yyyyy_0_xyyzzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xyyzzzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyzzzz_1[i] * fi_abcd_0 +
-                                     g_0_xyyyyy_0_xyyzzzz_0[i] * pb_x + g_0_xyyyyy_0_xyyzzzz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xyyzzzz_0[i] = g_0_yyyyy_0_xyyzzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xyyzzzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xyyzzzz_0[i] * pb_x + g_0_xyyyyy_0_xyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xyzzzzz_0[i] = g_0_yyyyy_0_xyzzzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xyzzzzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yzzzzz_1[i] * fi_abcd_0 +
-                                     g_0_xyyyyy_0_xyzzzzz_0[i] * pb_x + g_0_xyyyyy_0_xyzzzzz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_xyzzzzz_0[i] = g_0_yyyyy_0_xyzzzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_xyzzzzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xyyyyy_0_xyzzzzz_0[i] * pb_x + g_0_xyyyyy_0_xyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_xzzzzzz_0[i] = 4.0 * g_0_xxyyy_0_xzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxyyy_0_xzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyyy_0_xzzzzzz_0[i] * pb_y + g_0_xxyyyy_0_xzzzzzz_1[i] * wp_y[i];
+        g_0_xxyyyyy_0_xzzzzzz_0[i] = 4.0 * g_0_xxyyy_0_xzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_xxyyy_0_xzzzzzz_1[i] * fti_ab_0 + g_0_xxyyyy_0_xzzzzzz_0[i] * pb_y + g_0_xxyyyy_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_xxyyyyy_0_yyyyyyy_0[i] = g_0_yyyyy_0_yyyyyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_yyyyyyy_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyyyyy_0[i] * pb_x +
-                                     g_0_xyyyyy_0_yyyyyyy_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_yyyyyyy_0[i] = g_0_yyyyy_0_yyyyyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_yyyyyyy_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyyyyy_0[i] * pb_x + g_0_xyyyyy_0_yyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_yyyyyyz_0[i] = g_0_yyyyy_0_yyyyyyz_0[i] * fi_ab_0 - g_0_yyyyy_0_yyyyyyz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyyyyz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_yyyyyyz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_yyyyyyz_0[i] = g_0_yyyyy_0_yyyyyyz_0[i] * fi_ab_0 - g_0_yyyyy_0_yyyyyyz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyyyyz_0[i] * pb_x + g_0_xyyyyy_0_yyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_yyyyyzz_0[i] = g_0_yyyyy_0_yyyyyzz_0[i] * fi_ab_0 - g_0_yyyyy_0_yyyyyzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyyyzz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_yyyyyzz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_yyyyyzz_0[i] = g_0_yyyyy_0_yyyyyzz_0[i] * fi_ab_0 - g_0_yyyyy_0_yyyyyzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyyyzz_0[i] * pb_x + g_0_xyyyyy_0_yyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_yyyyzzz_0[i] = g_0_yyyyy_0_yyyyzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_yyyyzzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyyzzz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_yyyyzzz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_yyyyzzz_0[i] = g_0_yyyyy_0_yyyyzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_yyyyzzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyyzzz_0[i] * pb_x + g_0_xyyyyy_0_yyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_yyyzzzz_0[i] = g_0_yyyyy_0_yyyzzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_yyyzzzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyzzzz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_yyyzzzz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_yyyzzzz_0[i] = g_0_yyyyy_0_yyyzzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_yyyzzzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyyzzzz_0[i] * pb_x + g_0_xyyyyy_0_yyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_yyzzzzz_0[i] = g_0_yyyyy_0_yyzzzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_yyzzzzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyzzzzz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_yyzzzzz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_yyzzzzz_0[i] = g_0_yyyyy_0_yyzzzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_yyzzzzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yyzzzzz_0[i] * pb_x + g_0_xyyyyy_0_yyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_yzzzzzz_0[i] = g_0_yyyyy_0_yzzzzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_yzzzzzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yzzzzzz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_yzzzzzz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_yzzzzzz_0[i] = g_0_yyyyy_0_yzzzzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_yzzzzzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_yzzzzzz_0[i] * pb_x + g_0_xyyyyy_0_yzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyyy_0_zzzzzzz_0[i] = g_0_yyyyy_0_zzzzzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_zzzzzzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_zzzzzzz_0[i] * pb_x +
-                                     g_0_xyyyyy_0_zzzzzzz_1[i] * wp_x[i];
+        g_0_xxyyyyy_0_zzzzzzz_0[i] = g_0_yyyyy_0_zzzzzzz_0[i] * fi_ab_0 - g_0_yyyyy_0_zzzzzzz_1[i] * fti_ab_0 + g_0_xyyyyy_0_zzzzzzz_0[i] * pb_x + g_0_xyyyyy_0_zzzzzzz_1[i] * wp_x[i];
     }
 
     /// Set up 576-612 components of targeted buffer : SKSK
@@ -11728,145 +8330,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxyyyyz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 611);
 
-#pragma omp simd aligned(g_0_xxyyyy_0_xxxxxx_1,       \
-                             g_0_xxyyyy_0_xxxxxxx_0,  \
-                             g_0_xxyyyy_0_xxxxxxx_1,  \
-                             g_0_xxyyyy_0_xxxxxxy_0,  \
-                             g_0_xxyyyy_0_xxxxxxy_1,  \
-                             g_0_xxyyyy_0_xxxxxxz_0,  \
-                             g_0_xxyyyy_0_xxxxxxz_1,  \
-                             g_0_xxyyyy_0_xxxxxy_1,   \
-                             g_0_xxyyyy_0_xxxxxyy_0,  \
-                             g_0_xxyyyy_0_xxxxxyy_1,  \
-                             g_0_xxyyyy_0_xxxxxyz_0,  \
-                             g_0_xxyyyy_0_xxxxxyz_1,  \
-                             g_0_xxyyyy_0_xxxxxz_1,   \
-                             g_0_xxyyyy_0_xxxxxzz_0,  \
-                             g_0_xxyyyy_0_xxxxxzz_1,  \
-                             g_0_xxyyyy_0_xxxxyy_1,   \
-                             g_0_xxyyyy_0_xxxxyyy_0,  \
-                             g_0_xxyyyy_0_xxxxyyy_1,  \
-                             g_0_xxyyyy_0_xxxxyyz_0,  \
-                             g_0_xxyyyy_0_xxxxyyz_1,  \
-                             g_0_xxyyyy_0_xxxxyz_1,   \
-                             g_0_xxyyyy_0_xxxxyzz_0,  \
-                             g_0_xxyyyy_0_xxxxyzz_1,  \
-                             g_0_xxyyyy_0_xxxxzz_1,   \
-                             g_0_xxyyyy_0_xxxxzzz_0,  \
-                             g_0_xxyyyy_0_xxxxzzz_1,  \
-                             g_0_xxyyyy_0_xxxyyy_1,   \
-                             g_0_xxyyyy_0_xxxyyyy_0,  \
-                             g_0_xxyyyy_0_xxxyyyy_1,  \
-                             g_0_xxyyyy_0_xxxyyyz_0,  \
-                             g_0_xxyyyy_0_xxxyyyz_1,  \
-                             g_0_xxyyyy_0_xxxyyz_1,   \
-                             g_0_xxyyyy_0_xxxyyzz_0,  \
-                             g_0_xxyyyy_0_xxxyyzz_1,  \
-                             g_0_xxyyyy_0_xxxyzz_1,   \
-                             g_0_xxyyyy_0_xxxyzzz_0,  \
-                             g_0_xxyyyy_0_xxxyzzz_1,  \
-                             g_0_xxyyyy_0_xxxzzz_1,   \
-                             g_0_xxyyyy_0_xxxzzzz_0,  \
-                             g_0_xxyyyy_0_xxxzzzz_1,  \
-                             g_0_xxyyyy_0_xxyyyy_1,   \
-                             g_0_xxyyyy_0_xxyyyyy_0,  \
-                             g_0_xxyyyy_0_xxyyyyy_1,  \
-                             g_0_xxyyyy_0_xxyyyyz_0,  \
-                             g_0_xxyyyy_0_xxyyyyz_1,  \
-                             g_0_xxyyyy_0_xxyyyz_1,   \
-                             g_0_xxyyyy_0_xxyyyzz_0,  \
-                             g_0_xxyyyy_0_xxyyyzz_1,  \
-                             g_0_xxyyyy_0_xxyyzz_1,   \
-                             g_0_xxyyyy_0_xxyyzzz_0,  \
-                             g_0_xxyyyy_0_xxyyzzz_1,  \
-                             g_0_xxyyyy_0_xxyzzz_1,   \
-                             g_0_xxyyyy_0_xxyzzzz_0,  \
-                             g_0_xxyyyy_0_xxyzzzz_1,  \
-                             g_0_xxyyyy_0_xxzzzz_1,   \
-                             g_0_xxyyyy_0_xxzzzzz_0,  \
-                             g_0_xxyyyy_0_xxzzzzz_1,  \
-                             g_0_xxyyyy_0_xyyyyy_1,   \
-                             g_0_xxyyyy_0_xyyyyyy_0,  \
-                             g_0_xxyyyy_0_xyyyyyy_1,  \
-                             g_0_xxyyyy_0_xyyyyyz_0,  \
-                             g_0_xxyyyy_0_xyyyyyz_1,  \
-                             g_0_xxyyyy_0_xyyyyz_1,   \
-                             g_0_xxyyyy_0_xyyyyzz_0,  \
-                             g_0_xxyyyy_0_xyyyyzz_1,  \
-                             g_0_xxyyyy_0_xyyyzz_1,   \
-                             g_0_xxyyyy_0_xyyyzzz_0,  \
-                             g_0_xxyyyy_0_xyyyzzz_1,  \
-                             g_0_xxyyyy_0_xyyzzz_1,   \
-                             g_0_xxyyyy_0_xyyzzzz_0,  \
-                             g_0_xxyyyy_0_xyyzzzz_1,  \
-                             g_0_xxyyyy_0_xyzzzz_1,   \
-                             g_0_xxyyyy_0_xyzzzzz_0,  \
-                             g_0_xxyyyy_0_xyzzzzz_1,  \
-                             g_0_xxyyyy_0_xzzzzz_1,   \
-                             g_0_xxyyyy_0_xzzzzzz_0,  \
-                             g_0_xxyyyy_0_xzzzzzz_1,  \
-                             g_0_xxyyyy_0_yyyyyy_1,   \
-                             g_0_xxyyyy_0_yyyyyyy_0,  \
-                             g_0_xxyyyy_0_yyyyyyy_1,  \
-                             g_0_xxyyyy_0_yyyyyyz_0,  \
-                             g_0_xxyyyy_0_yyyyyyz_1,  \
-                             g_0_xxyyyy_0_yyyyyz_1,   \
-                             g_0_xxyyyy_0_yyyyyzz_0,  \
-                             g_0_xxyyyy_0_yyyyyzz_1,  \
-                             g_0_xxyyyy_0_yyyyzz_1,   \
-                             g_0_xxyyyy_0_yyyyzzz_0,  \
-                             g_0_xxyyyy_0_yyyyzzz_1,  \
-                             g_0_xxyyyy_0_yyyzzz_1,   \
-                             g_0_xxyyyy_0_yyyzzzz_0,  \
-                             g_0_xxyyyy_0_yyyzzzz_1,  \
-                             g_0_xxyyyy_0_yyzzzz_1,   \
-                             g_0_xxyyyy_0_yyzzzzz_0,  \
-                             g_0_xxyyyy_0_yyzzzzz_1,  \
-                             g_0_xxyyyy_0_yzzzzz_1,   \
-                             g_0_xxyyyy_0_yzzzzzz_0,  \
-                             g_0_xxyyyy_0_yzzzzzz_1,  \
-                             g_0_xxyyyy_0_zzzzzz_1,   \
-                             g_0_xxyyyy_0_zzzzzzz_0,  \
-                             g_0_xxyyyy_0_zzzzzzz_1,  \
-                             g_0_xxyyyyz_0_xxxxxxx_0, \
-                             g_0_xxyyyyz_0_xxxxxxy_0, \
-                             g_0_xxyyyyz_0_xxxxxxz_0, \
-                             g_0_xxyyyyz_0_xxxxxyy_0, \
-                             g_0_xxyyyyz_0_xxxxxyz_0, \
-                             g_0_xxyyyyz_0_xxxxxzz_0, \
-                             g_0_xxyyyyz_0_xxxxyyy_0, \
-                             g_0_xxyyyyz_0_xxxxyyz_0, \
-                             g_0_xxyyyyz_0_xxxxyzz_0, \
-                             g_0_xxyyyyz_0_xxxxzzz_0, \
-                             g_0_xxyyyyz_0_xxxyyyy_0, \
-                             g_0_xxyyyyz_0_xxxyyyz_0, \
-                             g_0_xxyyyyz_0_xxxyyzz_0, \
-                             g_0_xxyyyyz_0_xxxyzzz_0, \
-                             g_0_xxyyyyz_0_xxxzzzz_0, \
-                             g_0_xxyyyyz_0_xxyyyyy_0, \
-                             g_0_xxyyyyz_0_xxyyyyz_0, \
-                             g_0_xxyyyyz_0_xxyyyzz_0, \
-                             g_0_xxyyyyz_0_xxyyzzz_0, \
-                             g_0_xxyyyyz_0_xxyzzzz_0, \
-                             g_0_xxyyyyz_0_xxzzzzz_0, \
-                             g_0_xxyyyyz_0_xyyyyyy_0, \
-                             g_0_xxyyyyz_0_xyyyyyz_0, \
-                             g_0_xxyyyyz_0_xyyyyzz_0, \
-                             g_0_xxyyyyz_0_xyyyzzz_0, \
-                             g_0_xxyyyyz_0_xyyzzzz_0, \
-                             g_0_xxyyyyz_0_xyzzzzz_0, \
-                             g_0_xxyyyyz_0_xzzzzzz_0, \
-                             g_0_xxyyyyz_0_yyyyyyy_0, \
-                             g_0_xxyyyyz_0_yyyyyyz_0, \
-                             g_0_xxyyyyz_0_yyyyyzz_0, \
-                             g_0_xxyyyyz_0_yyyyzzz_0, \
-                             g_0_xxyyyyz_0_yyyzzzz_0, \
-                             g_0_xxyyyyz_0_yyzzzzz_0, \
-                             g_0_xxyyyyz_0_yzzzzzz_0, \
-                             g_0_xxyyyyz_0_zzzzzzz_0, \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxyyyy_0_xxxxxx_1, g_0_xxyyyy_0_xxxxxxx_0, g_0_xxyyyy_0_xxxxxxx_1, g_0_xxyyyy_0_xxxxxxy_0, g_0_xxyyyy_0_xxxxxxy_1, g_0_xxyyyy_0_xxxxxxz_0, g_0_xxyyyy_0_xxxxxxz_1, g_0_xxyyyy_0_xxxxxy_1, g_0_xxyyyy_0_xxxxxyy_0, g_0_xxyyyy_0_xxxxxyy_1, g_0_xxyyyy_0_xxxxxyz_0, g_0_xxyyyy_0_xxxxxyz_1, g_0_xxyyyy_0_xxxxxz_1, g_0_xxyyyy_0_xxxxxzz_0, g_0_xxyyyy_0_xxxxxzz_1, g_0_xxyyyy_0_xxxxyy_1, g_0_xxyyyy_0_xxxxyyy_0, g_0_xxyyyy_0_xxxxyyy_1, g_0_xxyyyy_0_xxxxyyz_0, g_0_xxyyyy_0_xxxxyyz_1, g_0_xxyyyy_0_xxxxyz_1, g_0_xxyyyy_0_xxxxyzz_0, g_0_xxyyyy_0_xxxxyzz_1, g_0_xxyyyy_0_xxxxzz_1, g_0_xxyyyy_0_xxxxzzz_0, g_0_xxyyyy_0_xxxxzzz_1, g_0_xxyyyy_0_xxxyyy_1, g_0_xxyyyy_0_xxxyyyy_0, g_0_xxyyyy_0_xxxyyyy_1, g_0_xxyyyy_0_xxxyyyz_0, g_0_xxyyyy_0_xxxyyyz_1, g_0_xxyyyy_0_xxxyyz_1, g_0_xxyyyy_0_xxxyyzz_0, g_0_xxyyyy_0_xxxyyzz_1, g_0_xxyyyy_0_xxxyzz_1, g_0_xxyyyy_0_xxxyzzz_0, g_0_xxyyyy_0_xxxyzzz_1, g_0_xxyyyy_0_xxxzzz_1, g_0_xxyyyy_0_xxxzzzz_0, g_0_xxyyyy_0_xxxzzzz_1, g_0_xxyyyy_0_xxyyyy_1, g_0_xxyyyy_0_xxyyyyy_0, g_0_xxyyyy_0_xxyyyyy_1, g_0_xxyyyy_0_xxyyyyz_0, g_0_xxyyyy_0_xxyyyyz_1, g_0_xxyyyy_0_xxyyyz_1, g_0_xxyyyy_0_xxyyyzz_0, g_0_xxyyyy_0_xxyyyzz_1, g_0_xxyyyy_0_xxyyzz_1, g_0_xxyyyy_0_xxyyzzz_0, g_0_xxyyyy_0_xxyyzzz_1, g_0_xxyyyy_0_xxyzzz_1, g_0_xxyyyy_0_xxyzzzz_0, g_0_xxyyyy_0_xxyzzzz_1, g_0_xxyyyy_0_xxzzzz_1, g_0_xxyyyy_0_xxzzzzz_0, g_0_xxyyyy_0_xxzzzzz_1, g_0_xxyyyy_0_xyyyyy_1, g_0_xxyyyy_0_xyyyyyy_0, g_0_xxyyyy_0_xyyyyyy_1, g_0_xxyyyy_0_xyyyyyz_0, g_0_xxyyyy_0_xyyyyyz_1, g_0_xxyyyy_0_xyyyyz_1, g_0_xxyyyy_0_xyyyyzz_0, g_0_xxyyyy_0_xyyyyzz_1, g_0_xxyyyy_0_xyyyzz_1, g_0_xxyyyy_0_xyyyzzz_0, g_0_xxyyyy_0_xyyyzzz_1, g_0_xxyyyy_0_xyyzzz_1, g_0_xxyyyy_0_xyyzzzz_0, g_0_xxyyyy_0_xyyzzzz_1, g_0_xxyyyy_0_xyzzzz_1, g_0_xxyyyy_0_xyzzzzz_0, g_0_xxyyyy_0_xyzzzzz_1, g_0_xxyyyy_0_xzzzzz_1, g_0_xxyyyy_0_xzzzzzz_0, g_0_xxyyyy_0_xzzzzzz_1, g_0_xxyyyy_0_yyyyyy_1, g_0_xxyyyy_0_yyyyyyy_0, g_0_xxyyyy_0_yyyyyyy_1, g_0_xxyyyy_0_yyyyyyz_0, g_0_xxyyyy_0_yyyyyyz_1, g_0_xxyyyy_0_yyyyyz_1, g_0_xxyyyy_0_yyyyyzz_0, g_0_xxyyyy_0_yyyyyzz_1, g_0_xxyyyy_0_yyyyzz_1, g_0_xxyyyy_0_yyyyzzz_0, g_0_xxyyyy_0_yyyyzzz_1, g_0_xxyyyy_0_yyyzzz_1, g_0_xxyyyy_0_yyyzzzz_0, g_0_xxyyyy_0_yyyzzzz_1, g_0_xxyyyy_0_yyzzzz_1, g_0_xxyyyy_0_yyzzzzz_0, g_0_xxyyyy_0_yyzzzzz_1, g_0_xxyyyy_0_yzzzzz_1, g_0_xxyyyy_0_yzzzzzz_0, g_0_xxyyyy_0_yzzzzzz_1, g_0_xxyyyy_0_zzzzzz_1, g_0_xxyyyy_0_zzzzzzz_0, g_0_xxyyyy_0_zzzzzzz_1, g_0_xxyyyyz_0_xxxxxxx_0, g_0_xxyyyyz_0_xxxxxxy_0, g_0_xxyyyyz_0_xxxxxxz_0, g_0_xxyyyyz_0_xxxxxyy_0, g_0_xxyyyyz_0_xxxxxyz_0, g_0_xxyyyyz_0_xxxxxzz_0, g_0_xxyyyyz_0_xxxxyyy_0, g_0_xxyyyyz_0_xxxxyyz_0, g_0_xxyyyyz_0_xxxxyzz_0, g_0_xxyyyyz_0_xxxxzzz_0, g_0_xxyyyyz_0_xxxyyyy_0, g_0_xxyyyyz_0_xxxyyyz_0, g_0_xxyyyyz_0_xxxyyzz_0, g_0_xxyyyyz_0_xxxyzzz_0, g_0_xxyyyyz_0_xxxzzzz_0, g_0_xxyyyyz_0_xxyyyyy_0, g_0_xxyyyyz_0_xxyyyyz_0, g_0_xxyyyyz_0_xxyyyzz_0, g_0_xxyyyyz_0_xxyyzzz_0, g_0_xxyyyyz_0_xxyzzzz_0, g_0_xxyyyyz_0_xxzzzzz_0, g_0_xxyyyyz_0_xyyyyyy_0, g_0_xxyyyyz_0_xyyyyyz_0, g_0_xxyyyyz_0_xyyyyzz_0, g_0_xxyyyyz_0_xyyyzzz_0, g_0_xxyyyyz_0_xyyzzzz_0, g_0_xxyyyyz_0_xyzzzzz_0, g_0_xxyyyyz_0_xzzzzzz_0, g_0_xxyyyyz_0_yyyyyyy_0, g_0_xxyyyyz_0_yyyyyyz_0, g_0_xxyyyyz_0_yyyyyzz_0, g_0_xxyyyyz_0_yyyyzzz_0, g_0_xxyyyyz_0_yyyzzzz_0, g_0_xxyyyyz_0_yyzzzzz_0, g_0_xxyyyyz_0_yzzzzzz_0, g_0_xxyyyyz_0_zzzzzzz_0, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -11881,88 +8345,67 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         g_0_xxyyyyz_0_xxxxxyz_0[i] = g_0_xxyyyy_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxxyz_0[i] * pb_z + g_0_xxyyyy_0_xxxxxyz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_xxxxxzz_0[i] =
-            2.0 * g_0_xxyyyy_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxxzz_0[i] * pb_z + g_0_xxyyyy_0_xxxxxzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_xxxxxzz_0[i] = 2.0 * g_0_xxyyyy_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxxzz_0[i] * pb_z + g_0_xxyyyy_0_xxxxxzz_1[i] * wp_z[i];
 
         g_0_xxyyyyz_0_xxxxyyy_0[i] = g_0_xxyyyy_0_xxxxyyy_0[i] * pb_z + g_0_xxyyyy_0_xxxxyyy_1[i] * wp_z[i];
 
         g_0_xxyyyyz_0_xxxxyyz_0[i] = g_0_xxyyyy_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxyyz_0[i] * pb_z + g_0_xxyyyy_0_xxxxyyz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_xxxxyzz_0[i] =
-            2.0 * g_0_xxyyyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxyzz_0[i] * pb_z + g_0_xxyyyy_0_xxxxyzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_xxxxyzz_0[i] = 2.0 * g_0_xxyyyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxyzz_0[i] * pb_z + g_0_xxyyyy_0_xxxxyzz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_xxxxzzz_0[i] =
-            3.0 * g_0_xxyyyy_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxzzz_0[i] * pb_z + g_0_xxyyyy_0_xxxxzzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_xxxxzzz_0[i] = 3.0 * g_0_xxyyyy_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxxzzz_0[i] * pb_z + g_0_xxyyyy_0_xxxxzzz_1[i] * wp_z[i];
 
         g_0_xxyyyyz_0_xxxyyyy_0[i] = g_0_xxyyyy_0_xxxyyyy_0[i] * pb_z + g_0_xxyyyy_0_xxxyyyy_1[i] * wp_z[i];
 
         g_0_xxyyyyz_0_xxxyyyz_0[i] = g_0_xxyyyy_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxyyyz_0[i] * pb_z + g_0_xxyyyy_0_xxxyyyz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_xxxyyzz_0[i] =
-            2.0 * g_0_xxyyyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxyyzz_0[i] * pb_z + g_0_xxyyyy_0_xxxyyzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_xxxyyzz_0[i] = 2.0 * g_0_xxyyyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxyyzz_0[i] * pb_z + g_0_xxyyyy_0_xxxyyzz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_xxxyzzz_0[i] =
-            3.0 * g_0_xxyyyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxyzzz_0[i] * pb_z + g_0_xxyyyy_0_xxxyzzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_xxxyzzz_0[i] = 3.0 * g_0_xxyyyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxyzzz_0[i] * pb_z + g_0_xxyyyy_0_xxxyzzz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_xxxzzzz_0[i] =
-            4.0 * g_0_xxyyyy_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxzzzz_0[i] * pb_z + g_0_xxyyyy_0_xxxzzzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_xxxzzzz_0[i] = 4.0 * g_0_xxyyyy_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxxzzzz_0[i] * pb_z + g_0_xxyyyy_0_xxxzzzz_1[i] * wp_z[i];
 
         g_0_xxyyyyz_0_xxyyyyy_0[i] = g_0_xxyyyy_0_xxyyyyy_0[i] * pb_z + g_0_xxyyyy_0_xxyyyyy_1[i] * wp_z[i];
 
         g_0_xxyyyyz_0_xxyyyyz_0[i] = g_0_xxyyyy_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyyyyz_0[i] * pb_z + g_0_xxyyyy_0_xxyyyyz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_xxyyyzz_0[i] =
-            2.0 * g_0_xxyyyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyyyzz_0[i] * pb_z + g_0_xxyyyy_0_xxyyyzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_xxyyyzz_0[i] = 2.0 * g_0_xxyyyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyyyzz_0[i] * pb_z + g_0_xxyyyy_0_xxyyyzz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_xxyyzzz_0[i] =
-            3.0 * g_0_xxyyyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyyzzz_0[i] * pb_z + g_0_xxyyyy_0_xxyyzzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_xxyyzzz_0[i] = 3.0 * g_0_xxyyyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyyzzz_0[i] * pb_z + g_0_xxyyyy_0_xxyyzzz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_xxyzzzz_0[i] =
-            4.0 * g_0_xxyyyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyzzzz_0[i] * pb_z + g_0_xxyyyy_0_xxyzzzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_xxyzzzz_0[i] = 4.0 * g_0_xxyyyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxyzzzz_0[i] * pb_z + g_0_xxyyyy_0_xxyzzzz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_xxzzzzz_0[i] =
-            5.0 * g_0_xxyyyy_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxzzzzz_0[i] * pb_z + g_0_xxyyyy_0_xxzzzzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_xxzzzzz_0[i] = 5.0 * g_0_xxyyyy_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xxzzzzz_0[i] * pb_z + g_0_xxyyyy_0_xxzzzzz_1[i] * wp_z[i];
 
         g_0_xxyyyyz_0_xyyyyyy_0[i] = g_0_xxyyyy_0_xyyyyyy_0[i] * pb_z + g_0_xxyyyy_0_xyyyyyy_1[i] * wp_z[i];
 
         g_0_xxyyyyz_0_xyyyyyz_0[i] = g_0_xxyyyy_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyyyyz_0[i] * pb_z + g_0_xxyyyy_0_xyyyyyz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_xyyyyzz_0[i] =
-            2.0 * g_0_xxyyyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyyyzz_0[i] * pb_z + g_0_xxyyyy_0_xyyyyzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_xyyyyzz_0[i] = 2.0 * g_0_xxyyyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyyyzz_0[i] * pb_z + g_0_xxyyyy_0_xyyyyzz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_xyyyzzz_0[i] =
-            3.0 * g_0_xxyyyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyyzzz_0[i] * pb_z + g_0_xxyyyy_0_xyyyzzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_xyyyzzz_0[i] = 3.0 * g_0_xxyyyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyyzzz_0[i] * pb_z + g_0_xxyyyy_0_xyyyzzz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_xyyzzzz_0[i] =
-            4.0 * g_0_xxyyyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyzzzz_0[i] * pb_z + g_0_xxyyyy_0_xyyzzzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_xyyzzzz_0[i] = 4.0 * g_0_xxyyyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyyzzzz_0[i] * pb_z + g_0_xxyyyy_0_xyyzzzz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_xyzzzzz_0[i] =
-            5.0 * g_0_xxyyyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyzzzzz_0[i] * pb_z + g_0_xxyyyy_0_xyzzzzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_xyzzzzz_0[i] = 5.0 * g_0_xxyyyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xyzzzzz_0[i] * pb_z + g_0_xxyyyy_0_xyzzzzz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_xzzzzzz_0[i] =
-            6.0 * g_0_xxyyyy_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xzzzzzz_0[i] * pb_z + g_0_xxyyyy_0_xzzzzzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_xzzzzzz_0[i] = 6.0 * g_0_xxyyyy_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_xzzzzzz_0[i] * pb_z + g_0_xxyyyy_0_xzzzzzz_1[i] * wp_z[i];
 
         g_0_xxyyyyz_0_yyyyyyy_0[i] = g_0_xxyyyy_0_yyyyyyy_0[i] * pb_z + g_0_xxyyyy_0_yyyyyyy_1[i] * wp_z[i];
 
         g_0_xxyyyyz_0_yyyyyyz_0[i] = g_0_xxyyyy_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxyyyy_0_yyyyyyz_0[i] * pb_z + g_0_xxyyyy_0_yyyyyyz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_yyyyyzz_0[i] =
-            2.0 * g_0_xxyyyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_yyyyyzz_0[i] * pb_z + g_0_xxyyyy_0_yyyyyzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_yyyyyzz_0[i] = 2.0 * g_0_xxyyyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_yyyyyzz_0[i] * pb_z + g_0_xxyyyy_0_yyyyyzz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_yyyyzzz_0[i] =
-            3.0 * g_0_xxyyyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_yyyyzzz_0[i] * pb_z + g_0_xxyyyy_0_yyyyzzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_yyyyzzz_0[i] = 3.0 * g_0_xxyyyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_yyyyzzz_0[i] * pb_z + g_0_xxyyyy_0_yyyyzzz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_yyyzzzz_0[i] =
-            4.0 * g_0_xxyyyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_yyyzzzz_0[i] * pb_z + g_0_xxyyyy_0_yyyzzzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_yyyzzzz_0[i] = 4.0 * g_0_xxyyyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_yyyzzzz_0[i] * pb_z + g_0_xxyyyy_0_yyyzzzz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_yyzzzzz_0[i] =
-            5.0 * g_0_xxyyyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_yyzzzzz_0[i] * pb_z + g_0_xxyyyy_0_yyzzzzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_yyzzzzz_0[i] = 5.0 * g_0_xxyyyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_yyzzzzz_0[i] * pb_z + g_0_xxyyyy_0_yyzzzzz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_yzzzzzz_0[i] =
-            6.0 * g_0_xxyyyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_yzzzzzz_0[i] * pb_z + g_0_xxyyyy_0_yzzzzzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_yzzzzzz_0[i] = 6.0 * g_0_xxyyyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_yzzzzzz_0[i] * pb_z + g_0_xxyyyy_0_yzzzzzz_1[i] * wp_z[i];
 
-        g_0_xxyyyyz_0_zzzzzzz_0[i] =
-            7.0 * g_0_xxyyyy_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_zzzzzzz_0[i] * pb_z + g_0_xxyyyy_0_zzzzzzz_1[i] * wp_z[i];
+        g_0_xxyyyyz_0_zzzzzzz_0[i] = 7.0 * g_0_xxyyyy_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxyyyy_0_zzzzzzz_0[i] * pb_z + g_0_xxyyyy_0_zzzzzzz_1[i] * wp_z[i];
     }
 
     /// Set up 612-648 components of targeted buffer : SKSK
@@ -12039,206 +8482,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxyyyzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 647);
 
-#pragma omp simd aligned(g_0_xxyyy_0_xxxxxxy_0,       \
-                             g_0_xxyyy_0_xxxxxxy_1,   \
-                             g_0_xxyyy_0_xxxxxyy_0,   \
-                             g_0_xxyyy_0_xxxxxyy_1,   \
-                             g_0_xxyyy_0_xxxxyyy_0,   \
-                             g_0_xxyyy_0_xxxxyyy_1,   \
-                             g_0_xxyyy_0_xxxyyyy_0,   \
-                             g_0_xxyyy_0_xxxyyyy_1,   \
-                             g_0_xxyyy_0_xxyyyyy_0,   \
-                             g_0_xxyyy_0_xxyyyyy_1,   \
-                             g_0_xxyyy_0_xyyyyyy_0,   \
-                             g_0_xxyyy_0_xyyyyyy_1,   \
-                             g_0_xxyyyz_0_xxxxxxy_0,  \
-                             g_0_xxyyyz_0_xxxxxxy_1,  \
-                             g_0_xxyyyz_0_xxxxxyy_0,  \
-                             g_0_xxyyyz_0_xxxxxyy_1,  \
-                             g_0_xxyyyz_0_xxxxyyy_0,  \
-                             g_0_xxyyyz_0_xxxxyyy_1,  \
-                             g_0_xxyyyz_0_xxxyyyy_0,  \
-                             g_0_xxyyyz_0_xxxyyyy_1,  \
-                             g_0_xxyyyz_0_xxyyyyy_0,  \
-                             g_0_xxyyyz_0_xxyyyyy_1,  \
-                             g_0_xxyyyz_0_xyyyyyy_0,  \
-                             g_0_xxyyyz_0_xyyyyyy_1,  \
-                             g_0_xxyyyzz_0_xxxxxxx_0, \
-                             g_0_xxyyyzz_0_xxxxxxy_0, \
-                             g_0_xxyyyzz_0_xxxxxxz_0, \
-                             g_0_xxyyyzz_0_xxxxxyy_0, \
-                             g_0_xxyyyzz_0_xxxxxyz_0, \
-                             g_0_xxyyyzz_0_xxxxxzz_0, \
-                             g_0_xxyyyzz_0_xxxxyyy_0, \
-                             g_0_xxyyyzz_0_xxxxyyz_0, \
-                             g_0_xxyyyzz_0_xxxxyzz_0, \
-                             g_0_xxyyyzz_0_xxxxzzz_0, \
-                             g_0_xxyyyzz_0_xxxyyyy_0, \
-                             g_0_xxyyyzz_0_xxxyyyz_0, \
-                             g_0_xxyyyzz_0_xxxyyzz_0, \
-                             g_0_xxyyyzz_0_xxxyzzz_0, \
-                             g_0_xxyyyzz_0_xxxzzzz_0, \
-                             g_0_xxyyyzz_0_xxyyyyy_0, \
-                             g_0_xxyyyzz_0_xxyyyyz_0, \
-                             g_0_xxyyyzz_0_xxyyyzz_0, \
-                             g_0_xxyyyzz_0_xxyyzzz_0, \
-                             g_0_xxyyyzz_0_xxyzzzz_0, \
-                             g_0_xxyyyzz_0_xxzzzzz_0, \
-                             g_0_xxyyyzz_0_xyyyyyy_0, \
-                             g_0_xxyyyzz_0_xyyyyyz_0, \
-                             g_0_xxyyyzz_0_xyyyyzz_0, \
-                             g_0_xxyyyzz_0_xyyyzzz_0, \
-                             g_0_xxyyyzz_0_xyyzzzz_0, \
-                             g_0_xxyyyzz_0_xyzzzzz_0, \
-                             g_0_xxyyyzz_0_xzzzzzz_0, \
-                             g_0_xxyyyzz_0_yyyyyyy_0, \
-                             g_0_xxyyyzz_0_yyyyyyz_0, \
-                             g_0_xxyyyzz_0_yyyyyzz_0, \
-                             g_0_xxyyyzz_0_yyyyzzz_0, \
-                             g_0_xxyyyzz_0_yyyzzzz_0, \
-                             g_0_xxyyyzz_0_yyzzzzz_0, \
-                             g_0_xxyyyzz_0_yzzzzzz_0, \
-                             g_0_xxyyyzz_0_zzzzzzz_0, \
-                             g_0_xxyyzz_0_xxxxxxx_0,  \
-                             g_0_xxyyzz_0_xxxxxxx_1,  \
-                             g_0_xxyyzz_0_xxxxxxz_0,  \
-                             g_0_xxyyzz_0_xxxxxxz_1,  \
-                             g_0_xxyyzz_0_xxxxxzz_0,  \
-                             g_0_xxyyzz_0_xxxxxzz_1,  \
-                             g_0_xxyyzz_0_xxxxzzz_0,  \
-                             g_0_xxyyzz_0_xxxxzzz_1,  \
-                             g_0_xxyyzz_0_xxxzzzz_0,  \
-                             g_0_xxyyzz_0_xxxzzzz_1,  \
-                             g_0_xxyyzz_0_xxzzzzz_0,  \
-                             g_0_xxyyzz_0_xxzzzzz_1,  \
-                             g_0_xxyyzz_0_xzzzzzz_0,  \
-                             g_0_xxyyzz_0_xzzzzzz_1,  \
-                             g_0_xxyzz_0_xxxxxxx_0,   \
-                             g_0_xxyzz_0_xxxxxxx_1,   \
-                             g_0_xxyzz_0_xxxxxxz_0,   \
-                             g_0_xxyzz_0_xxxxxxz_1,   \
-                             g_0_xxyzz_0_xxxxxzz_0,   \
-                             g_0_xxyzz_0_xxxxxzz_1,   \
-                             g_0_xxyzz_0_xxxxzzz_0,   \
-                             g_0_xxyzz_0_xxxxzzz_1,   \
-                             g_0_xxyzz_0_xxxzzzz_0,   \
-                             g_0_xxyzz_0_xxxzzzz_1,   \
-                             g_0_xxyzz_0_xxzzzzz_0,   \
-                             g_0_xxyzz_0_xxzzzzz_1,   \
-                             g_0_xxyzz_0_xzzzzzz_0,   \
-                             g_0_xxyzz_0_xzzzzzz_1,   \
-                             g_0_xyyyzz_0_xxxxxyz_0,  \
-                             g_0_xyyyzz_0_xxxxxyz_1,  \
-                             g_0_xyyyzz_0_xxxxyyz_0,  \
-                             g_0_xyyyzz_0_xxxxyyz_1,  \
-                             g_0_xyyyzz_0_xxxxyz_1,   \
-                             g_0_xyyyzz_0_xxxxyzz_0,  \
-                             g_0_xyyyzz_0_xxxxyzz_1,  \
-                             g_0_xyyyzz_0_xxxyyyz_0,  \
-                             g_0_xyyyzz_0_xxxyyyz_1,  \
-                             g_0_xyyyzz_0_xxxyyz_1,   \
-                             g_0_xyyyzz_0_xxxyyzz_0,  \
-                             g_0_xyyyzz_0_xxxyyzz_1,  \
-                             g_0_xyyyzz_0_xxxyzz_1,   \
-                             g_0_xyyyzz_0_xxxyzzz_0,  \
-                             g_0_xyyyzz_0_xxxyzzz_1,  \
-                             g_0_xyyyzz_0_xxyyyyz_0,  \
-                             g_0_xyyyzz_0_xxyyyyz_1,  \
-                             g_0_xyyyzz_0_xxyyyz_1,   \
-                             g_0_xyyyzz_0_xxyyyzz_0,  \
-                             g_0_xyyyzz_0_xxyyyzz_1,  \
-                             g_0_xyyyzz_0_xxyyzz_1,   \
-                             g_0_xyyyzz_0_xxyyzzz_0,  \
-                             g_0_xyyyzz_0_xxyyzzz_1,  \
-                             g_0_xyyyzz_0_xxyzzz_1,   \
-                             g_0_xyyyzz_0_xxyzzzz_0,  \
-                             g_0_xyyyzz_0_xxyzzzz_1,  \
-                             g_0_xyyyzz_0_xyyyyyz_0,  \
-                             g_0_xyyyzz_0_xyyyyyz_1,  \
-                             g_0_xyyyzz_0_xyyyyz_1,   \
-                             g_0_xyyyzz_0_xyyyyzz_0,  \
-                             g_0_xyyyzz_0_xyyyyzz_1,  \
-                             g_0_xyyyzz_0_xyyyzz_1,   \
-                             g_0_xyyyzz_0_xyyyzzz_0,  \
-                             g_0_xyyyzz_0_xyyyzzz_1,  \
-                             g_0_xyyyzz_0_xyyzzz_1,   \
-                             g_0_xyyyzz_0_xyyzzzz_0,  \
-                             g_0_xyyyzz_0_xyyzzzz_1,  \
-                             g_0_xyyyzz_0_xyzzzz_1,   \
-                             g_0_xyyyzz_0_xyzzzzz_0,  \
-                             g_0_xyyyzz_0_xyzzzzz_1,  \
-                             g_0_xyyyzz_0_yyyyyyy_0,  \
-                             g_0_xyyyzz_0_yyyyyyy_1,  \
-                             g_0_xyyyzz_0_yyyyyyz_0,  \
-                             g_0_xyyyzz_0_yyyyyyz_1,  \
-                             g_0_xyyyzz_0_yyyyyz_1,   \
-                             g_0_xyyyzz_0_yyyyyzz_0,  \
-                             g_0_xyyyzz_0_yyyyyzz_1,  \
-                             g_0_xyyyzz_0_yyyyzz_1,   \
-                             g_0_xyyyzz_0_yyyyzzz_0,  \
-                             g_0_xyyyzz_0_yyyyzzz_1,  \
-                             g_0_xyyyzz_0_yyyzzz_1,   \
-                             g_0_xyyyzz_0_yyyzzzz_0,  \
-                             g_0_xyyyzz_0_yyyzzzz_1,  \
-                             g_0_xyyyzz_0_yyzzzz_1,   \
-                             g_0_xyyyzz_0_yyzzzzz_0,  \
-                             g_0_xyyyzz_0_yyzzzzz_1,  \
-                             g_0_xyyyzz_0_yzzzzz_1,   \
-                             g_0_xyyyzz_0_yzzzzzz_0,  \
-                             g_0_xyyyzz_0_yzzzzzz_1,  \
-                             g_0_xyyyzz_0_zzzzzzz_0,  \
-                             g_0_xyyyzz_0_zzzzzzz_1,  \
-                             g_0_yyyzz_0_xxxxxyz_0,   \
-                             g_0_yyyzz_0_xxxxxyz_1,   \
-                             g_0_yyyzz_0_xxxxyyz_0,   \
-                             g_0_yyyzz_0_xxxxyyz_1,   \
-                             g_0_yyyzz_0_xxxxyzz_0,   \
-                             g_0_yyyzz_0_xxxxyzz_1,   \
-                             g_0_yyyzz_0_xxxyyyz_0,   \
-                             g_0_yyyzz_0_xxxyyyz_1,   \
-                             g_0_yyyzz_0_xxxyyzz_0,   \
-                             g_0_yyyzz_0_xxxyyzz_1,   \
-                             g_0_yyyzz_0_xxxyzzz_0,   \
-                             g_0_yyyzz_0_xxxyzzz_1,   \
-                             g_0_yyyzz_0_xxyyyyz_0,   \
-                             g_0_yyyzz_0_xxyyyyz_1,   \
-                             g_0_yyyzz_0_xxyyyzz_0,   \
-                             g_0_yyyzz_0_xxyyyzz_1,   \
-                             g_0_yyyzz_0_xxyyzzz_0,   \
-                             g_0_yyyzz_0_xxyyzzz_1,   \
-                             g_0_yyyzz_0_xxyzzzz_0,   \
-                             g_0_yyyzz_0_xxyzzzz_1,   \
-                             g_0_yyyzz_0_xyyyyyz_0,   \
-                             g_0_yyyzz_0_xyyyyyz_1,   \
-                             g_0_yyyzz_0_xyyyyzz_0,   \
-                             g_0_yyyzz_0_xyyyyzz_1,   \
-                             g_0_yyyzz_0_xyyyzzz_0,   \
-                             g_0_yyyzz_0_xyyyzzz_1,   \
-                             g_0_yyyzz_0_xyyzzzz_0,   \
-                             g_0_yyyzz_0_xyyzzzz_1,   \
-                             g_0_yyyzz_0_xyzzzzz_0,   \
-                             g_0_yyyzz_0_xyzzzzz_1,   \
-                             g_0_yyyzz_0_yyyyyyy_0,   \
-                             g_0_yyyzz_0_yyyyyyy_1,   \
-                             g_0_yyyzz_0_yyyyyyz_0,   \
-                             g_0_yyyzz_0_yyyyyyz_1,   \
-                             g_0_yyyzz_0_yyyyyzz_0,   \
-                             g_0_yyyzz_0_yyyyyzz_1,   \
-                             g_0_yyyzz_0_yyyyzzz_0,   \
-                             g_0_yyyzz_0_yyyyzzz_1,   \
-                             g_0_yyyzz_0_yyyzzzz_0,   \
-                             g_0_yyyzz_0_yyyzzzz_1,   \
-                             g_0_yyyzz_0_yyzzzzz_0,   \
-                             g_0_yyyzz_0_yyzzzzz_1,   \
-                             g_0_yyyzz_0_yzzzzzz_0,   \
-                             g_0_yyyzz_0_yzzzzzz_1,   \
-                             g_0_yyyzz_0_zzzzzzz_0,   \
-                             g_0_yyyzz_0_zzzzzzz_1,   \
-                             wp_x,                    \
-                             wp_y,                    \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxyyy_0_xxxxxxy_0, g_0_xxyyy_0_xxxxxxy_1, g_0_xxyyy_0_xxxxxyy_0, g_0_xxyyy_0_xxxxxyy_1, g_0_xxyyy_0_xxxxyyy_0, g_0_xxyyy_0_xxxxyyy_1, g_0_xxyyy_0_xxxyyyy_0, g_0_xxyyy_0_xxxyyyy_1, g_0_xxyyy_0_xxyyyyy_0, g_0_xxyyy_0_xxyyyyy_1, g_0_xxyyy_0_xyyyyyy_0, g_0_xxyyy_0_xyyyyyy_1, g_0_xxyyyz_0_xxxxxxy_0, g_0_xxyyyz_0_xxxxxxy_1, g_0_xxyyyz_0_xxxxxyy_0, g_0_xxyyyz_0_xxxxxyy_1, g_0_xxyyyz_0_xxxxyyy_0, g_0_xxyyyz_0_xxxxyyy_1, g_0_xxyyyz_0_xxxyyyy_0, g_0_xxyyyz_0_xxxyyyy_1, g_0_xxyyyz_0_xxyyyyy_0, g_0_xxyyyz_0_xxyyyyy_1, g_0_xxyyyz_0_xyyyyyy_0, g_0_xxyyyz_0_xyyyyyy_1, g_0_xxyyyzz_0_xxxxxxx_0, g_0_xxyyyzz_0_xxxxxxy_0, g_0_xxyyyzz_0_xxxxxxz_0, g_0_xxyyyzz_0_xxxxxyy_0, g_0_xxyyyzz_0_xxxxxyz_0, g_0_xxyyyzz_0_xxxxxzz_0, g_0_xxyyyzz_0_xxxxyyy_0, g_0_xxyyyzz_0_xxxxyyz_0, g_0_xxyyyzz_0_xxxxyzz_0, g_0_xxyyyzz_0_xxxxzzz_0, g_0_xxyyyzz_0_xxxyyyy_0, g_0_xxyyyzz_0_xxxyyyz_0, g_0_xxyyyzz_0_xxxyyzz_0, g_0_xxyyyzz_0_xxxyzzz_0, g_0_xxyyyzz_0_xxxzzzz_0, g_0_xxyyyzz_0_xxyyyyy_0, g_0_xxyyyzz_0_xxyyyyz_0, g_0_xxyyyzz_0_xxyyyzz_0, g_0_xxyyyzz_0_xxyyzzz_0, g_0_xxyyyzz_0_xxyzzzz_0, g_0_xxyyyzz_0_xxzzzzz_0, g_0_xxyyyzz_0_xyyyyyy_0, g_0_xxyyyzz_0_xyyyyyz_0, g_0_xxyyyzz_0_xyyyyzz_0, g_0_xxyyyzz_0_xyyyzzz_0, g_0_xxyyyzz_0_xyyzzzz_0, g_0_xxyyyzz_0_xyzzzzz_0, g_0_xxyyyzz_0_xzzzzzz_0, g_0_xxyyyzz_0_yyyyyyy_0, g_0_xxyyyzz_0_yyyyyyz_0, g_0_xxyyyzz_0_yyyyyzz_0, g_0_xxyyyzz_0_yyyyzzz_0, g_0_xxyyyzz_0_yyyzzzz_0, g_0_xxyyyzz_0_yyzzzzz_0, g_0_xxyyyzz_0_yzzzzzz_0, g_0_xxyyyzz_0_zzzzzzz_0, g_0_xxyyzz_0_xxxxxxx_0, g_0_xxyyzz_0_xxxxxxx_1, g_0_xxyyzz_0_xxxxxxz_0, g_0_xxyyzz_0_xxxxxxz_1, g_0_xxyyzz_0_xxxxxzz_0, g_0_xxyyzz_0_xxxxxzz_1, g_0_xxyyzz_0_xxxxzzz_0, g_0_xxyyzz_0_xxxxzzz_1, g_0_xxyyzz_0_xxxzzzz_0, g_0_xxyyzz_0_xxxzzzz_1, g_0_xxyyzz_0_xxzzzzz_0, g_0_xxyyzz_0_xxzzzzz_1, g_0_xxyyzz_0_xzzzzzz_0, g_0_xxyyzz_0_xzzzzzz_1, g_0_xxyzz_0_xxxxxxx_0, g_0_xxyzz_0_xxxxxxx_1, g_0_xxyzz_0_xxxxxxz_0, g_0_xxyzz_0_xxxxxxz_1, g_0_xxyzz_0_xxxxxzz_0, g_0_xxyzz_0_xxxxxzz_1, g_0_xxyzz_0_xxxxzzz_0, g_0_xxyzz_0_xxxxzzz_1, g_0_xxyzz_0_xxxzzzz_0, g_0_xxyzz_0_xxxzzzz_1, g_0_xxyzz_0_xxzzzzz_0, g_0_xxyzz_0_xxzzzzz_1, g_0_xxyzz_0_xzzzzzz_0, g_0_xxyzz_0_xzzzzzz_1, g_0_xyyyzz_0_xxxxxyz_0, g_0_xyyyzz_0_xxxxxyz_1, g_0_xyyyzz_0_xxxxyyz_0, g_0_xyyyzz_0_xxxxyyz_1, g_0_xyyyzz_0_xxxxyz_1, g_0_xyyyzz_0_xxxxyzz_0, g_0_xyyyzz_0_xxxxyzz_1, g_0_xyyyzz_0_xxxyyyz_0, g_0_xyyyzz_0_xxxyyyz_1, g_0_xyyyzz_0_xxxyyz_1, g_0_xyyyzz_0_xxxyyzz_0, g_0_xyyyzz_0_xxxyyzz_1, g_0_xyyyzz_0_xxxyzz_1, g_0_xyyyzz_0_xxxyzzz_0, g_0_xyyyzz_0_xxxyzzz_1, g_0_xyyyzz_0_xxyyyyz_0, g_0_xyyyzz_0_xxyyyyz_1, g_0_xyyyzz_0_xxyyyz_1, g_0_xyyyzz_0_xxyyyzz_0, g_0_xyyyzz_0_xxyyyzz_1, g_0_xyyyzz_0_xxyyzz_1, g_0_xyyyzz_0_xxyyzzz_0, g_0_xyyyzz_0_xxyyzzz_1, g_0_xyyyzz_0_xxyzzz_1, g_0_xyyyzz_0_xxyzzzz_0, g_0_xyyyzz_0_xxyzzzz_1, g_0_xyyyzz_0_xyyyyyz_0, g_0_xyyyzz_0_xyyyyyz_1, g_0_xyyyzz_0_xyyyyz_1, g_0_xyyyzz_0_xyyyyzz_0, g_0_xyyyzz_0_xyyyyzz_1, g_0_xyyyzz_0_xyyyzz_1, g_0_xyyyzz_0_xyyyzzz_0, g_0_xyyyzz_0_xyyyzzz_1, g_0_xyyyzz_0_xyyzzz_1, g_0_xyyyzz_0_xyyzzzz_0, g_0_xyyyzz_0_xyyzzzz_1, g_0_xyyyzz_0_xyzzzz_1, g_0_xyyyzz_0_xyzzzzz_0, g_0_xyyyzz_0_xyzzzzz_1, g_0_xyyyzz_0_yyyyyyy_0, g_0_xyyyzz_0_yyyyyyy_1, g_0_xyyyzz_0_yyyyyyz_0, g_0_xyyyzz_0_yyyyyyz_1, g_0_xyyyzz_0_yyyyyz_1, g_0_xyyyzz_0_yyyyyzz_0, g_0_xyyyzz_0_yyyyyzz_1, g_0_xyyyzz_0_yyyyzz_1, g_0_xyyyzz_0_yyyyzzz_0, g_0_xyyyzz_0_yyyyzzz_1, g_0_xyyyzz_0_yyyzzz_1, g_0_xyyyzz_0_yyyzzzz_0, g_0_xyyyzz_0_yyyzzzz_1, g_0_xyyyzz_0_yyzzzz_1, g_0_xyyyzz_0_yyzzzzz_0, g_0_xyyyzz_0_yyzzzzz_1, g_0_xyyyzz_0_yzzzzz_1, g_0_xyyyzz_0_yzzzzzz_0, g_0_xyyyzz_0_yzzzzzz_1, g_0_xyyyzz_0_zzzzzzz_0, g_0_xyyyzz_0_zzzzzzz_1, g_0_yyyzz_0_xxxxxyz_0, g_0_yyyzz_0_xxxxxyz_1, g_0_yyyzz_0_xxxxyyz_0, g_0_yyyzz_0_xxxxyyz_1, g_0_yyyzz_0_xxxxyzz_0, g_0_yyyzz_0_xxxxyzz_1, g_0_yyyzz_0_xxxyyyz_0, g_0_yyyzz_0_xxxyyyz_1, g_0_yyyzz_0_xxxyyzz_0, g_0_yyyzz_0_xxxyyzz_1, g_0_yyyzz_0_xxxyzzz_0, g_0_yyyzz_0_xxxyzzz_1, g_0_yyyzz_0_xxyyyyz_0, g_0_yyyzz_0_xxyyyyz_1, g_0_yyyzz_0_xxyyyzz_0, g_0_yyyzz_0_xxyyyzz_1, g_0_yyyzz_0_xxyyzzz_0, g_0_yyyzz_0_xxyyzzz_1, g_0_yyyzz_0_xxyzzzz_0, g_0_yyyzz_0_xxyzzzz_1, g_0_yyyzz_0_xyyyyyz_0, g_0_yyyzz_0_xyyyyyz_1, g_0_yyyzz_0_xyyyyzz_0, g_0_yyyzz_0_xyyyyzz_1, g_0_yyyzz_0_xyyyzzz_0, g_0_yyyzz_0_xyyyzzz_1, g_0_yyyzz_0_xyyzzzz_0, g_0_yyyzz_0_xyyzzzz_1, g_0_yyyzz_0_xyzzzzz_0, g_0_yyyzz_0_xyzzzzz_1, g_0_yyyzz_0_yyyyyyy_0, g_0_yyyzz_0_yyyyyyy_1, g_0_yyyzz_0_yyyyyyz_0, g_0_yyyzz_0_yyyyyyz_1, g_0_yyyzz_0_yyyyyzz_0, g_0_yyyzz_0_yyyyyzz_1, g_0_yyyzz_0_yyyyzzz_0, g_0_yyyzz_0_yyyyzzz_1, g_0_yyyzz_0_yyyzzzz_0, g_0_yyyzz_0_yyyzzzz_1, g_0_yyyzz_0_yyzzzzz_0, g_0_yyyzz_0_yyzzzzz_1, g_0_yyyzz_0_yzzzzzz_0, g_0_yyyzz_0_yzzzzzz_1, g_0_yyyzz_0_zzzzzzz_0, g_0_yyyzz_0_zzzzzzz_1, wp_x, wp_y, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -12247,123 +8491,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxyyyzz_0_xxxxxxx_0[i] = 2.0 * g_0_xxyzz_0_xxxxxxx_0[i] * fi_ab_0 - 2.0 * g_0_xxyzz_0_xxxxxxx_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_xxxxxxx_0[i] * pb_y + g_0_xxyyzz_0_xxxxxxx_1[i] * wp_y[i];
+        g_0_xxyyyzz_0_xxxxxxx_0[i] = 2.0 * g_0_xxyzz_0_xxxxxxx_0[i] * fi_ab_0 - 2.0 * g_0_xxyzz_0_xxxxxxx_1[i] * fti_ab_0 + g_0_xxyyzz_0_xxxxxxx_0[i] * pb_y + g_0_xxyyzz_0_xxxxxxx_1[i] * wp_y[i];
 
-        g_0_xxyyyzz_0_xxxxxxy_0[i] = g_0_xxyyy_0_xxxxxxy_0[i] * fi_ab_0 - g_0_xxyyy_0_xxxxxxy_1[i] * fti_ab_0 + g_0_xxyyyz_0_xxxxxxy_0[i] * pb_z +
-                                     g_0_xxyyyz_0_xxxxxxy_1[i] * wp_z[i];
+        g_0_xxyyyzz_0_xxxxxxy_0[i] = g_0_xxyyy_0_xxxxxxy_0[i] * fi_ab_0 - g_0_xxyyy_0_xxxxxxy_1[i] * fti_ab_0 + g_0_xxyyyz_0_xxxxxxy_0[i] * pb_z + g_0_xxyyyz_0_xxxxxxy_1[i] * wp_z[i];
 
-        g_0_xxyyyzz_0_xxxxxxz_0[i] = 2.0 * g_0_xxyzz_0_xxxxxxz_0[i] * fi_ab_0 - 2.0 * g_0_xxyzz_0_xxxxxxz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_xxxxxxz_0[i] * pb_y + g_0_xxyyzz_0_xxxxxxz_1[i] * wp_y[i];
+        g_0_xxyyyzz_0_xxxxxxz_0[i] = 2.0 * g_0_xxyzz_0_xxxxxxz_0[i] * fi_ab_0 - 2.0 * g_0_xxyzz_0_xxxxxxz_1[i] * fti_ab_0 + g_0_xxyyzz_0_xxxxxxz_0[i] * pb_y + g_0_xxyyzz_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_xxyyyzz_0_xxxxxyy_0[i] = g_0_xxyyy_0_xxxxxyy_0[i] * fi_ab_0 - g_0_xxyyy_0_xxxxxyy_1[i] * fti_ab_0 + g_0_xxyyyz_0_xxxxxyy_0[i] * pb_z +
-                                     g_0_xxyyyz_0_xxxxxyy_1[i] * wp_z[i];
+        g_0_xxyyyzz_0_xxxxxyy_0[i] = g_0_xxyyy_0_xxxxxyy_0[i] * fi_ab_0 - g_0_xxyyy_0_xxxxxyy_1[i] * fti_ab_0 + g_0_xxyyyz_0_xxxxxyy_0[i] * pb_z + g_0_xxyyyz_0_xxxxxyy_1[i] * wp_z[i];
 
-        g_0_xxyyyzz_0_xxxxxyz_0[i] = g_0_yyyzz_0_xxxxxyz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xyyyzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxxxxyz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_xxxxxyz_0[i] = g_0_yyyzz_0_xxxxxyz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxxxxyz_1[i] * fti_ab_0 + 5.0 * g_0_xyyyzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxxxxyz_0[i] * pb_x + g_0_xyyyzz_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_xxxxxzz_0[i] = 2.0 * g_0_xxyzz_0_xxxxxzz_0[i] * fi_ab_0 - 2.0 * g_0_xxyzz_0_xxxxxzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_xxxxxzz_0[i] * pb_y + g_0_xxyyzz_0_xxxxxzz_1[i] * wp_y[i];
+        g_0_xxyyyzz_0_xxxxxzz_0[i] = 2.0 * g_0_xxyzz_0_xxxxxzz_0[i] * fi_ab_0 - 2.0 * g_0_xxyzz_0_xxxxxzz_1[i] * fti_ab_0 + g_0_xxyyzz_0_xxxxxzz_0[i] * pb_y + g_0_xxyyzz_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_xxyyyzz_0_xxxxyyy_0[i] = g_0_xxyyy_0_xxxxyyy_0[i] * fi_ab_0 - g_0_xxyyy_0_xxxxyyy_1[i] * fti_ab_0 + g_0_xxyyyz_0_xxxxyyy_0[i] * pb_z +
-                                     g_0_xxyyyz_0_xxxxyyy_1[i] * wp_z[i];
+        g_0_xxyyyzz_0_xxxxyyy_0[i] = g_0_xxyyy_0_xxxxyyy_0[i] * fi_ab_0 - g_0_xxyyy_0_xxxxyyy_1[i] * fti_ab_0 + g_0_xxyyyz_0_xxxxyyy_0[i] * pb_z + g_0_xxyyyz_0_xxxxyyy_1[i] * wp_z[i];
 
-        g_0_xxyyyzz_0_xxxxyyz_0[i] = g_0_yyyzz_0_xxxxyyz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xyyyzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxxxyyz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_xxxxyyz_0[i] = g_0_yyyzz_0_xxxxyyz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxxxyyz_1[i] * fti_ab_0 + 4.0 * g_0_xyyyzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxxxyyz_0[i] * pb_x + g_0_xyyyzz_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_xxxxyzz_0[i] = g_0_yyyzz_0_xxxxyzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xyyyzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxxxyzz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_xxxxyzz_0[i] = g_0_yyyzz_0_xxxxyzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxxxyzz_1[i] * fti_ab_0 + 4.0 * g_0_xyyyzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxxxyzz_0[i] * pb_x + g_0_xyyyzz_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_xxxxzzz_0[i] = 2.0 * g_0_xxyzz_0_xxxxzzz_0[i] * fi_ab_0 - 2.0 * g_0_xxyzz_0_xxxxzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_xxxxzzz_0[i] * pb_y + g_0_xxyyzz_0_xxxxzzz_1[i] * wp_y[i];
+        g_0_xxyyyzz_0_xxxxzzz_0[i] = 2.0 * g_0_xxyzz_0_xxxxzzz_0[i] * fi_ab_0 - 2.0 * g_0_xxyzz_0_xxxxzzz_1[i] * fti_ab_0 + g_0_xxyyzz_0_xxxxzzz_0[i] * pb_y + g_0_xxyyzz_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_xxyyyzz_0_xxxyyyy_0[i] = g_0_xxyyy_0_xxxyyyy_0[i] * fi_ab_0 - g_0_xxyyy_0_xxxyyyy_1[i] * fti_ab_0 + g_0_xxyyyz_0_xxxyyyy_0[i] * pb_z +
-                                     g_0_xxyyyz_0_xxxyyyy_1[i] * wp_z[i];
+        g_0_xxyyyzz_0_xxxyyyy_0[i] = g_0_xxyyy_0_xxxyyyy_0[i] * fi_ab_0 - g_0_xxyyy_0_xxxyyyy_1[i] * fti_ab_0 + g_0_xxyyyz_0_xxxyyyy_0[i] * pb_z + g_0_xxyyyz_0_xxxyyyy_1[i] * wp_z[i];
 
-        g_0_xxyyyzz_0_xxxyyyz_0[i] = g_0_yyyzz_0_xxxyyyz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xyyyzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxxyyyz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_xxxyyyz_0[i] = g_0_yyyzz_0_xxxyyyz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_xyyyzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxxyyyz_0[i] * pb_x + g_0_xyyyzz_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_xxxyyzz_0[i] = g_0_yyyzz_0_xxxyyzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xyyyzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxxyyzz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_xxxyyzz_0[i] = g_0_yyyzz_0_xxxyyzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxxyyzz_1[i] * fti_ab_0 + 3.0 * g_0_xyyyzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxxyyzz_0[i] * pb_x + g_0_xyyyzz_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_xxxyzzz_0[i] = g_0_yyyzz_0_xxxyzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xyyyzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxxyzzz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_xxxyzzz_0[i] = g_0_yyyzz_0_xxxyzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxxyzzz_1[i] * fti_ab_0 + 3.0 * g_0_xyyyzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxxyzzz_0[i] * pb_x + g_0_xyyyzz_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_xxxzzzz_0[i] = 2.0 * g_0_xxyzz_0_xxxzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xxyzz_0_xxxzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_xxxzzzz_0[i] * pb_y + g_0_xxyyzz_0_xxxzzzz_1[i] * wp_y[i];
+        g_0_xxyyyzz_0_xxxzzzz_0[i] = 2.0 * g_0_xxyzz_0_xxxzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xxyzz_0_xxxzzzz_1[i] * fti_ab_0 + g_0_xxyyzz_0_xxxzzzz_0[i] * pb_y + g_0_xxyyzz_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_xxyyyzz_0_xxyyyyy_0[i] = g_0_xxyyy_0_xxyyyyy_0[i] * fi_ab_0 - g_0_xxyyy_0_xxyyyyy_1[i] * fti_ab_0 + g_0_xxyyyz_0_xxyyyyy_0[i] * pb_z +
-                                     g_0_xxyyyz_0_xxyyyyy_1[i] * wp_z[i];
+        g_0_xxyyyzz_0_xxyyyyy_0[i] = g_0_xxyyy_0_xxyyyyy_0[i] * fi_ab_0 - g_0_xxyyy_0_xxyyyyy_1[i] * fti_ab_0 + g_0_xxyyyz_0_xxyyyyy_0[i] * pb_z + g_0_xxyyyz_0_xxyyyyy_1[i] * wp_z[i];
 
-        g_0_xxyyyzz_0_xxyyyyz_0[i] = g_0_yyyzz_0_xxyyyyz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xyyyzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxyyyyz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_xxyyyyz_0[i] = g_0_yyyzz_0_xxyyyyz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxyyyyz_1[i] * fti_ab_0 + 2.0 * g_0_xyyyzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxyyyyz_0[i] * pb_x + g_0_xyyyzz_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_xxyyyzz_0[i] = g_0_yyyzz_0_xxyyyzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xyyyzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxyyyzz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_xxyyyzz_0[i] = g_0_yyyzz_0_xxyyyzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxyyyzz_1[i] * fti_ab_0 + 2.0 * g_0_xyyyzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxyyyzz_0[i] * pb_x + g_0_xyyyzz_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_xxyyzzz_0[i] = g_0_yyyzz_0_xxyyzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xyyyzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxyyzzz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_xxyyzzz_0[i] = g_0_yyyzz_0_xxyyzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_xyyyzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxyyzzz_0[i] * pb_x + g_0_xyyyzz_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_xxyzzzz_0[i] = g_0_yyyzz_0_xxyzzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xyyyzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxyzzzz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_xxyzzzz_0[i] = g_0_yyyzz_0_xxyzzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xxyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xyyyzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xxyzzzz_0[i] * pb_x + g_0_xyyyzz_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_xxzzzzz_0[i] = 2.0 * g_0_xxyzz_0_xxzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xxyzz_0_xxzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_xxzzzzz_0[i] * pb_y + g_0_xxyyzz_0_xxzzzzz_1[i] * wp_y[i];
+        g_0_xxyyyzz_0_xxzzzzz_0[i] = 2.0 * g_0_xxyzz_0_xxzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xxyzz_0_xxzzzzz_1[i] * fti_ab_0 + g_0_xxyyzz_0_xxzzzzz_0[i] * pb_y + g_0_xxyyzz_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_xxyyyzz_0_xyyyyyy_0[i] = g_0_xxyyy_0_xyyyyyy_0[i] * fi_ab_0 - g_0_xxyyy_0_xyyyyyy_1[i] * fti_ab_0 + g_0_xxyyyz_0_xyyyyyy_0[i] * pb_z +
-                                     g_0_xxyyyz_0_xyyyyyy_1[i] * wp_z[i];
+        g_0_xxyyyzz_0_xyyyyyy_0[i] = g_0_xxyyy_0_xyyyyyy_0[i] * fi_ab_0 - g_0_xxyyy_0_xyyyyyy_1[i] * fti_ab_0 + g_0_xxyyyz_0_xyyyyyy_0[i] * pb_z + g_0_xxyyyz_0_xyyyyyy_1[i] * wp_z[i];
 
-        g_0_xxyyyzz_0_xyyyyyz_0[i] = g_0_yyyzz_0_xyyyyyz_0[i] * fi_ab_0 - g_0_yyyzz_0_xyyyyyz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyyyyz_1[i] * fi_abcd_0 +
-                                     g_0_xyyyzz_0_xyyyyyz_0[i] * pb_x + g_0_xyyyzz_0_xyyyyyz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_xyyyyyz_0[i] = g_0_yyyzz_0_xyyyyyz_0[i] * fi_ab_0 - g_0_yyyzz_0_xyyyyyz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xyyyyyz_0[i] * pb_x + g_0_xyyyzz_0_xyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_xyyyyzz_0[i] = g_0_yyyzz_0_xyyyyzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xyyyyzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyyyzz_1[i] * fi_abcd_0 +
-                                     g_0_xyyyzz_0_xyyyyzz_0[i] * pb_x + g_0_xyyyzz_0_xyyyyzz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_xyyyyzz_0[i] = g_0_yyyzz_0_xyyyyzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xyyyyzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xyyyyzz_0[i] * pb_x + g_0_xyyyzz_0_xyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_xyyyzzz_0[i] = g_0_yyyzz_0_xyyyzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xyyyzzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyyzzz_1[i] * fi_abcd_0 +
-                                     g_0_xyyyzz_0_xyyyzzz_0[i] * pb_x + g_0_xyyyzz_0_xyyyzzz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_xyyyzzz_0[i] = g_0_yyyzz_0_xyyyzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xyyyzzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xyyyzzz_0[i] * pb_x + g_0_xyyyzz_0_xyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_xyyzzzz_0[i] = g_0_yyyzz_0_xyyzzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xyyzzzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyzzzz_1[i] * fi_abcd_0 +
-                                     g_0_xyyyzz_0_xyyzzzz_0[i] * pb_x + g_0_xyyyzz_0_xyyzzzz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_xyyzzzz_0[i] = g_0_yyyzz_0_xyyzzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xyyzzzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xyyzzzz_0[i] * pb_x + g_0_xyyyzz_0_xyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_xyzzzzz_0[i] = g_0_yyyzz_0_xyzzzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xyzzzzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yzzzzz_1[i] * fi_abcd_0 +
-                                     g_0_xyyyzz_0_xyzzzzz_0[i] * pb_x + g_0_xyyyzz_0_xyzzzzz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_xyzzzzz_0[i] = g_0_yyyzz_0_xyzzzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_xyzzzzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xyyyzz_0_xyzzzzz_0[i] * pb_x + g_0_xyyyzz_0_xyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_xzzzzzz_0[i] = 2.0 * g_0_xxyzz_0_xzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xxyzz_0_xzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_xzzzzzz_0[i] * pb_y + g_0_xxyyzz_0_xzzzzzz_1[i] * wp_y[i];
+        g_0_xxyyyzz_0_xzzzzzz_0[i] = 2.0 * g_0_xxyzz_0_xzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_xxyzz_0_xzzzzzz_1[i] * fti_ab_0 + g_0_xxyyzz_0_xzzzzzz_0[i] * pb_y + g_0_xxyyzz_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_xxyyyzz_0_yyyyyyy_0[i] = g_0_yyyzz_0_yyyyyyy_0[i] * fi_ab_0 - g_0_yyyzz_0_yyyyyyy_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyyyyyy_0[i] * pb_x +
-                                     g_0_xyyyzz_0_yyyyyyy_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_yyyyyyy_0[i] = g_0_yyyzz_0_yyyyyyy_0[i] * fi_ab_0 - g_0_yyyzz_0_yyyyyyy_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyyyyyy_0[i] * pb_x + g_0_xyyyzz_0_yyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_yyyyyyz_0[i] = g_0_yyyzz_0_yyyyyyz_0[i] * fi_ab_0 - g_0_yyyzz_0_yyyyyyz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyyyyyz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_yyyyyyz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_yyyyyyz_0[i] = g_0_yyyzz_0_yyyyyyz_0[i] * fi_ab_0 - g_0_yyyzz_0_yyyyyyz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyyyyyz_0[i] * pb_x + g_0_xyyyzz_0_yyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_yyyyyzz_0[i] = g_0_yyyzz_0_yyyyyzz_0[i] * fi_ab_0 - g_0_yyyzz_0_yyyyyzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyyyyzz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_yyyyyzz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_yyyyyzz_0[i] = g_0_yyyzz_0_yyyyyzz_0[i] * fi_ab_0 - g_0_yyyzz_0_yyyyyzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyyyyzz_0[i] * pb_x + g_0_xyyyzz_0_yyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_yyyyzzz_0[i] = g_0_yyyzz_0_yyyyzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_yyyyzzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyyyzzz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_yyyyzzz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_yyyyzzz_0[i] = g_0_yyyzz_0_yyyyzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_yyyyzzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyyyzzz_0[i] * pb_x + g_0_xyyyzz_0_yyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_yyyzzzz_0[i] = g_0_yyyzz_0_yyyzzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_yyyzzzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyyzzzz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_yyyzzzz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_yyyzzzz_0[i] = g_0_yyyzz_0_yyyzzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_yyyzzzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyyzzzz_0[i] * pb_x + g_0_xyyyzz_0_yyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_yyzzzzz_0[i] = g_0_yyyzz_0_yyzzzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_yyzzzzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyzzzzz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_yyzzzzz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_yyzzzzz_0[i] = g_0_yyyzz_0_yyzzzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_yyzzzzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yyzzzzz_0[i] * pb_x + g_0_xyyyzz_0_yyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_yzzzzzz_0[i] = g_0_yyyzz_0_yzzzzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_yzzzzzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yzzzzzz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_yzzzzzz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_yzzzzzz_0[i] = g_0_yyyzz_0_yzzzzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_yzzzzzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_yzzzzzz_0[i] * pb_x + g_0_xyyyzz_0_yzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyyzz_0_zzzzzzz_0[i] = g_0_yyyzz_0_zzzzzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_zzzzzzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_zzzzzzz_0[i] * pb_x +
-                                     g_0_xyyyzz_0_zzzzzzz_1[i] * wp_x[i];
+        g_0_xxyyyzz_0_zzzzzzz_0[i] = g_0_yyyzz_0_zzzzzzz_0[i] * fi_ab_0 - g_0_yyyzz_0_zzzzzzz_1[i] * fti_ab_0 + g_0_xyyyzz_0_zzzzzzz_0[i] * pb_x + g_0_xyyyzz_0_zzzzzzz_1[i] * wp_x[i];
     }
 
     /// Set up 648-684 components of targeted buffer : SKSK
@@ -12440,206 +8638,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxyyzzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 683);
 
-#pragma omp simd aligned(g_0_xxyyz_0_xxxxxxy_0,       \
-                             g_0_xxyyz_0_xxxxxxy_1,   \
-                             g_0_xxyyz_0_xxxxxyy_0,   \
-                             g_0_xxyyz_0_xxxxxyy_1,   \
-                             g_0_xxyyz_0_xxxxyyy_0,   \
-                             g_0_xxyyz_0_xxxxyyy_1,   \
-                             g_0_xxyyz_0_xxxyyyy_0,   \
-                             g_0_xxyyz_0_xxxyyyy_1,   \
-                             g_0_xxyyz_0_xxyyyyy_0,   \
-                             g_0_xxyyz_0_xxyyyyy_1,   \
-                             g_0_xxyyz_0_xyyyyyy_0,   \
-                             g_0_xxyyz_0_xyyyyyy_1,   \
-                             g_0_xxyyzz_0_xxxxxxy_0,  \
-                             g_0_xxyyzz_0_xxxxxxy_1,  \
-                             g_0_xxyyzz_0_xxxxxyy_0,  \
-                             g_0_xxyyzz_0_xxxxxyy_1,  \
-                             g_0_xxyyzz_0_xxxxyyy_0,  \
-                             g_0_xxyyzz_0_xxxxyyy_1,  \
-                             g_0_xxyyzz_0_xxxyyyy_0,  \
-                             g_0_xxyyzz_0_xxxyyyy_1,  \
-                             g_0_xxyyzz_0_xxyyyyy_0,  \
-                             g_0_xxyyzz_0_xxyyyyy_1,  \
-                             g_0_xxyyzz_0_xyyyyyy_0,  \
-                             g_0_xxyyzz_0_xyyyyyy_1,  \
-                             g_0_xxyyzzz_0_xxxxxxx_0, \
-                             g_0_xxyyzzz_0_xxxxxxy_0, \
-                             g_0_xxyyzzz_0_xxxxxxz_0, \
-                             g_0_xxyyzzz_0_xxxxxyy_0, \
-                             g_0_xxyyzzz_0_xxxxxyz_0, \
-                             g_0_xxyyzzz_0_xxxxxzz_0, \
-                             g_0_xxyyzzz_0_xxxxyyy_0, \
-                             g_0_xxyyzzz_0_xxxxyyz_0, \
-                             g_0_xxyyzzz_0_xxxxyzz_0, \
-                             g_0_xxyyzzz_0_xxxxzzz_0, \
-                             g_0_xxyyzzz_0_xxxyyyy_0, \
-                             g_0_xxyyzzz_0_xxxyyyz_0, \
-                             g_0_xxyyzzz_0_xxxyyzz_0, \
-                             g_0_xxyyzzz_0_xxxyzzz_0, \
-                             g_0_xxyyzzz_0_xxxzzzz_0, \
-                             g_0_xxyyzzz_0_xxyyyyy_0, \
-                             g_0_xxyyzzz_0_xxyyyyz_0, \
-                             g_0_xxyyzzz_0_xxyyyzz_0, \
-                             g_0_xxyyzzz_0_xxyyzzz_0, \
-                             g_0_xxyyzzz_0_xxyzzzz_0, \
-                             g_0_xxyyzzz_0_xxzzzzz_0, \
-                             g_0_xxyyzzz_0_xyyyyyy_0, \
-                             g_0_xxyyzzz_0_xyyyyyz_0, \
-                             g_0_xxyyzzz_0_xyyyyzz_0, \
-                             g_0_xxyyzzz_0_xyyyzzz_0, \
-                             g_0_xxyyzzz_0_xyyzzzz_0, \
-                             g_0_xxyyzzz_0_xyzzzzz_0, \
-                             g_0_xxyyzzz_0_xzzzzzz_0, \
-                             g_0_xxyyzzz_0_yyyyyyy_0, \
-                             g_0_xxyyzzz_0_yyyyyyz_0, \
-                             g_0_xxyyzzz_0_yyyyyzz_0, \
-                             g_0_xxyyzzz_0_yyyyzzz_0, \
-                             g_0_xxyyzzz_0_yyyzzzz_0, \
-                             g_0_xxyyzzz_0_yyzzzzz_0, \
-                             g_0_xxyyzzz_0_yzzzzzz_0, \
-                             g_0_xxyyzzz_0_zzzzzzz_0, \
-                             g_0_xxyzzz_0_xxxxxxx_0,  \
-                             g_0_xxyzzz_0_xxxxxxx_1,  \
-                             g_0_xxyzzz_0_xxxxxxz_0,  \
-                             g_0_xxyzzz_0_xxxxxxz_1,  \
-                             g_0_xxyzzz_0_xxxxxzz_0,  \
-                             g_0_xxyzzz_0_xxxxxzz_1,  \
-                             g_0_xxyzzz_0_xxxxzzz_0,  \
-                             g_0_xxyzzz_0_xxxxzzz_1,  \
-                             g_0_xxyzzz_0_xxxzzzz_0,  \
-                             g_0_xxyzzz_0_xxxzzzz_1,  \
-                             g_0_xxyzzz_0_xxzzzzz_0,  \
-                             g_0_xxyzzz_0_xxzzzzz_1,  \
-                             g_0_xxyzzz_0_xzzzzzz_0,  \
-                             g_0_xxyzzz_0_xzzzzzz_1,  \
-                             g_0_xxzzz_0_xxxxxxx_0,   \
-                             g_0_xxzzz_0_xxxxxxx_1,   \
-                             g_0_xxzzz_0_xxxxxxz_0,   \
-                             g_0_xxzzz_0_xxxxxxz_1,   \
-                             g_0_xxzzz_0_xxxxxzz_0,   \
-                             g_0_xxzzz_0_xxxxxzz_1,   \
-                             g_0_xxzzz_0_xxxxzzz_0,   \
-                             g_0_xxzzz_0_xxxxzzz_1,   \
-                             g_0_xxzzz_0_xxxzzzz_0,   \
-                             g_0_xxzzz_0_xxxzzzz_1,   \
-                             g_0_xxzzz_0_xxzzzzz_0,   \
-                             g_0_xxzzz_0_xxzzzzz_1,   \
-                             g_0_xxzzz_0_xzzzzzz_0,   \
-                             g_0_xxzzz_0_xzzzzzz_1,   \
-                             g_0_xyyzzz_0_xxxxxyz_0,  \
-                             g_0_xyyzzz_0_xxxxxyz_1,  \
-                             g_0_xyyzzz_0_xxxxyyz_0,  \
-                             g_0_xyyzzz_0_xxxxyyz_1,  \
-                             g_0_xyyzzz_0_xxxxyz_1,   \
-                             g_0_xyyzzz_0_xxxxyzz_0,  \
-                             g_0_xyyzzz_0_xxxxyzz_1,  \
-                             g_0_xyyzzz_0_xxxyyyz_0,  \
-                             g_0_xyyzzz_0_xxxyyyz_1,  \
-                             g_0_xyyzzz_0_xxxyyz_1,   \
-                             g_0_xyyzzz_0_xxxyyzz_0,  \
-                             g_0_xyyzzz_0_xxxyyzz_1,  \
-                             g_0_xyyzzz_0_xxxyzz_1,   \
-                             g_0_xyyzzz_0_xxxyzzz_0,  \
-                             g_0_xyyzzz_0_xxxyzzz_1,  \
-                             g_0_xyyzzz_0_xxyyyyz_0,  \
-                             g_0_xyyzzz_0_xxyyyyz_1,  \
-                             g_0_xyyzzz_0_xxyyyz_1,   \
-                             g_0_xyyzzz_0_xxyyyzz_0,  \
-                             g_0_xyyzzz_0_xxyyyzz_1,  \
-                             g_0_xyyzzz_0_xxyyzz_1,   \
-                             g_0_xyyzzz_0_xxyyzzz_0,  \
-                             g_0_xyyzzz_0_xxyyzzz_1,  \
-                             g_0_xyyzzz_0_xxyzzz_1,   \
-                             g_0_xyyzzz_0_xxyzzzz_0,  \
-                             g_0_xyyzzz_0_xxyzzzz_1,  \
-                             g_0_xyyzzz_0_xyyyyyz_0,  \
-                             g_0_xyyzzz_0_xyyyyyz_1,  \
-                             g_0_xyyzzz_0_xyyyyz_1,   \
-                             g_0_xyyzzz_0_xyyyyzz_0,  \
-                             g_0_xyyzzz_0_xyyyyzz_1,  \
-                             g_0_xyyzzz_0_xyyyzz_1,   \
-                             g_0_xyyzzz_0_xyyyzzz_0,  \
-                             g_0_xyyzzz_0_xyyyzzz_1,  \
-                             g_0_xyyzzz_0_xyyzzz_1,   \
-                             g_0_xyyzzz_0_xyyzzzz_0,  \
-                             g_0_xyyzzz_0_xyyzzzz_1,  \
-                             g_0_xyyzzz_0_xyzzzz_1,   \
-                             g_0_xyyzzz_0_xyzzzzz_0,  \
-                             g_0_xyyzzz_0_xyzzzzz_1,  \
-                             g_0_xyyzzz_0_yyyyyyy_0,  \
-                             g_0_xyyzzz_0_yyyyyyy_1,  \
-                             g_0_xyyzzz_0_yyyyyyz_0,  \
-                             g_0_xyyzzz_0_yyyyyyz_1,  \
-                             g_0_xyyzzz_0_yyyyyz_1,   \
-                             g_0_xyyzzz_0_yyyyyzz_0,  \
-                             g_0_xyyzzz_0_yyyyyzz_1,  \
-                             g_0_xyyzzz_0_yyyyzz_1,   \
-                             g_0_xyyzzz_0_yyyyzzz_0,  \
-                             g_0_xyyzzz_0_yyyyzzz_1,  \
-                             g_0_xyyzzz_0_yyyzzz_1,   \
-                             g_0_xyyzzz_0_yyyzzzz_0,  \
-                             g_0_xyyzzz_0_yyyzzzz_1,  \
-                             g_0_xyyzzz_0_yyzzzz_1,   \
-                             g_0_xyyzzz_0_yyzzzzz_0,  \
-                             g_0_xyyzzz_0_yyzzzzz_1,  \
-                             g_0_xyyzzz_0_yzzzzz_1,   \
-                             g_0_xyyzzz_0_yzzzzzz_0,  \
-                             g_0_xyyzzz_0_yzzzzzz_1,  \
-                             g_0_xyyzzz_0_zzzzzzz_0,  \
-                             g_0_xyyzzz_0_zzzzzzz_1,  \
-                             g_0_yyzzz_0_xxxxxyz_0,   \
-                             g_0_yyzzz_0_xxxxxyz_1,   \
-                             g_0_yyzzz_0_xxxxyyz_0,   \
-                             g_0_yyzzz_0_xxxxyyz_1,   \
-                             g_0_yyzzz_0_xxxxyzz_0,   \
-                             g_0_yyzzz_0_xxxxyzz_1,   \
-                             g_0_yyzzz_0_xxxyyyz_0,   \
-                             g_0_yyzzz_0_xxxyyyz_1,   \
-                             g_0_yyzzz_0_xxxyyzz_0,   \
-                             g_0_yyzzz_0_xxxyyzz_1,   \
-                             g_0_yyzzz_0_xxxyzzz_0,   \
-                             g_0_yyzzz_0_xxxyzzz_1,   \
-                             g_0_yyzzz_0_xxyyyyz_0,   \
-                             g_0_yyzzz_0_xxyyyyz_1,   \
-                             g_0_yyzzz_0_xxyyyzz_0,   \
-                             g_0_yyzzz_0_xxyyyzz_1,   \
-                             g_0_yyzzz_0_xxyyzzz_0,   \
-                             g_0_yyzzz_0_xxyyzzz_1,   \
-                             g_0_yyzzz_0_xxyzzzz_0,   \
-                             g_0_yyzzz_0_xxyzzzz_1,   \
-                             g_0_yyzzz_0_xyyyyyz_0,   \
-                             g_0_yyzzz_0_xyyyyyz_1,   \
-                             g_0_yyzzz_0_xyyyyzz_0,   \
-                             g_0_yyzzz_0_xyyyyzz_1,   \
-                             g_0_yyzzz_0_xyyyzzz_0,   \
-                             g_0_yyzzz_0_xyyyzzz_1,   \
-                             g_0_yyzzz_0_xyyzzzz_0,   \
-                             g_0_yyzzz_0_xyyzzzz_1,   \
-                             g_0_yyzzz_0_xyzzzzz_0,   \
-                             g_0_yyzzz_0_xyzzzzz_1,   \
-                             g_0_yyzzz_0_yyyyyyy_0,   \
-                             g_0_yyzzz_0_yyyyyyy_1,   \
-                             g_0_yyzzz_0_yyyyyyz_0,   \
-                             g_0_yyzzz_0_yyyyyyz_1,   \
-                             g_0_yyzzz_0_yyyyyzz_0,   \
-                             g_0_yyzzz_0_yyyyyzz_1,   \
-                             g_0_yyzzz_0_yyyyzzz_0,   \
-                             g_0_yyzzz_0_yyyyzzz_1,   \
-                             g_0_yyzzz_0_yyyzzzz_0,   \
-                             g_0_yyzzz_0_yyyzzzz_1,   \
-                             g_0_yyzzz_0_yyzzzzz_0,   \
-                             g_0_yyzzz_0_yyzzzzz_1,   \
-                             g_0_yyzzz_0_yzzzzzz_0,   \
-                             g_0_yyzzz_0_yzzzzzz_1,   \
-                             g_0_yyzzz_0_zzzzzzz_0,   \
-                             g_0_yyzzz_0_zzzzzzz_1,   \
-                             wp_x,                    \
-                             wp_y,                    \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxyyz_0_xxxxxxy_0, g_0_xxyyz_0_xxxxxxy_1, g_0_xxyyz_0_xxxxxyy_0, g_0_xxyyz_0_xxxxxyy_1, g_0_xxyyz_0_xxxxyyy_0, g_0_xxyyz_0_xxxxyyy_1, g_0_xxyyz_0_xxxyyyy_0, g_0_xxyyz_0_xxxyyyy_1, g_0_xxyyz_0_xxyyyyy_0, g_0_xxyyz_0_xxyyyyy_1, g_0_xxyyz_0_xyyyyyy_0, g_0_xxyyz_0_xyyyyyy_1, g_0_xxyyzz_0_xxxxxxy_0, g_0_xxyyzz_0_xxxxxxy_1, g_0_xxyyzz_0_xxxxxyy_0, g_0_xxyyzz_0_xxxxxyy_1, g_0_xxyyzz_0_xxxxyyy_0, g_0_xxyyzz_0_xxxxyyy_1, g_0_xxyyzz_0_xxxyyyy_0, g_0_xxyyzz_0_xxxyyyy_1, g_0_xxyyzz_0_xxyyyyy_0, g_0_xxyyzz_0_xxyyyyy_1, g_0_xxyyzz_0_xyyyyyy_0, g_0_xxyyzz_0_xyyyyyy_1, g_0_xxyyzzz_0_xxxxxxx_0, g_0_xxyyzzz_0_xxxxxxy_0, g_0_xxyyzzz_0_xxxxxxz_0, g_0_xxyyzzz_0_xxxxxyy_0, g_0_xxyyzzz_0_xxxxxyz_0, g_0_xxyyzzz_0_xxxxxzz_0, g_0_xxyyzzz_0_xxxxyyy_0, g_0_xxyyzzz_0_xxxxyyz_0, g_0_xxyyzzz_0_xxxxyzz_0, g_0_xxyyzzz_0_xxxxzzz_0, g_0_xxyyzzz_0_xxxyyyy_0, g_0_xxyyzzz_0_xxxyyyz_0, g_0_xxyyzzz_0_xxxyyzz_0, g_0_xxyyzzz_0_xxxyzzz_0, g_0_xxyyzzz_0_xxxzzzz_0, g_0_xxyyzzz_0_xxyyyyy_0, g_0_xxyyzzz_0_xxyyyyz_0, g_0_xxyyzzz_0_xxyyyzz_0, g_0_xxyyzzz_0_xxyyzzz_0, g_0_xxyyzzz_0_xxyzzzz_0, g_0_xxyyzzz_0_xxzzzzz_0, g_0_xxyyzzz_0_xyyyyyy_0, g_0_xxyyzzz_0_xyyyyyz_0, g_0_xxyyzzz_0_xyyyyzz_0, g_0_xxyyzzz_0_xyyyzzz_0, g_0_xxyyzzz_0_xyyzzzz_0, g_0_xxyyzzz_0_xyzzzzz_0, g_0_xxyyzzz_0_xzzzzzz_0, g_0_xxyyzzz_0_yyyyyyy_0, g_0_xxyyzzz_0_yyyyyyz_0, g_0_xxyyzzz_0_yyyyyzz_0, g_0_xxyyzzz_0_yyyyzzz_0, g_0_xxyyzzz_0_yyyzzzz_0, g_0_xxyyzzz_0_yyzzzzz_0, g_0_xxyyzzz_0_yzzzzzz_0, g_0_xxyyzzz_0_zzzzzzz_0, g_0_xxyzzz_0_xxxxxxx_0, g_0_xxyzzz_0_xxxxxxx_1, g_0_xxyzzz_0_xxxxxxz_0, g_0_xxyzzz_0_xxxxxxz_1, g_0_xxyzzz_0_xxxxxzz_0, g_0_xxyzzz_0_xxxxxzz_1, g_0_xxyzzz_0_xxxxzzz_0, g_0_xxyzzz_0_xxxxzzz_1, g_0_xxyzzz_0_xxxzzzz_0, g_0_xxyzzz_0_xxxzzzz_1, g_0_xxyzzz_0_xxzzzzz_0, g_0_xxyzzz_0_xxzzzzz_1, g_0_xxyzzz_0_xzzzzzz_0, g_0_xxyzzz_0_xzzzzzz_1, g_0_xxzzz_0_xxxxxxx_0, g_0_xxzzz_0_xxxxxxx_1, g_0_xxzzz_0_xxxxxxz_0, g_0_xxzzz_0_xxxxxxz_1, g_0_xxzzz_0_xxxxxzz_0, g_0_xxzzz_0_xxxxxzz_1, g_0_xxzzz_0_xxxxzzz_0, g_0_xxzzz_0_xxxxzzz_1, g_0_xxzzz_0_xxxzzzz_0, g_0_xxzzz_0_xxxzzzz_1, g_0_xxzzz_0_xxzzzzz_0, g_0_xxzzz_0_xxzzzzz_1, g_0_xxzzz_0_xzzzzzz_0, g_0_xxzzz_0_xzzzzzz_1, g_0_xyyzzz_0_xxxxxyz_0, g_0_xyyzzz_0_xxxxxyz_1, g_0_xyyzzz_0_xxxxyyz_0, g_0_xyyzzz_0_xxxxyyz_1, g_0_xyyzzz_0_xxxxyz_1, g_0_xyyzzz_0_xxxxyzz_0, g_0_xyyzzz_0_xxxxyzz_1, g_0_xyyzzz_0_xxxyyyz_0, g_0_xyyzzz_0_xxxyyyz_1, g_0_xyyzzz_0_xxxyyz_1, g_0_xyyzzz_0_xxxyyzz_0, g_0_xyyzzz_0_xxxyyzz_1, g_0_xyyzzz_0_xxxyzz_1, g_0_xyyzzz_0_xxxyzzz_0, g_0_xyyzzz_0_xxxyzzz_1, g_0_xyyzzz_0_xxyyyyz_0, g_0_xyyzzz_0_xxyyyyz_1, g_0_xyyzzz_0_xxyyyz_1, g_0_xyyzzz_0_xxyyyzz_0, g_0_xyyzzz_0_xxyyyzz_1, g_0_xyyzzz_0_xxyyzz_1, g_0_xyyzzz_0_xxyyzzz_0, g_0_xyyzzz_0_xxyyzzz_1, g_0_xyyzzz_0_xxyzzz_1, g_0_xyyzzz_0_xxyzzzz_0, g_0_xyyzzz_0_xxyzzzz_1, g_0_xyyzzz_0_xyyyyyz_0, g_0_xyyzzz_0_xyyyyyz_1, g_0_xyyzzz_0_xyyyyz_1, g_0_xyyzzz_0_xyyyyzz_0, g_0_xyyzzz_0_xyyyyzz_1, g_0_xyyzzz_0_xyyyzz_1, g_0_xyyzzz_0_xyyyzzz_0, g_0_xyyzzz_0_xyyyzzz_1, g_0_xyyzzz_0_xyyzzz_1, g_0_xyyzzz_0_xyyzzzz_0, g_0_xyyzzz_0_xyyzzzz_1, g_0_xyyzzz_0_xyzzzz_1, g_0_xyyzzz_0_xyzzzzz_0, g_0_xyyzzz_0_xyzzzzz_1, g_0_xyyzzz_0_yyyyyyy_0, g_0_xyyzzz_0_yyyyyyy_1, g_0_xyyzzz_0_yyyyyyz_0, g_0_xyyzzz_0_yyyyyyz_1, g_0_xyyzzz_0_yyyyyz_1, g_0_xyyzzz_0_yyyyyzz_0, g_0_xyyzzz_0_yyyyyzz_1, g_0_xyyzzz_0_yyyyzz_1, g_0_xyyzzz_0_yyyyzzz_0, g_0_xyyzzz_0_yyyyzzz_1, g_0_xyyzzz_0_yyyzzz_1, g_0_xyyzzz_0_yyyzzzz_0, g_0_xyyzzz_0_yyyzzzz_1, g_0_xyyzzz_0_yyzzzz_1, g_0_xyyzzz_0_yyzzzzz_0, g_0_xyyzzz_0_yyzzzzz_1, g_0_xyyzzz_0_yzzzzz_1, g_0_xyyzzz_0_yzzzzzz_0, g_0_xyyzzz_0_yzzzzzz_1, g_0_xyyzzz_0_zzzzzzz_0, g_0_xyyzzz_0_zzzzzzz_1, g_0_yyzzz_0_xxxxxyz_0, g_0_yyzzz_0_xxxxxyz_1, g_0_yyzzz_0_xxxxyyz_0, g_0_yyzzz_0_xxxxyyz_1, g_0_yyzzz_0_xxxxyzz_0, g_0_yyzzz_0_xxxxyzz_1, g_0_yyzzz_0_xxxyyyz_0, g_0_yyzzz_0_xxxyyyz_1, g_0_yyzzz_0_xxxyyzz_0, g_0_yyzzz_0_xxxyyzz_1, g_0_yyzzz_0_xxxyzzz_0, g_0_yyzzz_0_xxxyzzz_1, g_0_yyzzz_0_xxyyyyz_0, g_0_yyzzz_0_xxyyyyz_1, g_0_yyzzz_0_xxyyyzz_0, g_0_yyzzz_0_xxyyyzz_1, g_0_yyzzz_0_xxyyzzz_0, g_0_yyzzz_0_xxyyzzz_1, g_0_yyzzz_0_xxyzzzz_0, g_0_yyzzz_0_xxyzzzz_1, g_0_yyzzz_0_xyyyyyz_0, g_0_yyzzz_0_xyyyyyz_1, g_0_yyzzz_0_xyyyyzz_0, g_0_yyzzz_0_xyyyyzz_1, g_0_yyzzz_0_xyyyzzz_0, g_0_yyzzz_0_xyyyzzz_1, g_0_yyzzz_0_xyyzzzz_0, g_0_yyzzz_0_xyyzzzz_1, g_0_yyzzz_0_xyzzzzz_0, g_0_yyzzz_0_xyzzzzz_1, g_0_yyzzz_0_yyyyyyy_0, g_0_yyzzz_0_yyyyyyy_1, g_0_yyzzz_0_yyyyyyz_0, g_0_yyzzz_0_yyyyyyz_1, g_0_yyzzz_0_yyyyyzz_0, g_0_yyzzz_0_yyyyyzz_1, g_0_yyzzz_0_yyyyzzz_0, g_0_yyzzz_0_yyyyzzz_1, g_0_yyzzz_0_yyyzzzz_0, g_0_yyzzz_0_yyyzzzz_1, g_0_yyzzz_0_yyzzzzz_0, g_0_yyzzz_0_yyzzzzz_1, g_0_yyzzz_0_yzzzzzz_0, g_0_yyzzz_0_yzzzzzz_1, g_0_yyzzz_0_zzzzzzz_0, g_0_yyzzz_0_zzzzzzz_1, wp_x, wp_y, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -12648,123 +8647,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxyyzzz_0_xxxxxxx_0[i] = g_0_xxzzz_0_xxxxxxx_0[i] * fi_ab_0 - g_0_xxzzz_0_xxxxxxx_1[i] * fti_ab_0 + g_0_xxyzzz_0_xxxxxxx_0[i] * pb_y +
-                                     g_0_xxyzzz_0_xxxxxxx_1[i] * wp_y[i];
+        g_0_xxyyzzz_0_xxxxxxx_0[i] = g_0_xxzzz_0_xxxxxxx_0[i] * fi_ab_0 - g_0_xxzzz_0_xxxxxxx_1[i] * fti_ab_0 + g_0_xxyzzz_0_xxxxxxx_0[i] * pb_y + g_0_xxyzzz_0_xxxxxxx_1[i] * wp_y[i];
 
-        g_0_xxyyzzz_0_xxxxxxy_0[i] = 2.0 * g_0_xxyyz_0_xxxxxxy_0[i] * fi_ab_0 - 2.0 * g_0_xxyyz_0_xxxxxxy_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_xxxxxxy_0[i] * pb_z + g_0_xxyyzz_0_xxxxxxy_1[i] * wp_z[i];
+        g_0_xxyyzzz_0_xxxxxxy_0[i] = 2.0 * g_0_xxyyz_0_xxxxxxy_0[i] * fi_ab_0 - 2.0 * g_0_xxyyz_0_xxxxxxy_1[i] * fti_ab_0 + g_0_xxyyzz_0_xxxxxxy_0[i] * pb_z + g_0_xxyyzz_0_xxxxxxy_1[i] * wp_z[i];
 
-        g_0_xxyyzzz_0_xxxxxxz_0[i] = g_0_xxzzz_0_xxxxxxz_0[i] * fi_ab_0 - g_0_xxzzz_0_xxxxxxz_1[i] * fti_ab_0 + g_0_xxyzzz_0_xxxxxxz_0[i] * pb_y +
-                                     g_0_xxyzzz_0_xxxxxxz_1[i] * wp_y[i];
+        g_0_xxyyzzz_0_xxxxxxz_0[i] = g_0_xxzzz_0_xxxxxxz_0[i] * fi_ab_0 - g_0_xxzzz_0_xxxxxxz_1[i] * fti_ab_0 + g_0_xxyzzz_0_xxxxxxz_0[i] * pb_y + g_0_xxyzzz_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_xxyyzzz_0_xxxxxyy_0[i] = 2.0 * g_0_xxyyz_0_xxxxxyy_0[i] * fi_ab_0 - 2.0 * g_0_xxyyz_0_xxxxxyy_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_xxxxxyy_0[i] * pb_z + g_0_xxyyzz_0_xxxxxyy_1[i] * wp_z[i];
+        g_0_xxyyzzz_0_xxxxxyy_0[i] = 2.0 * g_0_xxyyz_0_xxxxxyy_0[i] * fi_ab_0 - 2.0 * g_0_xxyyz_0_xxxxxyy_1[i] * fti_ab_0 + g_0_xxyyzz_0_xxxxxyy_0[i] * pb_z + g_0_xxyyzz_0_xxxxxyy_1[i] * wp_z[i];
 
-        g_0_xxyyzzz_0_xxxxxyz_0[i] = g_0_yyzzz_0_xxxxxyz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xyyzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxxxxyz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_xxxxxyz_0[i] = g_0_yyzzz_0_xxxxxyz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxxxxyz_1[i] * fti_ab_0 + 5.0 * g_0_xyyzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxxxxyz_0[i] * pb_x + g_0_xyyzzz_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_xxxxxzz_0[i] = g_0_xxzzz_0_xxxxxzz_0[i] * fi_ab_0 - g_0_xxzzz_0_xxxxxzz_1[i] * fti_ab_0 + g_0_xxyzzz_0_xxxxxzz_0[i] * pb_y +
-                                     g_0_xxyzzz_0_xxxxxzz_1[i] * wp_y[i];
+        g_0_xxyyzzz_0_xxxxxzz_0[i] = g_0_xxzzz_0_xxxxxzz_0[i] * fi_ab_0 - g_0_xxzzz_0_xxxxxzz_1[i] * fti_ab_0 + g_0_xxyzzz_0_xxxxxzz_0[i] * pb_y + g_0_xxyzzz_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_xxyyzzz_0_xxxxyyy_0[i] = 2.0 * g_0_xxyyz_0_xxxxyyy_0[i] * fi_ab_0 - 2.0 * g_0_xxyyz_0_xxxxyyy_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_xxxxyyy_0[i] * pb_z + g_0_xxyyzz_0_xxxxyyy_1[i] * wp_z[i];
+        g_0_xxyyzzz_0_xxxxyyy_0[i] = 2.0 * g_0_xxyyz_0_xxxxyyy_0[i] * fi_ab_0 - 2.0 * g_0_xxyyz_0_xxxxyyy_1[i] * fti_ab_0 + g_0_xxyyzz_0_xxxxyyy_0[i] * pb_z + g_0_xxyyzz_0_xxxxyyy_1[i] * wp_z[i];
 
-        g_0_xxyyzzz_0_xxxxyyz_0[i] = g_0_yyzzz_0_xxxxyyz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xyyzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxxxyyz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_xxxxyyz_0[i] = g_0_yyzzz_0_xxxxyyz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxxxyyz_1[i] * fti_ab_0 + 4.0 * g_0_xyyzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxxxyyz_0[i] * pb_x + g_0_xyyzzz_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_xxxxyzz_0[i] = g_0_yyzzz_0_xxxxyzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xyyzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxxxyzz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_xxxxyzz_0[i] = g_0_yyzzz_0_xxxxyzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxxxyzz_1[i] * fti_ab_0 + 4.0 * g_0_xyyzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxxxyzz_0[i] * pb_x + g_0_xyyzzz_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_xxxxzzz_0[i] = g_0_xxzzz_0_xxxxzzz_0[i] * fi_ab_0 - g_0_xxzzz_0_xxxxzzz_1[i] * fti_ab_0 + g_0_xxyzzz_0_xxxxzzz_0[i] * pb_y +
-                                     g_0_xxyzzz_0_xxxxzzz_1[i] * wp_y[i];
+        g_0_xxyyzzz_0_xxxxzzz_0[i] = g_0_xxzzz_0_xxxxzzz_0[i] * fi_ab_0 - g_0_xxzzz_0_xxxxzzz_1[i] * fti_ab_0 + g_0_xxyzzz_0_xxxxzzz_0[i] * pb_y + g_0_xxyzzz_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_xxyyzzz_0_xxxyyyy_0[i] = 2.0 * g_0_xxyyz_0_xxxyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xxyyz_0_xxxyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_xxxyyyy_0[i] * pb_z + g_0_xxyyzz_0_xxxyyyy_1[i] * wp_z[i];
+        g_0_xxyyzzz_0_xxxyyyy_0[i] = 2.0 * g_0_xxyyz_0_xxxyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xxyyz_0_xxxyyyy_1[i] * fti_ab_0 + g_0_xxyyzz_0_xxxyyyy_0[i] * pb_z + g_0_xxyyzz_0_xxxyyyy_1[i] * wp_z[i];
 
-        g_0_xxyyzzz_0_xxxyyyz_0[i] = g_0_yyzzz_0_xxxyyyz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xyyzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxxyyyz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_xxxyyyz_0[i] = g_0_yyzzz_0_xxxyyyz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_xyyzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxxyyyz_0[i] * pb_x + g_0_xyyzzz_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_xxxyyzz_0[i] = g_0_yyzzz_0_xxxyyzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xyyzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxxyyzz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_xxxyyzz_0[i] = g_0_yyzzz_0_xxxyyzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxxyyzz_1[i] * fti_ab_0 + 3.0 * g_0_xyyzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxxyyzz_0[i] * pb_x + g_0_xyyzzz_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_xxxyzzz_0[i] = g_0_yyzzz_0_xxxyzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xyyzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxxyzzz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_xxxyzzz_0[i] = g_0_yyzzz_0_xxxyzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxxyzzz_1[i] * fti_ab_0 + 3.0 * g_0_xyyzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxxyzzz_0[i] * pb_x + g_0_xyyzzz_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_xxxzzzz_0[i] = g_0_xxzzz_0_xxxzzzz_0[i] * fi_ab_0 - g_0_xxzzz_0_xxxzzzz_1[i] * fti_ab_0 + g_0_xxyzzz_0_xxxzzzz_0[i] * pb_y +
-                                     g_0_xxyzzz_0_xxxzzzz_1[i] * wp_y[i];
+        g_0_xxyyzzz_0_xxxzzzz_0[i] = g_0_xxzzz_0_xxxzzzz_0[i] * fi_ab_0 - g_0_xxzzz_0_xxxzzzz_1[i] * fti_ab_0 + g_0_xxyzzz_0_xxxzzzz_0[i] * pb_y + g_0_xxyzzz_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_xxyyzzz_0_xxyyyyy_0[i] = 2.0 * g_0_xxyyz_0_xxyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xxyyz_0_xxyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_xxyyyyy_0[i] * pb_z + g_0_xxyyzz_0_xxyyyyy_1[i] * wp_z[i];
+        g_0_xxyyzzz_0_xxyyyyy_0[i] = 2.0 * g_0_xxyyz_0_xxyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xxyyz_0_xxyyyyy_1[i] * fti_ab_0 + g_0_xxyyzz_0_xxyyyyy_0[i] * pb_z + g_0_xxyyzz_0_xxyyyyy_1[i] * wp_z[i];
 
-        g_0_xxyyzzz_0_xxyyyyz_0[i] = g_0_yyzzz_0_xxyyyyz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xyyzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxyyyyz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_xxyyyyz_0[i] = g_0_yyzzz_0_xxyyyyz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxyyyyz_1[i] * fti_ab_0 + 2.0 * g_0_xyyzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxyyyyz_0[i] * pb_x + g_0_xyyzzz_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_xxyyyzz_0[i] = g_0_yyzzz_0_xxyyyzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xyyzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxyyyzz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_xxyyyzz_0[i] = g_0_yyzzz_0_xxyyyzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxyyyzz_1[i] * fti_ab_0 + 2.0 * g_0_xyyzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxyyyzz_0[i] * pb_x + g_0_xyyzzz_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_xxyyzzz_0[i] = g_0_yyzzz_0_xxyyzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xyyzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxyyzzz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_xxyyzzz_0[i] = g_0_yyzzz_0_xxyyzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_xyyzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxyyzzz_0[i] * pb_x + g_0_xyyzzz_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_xxyzzzz_0[i] = g_0_yyzzz_0_xxyzzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xyyzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxyzzzz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_xxyzzzz_0[i] = g_0_yyzzz_0_xxyzzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xxyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xyyzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xxyzzzz_0[i] * pb_x + g_0_xyyzzz_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_xxzzzzz_0[i] = g_0_xxzzz_0_xxzzzzz_0[i] * fi_ab_0 - g_0_xxzzz_0_xxzzzzz_1[i] * fti_ab_0 + g_0_xxyzzz_0_xxzzzzz_0[i] * pb_y +
-                                     g_0_xxyzzz_0_xxzzzzz_1[i] * wp_y[i];
+        g_0_xxyyzzz_0_xxzzzzz_0[i] = g_0_xxzzz_0_xxzzzzz_0[i] * fi_ab_0 - g_0_xxzzz_0_xxzzzzz_1[i] * fti_ab_0 + g_0_xxyzzz_0_xxzzzzz_0[i] * pb_y + g_0_xxyzzz_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_xxyyzzz_0_xyyyyyy_0[i] = 2.0 * g_0_xxyyz_0_xyyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xxyyz_0_xyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxyyzz_0_xyyyyyy_0[i] * pb_z + g_0_xxyyzz_0_xyyyyyy_1[i] * wp_z[i];
+        g_0_xxyyzzz_0_xyyyyyy_0[i] = 2.0 * g_0_xxyyz_0_xyyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_xxyyz_0_xyyyyyy_1[i] * fti_ab_0 + g_0_xxyyzz_0_xyyyyyy_0[i] * pb_z + g_0_xxyyzz_0_xyyyyyy_1[i] * wp_z[i];
 
-        g_0_xxyyzzz_0_xyyyyyz_0[i] = g_0_yyzzz_0_xyyyyyz_0[i] * fi_ab_0 - g_0_yyzzz_0_xyyyyyz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyyyyz_1[i] * fi_abcd_0 +
-                                     g_0_xyyzzz_0_xyyyyyz_0[i] * pb_x + g_0_xyyzzz_0_xyyyyyz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_xyyyyyz_0[i] = g_0_yyzzz_0_xyyyyyz_0[i] * fi_ab_0 - g_0_yyzzz_0_xyyyyyz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xyyyyyz_0[i] * pb_x + g_0_xyyzzz_0_xyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_xyyyyzz_0[i] = g_0_yyzzz_0_xyyyyzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xyyyyzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyyyzz_1[i] * fi_abcd_0 +
-                                     g_0_xyyzzz_0_xyyyyzz_0[i] * pb_x + g_0_xyyzzz_0_xyyyyzz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_xyyyyzz_0[i] = g_0_yyzzz_0_xyyyyzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xyyyyzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xyyyyzz_0[i] * pb_x + g_0_xyyzzz_0_xyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_xyyyzzz_0[i] = g_0_yyzzz_0_xyyyzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xyyyzzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyyzzz_1[i] * fi_abcd_0 +
-                                     g_0_xyyzzz_0_xyyyzzz_0[i] * pb_x + g_0_xyyzzz_0_xyyyzzz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_xyyyzzz_0[i] = g_0_yyzzz_0_xyyyzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xyyyzzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xyyyzzz_0[i] * pb_x + g_0_xyyzzz_0_xyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_xyyzzzz_0[i] = g_0_yyzzz_0_xyyzzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xyyzzzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyzzzz_1[i] * fi_abcd_0 +
-                                     g_0_xyyzzz_0_xyyzzzz_0[i] * pb_x + g_0_xyyzzz_0_xyyzzzz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_xyyzzzz_0[i] = g_0_yyzzz_0_xyyzzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xyyzzzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xyyzzzz_0[i] * pb_x + g_0_xyyzzz_0_xyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_xyzzzzz_0[i] = g_0_yyzzz_0_xyzzzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xyzzzzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yzzzzz_1[i] * fi_abcd_0 +
-                                     g_0_xyyzzz_0_xyzzzzz_0[i] * pb_x + g_0_xyyzzz_0_xyzzzzz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_xyzzzzz_0[i] = g_0_yyzzz_0_xyzzzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_xyzzzzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xyyzzz_0_xyzzzzz_0[i] * pb_x + g_0_xyyzzz_0_xyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_xzzzzzz_0[i] = g_0_xxzzz_0_xzzzzzz_0[i] * fi_ab_0 - g_0_xxzzz_0_xzzzzzz_1[i] * fti_ab_0 + g_0_xxyzzz_0_xzzzzzz_0[i] * pb_y +
-                                     g_0_xxyzzz_0_xzzzzzz_1[i] * wp_y[i];
+        g_0_xxyyzzz_0_xzzzzzz_0[i] = g_0_xxzzz_0_xzzzzzz_0[i] * fi_ab_0 - g_0_xxzzz_0_xzzzzzz_1[i] * fti_ab_0 + g_0_xxyzzz_0_xzzzzzz_0[i] * pb_y + g_0_xxyzzz_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_xxyyzzz_0_yyyyyyy_0[i] = g_0_yyzzz_0_yyyyyyy_0[i] * fi_ab_0 - g_0_yyzzz_0_yyyyyyy_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyyyyyy_0[i] * pb_x +
-                                     g_0_xyyzzz_0_yyyyyyy_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_yyyyyyy_0[i] = g_0_yyzzz_0_yyyyyyy_0[i] * fi_ab_0 - g_0_yyzzz_0_yyyyyyy_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyyyyyy_0[i] * pb_x + g_0_xyyzzz_0_yyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_yyyyyyz_0[i] = g_0_yyzzz_0_yyyyyyz_0[i] * fi_ab_0 - g_0_yyzzz_0_yyyyyyz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyyyyyz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_yyyyyyz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_yyyyyyz_0[i] = g_0_yyzzz_0_yyyyyyz_0[i] * fi_ab_0 - g_0_yyzzz_0_yyyyyyz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyyyyyz_0[i] * pb_x + g_0_xyyzzz_0_yyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_yyyyyzz_0[i] = g_0_yyzzz_0_yyyyyzz_0[i] * fi_ab_0 - g_0_yyzzz_0_yyyyyzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyyyyzz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_yyyyyzz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_yyyyyzz_0[i] = g_0_yyzzz_0_yyyyyzz_0[i] * fi_ab_0 - g_0_yyzzz_0_yyyyyzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyyyyzz_0[i] * pb_x + g_0_xyyzzz_0_yyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_yyyyzzz_0[i] = g_0_yyzzz_0_yyyyzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_yyyyzzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyyyzzz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_yyyyzzz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_yyyyzzz_0[i] = g_0_yyzzz_0_yyyyzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_yyyyzzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyyyzzz_0[i] * pb_x + g_0_xyyzzz_0_yyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_yyyzzzz_0[i] = g_0_yyzzz_0_yyyzzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_yyyzzzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyyzzzz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_yyyzzzz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_yyyzzzz_0[i] = g_0_yyzzz_0_yyyzzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_yyyzzzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyyzzzz_0[i] * pb_x + g_0_xyyzzz_0_yyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_yyzzzzz_0[i] = g_0_yyzzz_0_yyzzzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_yyzzzzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyzzzzz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_yyzzzzz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_yyzzzzz_0[i] = g_0_yyzzz_0_yyzzzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_yyzzzzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yyzzzzz_0[i] * pb_x + g_0_xyyzzz_0_yyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_yzzzzzz_0[i] = g_0_yyzzz_0_yzzzzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_yzzzzzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yzzzzzz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_yzzzzzz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_yzzzzzz_0[i] = g_0_yyzzz_0_yzzzzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_yzzzzzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_yzzzzzz_0[i] * pb_x + g_0_xyyzzz_0_yzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxyyzzz_0_zzzzzzz_0[i] = g_0_yyzzz_0_zzzzzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_zzzzzzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_zzzzzzz_0[i] * pb_x +
-                                     g_0_xyyzzz_0_zzzzzzz_1[i] * wp_x[i];
+        g_0_xxyyzzz_0_zzzzzzz_0[i] = g_0_yyzzz_0_zzzzzzz_0[i] * fi_ab_0 - g_0_yyzzz_0_zzzzzzz_1[i] * fti_ab_0 + g_0_xyyzzz_0_zzzzzzz_0[i] * pb_x + g_0_xyyzzz_0_zzzzzzz_1[i] * wp_x[i];
     }
 
     /// Set up 684-720 components of targeted buffer : SKSK
@@ -12841,145 +8794,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxyzzzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 719);
 
-#pragma omp simd aligned(g_0_xxyzzzz_0_xxxxxxx_0,     \
-                             g_0_xxyzzzz_0_xxxxxxy_0, \
-                             g_0_xxyzzzz_0_xxxxxxz_0, \
-                             g_0_xxyzzzz_0_xxxxxyy_0, \
-                             g_0_xxyzzzz_0_xxxxxyz_0, \
-                             g_0_xxyzzzz_0_xxxxxzz_0, \
-                             g_0_xxyzzzz_0_xxxxyyy_0, \
-                             g_0_xxyzzzz_0_xxxxyyz_0, \
-                             g_0_xxyzzzz_0_xxxxyzz_0, \
-                             g_0_xxyzzzz_0_xxxxzzz_0, \
-                             g_0_xxyzzzz_0_xxxyyyy_0, \
-                             g_0_xxyzzzz_0_xxxyyyz_0, \
-                             g_0_xxyzzzz_0_xxxyyzz_0, \
-                             g_0_xxyzzzz_0_xxxyzzz_0, \
-                             g_0_xxyzzzz_0_xxxzzzz_0, \
-                             g_0_xxyzzzz_0_xxyyyyy_0, \
-                             g_0_xxyzzzz_0_xxyyyyz_0, \
-                             g_0_xxyzzzz_0_xxyyyzz_0, \
-                             g_0_xxyzzzz_0_xxyyzzz_0, \
-                             g_0_xxyzzzz_0_xxyzzzz_0, \
-                             g_0_xxyzzzz_0_xxzzzzz_0, \
-                             g_0_xxyzzzz_0_xyyyyyy_0, \
-                             g_0_xxyzzzz_0_xyyyyyz_0, \
-                             g_0_xxyzzzz_0_xyyyyzz_0, \
-                             g_0_xxyzzzz_0_xyyyzzz_0, \
-                             g_0_xxyzzzz_0_xyyzzzz_0, \
-                             g_0_xxyzzzz_0_xyzzzzz_0, \
-                             g_0_xxyzzzz_0_xzzzzzz_0, \
-                             g_0_xxyzzzz_0_yyyyyyy_0, \
-                             g_0_xxyzzzz_0_yyyyyyz_0, \
-                             g_0_xxyzzzz_0_yyyyyzz_0, \
-                             g_0_xxyzzzz_0_yyyyzzz_0, \
-                             g_0_xxyzzzz_0_yyyzzzz_0, \
-                             g_0_xxyzzzz_0_yyzzzzz_0, \
-                             g_0_xxyzzzz_0_yzzzzzz_0, \
-                             g_0_xxyzzzz_0_zzzzzzz_0, \
-                             g_0_xxzzzz_0_xxxxxx_1,   \
-                             g_0_xxzzzz_0_xxxxxxx_0,  \
-                             g_0_xxzzzz_0_xxxxxxx_1,  \
-                             g_0_xxzzzz_0_xxxxxxy_0,  \
-                             g_0_xxzzzz_0_xxxxxxy_1,  \
-                             g_0_xxzzzz_0_xxxxxxz_0,  \
-                             g_0_xxzzzz_0_xxxxxxz_1,  \
-                             g_0_xxzzzz_0_xxxxxy_1,   \
-                             g_0_xxzzzz_0_xxxxxyy_0,  \
-                             g_0_xxzzzz_0_xxxxxyy_1,  \
-                             g_0_xxzzzz_0_xxxxxyz_0,  \
-                             g_0_xxzzzz_0_xxxxxyz_1,  \
-                             g_0_xxzzzz_0_xxxxxz_1,   \
-                             g_0_xxzzzz_0_xxxxxzz_0,  \
-                             g_0_xxzzzz_0_xxxxxzz_1,  \
-                             g_0_xxzzzz_0_xxxxyy_1,   \
-                             g_0_xxzzzz_0_xxxxyyy_0,  \
-                             g_0_xxzzzz_0_xxxxyyy_1,  \
-                             g_0_xxzzzz_0_xxxxyyz_0,  \
-                             g_0_xxzzzz_0_xxxxyyz_1,  \
-                             g_0_xxzzzz_0_xxxxyz_1,   \
-                             g_0_xxzzzz_0_xxxxyzz_0,  \
-                             g_0_xxzzzz_0_xxxxyzz_1,  \
-                             g_0_xxzzzz_0_xxxxzz_1,   \
-                             g_0_xxzzzz_0_xxxxzzz_0,  \
-                             g_0_xxzzzz_0_xxxxzzz_1,  \
-                             g_0_xxzzzz_0_xxxyyy_1,   \
-                             g_0_xxzzzz_0_xxxyyyy_0,  \
-                             g_0_xxzzzz_0_xxxyyyy_1,  \
-                             g_0_xxzzzz_0_xxxyyyz_0,  \
-                             g_0_xxzzzz_0_xxxyyyz_1,  \
-                             g_0_xxzzzz_0_xxxyyz_1,   \
-                             g_0_xxzzzz_0_xxxyyzz_0,  \
-                             g_0_xxzzzz_0_xxxyyzz_1,  \
-                             g_0_xxzzzz_0_xxxyzz_1,   \
-                             g_0_xxzzzz_0_xxxyzzz_0,  \
-                             g_0_xxzzzz_0_xxxyzzz_1,  \
-                             g_0_xxzzzz_0_xxxzzz_1,   \
-                             g_0_xxzzzz_0_xxxzzzz_0,  \
-                             g_0_xxzzzz_0_xxxzzzz_1,  \
-                             g_0_xxzzzz_0_xxyyyy_1,   \
-                             g_0_xxzzzz_0_xxyyyyy_0,  \
-                             g_0_xxzzzz_0_xxyyyyy_1,  \
-                             g_0_xxzzzz_0_xxyyyyz_0,  \
-                             g_0_xxzzzz_0_xxyyyyz_1,  \
-                             g_0_xxzzzz_0_xxyyyz_1,   \
-                             g_0_xxzzzz_0_xxyyyzz_0,  \
-                             g_0_xxzzzz_0_xxyyyzz_1,  \
-                             g_0_xxzzzz_0_xxyyzz_1,   \
-                             g_0_xxzzzz_0_xxyyzzz_0,  \
-                             g_0_xxzzzz_0_xxyyzzz_1,  \
-                             g_0_xxzzzz_0_xxyzzz_1,   \
-                             g_0_xxzzzz_0_xxyzzzz_0,  \
-                             g_0_xxzzzz_0_xxyzzzz_1,  \
-                             g_0_xxzzzz_0_xxzzzz_1,   \
-                             g_0_xxzzzz_0_xxzzzzz_0,  \
-                             g_0_xxzzzz_0_xxzzzzz_1,  \
-                             g_0_xxzzzz_0_xyyyyy_1,   \
-                             g_0_xxzzzz_0_xyyyyyy_0,  \
-                             g_0_xxzzzz_0_xyyyyyy_1,  \
-                             g_0_xxzzzz_0_xyyyyyz_0,  \
-                             g_0_xxzzzz_0_xyyyyyz_1,  \
-                             g_0_xxzzzz_0_xyyyyz_1,   \
-                             g_0_xxzzzz_0_xyyyyzz_0,  \
-                             g_0_xxzzzz_0_xyyyyzz_1,  \
-                             g_0_xxzzzz_0_xyyyzz_1,   \
-                             g_0_xxzzzz_0_xyyyzzz_0,  \
-                             g_0_xxzzzz_0_xyyyzzz_1,  \
-                             g_0_xxzzzz_0_xyyzzz_1,   \
-                             g_0_xxzzzz_0_xyyzzzz_0,  \
-                             g_0_xxzzzz_0_xyyzzzz_1,  \
-                             g_0_xxzzzz_0_xyzzzz_1,   \
-                             g_0_xxzzzz_0_xyzzzzz_0,  \
-                             g_0_xxzzzz_0_xyzzzzz_1,  \
-                             g_0_xxzzzz_0_xzzzzz_1,   \
-                             g_0_xxzzzz_0_xzzzzzz_0,  \
-                             g_0_xxzzzz_0_xzzzzzz_1,  \
-                             g_0_xxzzzz_0_yyyyyy_1,   \
-                             g_0_xxzzzz_0_yyyyyyy_0,  \
-                             g_0_xxzzzz_0_yyyyyyy_1,  \
-                             g_0_xxzzzz_0_yyyyyyz_0,  \
-                             g_0_xxzzzz_0_yyyyyyz_1,  \
-                             g_0_xxzzzz_0_yyyyyz_1,   \
-                             g_0_xxzzzz_0_yyyyyzz_0,  \
-                             g_0_xxzzzz_0_yyyyyzz_1,  \
-                             g_0_xxzzzz_0_yyyyzz_1,   \
-                             g_0_xxzzzz_0_yyyyzzz_0,  \
-                             g_0_xxzzzz_0_yyyyzzz_1,  \
-                             g_0_xxzzzz_0_yyyzzz_1,   \
-                             g_0_xxzzzz_0_yyyzzzz_0,  \
-                             g_0_xxzzzz_0_yyyzzzz_1,  \
-                             g_0_xxzzzz_0_yyzzzz_1,   \
-                             g_0_xxzzzz_0_yyzzzzz_0,  \
-                             g_0_xxzzzz_0_yyzzzzz_1,  \
-                             g_0_xxzzzz_0_yzzzzz_1,   \
-                             g_0_xxzzzz_0_yzzzzzz_0,  \
-                             g_0_xxzzzz_0_yzzzzzz_1,  \
-                             g_0_xxzzzz_0_zzzzzz_1,   \
-                             g_0_xxzzzz_0_zzzzzzz_0,  \
-                             g_0_xxzzzz_0_zzzzzzz_1,  \
-                             wp_y,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxyzzzz_0_xxxxxxx_0, g_0_xxyzzzz_0_xxxxxxy_0, g_0_xxyzzzz_0_xxxxxxz_0, g_0_xxyzzzz_0_xxxxxyy_0, g_0_xxyzzzz_0_xxxxxyz_0, g_0_xxyzzzz_0_xxxxxzz_0, g_0_xxyzzzz_0_xxxxyyy_0, g_0_xxyzzzz_0_xxxxyyz_0, g_0_xxyzzzz_0_xxxxyzz_0, g_0_xxyzzzz_0_xxxxzzz_0, g_0_xxyzzzz_0_xxxyyyy_0, g_0_xxyzzzz_0_xxxyyyz_0, g_0_xxyzzzz_0_xxxyyzz_0, g_0_xxyzzzz_0_xxxyzzz_0, g_0_xxyzzzz_0_xxxzzzz_0, g_0_xxyzzzz_0_xxyyyyy_0, g_0_xxyzzzz_0_xxyyyyz_0, g_0_xxyzzzz_0_xxyyyzz_0, g_0_xxyzzzz_0_xxyyzzz_0, g_0_xxyzzzz_0_xxyzzzz_0, g_0_xxyzzzz_0_xxzzzzz_0, g_0_xxyzzzz_0_xyyyyyy_0, g_0_xxyzzzz_0_xyyyyyz_0, g_0_xxyzzzz_0_xyyyyzz_0, g_0_xxyzzzz_0_xyyyzzz_0, g_0_xxyzzzz_0_xyyzzzz_0, g_0_xxyzzzz_0_xyzzzzz_0, g_0_xxyzzzz_0_xzzzzzz_0, g_0_xxyzzzz_0_yyyyyyy_0, g_0_xxyzzzz_0_yyyyyyz_0, g_0_xxyzzzz_0_yyyyyzz_0, g_0_xxyzzzz_0_yyyyzzz_0, g_0_xxyzzzz_0_yyyzzzz_0, g_0_xxyzzzz_0_yyzzzzz_0, g_0_xxyzzzz_0_yzzzzzz_0, g_0_xxyzzzz_0_zzzzzzz_0, g_0_xxzzzz_0_xxxxxx_1, g_0_xxzzzz_0_xxxxxxx_0, g_0_xxzzzz_0_xxxxxxx_1, g_0_xxzzzz_0_xxxxxxy_0, g_0_xxzzzz_0_xxxxxxy_1, g_0_xxzzzz_0_xxxxxxz_0, g_0_xxzzzz_0_xxxxxxz_1, g_0_xxzzzz_0_xxxxxy_1, g_0_xxzzzz_0_xxxxxyy_0, g_0_xxzzzz_0_xxxxxyy_1, g_0_xxzzzz_0_xxxxxyz_0, g_0_xxzzzz_0_xxxxxyz_1, g_0_xxzzzz_0_xxxxxz_1, g_0_xxzzzz_0_xxxxxzz_0, g_0_xxzzzz_0_xxxxxzz_1, g_0_xxzzzz_0_xxxxyy_1, g_0_xxzzzz_0_xxxxyyy_0, g_0_xxzzzz_0_xxxxyyy_1, g_0_xxzzzz_0_xxxxyyz_0, g_0_xxzzzz_0_xxxxyyz_1, g_0_xxzzzz_0_xxxxyz_1, g_0_xxzzzz_0_xxxxyzz_0, g_0_xxzzzz_0_xxxxyzz_1, g_0_xxzzzz_0_xxxxzz_1, g_0_xxzzzz_0_xxxxzzz_0, g_0_xxzzzz_0_xxxxzzz_1, g_0_xxzzzz_0_xxxyyy_1, g_0_xxzzzz_0_xxxyyyy_0, g_0_xxzzzz_0_xxxyyyy_1, g_0_xxzzzz_0_xxxyyyz_0, g_0_xxzzzz_0_xxxyyyz_1, g_0_xxzzzz_0_xxxyyz_1, g_0_xxzzzz_0_xxxyyzz_0, g_0_xxzzzz_0_xxxyyzz_1, g_0_xxzzzz_0_xxxyzz_1, g_0_xxzzzz_0_xxxyzzz_0, g_0_xxzzzz_0_xxxyzzz_1, g_0_xxzzzz_0_xxxzzz_1, g_0_xxzzzz_0_xxxzzzz_0, g_0_xxzzzz_0_xxxzzzz_1, g_0_xxzzzz_0_xxyyyy_1, g_0_xxzzzz_0_xxyyyyy_0, g_0_xxzzzz_0_xxyyyyy_1, g_0_xxzzzz_0_xxyyyyz_0, g_0_xxzzzz_0_xxyyyyz_1, g_0_xxzzzz_0_xxyyyz_1, g_0_xxzzzz_0_xxyyyzz_0, g_0_xxzzzz_0_xxyyyzz_1, g_0_xxzzzz_0_xxyyzz_1, g_0_xxzzzz_0_xxyyzzz_0, g_0_xxzzzz_0_xxyyzzz_1, g_0_xxzzzz_0_xxyzzz_1, g_0_xxzzzz_0_xxyzzzz_0, g_0_xxzzzz_0_xxyzzzz_1, g_0_xxzzzz_0_xxzzzz_1, g_0_xxzzzz_0_xxzzzzz_0, g_0_xxzzzz_0_xxzzzzz_1, g_0_xxzzzz_0_xyyyyy_1, g_0_xxzzzz_0_xyyyyyy_0, g_0_xxzzzz_0_xyyyyyy_1, g_0_xxzzzz_0_xyyyyyz_0, g_0_xxzzzz_0_xyyyyyz_1, g_0_xxzzzz_0_xyyyyz_1, g_0_xxzzzz_0_xyyyyzz_0, g_0_xxzzzz_0_xyyyyzz_1, g_0_xxzzzz_0_xyyyzz_1, g_0_xxzzzz_0_xyyyzzz_0, g_0_xxzzzz_0_xyyyzzz_1, g_0_xxzzzz_0_xyyzzz_1, g_0_xxzzzz_0_xyyzzzz_0, g_0_xxzzzz_0_xyyzzzz_1, g_0_xxzzzz_0_xyzzzz_1, g_0_xxzzzz_0_xyzzzzz_0, g_0_xxzzzz_0_xyzzzzz_1, g_0_xxzzzz_0_xzzzzz_1, g_0_xxzzzz_0_xzzzzzz_0, g_0_xxzzzz_0_xzzzzzz_1, g_0_xxzzzz_0_yyyyyy_1, g_0_xxzzzz_0_yyyyyyy_0, g_0_xxzzzz_0_yyyyyyy_1, g_0_xxzzzz_0_yyyyyyz_0, g_0_xxzzzz_0_yyyyyyz_1, g_0_xxzzzz_0_yyyyyz_1, g_0_xxzzzz_0_yyyyyzz_0, g_0_xxzzzz_0_yyyyyzz_1, g_0_xxzzzz_0_yyyyzz_1, g_0_xxzzzz_0_yyyyzzz_0, g_0_xxzzzz_0_yyyyzzz_1, g_0_xxzzzz_0_yyyzzz_1, g_0_xxzzzz_0_yyyzzzz_0, g_0_xxzzzz_0_yyyzzzz_1, g_0_xxzzzz_0_yyzzzz_1, g_0_xxzzzz_0_yyzzzzz_0, g_0_xxzzzz_0_yyzzzzz_1, g_0_xxzzzz_0_yzzzzz_1, g_0_xxzzzz_0_yzzzzzz_0, g_0_xxzzzz_0_yzzzzzz_1, g_0_xxzzzz_0_zzzzzz_1, g_0_xxzzzz_0_zzzzzzz_0, g_0_xxzzzz_0_zzzzzzz_1, wp_y, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -12990,88 +8805,67 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         g_0_xxyzzzz_0_xxxxxxz_0[i] = g_0_xxzzzz_0_xxxxxxz_0[i] * pb_y + g_0_xxzzzz_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_xxxxxyy_0[i] =
-            2.0 * g_0_xxzzzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxxyy_0[i] * pb_y + g_0_xxzzzz_0_xxxxxyy_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_xxxxxyy_0[i] = 2.0 * g_0_xxzzzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxxyy_0[i] * pb_y + g_0_xxzzzz_0_xxxxxyy_1[i] * wp_y[i];
 
         g_0_xxyzzzz_0_xxxxxyz_0[i] = g_0_xxzzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxxyz_0[i] * pb_y + g_0_xxzzzz_0_xxxxxyz_1[i] * wp_y[i];
 
         g_0_xxyzzzz_0_xxxxxzz_0[i] = g_0_xxzzzz_0_xxxxxzz_0[i] * pb_y + g_0_xxzzzz_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_xxxxyyy_0[i] =
-            3.0 * g_0_xxzzzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxyyy_0[i] * pb_y + g_0_xxzzzz_0_xxxxyyy_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_xxxxyyy_0[i] = 3.0 * g_0_xxzzzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxyyy_0[i] * pb_y + g_0_xxzzzz_0_xxxxyyy_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_xxxxyyz_0[i] =
-            2.0 * g_0_xxzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxyyz_0[i] * pb_y + g_0_xxzzzz_0_xxxxyyz_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_xxxxyyz_0[i] = 2.0 * g_0_xxzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxyyz_0[i] * pb_y + g_0_xxzzzz_0_xxxxyyz_1[i] * wp_y[i];
 
         g_0_xxyzzzz_0_xxxxyzz_0[i] = g_0_xxzzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxxyzz_0[i] * pb_y + g_0_xxzzzz_0_xxxxyzz_1[i] * wp_y[i];
 
         g_0_xxyzzzz_0_xxxxzzz_0[i] = g_0_xxzzzz_0_xxxxzzz_0[i] * pb_y + g_0_xxzzzz_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_xxxyyyy_0[i] =
-            4.0 * g_0_xxzzzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxyyyy_0[i] * pb_y + g_0_xxzzzz_0_xxxyyyy_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_xxxyyyy_0[i] = 4.0 * g_0_xxzzzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxyyyy_0[i] * pb_y + g_0_xxzzzz_0_xxxyyyy_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_xxxyyyz_0[i] =
-            3.0 * g_0_xxzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxyyyz_0[i] * pb_y + g_0_xxzzzz_0_xxxyyyz_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_xxxyyyz_0[i] = 3.0 * g_0_xxzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxyyyz_0[i] * pb_y + g_0_xxzzzz_0_xxxyyyz_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_xxxyyzz_0[i] =
-            2.0 * g_0_xxzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxyyzz_0[i] * pb_y + g_0_xxzzzz_0_xxxyyzz_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_xxxyyzz_0[i] = 2.0 * g_0_xxzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxyyzz_0[i] * pb_y + g_0_xxzzzz_0_xxxyyzz_1[i] * wp_y[i];
 
         g_0_xxyzzzz_0_xxxyzzz_0[i] = g_0_xxzzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxxyzzz_0[i] * pb_y + g_0_xxzzzz_0_xxxyzzz_1[i] * wp_y[i];
 
         g_0_xxyzzzz_0_xxxzzzz_0[i] = g_0_xxzzzz_0_xxxzzzz_0[i] * pb_y + g_0_xxzzzz_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_xxyyyyy_0[i] =
-            5.0 * g_0_xxzzzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyyyyy_0[i] * pb_y + g_0_xxzzzz_0_xxyyyyy_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_xxyyyyy_0[i] = 5.0 * g_0_xxzzzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyyyyy_0[i] * pb_y + g_0_xxzzzz_0_xxyyyyy_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_xxyyyyz_0[i] =
-            4.0 * g_0_xxzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyyyyz_0[i] * pb_y + g_0_xxzzzz_0_xxyyyyz_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_xxyyyyz_0[i] = 4.0 * g_0_xxzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyyyyz_0[i] * pb_y + g_0_xxzzzz_0_xxyyyyz_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_xxyyyzz_0[i] =
-            3.0 * g_0_xxzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyyyzz_0[i] * pb_y + g_0_xxzzzz_0_xxyyyzz_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_xxyyyzz_0[i] = 3.0 * g_0_xxzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyyyzz_0[i] * pb_y + g_0_xxzzzz_0_xxyyyzz_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_xxyyzzz_0[i] =
-            2.0 * g_0_xxzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyyzzz_0[i] * pb_y + g_0_xxzzzz_0_xxyyzzz_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_xxyyzzz_0[i] = 2.0 * g_0_xxzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyyzzz_0[i] * pb_y + g_0_xxzzzz_0_xxyyzzz_1[i] * wp_y[i];
 
         g_0_xxyzzzz_0_xxyzzzz_0[i] = g_0_xxzzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xxyzzzz_0[i] * pb_y + g_0_xxzzzz_0_xxyzzzz_1[i] * wp_y[i];
 
         g_0_xxyzzzz_0_xxzzzzz_0[i] = g_0_xxzzzz_0_xxzzzzz_0[i] * pb_y + g_0_xxzzzz_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_xyyyyyy_0[i] =
-            6.0 * g_0_xxzzzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyyyyy_0[i] * pb_y + g_0_xxzzzz_0_xyyyyyy_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_xyyyyyy_0[i] = 6.0 * g_0_xxzzzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyyyyy_0[i] * pb_y + g_0_xxzzzz_0_xyyyyyy_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_xyyyyyz_0[i] =
-            5.0 * g_0_xxzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyyyyz_0[i] * pb_y + g_0_xxzzzz_0_xyyyyyz_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_xyyyyyz_0[i] = 5.0 * g_0_xxzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyyyyz_0[i] * pb_y + g_0_xxzzzz_0_xyyyyyz_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_xyyyyzz_0[i] =
-            4.0 * g_0_xxzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyyyzz_0[i] * pb_y + g_0_xxzzzz_0_xyyyyzz_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_xyyyyzz_0[i] = 4.0 * g_0_xxzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyyyzz_0[i] * pb_y + g_0_xxzzzz_0_xyyyyzz_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_xyyyzzz_0[i] =
-            3.0 * g_0_xxzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyyzzz_0[i] * pb_y + g_0_xxzzzz_0_xyyyzzz_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_xyyyzzz_0[i] = 3.0 * g_0_xxzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyyzzz_0[i] * pb_y + g_0_xxzzzz_0_xyyyzzz_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_xyyzzzz_0[i] =
-            2.0 * g_0_xxzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyzzzz_0[i] * pb_y + g_0_xxzzzz_0_xyyzzzz_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_xyyzzzz_0[i] = 2.0 * g_0_xxzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyyzzzz_0[i] * pb_y + g_0_xxzzzz_0_xyyzzzz_1[i] * wp_y[i];
 
         g_0_xxyzzzz_0_xyzzzzz_0[i] = g_0_xxzzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_xyzzzzz_0[i] * pb_y + g_0_xxzzzz_0_xyzzzzz_1[i] * wp_y[i];
 
         g_0_xxyzzzz_0_xzzzzzz_0[i] = g_0_xxzzzz_0_xzzzzzz_0[i] * pb_y + g_0_xxzzzz_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_yyyyyyy_0[i] =
-            7.0 * g_0_xxzzzz_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxzzzz_0_yyyyyyy_0[i] * pb_y + g_0_xxzzzz_0_yyyyyyy_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_yyyyyyy_0[i] = 7.0 * g_0_xxzzzz_0_yyyyyy_1[i] * fi_abcd_0 + g_0_xxzzzz_0_yyyyyyy_0[i] * pb_y + g_0_xxzzzz_0_yyyyyyy_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_yyyyyyz_0[i] =
-            6.0 * g_0_xxzzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_yyyyyyz_0[i] * pb_y + g_0_xxzzzz_0_yyyyyyz_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_yyyyyyz_0[i] = 6.0 * g_0_xxzzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_yyyyyyz_0[i] * pb_y + g_0_xxzzzz_0_yyyyyyz_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_yyyyyzz_0[i] =
-            5.0 * g_0_xxzzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_yyyyyzz_0[i] * pb_y + g_0_xxzzzz_0_yyyyyzz_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_yyyyyzz_0[i] = 5.0 * g_0_xxzzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_yyyyyzz_0[i] * pb_y + g_0_xxzzzz_0_yyyyyzz_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_yyyyzzz_0[i] =
-            4.0 * g_0_xxzzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_yyyyzzz_0[i] * pb_y + g_0_xxzzzz_0_yyyyzzz_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_yyyyzzz_0[i] = 4.0 * g_0_xxzzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_yyyyzzz_0[i] * pb_y + g_0_xxzzzz_0_yyyyzzz_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_yyyzzzz_0[i] =
-            3.0 * g_0_xxzzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_yyyzzzz_0[i] * pb_y + g_0_xxzzzz_0_yyyzzzz_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_yyyzzzz_0[i] = 3.0 * g_0_xxzzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_yyyzzzz_0[i] * pb_y + g_0_xxzzzz_0_yyyzzzz_1[i] * wp_y[i];
 
-        g_0_xxyzzzz_0_yyzzzzz_0[i] =
-            2.0 * g_0_xxzzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_yyzzzzz_0[i] * pb_y + g_0_xxzzzz_0_yyzzzzz_1[i] * wp_y[i];
+        g_0_xxyzzzz_0_yyzzzzz_0[i] = 2.0 * g_0_xxzzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_yyzzzzz_0[i] * pb_y + g_0_xxzzzz_0_yyzzzzz_1[i] * wp_y[i];
 
         g_0_xxyzzzz_0_yzzzzzz_0[i] = g_0_xxzzzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xxzzzz_0_yzzzzzz_0[i] * pb_y + g_0_xxzzzz_0_yzzzzzz_1[i] * wp_y[i];
 
@@ -13152,211 +8946,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xxzzzzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 755);
 
-#pragma omp simd aligned(g_0_xxzzz_0_xxxxxxx_0,       \
-                             g_0_xxzzz_0_xxxxxxx_1,   \
-                             g_0_xxzzz_0_xxxxxxy_0,   \
-                             g_0_xxzzz_0_xxxxxxy_1,   \
-                             g_0_xxzzz_0_xxxxxyy_0,   \
-                             g_0_xxzzz_0_xxxxxyy_1,   \
-                             g_0_xxzzz_0_xxxxyyy_0,   \
-                             g_0_xxzzz_0_xxxxyyy_1,   \
-                             g_0_xxzzz_0_xxxyyyy_0,   \
-                             g_0_xxzzz_0_xxxyyyy_1,   \
-                             g_0_xxzzz_0_xxyyyyy_0,   \
-                             g_0_xxzzz_0_xxyyyyy_1,   \
-                             g_0_xxzzz_0_xyyyyyy_0,   \
-                             g_0_xxzzz_0_xyyyyyy_1,   \
-                             g_0_xxzzzz_0_xxxxxxx_0,  \
-                             g_0_xxzzzz_0_xxxxxxx_1,  \
-                             g_0_xxzzzz_0_xxxxxxy_0,  \
-                             g_0_xxzzzz_0_xxxxxxy_1,  \
-                             g_0_xxzzzz_0_xxxxxyy_0,  \
-                             g_0_xxzzzz_0_xxxxxyy_1,  \
-                             g_0_xxzzzz_0_xxxxyyy_0,  \
-                             g_0_xxzzzz_0_xxxxyyy_1,  \
-                             g_0_xxzzzz_0_xxxyyyy_0,  \
-                             g_0_xxzzzz_0_xxxyyyy_1,  \
-                             g_0_xxzzzz_0_xxyyyyy_0,  \
-                             g_0_xxzzzz_0_xxyyyyy_1,  \
-                             g_0_xxzzzz_0_xyyyyyy_0,  \
-                             g_0_xxzzzz_0_xyyyyyy_1,  \
-                             g_0_xxzzzzz_0_xxxxxxx_0, \
-                             g_0_xxzzzzz_0_xxxxxxy_0, \
-                             g_0_xxzzzzz_0_xxxxxxz_0, \
-                             g_0_xxzzzzz_0_xxxxxyy_0, \
-                             g_0_xxzzzzz_0_xxxxxyz_0, \
-                             g_0_xxzzzzz_0_xxxxxzz_0, \
-                             g_0_xxzzzzz_0_xxxxyyy_0, \
-                             g_0_xxzzzzz_0_xxxxyyz_0, \
-                             g_0_xxzzzzz_0_xxxxyzz_0, \
-                             g_0_xxzzzzz_0_xxxxzzz_0, \
-                             g_0_xxzzzzz_0_xxxyyyy_0, \
-                             g_0_xxzzzzz_0_xxxyyyz_0, \
-                             g_0_xxzzzzz_0_xxxyyzz_0, \
-                             g_0_xxzzzzz_0_xxxyzzz_0, \
-                             g_0_xxzzzzz_0_xxxzzzz_0, \
-                             g_0_xxzzzzz_0_xxyyyyy_0, \
-                             g_0_xxzzzzz_0_xxyyyyz_0, \
-                             g_0_xxzzzzz_0_xxyyyzz_0, \
-                             g_0_xxzzzzz_0_xxyyzzz_0, \
-                             g_0_xxzzzzz_0_xxyzzzz_0, \
-                             g_0_xxzzzzz_0_xxzzzzz_0, \
-                             g_0_xxzzzzz_0_xyyyyyy_0, \
-                             g_0_xxzzzzz_0_xyyyyyz_0, \
-                             g_0_xxzzzzz_0_xyyyyzz_0, \
-                             g_0_xxzzzzz_0_xyyyzzz_0, \
-                             g_0_xxzzzzz_0_xyyzzzz_0, \
-                             g_0_xxzzzzz_0_xyzzzzz_0, \
-                             g_0_xxzzzzz_0_xzzzzzz_0, \
-                             g_0_xxzzzzz_0_yyyyyyy_0, \
-                             g_0_xxzzzzz_0_yyyyyyz_0, \
-                             g_0_xxzzzzz_0_yyyyyzz_0, \
-                             g_0_xxzzzzz_0_yyyyzzz_0, \
-                             g_0_xxzzzzz_0_yyyzzzz_0, \
-                             g_0_xxzzzzz_0_yyzzzzz_0, \
-                             g_0_xxzzzzz_0_yzzzzzz_0, \
-                             g_0_xxzzzzz_0_zzzzzzz_0, \
-                             g_0_xzzzzz_0_xxxxxxz_0,  \
-                             g_0_xzzzzz_0_xxxxxxz_1,  \
-                             g_0_xzzzzz_0_xxxxxyz_0,  \
-                             g_0_xzzzzz_0_xxxxxyz_1,  \
-                             g_0_xzzzzz_0_xxxxxz_1,   \
-                             g_0_xzzzzz_0_xxxxxzz_0,  \
-                             g_0_xzzzzz_0_xxxxxzz_1,  \
-                             g_0_xzzzzz_0_xxxxyyz_0,  \
-                             g_0_xzzzzz_0_xxxxyyz_1,  \
-                             g_0_xzzzzz_0_xxxxyz_1,   \
-                             g_0_xzzzzz_0_xxxxyzz_0,  \
-                             g_0_xzzzzz_0_xxxxyzz_1,  \
-                             g_0_xzzzzz_0_xxxxzz_1,   \
-                             g_0_xzzzzz_0_xxxxzzz_0,  \
-                             g_0_xzzzzz_0_xxxxzzz_1,  \
-                             g_0_xzzzzz_0_xxxyyyz_0,  \
-                             g_0_xzzzzz_0_xxxyyyz_1,  \
-                             g_0_xzzzzz_0_xxxyyz_1,   \
-                             g_0_xzzzzz_0_xxxyyzz_0,  \
-                             g_0_xzzzzz_0_xxxyyzz_1,  \
-                             g_0_xzzzzz_0_xxxyzz_1,   \
-                             g_0_xzzzzz_0_xxxyzzz_0,  \
-                             g_0_xzzzzz_0_xxxyzzz_1,  \
-                             g_0_xzzzzz_0_xxxzzz_1,   \
-                             g_0_xzzzzz_0_xxxzzzz_0,  \
-                             g_0_xzzzzz_0_xxxzzzz_1,  \
-                             g_0_xzzzzz_0_xxyyyyz_0,  \
-                             g_0_xzzzzz_0_xxyyyyz_1,  \
-                             g_0_xzzzzz_0_xxyyyz_1,   \
-                             g_0_xzzzzz_0_xxyyyzz_0,  \
-                             g_0_xzzzzz_0_xxyyyzz_1,  \
-                             g_0_xzzzzz_0_xxyyzz_1,   \
-                             g_0_xzzzzz_0_xxyyzzz_0,  \
-                             g_0_xzzzzz_0_xxyyzzz_1,  \
-                             g_0_xzzzzz_0_xxyzzz_1,   \
-                             g_0_xzzzzz_0_xxyzzzz_0,  \
-                             g_0_xzzzzz_0_xxyzzzz_1,  \
-                             g_0_xzzzzz_0_xxzzzz_1,   \
-                             g_0_xzzzzz_0_xxzzzzz_0,  \
-                             g_0_xzzzzz_0_xxzzzzz_1,  \
-                             g_0_xzzzzz_0_xyyyyyz_0,  \
-                             g_0_xzzzzz_0_xyyyyyz_1,  \
-                             g_0_xzzzzz_0_xyyyyz_1,   \
-                             g_0_xzzzzz_0_xyyyyzz_0,  \
-                             g_0_xzzzzz_0_xyyyyzz_1,  \
-                             g_0_xzzzzz_0_xyyyzz_1,   \
-                             g_0_xzzzzz_0_xyyyzzz_0,  \
-                             g_0_xzzzzz_0_xyyyzzz_1,  \
-                             g_0_xzzzzz_0_xyyzzz_1,   \
-                             g_0_xzzzzz_0_xyyzzzz_0,  \
-                             g_0_xzzzzz_0_xyyzzzz_1,  \
-                             g_0_xzzzzz_0_xyzzzz_1,   \
-                             g_0_xzzzzz_0_xyzzzzz_0,  \
-                             g_0_xzzzzz_0_xyzzzzz_1,  \
-                             g_0_xzzzzz_0_xzzzzz_1,   \
-                             g_0_xzzzzz_0_xzzzzzz_0,  \
-                             g_0_xzzzzz_0_xzzzzzz_1,  \
-                             g_0_xzzzzz_0_yyyyyyy_0,  \
-                             g_0_xzzzzz_0_yyyyyyy_1,  \
-                             g_0_xzzzzz_0_yyyyyyz_0,  \
-                             g_0_xzzzzz_0_yyyyyyz_1,  \
-                             g_0_xzzzzz_0_yyyyyz_1,   \
-                             g_0_xzzzzz_0_yyyyyzz_0,  \
-                             g_0_xzzzzz_0_yyyyyzz_1,  \
-                             g_0_xzzzzz_0_yyyyzz_1,   \
-                             g_0_xzzzzz_0_yyyyzzz_0,  \
-                             g_0_xzzzzz_0_yyyyzzz_1,  \
-                             g_0_xzzzzz_0_yyyzzz_1,   \
-                             g_0_xzzzzz_0_yyyzzzz_0,  \
-                             g_0_xzzzzz_0_yyyzzzz_1,  \
-                             g_0_xzzzzz_0_yyzzzz_1,   \
-                             g_0_xzzzzz_0_yyzzzzz_0,  \
-                             g_0_xzzzzz_0_yyzzzzz_1,  \
-                             g_0_xzzzzz_0_yzzzzz_1,   \
-                             g_0_xzzzzz_0_yzzzzzz_0,  \
-                             g_0_xzzzzz_0_yzzzzzz_1,  \
-                             g_0_xzzzzz_0_zzzzzz_1,   \
-                             g_0_xzzzzz_0_zzzzzzz_0,  \
-                             g_0_xzzzzz_0_zzzzzzz_1,  \
-                             g_0_zzzzz_0_xxxxxxz_0,   \
-                             g_0_zzzzz_0_xxxxxxz_1,   \
-                             g_0_zzzzz_0_xxxxxyz_0,   \
-                             g_0_zzzzz_0_xxxxxyz_1,   \
-                             g_0_zzzzz_0_xxxxxzz_0,   \
-                             g_0_zzzzz_0_xxxxxzz_1,   \
-                             g_0_zzzzz_0_xxxxyyz_0,   \
-                             g_0_zzzzz_0_xxxxyyz_1,   \
-                             g_0_zzzzz_0_xxxxyzz_0,   \
-                             g_0_zzzzz_0_xxxxyzz_1,   \
-                             g_0_zzzzz_0_xxxxzzz_0,   \
-                             g_0_zzzzz_0_xxxxzzz_1,   \
-                             g_0_zzzzz_0_xxxyyyz_0,   \
-                             g_0_zzzzz_0_xxxyyyz_1,   \
-                             g_0_zzzzz_0_xxxyyzz_0,   \
-                             g_0_zzzzz_0_xxxyyzz_1,   \
-                             g_0_zzzzz_0_xxxyzzz_0,   \
-                             g_0_zzzzz_0_xxxyzzz_1,   \
-                             g_0_zzzzz_0_xxxzzzz_0,   \
-                             g_0_zzzzz_0_xxxzzzz_1,   \
-                             g_0_zzzzz_0_xxyyyyz_0,   \
-                             g_0_zzzzz_0_xxyyyyz_1,   \
-                             g_0_zzzzz_0_xxyyyzz_0,   \
-                             g_0_zzzzz_0_xxyyyzz_1,   \
-                             g_0_zzzzz_0_xxyyzzz_0,   \
-                             g_0_zzzzz_0_xxyyzzz_1,   \
-                             g_0_zzzzz_0_xxyzzzz_0,   \
-                             g_0_zzzzz_0_xxyzzzz_1,   \
-                             g_0_zzzzz_0_xxzzzzz_0,   \
-                             g_0_zzzzz_0_xxzzzzz_1,   \
-                             g_0_zzzzz_0_xyyyyyz_0,   \
-                             g_0_zzzzz_0_xyyyyyz_1,   \
-                             g_0_zzzzz_0_xyyyyzz_0,   \
-                             g_0_zzzzz_0_xyyyyzz_1,   \
-                             g_0_zzzzz_0_xyyyzzz_0,   \
-                             g_0_zzzzz_0_xyyyzzz_1,   \
-                             g_0_zzzzz_0_xyyzzzz_0,   \
-                             g_0_zzzzz_0_xyyzzzz_1,   \
-                             g_0_zzzzz_0_xyzzzzz_0,   \
-                             g_0_zzzzz_0_xyzzzzz_1,   \
-                             g_0_zzzzz_0_xzzzzzz_0,   \
-                             g_0_zzzzz_0_xzzzzzz_1,   \
-                             g_0_zzzzz_0_yyyyyyy_0,   \
-                             g_0_zzzzz_0_yyyyyyy_1,   \
-                             g_0_zzzzz_0_yyyyyyz_0,   \
-                             g_0_zzzzz_0_yyyyyyz_1,   \
-                             g_0_zzzzz_0_yyyyyzz_0,   \
-                             g_0_zzzzz_0_yyyyyzz_1,   \
-                             g_0_zzzzz_0_yyyyzzz_0,   \
-                             g_0_zzzzz_0_yyyyzzz_1,   \
-                             g_0_zzzzz_0_yyyzzzz_0,   \
-                             g_0_zzzzz_0_yyyzzzz_1,   \
-                             g_0_zzzzz_0_yyzzzzz_0,   \
-                             g_0_zzzzz_0_yyzzzzz_1,   \
-                             g_0_zzzzz_0_yzzzzzz_0,   \
-                             g_0_zzzzz_0_yzzzzzz_1,   \
-                             g_0_zzzzz_0_zzzzzzz_0,   \
-                             g_0_zzzzz_0_zzzzzzz_1,   \
-                             wp_x,                    \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xxzzz_0_xxxxxxx_0, g_0_xxzzz_0_xxxxxxx_1, g_0_xxzzz_0_xxxxxxy_0, g_0_xxzzz_0_xxxxxxy_1, g_0_xxzzz_0_xxxxxyy_0, g_0_xxzzz_0_xxxxxyy_1, g_0_xxzzz_0_xxxxyyy_0, g_0_xxzzz_0_xxxxyyy_1, g_0_xxzzz_0_xxxyyyy_0, g_0_xxzzz_0_xxxyyyy_1, g_0_xxzzz_0_xxyyyyy_0, g_0_xxzzz_0_xxyyyyy_1, g_0_xxzzz_0_xyyyyyy_0, g_0_xxzzz_0_xyyyyyy_1, g_0_xxzzzz_0_xxxxxxx_0, g_0_xxzzzz_0_xxxxxxx_1, g_0_xxzzzz_0_xxxxxxy_0, g_0_xxzzzz_0_xxxxxxy_1, g_0_xxzzzz_0_xxxxxyy_0, g_0_xxzzzz_0_xxxxxyy_1, g_0_xxzzzz_0_xxxxyyy_0, g_0_xxzzzz_0_xxxxyyy_1, g_0_xxzzzz_0_xxxyyyy_0, g_0_xxzzzz_0_xxxyyyy_1, g_0_xxzzzz_0_xxyyyyy_0, g_0_xxzzzz_0_xxyyyyy_1, g_0_xxzzzz_0_xyyyyyy_0, g_0_xxzzzz_0_xyyyyyy_1, g_0_xxzzzzz_0_xxxxxxx_0, g_0_xxzzzzz_0_xxxxxxy_0, g_0_xxzzzzz_0_xxxxxxz_0, g_0_xxzzzzz_0_xxxxxyy_0, g_0_xxzzzzz_0_xxxxxyz_0, g_0_xxzzzzz_0_xxxxxzz_0, g_0_xxzzzzz_0_xxxxyyy_0, g_0_xxzzzzz_0_xxxxyyz_0, g_0_xxzzzzz_0_xxxxyzz_0, g_0_xxzzzzz_0_xxxxzzz_0, g_0_xxzzzzz_0_xxxyyyy_0, g_0_xxzzzzz_0_xxxyyyz_0, g_0_xxzzzzz_0_xxxyyzz_0, g_0_xxzzzzz_0_xxxyzzz_0, g_0_xxzzzzz_0_xxxzzzz_0, g_0_xxzzzzz_0_xxyyyyy_0, g_0_xxzzzzz_0_xxyyyyz_0, g_0_xxzzzzz_0_xxyyyzz_0, g_0_xxzzzzz_0_xxyyzzz_0, g_0_xxzzzzz_0_xxyzzzz_0, g_0_xxzzzzz_0_xxzzzzz_0, g_0_xxzzzzz_0_xyyyyyy_0, g_0_xxzzzzz_0_xyyyyyz_0, g_0_xxzzzzz_0_xyyyyzz_0, g_0_xxzzzzz_0_xyyyzzz_0, g_0_xxzzzzz_0_xyyzzzz_0, g_0_xxzzzzz_0_xyzzzzz_0, g_0_xxzzzzz_0_xzzzzzz_0, g_0_xxzzzzz_0_yyyyyyy_0, g_0_xxzzzzz_0_yyyyyyz_0, g_0_xxzzzzz_0_yyyyyzz_0, g_0_xxzzzzz_0_yyyyzzz_0, g_0_xxzzzzz_0_yyyzzzz_0, g_0_xxzzzzz_0_yyzzzzz_0, g_0_xxzzzzz_0_yzzzzzz_0, g_0_xxzzzzz_0_zzzzzzz_0, g_0_xzzzzz_0_xxxxxxz_0, g_0_xzzzzz_0_xxxxxxz_1, g_0_xzzzzz_0_xxxxxyz_0, g_0_xzzzzz_0_xxxxxyz_1, g_0_xzzzzz_0_xxxxxz_1, g_0_xzzzzz_0_xxxxxzz_0, g_0_xzzzzz_0_xxxxxzz_1, g_0_xzzzzz_0_xxxxyyz_0, g_0_xzzzzz_0_xxxxyyz_1, g_0_xzzzzz_0_xxxxyz_1, g_0_xzzzzz_0_xxxxyzz_0, g_0_xzzzzz_0_xxxxyzz_1, g_0_xzzzzz_0_xxxxzz_1, g_0_xzzzzz_0_xxxxzzz_0, g_0_xzzzzz_0_xxxxzzz_1, g_0_xzzzzz_0_xxxyyyz_0, g_0_xzzzzz_0_xxxyyyz_1, g_0_xzzzzz_0_xxxyyz_1, g_0_xzzzzz_0_xxxyyzz_0, g_0_xzzzzz_0_xxxyyzz_1, g_0_xzzzzz_0_xxxyzz_1, g_0_xzzzzz_0_xxxyzzz_0, g_0_xzzzzz_0_xxxyzzz_1, g_0_xzzzzz_0_xxxzzz_1, g_0_xzzzzz_0_xxxzzzz_0, g_0_xzzzzz_0_xxxzzzz_1, g_0_xzzzzz_0_xxyyyyz_0, g_0_xzzzzz_0_xxyyyyz_1, g_0_xzzzzz_0_xxyyyz_1, g_0_xzzzzz_0_xxyyyzz_0, g_0_xzzzzz_0_xxyyyzz_1, g_0_xzzzzz_0_xxyyzz_1, g_0_xzzzzz_0_xxyyzzz_0, g_0_xzzzzz_0_xxyyzzz_1, g_0_xzzzzz_0_xxyzzz_1, g_0_xzzzzz_0_xxyzzzz_0, g_0_xzzzzz_0_xxyzzzz_1, g_0_xzzzzz_0_xxzzzz_1, g_0_xzzzzz_0_xxzzzzz_0, g_0_xzzzzz_0_xxzzzzz_1, g_0_xzzzzz_0_xyyyyyz_0, g_0_xzzzzz_0_xyyyyyz_1, g_0_xzzzzz_0_xyyyyz_1, g_0_xzzzzz_0_xyyyyzz_0, g_0_xzzzzz_0_xyyyyzz_1, g_0_xzzzzz_0_xyyyzz_1, g_0_xzzzzz_0_xyyyzzz_0, g_0_xzzzzz_0_xyyyzzz_1, g_0_xzzzzz_0_xyyzzz_1, g_0_xzzzzz_0_xyyzzzz_0, g_0_xzzzzz_0_xyyzzzz_1, g_0_xzzzzz_0_xyzzzz_1, g_0_xzzzzz_0_xyzzzzz_0, g_0_xzzzzz_0_xyzzzzz_1, g_0_xzzzzz_0_xzzzzz_1, g_0_xzzzzz_0_xzzzzzz_0, g_0_xzzzzz_0_xzzzzzz_1, g_0_xzzzzz_0_yyyyyyy_0, g_0_xzzzzz_0_yyyyyyy_1, g_0_xzzzzz_0_yyyyyyz_0, g_0_xzzzzz_0_yyyyyyz_1, g_0_xzzzzz_0_yyyyyz_1, g_0_xzzzzz_0_yyyyyzz_0, g_0_xzzzzz_0_yyyyyzz_1, g_0_xzzzzz_0_yyyyzz_1, g_0_xzzzzz_0_yyyyzzz_0, g_0_xzzzzz_0_yyyyzzz_1, g_0_xzzzzz_0_yyyzzz_1, g_0_xzzzzz_0_yyyzzzz_0, g_0_xzzzzz_0_yyyzzzz_1, g_0_xzzzzz_0_yyzzzz_1, g_0_xzzzzz_0_yyzzzzz_0, g_0_xzzzzz_0_yyzzzzz_1, g_0_xzzzzz_0_yzzzzz_1, g_0_xzzzzz_0_yzzzzzz_0, g_0_xzzzzz_0_yzzzzzz_1, g_0_xzzzzz_0_zzzzzz_1, g_0_xzzzzz_0_zzzzzzz_0, g_0_xzzzzz_0_zzzzzzz_1, g_0_zzzzz_0_xxxxxxz_0, g_0_zzzzz_0_xxxxxxz_1, g_0_zzzzz_0_xxxxxyz_0, g_0_zzzzz_0_xxxxxyz_1, g_0_zzzzz_0_xxxxxzz_0, g_0_zzzzz_0_xxxxxzz_1, g_0_zzzzz_0_xxxxyyz_0, g_0_zzzzz_0_xxxxyyz_1, g_0_zzzzz_0_xxxxyzz_0, g_0_zzzzz_0_xxxxyzz_1, g_0_zzzzz_0_xxxxzzz_0, g_0_zzzzz_0_xxxxzzz_1, g_0_zzzzz_0_xxxyyyz_0, g_0_zzzzz_0_xxxyyyz_1, g_0_zzzzz_0_xxxyyzz_0, g_0_zzzzz_0_xxxyyzz_1, g_0_zzzzz_0_xxxyzzz_0, g_0_zzzzz_0_xxxyzzz_1, g_0_zzzzz_0_xxxzzzz_0, g_0_zzzzz_0_xxxzzzz_1, g_0_zzzzz_0_xxyyyyz_0, g_0_zzzzz_0_xxyyyyz_1, g_0_zzzzz_0_xxyyyzz_0, g_0_zzzzz_0_xxyyyzz_1, g_0_zzzzz_0_xxyyzzz_0, g_0_zzzzz_0_xxyyzzz_1, g_0_zzzzz_0_xxyzzzz_0, g_0_zzzzz_0_xxyzzzz_1, g_0_zzzzz_0_xxzzzzz_0, g_0_zzzzz_0_xxzzzzz_1, g_0_zzzzz_0_xyyyyyz_0, g_0_zzzzz_0_xyyyyyz_1, g_0_zzzzz_0_xyyyyzz_0, g_0_zzzzz_0_xyyyyzz_1, g_0_zzzzz_0_xyyyzzz_0, g_0_zzzzz_0_xyyyzzz_1, g_0_zzzzz_0_xyyzzzz_0, g_0_zzzzz_0_xyyzzzz_1, g_0_zzzzz_0_xyzzzzz_0, g_0_zzzzz_0_xyzzzzz_1, g_0_zzzzz_0_xzzzzzz_0, g_0_zzzzz_0_xzzzzzz_1, g_0_zzzzz_0_yyyyyyy_0, g_0_zzzzz_0_yyyyyyy_1, g_0_zzzzz_0_yyyyyyz_0, g_0_zzzzz_0_yyyyyyz_1, g_0_zzzzz_0_yyyyyzz_0, g_0_zzzzz_0_yyyyyzz_1, g_0_zzzzz_0_yyyyzzz_0, g_0_zzzzz_0_yyyyzzz_1, g_0_zzzzz_0_yyyzzzz_0, g_0_zzzzz_0_yyyzzzz_1, g_0_zzzzz_0_yyzzzzz_0, g_0_zzzzz_0_yyzzzzz_1, g_0_zzzzz_0_yzzzzzz_0, g_0_zzzzz_0_yzzzzzz_1, g_0_zzzzz_0_zzzzzzz_0, g_0_zzzzz_0_zzzzzzz_1, wp_x, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -13365,128 +8955,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxzzzzz_0_xxxxxxx_0[i] = 4.0 * g_0_xxzzz_0_xxxxxxx_0[i] * fi_ab_0 - 4.0 * g_0_xxzzz_0_xxxxxxx_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_xxxxxxx_0[i] * pb_z + g_0_xxzzzz_0_xxxxxxx_1[i] * wp_z[i];
+        g_0_xxzzzzz_0_xxxxxxx_0[i] = 4.0 * g_0_xxzzz_0_xxxxxxx_0[i] * fi_ab_0 - 4.0 * g_0_xxzzz_0_xxxxxxx_1[i] * fti_ab_0 + g_0_xxzzzz_0_xxxxxxx_0[i] * pb_z + g_0_xxzzzz_0_xxxxxxx_1[i] * wp_z[i];
 
-        g_0_xxzzzzz_0_xxxxxxy_0[i] = 4.0 * g_0_xxzzz_0_xxxxxxy_0[i] * fi_ab_0 - 4.0 * g_0_xxzzz_0_xxxxxxy_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_xxxxxxy_0[i] * pb_z + g_0_xxzzzz_0_xxxxxxy_1[i] * wp_z[i];
+        g_0_xxzzzzz_0_xxxxxxy_0[i] = 4.0 * g_0_xxzzz_0_xxxxxxy_0[i] * fi_ab_0 - 4.0 * g_0_xxzzz_0_xxxxxxy_1[i] * fti_ab_0 + g_0_xxzzzz_0_xxxxxxy_0[i] * pb_z + g_0_xxzzzz_0_xxxxxxy_1[i] * wp_z[i];
 
-        g_0_xxzzzzz_0_xxxxxxz_0[i] = g_0_zzzzz_0_xxxxxxz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxxxz_1[i] * fti_ab_0 +
-                                     6.0 * g_0_xzzzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxxxxz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_xxxxxxz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xxxxxxz_0[i] = g_0_zzzzz_0_xxxxxxz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxxxz_1[i] * fti_ab_0 + 6.0 * g_0_xzzzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxxxxz_0[i] * pb_x + g_0_xzzzzz_0_xxxxxxz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xxxxxyy_0[i] = 4.0 * g_0_xxzzz_0_xxxxxyy_0[i] * fi_ab_0 - 4.0 * g_0_xxzzz_0_xxxxxyy_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_xxxxxyy_0[i] * pb_z + g_0_xxzzzz_0_xxxxxyy_1[i] * wp_z[i];
+        g_0_xxzzzzz_0_xxxxxyy_0[i] = 4.0 * g_0_xxzzz_0_xxxxxyy_0[i] * fi_ab_0 - 4.0 * g_0_xxzzz_0_xxxxxyy_1[i] * fti_ab_0 + g_0_xxzzzz_0_xxxxxyy_0[i] * pb_z + g_0_xxzzzz_0_xxxxxyy_1[i] * wp_z[i];
 
-        g_0_xxzzzzz_0_xxxxxyz_0[i] = g_0_zzzzz_0_xxxxxyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xzzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxxxyz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xxxxxyz_0[i] = g_0_zzzzz_0_xxxxxyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxxyz_1[i] * fti_ab_0 + 5.0 * g_0_xzzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxxxyz_0[i] * pb_x + g_0_xzzzzz_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xxxxxzz_0[i] = g_0_zzzzz_0_xxxxxzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxxzz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_xzzzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxxxzz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_xxxxxzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xxxxxzz_0[i] = g_0_zzzzz_0_xxxxxzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxxzz_1[i] * fti_ab_0 + 5.0 * g_0_xzzzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxxxzz_0[i] * pb_x + g_0_xzzzzz_0_xxxxxzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xxxxyyy_0[i] = 4.0 * g_0_xxzzz_0_xxxxyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxzzz_0_xxxxyyy_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_xxxxyyy_0[i] * pb_z + g_0_xxzzzz_0_xxxxyyy_1[i] * wp_z[i];
+        g_0_xxzzzzz_0_xxxxyyy_0[i] = 4.0 * g_0_xxzzz_0_xxxxyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxzzz_0_xxxxyyy_1[i] * fti_ab_0 + g_0_xxzzzz_0_xxxxyyy_0[i] * pb_z + g_0_xxzzzz_0_xxxxyyy_1[i] * wp_z[i];
 
-        g_0_xxzzzzz_0_xxxxyyz_0[i] = g_0_zzzzz_0_xxxxyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xzzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxxyyz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xxxxyyz_0[i] = g_0_zzzzz_0_xxxxyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxyyz_1[i] * fti_ab_0 + 4.0 * g_0_xzzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxxyyz_0[i] * pb_x + g_0_xzzzzz_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xxxxyzz_0[i] = g_0_zzzzz_0_xxxxyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xzzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxxyzz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xxxxyzz_0[i] = g_0_zzzzz_0_xxxxyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxyzz_1[i] * fti_ab_0 + 4.0 * g_0_xzzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxxyzz_0[i] * pb_x + g_0_xzzzzz_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xxxxzzz_0[i] = g_0_zzzzz_0_xxxxzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxzzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_xzzzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxxzzz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_xxxxzzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xxxxzzz_0[i] = g_0_zzzzz_0_xxxxzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxzzz_1[i] * fti_ab_0 + 4.0 * g_0_xzzzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxxzzz_0[i] * pb_x + g_0_xzzzzz_0_xxxxzzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xxxyyyy_0[i] = 4.0 * g_0_xxzzz_0_xxxyyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxzzz_0_xxxyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_xxxyyyy_0[i] * pb_z + g_0_xxzzzz_0_xxxyyyy_1[i] * wp_z[i];
+        g_0_xxzzzzz_0_xxxyyyy_0[i] = 4.0 * g_0_xxzzz_0_xxxyyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxzzz_0_xxxyyyy_1[i] * fti_ab_0 + g_0_xxzzzz_0_xxxyyyy_0[i] * pb_z + g_0_xxzzzz_0_xxxyyyy_1[i] * wp_z[i];
 
-        g_0_xxzzzzz_0_xxxyyyz_0[i] = g_0_zzzzz_0_xxxyyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xzzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxyyyz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xxxyyyz_0[i] = g_0_zzzzz_0_xxxyyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_xzzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxyyyz_0[i] * pb_x + g_0_xzzzzz_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xxxyyzz_0[i] = g_0_zzzzz_0_xxxyyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xzzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxyyzz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xxxyyzz_0[i] = g_0_zzzzz_0_xxxyyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxyyzz_1[i] * fti_ab_0 + 3.0 * g_0_xzzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxyyzz_0[i] * pb_x + g_0_xzzzzz_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xxxyzzz_0[i] = g_0_zzzzz_0_xxxyzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xzzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxyzzz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xxxyzzz_0[i] = g_0_zzzzz_0_xxxyzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxyzzz_1[i] * fti_ab_0 + 3.0 * g_0_xzzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxyzzz_0[i] * pb_x + g_0_xzzzzz_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xxxzzzz_0[i] = g_0_zzzzz_0_xxxzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxzzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_xzzzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxzzzz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_xxxzzzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xxxzzzz_0[i] = g_0_zzzzz_0_xxxzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxzzzz_1[i] * fti_ab_0 + 3.0 * g_0_xzzzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxxzzzz_0[i] * pb_x + g_0_xzzzzz_0_xxxzzzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xxyyyyy_0[i] = 4.0 * g_0_xxzzz_0_xxyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxzzz_0_xxyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_xxyyyyy_0[i] * pb_z + g_0_xxzzzz_0_xxyyyyy_1[i] * wp_z[i];
+        g_0_xxzzzzz_0_xxyyyyy_0[i] = 4.0 * g_0_xxzzz_0_xxyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxzzz_0_xxyyyyy_1[i] * fti_ab_0 + g_0_xxzzzz_0_xxyyyyy_0[i] * pb_z + g_0_xxzzzz_0_xxyyyyy_1[i] * wp_z[i];
 
-        g_0_xxzzzzz_0_xxyyyyz_0[i] = g_0_zzzzz_0_xxyyyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xzzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxyyyyz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xxyyyyz_0[i] = g_0_zzzzz_0_xxyyyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxyyyyz_1[i] * fti_ab_0 + 2.0 * g_0_xzzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxyyyyz_0[i] * pb_x + g_0_xzzzzz_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xxyyyzz_0[i] = g_0_zzzzz_0_xxyyyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xzzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxyyyzz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xxyyyzz_0[i] = g_0_zzzzz_0_xxyyyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxyyyzz_1[i] * fti_ab_0 + 2.0 * g_0_xzzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxyyyzz_0[i] * pb_x + g_0_xzzzzz_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xxyyzzz_0[i] = g_0_zzzzz_0_xxyyzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xzzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxyyzzz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xxyyzzz_0[i] = g_0_zzzzz_0_xxyyzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_xzzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxyyzzz_0[i] * pb_x + g_0_xzzzzz_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xxyzzzz_0[i] = g_0_zzzzz_0_xxyzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xzzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxyzzzz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xxyzzzz_0[i] = g_0_zzzzz_0_xxyzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xzzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxyzzzz_0[i] * pb_x + g_0_xzzzzz_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xxzzzzz_0[i] = g_0_zzzzz_0_xxzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxzzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_xzzzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxzzzzz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_xxzzzzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xxzzzzz_0[i] = g_0_zzzzz_0_xxzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxzzzzz_1[i] * fti_ab_0 + 2.0 * g_0_xzzzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xxzzzzz_0[i] * pb_x + g_0_xzzzzz_0_xxzzzzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xyyyyyy_0[i] = 4.0 * g_0_xxzzz_0_xyyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxzzz_0_xyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_xxzzzz_0_xyyyyyy_0[i] * pb_z + g_0_xxzzzz_0_xyyyyyy_1[i] * wp_z[i];
+        g_0_xxzzzzz_0_xyyyyyy_0[i] = 4.0 * g_0_xxzzz_0_xyyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_xxzzz_0_xyyyyyy_1[i] * fti_ab_0 + g_0_xxzzzz_0_xyyyyyy_0[i] * pb_z + g_0_xxzzzz_0_xyyyyyy_1[i] * wp_z[i];
 
-        g_0_xxzzzzz_0_xyyyyyz_0[i] = g_0_zzzzz_0_xyyyyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyyyyyz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyyyyz_1[i] * fi_abcd_0 +
-                                     g_0_xzzzzz_0_xyyyyyz_0[i] * pb_x + g_0_xzzzzz_0_xyyyyyz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xyyyyyz_0[i] = g_0_zzzzz_0_xyyyyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyyyyyz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xyyyyyz_0[i] * pb_x + g_0_xzzzzz_0_xyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xyyyyzz_0[i] = g_0_zzzzz_0_xyyyyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyyyyzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyyyzz_1[i] * fi_abcd_0 +
-                                     g_0_xzzzzz_0_xyyyyzz_0[i] * pb_x + g_0_xzzzzz_0_xyyyyzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xyyyyzz_0[i] = g_0_zzzzz_0_xyyyyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyyyyzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xyyyyzz_0[i] * pb_x + g_0_xzzzzz_0_xyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xyyyzzz_0[i] = g_0_zzzzz_0_xyyyzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyyyzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyyzzz_1[i] * fi_abcd_0 +
-                                     g_0_xzzzzz_0_xyyyzzz_0[i] * pb_x + g_0_xzzzzz_0_xyyyzzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xyyyzzz_0[i] = g_0_zzzzz_0_xyyyzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyyyzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xyyyzzz_0[i] * pb_x + g_0_xzzzzz_0_xyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xyyzzzz_0[i] = g_0_zzzzz_0_xyyzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyyzzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyzzzz_1[i] * fi_abcd_0 +
-                                     g_0_xzzzzz_0_xyyzzzz_0[i] * pb_x + g_0_xzzzzz_0_xyyzzzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xyyzzzz_0[i] = g_0_zzzzz_0_xyyzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyyzzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xyyzzzz_0[i] * pb_x + g_0_xzzzzz_0_xyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xyzzzzz_0[i] = g_0_zzzzz_0_xyzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyzzzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yzzzzz_1[i] * fi_abcd_0 +
-                                     g_0_xzzzzz_0_xyzzzzz_0[i] * pb_x + g_0_xzzzzz_0_xyzzzzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xyzzzzz_0[i] = g_0_zzzzz_0_xyzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyzzzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xyzzzzz_0[i] * pb_x + g_0_xzzzzz_0_xyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_xzzzzzz_0[i] = g_0_zzzzz_0_xzzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xzzzzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_zzzzzz_1[i] * fi_abcd_0 +
-                                     g_0_xzzzzz_0_xzzzzzz_0[i] * pb_x + g_0_xzzzzz_0_xzzzzzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_xzzzzzz_0[i] = g_0_zzzzz_0_xzzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xzzzzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_xzzzzz_0_xzzzzzz_0[i] * pb_x + g_0_xzzzzz_0_xzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_yyyyyyy_0[i] = g_0_zzzzz_0_yyyyyyy_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyyyyy_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyyyyyy_0[i] * pb_x +
-                                     g_0_xzzzzz_0_yyyyyyy_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_yyyyyyy_0[i] = g_0_zzzzz_0_yyyyyyy_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyyyyy_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyyyyyy_0[i] * pb_x + g_0_xzzzzz_0_yyyyyyy_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_yyyyyyz_0[i] = g_0_zzzzz_0_yyyyyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyyyyz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyyyyyz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_yyyyyyz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_yyyyyyz_0[i] = g_0_zzzzz_0_yyyyyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyyyyz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyyyyyz_0[i] * pb_x + g_0_xzzzzz_0_yyyyyyz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_yyyyyzz_0[i] = g_0_zzzzz_0_yyyyyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyyyzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyyyyzz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_yyyyyzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_yyyyyzz_0[i] = g_0_zzzzz_0_yyyyyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyyyzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyyyyzz_0[i] * pb_x + g_0_xzzzzz_0_yyyyyzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_yyyyzzz_0[i] = g_0_zzzzz_0_yyyyzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyyzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyyyzzz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_yyyyzzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_yyyyzzz_0[i] = g_0_zzzzz_0_yyyyzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyyzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyyyzzz_0[i] * pb_x + g_0_xzzzzz_0_yyyyzzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_yyyzzzz_0[i] = g_0_zzzzz_0_yyyzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyzzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyyzzzz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_yyyzzzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_yyyzzzz_0[i] = g_0_zzzzz_0_yyyzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyzzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyyzzzz_0[i] * pb_x + g_0_xzzzzz_0_yyyzzzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_yyzzzzz_0[i] = g_0_zzzzz_0_yyzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyzzzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyzzzzz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_yyzzzzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_yyzzzzz_0[i] = g_0_zzzzz_0_yyzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyzzzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yyzzzzz_0[i] * pb_x + g_0_xzzzzz_0_yyzzzzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_yzzzzzz_0[i] = g_0_zzzzz_0_yzzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yzzzzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yzzzzzz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_yzzzzzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_yzzzzzz_0[i] = g_0_zzzzz_0_yzzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yzzzzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_yzzzzzz_0[i] * pb_x + g_0_xzzzzz_0_yzzzzzz_1[i] * wp_x[i];
 
-        g_0_xxzzzzz_0_zzzzzzz_0[i] = g_0_zzzzz_0_zzzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_zzzzzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_zzzzzzz_0[i] * pb_x +
-                                     g_0_xzzzzz_0_zzzzzzz_1[i] * wp_x[i];
+        g_0_xxzzzzz_0_zzzzzzz_0[i] = g_0_zzzzz_0_zzzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_zzzzzzz_1[i] * fti_ab_0 + g_0_xzzzzz_0_zzzzzzz_0[i] * pb_x + g_0_xzzzzz_0_zzzzzzz_1[i] * wp_x[i];
     }
 
     /// Set up 756-792 components of targeted buffer : SKSK
@@ -13563,211 +9102,52 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xyyyyyy_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 791);
 
-#pragma omp simd aligned(g_0_xyyyyyy_0_xxxxxxx_0,     \
-                             g_0_xyyyyyy_0_xxxxxxy_0, \
-                             g_0_xyyyyyy_0_xxxxxxz_0, \
-                             g_0_xyyyyyy_0_xxxxxyy_0, \
-                             g_0_xyyyyyy_0_xxxxxyz_0, \
-                             g_0_xyyyyyy_0_xxxxxzz_0, \
-                             g_0_xyyyyyy_0_xxxxyyy_0, \
-                             g_0_xyyyyyy_0_xxxxyyz_0, \
-                             g_0_xyyyyyy_0_xxxxyzz_0, \
-                             g_0_xyyyyyy_0_xxxxzzz_0, \
-                             g_0_xyyyyyy_0_xxxyyyy_0, \
-                             g_0_xyyyyyy_0_xxxyyyz_0, \
-                             g_0_xyyyyyy_0_xxxyyzz_0, \
-                             g_0_xyyyyyy_0_xxxyzzz_0, \
-                             g_0_xyyyyyy_0_xxxzzzz_0, \
-                             g_0_xyyyyyy_0_xxyyyyy_0, \
-                             g_0_xyyyyyy_0_xxyyyyz_0, \
-                             g_0_xyyyyyy_0_xxyyyzz_0, \
-                             g_0_xyyyyyy_0_xxyyzzz_0, \
-                             g_0_xyyyyyy_0_xxyzzzz_0, \
-                             g_0_xyyyyyy_0_xxzzzzz_0, \
-                             g_0_xyyyyyy_0_xyyyyyy_0, \
-                             g_0_xyyyyyy_0_xyyyyyz_0, \
-                             g_0_xyyyyyy_0_xyyyyzz_0, \
-                             g_0_xyyyyyy_0_xyyyzzz_0, \
-                             g_0_xyyyyyy_0_xyyzzzz_0, \
-                             g_0_xyyyyyy_0_xyzzzzz_0, \
-                             g_0_xyyyyyy_0_xzzzzzz_0, \
-                             g_0_xyyyyyy_0_yyyyyyy_0, \
-                             g_0_xyyyyyy_0_yyyyyyz_0, \
-                             g_0_xyyyyyy_0_yyyyyzz_0, \
-                             g_0_xyyyyyy_0_yyyyzzz_0, \
-                             g_0_xyyyyyy_0_yyyzzzz_0, \
-                             g_0_xyyyyyy_0_yyzzzzz_0, \
-                             g_0_xyyyyyy_0_yzzzzzz_0, \
-                             g_0_xyyyyyy_0_zzzzzzz_0, \
-                             g_0_yyyyyy_0_xxxxxx_1,   \
-                             g_0_yyyyyy_0_xxxxxxx_0,  \
-                             g_0_yyyyyy_0_xxxxxxx_1,  \
-                             g_0_yyyyyy_0_xxxxxxy_0,  \
-                             g_0_yyyyyy_0_xxxxxxy_1,  \
-                             g_0_yyyyyy_0_xxxxxxz_0,  \
-                             g_0_yyyyyy_0_xxxxxxz_1,  \
-                             g_0_yyyyyy_0_xxxxxy_1,   \
-                             g_0_yyyyyy_0_xxxxxyy_0,  \
-                             g_0_yyyyyy_0_xxxxxyy_1,  \
-                             g_0_yyyyyy_0_xxxxxyz_0,  \
-                             g_0_yyyyyy_0_xxxxxyz_1,  \
-                             g_0_yyyyyy_0_xxxxxz_1,   \
-                             g_0_yyyyyy_0_xxxxxzz_0,  \
-                             g_0_yyyyyy_0_xxxxxzz_1,  \
-                             g_0_yyyyyy_0_xxxxyy_1,   \
-                             g_0_yyyyyy_0_xxxxyyy_0,  \
-                             g_0_yyyyyy_0_xxxxyyy_1,  \
-                             g_0_yyyyyy_0_xxxxyyz_0,  \
-                             g_0_yyyyyy_0_xxxxyyz_1,  \
-                             g_0_yyyyyy_0_xxxxyz_1,   \
-                             g_0_yyyyyy_0_xxxxyzz_0,  \
-                             g_0_yyyyyy_0_xxxxyzz_1,  \
-                             g_0_yyyyyy_0_xxxxzz_1,   \
-                             g_0_yyyyyy_0_xxxxzzz_0,  \
-                             g_0_yyyyyy_0_xxxxzzz_1,  \
-                             g_0_yyyyyy_0_xxxyyy_1,   \
-                             g_0_yyyyyy_0_xxxyyyy_0,  \
-                             g_0_yyyyyy_0_xxxyyyy_1,  \
-                             g_0_yyyyyy_0_xxxyyyz_0,  \
-                             g_0_yyyyyy_0_xxxyyyz_1,  \
-                             g_0_yyyyyy_0_xxxyyz_1,   \
-                             g_0_yyyyyy_0_xxxyyzz_0,  \
-                             g_0_yyyyyy_0_xxxyyzz_1,  \
-                             g_0_yyyyyy_0_xxxyzz_1,   \
-                             g_0_yyyyyy_0_xxxyzzz_0,  \
-                             g_0_yyyyyy_0_xxxyzzz_1,  \
-                             g_0_yyyyyy_0_xxxzzz_1,   \
-                             g_0_yyyyyy_0_xxxzzzz_0,  \
-                             g_0_yyyyyy_0_xxxzzzz_1,  \
-                             g_0_yyyyyy_0_xxyyyy_1,   \
-                             g_0_yyyyyy_0_xxyyyyy_0,  \
-                             g_0_yyyyyy_0_xxyyyyy_1,  \
-                             g_0_yyyyyy_0_xxyyyyz_0,  \
-                             g_0_yyyyyy_0_xxyyyyz_1,  \
-                             g_0_yyyyyy_0_xxyyyz_1,   \
-                             g_0_yyyyyy_0_xxyyyzz_0,  \
-                             g_0_yyyyyy_0_xxyyyzz_1,  \
-                             g_0_yyyyyy_0_xxyyzz_1,   \
-                             g_0_yyyyyy_0_xxyyzzz_0,  \
-                             g_0_yyyyyy_0_xxyyzzz_1,  \
-                             g_0_yyyyyy_0_xxyzzz_1,   \
-                             g_0_yyyyyy_0_xxyzzzz_0,  \
-                             g_0_yyyyyy_0_xxyzzzz_1,  \
-                             g_0_yyyyyy_0_xxzzzz_1,   \
-                             g_0_yyyyyy_0_xxzzzzz_0,  \
-                             g_0_yyyyyy_0_xxzzzzz_1,  \
-                             g_0_yyyyyy_0_xyyyyy_1,   \
-                             g_0_yyyyyy_0_xyyyyyy_0,  \
-                             g_0_yyyyyy_0_xyyyyyy_1,  \
-                             g_0_yyyyyy_0_xyyyyyz_0,  \
-                             g_0_yyyyyy_0_xyyyyyz_1,  \
-                             g_0_yyyyyy_0_xyyyyz_1,   \
-                             g_0_yyyyyy_0_xyyyyzz_0,  \
-                             g_0_yyyyyy_0_xyyyyzz_1,  \
-                             g_0_yyyyyy_0_xyyyzz_1,   \
-                             g_0_yyyyyy_0_xyyyzzz_0,  \
-                             g_0_yyyyyy_0_xyyyzzz_1,  \
-                             g_0_yyyyyy_0_xyyzzz_1,   \
-                             g_0_yyyyyy_0_xyyzzzz_0,  \
-                             g_0_yyyyyy_0_xyyzzzz_1,  \
-                             g_0_yyyyyy_0_xyzzzz_1,   \
-                             g_0_yyyyyy_0_xyzzzzz_0,  \
-                             g_0_yyyyyy_0_xyzzzzz_1,  \
-                             g_0_yyyyyy_0_xzzzzz_1,   \
-                             g_0_yyyyyy_0_xzzzzzz_0,  \
-                             g_0_yyyyyy_0_xzzzzzz_1,  \
-                             g_0_yyyyyy_0_yyyyyy_1,   \
-                             g_0_yyyyyy_0_yyyyyyy_0,  \
-                             g_0_yyyyyy_0_yyyyyyy_1,  \
-                             g_0_yyyyyy_0_yyyyyyz_0,  \
-                             g_0_yyyyyy_0_yyyyyyz_1,  \
-                             g_0_yyyyyy_0_yyyyyz_1,   \
-                             g_0_yyyyyy_0_yyyyyzz_0,  \
-                             g_0_yyyyyy_0_yyyyyzz_1,  \
-                             g_0_yyyyyy_0_yyyyzz_1,   \
-                             g_0_yyyyyy_0_yyyyzzz_0,  \
-                             g_0_yyyyyy_0_yyyyzzz_1,  \
-                             g_0_yyyyyy_0_yyyzzz_1,   \
-                             g_0_yyyyyy_0_yyyzzzz_0,  \
-                             g_0_yyyyyy_0_yyyzzzz_1,  \
-                             g_0_yyyyyy_0_yyzzzz_1,   \
-                             g_0_yyyyyy_0_yyzzzzz_0,  \
-                             g_0_yyyyyy_0_yyzzzzz_1,  \
-                             g_0_yyyyyy_0_yzzzzz_1,   \
-                             g_0_yyyyyy_0_yzzzzzz_0,  \
-                             g_0_yyyyyy_0_yzzzzzz_1,  \
-                             g_0_yyyyyy_0_zzzzzz_1,   \
-                             g_0_yyyyyy_0_zzzzzzz_0,  \
-                             g_0_yyyyyy_0_zzzzzzz_1,  \
-                             wp_x,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xyyyyyy_0_xxxxxxx_0, g_0_xyyyyyy_0_xxxxxxy_0, g_0_xyyyyyy_0_xxxxxxz_0, g_0_xyyyyyy_0_xxxxxyy_0, g_0_xyyyyyy_0_xxxxxyz_0, g_0_xyyyyyy_0_xxxxxzz_0, g_0_xyyyyyy_0_xxxxyyy_0, g_0_xyyyyyy_0_xxxxyyz_0, g_0_xyyyyyy_0_xxxxyzz_0, g_0_xyyyyyy_0_xxxxzzz_0, g_0_xyyyyyy_0_xxxyyyy_0, g_0_xyyyyyy_0_xxxyyyz_0, g_0_xyyyyyy_0_xxxyyzz_0, g_0_xyyyyyy_0_xxxyzzz_0, g_0_xyyyyyy_0_xxxzzzz_0, g_0_xyyyyyy_0_xxyyyyy_0, g_0_xyyyyyy_0_xxyyyyz_0, g_0_xyyyyyy_0_xxyyyzz_0, g_0_xyyyyyy_0_xxyyzzz_0, g_0_xyyyyyy_0_xxyzzzz_0, g_0_xyyyyyy_0_xxzzzzz_0, g_0_xyyyyyy_0_xyyyyyy_0, g_0_xyyyyyy_0_xyyyyyz_0, g_0_xyyyyyy_0_xyyyyzz_0, g_0_xyyyyyy_0_xyyyzzz_0, g_0_xyyyyyy_0_xyyzzzz_0, g_0_xyyyyyy_0_xyzzzzz_0, g_0_xyyyyyy_0_xzzzzzz_0, g_0_xyyyyyy_0_yyyyyyy_0, g_0_xyyyyyy_0_yyyyyyz_0, g_0_xyyyyyy_0_yyyyyzz_0, g_0_xyyyyyy_0_yyyyzzz_0, g_0_xyyyyyy_0_yyyzzzz_0, g_0_xyyyyyy_0_yyzzzzz_0, g_0_xyyyyyy_0_yzzzzzz_0, g_0_xyyyyyy_0_zzzzzzz_0, g_0_yyyyyy_0_xxxxxx_1, g_0_yyyyyy_0_xxxxxxx_0, g_0_yyyyyy_0_xxxxxxx_1, g_0_yyyyyy_0_xxxxxxy_0, g_0_yyyyyy_0_xxxxxxy_1, g_0_yyyyyy_0_xxxxxxz_0, g_0_yyyyyy_0_xxxxxxz_1, g_0_yyyyyy_0_xxxxxy_1, g_0_yyyyyy_0_xxxxxyy_0, g_0_yyyyyy_0_xxxxxyy_1, g_0_yyyyyy_0_xxxxxyz_0, g_0_yyyyyy_0_xxxxxyz_1, g_0_yyyyyy_0_xxxxxz_1, g_0_yyyyyy_0_xxxxxzz_0, g_0_yyyyyy_0_xxxxxzz_1, g_0_yyyyyy_0_xxxxyy_1, g_0_yyyyyy_0_xxxxyyy_0, g_0_yyyyyy_0_xxxxyyy_1, g_0_yyyyyy_0_xxxxyyz_0, g_0_yyyyyy_0_xxxxyyz_1, g_0_yyyyyy_0_xxxxyz_1, g_0_yyyyyy_0_xxxxyzz_0, g_0_yyyyyy_0_xxxxyzz_1, g_0_yyyyyy_0_xxxxzz_1, g_0_yyyyyy_0_xxxxzzz_0, g_0_yyyyyy_0_xxxxzzz_1, g_0_yyyyyy_0_xxxyyy_1, g_0_yyyyyy_0_xxxyyyy_0, g_0_yyyyyy_0_xxxyyyy_1, g_0_yyyyyy_0_xxxyyyz_0, g_0_yyyyyy_0_xxxyyyz_1, g_0_yyyyyy_0_xxxyyz_1, g_0_yyyyyy_0_xxxyyzz_0, g_0_yyyyyy_0_xxxyyzz_1, g_0_yyyyyy_0_xxxyzz_1, g_0_yyyyyy_0_xxxyzzz_0, g_0_yyyyyy_0_xxxyzzz_1, g_0_yyyyyy_0_xxxzzz_1, g_0_yyyyyy_0_xxxzzzz_0, g_0_yyyyyy_0_xxxzzzz_1, g_0_yyyyyy_0_xxyyyy_1, g_0_yyyyyy_0_xxyyyyy_0, g_0_yyyyyy_0_xxyyyyy_1, g_0_yyyyyy_0_xxyyyyz_0, g_0_yyyyyy_0_xxyyyyz_1, g_0_yyyyyy_0_xxyyyz_1, g_0_yyyyyy_0_xxyyyzz_0, g_0_yyyyyy_0_xxyyyzz_1, g_0_yyyyyy_0_xxyyzz_1, g_0_yyyyyy_0_xxyyzzz_0, g_0_yyyyyy_0_xxyyzzz_1, g_0_yyyyyy_0_xxyzzz_1, g_0_yyyyyy_0_xxyzzzz_0, g_0_yyyyyy_0_xxyzzzz_1, g_0_yyyyyy_0_xxzzzz_1, g_0_yyyyyy_0_xxzzzzz_0, g_0_yyyyyy_0_xxzzzzz_1, g_0_yyyyyy_0_xyyyyy_1, g_0_yyyyyy_0_xyyyyyy_0, g_0_yyyyyy_0_xyyyyyy_1, g_0_yyyyyy_0_xyyyyyz_0, g_0_yyyyyy_0_xyyyyyz_1, g_0_yyyyyy_0_xyyyyz_1, g_0_yyyyyy_0_xyyyyzz_0, g_0_yyyyyy_0_xyyyyzz_1, g_0_yyyyyy_0_xyyyzz_1, g_0_yyyyyy_0_xyyyzzz_0, g_0_yyyyyy_0_xyyyzzz_1, g_0_yyyyyy_0_xyyzzz_1, g_0_yyyyyy_0_xyyzzzz_0, g_0_yyyyyy_0_xyyzzzz_1, g_0_yyyyyy_0_xyzzzz_1, g_0_yyyyyy_0_xyzzzzz_0, g_0_yyyyyy_0_xyzzzzz_1, g_0_yyyyyy_0_xzzzzz_1, g_0_yyyyyy_0_xzzzzzz_0, g_0_yyyyyy_0_xzzzzzz_1, g_0_yyyyyy_0_yyyyyy_1, g_0_yyyyyy_0_yyyyyyy_0, g_0_yyyyyy_0_yyyyyyy_1, g_0_yyyyyy_0_yyyyyyz_0, g_0_yyyyyy_0_yyyyyyz_1, g_0_yyyyyy_0_yyyyyz_1, g_0_yyyyyy_0_yyyyyzz_0, g_0_yyyyyy_0_yyyyyzz_1, g_0_yyyyyy_0_yyyyzz_1, g_0_yyyyyy_0_yyyyzzz_0, g_0_yyyyyy_0_yyyyzzz_1, g_0_yyyyyy_0_yyyzzz_1, g_0_yyyyyy_0_yyyzzzz_0, g_0_yyyyyy_0_yyyzzzz_1, g_0_yyyyyy_0_yyzzzz_1, g_0_yyyyyy_0_yyzzzzz_0, g_0_yyyyyy_0_yyzzzzz_1, g_0_yyyyyy_0_yzzzzz_1, g_0_yyyyyy_0_yzzzzzz_0, g_0_yyyyyy_0_yzzzzzz_1, g_0_yyyyyy_0_zzzzzz_1, g_0_yyyyyy_0_zzzzzzz_0, g_0_yyyyyy_0_zzzzzzz_1, wp_x, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
 
-        g_0_xyyyyyy_0_xxxxxxx_0[i] =
-            7.0 * g_0_yyyyyy_0_xxxxxx_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxxx_0[i] * pb_x + g_0_yyyyyy_0_xxxxxxx_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxxxxxx_0[i] = 7.0 * g_0_yyyyyy_0_xxxxxx_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxxx_0[i] * pb_x + g_0_yyyyyy_0_xxxxxxx_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxxxxxy_0[i] =
-            6.0 * g_0_yyyyyy_0_xxxxxy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxxy_0[i] * pb_x + g_0_yyyyyy_0_xxxxxxy_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxxxxxy_0[i] = 6.0 * g_0_yyyyyy_0_xxxxxy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxxy_0[i] * pb_x + g_0_yyyyyy_0_xxxxxxy_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxxxxxz_0[i] =
-            6.0 * g_0_yyyyyy_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxxz_0[i] * pb_x + g_0_yyyyyy_0_xxxxxxz_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxxxxxz_0[i] = 6.0 * g_0_yyyyyy_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxxz_0[i] * pb_x + g_0_yyyyyy_0_xxxxxxz_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxxxxyy_0[i] =
-            5.0 * g_0_yyyyyy_0_xxxxyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxyy_0[i] * pb_x + g_0_yyyyyy_0_xxxxxyy_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxxxxyy_0[i] = 5.0 * g_0_yyyyyy_0_xxxxyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxyy_0[i] * pb_x + g_0_yyyyyy_0_xxxxxyy_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxxxxyz_0[i] =
-            5.0 * g_0_yyyyyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxyz_0[i] * pb_x + g_0_yyyyyy_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxxxxyz_0[i] = 5.0 * g_0_yyyyyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxyz_0[i] * pb_x + g_0_yyyyyy_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxxxxzz_0[i] =
-            5.0 * g_0_yyyyyy_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxzz_0[i] * pb_x + g_0_yyyyyy_0_xxxxxzz_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxxxxzz_0[i] = 5.0 * g_0_yyyyyy_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxzz_0[i] * pb_x + g_0_yyyyyy_0_xxxxxzz_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxxxyyy_0[i] =
-            4.0 * g_0_yyyyyy_0_xxxyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxyyy_0[i] * pb_x + g_0_yyyyyy_0_xxxxyyy_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxxxyyy_0[i] = 4.0 * g_0_yyyyyy_0_xxxyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxyyy_0[i] * pb_x + g_0_yyyyyy_0_xxxxyyy_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxxxyyz_0[i] =
-            4.0 * g_0_yyyyyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxyyz_0[i] * pb_x + g_0_yyyyyy_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxxxyyz_0[i] = 4.0 * g_0_yyyyyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxyyz_0[i] * pb_x + g_0_yyyyyy_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxxxyzz_0[i] =
-            4.0 * g_0_yyyyyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxyzz_0[i] * pb_x + g_0_yyyyyy_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxxxyzz_0[i] = 4.0 * g_0_yyyyyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxyzz_0[i] * pb_x + g_0_yyyyyy_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxxxzzz_0[i] =
-            4.0 * g_0_yyyyyy_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxzzz_0[i] * pb_x + g_0_yyyyyy_0_xxxxzzz_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxxxzzz_0[i] = 4.0 * g_0_yyyyyy_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxzzz_0[i] * pb_x + g_0_yyyyyy_0_xxxxzzz_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxxyyyy_0[i] =
-            3.0 * g_0_yyyyyy_0_xxyyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyyyy_0[i] * pb_x + g_0_yyyyyy_0_xxxyyyy_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxxyyyy_0[i] = 3.0 * g_0_yyyyyy_0_xxyyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyyyy_0[i] * pb_x + g_0_yyyyyy_0_xxxyyyy_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxxyyyz_0[i] =
-            3.0 * g_0_yyyyyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyyyz_0[i] * pb_x + g_0_yyyyyy_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxxyyyz_0[i] = 3.0 * g_0_yyyyyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyyyz_0[i] * pb_x + g_0_yyyyyy_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxxyyzz_0[i] =
-            3.0 * g_0_yyyyyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyyzz_0[i] * pb_x + g_0_yyyyyy_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxxyyzz_0[i] = 3.0 * g_0_yyyyyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyyzz_0[i] * pb_x + g_0_yyyyyy_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxxyzzz_0[i] =
-            3.0 * g_0_yyyyyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyzzz_0[i] * pb_x + g_0_yyyyyy_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxxyzzz_0[i] = 3.0 * g_0_yyyyyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyzzz_0[i] * pb_x + g_0_yyyyyy_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxxzzzz_0[i] =
-            3.0 * g_0_yyyyyy_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxzzzz_0[i] * pb_x + g_0_yyyyyy_0_xxxzzzz_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxxzzzz_0[i] = 3.0 * g_0_yyyyyy_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxzzzz_0[i] * pb_x + g_0_yyyyyy_0_xxxzzzz_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxyyyyy_0[i] =
-            2.0 * g_0_yyyyyy_0_xyyyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyyyy_0[i] * pb_x + g_0_yyyyyy_0_xxyyyyy_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxyyyyy_0[i] = 2.0 * g_0_yyyyyy_0_xyyyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyyyy_0[i] * pb_x + g_0_yyyyyy_0_xxyyyyy_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxyyyyz_0[i] =
-            2.0 * g_0_yyyyyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyyyz_0[i] * pb_x + g_0_yyyyyy_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxyyyyz_0[i] = 2.0 * g_0_yyyyyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyyyz_0[i] * pb_x + g_0_yyyyyy_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxyyyzz_0[i] =
-            2.0 * g_0_yyyyyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyyzz_0[i] * pb_x + g_0_yyyyyy_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxyyyzz_0[i] = 2.0 * g_0_yyyyyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyyzz_0[i] * pb_x + g_0_yyyyyy_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxyyzzz_0[i] =
-            2.0 * g_0_yyyyyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyzzz_0[i] * pb_x + g_0_yyyyyy_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxyyzzz_0[i] = 2.0 * g_0_yyyyyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyzzz_0[i] * pb_x + g_0_yyyyyy_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxyzzzz_0[i] =
-            2.0 * g_0_yyyyyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyzzzz_0[i] * pb_x + g_0_yyyyyy_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxyzzzz_0[i] = 2.0 * g_0_yyyyyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyzzzz_0[i] * pb_x + g_0_yyyyyy_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xyyyyyy_0_xxzzzzz_0[i] =
-            2.0 * g_0_yyyyyy_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxzzzzz_0[i] * pb_x + g_0_yyyyyy_0_xxzzzzz_1[i] * wp_x[i];
+        g_0_xyyyyyy_0_xxzzzzz_0[i] = 2.0 * g_0_yyyyyy_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxzzzzz_0[i] * pb_x + g_0_yyyyyy_0_xxzzzzz_1[i] * wp_x[i];
 
         g_0_xyyyyyy_0_xyyyyyy_0[i] = g_0_yyyyyy_0_yyyyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyyyyy_0[i] * pb_x + g_0_yyyyyy_0_xyyyyyy_1[i] * wp_x[i];
 
@@ -13874,139 +9254,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xyyyyyz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 827);
 
-#pragma omp simd aligned(g_0_xyyyyy_0_xxxxxxx_0,      \
-                             g_0_xyyyyy_0_xxxxxxx_1,  \
-                             g_0_xyyyyy_0_xxxxxxy_0,  \
-                             g_0_xyyyyy_0_xxxxxxy_1,  \
-                             g_0_xyyyyy_0_xxxxxyy_0,  \
-                             g_0_xyyyyy_0_xxxxxyy_1,  \
-                             g_0_xyyyyy_0_xxxxyyy_0,  \
-                             g_0_xyyyyy_0_xxxxyyy_1,  \
-                             g_0_xyyyyy_0_xxxyyyy_0,  \
-                             g_0_xyyyyy_0_xxxyyyy_1,  \
-                             g_0_xyyyyy_0_xxyyyyy_0,  \
-                             g_0_xyyyyy_0_xxyyyyy_1,  \
-                             g_0_xyyyyy_0_xyyyyyy_0,  \
-                             g_0_xyyyyy_0_xyyyyyy_1,  \
-                             g_0_xyyyyyz_0_xxxxxxx_0, \
-                             g_0_xyyyyyz_0_xxxxxxy_0, \
-                             g_0_xyyyyyz_0_xxxxxxz_0, \
-                             g_0_xyyyyyz_0_xxxxxyy_0, \
-                             g_0_xyyyyyz_0_xxxxxyz_0, \
-                             g_0_xyyyyyz_0_xxxxxzz_0, \
-                             g_0_xyyyyyz_0_xxxxyyy_0, \
-                             g_0_xyyyyyz_0_xxxxyyz_0, \
-                             g_0_xyyyyyz_0_xxxxyzz_0, \
-                             g_0_xyyyyyz_0_xxxxzzz_0, \
-                             g_0_xyyyyyz_0_xxxyyyy_0, \
-                             g_0_xyyyyyz_0_xxxyyyz_0, \
-                             g_0_xyyyyyz_0_xxxyyzz_0, \
-                             g_0_xyyyyyz_0_xxxyzzz_0, \
-                             g_0_xyyyyyz_0_xxxzzzz_0, \
-                             g_0_xyyyyyz_0_xxyyyyy_0, \
-                             g_0_xyyyyyz_0_xxyyyyz_0, \
-                             g_0_xyyyyyz_0_xxyyyzz_0, \
-                             g_0_xyyyyyz_0_xxyyzzz_0, \
-                             g_0_xyyyyyz_0_xxyzzzz_0, \
-                             g_0_xyyyyyz_0_xxzzzzz_0, \
-                             g_0_xyyyyyz_0_xyyyyyy_0, \
-                             g_0_xyyyyyz_0_xyyyyyz_0, \
-                             g_0_xyyyyyz_0_xyyyyzz_0, \
-                             g_0_xyyyyyz_0_xyyyzzz_0, \
-                             g_0_xyyyyyz_0_xyyzzzz_0, \
-                             g_0_xyyyyyz_0_xyzzzzz_0, \
-                             g_0_xyyyyyz_0_xzzzzzz_0, \
-                             g_0_xyyyyyz_0_yyyyyyy_0, \
-                             g_0_xyyyyyz_0_yyyyyyz_0, \
-                             g_0_xyyyyyz_0_yyyyyzz_0, \
-                             g_0_xyyyyyz_0_yyyyzzz_0, \
-                             g_0_xyyyyyz_0_yyyzzzz_0, \
-                             g_0_xyyyyyz_0_yyzzzzz_0, \
-                             g_0_xyyyyyz_0_yzzzzzz_0, \
-                             g_0_xyyyyyz_0_zzzzzzz_0, \
-                             g_0_yyyyyz_0_xxxxxxz_0,  \
-                             g_0_yyyyyz_0_xxxxxxz_1,  \
-                             g_0_yyyyyz_0_xxxxxyz_0,  \
-                             g_0_yyyyyz_0_xxxxxyz_1,  \
-                             g_0_yyyyyz_0_xxxxxz_1,   \
-                             g_0_yyyyyz_0_xxxxxzz_0,  \
-                             g_0_yyyyyz_0_xxxxxzz_1,  \
-                             g_0_yyyyyz_0_xxxxyyz_0,  \
-                             g_0_yyyyyz_0_xxxxyyz_1,  \
-                             g_0_yyyyyz_0_xxxxyz_1,   \
-                             g_0_yyyyyz_0_xxxxyzz_0,  \
-                             g_0_yyyyyz_0_xxxxyzz_1,  \
-                             g_0_yyyyyz_0_xxxxzz_1,   \
-                             g_0_yyyyyz_0_xxxxzzz_0,  \
-                             g_0_yyyyyz_0_xxxxzzz_1,  \
-                             g_0_yyyyyz_0_xxxyyyz_0,  \
-                             g_0_yyyyyz_0_xxxyyyz_1,  \
-                             g_0_yyyyyz_0_xxxyyz_1,   \
-                             g_0_yyyyyz_0_xxxyyzz_0,  \
-                             g_0_yyyyyz_0_xxxyyzz_1,  \
-                             g_0_yyyyyz_0_xxxyzz_1,   \
-                             g_0_yyyyyz_0_xxxyzzz_0,  \
-                             g_0_yyyyyz_0_xxxyzzz_1,  \
-                             g_0_yyyyyz_0_xxxzzz_1,   \
-                             g_0_yyyyyz_0_xxxzzzz_0,  \
-                             g_0_yyyyyz_0_xxxzzzz_1,  \
-                             g_0_yyyyyz_0_xxyyyyz_0,  \
-                             g_0_yyyyyz_0_xxyyyyz_1,  \
-                             g_0_yyyyyz_0_xxyyyz_1,   \
-                             g_0_yyyyyz_0_xxyyyzz_0,  \
-                             g_0_yyyyyz_0_xxyyyzz_1,  \
-                             g_0_yyyyyz_0_xxyyzz_1,   \
-                             g_0_yyyyyz_0_xxyyzzz_0,  \
-                             g_0_yyyyyz_0_xxyyzzz_1,  \
-                             g_0_yyyyyz_0_xxyzzz_1,   \
-                             g_0_yyyyyz_0_xxyzzzz_0,  \
-                             g_0_yyyyyz_0_xxyzzzz_1,  \
-                             g_0_yyyyyz_0_xxzzzz_1,   \
-                             g_0_yyyyyz_0_xxzzzzz_0,  \
-                             g_0_yyyyyz_0_xxzzzzz_1,  \
-                             g_0_yyyyyz_0_xyyyyyz_0,  \
-                             g_0_yyyyyz_0_xyyyyyz_1,  \
-                             g_0_yyyyyz_0_xyyyyz_1,   \
-                             g_0_yyyyyz_0_xyyyyzz_0,  \
-                             g_0_yyyyyz_0_xyyyyzz_1,  \
-                             g_0_yyyyyz_0_xyyyzz_1,   \
-                             g_0_yyyyyz_0_xyyyzzz_0,  \
-                             g_0_yyyyyz_0_xyyyzzz_1,  \
-                             g_0_yyyyyz_0_xyyzzz_1,   \
-                             g_0_yyyyyz_0_xyyzzzz_0,  \
-                             g_0_yyyyyz_0_xyyzzzz_1,  \
-                             g_0_yyyyyz_0_xyzzzz_1,   \
-                             g_0_yyyyyz_0_xyzzzzz_0,  \
-                             g_0_yyyyyz_0_xyzzzzz_1,  \
-                             g_0_yyyyyz_0_xzzzzz_1,   \
-                             g_0_yyyyyz_0_xzzzzzz_0,  \
-                             g_0_yyyyyz_0_xzzzzzz_1,  \
-                             g_0_yyyyyz_0_yyyyyyy_0,  \
-                             g_0_yyyyyz_0_yyyyyyy_1,  \
-                             g_0_yyyyyz_0_yyyyyyz_0,  \
-                             g_0_yyyyyz_0_yyyyyyz_1,  \
-                             g_0_yyyyyz_0_yyyyyz_1,   \
-                             g_0_yyyyyz_0_yyyyyzz_0,  \
-                             g_0_yyyyyz_0_yyyyyzz_1,  \
-                             g_0_yyyyyz_0_yyyyzz_1,   \
-                             g_0_yyyyyz_0_yyyyzzz_0,  \
-                             g_0_yyyyyz_0_yyyyzzz_1,  \
-                             g_0_yyyyyz_0_yyyzzz_1,   \
-                             g_0_yyyyyz_0_yyyzzzz_0,  \
-                             g_0_yyyyyz_0_yyyzzzz_1,  \
-                             g_0_yyyyyz_0_yyzzzz_1,   \
-                             g_0_yyyyyz_0_yyzzzzz_0,  \
-                             g_0_yyyyyz_0_yyzzzzz_1,  \
-                             g_0_yyyyyz_0_yzzzzz_1,   \
-                             g_0_yyyyyz_0_yzzzzzz_0,  \
-                             g_0_yyyyyz_0_yzzzzzz_1,  \
-                             g_0_yyyyyz_0_zzzzzz_1,   \
-                             g_0_yyyyyz_0_zzzzzzz_0,  \
-                             g_0_yyyyyz_0_zzzzzzz_1,  \
-                             wp_x,                    \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xyyyyy_0_xxxxxxx_0, g_0_xyyyyy_0_xxxxxxx_1, g_0_xyyyyy_0_xxxxxxy_0, g_0_xyyyyy_0_xxxxxxy_1, g_0_xyyyyy_0_xxxxxyy_0, g_0_xyyyyy_0_xxxxxyy_1, g_0_xyyyyy_0_xxxxyyy_0, g_0_xyyyyy_0_xxxxyyy_1, g_0_xyyyyy_0_xxxyyyy_0, g_0_xyyyyy_0_xxxyyyy_1, g_0_xyyyyy_0_xxyyyyy_0, g_0_xyyyyy_0_xxyyyyy_1, g_0_xyyyyy_0_xyyyyyy_0, g_0_xyyyyy_0_xyyyyyy_1, g_0_xyyyyyz_0_xxxxxxx_0, g_0_xyyyyyz_0_xxxxxxy_0, g_0_xyyyyyz_0_xxxxxxz_0, g_0_xyyyyyz_0_xxxxxyy_0, g_0_xyyyyyz_0_xxxxxyz_0, g_0_xyyyyyz_0_xxxxxzz_0, g_0_xyyyyyz_0_xxxxyyy_0, g_0_xyyyyyz_0_xxxxyyz_0, g_0_xyyyyyz_0_xxxxyzz_0, g_0_xyyyyyz_0_xxxxzzz_0, g_0_xyyyyyz_0_xxxyyyy_0, g_0_xyyyyyz_0_xxxyyyz_0, g_0_xyyyyyz_0_xxxyyzz_0, g_0_xyyyyyz_0_xxxyzzz_0, g_0_xyyyyyz_0_xxxzzzz_0, g_0_xyyyyyz_0_xxyyyyy_0, g_0_xyyyyyz_0_xxyyyyz_0, g_0_xyyyyyz_0_xxyyyzz_0, g_0_xyyyyyz_0_xxyyzzz_0, g_0_xyyyyyz_0_xxyzzzz_0, g_0_xyyyyyz_0_xxzzzzz_0, g_0_xyyyyyz_0_xyyyyyy_0, g_0_xyyyyyz_0_xyyyyyz_0, g_0_xyyyyyz_0_xyyyyzz_0, g_0_xyyyyyz_0_xyyyzzz_0, g_0_xyyyyyz_0_xyyzzzz_0, g_0_xyyyyyz_0_xyzzzzz_0, g_0_xyyyyyz_0_xzzzzzz_0, g_0_xyyyyyz_0_yyyyyyy_0, g_0_xyyyyyz_0_yyyyyyz_0, g_0_xyyyyyz_0_yyyyyzz_0, g_0_xyyyyyz_0_yyyyzzz_0, g_0_xyyyyyz_0_yyyzzzz_0, g_0_xyyyyyz_0_yyzzzzz_0, g_0_xyyyyyz_0_yzzzzzz_0, g_0_xyyyyyz_0_zzzzzzz_0, g_0_yyyyyz_0_xxxxxxz_0, g_0_yyyyyz_0_xxxxxxz_1, g_0_yyyyyz_0_xxxxxyz_0, g_0_yyyyyz_0_xxxxxyz_1, g_0_yyyyyz_0_xxxxxz_1, g_0_yyyyyz_0_xxxxxzz_0, g_0_yyyyyz_0_xxxxxzz_1, g_0_yyyyyz_0_xxxxyyz_0, g_0_yyyyyz_0_xxxxyyz_1, g_0_yyyyyz_0_xxxxyz_1, g_0_yyyyyz_0_xxxxyzz_0, g_0_yyyyyz_0_xxxxyzz_1, g_0_yyyyyz_0_xxxxzz_1, g_0_yyyyyz_0_xxxxzzz_0, g_0_yyyyyz_0_xxxxzzz_1, g_0_yyyyyz_0_xxxyyyz_0, g_0_yyyyyz_0_xxxyyyz_1, g_0_yyyyyz_0_xxxyyz_1, g_0_yyyyyz_0_xxxyyzz_0, g_0_yyyyyz_0_xxxyyzz_1, g_0_yyyyyz_0_xxxyzz_1, g_0_yyyyyz_0_xxxyzzz_0, g_0_yyyyyz_0_xxxyzzz_1, g_0_yyyyyz_0_xxxzzz_1, g_0_yyyyyz_0_xxxzzzz_0, g_0_yyyyyz_0_xxxzzzz_1, g_0_yyyyyz_0_xxyyyyz_0, g_0_yyyyyz_0_xxyyyyz_1, g_0_yyyyyz_0_xxyyyz_1, g_0_yyyyyz_0_xxyyyzz_0, g_0_yyyyyz_0_xxyyyzz_1, g_0_yyyyyz_0_xxyyzz_1, g_0_yyyyyz_0_xxyyzzz_0, g_0_yyyyyz_0_xxyyzzz_1, g_0_yyyyyz_0_xxyzzz_1, g_0_yyyyyz_0_xxyzzzz_0, g_0_yyyyyz_0_xxyzzzz_1, g_0_yyyyyz_0_xxzzzz_1, g_0_yyyyyz_0_xxzzzzz_0, g_0_yyyyyz_0_xxzzzzz_1, g_0_yyyyyz_0_xyyyyyz_0, g_0_yyyyyz_0_xyyyyyz_1, g_0_yyyyyz_0_xyyyyz_1, g_0_yyyyyz_0_xyyyyzz_0, g_0_yyyyyz_0_xyyyyzz_1, g_0_yyyyyz_0_xyyyzz_1, g_0_yyyyyz_0_xyyyzzz_0, g_0_yyyyyz_0_xyyyzzz_1, g_0_yyyyyz_0_xyyzzz_1, g_0_yyyyyz_0_xyyzzzz_0, g_0_yyyyyz_0_xyyzzzz_1, g_0_yyyyyz_0_xyzzzz_1, g_0_yyyyyz_0_xyzzzzz_0, g_0_yyyyyz_0_xyzzzzz_1, g_0_yyyyyz_0_xzzzzz_1, g_0_yyyyyz_0_xzzzzzz_0, g_0_yyyyyz_0_xzzzzzz_1, g_0_yyyyyz_0_yyyyyyy_0, g_0_yyyyyz_0_yyyyyyy_1, g_0_yyyyyz_0_yyyyyyz_0, g_0_yyyyyz_0_yyyyyyz_1, g_0_yyyyyz_0_yyyyyz_1, g_0_yyyyyz_0_yyyyyzz_0, g_0_yyyyyz_0_yyyyyzz_1, g_0_yyyyyz_0_yyyyzz_1, g_0_yyyyyz_0_yyyyzzz_0, g_0_yyyyyz_0_yyyyzzz_1, g_0_yyyyyz_0_yyyzzz_1, g_0_yyyyyz_0_yyyzzzz_0, g_0_yyyyyz_0_yyyzzzz_1, g_0_yyyyyz_0_yyzzzz_1, g_0_yyyyyz_0_yyzzzzz_0, g_0_yyyyyz_0_yyzzzzz_1, g_0_yyyyyz_0_yzzzzz_1, g_0_yyyyyz_0_yzzzzzz_0, g_0_yyyyyz_0_yzzzzzz_1, g_0_yyyyyz_0_zzzzzz_1, g_0_yyyyyz_0_zzzzzzz_0, g_0_yyyyyz_0_zzzzzzz_1, wp_x, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -14015,58 +9263,43 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         g_0_xyyyyyz_0_xxxxxxy_0[i] = g_0_xyyyyy_0_xxxxxxy_0[i] * pb_z + g_0_xyyyyy_0_xxxxxxy_1[i] * wp_z[i];
 
-        g_0_xyyyyyz_0_xxxxxxz_0[i] =
-            6.0 * g_0_yyyyyz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxxxxz_0[i] * pb_x + g_0_yyyyyz_0_xxxxxxz_1[i] * wp_x[i];
+        g_0_xyyyyyz_0_xxxxxxz_0[i] = 6.0 * g_0_yyyyyz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxxxxz_0[i] * pb_x + g_0_yyyyyz_0_xxxxxxz_1[i] * wp_x[i];
 
         g_0_xyyyyyz_0_xxxxxyy_0[i] = g_0_xyyyyy_0_xxxxxyy_0[i] * pb_z + g_0_xyyyyy_0_xxxxxyy_1[i] * wp_z[i];
 
-        g_0_xyyyyyz_0_xxxxxyz_0[i] =
-            5.0 * g_0_yyyyyz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxxxyz_0[i] * pb_x + g_0_yyyyyz_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xyyyyyz_0_xxxxxyz_0[i] = 5.0 * g_0_yyyyyz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxxxyz_0[i] * pb_x + g_0_yyyyyz_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xyyyyyz_0_xxxxxzz_0[i] =
-            5.0 * g_0_yyyyyz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxxxzz_0[i] * pb_x + g_0_yyyyyz_0_xxxxxzz_1[i] * wp_x[i];
+        g_0_xyyyyyz_0_xxxxxzz_0[i] = 5.0 * g_0_yyyyyz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxxxzz_0[i] * pb_x + g_0_yyyyyz_0_xxxxxzz_1[i] * wp_x[i];
 
         g_0_xyyyyyz_0_xxxxyyy_0[i] = g_0_xyyyyy_0_xxxxyyy_0[i] * pb_z + g_0_xyyyyy_0_xxxxyyy_1[i] * wp_z[i];
 
-        g_0_xyyyyyz_0_xxxxyyz_0[i] =
-            4.0 * g_0_yyyyyz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxxyyz_0[i] * pb_x + g_0_yyyyyz_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xyyyyyz_0_xxxxyyz_0[i] = 4.0 * g_0_yyyyyz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxxyyz_0[i] * pb_x + g_0_yyyyyz_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xyyyyyz_0_xxxxyzz_0[i] =
-            4.0 * g_0_yyyyyz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxxyzz_0[i] * pb_x + g_0_yyyyyz_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xyyyyyz_0_xxxxyzz_0[i] = 4.0 * g_0_yyyyyz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxxyzz_0[i] * pb_x + g_0_yyyyyz_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xyyyyyz_0_xxxxzzz_0[i] =
-            4.0 * g_0_yyyyyz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxxzzz_0[i] * pb_x + g_0_yyyyyz_0_xxxxzzz_1[i] * wp_x[i];
+        g_0_xyyyyyz_0_xxxxzzz_0[i] = 4.0 * g_0_yyyyyz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxxzzz_0[i] * pb_x + g_0_yyyyyz_0_xxxxzzz_1[i] * wp_x[i];
 
         g_0_xyyyyyz_0_xxxyyyy_0[i] = g_0_xyyyyy_0_xxxyyyy_0[i] * pb_z + g_0_xyyyyy_0_xxxyyyy_1[i] * wp_z[i];
 
-        g_0_xyyyyyz_0_xxxyyyz_0[i] =
-            3.0 * g_0_yyyyyz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxyyyz_0[i] * pb_x + g_0_yyyyyz_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xyyyyyz_0_xxxyyyz_0[i] = 3.0 * g_0_yyyyyz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxyyyz_0[i] * pb_x + g_0_yyyyyz_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xyyyyyz_0_xxxyyzz_0[i] =
-            3.0 * g_0_yyyyyz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxyyzz_0[i] * pb_x + g_0_yyyyyz_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xyyyyyz_0_xxxyyzz_0[i] = 3.0 * g_0_yyyyyz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxyyzz_0[i] * pb_x + g_0_yyyyyz_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xyyyyyz_0_xxxyzzz_0[i] =
-            3.0 * g_0_yyyyyz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxyzzz_0[i] * pb_x + g_0_yyyyyz_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xyyyyyz_0_xxxyzzz_0[i] = 3.0 * g_0_yyyyyz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxyzzz_0[i] * pb_x + g_0_yyyyyz_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xyyyyyz_0_xxxzzzz_0[i] =
-            3.0 * g_0_yyyyyz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxzzzz_0[i] * pb_x + g_0_yyyyyz_0_xxxzzzz_1[i] * wp_x[i];
+        g_0_xyyyyyz_0_xxxzzzz_0[i] = 3.0 * g_0_yyyyyz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxxzzzz_0[i] * pb_x + g_0_yyyyyz_0_xxxzzzz_1[i] * wp_x[i];
 
         g_0_xyyyyyz_0_xxyyyyy_0[i] = g_0_xyyyyy_0_xxyyyyy_0[i] * pb_z + g_0_xyyyyy_0_xxyyyyy_1[i] * wp_z[i];
 
-        g_0_xyyyyyz_0_xxyyyyz_0[i] =
-            2.0 * g_0_yyyyyz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxyyyyz_0[i] * pb_x + g_0_yyyyyz_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xyyyyyz_0_xxyyyyz_0[i] = 2.0 * g_0_yyyyyz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxyyyyz_0[i] * pb_x + g_0_yyyyyz_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xyyyyyz_0_xxyyyzz_0[i] =
-            2.0 * g_0_yyyyyz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxyyyzz_0[i] * pb_x + g_0_yyyyyz_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xyyyyyz_0_xxyyyzz_0[i] = 2.0 * g_0_yyyyyz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxyyyzz_0[i] * pb_x + g_0_yyyyyz_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xyyyyyz_0_xxyyzzz_0[i] =
-            2.0 * g_0_yyyyyz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxyyzzz_0[i] * pb_x + g_0_yyyyyz_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xyyyyyz_0_xxyyzzz_0[i] = 2.0 * g_0_yyyyyz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxyyzzz_0[i] * pb_x + g_0_yyyyyz_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xyyyyyz_0_xxyzzzz_0[i] =
-            2.0 * g_0_yyyyyz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxyzzzz_0[i] * pb_x + g_0_yyyyyz_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xyyyyyz_0_xxyzzzz_0[i] = 2.0 * g_0_yyyyyz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxyzzzz_0[i] * pb_x + g_0_yyyyyz_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xyyyyyz_0_xxzzzzz_0[i] =
-            2.0 * g_0_yyyyyz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxzzzzz_0[i] * pb_x + g_0_yyyyyz_0_xxzzzzz_1[i] * wp_x[i];
+        g_0_xyyyyyz_0_xxzzzzz_0[i] = 2.0 * g_0_yyyyyz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyyyyz_0_xxzzzzz_0[i] * pb_x + g_0_yyyyyz_0_xxzzzzz_1[i] * wp_x[i];
 
         g_0_xyyyyyz_0_xyyyyyy_0[i] = g_0_xyyyyy_0_xyyyyyy_0[i] * pb_z + g_0_xyyyyy_0_xyyyyyy_1[i] * wp_z[i];
 
@@ -14173,211 +9406,52 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xyyyyzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 863);
 
-#pragma omp simd aligned(g_0_xyyyyzz_0_xxxxxxx_0,     \
-                             g_0_xyyyyzz_0_xxxxxxy_0, \
-                             g_0_xyyyyzz_0_xxxxxxz_0, \
-                             g_0_xyyyyzz_0_xxxxxyy_0, \
-                             g_0_xyyyyzz_0_xxxxxyz_0, \
-                             g_0_xyyyyzz_0_xxxxxzz_0, \
-                             g_0_xyyyyzz_0_xxxxyyy_0, \
-                             g_0_xyyyyzz_0_xxxxyyz_0, \
-                             g_0_xyyyyzz_0_xxxxyzz_0, \
-                             g_0_xyyyyzz_0_xxxxzzz_0, \
-                             g_0_xyyyyzz_0_xxxyyyy_0, \
-                             g_0_xyyyyzz_0_xxxyyyz_0, \
-                             g_0_xyyyyzz_0_xxxyyzz_0, \
-                             g_0_xyyyyzz_0_xxxyzzz_0, \
-                             g_0_xyyyyzz_0_xxxzzzz_0, \
-                             g_0_xyyyyzz_0_xxyyyyy_0, \
-                             g_0_xyyyyzz_0_xxyyyyz_0, \
-                             g_0_xyyyyzz_0_xxyyyzz_0, \
-                             g_0_xyyyyzz_0_xxyyzzz_0, \
-                             g_0_xyyyyzz_0_xxyzzzz_0, \
-                             g_0_xyyyyzz_0_xxzzzzz_0, \
-                             g_0_xyyyyzz_0_xyyyyyy_0, \
-                             g_0_xyyyyzz_0_xyyyyyz_0, \
-                             g_0_xyyyyzz_0_xyyyyzz_0, \
-                             g_0_xyyyyzz_0_xyyyzzz_0, \
-                             g_0_xyyyyzz_0_xyyzzzz_0, \
-                             g_0_xyyyyzz_0_xyzzzzz_0, \
-                             g_0_xyyyyzz_0_xzzzzzz_0, \
-                             g_0_xyyyyzz_0_yyyyyyy_0, \
-                             g_0_xyyyyzz_0_yyyyyyz_0, \
-                             g_0_xyyyyzz_0_yyyyyzz_0, \
-                             g_0_xyyyyzz_0_yyyyzzz_0, \
-                             g_0_xyyyyzz_0_yyyzzzz_0, \
-                             g_0_xyyyyzz_0_yyzzzzz_0, \
-                             g_0_xyyyyzz_0_yzzzzzz_0, \
-                             g_0_xyyyyzz_0_zzzzzzz_0, \
-                             g_0_yyyyzz_0_xxxxxx_1,   \
-                             g_0_yyyyzz_0_xxxxxxx_0,  \
-                             g_0_yyyyzz_0_xxxxxxx_1,  \
-                             g_0_yyyyzz_0_xxxxxxy_0,  \
-                             g_0_yyyyzz_0_xxxxxxy_1,  \
-                             g_0_yyyyzz_0_xxxxxxz_0,  \
-                             g_0_yyyyzz_0_xxxxxxz_1,  \
-                             g_0_yyyyzz_0_xxxxxy_1,   \
-                             g_0_yyyyzz_0_xxxxxyy_0,  \
-                             g_0_yyyyzz_0_xxxxxyy_1,  \
-                             g_0_yyyyzz_0_xxxxxyz_0,  \
-                             g_0_yyyyzz_0_xxxxxyz_1,  \
-                             g_0_yyyyzz_0_xxxxxz_1,   \
-                             g_0_yyyyzz_0_xxxxxzz_0,  \
-                             g_0_yyyyzz_0_xxxxxzz_1,  \
-                             g_0_yyyyzz_0_xxxxyy_1,   \
-                             g_0_yyyyzz_0_xxxxyyy_0,  \
-                             g_0_yyyyzz_0_xxxxyyy_1,  \
-                             g_0_yyyyzz_0_xxxxyyz_0,  \
-                             g_0_yyyyzz_0_xxxxyyz_1,  \
-                             g_0_yyyyzz_0_xxxxyz_1,   \
-                             g_0_yyyyzz_0_xxxxyzz_0,  \
-                             g_0_yyyyzz_0_xxxxyzz_1,  \
-                             g_0_yyyyzz_0_xxxxzz_1,   \
-                             g_0_yyyyzz_0_xxxxzzz_0,  \
-                             g_0_yyyyzz_0_xxxxzzz_1,  \
-                             g_0_yyyyzz_0_xxxyyy_1,   \
-                             g_0_yyyyzz_0_xxxyyyy_0,  \
-                             g_0_yyyyzz_0_xxxyyyy_1,  \
-                             g_0_yyyyzz_0_xxxyyyz_0,  \
-                             g_0_yyyyzz_0_xxxyyyz_1,  \
-                             g_0_yyyyzz_0_xxxyyz_1,   \
-                             g_0_yyyyzz_0_xxxyyzz_0,  \
-                             g_0_yyyyzz_0_xxxyyzz_1,  \
-                             g_0_yyyyzz_0_xxxyzz_1,   \
-                             g_0_yyyyzz_0_xxxyzzz_0,  \
-                             g_0_yyyyzz_0_xxxyzzz_1,  \
-                             g_0_yyyyzz_0_xxxzzz_1,   \
-                             g_0_yyyyzz_0_xxxzzzz_0,  \
-                             g_0_yyyyzz_0_xxxzzzz_1,  \
-                             g_0_yyyyzz_0_xxyyyy_1,   \
-                             g_0_yyyyzz_0_xxyyyyy_0,  \
-                             g_0_yyyyzz_0_xxyyyyy_1,  \
-                             g_0_yyyyzz_0_xxyyyyz_0,  \
-                             g_0_yyyyzz_0_xxyyyyz_1,  \
-                             g_0_yyyyzz_0_xxyyyz_1,   \
-                             g_0_yyyyzz_0_xxyyyzz_0,  \
-                             g_0_yyyyzz_0_xxyyyzz_1,  \
-                             g_0_yyyyzz_0_xxyyzz_1,   \
-                             g_0_yyyyzz_0_xxyyzzz_0,  \
-                             g_0_yyyyzz_0_xxyyzzz_1,  \
-                             g_0_yyyyzz_0_xxyzzz_1,   \
-                             g_0_yyyyzz_0_xxyzzzz_0,  \
-                             g_0_yyyyzz_0_xxyzzzz_1,  \
-                             g_0_yyyyzz_0_xxzzzz_1,   \
-                             g_0_yyyyzz_0_xxzzzzz_0,  \
-                             g_0_yyyyzz_0_xxzzzzz_1,  \
-                             g_0_yyyyzz_0_xyyyyy_1,   \
-                             g_0_yyyyzz_0_xyyyyyy_0,  \
-                             g_0_yyyyzz_0_xyyyyyy_1,  \
-                             g_0_yyyyzz_0_xyyyyyz_0,  \
-                             g_0_yyyyzz_0_xyyyyyz_1,  \
-                             g_0_yyyyzz_0_xyyyyz_1,   \
-                             g_0_yyyyzz_0_xyyyyzz_0,  \
-                             g_0_yyyyzz_0_xyyyyzz_1,  \
-                             g_0_yyyyzz_0_xyyyzz_1,   \
-                             g_0_yyyyzz_0_xyyyzzz_0,  \
-                             g_0_yyyyzz_0_xyyyzzz_1,  \
-                             g_0_yyyyzz_0_xyyzzz_1,   \
-                             g_0_yyyyzz_0_xyyzzzz_0,  \
-                             g_0_yyyyzz_0_xyyzzzz_1,  \
-                             g_0_yyyyzz_0_xyzzzz_1,   \
-                             g_0_yyyyzz_0_xyzzzzz_0,  \
-                             g_0_yyyyzz_0_xyzzzzz_1,  \
-                             g_0_yyyyzz_0_xzzzzz_1,   \
-                             g_0_yyyyzz_0_xzzzzzz_0,  \
-                             g_0_yyyyzz_0_xzzzzzz_1,  \
-                             g_0_yyyyzz_0_yyyyyy_1,   \
-                             g_0_yyyyzz_0_yyyyyyy_0,  \
-                             g_0_yyyyzz_0_yyyyyyy_1,  \
-                             g_0_yyyyzz_0_yyyyyyz_0,  \
-                             g_0_yyyyzz_0_yyyyyyz_1,  \
-                             g_0_yyyyzz_0_yyyyyz_1,   \
-                             g_0_yyyyzz_0_yyyyyzz_0,  \
-                             g_0_yyyyzz_0_yyyyyzz_1,  \
-                             g_0_yyyyzz_0_yyyyzz_1,   \
-                             g_0_yyyyzz_0_yyyyzzz_0,  \
-                             g_0_yyyyzz_0_yyyyzzz_1,  \
-                             g_0_yyyyzz_0_yyyzzz_1,   \
-                             g_0_yyyyzz_0_yyyzzzz_0,  \
-                             g_0_yyyyzz_0_yyyzzzz_1,  \
-                             g_0_yyyyzz_0_yyzzzz_1,   \
-                             g_0_yyyyzz_0_yyzzzzz_0,  \
-                             g_0_yyyyzz_0_yyzzzzz_1,  \
-                             g_0_yyyyzz_0_yzzzzz_1,   \
-                             g_0_yyyyzz_0_yzzzzzz_0,  \
-                             g_0_yyyyzz_0_yzzzzzz_1,  \
-                             g_0_yyyyzz_0_zzzzzz_1,   \
-                             g_0_yyyyzz_0_zzzzzzz_0,  \
-                             g_0_yyyyzz_0_zzzzzzz_1,  \
-                             wp_x,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xyyyyzz_0_xxxxxxx_0, g_0_xyyyyzz_0_xxxxxxy_0, g_0_xyyyyzz_0_xxxxxxz_0, g_0_xyyyyzz_0_xxxxxyy_0, g_0_xyyyyzz_0_xxxxxyz_0, g_0_xyyyyzz_0_xxxxxzz_0, g_0_xyyyyzz_0_xxxxyyy_0, g_0_xyyyyzz_0_xxxxyyz_0, g_0_xyyyyzz_0_xxxxyzz_0, g_0_xyyyyzz_0_xxxxzzz_0, g_0_xyyyyzz_0_xxxyyyy_0, g_0_xyyyyzz_0_xxxyyyz_0, g_0_xyyyyzz_0_xxxyyzz_0, g_0_xyyyyzz_0_xxxyzzz_0, g_0_xyyyyzz_0_xxxzzzz_0, g_0_xyyyyzz_0_xxyyyyy_0, g_0_xyyyyzz_0_xxyyyyz_0, g_0_xyyyyzz_0_xxyyyzz_0, g_0_xyyyyzz_0_xxyyzzz_0, g_0_xyyyyzz_0_xxyzzzz_0, g_0_xyyyyzz_0_xxzzzzz_0, g_0_xyyyyzz_0_xyyyyyy_0, g_0_xyyyyzz_0_xyyyyyz_0, g_0_xyyyyzz_0_xyyyyzz_0, g_0_xyyyyzz_0_xyyyzzz_0, g_0_xyyyyzz_0_xyyzzzz_0, g_0_xyyyyzz_0_xyzzzzz_0, g_0_xyyyyzz_0_xzzzzzz_0, g_0_xyyyyzz_0_yyyyyyy_0, g_0_xyyyyzz_0_yyyyyyz_0, g_0_xyyyyzz_0_yyyyyzz_0, g_0_xyyyyzz_0_yyyyzzz_0, g_0_xyyyyzz_0_yyyzzzz_0, g_0_xyyyyzz_0_yyzzzzz_0, g_0_xyyyyzz_0_yzzzzzz_0, g_0_xyyyyzz_0_zzzzzzz_0, g_0_yyyyzz_0_xxxxxx_1, g_0_yyyyzz_0_xxxxxxx_0, g_0_yyyyzz_0_xxxxxxx_1, g_0_yyyyzz_0_xxxxxxy_0, g_0_yyyyzz_0_xxxxxxy_1, g_0_yyyyzz_0_xxxxxxz_0, g_0_yyyyzz_0_xxxxxxz_1, g_0_yyyyzz_0_xxxxxy_1, g_0_yyyyzz_0_xxxxxyy_0, g_0_yyyyzz_0_xxxxxyy_1, g_0_yyyyzz_0_xxxxxyz_0, g_0_yyyyzz_0_xxxxxyz_1, g_0_yyyyzz_0_xxxxxz_1, g_0_yyyyzz_0_xxxxxzz_0, g_0_yyyyzz_0_xxxxxzz_1, g_0_yyyyzz_0_xxxxyy_1, g_0_yyyyzz_0_xxxxyyy_0, g_0_yyyyzz_0_xxxxyyy_1, g_0_yyyyzz_0_xxxxyyz_0, g_0_yyyyzz_0_xxxxyyz_1, g_0_yyyyzz_0_xxxxyz_1, g_0_yyyyzz_0_xxxxyzz_0, g_0_yyyyzz_0_xxxxyzz_1, g_0_yyyyzz_0_xxxxzz_1, g_0_yyyyzz_0_xxxxzzz_0, g_0_yyyyzz_0_xxxxzzz_1, g_0_yyyyzz_0_xxxyyy_1, g_0_yyyyzz_0_xxxyyyy_0, g_0_yyyyzz_0_xxxyyyy_1, g_0_yyyyzz_0_xxxyyyz_0, g_0_yyyyzz_0_xxxyyyz_1, g_0_yyyyzz_0_xxxyyz_1, g_0_yyyyzz_0_xxxyyzz_0, g_0_yyyyzz_0_xxxyyzz_1, g_0_yyyyzz_0_xxxyzz_1, g_0_yyyyzz_0_xxxyzzz_0, g_0_yyyyzz_0_xxxyzzz_1, g_0_yyyyzz_0_xxxzzz_1, g_0_yyyyzz_0_xxxzzzz_0, g_0_yyyyzz_0_xxxzzzz_1, g_0_yyyyzz_0_xxyyyy_1, g_0_yyyyzz_0_xxyyyyy_0, g_0_yyyyzz_0_xxyyyyy_1, g_0_yyyyzz_0_xxyyyyz_0, g_0_yyyyzz_0_xxyyyyz_1, g_0_yyyyzz_0_xxyyyz_1, g_0_yyyyzz_0_xxyyyzz_0, g_0_yyyyzz_0_xxyyyzz_1, g_0_yyyyzz_0_xxyyzz_1, g_0_yyyyzz_0_xxyyzzz_0, g_0_yyyyzz_0_xxyyzzz_1, g_0_yyyyzz_0_xxyzzz_1, g_0_yyyyzz_0_xxyzzzz_0, g_0_yyyyzz_0_xxyzzzz_1, g_0_yyyyzz_0_xxzzzz_1, g_0_yyyyzz_0_xxzzzzz_0, g_0_yyyyzz_0_xxzzzzz_1, g_0_yyyyzz_0_xyyyyy_1, g_0_yyyyzz_0_xyyyyyy_0, g_0_yyyyzz_0_xyyyyyy_1, g_0_yyyyzz_0_xyyyyyz_0, g_0_yyyyzz_0_xyyyyyz_1, g_0_yyyyzz_0_xyyyyz_1, g_0_yyyyzz_0_xyyyyzz_0, g_0_yyyyzz_0_xyyyyzz_1, g_0_yyyyzz_0_xyyyzz_1, g_0_yyyyzz_0_xyyyzzz_0, g_0_yyyyzz_0_xyyyzzz_1, g_0_yyyyzz_0_xyyzzz_1, g_0_yyyyzz_0_xyyzzzz_0, g_0_yyyyzz_0_xyyzzzz_1, g_0_yyyyzz_0_xyzzzz_1, g_0_yyyyzz_0_xyzzzzz_0, g_0_yyyyzz_0_xyzzzzz_1, g_0_yyyyzz_0_xzzzzz_1, g_0_yyyyzz_0_xzzzzzz_0, g_0_yyyyzz_0_xzzzzzz_1, g_0_yyyyzz_0_yyyyyy_1, g_0_yyyyzz_0_yyyyyyy_0, g_0_yyyyzz_0_yyyyyyy_1, g_0_yyyyzz_0_yyyyyyz_0, g_0_yyyyzz_0_yyyyyyz_1, g_0_yyyyzz_0_yyyyyz_1, g_0_yyyyzz_0_yyyyyzz_0, g_0_yyyyzz_0_yyyyyzz_1, g_0_yyyyzz_0_yyyyzz_1, g_0_yyyyzz_0_yyyyzzz_0, g_0_yyyyzz_0_yyyyzzz_1, g_0_yyyyzz_0_yyyzzz_1, g_0_yyyyzz_0_yyyzzzz_0, g_0_yyyyzz_0_yyyzzzz_1, g_0_yyyyzz_0_yyzzzz_1, g_0_yyyyzz_0_yyzzzzz_0, g_0_yyyyzz_0_yyzzzzz_1, g_0_yyyyzz_0_yzzzzz_1, g_0_yyyyzz_0_yzzzzzz_0, g_0_yyyyzz_0_yzzzzzz_1, g_0_yyyyzz_0_zzzzzz_1, g_0_yyyyzz_0_zzzzzzz_0, g_0_yyyyzz_0_zzzzzzz_1, wp_x, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
 
-        g_0_xyyyyzz_0_xxxxxxx_0[i] =
-            7.0 * g_0_yyyyzz_0_xxxxxx_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxxxx_0[i] * pb_x + g_0_yyyyzz_0_xxxxxxx_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxxxxxx_0[i] = 7.0 * g_0_yyyyzz_0_xxxxxx_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxxxx_0[i] * pb_x + g_0_yyyyzz_0_xxxxxxx_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxxxxxy_0[i] =
-            6.0 * g_0_yyyyzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxxxy_0[i] * pb_x + g_0_yyyyzz_0_xxxxxxy_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxxxxxy_0[i] = 6.0 * g_0_yyyyzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxxxy_0[i] * pb_x + g_0_yyyyzz_0_xxxxxxy_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxxxxxz_0[i] =
-            6.0 * g_0_yyyyzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxxxz_0[i] * pb_x + g_0_yyyyzz_0_xxxxxxz_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxxxxxz_0[i] = 6.0 * g_0_yyyyzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxxxz_0[i] * pb_x + g_0_yyyyzz_0_xxxxxxz_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxxxxyy_0[i] =
-            5.0 * g_0_yyyyzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxxyy_0[i] * pb_x + g_0_yyyyzz_0_xxxxxyy_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxxxxyy_0[i] = 5.0 * g_0_yyyyzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxxyy_0[i] * pb_x + g_0_yyyyzz_0_xxxxxyy_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxxxxyz_0[i] =
-            5.0 * g_0_yyyyzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxxyz_0[i] * pb_x + g_0_yyyyzz_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxxxxyz_0[i] = 5.0 * g_0_yyyyzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxxyz_0[i] * pb_x + g_0_yyyyzz_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxxxxzz_0[i] =
-            5.0 * g_0_yyyyzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxxzz_0[i] * pb_x + g_0_yyyyzz_0_xxxxxzz_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxxxxzz_0[i] = 5.0 * g_0_yyyyzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxxzz_0[i] * pb_x + g_0_yyyyzz_0_xxxxxzz_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxxxyyy_0[i] =
-            4.0 * g_0_yyyyzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxyyy_0[i] * pb_x + g_0_yyyyzz_0_xxxxyyy_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxxxyyy_0[i] = 4.0 * g_0_yyyyzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxyyy_0[i] * pb_x + g_0_yyyyzz_0_xxxxyyy_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxxxyyz_0[i] =
-            4.0 * g_0_yyyyzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxyyz_0[i] * pb_x + g_0_yyyyzz_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxxxyyz_0[i] = 4.0 * g_0_yyyyzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxyyz_0[i] * pb_x + g_0_yyyyzz_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxxxyzz_0[i] =
-            4.0 * g_0_yyyyzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxyzz_0[i] * pb_x + g_0_yyyyzz_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxxxyzz_0[i] = 4.0 * g_0_yyyyzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxyzz_0[i] * pb_x + g_0_yyyyzz_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxxxzzz_0[i] =
-            4.0 * g_0_yyyyzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxzzz_0[i] * pb_x + g_0_yyyyzz_0_xxxxzzz_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxxxzzz_0[i] = 4.0 * g_0_yyyyzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxzzz_0[i] * pb_x + g_0_yyyyzz_0_xxxxzzz_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxxyyyy_0[i] =
-            3.0 * g_0_yyyyzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxyyyy_0[i] * pb_x + g_0_yyyyzz_0_xxxyyyy_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxxyyyy_0[i] = 3.0 * g_0_yyyyzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxyyyy_0[i] * pb_x + g_0_yyyyzz_0_xxxyyyy_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxxyyyz_0[i] =
-            3.0 * g_0_yyyyzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxyyyz_0[i] * pb_x + g_0_yyyyzz_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxxyyyz_0[i] = 3.0 * g_0_yyyyzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxyyyz_0[i] * pb_x + g_0_yyyyzz_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxxyyzz_0[i] =
-            3.0 * g_0_yyyyzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxyyzz_0[i] * pb_x + g_0_yyyyzz_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxxyyzz_0[i] = 3.0 * g_0_yyyyzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxyyzz_0[i] * pb_x + g_0_yyyyzz_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxxyzzz_0[i] =
-            3.0 * g_0_yyyyzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxyzzz_0[i] * pb_x + g_0_yyyyzz_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxxyzzz_0[i] = 3.0 * g_0_yyyyzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxyzzz_0[i] * pb_x + g_0_yyyyzz_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxxzzzz_0[i] =
-            3.0 * g_0_yyyyzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxzzzz_0[i] * pb_x + g_0_yyyyzz_0_xxxzzzz_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxxzzzz_0[i] = 3.0 * g_0_yyyyzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxzzzz_0[i] * pb_x + g_0_yyyyzz_0_xxxzzzz_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxyyyyy_0[i] =
-            2.0 * g_0_yyyyzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyyyyy_0[i] * pb_x + g_0_yyyyzz_0_xxyyyyy_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxyyyyy_0[i] = 2.0 * g_0_yyyyzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyyyyy_0[i] * pb_x + g_0_yyyyzz_0_xxyyyyy_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxyyyyz_0[i] =
-            2.0 * g_0_yyyyzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyyyyz_0[i] * pb_x + g_0_yyyyzz_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxyyyyz_0[i] = 2.0 * g_0_yyyyzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyyyyz_0[i] * pb_x + g_0_yyyyzz_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxyyyzz_0[i] =
-            2.0 * g_0_yyyyzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyyyzz_0[i] * pb_x + g_0_yyyyzz_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxyyyzz_0[i] = 2.0 * g_0_yyyyzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyyyzz_0[i] * pb_x + g_0_yyyyzz_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxyyzzz_0[i] =
-            2.0 * g_0_yyyyzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyyzzz_0[i] * pb_x + g_0_yyyyzz_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxyyzzz_0[i] = 2.0 * g_0_yyyyzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyyzzz_0[i] * pb_x + g_0_yyyyzz_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxyzzzz_0[i] =
-            2.0 * g_0_yyyyzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyzzzz_0[i] * pb_x + g_0_yyyyzz_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxyzzzz_0[i] = 2.0 * g_0_yyyyzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyzzzz_0[i] * pb_x + g_0_yyyyzz_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xyyyyzz_0_xxzzzzz_0[i] =
-            2.0 * g_0_yyyyzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxzzzzz_0[i] * pb_x + g_0_yyyyzz_0_xxzzzzz_1[i] * wp_x[i];
+        g_0_xyyyyzz_0_xxzzzzz_0[i] = 2.0 * g_0_yyyyzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxzzzzz_0[i] * pb_x + g_0_yyyyzz_0_xxzzzzz_1[i] * wp_x[i];
 
         g_0_xyyyyzz_0_xyyyyyy_0[i] = g_0_yyyyzz_0_yyyyyy_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xyyyyyy_0[i] * pb_x + g_0_yyyyzz_0_xyyyyyy_1[i] * wp_x[i];
 
@@ -14484,211 +9558,52 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xyyyzzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 899);
 
-#pragma omp simd aligned(g_0_xyyyzzz_0_xxxxxxx_0,     \
-                             g_0_xyyyzzz_0_xxxxxxy_0, \
-                             g_0_xyyyzzz_0_xxxxxxz_0, \
-                             g_0_xyyyzzz_0_xxxxxyy_0, \
-                             g_0_xyyyzzz_0_xxxxxyz_0, \
-                             g_0_xyyyzzz_0_xxxxxzz_0, \
-                             g_0_xyyyzzz_0_xxxxyyy_0, \
-                             g_0_xyyyzzz_0_xxxxyyz_0, \
-                             g_0_xyyyzzz_0_xxxxyzz_0, \
-                             g_0_xyyyzzz_0_xxxxzzz_0, \
-                             g_0_xyyyzzz_0_xxxyyyy_0, \
-                             g_0_xyyyzzz_0_xxxyyyz_0, \
-                             g_0_xyyyzzz_0_xxxyyzz_0, \
-                             g_0_xyyyzzz_0_xxxyzzz_0, \
-                             g_0_xyyyzzz_0_xxxzzzz_0, \
-                             g_0_xyyyzzz_0_xxyyyyy_0, \
-                             g_0_xyyyzzz_0_xxyyyyz_0, \
-                             g_0_xyyyzzz_0_xxyyyzz_0, \
-                             g_0_xyyyzzz_0_xxyyzzz_0, \
-                             g_0_xyyyzzz_0_xxyzzzz_0, \
-                             g_0_xyyyzzz_0_xxzzzzz_0, \
-                             g_0_xyyyzzz_0_xyyyyyy_0, \
-                             g_0_xyyyzzz_0_xyyyyyz_0, \
-                             g_0_xyyyzzz_0_xyyyyzz_0, \
-                             g_0_xyyyzzz_0_xyyyzzz_0, \
-                             g_0_xyyyzzz_0_xyyzzzz_0, \
-                             g_0_xyyyzzz_0_xyzzzzz_0, \
-                             g_0_xyyyzzz_0_xzzzzzz_0, \
-                             g_0_xyyyzzz_0_yyyyyyy_0, \
-                             g_0_xyyyzzz_0_yyyyyyz_0, \
-                             g_0_xyyyzzz_0_yyyyyzz_0, \
-                             g_0_xyyyzzz_0_yyyyzzz_0, \
-                             g_0_xyyyzzz_0_yyyzzzz_0, \
-                             g_0_xyyyzzz_0_yyzzzzz_0, \
-                             g_0_xyyyzzz_0_yzzzzzz_0, \
-                             g_0_xyyyzzz_0_zzzzzzz_0, \
-                             g_0_yyyzzz_0_xxxxxx_1,   \
-                             g_0_yyyzzz_0_xxxxxxx_0,  \
-                             g_0_yyyzzz_0_xxxxxxx_1,  \
-                             g_0_yyyzzz_0_xxxxxxy_0,  \
-                             g_0_yyyzzz_0_xxxxxxy_1,  \
-                             g_0_yyyzzz_0_xxxxxxz_0,  \
-                             g_0_yyyzzz_0_xxxxxxz_1,  \
-                             g_0_yyyzzz_0_xxxxxy_1,   \
-                             g_0_yyyzzz_0_xxxxxyy_0,  \
-                             g_0_yyyzzz_0_xxxxxyy_1,  \
-                             g_0_yyyzzz_0_xxxxxyz_0,  \
-                             g_0_yyyzzz_0_xxxxxyz_1,  \
-                             g_0_yyyzzz_0_xxxxxz_1,   \
-                             g_0_yyyzzz_0_xxxxxzz_0,  \
-                             g_0_yyyzzz_0_xxxxxzz_1,  \
-                             g_0_yyyzzz_0_xxxxyy_1,   \
-                             g_0_yyyzzz_0_xxxxyyy_0,  \
-                             g_0_yyyzzz_0_xxxxyyy_1,  \
-                             g_0_yyyzzz_0_xxxxyyz_0,  \
-                             g_0_yyyzzz_0_xxxxyyz_1,  \
-                             g_0_yyyzzz_0_xxxxyz_1,   \
-                             g_0_yyyzzz_0_xxxxyzz_0,  \
-                             g_0_yyyzzz_0_xxxxyzz_1,  \
-                             g_0_yyyzzz_0_xxxxzz_1,   \
-                             g_0_yyyzzz_0_xxxxzzz_0,  \
-                             g_0_yyyzzz_0_xxxxzzz_1,  \
-                             g_0_yyyzzz_0_xxxyyy_1,   \
-                             g_0_yyyzzz_0_xxxyyyy_0,  \
-                             g_0_yyyzzz_0_xxxyyyy_1,  \
-                             g_0_yyyzzz_0_xxxyyyz_0,  \
-                             g_0_yyyzzz_0_xxxyyyz_1,  \
-                             g_0_yyyzzz_0_xxxyyz_1,   \
-                             g_0_yyyzzz_0_xxxyyzz_0,  \
-                             g_0_yyyzzz_0_xxxyyzz_1,  \
-                             g_0_yyyzzz_0_xxxyzz_1,   \
-                             g_0_yyyzzz_0_xxxyzzz_0,  \
-                             g_0_yyyzzz_0_xxxyzzz_1,  \
-                             g_0_yyyzzz_0_xxxzzz_1,   \
-                             g_0_yyyzzz_0_xxxzzzz_0,  \
-                             g_0_yyyzzz_0_xxxzzzz_1,  \
-                             g_0_yyyzzz_0_xxyyyy_1,   \
-                             g_0_yyyzzz_0_xxyyyyy_0,  \
-                             g_0_yyyzzz_0_xxyyyyy_1,  \
-                             g_0_yyyzzz_0_xxyyyyz_0,  \
-                             g_0_yyyzzz_0_xxyyyyz_1,  \
-                             g_0_yyyzzz_0_xxyyyz_1,   \
-                             g_0_yyyzzz_0_xxyyyzz_0,  \
-                             g_0_yyyzzz_0_xxyyyzz_1,  \
-                             g_0_yyyzzz_0_xxyyzz_1,   \
-                             g_0_yyyzzz_0_xxyyzzz_0,  \
-                             g_0_yyyzzz_0_xxyyzzz_1,  \
-                             g_0_yyyzzz_0_xxyzzz_1,   \
-                             g_0_yyyzzz_0_xxyzzzz_0,  \
-                             g_0_yyyzzz_0_xxyzzzz_1,  \
-                             g_0_yyyzzz_0_xxzzzz_1,   \
-                             g_0_yyyzzz_0_xxzzzzz_0,  \
-                             g_0_yyyzzz_0_xxzzzzz_1,  \
-                             g_0_yyyzzz_0_xyyyyy_1,   \
-                             g_0_yyyzzz_0_xyyyyyy_0,  \
-                             g_0_yyyzzz_0_xyyyyyy_1,  \
-                             g_0_yyyzzz_0_xyyyyyz_0,  \
-                             g_0_yyyzzz_0_xyyyyyz_1,  \
-                             g_0_yyyzzz_0_xyyyyz_1,   \
-                             g_0_yyyzzz_0_xyyyyzz_0,  \
-                             g_0_yyyzzz_0_xyyyyzz_1,  \
-                             g_0_yyyzzz_0_xyyyzz_1,   \
-                             g_0_yyyzzz_0_xyyyzzz_0,  \
-                             g_0_yyyzzz_0_xyyyzzz_1,  \
-                             g_0_yyyzzz_0_xyyzzz_1,   \
-                             g_0_yyyzzz_0_xyyzzzz_0,  \
-                             g_0_yyyzzz_0_xyyzzzz_1,  \
-                             g_0_yyyzzz_0_xyzzzz_1,   \
-                             g_0_yyyzzz_0_xyzzzzz_0,  \
-                             g_0_yyyzzz_0_xyzzzzz_1,  \
-                             g_0_yyyzzz_0_xzzzzz_1,   \
-                             g_0_yyyzzz_0_xzzzzzz_0,  \
-                             g_0_yyyzzz_0_xzzzzzz_1,  \
-                             g_0_yyyzzz_0_yyyyyy_1,   \
-                             g_0_yyyzzz_0_yyyyyyy_0,  \
-                             g_0_yyyzzz_0_yyyyyyy_1,  \
-                             g_0_yyyzzz_0_yyyyyyz_0,  \
-                             g_0_yyyzzz_0_yyyyyyz_1,  \
-                             g_0_yyyzzz_0_yyyyyz_1,   \
-                             g_0_yyyzzz_0_yyyyyzz_0,  \
-                             g_0_yyyzzz_0_yyyyyzz_1,  \
-                             g_0_yyyzzz_0_yyyyzz_1,   \
-                             g_0_yyyzzz_0_yyyyzzz_0,  \
-                             g_0_yyyzzz_0_yyyyzzz_1,  \
-                             g_0_yyyzzz_0_yyyzzz_1,   \
-                             g_0_yyyzzz_0_yyyzzzz_0,  \
-                             g_0_yyyzzz_0_yyyzzzz_1,  \
-                             g_0_yyyzzz_0_yyzzzz_1,   \
-                             g_0_yyyzzz_0_yyzzzzz_0,  \
-                             g_0_yyyzzz_0_yyzzzzz_1,  \
-                             g_0_yyyzzz_0_yzzzzz_1,   \
-                             g_0_yyyzzz_0_yzzzzzz_0,  \
-                             g_0_yyyzzz_0_yzzzzzz_1,  \
-                             g_0_yyyzzz_0_zzzzzz_1,   \
-                             g_0_yyyzzz_0_zzzzzzz_0,  \
-                             g_0_yyyzzz_0_zzzzzzz_1,  \
-                             wp_x,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xyyyzzz_0_xxxxxxx_0, g_0_xyyyzzz_0_xxxxxxy_0, g_0_xyyyzzz_0_xxxxxxz_0, g_0_xyyyzzz_0_xxxxxyy_0, g_0_xyyyzzz_0_xxxxxyz_0, g_0_xyyyzzz_0_xxxxxzz_0, g_0_xyyyzzz_0_xxxxyyy_0, g_0_xyyyzzz_0_xxxxyyz_0, g_0_xyyyzzz_0_xxxxyzz_0, g_0_xyyyzzz_0_xxxxzzz_0, g_0_xyyyzzz_0_xxxyyyy_0, g_0_xyyyzzz_0_xxxyyyz_0, g_0_xyyyzzz_0_xxxyyzz_0, g_0_xyyyzzz_0_xxxyzzz_0, g_0_xyyyzzz_0_xxxzzzz_0, g_0_xyyyzzz_0_xxyyyyy_0, g_0_xyyyzzz_0_xxyyyyz_0, g_0_xyyyzzz_0_xxyyyzz_0, g_0_xyyyzzz_0_xxyyzzz_0, g_0_xyyyzzz_0_xxyzzzz_0, g_0_xyyyzzz_0_xxzzzzz_0, g_0_xyyyzzz_0_xyyyyyy_0, g_0_xyyyzzz_0_xyyyyyz_0, g_0_xyyyzzz_0_xyyyyzz_0, g_0_xyyyzzz_0_xyyyzzz_0, g_0_xyyyzzz_0_xyyzzzz_0, g_0_xyyyzzz_0_xyzzzzz_0, g_0_xyyyzzz_0_xzzzzzz_0, g_0_xyyyzzz_0_yyyyyyy_0, g_0_xyyyzzz_0_yyyyyyz_0, g_0_xyyyzzz_0_yyyyyzz_0, g_0_xyyyzzz_0_yyyyzzz_0, g_0_xyyyzzz_0_yyyzzzz_0, g_0_xyyyzzz_0_yyzzzzz_0, g_0_xyyyzzz_0_yzzzzzz_0, g_0_xyyyzzz_0_zzzzzzz_0, g_0_yyyzzz_0_xxxxxx_1, g_0_yyyzzz_0_xxxxxxx_0, g_0_yyyzzz_0_xxxxxxx_1, g_0_yyyzzz_0_xxxxxxy_0, g_0_yyyzzz_0_xxxxxxy_1, g_0_yyyzzz_0_xxxxxxz_0, g_0_yyyzzz_0_xxxxxxz_1, g_0_yyyzzz_0_xxxxxy_1, g_0_yyyzzz_0_xxxxxyy_0, g_0_yyyzzz_0_xxxxxyy_1, g_0_yyyzzz_0_xxxxxyz_0, g_0_yyyzzz_0_xxxxxyz_1, g_0_yyyzzz_0_xxxxxz_1, g_0_yyyzzz_0_xxxxxzz_0, g_0_yyyzzz_0_xxxxxzz_1, g_0_yyyzzz_0_xxxxyy_1, g_0_yyyzzz_0_xxxxyyy_0, g_0_yyyzzz_0_xxxxyyy_1, g_0_yyyzzz_0_xxxxyyz_0, g_0_yyyzzz_0_xxxxyyz_1, g_0_yyyzzz_0_xxxxyz_1, g_0_yyyzzz_0_xxxxyzz_0, g_0_yyyzzz_0_xxxxyzz_1, g_0_yyyzzz_0_xxxxzz_1, g_0_yyyzzz_0_xxxxzzz_0, g_0_yyyzzz_0_xxxxzzz_1, g_0_yyyzzz_0_xxxyyy_1, g_0_yyyzzz_0_xxxyyyy_0, g_0_yyyzzz_0_xxxyyyy_1, g_0_yyyzzz_0_xxxyyyz_0, g_0_yyyzzz_0_xxxyyyz_1, g_0_yyyzzz_0_xxxyyz_1, g_0_yyyzzz_0_xxxyyzz_0, g_0_yyyzzz_0_xxxyyzz_1, g_0_yyyzzz_0_xxxyzz_1, g_0_yyyzzz_0_xxxyzzz_0, g_0_yyyzzz_0_xxxyzzz_1, g_0_yyyzzz_0_xxxzzz_1, g_0_yyyzzz_0_xxxzzzz_0, g_0_yyyzzz_0_xxxzzzz_1, g_0_yyyzzz_0_xxyyyy_1, g_0_yyyzzz_0_xxyyyyy_0, g_0_yyyzzz_0_xxyyyyy_1, g_0_yyyzzz_0_xxyyyyz_0, g_0_yyyzzz_0_xxyyyyz_1, g_0_yyyzzz_0_xxyyyz_1, g_0_yyyzzz_0_xxyyyzz_0, g_0_yyyzzz_0_xxyyyzz_1, g_0_yyyzzz_0_xxyyzz_1, g_0_yyyzzz_0_xxyyzzz_0, g_0_yyyzzz_0_xxyyzzz_1, g_0_yyyzzz_0_xxyzzz_1, g_0_yyyzzz_0_xxyzzzz_0, g_0_yyyzzz_0_xxyzzzz_1, g_0_yyyzzz_0_xxzzzz_1, g_0_yyyzzz_0_xxzzzzz_0, g_0_yyyzzz_0_xxzzzzz_1, g_0_yyyzzz_0_xyyyyy_1, g_0_yyyzzz_0_xyyyyyy_0, g_0_yyyzzz_0_xyyyyyy_1, g_0_yyyzzz_0_xyyyyyz_0, g_0_yyyzzz_0_xyyyyyz_1, g_0_yyyzzz_0_xyyyyz_1, g_0_yyyzzz_0_xyyyyzz_0, g_0_yyyzzz_0_xyyyyzz_1, g_0_yyyzzz_0_xyyyzz_1, g_0_yyyzzz_0_xyyyzzz_0, g_0_yyyzzz_0_xyyyzzz_1, g_0_yyyzzz_0_xyyzzz_1, g_0_yyyzzz_0_xyyzzzz_0, g_0_yyyzzz_0_xyyzzzz_1, g_0_yyyzzz_0_xyzzzz_1, g_0_yyyzzz_0_xyzzzzz_0, g_0_yyyzzz_0_xyzzzzz_1, g_0_yyyzzz_0_xzzzzz_1, g_0_yyyzzz_0_xzzzzzz_0, g_0_yyyzzz_0_xzzzzzz_1, g_0_yyyzzz_0_yyyyyy_1, g_0_yyyzzz_0_yyyyyyy_0, g_0_yyyzzz_0_yyyyyyy_1, g_0_yyyzzz_0_yyyyyyz_0, g_0_yyyzzz_0_yyyyyyz_1, g_0_yyyzzz_0_yyyyyz_1, g_0_yyyzzz_0_yyyyyzz_0, g_0_yyyzzz_0_yyyyyzz_1, g_0_yyyzzz_0_yyyyzz_1, g_0_yyyzzz_0_yyyyzzz_0, g_0_yyyzzz_0_yyyyzzz_1, g_0_yyyzzz_0_yyyzzz_1, g_0_yyyzzz_0_yyyzzzz_0, g_0_yyyzzz_0_yyyzzzz_1, g_0_yyyzzz_0_yyzzzz_1, g_0_yyyzzz_0_yyzzzzz_0, g_0_yyyzzz_0_yyzzzzz_1, g_0_yyyzzz_0_yzzzzz_1, g_0_yyyzzz_0_yzzzzzz_0, g_0_yyyzzz_0_yzzzzzz_1, g_0_yyyzzz_0_zzzzzz_1, g_0_yyyzzz_0_zzzzzzz_0, g_0_yyyzzz_0_zzzzzzz_1, wp_x, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
 
-        g_0_xyyyzzz_0_xxxxxxx_0[i] =
-            7.0 * g_0_yyyzzz_0_xxxxxx_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxxxx_0[i] * pb_x + g_0_yyyzzz_0_xxxxxxx_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxxxxxx_0[i] = 7.0 * g_0_yyyzzz_0_xxxxxx_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxxxx_0[i] * pb_x + g_0_yyyzzz_0_xxxxxxx_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxxxxxy_0[i] =
-            6.0 * g_0_yyyzzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxxxy_0[i] * pb_x + g_0_yyyzzz_0_xxxxxxy_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxxxxxy_0[i] = 6.0 * g_0_yyyzzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxxxy_0[i] * pb_x + g_0_yyyzzz_0_xxxxxxy_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxxxxxz_0[i] =
-            6.0 * g_0_yyyzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxxxz_0[i] * pb_x + g_0_yyyzzz_0_xxxxxxz_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxxxxxz_0[i] = 6.0 * g_0_yyyzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxxxz_0[i] * pb_x + g_0_yyyzzz_0_xxxxxxz_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxxxxyy_0[i] =
-            5.0 * g_0_yyyzzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxxyy_0[i] * pb_x + g_0_yyyzzz_0_xxxxxyy_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxxxxyy_0[i] = 5.0 * g_0_yyyzzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxxyy_0[i] * pb_x + g_0_yyyzzz_0_xxxxxyy_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxxxxyz_0[i] =
-            5.0 * g_0_yyyzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxxyz_0[i] * pb_x + g_0_yyyzzz_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxxxxyz_0[i] = 5.0 * g_0_yyyzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxxyz_0[i] * pb_x + g_0_yyyzzz_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxxxxzz_0[i] =
-            5.0 * g_0_yyyzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxxzz_0[i] * pb_x + g_0_yyyzzz_0_xxxxxzz_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxxxxzz_0[i] = 5.0 * g_0_yyyzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxxzz_0[i] * pb_x + g_0_yyyzzz_0_xxxxxzz_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxxxyyy_0[i] =
-            4.0 * g_0_yyyzzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxyyy_0[i] * pb_x + g_0_yyyzzz_0_xxxxyyy_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxxxyyy_0[i] = 4.0 * g_0_yyyzzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxyyy_0[i] * pb_x + g_0_yyyzzz_0_xxxxyyy_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxxxyyz_0[i] =
-            4.0 * g_0_yyyzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxyyz_0[i] * pb_x + g_0_yyyzzz_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxxxyyz_0[i] = 4.0 * g_0_yyyzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxyyz_0[i] * pb_x + g_0_yyyzzz_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxxxyzz_0[i] =
-            4.0 * g_0_yyyzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxyzz_0[i] * pb_x + g_0_yyyzzz_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxxxyzz_0[i] = 4.0 * g_0_yyyzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxyzz_0[i] * pb_x + g_0_yyyzzz_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxxxzzz_0[i] =
-            4.0 * g_0_yyyzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxzzz_0[i] * pb_x + g_0_yyyzzz_0_xxxxzzz_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxxxzzz_0[i] = 4.0 * g_0_yyyzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxzzz_0[i] * pb_x + g_0_yyyzzz_0_xxxxzzz_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxxyyyy_0[i] =
-            3.0 * g_0_yyyzzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxyyyy_0[i] * pb_x + g_0_yyyzzz_0_xxxyyyy_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxxyyyy_0[i] = 3.0 * g_0_yyyzzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxyyyy_0[i] * pb_x + g_0_yyyzzz_0_xxxyyyy_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxxyyyz_0[i] =
-            3.0 * g_0_yyyzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxyyyz_0[i] * pb_x + g_0_yyyzzz_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxxyyyz_0[i] = 3.0 * g_0_yyyzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxyyyz_0[i] * pb_x + g_0_yyyzzz_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxxyyzz_0[i] =
-            3.0 * g_0_yyyzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxyyzz_0[i] * pb_x + g_0_yyyzzz_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxxyyzz_0[i] = 3.0 * g_0_yyyzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxyyzz_0[i] * pb_x + g_0_yyyzzz_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxxyzzz_0[i] =
-            3.0 * g_0_yyyzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxyzzz_0[i] * pb_x + g_0_yyyzzz_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxxyzzz_0[i] = 3.0 * g_0_yyyzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxyzzz_0[i] * pb_x + g_0_yyyzzz_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxxzzzz_0[i] =
-            3.0 * g_0_yyyzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxzzzz_0[i] * pb_x + g_0_yyyzzz_0_xxxzzzz_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxxzzzz_0[i] = 3.0 * g_0_yyyzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxzzzz_0[i] * pb_x + g_0_yyyzzz_0_xxxzzzz_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxyyyyy_0[i] =
-            2.0 * g_0_yyyzzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyyyyy_0[i] * pb_x + g_0_yyyzzz_0_xxyyyyy_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxyyyyy_0[i] = 2.0 * g_0_yyyzzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyyyyy_0[i] * pb_x + g_0_yyyzzz_0_xxyyyyy_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxyyyyz_0[i] =
-            2.0 * g_0_yyyzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyyyyz_0[i] * pb_x + g_0_yyyzzz_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxyyyyz_0[i] = 2.0 * g_0_yyyzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyyyyz_0[i] * pb_x + g_0_yyyzzz_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxyyyzz_0[i] =
-            2.0 * g_0_yyyzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyyyzz_0[i] * pb_x + g_0_yyyzzz_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxyyyzz_0[i] = 2.0 * g_0_yyyzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyyyzz_0[i] * pb_x + g_0_yyyzzz_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxyyzzz_0[i] =
-            2.0 * g_0_yyyzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyyzzz_0[i] * pb_x + g_0_yyyzzz_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxyyzzz_0[i] = 2.0 * g_0_yyyzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyyzzz_0[i] * pb_x + g_0_yyyzzz_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxyzzzz_0[i] =
-            2.0 * g_0_yyyzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyzzzz_0[i] * pb_x + g_0_yyyzzz_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxyzzzz_0[i] = 2.0 * g_0_yyyzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyzzzz_0[i] * pb_x + g_0_yyyzzz_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xyyyzzz_0_xxzzzzz_0[i] =
-            2.0 * g_0_yyyzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxzzzzz_0[i] * pb_x + g_0_yyyzzz_0_xxzzzzz_1[i] * wp_x[i];
+        g_0_xyyyzzz_0_xxzzzzz_0[i] = 2.0 * g_0_yyyzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxzzzzz_0[i] * pb_x + g_0_yyyzzz_0_xxzzzzz_1[i] * wp_x[i];
 
         g_0_xyyyzzz_0_xyyyyyy_0[i] = g_0_yyyzzz_0_yyyyyy_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xyyyyyy_0[i] * pb_x + g_0_yyyzzz_0_xyyyyyy_1[i] * wp_x[i];
 
@@ -14795,211 +9710,52 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xyyzzzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 935);
 
-#pragma omp simd aligned(g_0_xyyzzzz_0_xxxxxxx_0,     \
-                             g_0_xyyzzzz_0_xxxxxxy_0, \
-                             g_0_xyyzzzz_0_xxxxxxz_0, \
-                             g_0_xyyzzzz_0_xxxxxyy_0, \
-                             g_0_xyyzzzz_0_xxxxxyz_0, \
-                             g_0_xyyzzzz_0_xxxxxzz_0, \
-                             g_0_xyyzzzz_0_xxxxyyy_0, \
-                             g_0_xyyzzzz_0_xxxxyyz_0, \
-                             g_0_xyyzzzz_0_xxxxyzz_0, \
-                             g_0_xyyzzzz_0_xxxxzzz_0, \
-                             g_0_xyyzzzz_0_xxxyyyy_0, \
-                             g_0_xyyzzzz_0_xxxyyyz_0, \
-                             g_0_xyyzzzz_0_xxxyyzz_0, \
-                             g_0_xyyzzzz_0_xxxyzzz_0, \
-                             g_0_xyyzzzz_0_xxxzzzz_0, \
-                             g_0_xyyzzzz_0_xxyyyyy_0, \
-                             g_0_xyyzzzz_0_xxyyyyz_0, \
-                             g_0_xyyzzzz_0_xxyyyzz_0, \
-                             g_0_xyyzzzz_0_xxyyzzz_0, \
-                             g_0_xyyzzzz_0_xxyzzzz_0, \
-                             g_0_xyyzzzz_0_xxzzzzz_0, \
-                             g_0_xyyzzzz_0_xyyyyyy_0, \
-                             g_0_xyyzzzz_0_xyyyyyz_0, \
-                             g_0_xyyzzzz_0_xyyyyzz_0, \
-                             g_0_xyyzzzz_0_xyyyzzz_0, \
-                             g_0_xyyzzzz_0_xyyzzzz_0, \
-                             g_0_xyyzzzz_0_xyzzzzz_0, \
-                             g_0_xyyzzzz_0_xzzzzzz_0, \
-                             g_0_xyyzzzz_0_yyyyyyy_0, \
-                             g_0_xyyzzzz_0_yyyyyyz_0, \
-                             g_0_xyyzzzz_0_yyyyyzz_0, \
-                             g_0_xyyzzzz_0_yyyyzzz_0, \
-                             g_0_xyyzzzz_0_yyyzzzz_0, \
-                             g_0_xyyzzzz_0_yyzzzzz_0, \
-                             g_0_xyyzzzz_0_yzzzzzz_0, \
-                             g_0_xyyzzzz_0_zzzzzzz_0, \
-                             g_0_yyzzzz_0_xxxxxx_1,   \
-                             g_0_yyzzzz_0_xxxxxxx_0,  \
-                             g_0_yyzzzz_0_xxxxxxx_1,  \
-                             g_0_yyzzzz_0_xxxxxxy_0,  \
-                             g_0_yyzzzz_0_xxxxxxy_1,  \
-                             g_0_yyzzzz_0_xxxxxxz_0,  \
-                             g_0_yyzzzz_0_xxxxxxz_1,  \
-                             g_0_yyzzzz_0_xxxxxy_1,   \
-                             g_0_yyzzzz_0_xxxxxyy_0,  \
-                             g_0_yyzzzz_0_xxxxxyy_1,  \
-                             g_0_yyzzzz_0_xxxxxyz_0,  \
-                             g_0_yyzzzz_0_xxxxxyz_1,  \
-                             g_0_yyzzzz_0_xxxxxz_1,   \
-                             g_0_yyzzzz_0_xxxxxzz_0,  \
-                             g_0_yyzzzz_0_xxxxxzz_1,  \
-                             g_0_yyzzzz_0_xxxxyy_1,   \
-                             g_0_yyzzzz_0_xxxxyyy_0,  \
-                             g_0_yyzzzz_0_xxxxyyy_1,  \
-                             g_0_yyzzzz_0_xxxxyyz_0,  \
-                             g_0_yyzzzz_0_xxxxyyz_1,  \
-                             g_0_yyzzzz_0_xxxxyz_1,   \
-                             g_0_yyzzzz_0_xxxxyzz_0,  \
-                             g_0_yyzzzz_0_xxxxyzz_1,  \
-                             g_0_yyzzzz_0_xxxxzz_1,   \
-                             g_0_yyzzzz_0_xxxxzzz_0,  \
-                             g_0_yyzzzz_0_xxxxzzz_1,  \
-                             g_0_yyzzzz_0_xxxyyy_1,   \
-                             g_0_yyzzzz_0_xxxyyyy_0,  \
-                             g_0_yyzzzz_0_xxxyyyy_1,  \
-                             g_0_yyzzzz_0_xxxyyyz_0,  \
-                             g_0_yyzzzz_0_xxxyyyz_1,  \
-                             g_0_yyzzzz_0_xxxyyz_1,   \
-                             g_0_yyzzzz_0_xxxyyzz_0,  \
-                             g_0_yyzzzz_0_xxxyyzz_1,  \
-                             g_0_yyzzzz_0_xxxyzz_1,   \
-                             g_0_yyzzzz_0_xxxyzzz_0,  \
-                             g_0_yyzzzz_0_xxxyzzz_1,  \
-                             g_0_yyzzzz_0_xxxzzz_1,   \
-                             g_0_yyzzzz_0_xxxzzzz_0,  \
-                             g_0_yyzzzz_0_xxxzzzz_1,  \
-                             g_0_yyzzzz_0_xxyyyy_1,   \
-                             g_0_yyzzzz_0_xxyyyyy_0,  \
-                             g_0_yyzzzz_0_xxyyyyy_1,  \
-                             g_0_yyzzzz_0_xxyyyyz_0,  \
-                             g_0_yyzzzz_0_xxyyyyz_1,  \
-                             g_0_yyzzzz_0_xxyyyz_1,   \
-                             g_0_yyzzzz_0_xxyyyzz_0,  \
-                             g_0_yyzzzz_0_xxyyyzz_1,  \
-                             g_0_yyzzzz_0_xxyyzz_1,   \
-                             g_0_yyzzzz_0_xxyyzzz_0,  \
-                             g_0_yyzzzz_0_xxyyzzz_1,  \
-                             g_0_yyzzzz_0_xxyzzz_1,   \
-                             g_0_yyzzzz_0_xxyzzzz_0,  \
-                             g_0_yyzzzz_0_xxyzzzz_1,  \
-                             g_0_yyzzzz_0_xxzzzz_1,   \
-                             g_0_yyzzzz_0_xxzzzzz_0,  \
-                             g_0_yyzzzz_0_xxzzzzz_1,  \
-                             g_0_yyzzzz_0_xyyyyy_1,   \
-                             g_0_yyzzzz_0_xyyyyyy_0,  \
-                             g_0_yyzzzz_0_xyyyyyy_1,  \
-                             g_0_yyzzzz_0_xyyyyyz_0,  \
-                             g_0_yyzzzz_0_xyyyyyz_1,  \
-                             g_0_yyzzzz_0_xyyyyz_1,   \
-                             g_0_yyzzzz_0_xyyyyzz_0,  \
-                             g_0_yyzzzz_0_xyyyyzz_1,  \
-                             g_0_yyzzzz_0_xyyyzz_1,   \
-                             g_0_yyzzzz_0_xyyyzzz_0,  \
-                             g_0_yyzzzz_0_xyyyzzz_1,  \
-                             g_0_yyzzzz_0_xyyzzz_1,   \
-                             g_0_yyzzzz_0_xyyzzzz_0,  \
-                             g_0_yyzzzz_0_xyyzzzz_1,  \
-                             g_0_yyzzzz_0_xyzzzz_1,   \
-                             g_0_yyzzzz_0_xyzzzzz_0,  \
-                             g_0_yyzzzz_0_xyzzzzz_1,  \
-                             g_0_yyzzzz_0_xzzzzz_1,   \
-                             g_0_yyzzzz_0_xzzzzzz_0,  \
-                             g_0_yyzzzz_0_xzzzzzz_1,  \
-                             g_0_yyzzzz_0_yyyyyy_1,   \
-                             g_0_yyzzzz_0_yyyyyyy_0,  \
-                             g_0_yyzzzz_0_yyyyyyy_1,  \
-                             g_0_yyzzzz_0_yyyyyyz_0,  \
-                             g_0_yyzzzz_0_yyyyyyz_1,  \
-                             g_0_yyzzzz_0_yyyyyz_1,   \
-                             g_0_yyzzzz_0_yyyyyzz_0,  \
-                             g_0_yyzzzz_0_yyyyyzz_1,  \
-                             g_0_yyzzzz_0_yyyyzz_1,   \
-                             g_0_yyzzzz_0_yyyyzzz_0,  \
-                             g_0_yyzzzz_0_yyyyzzz_1,  \
-                             g_0_yyzzzz_0_yyyzzz_1,   \
-                             g_0_yyzzzz_0_yyyzzzz_0,  \
-                             g_0_yyzzzz_0_yyyzzzz_1,  \
-                             g_0_yyzzzz_0_yyzzzz_1,   \
-                             g_0_yyzzzz_0_yyzzzzz_0,  \
-                             g_0_yyzzzz_0_yyzzzzz_1,  \
-                             g_0_yyzzzz_0_yzzzzz_1,   \
-                             g_0_yyzzzz_0_yzzzzzz_0,  \
-                             g_0_yyzzzz_0_yzzzzzz_1,  \
-                             g_0_yyzzzz_0_zzzzzz_1,   \
-                             g_0_yyzzzz_0_zzzzzzz_0,  \
-                             g_0_yyzzzz_0_zzzzzzz_1,  \
-                             wp_x,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xyyzzzz_0_xxxxxxx_0, g_0_xyyzzzz_0_xxxxxxy_0, g_0_xyyzzzz_0_xxxxxxz_0, g_0_xyyzzzz_0_xxxxxyy_0, g_0_xyyzzzz_0_xxxxxyz_0, g_0_xyyzzzz_0_xxxxxzz_0, g_0_xyyzzzz_0_xxxxyyy_0, g_0_xyyzzzz_0_xxxxyyz_0, g_0_xyyzzzz_0_xxxxyzz_0, g_0_xyyzzzz_0_xxxxzzz_0, g_0_xyyzzzz_0_xxxyyyy_0, g_0_xyyzzzz_0_xxxyyyz_0, g_0_xyyzzzz_0_xxxyyzz_0, g_0_xyyzzzz_0_xxxyzzz_0, g_0_xyyzzzz_0_xxxzzzz_0, g_0_xyyzzzz_0_xxyyyyy_0, g_0_xyyzzzz_0_xxyyyyz_0, g_0_xyyzzzz_0_xxyyyzz_0, g_0_xyyzzzz_0_xxyyzzz_0, g_0_xyyzzzz_0_xxyzzzz_0, g_0_xyyzzzz_0_xxzzzzz_0, g_0_xyyzzzz_0_xyyyyyy_0, g_0_xyyzzzz_0_xyyyyyz_0, g_0_xyyzzzz_0_xyyyyzz_0, g_0_xyyzzzz_0_xyyyzzz_0, g_0_xyyzzzz_0_xyyzzzz_0, g_0_xyyzzzz_0_xyzzzzz_0, g_0_xyyzzzz_0_xzzzzzz_0, g_0_xyyzzzz_0_yyyyyyy_0, g_0_xyyzzzz_0_yyyyyyz_0, g_0_xyyzzzz_0_yyyyyzz_0, g_0_xyyzzzz_0_yyyyzzz_0, g_0_xyyzzzz_0_yyyzzzz_0, g_0_xyyzzzz_0_yyzzzzz_0, g_0_xyyzzzz_0_yzzzzzz_0, g_0_xyyzzzz_0_zzzzzzz_0, g_0_yyzzzz_0_xxxxxx_1, g_0_yyzzzz_0_xxxxxxx_0, g_0_yyzzzz_0_xxxxxxx_1, g_0_yyzzzz_0_xxxxxxy_0, g_0_yyzzzz_0_xxxxxxy_1, g_0_yyzzzz_0_xxxxxxz_0, g_0_yyzzzz_0_xxxxxxz_1, g_0_yyzzzz_0_xxxxxy_1, g_0_yyzzzz_0_xxxxxyy_0, g_0_yyzzzz_0_xxxxxyy_1, g_0_yyzzzz_0_xxxxxyz_0, g_0_yyzzzz_0_xxxxxyz_1, g_0_yyzzzz_0_xxxxxz_1, g_0_yyzzzz_0_xxxxxzz_0, g_0_yyzzzz_0_xxxxxzz_1, g_0_yyzzzz_0_xxxxyy_1, g_0_yyzzzz_0_xxxxyyy_0, g_0_yyzzzz_0_xxxxyyy_1, g_0_yyzzzz_0_xxxxyyz_0, g_0_yyzzzz_0_xxxxyyz_1, g_0_yyzzzz_0_xxxxyz_1, g_0_yyzzzz_0_xxxxyzz_0, g_0_yyzzzz_0_xxxxyzz_1, g_0_yyzzzz_0_xxxxzz_1, g_0_yyzzzz_0_xxxxzzz_0, g_0_yyzzzz_0_xxxxzzz_1, g_0_yyzzzz_0_xxxyyy_1, g_0_yyzzzz_0_xxxyyyy_0, g_0_yyzzzz_0_xxxyyyy_1, g_0_yyzzzz_0_xxxyyyz_0, g_0_yyzzzz_0_xxxyyyz_1, g_0_yyzzzz_0_xxxyyz_1, g_0_yyzzzz_0_xxxyyzz_0, g_0_yyzzzz_0_xxxyyzz_1, g_0_yyzzzz_0_xxxyzz_1, g_0_yyzzzz_0_xxxyzzz_0, g_0_yyzzzz_0_xxxyzzz_1, g_0_yyzzzz_0_xxxzzz_1, g_0_yyzzzz_0_xxxzzzz_0, g_0_yyzzzz_0_xxxzzzz_1, g_0_yyzzzz_0_xxyyyy_1, g_0_yyzzzz_0_xxyyyyy_0, g_0_yyzzzz_0_xxyyyyy_1, g_0_yyzzzz_0_xxyyyyz_0, g_0_yyzzzz_0_xxyyyyz_1, g_0_yyzzzz_0_xxyyyz_1, g_0_yyzzzz_0_xxyyyzz_0, g_0_yyzzzz_0_xxyyyzz_1, g_0_yyzzzz_0_xxyyzz_1, g_0_yyzzzz_0_xxyyzzz_0, g_0_yyzzzz_0_xxyyzzz_1, g_0_yyzzzz_0_xxyzzz_1, g_0_yyzzzz_0_xxyzzzz_0, g_0_yyzzzz_0_xxyzzzz_1, g_0_yyzzzz_0_xxzzzz_1, g_0_yyzzzz_0_xxzzzzz_0, g_0_yyzzzz_0_xxzzzzz_1, g_0_yyzzzz_0_xyyyyy_1, g_0_yyzzzz_0_xyyyyyy_0, g_0_yyzzzz_0_xyyyyyy_1, g_0_yyzzzz_0_xyyyyyz_0, g_0_yyzzzz_0_xyyyyyz_1, g_0_yyzzzz_0_xyyyyz_1, g_0_yyzzzz_0_xyyyyzz_0, g_0_yyzzzz_0_xyyyyzz_1, g_0_yyzzzz_0_xyyyzz_1, g_0_yyzzzz_0_xyyyzzz_0, g_0_yyzzzz_0_xyyyzzz_1, g_0_yyzzzz_0_xyyzzz_1, g_0_yyzzzz_0_xyyzzzz_0, g_0_yyzzzz_0_xyyzzzz_1, g_0_yyzzzz_0_xyzzzz_1, g_0_yyzzzz_0_xyzzzzz_0, g_0_yyzzzz_0_xyzzzzz_1, g_0_yyzzzz_0_xzzzzz_1, g_0_yyzzzz_0_xzzzzzz_0, g_0_yyzzzz_0_xzzzzzz_1, g_0_yyzzzz_0_yyyyyy_1, g_0_yyzzzz_0_yyyyyyy_0, g_0_yyzzzz_0_yyyyyyy_1, g_0_yyzzzz_0_yyyyyyz_0, g_0_yyzzzz_0_yyyyyyz_1, g_0_yyzzzz_0_yyyyyz_1, g_0_yyzzzz_0_yyyyyzz_0, g_0_yyzzzz_0_yyyyyzz_1, g_0_yyzzzz_0_yyyyzz_1, g_0_yyzzzz_0_yyyyzzz_0, g_0_yyzzzz_0_yyyyzzz_1, g_0_yyzzzz_0_yyyzzz_1, g_0_yyzzzz_0_yyyzzzz_0, g_0_yyzzzz_0_yyyzzzz_1, g_0_yyzzzz_0_yyzzzz_1, g_0_yyzzzz_0_yyzzzzz_0, g_0_yyzzzz_0_yyzzzzz_1, g_0_yyzzzz_0_yzzzzz_1, g_0_yyzzzz_0_yzzzzzz_0, g_0_yyzzzz_0_yzzzzzz_1, g_0_yyzzzz_0_zzzzzz_1, g_0_yyzzzz_0_zzzzzzz_0, g_0_yyzzzz_0_zzzzzzz_1, wp_x, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
 
-        g_0_xyyzzzz_0_xxxxxxx_0[i] =
-            7.0 * g_0_yyzzzz_0_xxxxxx_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxxxx_0[i] * pb_x + g_0_yyzzzz_0_xxxxxxx_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxxxxxx_0[i] = 7.0 * g_0_yyzzzz_0_xxxxxx_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxxxx_0[i] * pb_x + g_0_yyzzzz_0_xxxxxxx_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxxxxxy_0[i] =
-            6.0 * g_0_yyzzzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxxxy_0[i] * pb_x + g_0_yyzzzz_0_xxxxxxy_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxxxxxy_0[i] = 6.0 * g_0_yyzzzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxxxy_0[i] * pb_x + g_0_yyzzzz_0_xxxxxxy_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxxxxxz_0[i] =
-            6.0 * g_0_yyzzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxxxz_0[i] * pb_x + g_0_yyzzzz_0_xxxxxxz_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxxxxxz_0[i] = 6.0 * g_0_yyzzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxxxz_0[i] * pb_x + g_0_yyzzzz_0_xxxxxxz_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxxxxyy_0[i] =
-            5.0 * g_0_yyzzzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxxyy_0[i] * pb_x + g_0_yyzzzz_0_xxxxxyy_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxxxxyy_0[i] = 5.0 * g_0_yyzzzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxxyy_0[i] * pb_x + g_0_yyzzzz_0_xxxxxyy_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxxxxyz_0[i] =
-            5.0 * g_0_yyzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxxyz_0[i] * pb_x + g_0_yyzzzz_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxxxxyz_0[i] = 5.0 * g_0_yyzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxxyz_0[i] * pb_x + g_0_yyzzzz_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxxxxzz_0[i] =
-            5.0 * g_0_yyzzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxxzz_0[i] * pb_x + g_0_yyzzzz_0_xxxxxzz_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxxxxzz_0[i] = 5.0 * g_0_yyzzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxxzz_0[i] * pb_x + g_0_yyzzzz_0_xxxxxzz_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxxxyyy_0[i] =
-            4.0 * g_0_yyzzzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxyyy_0[i] * pb_x + g_0_yyzzzz_0_xxxxyyy_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxxxyyy_0[i] = 4.0 * g_0_yyzzzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxyyy_0[i] * pb_x + g_0_yyzzzz_0_xxxxyyy_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxxxyyz_0[i] =
-            4.0 * g_0_yyzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxyyz_0[i] * pb_x + g_0_yyzzzz_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxxxyyz_0[i] = 4.0 * g_0_yyzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxyyz_0[i] * pb_x + g_0_yyzzzz_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxxxyzz_0[i] =
-            4.0 * g_0_yyzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxyzz_0[i] * pb_x + g_0_yyzzzz_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxxxyzz_0[i] = 4.0 * g_0_yyzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxyzz_0[i] * pb_x + g_0_yyzzzz_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxxxzzz_0[i] =
-            4.0 * g_0_yyzzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxzzz_0[i] * pb_x + g_0_yyzzzz_0_xxxxzzz_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxxxzzz_0[i] = 4.0 * g_0_yyzzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxzzz_0[i] * pb_x + g_0_yyzzzz_0_xxxxzzz_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxxyyyy_0[i] =
-            3.0 * g_0_yyzzzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxyyyy_0[i] * pb_x + g_0_yyzzzz_0_xxxyyyy_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxxyyyy_0[i] = 3.0 * g_0_yyzzzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxyyyy_0[i] * pb_x + g_0_yyzzzz_0_xxxyyyy_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxxyyyz_0[i] =
-            3.0 * g_0_yyzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxyyyz_0[i] * pb_x + g_0_yyzzzz_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxxyyyz_0[i] = 3.0 * g_0_yyzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxyyyz_0[i] * pb_x + g_0_yyzzzz_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxxyyzz_0[i] =
-            3.0 * g_0_yyzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxyyzz_0[i] * pb_x + g_0_yyzzzz_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxxyyzz_0[i] = 3.0 * g_0_yyzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxyyzz_0[i] * pb_x + g_0_yyzzzz_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxxyzzz_0[i] =
-            3.0 * g_0_yyzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxyzzz_0[i] * pb_x + g_0_yyzzzz_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxxyzzz_0[i] = 3.0 * g_0_yyzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxyzzz_0[i] * pb_x + g_0_yyzzzz_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxxzzzz_0[i] =
-            3.0 * g_0_yyzzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxzzzz_0[i] * pb_x + g_0_yyzzzz_0_xxxzzzz_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxxzzzz_0[i] = 3.0 * g_0_yyzzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxzzzz_0[i] * pb_x + g_0_yyzzzz_0_xxxzzzz_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxyyyyy_0[i] =
-            2.0 * g_0_yyzzzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyyyyy_0[i] * pb_x + g_0_yyzzzz_0_xxyyyyy_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxyyyyy_0[i] = 2.0 * g_0_yyzzzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyyyyy_0[i] * pb_x + g_0_yyzzzz_0_xxyyyyy_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxyyyyz_0[i] =
-            2.0 * g_0_yyzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyyyyz_0[i] * pb_x + g_0_yyzzzz_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxyyyyz_0[i] = 2.0 * g_0_yyzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyyyyz_0[i] * pb_x + g_0_yyzzzz_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxyyyzz_0[i] =
-            2.0 * g_0_yyzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyyyzz_0[i] * pb_x + g_0_yyzzzz_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxyyyzz_0[i] = 2.0 * g_0_yyzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyyyzz_0[i] * pb_x + g_0_yyzzzz_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxyyzzz_0[i] =
-            2.0 * g_0_yyzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyyzzz_0[i] * pb_x + g_0_yyzzzz_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxyyzzz_0[i] = 2.0 * g_0_yyzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyyzzz_0[i] * pb_x + g_0_yyzzzz_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxyzzzz_0[i] =
-            2.0 * g_0_yyzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyzzzz_0[i] * pb_x + g_0_yyzzzz_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxyzzzz_0[i] = 2.0 * g_0_yyzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyzzzz_0[i] * pb_x + g_0_yyzzzz_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xyyzzzz_0_xxzzzzz_0[i] =
-            2.0 * g_0_yyzzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxzzzzz_0[i] * pb_x + g_0_yyzzzz_0_xxzzzzz_1[i] * wp_x[i];
+        g_0_xyyzzzz_0_xxzzzzz_0[i] = 2.0 * g_0_yyzzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxzzzzz_0[i] * pb_x + g_0_yyzzzz_0_xxzzzzz_1[i] * wp_x[i];
 
         g_0_xyyzzzz_0_xyyyyyy_0[i] = g_0_yyzzzz_0_yyyyyy_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xyyyyyy_0[i] * pb_x + g_0_yyzzzz_0_xyyyyyy_1[i] * wp_x[i];
 
@@ -15106,197 +9862,50 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xyzzzzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 971);
 
-#pragma omp simd aligned(g_0_xyzzzzz_0_xxxxxxx_0,     \
-                             g_0_xyzzzzz_0_xxxxxxy_0, \
-                             g_0_xyzzzzz_0_xxxxxxz_0, \
-                             g_0_xyzzzzz_0_xxxxxyy_0, \
-                             g_0_xyzzzzz_0_xxxxxyz_0, \
-                             g_0_xyzzzzz_0_xxxxxzz_0, \
-                             g_0_xyzzzzz_0_xxxxyyy_0, \
-                             g_0_xyzzzzz_0_xxxxyyz_0, \
-                             g_0_xyzzzzz_0_xxxxyzz_0, \
-                             g_0_xyzzzzz_0_xxxxzzz_0, \
-                             g_0_xyzzzzz_0_xxxyyyy_0, \
-                             g_0_xyzzzzz_0_xxxyyyz_0, \
-                             g_0_xyzzzzz_0_xxxyyzz_0, \
-                             g_0_xyzzzzz_0_xxxyzzz_0, \
-                             g_0_xyzzzzz_0_xxxzzzz_0, \
-                             g_0_xyzzzzz_0_xxyyyyy_0, \
-                             g_0_xyzzzzz_0_xxyyyyz_0, \
-                             g_0_xyzzzzz_0_xxyyyzz_0, \
-                             g_0_xyzzzzz_0_xxyyzzz_0, \
-                             g_0_xyzzzzz_0_xxyzzzz_0, \
-                             g_0_xyzzzzz_0_xxzzzzz_0, \
-                             g_0_xyzzzzz_0_xyyyyyy_0, \
-                             g_0_xyzzzzz_0_xyyyyyz_0, \
-                             g_0_xyzzzzz_0_xyyyyzz_0, \
-                             g_0_xyzzzzz_0_xyyyzzz_0, \
-                             g_0_xyzzzzz_0_xyyzzzz_0, \
-                             g_0_xyzzzzz_0_xyzzzzz_0, \
-                             g_0_xyzzzzz_0_xzzzzzz_0, \
-                             g_0_xyzzzzz_0_yyyyyyy_0, \
-                             g_0_xyzzzzz_0_yyyyyyz_0, \
-                             g_0_xyzzzzz_0_yyyyyzz_0, \
-                             g_0_xyzzzzz_0_yyyyzzz_0, \
-                             g_0_xyzzzzz_0_yyyzzzz_0, \
-                             g_0_xyzzzzz_0_yyzzzzz_0, \
-                             g_0_xyzzzzz_0_yzzzzzz_0, \
-                             g_0_xyzzzzz_0_zzzzzzz_0, \
-                             g_0_xzzzzz_0_xxxxxxx_0,  \
-                             g_0_xzzzzz_0_xxxxxxx_1,  \
-                             g_0_xzzzzz_0_xxxxxxz_0,  \
-                             g_0_xzzzzz_0_xxxxxxz_1,  \
-                             g_0_xzzzzz_0_xxxxxzz_0,  \
-                             g_0_xzzzzz_0_xxxxxzz_1,  \
-                             g_0_xzzzzz_0_xxxxzzz_0,  \
-                             g_0_xzzzzz_0_xxxxzzz_1,  \
-                             g_0_xzzzzz_0_xxxzzzz_0,  \
-                             g_0_xzzzzz_0_xxxzzzz_1,  \
-                             g_0_xzzzzz_0_xxzzzzz_0,  \
-                             g_0_xzzzzz_0_xxzzzzz_1,  \
-                             g_0_xzzzzz_0_xzzzzzz_0,  \
-                             g_0_xzzzzz_0_xzzzzzz_1,  \
-                             g_0_yzzzzz_0_xxxxxxy_0,  \
-                             g_0_yzzzzz_0_xxxxxxy_1,  \
-                             g_0_yzzzzz_0_xxxxxy_1,   \
-                             g_0_yzzzzz_0_xxxxxyy_0,  \
-                             g_0_yzzzzz_0_xxxxxyy_1,  \
-                             g_0_yzzzzz_0_xxxxxyz_0,  \
-                             g_0_yzzzzz_0_xxxxxyz_1,  \
-                             g_0_yzzzzz_0_xxxxyy_1,   \
-                             g_0_yzzzzz_0_xxxxyyy_0,  \
-                             g_0_yzzzzz_0_xxxxyyy_1,  \
-                             g_0_yzzzzz_0_xxxxyyz_0,  \
-                             g_0_yzzzzz_0_xxxxyyz_1,  \
-                             g_0_yzzzzz_0_xxxxyz_1,   \
-                             g_0_yzzzzz_0_xxxxyzz_0,  \
-                             g_0_yzzzzz_0_xxxxyzz_1,  \
-                             g_0_yzzzzz_0_xxxyyy_1,   \
-                             g_0_yzzzzz_0_xxxyyyy_0,  \
-                             g_0_yzzzzz_0_xxxyyyy_1,  \
-                             g_0_yzzzzz_0_xxxyyyz_0,  \
-                             g_0_yzzzzz_0_xxxyyyz_1,  \
-                             g_0_yzzzzz_0_xxxyyz_1,   \
-                             g_0_yzzzzz_0_xxxyyzz_0,  \
-                             g_0_yzzzzz_0_xxxyyzz_1,  \
-                             g_0_yzzzzz_0_xxxyzz_1,   \
-                             g_0_yzzzzz_0_xxxyzzz_0,  \
-                             g_0_yzzzzz_0_xxxyzzz_1,  \
-                             g_0_yzzzzz_0_xxyyyy_1,   \
-                             g_0_yzzzzz_0_xxyyyyy_0,  \
-                             g_0_yzzzzz_0_xxyyyyy_1,  \
-                             g_0_yzzzzz_0_xxyyyyz_0,  \
-                             g_0_yzzzzz_0_xxyyyyz_1,  \
-                             g_0_yzzzzz_0_xxyyyz_1,   \
-                             g_0_yzzzzz_0_xxyyyzz_0,  \
-                             g_0_yzzzzz_0_xxyyyzz_1,  \
-                             g_0_yzzzzz_0_xxyyzz_1,   \
-                             g_0_yzzzzz_0_xxyyzzz_0,  \
-                             g_0_yzzzzz_0_xxyyzzz_1,  \
-                             g_0_yzzzzz_0_xxyzzz_1,   \
-                             g_0_yzzzzz_0_xxyzzzz_0,  \
-                             g_0_yzzzzz_0_xxyzzzz_1,  \
-                             g_0_yzzzzz_0_xyyyyy_1,   \
-                             g_0_yzzzzz_0_xyyyyyy_0,  \
-                             g_0_yzzzzz_0_xyyyyyy_1,  \
-                             g_0_yzzzzz_0_xyyyyyz_0,  \
-                             g_0_yzzzzz_0_xyyyyyz_1,  \
-                             g_0_yzzzzz_0_xyyyyz_1,   \
-                             g_0_yzzzzz_0_xyyyyzz_0,  \
-                             g_0_yzzzzz_0_xyyyyzz_1,  \
-                             g_0_yzzzzz_0_xyyyzz_1,   \
-                             g_0_yzzzzz_0_xyyyzzz_0,  \
-                             g_0_yzzzzz_0_xyyyzzz_1,  \
-                             g_0_yzzzzz_0_xyyzzz_1,   \
-                             g_0_yzzzzz_0_xyyzzzz_0,  \
-                             g_0_yzzzzz_0_xyyzzzz_1,  \
-                             g_0_yzzzzz_0_xyzzzz_1,   \
-                             g_0_yzzzzz_0_xyzzzzz_0,  \
-                             g_0_yzzzzz_0_xyzzzzz_1,  \
-                             g_0_yzzzzz_0_yyyyyy_1,   \
-                             g_0_yzzzzz_0_yyyyyyy_0,  \
-                             g_0_yzzzzz_0_yyyyyyy_1,  \
-                             g_0_yzzzzz_0_yyyyyyz_0,  \
-                             g_0_yzzzzz_0_yyyyyyz_1,  \
-                             g_0_yzzzzz_0_yyyyyz_1,   \
-                             g_0_yzzzzz_0_yyyyyzz_0,  \
-                             g_0_yzzzzz_0_yyyyyzz_1,  \
-                             g_0_yzzzzz_0_yyyyzz_1,   \
-                             g_0_yzzzzz_0_yyyyzzz_0,  \
-                             g_0_yzzzzz_0_yyyyzzz_1,  \
-                             g_0_yzzzzz_0_yyyzzz_1,   \
-                             g_0_yzzzzz_0_yyyzzzz_0,  \
-                             g_0_yzzzzz_0_yyyzzzz_1,  \
-                             g_0_yzzzzz_0_yyzzzz_1,   \
-                             g_0_yzzzzz_0_yyzzzzz_0,  \
-                             g_0_yzzzzz_0_yyzzzzz_1,  \
-                             g_0_yzzzzz_0_yzzzzz_1,   \
-                             g_0_yzzzzz_0_yzzzzzz_0,  \
-                             g_0_yzzzzz_0_yzzzzzz_1,  \
-                             g_0_yzzzzz_0_zzzzzzz_0,  \
-                             g_0_yzzzzz_0_zzzzzzz_1,  \
-                             wp_x,                    \
-                             wp_y,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xyzzzzz_0_xxxxxxx_0, g_0_xyzzzzz_0_xxxxxxy_0, g_0_xyzzzzz_0_xxxxxxz_0, g_0_xyzzzzz_0_xxxxxyy_0, g_0_xyzzzzz_0_xxxxxyz_0, g_0_xyzzzzz_0_xxxxxzz_0, g_0_xyzzzzz_0_xxxxyyy_0, g_0_xyzzzzz_0_xxxxyyz_0, g_0_xyzzzzz_0_xxxxyzz_0, g_0_xyzzzzz_0_xxxxzzz_0, g_0_xyzzzzz_0_xxxyyyy_0, g_0_xyzzzzz_0_xxxyyyz_0, g_0_xyzzzzz_0_xxxyyzz_0, g_0_xyzzzzz_0_xxxyzzz_0, g_0_xyzzzzz_0_xxxzzzz_0, g_0_xyzzzzz_0_xxyyyyy_0, g_0_xyzzzzz_0_xxyyyyz_0, g_0_xyzzzzz_0_xxyyyzz_0, g_0_xyzzzzz_0_xxyyzzz_0, g_0_xyzzzzz_0_xxyzzzz_0, g_0_xyzzzzz_0_xxzzzzz_0, g_0_xyzzzzz_0_xyyyyyy_0, g_0_xyzzzzz_0_xyyyyyz_0, g_0_xyzzzzz_0_xyyyyzz_0, g_0_xyzzzzz_0_xyyyzzz_0, g_0_xyzzzzz_0_xyyzzzz_0, g_0_xyzzzzz_0_xyzzzzz_0, g_0_xyzzzzz_0_xzzzzzz_0, g_0_xyzzzzz_0_yyyyyyy_0, g_0_xyzzzzz_0_yyyyyyz_0, g_0_xyzzzzz_0_yyyyyzz_0, g_0_xyzzzzz_0_yyyyzzz_0, g_0_xyzzzzz_0_yyyzzzz_0, g_0_xyzzzzz_0_yyzzzzz_0, g_0_xyzzzzz_0_yzzzzzz_0, g_0_xyzzzzz_0_zzzzzzz_0, g_0_xzzzzz_0_xxxxxxx_0, g_0_xzzzzz_0_xxxxxxx_1, g_0_xzzzzz_0_xxxxxxz_0, g_0_xzzzzz_0_xxxxxxz_1, g_0_xzzzzz_0_xxxxxzz_0, g_0_xzzzzz_0_xxxxxzz_1, g_0_xzzzzz_0_xxxxzzz_0, g_0_xzzzzz_0_xxxxzzz_1, g_0_xzzzzz_0_xxxzzzz_0, g_0_xzzzzz_0_xxxzzzz_1, g_0_xzzzzz_0_xxzzzzz_0, g_0_xzzzzz_0_xxzzzzz_1, g_0_xzzzzz_0_xzzzzzz_0, g_0_xzzzzz_0_xzzzzzz_1, g_0_yzzzzz_0_xxxxxxy_0, g_0_yzzzzz_0_xxxxxxy_1, g_0_yzzzzz_0_xxxxxy_1, g_0_yzzzzz_0_xxxxxyy_0, g_0_yzzzzz_0_xxxxxyy_1, g_0_yzzzzz_0_xxxxxyz_0, g_0_yzzzzz_0_xxxxxyz_1, g_0_yzzzzz_0_xxxxyy_1, g_0_yzzzzz_0_xxxxyyy_0, g_0_yzzzzz_0_xxxxyyy_1, g_0_yzzzzz_0_xxxxyyz_0, g_0_yzzzzz_0_xxxxyyz_1, g_0_yzzzzz_0_xxxxyz_1, g_0_yzzzzz_0_xxxxyzz_0, g_0_yzzzzz_0_xxxxyzz_1, g_0_yzzzzz_0_xxxyyy_1, g_0_yzzzzz_0_xxxyyyy_0, g_0_yzzzzz_0_xxxyyyy_1, g_0_yzzzzz_0_xxxyyyz_0, g_0_yzzzzz_0_xxxyyyz_1, g_0_yzzzzz_0_xxxyyz_1, g_0_yzzzzz_0_xxxyyzz_0, g_0_yzzzzz_0_xxxyyzz_1, g_0_yzzzzz_0_xxxyzz_1, g_0_yzzzzz_0_xxxyzzz_0, g_0_yzzzzz_0_xxxyzzz_1, g_0_yzzzzz_0_xxyyyy_1, g_0_yzzzzz_0_xxyyyyy_0, g_0_yzzzzz_0_xxyyyyy_1, g_0_yzzzzz_0_xxyyyyz_0, g_0_yzzzzz_0_xxyyyyz_1, g_0_yzzzzz_0_xxyyyz_1, g_0_yzzzzz_0_xxyyyzz_0, g_0_yzzzzz_0_xxyyyzz_1, g_0_yzzzzz_0_xxyyzz_1, g_0_yzzzzz_0_xxyyzzz_0, g_0_yzzzzz_0_xxyyzzz_1, g_0_yzzzzz_0_xxyzzz_1, g_0_yzzzzz_0_xxyzzzz_0, g_0_yzzzzz_0_xxyzzzz_1, g_0_yzzzzz_0_xyyyyy_1, g_0_yzzzzz_0_xyyyyyy_0, g_0_yzzzzz_0_xyyyyyy_1, g_0_yzzzzz_0_xyyyyyz_0, g_0_yzzzzz_0_xyyyyyz_1, g_0_yzzzzz_0_xyyyyz_1, g_0_yzzzzz_0_xyyyyzz_0, g_0_yzzzzz_0_xyyyyzz_1, g_0_yzzzzz_0_xyyyzz_1, g_0_yzzzzz_0_xyyyzzz_0, g_0_yzzzzz_0_xyyyzzz_1, g_0_yzzzzz_0_xyyzzz_1, g_0_yzzzzz_0_xyyzzzz_0, g_0_yzzzzz_0_xyyzzzz_1, g_0_yzzzzz_0_xyzzzz_1, g_0_yzzzzz_0_xyzzzzz_0, g_0_yzzzzz_0_xyzzzzz_1, g_0_yzzzzz_0_yyyyyy_1, g_0_yzzzzz_0_yyyyyyy_0, g_0_yzzzzz_0_yyyyyyy_1, g_0_yzzzzz_0_yyyyyyz_0, g_0_yzzzzz_0_yyyyyyz_1, g_0_yzzzzz_0_yyyyyz_1, g_0_yzzzzz_0_yyyyyzz_0, g_0_yzzzzz_0_yyyyyzz_1, g_0_yzzzzz_0_yyyyzz_1, g_0_yzzzzz_0_yyyyzzz_0, g_0_yzzzzz_0_yyyyzzz_1, g_0_yzzzzz_0_yyyzzz_1, g_0_yzzzzz_0_yyyzzzz_0, g_0_yzzzzz_0_yyyzzzz_1, g_0_yzzzzz_0_yyzzzz_1, g_0_yzzzzz_0_yyzzzzz_0, g_0_yzzzzz_0_yyzzzzz_1, g_0_yzzzzz_0_yzzzzz_1, g_0_yzzzzz_0_yzzzzzz_0, g_0_yzzzzz_0_yzzzzzz_1, g_0_yzzzzz_0_zzzzzzz_0, g_0_yzzzzz_0_zzzzzzz_1, wp_x, wp_y, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
 
         g_0_xyzzzzz_0_xxxxxxx_0[i] = g_0_xzzzzz_0_xxxxxxx_0[i] * pb_y + g_0_xzzzzz_0_xxxxxxx_1[i] * wp_y[i];
 
-        g_0_xyzzzzz_0_xxxxxxy_0[i] =
-            6.0 * g_0_yzzzzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxxxxy_0[i] * pb_x + g_0_yzzzzz_0_xxxxxxy_1[i] * wp_x[i];
+        g_0_xyzzzzz_0_xxxxxxy_0[i] = 6.0 * g_0_yzzzzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxxxxy_0[i] * pb_x + g_0_yzzzzz_0_xxxxxxy_1[i] * wp_x[i];
 
         g_0_xyzzzzz_0_xxxxxxz_0[i] = g_0_xzzzzz_0_xxxxxxz_0[i] * pb_y + g_0_xzzzzz_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_xyzzzzz_0_xxxxxyy_0[i] =
-            5.0 * g_0_yzzzzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxxxyy_0[i] * pb_x + g_0_yzzzzz_0_xxxxxyy_1[i] * wp_x[i];
+        g_0_xyzzzzz_0_xxxxxyy_0[i] = 5.0 * g_0_yzzzzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxxxyy_0[i] * pb_x + g_0_yzzzzz_0_xxxxxyy_1[i] * wp_x[i];
 
-        g_0_xyzzzzz_0_xxxxxyz_0[i] =
-            5.0 * g_0_yzzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxxxyz_0[i] * pb_x + g_0_yzzzzz_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xyzzzzz_0_xxxxxyz_0[i] = 5.0 * g_0_yzzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxxxyz_0[i] * pb_x + g_0_yzzzzz_0_xxxxxyz_1[i] * wp_x[i];
 
         g_0_xyzzzzz_0_xxxxxzz_0[i] = g_0_xzzzzz_0_xxxxxzz_0[i] * pb_y + g_0_xzzzzz_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_xyzzzzz_0_xxxxyyy_0[i] =
-            4.0 * g_0_yzzzzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxxyyy_0[i] * pb_x + g_0_yzzzzz_0_xxxxyyy_1[i] * wp_x[i];
+        g_0_xyzzzzz_0_xxxxyyy_0[i] = 4.0 * g_0_yzzzzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxxyyy_0[i] * pb_x + g_0_yzzzzz_0_xxxxyyy_1[i] * wp_x[i];
 
-        g_0_xyzzzzz_0_xxxxyyz_0[i] =
-            4.0 * g_0_yzzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxxyyz_0[i] * pb_x + g_0_yzzzzz_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xyzzzzz_0_xxxxyyz_0[i] = 4.0 * g_0_yzzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxxyyz_0[i] * pb_x + g_0_yzzzzz_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xyzzzzz_0_xxxxyzz_0[i] =
-            4.0 * g_0_yzzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxxyzz_0[i] * pb_x + g_0_yzzzzz_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xyzzzzz_0_xxxxyzz_0[i] = 4.0 * g_0_yzzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxxyzz_0[i] * pb_x + g_0_yzzzzz_0_xxxxyzz_1[i] * wp_x[i];
 
         g_0_xyzzzzz_0_xxxxzzz_0[i] = g_0_xzzzzz_0_xxxxzzz_0[i] * pb_y + g_0_xzzzzz_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_xyzzzzz_0_xxxyyyy_0[i] =
-            3.0 * g_0_yzzzzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxyyyy_0[i] * pb_x + g_0_yzzzzz_0_xxxyyyy_1[i] * wp_x[i];
+        g_0_xyzzzzz_0_xxxyyyy_0[i] = 3.0 * g_0_yzzzzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxyyyy_0[i] * pb_x + g_0_yzzzzz_0_xxxyyyy_1[i] * wp_x[i];
 
-        g_0_xyzzzzz_0_xxxyyyz_0[i] =
-            3.0 * g_0_yzzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxyyyz_0[i] * pb_x + g_0_yzzzzz_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xyzzzzz_0_xxxyyyz_0[i] = 3.0 * g_0_yzzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxyyyz_0[i] * pb_x + g_0_yzzzzz_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xyzzzzz_0_xxxyyzz_0[i] =
-            3.0 * g_0_yzzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxyyzz_0[i] * pb_x + g_0_yzzzzz_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xyzzzzz_0_xxxyyzz_0[i] = 3.0 * g_0_yzzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxyyzz_0[i] * pb_x + g_0_yzzzzz_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xyzzzzz_0_xxxyzzz_0[i] =
-            3.0 * g_0_yzzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxyzzz_0[i] * pb_x + g_0_yzzzzz_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xyzzzzz_0_xxxyzzz_0[i] = 3.0 * g_0_yzzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxyzzz_0[i] * pb_x + g_0_yzzzzz_0_xxxyzzz_1[i] * wp_x[i];
 
         g_0_xyzzzzz_0_xxxzzzz_0[i] = g_0_xzzzzz_0_xxxzzzz_0[i] * pb_y + g_0_xzzzzz_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_xyzzzzz_0_xxyyyyy_0[i] =
-            2.0 * g_0_yzzzzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyyyyy_0[i] * pb_x + g_0_yzzzzz_0_xxyyyyy_1[i] * wp_x[i];
+        g_0_xyzzzzz_0_xxyyyyy_0[i] = 2.0 * g_0_yzzzzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyyyyy_0[i] * pb_x + g_0_yzzzzz_0_xxyyyyy_1[i] * wp_x[i];
 
-        g_0_xyzzzzz_0_xxyyyyz_0[i] =
-            2.0 * g_0_yzzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyyyyz_0[i] * pb_x + g_0_yzzzzz_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xyzzzzz_0_xxyyyyz_0[i] = 2.0 * g_0_yzzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyyyyz_0[i] * pb_x + g_0_yzzzzz_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xyzzzzz_0_xxyyyzz_0[i] =
-            2.0 * g_0_yzzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyyyzz_0[i] * pb_x + g_0_yzzzzz_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xyzzzzz_0_xxyyyzz_0[i] = 2.0 * g_0_yzzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyyyzz_0[i] * pb_x + g_0_yzzzzz_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xyzzzzz_0_xxyyzzz_0[i] =
-            2.0 * g_0_yzzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyyzzz_0[i] * pb_x + g_0_yzzzzz_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xyzzzzz_0_xxyyzzz_0[i] = 2.0 * g_0_yzzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyyzzz_0[i] * pb_x + g_0_yzzzzz_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xyzzzzz_0_xxyzzzz_0[i] =
-            2.0 * g_0_yzzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyzzzz_0[i] * pb_x + g_0_yzzzzz_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xyzzzzz_0_xxyzzzz_0[i] = 2.0 * g_0_yzzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyzzzz_0[i] * pb_x + g_0_yzzzzz_0_xxyzzzz_1[i] * wp_x[i];
 
         g_0_xyzzzzz_0_xxzzzzz_0[i] = g_0_xzzzzz_0_xxzzzzz_0[i] * pb_y + g_0_xzzzzz_0_xxzzzzz_1[i] * wp_y[i];
 
@@ -15405,211 +10014,52 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_xzzzzzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 1007);
 
-#pragma omp simd aligned(g_0_xzzzzzz_0_xxxxxxx_0,     \
-                             g_0_xzzzzzz_0_xxxxxxy_0, \
-                             g_0_xzzzzzz_0_xxxxxxz_0, \
-                             g_0_xzzzzzz_0_xxxxxyy_0, \
-                             g_0_xzzzzzz_0_xxxxxyz_0, \
-                             g_0_xzzzzzz_0_xxxxxzz_0, \
-                             g_0_xzzzzzz_0_xxxxyyy_0, \
-                             g_0_xzzzzzz_0_xxxxyyz_0, \
-                             g_0_xzzzzzz_0_xxxxyzz_0, \
-                             g_0_xzzzzzz_0_xxxxzzz_0, \
-                             g_0_xzzzzzz_0_xxxyyyy_0, \
-                             g_0_xzzzzzz_0_xxxyyyz_0, \
-                             g_0_xzzzzzz_0_xxxyyzz_0, \
-                             g_0_xzzzzzz_0_xxxyzzz_0, \
-                             g_0_xzzzzzz_0_xxxzzzz_0, \
-                             g_0_xzzzzzz_0_xxyyyyy_0, \
-                             g_0_xzzzzzz_0_xxyyyyz_0, \
-                             g_0_xzzzzzz_0_xxyyyzz_0, \
-                             g_0_xzzzzzz_0_xxyyzzz_0, \
-                             g_0_xzzzzzz_0_xxyzzzz_0, \
-                             g_0_xzzzzzz_0_xxzzzzz_0, \
-                             g_0_xzzzzzz_0_xyyyyyy_0, \
-                             g_0_xzzzzzz_0_xyyyyyz_0, \
-                             g_0_xzzzzzz_0_xyyyyzz_0, \
-                             g_0_xzzzzzz_0_xyyyzzz_0, \
-                             g_0_xzzzzzz_0_xyyzzzz_0, \
-                             g_0_xzzzzzz_0_xyzzzzz_0, \
-                             g_0_xzzzzzz_0_xzzzzzz_0, \
-                             g_0_xzzzzzz_0_yyyyyyy_0, \
-                             g_0_xzzzzzz_0_yyyyyyz_0, \
-                             g_0_xzzzzzz_0_yyyyyzz_0, \
-                             g_0_xzzzzzz_0_yyyyzzz_0, \
-                             g_0_xzzzzzz_0_yyyzzzz_0, \
-                             g_0_xzzzzzz_0_yyzzzzz_0, \
-                             g_0_xzzzzzz_0_yzzzzzz_0, \
-                             g_0_xzzzzzz_0_zzzzzzz_0, \
-                             g_0_zzzzzz_0_xxxxxx_1,   \
-                             g_0_zzzzzz_0_xxxxxxx_0,  \
-                             g_0_zzzzzz_0_xxxxxxx_1,  \
-                             g_0_zzzzzz_0_xxxxxxy_0,  \
-                             g_0_zzzzzz_0_xxxxxxy_1,  \
-                             g_0_zzzzzz_0_xxxxxxz_0,  \
-                             g_0_zzzzzz_0_xxxxxxz_1,  \
-                             g_0_zzzzzz_0_xxxxxy_1,   \
-                             g_0_zzzzzz_0_xxxxxyy_0,  \
-                             g_0_zzzzzz_0_xxxxxyy_1,  \
-                             g_0_zzzzzz_0_xxxxxyz_0,  \
-                             g_0_zzzzzz_0_xxxxxyz_1,  \
-                             g_0_zzzzzz_0_xxxxxz_1,   \
-                             g_0_zzzzzz_0_xxxxxzz_0,  \
-                             g_0_zzzzzz_0_xxxxxzz_1,  \
-                             g_0_zzzzzz_0_xxxxyy_1,   \
-                             g_0_zzzzzz_0_xxxxyyy_0,  \
-                             g_0_zzzzzz_0_xxxxyyy_1,  \
-                             g_0_zzzzzz_0_xxxxyyz_0,  \
-                             g_0_zzzzzz_0_xxxxyyz_1,  \
-                             g_0_zzzzzz_0_xxxxyz_1,   \
-                             g_0_zzzzzz_0_xxxxyzz_0,  \
-                             g_0_zzzzzz_0_xxxxyzz_1,  \
-                             g_0_zzzzzz_0_xxxxzz_1,   \
-                             g_0_zzzzzz_0_xxxxzzz_0,  \
-                             g_0_zzzzzz_0_xxxxzzz_1,  \
-                             g_0_zzzzzz_0_xxxyyy_1,   \
-                             g_0_zzzzzz_0_xxxyyyy_0,  \
-                             g_0_zzzzzz_0_xxxyyyy_1,  \
-                             g_0_zzzzzz_0_xxxyyyz_0,  \
-                             g_0_zzzzzz_0_xxxyyyz_1,  \
-                             g_0_zzzzzz_0_xxxyyz_1,   \
-                             g_0_zzzzzz_0_xxxyyzz_0,  \
-                             g_0_zzzzzz_0_xxxyyzz_1,  \
-                             g_0_zzzzzz_0_xxxyzz_1,   \
-                             g_0_zzzzzz_0_xxxyzzz_0,  \
-                             g_0_zzzzzz_0_xxxyzzz_1,  \
-                             g_0_zzzzzz_0_xxxzzz_1,   \
-                             g_0_zzzzzz_0_xxxzzzz_0,  \
-                             g_0_zzzzzz_0_xxxzzzz_1,  \
-                             g_0_zzzzzz_0_xxyyyy_1,   \
-                             g_0_zzzzzz_0_xxyyyyy_0,  \
-                             g_0_zzzzzz_0_xxyyyyy_1,  \
-                             g_0_zzzzzz_0_xxyyyyz_0,  \
-                             g_0_zzzzzz_0_xxyyyyz_1,  \
-                             g_0_zzzzzz_0_xxyyyz_1,   \
-                             g_0_zzzzzz_0_xxyyyzz_0,  \
-                             g_0_zzzzzz_0_xxyyyzz_1,  \
-                             g_0_zzzzzz_0_xxyyzz_1,   \
-                             g_0_zzzzzz_0_xxyyzzz_0,  \
-                             g_0_zzzzzz_0_xxyyzzz_1,  \
-                             g_0_zzzzzz_0_xxyzzz_1,   \
-                             g_0_zzzzzz_0_xxyzzzz_0,  \
-                             g_0_zzzzzz_0_xxyzzzz_1,  \
-                             g_0_zzzzzz_0_xxzzzz_1,   \
-                             g_0_zzzzzz_0_xxzzzzz_0,  \
-                             g_0_zzzzzz_0_xxzzzzz_1,  \
-                             g_0_zzzzzz_0_xyyyyy_1,   \
-                             g_0_zzzzzz_0_xyyyyyy_0,  \
-                             g_0_zzzzzz_0_xyyyyyy_1,  \
-                             g_0_zzzzzz_0_xyyyyyz_0,  \
-                             g_0_zzzzzz_0_xyyyyyz_1,  \
-                             g_0_zzzzzz_0_xyyyyz_1,   \
-                             g_0_zzzzzz_0_xyyyyzz_0,  \
-                             g_0_zzzzzz_0_xyyyyzz_1,  \
-                             g_0_zzzzzz_0_xyyyzz_1,   \
-                             g_0_zzzzzz_0_xyyyzzz_0,  \
-                             g_0_zzzzzz_0_xyyyzzz_1,  \
-                             g_0_zzzzzz_0_xyyzzz_1,   \
-                             g_0_zzzzzz_0_xyyzzzz_0,  \
-                             g_0_zzzzzz_0_xyyzzzz_1,  \
-                             g_0_zzzzzz_0_xyzzzz_1,   \
-                             g_0_zzzzzz_0_xyzzzzz_0,  \
-                             g_0_zzzzzz_0_xyzzzzz_1,  \
-                             g_0_zzzzzz_0_xzzzzz_1,   \
-                             g_0_zzzzzz_0_xzzzzzz_0,  \
-                             g_0_zzzzzz_0_xzzzzzz_1,  \
-                             g_0_zzzzzz_0_yyyyyy_1,   \
-                             g_0_zzzzzz_0_yyyyyyy_0,  \
-                             g_0_zzzzzz_0_yyyyyyy_1,  \
-                             g_0_zzzzzz_0_yyyyyyz_0,  \
-                             g_0_zzzzzz_0_yyyyyyz_1,  \
-                             g_0_zzzzzz_0_yyyyyz_1,   \
-                             g_0_zzzzzz_0_yyyyyzz_0,  \
-                             g_0_zzzzzz_0_yyyyyzz_1,  \
-                             g_0_zzzzzz_0_yyyyzz_1,   \
-                             g_0_zzzzzz_0_yyyyzzz_0,  \
-                             g_0_zzzzzz_0_yyyyzzz_1,  \
-                             g_0_zzzzzz_0_yyyzzz_1,   \
-                             g_0_zzzzzz_0_yyyzzzz_0,  \
-                             g_0_zzzzzz_0_yyyzzzz_1,  \
-                             g_0_zzzzzz_0_yyzzzz_1,   \
-                             g_0_zzzzzz_0_yyzzzzz_0,  \
-                             g_0_zzzzzz_0_yyzzzzz_1,  \
-                             g_0_zzzzzz_0_yzzzzz_1,   \
-                             g_0_zzzzzz_0_yzzzzzz_0,  \
-                             g_0_zzzzzz_0_yzzzzzz_1,  \
-                             g_0_zzzzzz_0_zzzzzz_1,   \
-                             g_0_zzzzzz_0_zzzzzzz_0,  \
-                             g_0_zzzzzz_0_zzzzzzz_1,  \
-                             wp_x,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_xzzzzzz_0_xxxxxxx_0, g_0_xzzzzzz_0_xxxxxxy_0, g_0_xzzzzzz_0_xxxxxxz_0, g_0_xzzzzzz_0_xxxxxyy_0, g_0_xzzzzzz_0_xxxxxyz_0, g_0_xzzzzzz_0_xxxxxzz_0, g_0_xzzzzzz_0_xxxxyyy_0, g_0_xzzzzzz_0_xxxxyyz_0, g_0_xzzzzzz_0_xxxxyzz_0, g_0_xzzzzzz_0_xxxxzzz_0, g_0_xzzzzzz_0_xxxyyyy_0, g_0_xzzzzzz_0_xxxyyyz_0, g_0_xzzzzzz_0_xxxyyzz_0, g_0_xzzzzzz_0_xxxyzzz_0, g_0_xzzzzzz_0_xxxzzzz_0, g_0_xzzzzzz_0_xxyyyyy_0, g_0_xzzzzzz_0_xxyyyyz_0, g_0_xzzzzzz_0_xxyyyzz_0, g_0_xzzzzzz_0_xxyyzzz_0, g_0_xzzzzzz_0_xxyzzzz_0, g_0_xzzzzzz_0_xxzzzzz_0, g_0_xzzzzzz_0_xyyyyyy_0, g_0_xzzzzzz_0_xyyyyyz_0, g_0_xzzzzzz_0_xyyyyzz_0, g_0_xzzzzzz_0_xyyyzzz_0, g_0_xzzzzzz_0_xyyzzzz_0, g_0_xzzzzzz_0_xyzzzzz_0, g_0_xzzzzzz_0_xzzzzzz_0, g_0_xzzzzzz_0_yyyyyyy_0, g_0_xzzzzzz_0_yyyyyyz_0, g_0_xzzzzzz_0_yyyyyzz_0, g_0_xzzzzzz_0_yyyyzzz_0, g_0_xzzzzzz_0_yyyzzzz_0, g_0_xzzzzzz_0_yyzzzzz_0, g_0_xzzzzzz_0_yzzzzzz_0, g_0_xzzzzzz_0_zzzzzzz_0, g_0_zzzzzz_0_xxxxxx_1, g_0_zzzzzz_0_xxxxxxx_0, g_0_zzzzzz_0_xxxxxxx_1, g_0_zzzzzz_0_xxxxxxy_0, g_0_zzzzzz_0_xxxxxxy_1, g_0_zzzzzz_0_xxxxxxz_0, g_0_zzzzzz_0_xxxxxxz_1, g_0_zzzzzz_0_xxxxxy_1, g_0_zzzzzz_0_xxxxxyy_0, g_0_zzzzzz_0_xxxxxyy_1, g_0_zzzzzz_0_xxxxxyz_0, g_0_zzzzzz_0_xxxxxyz_1, g_0_zzzzzz_0_xxxxxz_1, g_0_zzzzzz_0_xxxxxzz_0, g_0_zzzzzz_0_xxxxxzz_1, g_0_zzzzzz_0_xxxxyy_1, g_0_zzzzzz_0_xxxxyyy_0, g_0_zzzzzz_0_xxxxyyy_1, g_0_zzzzzz_0_xxxxyyz_0, g_0_zzzzzz_0_xxxxyyz_1, g_0_zzzzzz_0_xxxxyz_1, g_0_zzzzzz_0_xxxxyzz_0, g_0_zzzzzz_0_xxxxyzz_1, g_0_zzzzzz_0_xxxxzz_1, g_0_zzzzzz_0_xxxxzzz_0, g_0_zzzzzz_0_xxxxzzz_1, g_0_zzzzzz_0_xxxyyy_1, g_0_zzzzzz_0_xxxyyyy_0, g_0_zzzzzz_0_xxxyyyy_1, g_0_zzzzzz_0_xxxyyyz_0, g_0_zzzzzz_0_xxxyyyz_1, g_0_zzzzzz_0_xxxyyz_1, g_0_zzzzzz_0_xxxyyzz_0, g_0_zzzzzz_0_xxxyyzz_1, g_0_zzzzzz_0_xxxyzz_1, g_0_zzzzzz_0_xxxyzzz_0, g_0_zzzzzz_0_xxxyzzz_1, g_0_zzzzzz_0_xxxzzz_1, g_0_zzzzzz_0_xxxzzzz_0, g_0_zzzzzz_0_xxxzzzz_1, g_0_zzzzzz_0_xxyyyy_1, g_0_zzzzzz_0_xxyyyyy_0, g_0_zzzzzz_0_xxyyyyy_1, g_0_zzzzzz_0_xxyyyyz_0, g_0_zzzzzz_0_xxyyyyz_1, g_0_zzzzzz_0_xxyyyz_1, g_0_zzzzzz_0_xxyyyzz_0, g_0_zzzzzz_0_xxyyyzz_1, g_0_zzzzzz_0_xxyyzz_1, g_0_zzzzzz_0_xxyyzzz_0, g_0_zzzzzz_0_xxyyzzz_1, g_0_zzzzzz_0_xxyzzz_1, g_0_zzzzzz_0_xxyzzzz_0, g_0_zzzzzz_0_xxyzzzz_1, g_0_zzzzzz_0_xxzzzz_1, g_0_zzzzzz_0_xxzzzzz_0, g_0_zzzzzz_0_xxzzzzz_1, g_0_zzzzzz_0_xyyyyy_1, g_0_zzzzzz_0_xyyyyyy_0, g_0_zzzzzz_0_xyyyyyy_1, g_0_zzzzzz_0_xyyyyyz_0, g_0_zzzzzz_0_xyyyyyz_1, g_0_zzzzzz_0_xyyyyz_1, g_0_zzzzzz_0_xyyyyzz_0, g_0_zzzzzz_0_xyyyyzz_1, g_0_zzzzzz_0_xyyyzz_1, g_0_zzzzzz_0_xyyyzzz_0, g_0_zzzzzz_0_xyyyzzz_1, g_0_zzzzzz_0_xyyzzz_1, g_0_zzzzzz_0_xyyzzzz_0, g_0_zzzzzz_0_xyyzzzz_1, g_0_zzzzzz_0_xyzzzz_1, g_0_zzzzzz_0_xyzzzzz_0, g_0_zzzzzz_0_xyzzzzz_1, g_0_zzzzzz_0_xzzzzz_1, g_0_zzzzzz_0_xzzzzzz_0, g_0_zzzzzz_0_xzzzzzz_1, g_0_zzzzzz_0_yyyyyy_1, g_0_zzzzzz_0_yyyyyyy_0, g_0_zzzzzz_0_yyyyyyy_1, g_0_zzzzzz_0_yyyyyyz_0, g_0_zzzzzz_0_yyyyyyz_1, g_0_zzzzzz_0_yyyyyz_1, g_0_zzzzzz_0_yyyyyzz_0, g_0_zzzzzz_0_yyyyyzz_1, g_0_zzzzzz_0_yyyyzz_1, g_0_zzzzzz_0_yyyyzzz_0, g_0_zzzzzz_0_yyyyzzz_1, g_0_zzzzzz_0_yyyzzz_1, g_0_zzzzzz_0_yyyzzzz_0, g_0_zzzzzz_0_yyyzzzz_1, g_0_zzzzzz_0_yyzzzz_1, g_0_zzzzzz_0_yyzzzzz_0, g_0_zzzzzz_0_yyzzzzz_1, g_0_zzzzzz_0_yzzzzz_1, g_0_zzzzzz_0_yzzzzzz_0, g_0_zzzzzz_0_yzzzzzz_1, g_0_zzzzzz_0_zzzzzz_1, g_0_zzzzzz_0_zzzzzzz_0, g_0_zzzzzz_0_zzzzzzz_1, wp_x, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
 
-        g_0_xzzzzzz_0_xxxxxxx_0[i] =
-            7.0 * g_0_zzzzzz_0_xxxxxx_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxxx_0[i] * pb_x + g_0_zzzzzz_0_xxxxxxx_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxxxxxx_0[i] = 7.0 * g_0_zzzzzz_0_xxxxxx_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxxx_0[i] * pb_x + g_0_zzzzzz_0_xxxxxxx_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxxxxxy_0[i] =
-            6.0 * g_0_zzzzzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxxy_0[i] * pb_x + g_0_zzzzzz_0_xxxxxxy_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxxxxxy_0[i] = 6.0 * g_0_zzzzzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxxy_0[i] * pb_x + g_0_zzzzzz_0_xxxxxxy_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxxxxxz_0[i] =
-            6.0 * g_0_zzzzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxxz_0[i] * pb_x + g_0_zzzzzz_0_xxxxxxz_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxxxxxz_0[i] = 6.0 * g_0_zzzzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxxz_0[i] * pb_x + g_0_zzzzzz_0_xxxxxxz_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxxxxyy_0[i] =
-            5.0 * g_0_zzzzzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxyy_0[i] * pb_x + g_0_zzzzzz_0_xxxxxyy_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxxxxyy_0[i] = 5.0 * g_0_zzzzzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxyy_0[i] * pb_x + g_0_zzzzzz_0_xxxxxyy_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxxxxyz_0[i] =
-            5.0 * g_0_zzzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxyz_0[i] * pb_x + g_0_zzzzzz_0_xxxxxyz_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxxxxyz_0[i] = 5.0 * g_0_zzzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxyz_0[i] * pb_x + g_0_zzzzzz_0_xxxxxyz_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxxxxzz_0[i] =
-            5.0 * g_0_zzzzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxzz_0[i] * pb_x + g_0_zzzzzz_0_xxxxxzz_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxxxxzz_0[i] = 5.0 * g_0_zzzzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxzz_0[i] * pb_x + g_0_zzzzzz_0_xxxxxzz_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxxxyyy_0[i] =
-            4.0 * g_0_zzzzzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxyyy_0[i] * pb_x + g_0_zzzzzz_0_xxxxyyy_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxxxyyy_0[i] = 4.0 * g_0_zzzzzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxyyy_0[i] * pb_x + g_0_zzzzzz_0_xxxxyyy_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxxxyyz_0[i] =
-            4.0 * g_0_zzzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxyyz_0[i] * pb_x + g_0_zzzzzz_0_xxxxyyz_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxxxyyz_0[i] = 4.0 * g_0_zzzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxyyz_0[i] * pb_x + g_0_zzzzzz_0_xxxxyyz_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxxxyzz_0[i] =
-            4.0 * g_0_zzzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxyzz_0[i] * pb_x + g_0_zzzzzz_0_xxxxyzz_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxxxyzz_0[i] = 4.0 * g_0_zzzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxyzz_0[i] * pb_x + g_0_zzzzzz_0_xxxxyzz_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxxxzzz_0[i] =
-            4.0 * g_0_zzzzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxzzz_0[i] * pb_x + g_0_zzzzzz_0_xxxxzzz_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxxxzzz_0[i] = 4.0 * g_0_zzzzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxzzz_0[i] * pb_x + g_0_zzzzzz_0_xxxxzzz_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxxyyyy_0[i] =
-            3.0 * g_0_zzzzzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyyyy_0[i] * pb_x + g_0_zzzzzz_0_xxxyyyy_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxxyyyy_0[i] = 3.0 * g_0_zzzzzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyyyy_0[i] * pb_x + g_0_zzzzzz_0_xxxyyyy_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxxyyyz_0[i] =
-            3.0 * g_0_zzzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyyyz_0[i] * pb_x + g_0_zzzzzz_0_xxxyyyz_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxxyyyz_0[i] = 3.0 * g_0_zzzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyyyz_0[i] * pb_x + g_0_zzzzzz_0_xxxyyyz_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxxyyzz_0[i] =
-            3.0 * g_0_zzzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyyzz_0[i] * pb_x + g_0_zzzzzz_0_xxxyyzz_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxxyyzz_0[i] = 3.0 * g_0_zzzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyyzz_0[i] * pb_x + g_0_zzzzzz_0_xxxyyzz_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxxyzzz_0[i] =
-            3.0 * g_0_zzzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyzzz_0[i] * pb_x + g_0_zzzzzz_0_xxxyzzz_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxxyzzz_0[i] = 3.0 * g_0_zzzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyzzz_0[i] * pb_x + g_0_zzzzzz_0_xxxyzzz_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxxzzzz_0[i] =
-            3.0 * g_0_zzzzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxzzzz_0[i] * pb_x + g_0_zzzzzz_0_xxxzzzz_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxxzzzz_0[i] = 3.0 * g_0_zzzzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxzzzz_0[i] * pb_x + g_0_zzzzzz_0_xxxzzzz_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxyyyyy_0[i] =
-            2.0 * g_0_zzzzzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyyyy_0[i] * pb_x + g_0_zzzzzz_0_xxyyyyy_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxyyyyy_0[i] = 2.0 * g_0_zzzzzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyyyy_0[i] * pb_x + g_0_zzzzzz_0_xxyyyyy_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxyyyyz_0[i] =
-            2.0 * g_0_zzzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyyyz_0[i] * pb_x + g_0_zzzzzz_0_xxyyyyz_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxyyyyz_0[i] = 2.0 * g_0_zzzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyyyz_0[i] * pb_x + g_0_zzzzzz_0_xxyyyyz_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxyyyzz_0[i] =
-            2.0 * g_0_zzzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyyzz_0[i] * pb_x + g_0_zzzzzz_0_xxyyyzz_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxyyyzz_0[i] = 2.0 * g_0_zzzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyyzz_0[i] * pb_x + g_0_zzzzzz_0_xxyyyzz_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxyyzzz_0[i] =
-            2.0 * g_0_zzzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyzzz_0[i] * pb_x + g_0_zzzzzz_0_xxyyzzz_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxyyzzz_0[i] = 2.0 * g_0_zzzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyzzz_0[i] * pb_x + g_0_zzzzzz_0_xxyyzzz_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxyzzzz_0[i] =
-            2.0 * g_0_zzzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyzzzz_0[i] * pb_x + g_0_zzzzzz_0_xxyzzzz_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxyzzzz_0[i] = 2.0 * g_0_zzzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyzzzz_0[i] * pb_x + g_0_zzzzzz_0_xxyzzzz_1[i] * wp_x[i];
 
-        g_0_xzzzzzz_0_xxzzzzz_0[i] =
-            2.0 * g_0_zzzzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxzzzzz_0[i] * pb_x + g_0_zzzzzz_0_xxzzzzz_1[i] * wp_x[i];
+        g_0_xzzzzzz_0_xxzzzzz_0[i] = 2.0 * g_0_zzzzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxzzzzz_0[i] * pb_x + g_0_zzzzzz_0_xxzzzzz_1[i] * wp_x[i];
 
         g_0_xzzzzzz_0_xyyyyyy_0[i] = g_0_zzzzzz_0_yyyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyyyyy_0[i] * pb_x + g_0_zzzzzz_0_xyyyyyy_1[i] * wp_x[i];
 
@@ -15716,217 +10166,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_yyyyyyy_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 1043);
 
-#pragma omp simd aligned(g_0_yyyyy_0_xxxxxxx_0,       \
-                             g_0_yyyyy_0_xxxxxxx_1,   \
-                             g_0_yyyyy_0_xxxxxxy_0,   \
-                             g_0_yyyyy_0_xxxxxxy_1,   \
-                             g_0_yyyyy_0_xxxxxxz_0,   \
-                             g_0_yyyyy_0_xxxxxxz_1,   \
-                             g_0_yyyyy_0_xxxxxyy_0,   \
-                             g_0_yyyyy_0_xxxxxyy_1,   \
-                             g_0_yyyyy_0_xxxxxyz_0,   \
-                             g_0_yyyyy_0_xxxxxyz_1,   \
-                             g_0_yyyyy_0_xxxxxzz_0,   \
-                             g_0_yyyyy_0_xxxxxzz_1,   \
-                             g_0_yyyyy_0_xxxxyyy_0,   \
-                             g_0_yyyyy_0_xxxxyyy_1,   \
-                             g_0_yyyyy_0_xxxxyyz_0,   \
-                             g_0_yyyyy_0_xxxxyyz_1,   \
-                             g_0_yyyyy_0_xxxxyzz_0,   \
-                             g_0_yyyyy_0_xxxxyzz_1,   \
-                             g_0_yyyyy_0_xxxxzzz_0,   \
-                             g_0_yyyyy_0_xxxxzzz_1,   \
-                             g_0_yyyyy_0_xxxyyyy_0,   \
-                             g_0_yyyyy_0_xxxyyyy_1,   \
-                             g_0_yyyyy_0_xxxyyyz_0,   \
-                             g_0_yyyyy_0_xxxyyyz_1,   \
-                             g_0_yyyyy_0_xxxyyzz_0,   \
-                             g_0_yyyyy_0_xxxyyzz_1,   \
-                             g_0_yyyyy_0_xxxyzzz_0,   \
-                             g_0_yyyyy_0_xxxyzzz_1,   \
-                             g_0_yyyyy_0_xxxzzzz_0,   \
-                             g_0_yyyyy_0_xxxzzzz_1,   \
-                             g_0_yyyyy_0_xxyyyyy_0,   \
-                             g_0_yyyyy_0_xxyyyyy_1,   \
-                             g_0_yyyyy_0_xxyyyyz_0,   \
-                             g_0_yyyyy_0_xxyyyyz_1,   \
-                             g_0_yyyyy_0_xxyyyzz_0,   \
-                             g_0_yyyyy_0_xxyyyzz_1,   \
-                             g_0_yyyyy_0_xxyyzzz_0,   \
-                             g_0_yyyyy_0_xxyyzzz_1,   \
-                             g_0_yyyyy_0_xxyzzzz_0,   \
-                             g_0_yyyyy_0_xxyzzzz_1,   \
-                             g_0_yyyyy_0_xxzzzzz_0,   \
-                             g_0_yyyyy_0_xxzzzzz_1,   \
-                             g_0_yyyyy_0_xyyyyyy_0,   \
-                             g_0_yyyyy_0_xyyyyyy_1,   \
-                             g_0_yyyyy_0_xyyyyyz_0,   \
-                             g_0_yyyyy_0_xyyyyyz_1,   \
-                             g_0_yyyyy_0_xyyyyzz_0,   \
-                             g_0_yyyyy_0_xyyyyzz_1,   \
-                             g_0_yyyyy_0_xyyyzzz_0,   \
-                             g_0_yyyyy_0_xyyyzzz_1,   \
-                             g_0_yyyyy_0_xyyzzzz_0,   \
-                             g_0_yyyyy_0_xyyzzzz_1,   \
-                             g_0_yyyyy_0_xyzzzzz_0,   \
-                             g_0_yyyyy_0_xyzzzzz_1,   \
-                             g_0_yyyyy_0_xzzzzzz_0,   \
-                             g_0_yyyyy_0_xzzzzzz_1,   \
-                             g_0_yyyyy_0_yyyyyyy_0,   \
-                             g_0_yyyyy_0_yyyyyyy_1,   \
-                             g_0_yyyyy_0_yyyyyyz_0,   \
-                             g_0_yyyyy_0_yyyyyyz_1,   \
-                             g_0_yyyyy_0_yyyyyzz_0,   \
-                             g_0_yyyyy_0_yyyyyzz_1,   \
-                             g_0_yyyyy_0_yyyyzzz_0,   \
-                             g_0_yyyyy_0_yyyyzzz_1,   \
-                             g_0_yyyyy_0_yyyzzzz_0,   \
-                             g_0_yyyyy_0_yyyzzzz_1,   \
-                             g_0_yyyyy_0_yyzzzzz_0,   \
-                             g_0_yyyyy_0_yyzzzzz_1,   \
-                             g_0_yyyyy_0_yzzzzzz_0,   \
-                             g_0_yyyyy_0_yzzzzzz_1,   \
-                             g_0_yyyyy_0_zzzzzzz_0,   \
-                             g_0_yyyyy_0_zzzzzzz_1,   \
-                             g_0_yyyyyy_0_xxxxxx_1,   \
-                             g_0_yyyyyy_0_xxxxxxx_0,  \
-                             g_0_yyyyyy_0_xxxxxxx_1,  \
-                             g_0_yyyyyy_0_xxxxxxy_0,  \
-                             g_0_yyyyyy_0_xxxxxxy_1,  \
-                             g_0_yyyyyy_0_xxxxxxz_0,  \
-                             g_0_yyyyyy_0_xxxxxxz_1,  \
-                             g_0_yyyyyy_0_xxxxxy_1,   \
-                             g_0_yyyyyy_0_xxxxxyy_0,  \
-                             g_0_yyyyyy_0_xxxxxyy_1,  \
-                             g_0_yyyyyy_0_xxxxxyz_0,  \
-                             g_0_yyyyyy_0_xxxxxyz_1,  \
-                             g_0_yyyyyy_0_xxxxxz_1,   \
-                             g_0_yyyyyy_0_xxxxxzz_0,  \
-                             g_0_yyyyyy_0_xxxxxzz_1,  \
-                             g_0_yyyyyy_0_xxxxyy_1,   \
-                             g_0_yyyyyy_0_xxxxyyy_0,  \
-                             g_0_yyyyyy_0_xxxxyyy_1,  \
-                             g_0_yyyyyy_0_xxxxyyz_0,  \
-                             g_0_yyyyyy_0_xxxxyyz_1,  \
-                             g_0_yyyyyy_0_xxxxyz_1,   \
-                             g_0_yyyyyy_0_xxxxyzz_0,  \
-                             g_0_yyyyyy_0_xxxxyzz_1,  \
-                             g_0_yyyyyy_0_xxxxzz_1,   \
-                             g_0_yyyyyy_0_xxxxzzz_0,  \
-                             g_0_yyyyyy_0_xxxxzzz_1,  \
-                             g_0_yyyyyy_0_xxxyyy_1,   \
-                             g_0_yyyyyy_0_xxxyyyy_0,  \
-                             g_0_yyyyyy_0_xxxyyyy_1,  \
-                             g_0_yyyyyy_0_xxxyyyz_0,  \
-                             g_0_yyyyyy_0_xxxyyyz_1,  \
-                             g_0_yyyyyy_0_xxxyyz_1,   \
-                             g_0_yyyyyy_0_xxxyyzz_0,  \
-                             g_0_yyyyyy_0_xxxyyzz_1,  \
-                             g_0_yyyyyy_0_xxxyzz_1,   \
-                             g_0_yyyyyy_0_xxxyzzz_0,  \
-                             g_0_yyyyyy_0_xxxyzzz_1,  \
-                             g_0_yyyyyy_0_xxxzzz_1,   \
-                             g_0_yyyyyy_0_xxxzzzz_0,  \
-                             g_0_yyyyyy_0_xxxzzzz_1,  \
-                             g_0_yyyyyy_0_xxyyyy_1,   \
-                             g_0_yyyyyy_0_xxyyyyy_0,  \
-                             g_0_yyyyyy_0_xxyyyyy_1,  \
-                             g_0_yyyyyy_0_xxyyyyz_0,  \
-                             g_0_yyyyyy_0_xxyyyyz_1,  \
-                             g_0_yyyyyy_0_xxyyyz_1,   \
-                             g_0_yyyyyy_0_xxyyyzz_0,  \
-                             g_0_yyyyyy_0_xxyyyzz_1,  \
-                             g_0_yyyyyy_0_xxyyzz_1,   \
-                             g_0_yyyyyy_0_xxyyzzz_0,  \
-                             g_0_yyyyyy_0_xxyyzzz_1,  \
-                             g_0_yyyyyy_0_xxyzzz_1,   \
-                             g_0_yyyyyy_0_xxyzzzz_0,  \
-                             g_0_yyyyyy_0_xxyzzzz_1,  \
-                             g_0_yyyyyy_0_xxzzzz_1,   \
-                             g_0_yyyyyy_0_xxzzzzz_0,  \
-                             g_0_yyyyyy_0_xxzzzzz_1,  \
-                             g_0_yyyyyy_0_xyyyyy_1,   \
-                             g_0_yyyyyy_0_xyyyyyy_0,  \
-                             g_0_yyyyyy_0_xyyyyyy_1,  \
-                             g_0_yyyyyy_0_xyyyyyz_0,  \
-                             g_0_yyyyyy_0_xyyyyyz_1,  \
-                             g_0_yyyyyy_0_xyyyyz_1,   \
-                             g_0_yyyyyy_0_xyyyyzz_0,  \
-                             g_0_yyyyyy_0_xyyyyzz_1,  \
-                             g_0_yyyyyy_0_xyyyzz_1,   \
-                             g_0_yyyyyy_0_xyyyzzz_0,  \
-                             g_0_yyyyyy_0_xyyyzzz_1,  \
-                             g_0_yyyyyy_0_xyyzzz_1,   \
-                             g_0_yyyyyy_0_xyyzzzz_0,  \
-                             g_0_yyyyyy_0_xyyzzzz_1,  \
-                             g_0_yyyyyy_0_xyzzzz_1,   \
-                             g_0_yyyyyy_0_xyzzzzz_0,  \
-                             g_0_yyyyyy_0_xyzzzzz_1,  \
-                             g_0_yyyyyy_0_xzzzzz_1,   \
-                             g_0_yyyyyy_0_xzzzzzz_0,  \
-                             g_0_yyyyyy_0_xzzzzzz_1,  \
-                             g_0_yyyyyy_0_yyyyyy_1,   \
-                             g_0_yyyyyy_0_yyyyyyy_0,  \
-                             g_0_yyyyyy_0_yyyyyyy_1,  \
-                             g_0_yyyyyy_0_yyyyyyz_0,  \
-                             g_0_yyyyyy_0_yyyyyyz_1,  \
-                             g_0_yyyyyy_0_yyyyyz_1,   \
-                             g_0_yyyyyy_0_yyyyyzz_0,  \
-                             g_0_yyyyyy_0_yyyyyzz_1,  \
-                             g_0_yyyyyy_0_yyyyzz_1,   \
-                             g_0_yyyyyy_0_yyyyzzz_0,  \
-                             g_0_yyyyyy_0_yyyyzzz_1,  \
-                             g_0_yyyyyy_0_yyyzzz_1,   \
-                             g_0_yyyyyy_0_yyyzzzz_0,  \
-                             g_0_yyyyyy_0_yyyzzzz_1,  \
-                             g_0_yyyyyy_0_yyzzzz_1,   \
-                             g_0_yyyyyy_0_yyzzzzz_0,  \
-                             g_0_yyyyyy_0_yyzzzzz_1,  \
-                             g_0_yyyyyy_0_yzzzzz_1,   \
-                             g_0_yyyyyy_0_yzzzzzz_0,  \
-                             g_0_yyyyyy_0_yzzzzzz_1,  \
-                             g_0_yyyyyy_0_zzzzzz_1,   \
-                             g_0_yyyyyy_0_zzzzzzz_0,  \
-                             g_0_yyyyyy_0_zzzzzzz_1,  \
-                             g_0_yyyyyyy_0_xxxxxxx_0, \
-                             g_0_yyyyyyy_0_xxxxxxy_0, \
-                             g_0_yyyyyyy_0_xxxxxxz_0, \
-                             g_0_yyyyyyy_0_xxxxxyy_0, \
-                             g_0_yyyyyyy_0_xxxxxyz_0, \
-                             g_0_yyyyyyy_0_xxxxxzz_0, \
-                             g_0_yyyyyyy_0_xxxxyyy_0, \
-                             g_0_yyyyyyy_0_xxxxyyz_0, \
-                             g_0_yyyyyyy_0_xxxxyzz_0, \
-                             g_0_yyyyyyy_0_xxxxzzz_0, \
-                             g_0_yyyyyyy_0_xxxyyyy_0, \
-                             g_0_yyyyyyy_0_xxxyyyz_0, \
-                             g_0_yyyyyyy_0_xxxyyzz_0, \
-                             g_0_yyyyyyy_0_xxxyzzz_0, \
-                             g_0_yyyyyyy_0_xxxzzzz_0, \
-                             g_0_yyyyyyy_0_xxyyyyy_0, \
-                             g_0_yyyyyyy_0_xxyyyyz_0, \
-                             g_0_yyyyyyy_0_xxyyyzz_0, \
-                             g_0_yyyyyyy_0_xxyyzzz_0, \
-                             g_0_yyyyyyy_0_xxyzzzz_0, \
-                             g_0_yyyyyyy_0_xxzzzzz_0, \
-                             g_0_yyyyyyy_0_xyyyyyy_0, \
-                             g_0_yyyyyyy_0_xyyyyyz_0, \
-                             g_0_yyyyyyy_0_xyyyyzz_0, \
-                             g_0_yyyyyyy_0_xyyyzzz_0, \
-                             g_0_yyyyyyy_0_xyyzzzz_0, \
-                             g_0_yyyyyyy_0_xyzzzzz_0, \
-                             g_0_yyyyyyy_0_xzzzzzz_0, \
-                             g_0_yyyyyyy_0_yyyyyyy_0, \
-                             g_0_yyyyyyy_0_yyyyyyz_0, \
-                             g_0_yyyyyyy_0_yyyyyzz_0, \
-                             g_0_yyyyyyy_0_yyyyzzz_0, \
-                             g_0_yyyyyyy_0_yyyzzzz_0, \
-                             g_0_yyyyyyy_0_yyzzzzz_0, \
-                             g_0_yyyyyyy_0_yzzzzzz_0, \
-                             g_0_yyyyyyy_0_zzzzzzz_0, \
-                             wp_y,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_yyyyy_0_xxxxxxx_0, g_0_yyyyy_0_xxxxxxx_1, g_0_yyyyy_0_xxxxxxy_0, g_0_yyyyy_0_xxxxxxy_1, g_0_yyyyy_0_xxxxxxz_0, g_0_yyyyy_0_xxxxxxz_1, g_0_yyyyy_0_xxxxxyy_0, g_0_yyyyy_0_xxxxxyy_1, g_0_yyyyy_0_xxxxxyz_0, g_0_yyyyy_0_xxxxxyz_1, g_0_yyyyy_0_xxxxxzz_0, g_0_yyyyy_0_xxxxxzz_1, g_0_yyyyy_0_xxxxyyy_0, g_0_yyyyy_0_xxxxyyy_1, g_0_yyyyy_0_xxxxyyz_0, g_0_yyyyy_0_xxxxyyz_1, g_0_yyyyy_0_xxxxyzz_0, g_0_yyyyy_0_xxxxyzz_1, g_0_yyyyy_0_xxxxzzz_0, g_0_yyyyy_0_xxxxzzz_1, g_0_yyyyy_0_xxxyyyy_0, g_0_yyyyy_0_xxxyyyy_1, g_0_yyyyy_0_xxxyyyz_0, g_0_yyyyy_0_xxxyyyz_1, g_0_yyyyy_0_xxxyyzz_0, g_0_yyyyy_0_xxxyyzz_1, g_0_yyyyy_0_xxxyzzz_0, g_0_yyyyy_0_xxxyzzz_1, g_0_yyyyy_0_xxxzzzz_0, g_0_yyyyy_0_xxxzzzz_1, g_0_yyyyy_0_xxyyyyy_0, g_0_yyyyy_0_xxyyyyy_1, g_0_yyyyy_0_xxyyyyz_0, g_0_yyyyy_0_xxyyyyz_1, g_0_yyyyy_0_xxyyyzz_0, g_0_yyyyy_0_xxyyyzz_1, g_0_yyyyy_0_xxyyzzz_0, g_0_yyyyy_0_xxyyzzz_1, g_0_yyyyy_0_xxyzzzz_0, g_0_yyyyy_0_xxyzzzz_1, g_0_yyyyy_0_xxzzzzz_0, g_0_yyyyy_0_xxzzzzz_1, g_0_yyyyy_0_xyyyyyy_0, g_0_yyyyy_0_xyyyyyy_1, g_0_yyyyy_0_xyyyyyz_0, g_0_yyyyy_0_xyyyyyz_1, g_0_yyyyy_0_xyyyyzz_0, g_0_yyyyy_0_xyyyyzz_1, g_0_yyyyy_0_xyyyzzz_0, g_0_yyyyy_0_xyyyzzz_1, g_0_yyyyy_0_xyyzzzz_0, g_0_yyyyy_0_xyyzzzz_1, g_0_yyyyy_0_xyzzzzz_0, g_0_yyyyy_0_xyzzzzz_1, g_0_yyyyy_0_xzzzzzz_0, g_0_yyyyy_0_xzzzzzz_1, g_0_yyyyy_0_yyyyyyy_0, g_0_yyyyy_0_yyyyyyy_1, g_0_yyyyy_0_yyyyyyz_0, g_0_yyyyy_0_yyyyyyz_1, g_0_yyyyy_0_yyyyyzz_0, g_0_yyyyy_0_yyyyyzz_1, g_0_yyyyy_0_yyyyzzz_0, g_0_yyyyy_0_yyyyzzz_1, g_0_yyyyy_0_yyyzzzz_0, g_0_yyyyy_0_yyyzzzz_1, g_0_yyyyy_0_yyzzzzz_0, g_0_yyyyy_0_yyzzzzz_1, g_0_yyyyy_0_yzzzzzz_0, g_0_yyyyy_0_yzzzzzz_1, g_0_yyyyy_0_zzzzzzz_0, g_0_yyyyy_0_zzzzzzz_1, g_0_yyyyyy_0_xxxxxx_1, g_0_yyyyyy_0_xxxxxxx_0, g_0_yyyyyy_0_xxxxxxx_1, g_0_yyyyyy_0_xxxxxxy_0, g_0_yyyyyy_0_xxxxxxy_1, g_0_yyyyyy_0_xxxxxxz_0, g_0_yyyyyy_0_xxxxxxz_1, g_0_yyyyyy_0_xxxxxy_1, g_0_yyyyyy_0_xxxxxyy_0, g_0_yyyyyy_0_xxxxxyy_1, g_0_yyyyyy_0_xxxxxyz_0, g_0_yyyyyy_0_xxxxxyz_1, g_0_yyyyyy_0_xxxxxz_1, g_0_yyyyyy_0_xxxxxzz_0, g_0_yyyyyy_0_xxxxxzz_1, g_0_yyyyyy_0_xxxxyy_1, g_0_yyyyyy_0_xxxxyyy_0, g_0_yyyyyy_0_xxxxyyy_1, g_0_yyyyyy_0_xxxxyyz_0, g_0_yyyyyy_0_xxxxyyz_1, g_0_yyyyyy_0_xxxxyz_1, g_0_yyyyyy_0_xxxxyzz_0, g_0_yyyyyy_0_xxxxyzz_1, g_0_yyyyyy_0_xxxxzz_1, g_0_yyyyyy_0_xxxxzzz_0, g_0_yyyyyy_0_xxxxzzz_1, g_0_yyyyyy_0_xxxyyy_1, g_0_yyyyyy_0_xxxyyyy_0, g_0_yyyyyy_0_xxxyyyy_1, g_0_yyyyyy_0_xxxyyyz_0, g_0_yyyyyy_0_xxxyyyz_1, g_0_yyyyyy_0_xxxyyz_1, g_0_yyyyyy_0_xxxyyzz_0, g_0_yyyyyy_0_xxxyyzz_1, g_0_yyyyyy_0_xxxyzz_1, g_0_yyyyyy_0_xxxyzzz_0, g_0_yyyyyy_0_xxxyzzz_1, g_0_yyyyyy_0_xxxzzz_1, g_0_yyyyyy_0_xxxzzzz_0, g_0_yyyyyy_0_xxxzzzz_1, g_0_yyyyyy_0_xxyyyy_1, g_0_yyyyyy_0_xxyyyyy_0, g_0_yyyyyy_0_xxyyyyy_1, g_0_yyyyyy_0_xxyyyyz_0, g_0_yyyyyy_0_xxyyyyz_1, g_0_yyyyyy_0_xxyyyz_1, g_0_yyyyyy_0_xxyyyzz_0, g_0_yyyyyy_0_xxyyyzz_1, g_0_yyyyyy_0_xxyyzz_1, g_0_yyyyyy_0_xxyyzzz_0, g_0_yyyyyy_0_xxyyzzz_1, g_0_yyyyyy_0_xxyzzz_1, g_0_yyyyyy_0_xxyzzzz_0, g_0_yyyyyy_0_xxyzzzz_1, g_0_yyyyyy_0_xxzzzz_1, g_0_yyyyyy_0_xxzzzzz_0, g_0_yyyyyy_0_xxzzzzz_1, g_0_yyyyyy_0_xyyyyy_1, g_0_yyyyyy_0_xyyyyyy_0, g_0_yyyyyy_0_xyyyyyy_1, g_0_yyyyyy_0_xyyyyyz_0, g_0_yyyyyy_0_xyyyyyz_1, g_0_yyyyyy_0_xyyyyz_1, g_0_yyyyyy_0_xyyyyzz_0, g_0_yyyyyy_0_xyyyyzz_1, g_0_yyyyyy_0_xyyyzz_1, g_0_yyyyyy_0_xyyyzzz_0, g_0_yyyyyy_0_xyyyzzz_1, g_0_yyyyyy_0_xyyzzz_1, g_0_yyyyyy_0_xyyzzzz_0, g_0_yyyyyy_0_xyyzzzz_1, g_0_yyyyyy_0_xyzzzz_1, g_0_yyyyyy_0_xyzzzzz_0, g_0_yyyyyy_0_xyzzzzz_1, g_0_yyyyyy_0_xzzzzz_1, g_0_yyyyyy_0_xzzzzzz_0, g_0_yyyyyy_0_xzzzzzz_1, g_0_yyyyyy_0_yyyyyy_1, g_0_yyyyyy_0_yyyyyyy_0, g_0_yyyyyy_0_yyyyyyy_1, g_0_yyyyyy_0_yyyyyyz_0, g_0_yyyyyy_0_yyyyyyz_1, g_0_yyyyyy_0_yyyyyz_1, g_0_yyyyyy_0_yyyyyzz_0, g_0_yyyyyy_0_yyyyyzz_1, g_0_yyyyyy_0_yyyyzz_1, g_0_yyyyyy_0_yyyyzzz_0, g_0_yyyyyy_0_yyyyzzz_1, g_0_yyyyyy_0_yyyzzz_1, g_0_yyyyyy_0_yyyzzzz_0, g_0_yyyyyy_0_yyyzzzz_1, g_0_yyyyyy_0_yyzzzz_1, g_0_yyyyyy_0_yyzzzzz_0, g_0_yyyyyy_0_yyzzzzz_1, g_0_yyyyyy_0_yzzzzz_1, g_0_yyyyyy_0_yzzzzzz_0, g_0_yyyyyy_0_yzzzzzz_1, g_0_yyyyyy_0_zzzzzz_1, g_0_yyyyyy_0_zzzzzzz_0, g_0_yyyyyy_0_zzzzzzz_1, g_0_yyyyyyy_0_xxxxxxx_0, g_0_yyyyyyy_0_xxxxxxy_0, g_0_yyyyyyy_0_xxxxxxz_0, g_0_yyyyyyy_0_xxxxxyy_0, g_0_yyyyyyy_0_xxxxxyz_0, g_0_yyyyyyy_0_xxxxxzz_0, g_0_yyyyyyy_0_xxxxyyy_0, g_0_yyyyyyy_0_xxxxyyz_0, g_0_yyyyyyy_0_xxxxyzz_0, g_0_yyyyyyy_0_xxxxzzz_0, g_0_yyyyyyy_0_xxxyyyy_0, g_0_yyyyyyy_0_xxxyyyz_0, g_0_yyyyyyy_0_xxxyyzz_0, g_0_yyyyyyy_0_xxxyzzz_0, g_0_yyyyyyy_0_xxxzzzz_0, g_0_yyyyyyy_0_xxyyyyy_0, g_0_yyyyyyy_0_xxyyyyz_0, g_0_yyyyyyy_0_xxyyyzz_0, g_0_yyyyyyy_0_xxyyzzz_0, g_0_yyyyyyy_0_xxyzzzz_0, g_0_yyyyyyy_0_xxzzzzz_0, g_0_yyyyyyy_0_xyyyyyy_0, g_0_yyyyyyy_0_xyyyyyz_0, g_0_yyyyyyy_0_xyyyyzz_0, g_0_yyyyyyy_0_xyyyzzz_0, g_0_yyyyyyy_0_xyyzzzz_0, g_0_yyyyyyy_0_xyzzzzz_0, g_0_yyyyyyy_0_xzzzzzz_0, g_0_yyyyyyy_0_yyyyyyy_0, g_0_yyyyyyy_0_yyyyyyz_0, g_0_yyyyyyy_0_yyyyyzz_0, g_0_yyyyyyy_0_yyyyzzz_0, g_0_yyyyyyy_0_yyyzzzz_0, g_0_yyyyyyy_0_yyzzzzz_0, g_0_yyyyyyy_0_yzzzzzz_0, g_0_yyyyyyy_0_zzzzzzz_0, wp_y, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -15935,134 +10175,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_yyyyyyy_0_xxxxxxx_0[i] = 6.0 * g_0_yyyyy_0_xxxxxxx_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxxxx_1[i] * fti_ab_0 +
-                                     g_0_yyyyyy_0_xxxxxxx_0[i] * pb_y + g_0_yyyyyy_0_xxxxxxx_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxxxxxx_0[i] = 6.0 * g_0_yyyyy_0_xxxxxxx_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxxxx_1[i] * fti_ab_0 + g_0_yyyyyy_0_xxxxxxx_0[i] * pb_y + g_0_yyyyyy_0_xxxxxxx_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxxxxxy_0[i] = 6.0 * g_0_yyyyy_0_xxxxxxy_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxxxy_1[i] * fti_ab_0 +
-                                     g_0_yyyyyy_0_xxxxxx_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxxy_0[i] * pb_y + g_0_yyyyyy_0_xxxxxxy_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxxxxxy_0[i] = 6.0 * g_0_yyyyy_0_xxxxxxy_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxxxy_1[i] * fti_ab_0 + g_0_yyyyyy_0_xxxxxx_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxxy_0[i] * pb_y + g_0_yyyyyy_0_xxxxxxy_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxxxxxz_0[i] = 6.0 * g_0_yyyyy_0_xxxxxxz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxxxz_1[i] * fti_ab_0 +
-                                     g_0_yyyyyy_0_xxxxxxz_0[i] * pb_y + g_0_yyyyyy_0_xxxxxxz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxxxxxz_0[i] = 6.0 * g_0_yyyyy_0_xxxxxxz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxxxz_1[i] * fti_ab_0 + g_0_yyyyyy_0_xxxxxxz_0[i] * pb_y + g_0_yyyyyy_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxxxxyy_0[i] = 6.0 * g_0_yyyyy_0_xxxxxyy_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxxyy_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyyyyy_0_xxxxxy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxyy_0[i] * pb_y +
-                                     g_0_yyyyyy_0_xxxxxyy_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxxxxyy_0[i] = 6.0 * g_0_yyyyy_0_xxxxxyy_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxxyy_1[i] * fti_ab_0 + 2.0 * g_0_yyyyyy_0_xxxxxy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxyy_0[i] * pb_y + g_0_yyyyyy_0_xxxxxyy_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxxxxyz_0[i] = 6.0 * g_0_yyyyy_0_xxxxxyz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     g_0_yyyyyy_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxyz_0[i] * pb_y + g_0_yyyyyy_0_xxxxxyz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxxxxyz_0[i] = 6.0 * g_0_yyyyy_0_xxxxxyz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxxyz_1[i] * fti_ab_0 + g_0_yyyyyy_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxyz_0[i] * pb_y + g_0_yyyyyy_0_xxxxxyz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxxxxzz_0[i] = 6.0 * g_0_yyyyy_0_xxxxxzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxxzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyyy_0_xxxxxzz_0[i] * pb_y + g_0_yyyyyy_0_xxxxxzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxxxxzz_0[i] = 6.0 * g_0_yyyyy_0_xxxxxzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxxzz_1[i] * fti_ab_0 + g_0_yyyyyy_0_xxxxxzz_0[i] * pb_y + g_0_yyyyyy_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxxxyyy_0[i] = 6.0 * g_0_yyyyy_0_xxxxyyy_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxyyy_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyyyyy_0_xxxxyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxyyy_0[i] * pb_y +
-                                     g_0_yyyyyy_0_xxxxyyy_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxxxyyy_0[i] = 6.0 * g_0_yyyyy_0_xxxxyyy_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxyyy_1[i] * fti_ab_0 + 3.0 * g_0_yyyyyy_0_xxxxyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxyyy_0[i] * pb_y + g_0_yyyyyy_0_xxxxyyy_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxxxyyz_0[i] = 6.0 * g_0_yyyyy_0_xxxxyyz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyyyyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxyyz_0[i] * pb_y +
-                                     g_0_yyyyyy_0_xxxxyyz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxxxyyz_0[i] = 6.0 * g_0_yyyyy_0_xxxxyyz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxyyz_1[i] * fti_ab_0 + 2.0 * g_0_yyyyyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxyyz_0[i] * pb_y + g_0_yyyyyy_0_xxxxyyz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxxxyzz_0[i] = 6.0 * g_0_yyyyy_0_xxxxyzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyyy_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxyzz_0[i] * pb_y + g_0_yyyyyy_0_xxxxyzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxxxyzz_0[i] = 6.0 * g_0_yyyyy_0_xxxxyzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxyzz_1[i] * fti_ab_0 + g_0_yyyyyy_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxyzz_0[i] * pb_y + g_0_yyyyyy_0_xxxxyzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxxxzzz_0[i] = 6.0 * g_0_yyyyy_0_xxxxzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyyy_0_xxxxzzz_0[i] * pb_y + g_0_yyyyyy_0_xxxxzzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxxxzzz_0[i] = 6.0 * g_0_yyyyy_0_xxxxzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxxzzz_1[i] * fti_ab_0 + g_0_yyyyyy_0_xxxxzzz_0[i] * pb_y + g_0_yyyyyy_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxxyyyy_0[i] = 6.0 * g_0_yyyyy_0_xxxyyyy_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxyyyy_1[i] * fti_ab_0 +
-                                     4.0 * g_0_yyyyyy_0_xxxyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyyyy_0[i] * pb_y +
-                                     g_0_yyyyyy_0_xxxyyyy_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxxyyyy_0[i] = 6.0 * g_0_yyyyy_0_xxxyyyy_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxyyyy_1[i] * fti_ab_0 + 4.0 * g_0_yyyyyy_0_xxxyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyyyy_0[i] * pb_y + g_0_yyyyyy_0_xxxyyyy_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxxyyyz_0[i] = 6.0 * g_0_yyyyy_0_xxxyyyz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyyyyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyyyz_0[i] * pb_y +
-                                     g_0_yyyyyy_0_xxxyyyz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxxyyyz_0[i] = 6.0 * g_0_yyyyy_0_xxxyyyz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_yyyyyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyyyz_0[i] * pb_y + g_0_yyyyyy_0_xxxyyyz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxxyyzz_0[i] = 6.0 * g_0_yyyyy_0_xxxyyzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyyyyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyyzz_0[i] * pb_y +
-                                     g_0_yyyyyy_0_xxxyyzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxxyyzz_0[i] = 6.0 * g_0_yyyyy_0_xxxyyzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxyyzz_1[i] * fti_ab_0 + 2.0 * g_0_yyyyyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyyzz_0[i] * pb_y + g_0_yyyyyy_0_xxxyyzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxxyzzz_0[i] = 6.0 * g_0_yyyyy_0_xxxyzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyyy_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyzzz_0[i] * pb_y + g_0_yyyyyy_0_xxxyzzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxxyzzz_0[i] = 6.0 * g_0_yyyyy_0_xxxyzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxyzzz_1[i] * fti_ab_0 + g_0_yyyyyy_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyzzz_0[i] * pb_y + g_0_yyyyyy_0_xxxyzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxxzzzz_0[i] = 6.0 * g_0_yyyyy_0_xxxzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyyy_0_xxxzzzz_0[i] * pb_y + g_0_yyyyyy_0_xxxzzzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxxzzzz_0[i] = 6.0 * g_0_yyyyy_0_xxxzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxxzzzz_1[i] * fti_ab_0 + g_0_yyyyyy_0_xxxzzzz_0[i] * pb_y + g_0_yyyyyy_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxyyyyy_0[i] = 6.0 * g_0_yyyyy_0_xxyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxyyyyy_1[i] * fti_ab_0 +
-                                     5.0 * g_0_yyyyyy_0_xxyyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyyyy_0[i] * pb_y +
-                                     g_0_yyyyyy_0_xxyyyyy_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxyyyyy_0[i] = 6.0 * g_0_yyyyy_0_xxyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxyyyyy_1[i] * fti_ab_0 + 5.0 * g_0_yyyyyy_0_xxyyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyyyy_0[i] * pb_y + g_0_yyyyyy_0_xxyyyyy_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxyyyyz_0[i] = 6.0 * g_0_yyyyy_0_xxyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_yyyyyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyyyz_0[i] * pb_y +
-                                     g_0_yyyyyy_0_xxyyyyz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxyyyyz_0[i] = 6.0 * g_0_yyyyy_0_xxyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxyyyyz_1[i] * fti_ab_0 + 4.0 * g_0_yyyyyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyyyz_0[i] * pb_y + g_0_yyyyyy_0_xxyyyyz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxyyyzz_0[i] = 6.0 * g_0_yyyyy_0_xxyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyyyyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyyzz_0[i] * pb_y +
-                                     g_0_yyyyyy_0_xxyyyzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxyyyzz_0[i] = 6.0 * g_0_yyyyy_0_xxyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxyyyzz_1[i] * fti_ab_0 + 3.0 * g_0_yyyyyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyyzz_0[i] * pb_y + g_0_yyyyyy_0_xxyyyzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxyyzzz_0[i] = 6.0 * g_0_yyyyy_0_xxyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyyyyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyzzz_0[i] * pb_y +
-                                     g_0_yyyyyy_0_xxyyzzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxyyzzz_0[i] = 6.0 * g_0_yyyyy_0_xxyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_yyyyyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyzzz_0[i] * pb_y + g_0_yyyyyy_0_xxyyzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxyzzzz_0[i] = 6.0 * g_0_yyyyy_0_xxyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyyy_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyzzzz_0[i] * pb_y + g_0_yyyyyy_0_xxyzzzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxyzzzz_0[i] = 6.0 * g_0_yyyyy_0_xxyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxyzzzz_1[i] * fti_ab_0 + g_0_yyyyyy_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyzzzz_0[i] * pb_y + g_0_yyyyyy_0_xxyzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xxzzzzz_0[i] = 6.0 * g_0_yyyyy_0_xxzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyyy_0_xxzzzzz_0[i] * pb_y + g_0_yyyyyy_0_xxzzzzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xxzzzzz_0[i] = 6.0 * g_0_yyyyy_0_xxzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xxzzzzz_1[i] * fti_ab_0 + g_0_yyyyyy_0_xxzzzzz_0[i] * pb_y + g_0_yyyyyy_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xyyyyyy_0[i] = 6.0 * g_0_yyyyy_0_xyyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xyyyyyy_1[i] * fti_ab_0 +
-                                     6.0 * g_0_yyyyyy_0_xyyyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyyyyy_0[i] * pb_y +
-                                     g_0_yyyyyy_0_xyyyyyy_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xyyyyyy_0[i] = 6.0 * g_0_yyyyy_0_xyyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xyyyyyy_1[i] * fti_ab_0 + 6.0 * g_0_yyyyyy_0_xyyyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyyyyy_0[i] * pb_y + g_0_yyyyyy_0_xyyyyyy_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xyyyyyz_0[i] = 6.0 * g_0_yyyyy_0_xyyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xyyyyyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_yyyyyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyyyyz_0[i] * pb_y +
-                                     g_0_yyyyyy_0_xyyyyyz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xyyyyyz_0[i] = 6.0 * g_0_yyyyy_0_xyyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xyyyyyz_1[i] * fti_ab_0 + 5.0 * g_0_yyyyyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyyyyz_0[i] * pb_y + g_0_yyyyyy_0_xyyyyyz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xyyyyzz_0[i] = 6.0 * g_0_yyyyy_0_xyyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xyyyyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_yyyyyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyyyzz_0[i] * pb_y +
-                                     g_0_yyyyyy_0_xyyyyzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xyyyyzz_0[i] = 6.0 * g_0_yyyyy_0_xyyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xyyyyzz_1[i] * fti_ab_0 + 4.0 * g_0_yyyyyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyyyzz_0[i] * pb_y + g_0_yyyyyy_0_xyyyyzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xyyyzzz_0[i] = 6.0 * g_0_yyyyy_0_xyyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xyyyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyyyyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyyzzz_0[i] * pb_y +
-                                     g_0_yyyyyy_0_xyyyzzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xyyyzzz_0[i] = 6.0 * g_0_yyyyy_0_xyyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xyyyzzz_1[i] * fti_ab_0 + 3.0 * g_0_yyyyyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyyzzz_0[i] * pb_y + g_0_yyyyyy_0_xyyyzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xyyzzzz_0[i] = 6.0 * g_0_yyyyy_0_xyyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xyyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyyyyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyzzzz_0[i] * pb_y +
-                                     g_0_yyyyyy_0_xyyzzzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xyyzzzz_0[i] = 6.0 * g_0_yyyyy_0_xyyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xyyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_yyyyyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyzzzz_0[i] * pb_y + g_0_yyyyyy_0_xyyzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xyzzzzz_0[i] = 6.0 * g_0_yyyyy_0_xyzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyyy_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyzzzzz_0[i] * pb_y + g_0_yyyyyy_0_xyzzzzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xyzzzzz_0[i] = 6.0 * g_0_yyyyy_0_xyzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xyzzzzz_1[i] * fti_ab_0 + g_0_yyyyyy_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyzzzzz_0[i] * pb_y + g_0_yyyyyy_0_xyzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_xzzzzzz_0[i] = 6.0 * g_0_yyyyy_0_xzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyyy_0_xzzzzzz_0[i] * pb_y + g_0_yyyyyy_0_xzzzzzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_xzzzzzz_0[i] = 6.0 * g_0_yyyyy_0_xzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_xzzzzzz_1[i] * fti_ab_0 + g_0_yyyyyy_0_xzzzzzz_0[i] * pb_y + g_0_yyyyyy_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_yyyyyyy_0[i] = 6.0 * g_0_yyyyy_0_yyyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_yyyyyyy_1[i] * fti_ab_0 +
-                                     7.0 * g_0_yyyyyy_0_yyyyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyyyyy_0[i] * pb_y +
-                                     g_0_yyyyyy_0_yyyyyyy_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_yyyyyyy_0[i] = 6.0 * g_0_yyyyy_0_yyyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_yyyyyyy_1[i] * fti_ab_0 + 7.0 * g_0_yyyyyy_0_yyyyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyyyyy_0[i] * pb_y + g_0_yyyyyy_0_yyyyyyy_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_yyyyyyz_0[i] = 6.0 * g_0_yyyyy_0_yyyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_yyyyyyz_1[i] * fti_ab_0 +
-                                     6.0 * g_0_yyyyyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyyyyz_0[i] * pb_y +
-                                     g_0_yyyyyy_0_yyyyyyz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_yyyyyyz_0[i] = 6.0 * g_0_yyyyy_0_yyyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_yyyyyyz_1[i] * fti_ab_0 + 6.0 * g_0_yyyyyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyyyyz_0[i] * pb_y + g_0_yyyyyy_0_yyyyyyz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_yyyyyzz_0[i] = 6.0 * g_0_yyyyy_0_yyyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_yyyyyzz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_yyyyyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyyyzz_0[i] * pb_y +
-                                     g_0_yyyyyy_0_yyyyyzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_yyyyyzz_0[i] = 6.0 * g_0_yyyyy_0_yyyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_yyyyyzz_1[i] * fti_ab_0 + 5.0 * g_0_yyyyyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyyyzz_0[i] * pb_y + g_0_yyyyyy_0_yyyyyzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_yyyyzzz_0[i] = 6.0 * g_0_yyyyy_0_yyyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_yyyyzzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_yyyyyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyyzzz_0[i] * pb_y +
-                                     g_0_yyyyyy_0_yyyyzzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_yyyyzzz_0[i] = 6.0 * g_0_yyyyy_0_yyyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_yyyyzzz_1[i] * fti_ab_0 + 4.0 * g_0_yyyyyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyyzzz_0[i] * pb_y + g_0_yyyyyy_0_yyyyzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_yyyzzzz_0[i] = 6.0 * g_0_yyyyy_0_yyyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_yyyzzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyyyyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyzzzz_0[i] * pb_y +
-                                     g_0_yyyyyy_0_yyyzzzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_yyyzzzz_0[i] = 6.0 * g_0_yyyyy_0_yyyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_yyyzzzz_1[i] * fti_ab_0 + 3.0 * g_0_yyyyyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyzzzz_0[i] * pb_y + g_0_yyyyyy_0_yyyzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_yyzzzzz_0[i] = 6.0 * g_0_yyyyy_0_yyzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_yyzzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyyyyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyzzzzz_0[i] * pb_y +
-                                     g_0_yyyyyy_0_yyzzzzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_yyzzzzz_0[i] = 6.0 * g_0_yyyyy_0_yyzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_yyzzzzz_1[i] * fti_ab_0 + 2.0 * g_0_yyyyyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyzzzzz_0[i] * pb_y + g_0_yyyyyy_0_yyzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_yzzzzzz_0[i] = 6.0 * g_0_yyyyy_0_yzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_yzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyyy_0_zzzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yzzzzzz_0[i] * pb_y + g_0_yyyyyy_0_yzzzzzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_yzzzzzz_0[i] = 6.0 * g_0_yyyyy_0_yzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_yzzzzzz_1[i] * fti_ab_0 + g_0_yyyyyy_0_zzzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yzzzzzz_0[i] * pb_y + g_0_yyyyyy_0_yzzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyyy_0_zzzzzzz_0[i] = 6.0 * g_0_yyyyy_0_zzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_zzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyyy_0_zzzzzzz_0[i] * pb_y + g_0_yyyyyy_0_zzzzzzz_1[i] * wp_y[i];
+        g_0_yyyyyyy_0_zzzzzzz_0[i] = 6.0 * g_0_yyyyy_0_zzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_yyyyy_0_zzzzzzz_1[i] * fti_ab_0 + g_0_yyyyyy_0_zzzzzzz_0[i] * pb_y + g_0_yyyyyy_0_zzzzzzz_1[i] * wp_y[i];
     }
 
     /// Set up 1044-1080 components of targeted buffer : SKSK
@@ -16139,145 +10322,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_yyyyyyz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 1079);
 
-#pragma omp simd aligned(g_0_yyyyyy_0_xxxxxx_1,       \
-                             g_0_yyyyyy_0_xxxxxxx_0,  \
-                             g_0_yyyyyy_0_xxxxxxx_1,  \
-                             g_0_yyyyyy_0_xxxxxxy_0,  \
-                             g_0_yyyyyy_0_xxxxxxy_1,  \
-                             g_0_yyyyyy_0_xxxxxxz_0,  \
-                             g_0_yyyyyy_0_xxxxxxz_1,  \
-                             g_0_yyyyyy_0_xxxxxy_1,   \
-                             g_0_yyyyyy_0_xxxxxyy_0,  \
-                             g_0_yyyyyy_0_xxxxxyy_1,  \
-                             g_0_yyyyyy_0_xxxxxyz_0,  \
-                             g_0_yyyyyy_0_xxxxxyz_1,  \
-                             g_0_yyyyyy_0_xxxxxz_1,   \
-                             g_0_yyyyyy_0_xxxxxzz_0,  \
-                             g_0_yyyyyy_0_xxxxxzz_1,  \
-                             g_0_yyyyyy_0_xxxxyy_1,   \
-                             g_0_yyyyyy_0_xxxxyyy_0,  \
-                             g_0_yyyyyy_0_xxxxyyy_1,  \
-                             g_0_yyyyyy_0_xxxxyyz_0,  \
-                             g_0_yyyyyy_0_xxxxyyz_1,  \
-                             g_0_yyyyyy_0_xxxxyz_1,   \
-                             g_0_yyyyyy_0_xxxxyzz_0,  \
-                             g_0_yyyyyy_0_xxxxyzz_1,  \
-                             g_0_yyyyyy_0_xxxxzz_1,   \
-                             g_0_yyyyyy_0_xxxxzzz_0,  \
-                             g_0_yyyyyy_0_xxxxzzz_1,  \
-                             g_0_yyyyyy_0_xxxyyy_1,   \
-                             g_0_yyyyyy_0_xxxyyyy_0,  \
-                             g_0_yyyyyy_0_xxxyyyy_1,  \
-                             g_0_yyyyyy_0_xxxyyyz_0,  \
-                             g_0_yyyyyy_0_xxxyyyz_1,  \
-                             g_0_yyyyyy_0_xxxyyz_1,   \
-                             g_0_yyyyyy_0_xxxyyzz_0,  \
-                             g_0_yyyyyy_0_xxxyyzz_1,  \
-                             g_0_yyyyyy_0_xxxyzz_1,   \
-                             g_0_yyyyyy_0_xxxyzzz_0,  \
-                             g_0_yyyyyy_0_xxxyzzz_1,  \
-                             g_0_yyyyyy_0_xxxzzz_1,   \
-                             g_0_yyyyyy_0_xxxzzzz_0,  \
-                             g_0_yyyyyy_0_xxxzzzz_1,  \
-                             g_0_yyyyyy_0_xxyyyy_1,   \
-                             g_0_yyyyyy_0_xxyyyyy_0,  \
-                             g_0_yyyyyy_0_xxyyyyy_1,  \
-                             g_0_yyyyyy_0_xxyyyyz_0,  \
-                             g_0_yyyyyy_0_xxyyyyz_1,  \
-                             g_0_yyyyyy_0_xxyyyz_1,   \
-                             g_0_yyyyyy_0_xxyyyzz_0,  \
-                             g_0_yyyyyy_0_xxyyyzz_1,  \
-                             g_0_yyyyyy_0_xxyyzz_1,   \
-                             g_0_yyyyyy_0_xxyyzzz_0,  \
-                             g_0_yyyyyy_0_xxyyzzz_1,  \
-                             g_0_yyyyyy_0_xxyzzz_1,   \
-                             g_0_yyyyyy_0_xxyzzzz_0,  \
-                             g_0_yyyyyy_0_xxyzzzz_1,  \
-                             g_0_yyyyyy_0_xxzzzz_1,   \
-                             g_0_yyyyyy_0_xxzzzzz_0,  \
-                             g_0_yyyyyy_0_xxzzzzz_1,  \
-                             g_0_yyyyyy_0_xyyyyy_1,   \
-                             g_0_yyyyyy_0_xyyyyyy_0,  \
-                             g_0_yyyyyy_0_xyyyyyy_1,  \
-                             g_0_yyyyyy_0_xyyyyyz_0,  \
-                             g_0_yyyyyy_0_xyyyyyz_1,  \
-                             g_0_yyyyyy_0_xyyyyz_1,   \
-                             g_0_yyyyyy_0_xyyyyzz_0,  \
-                             g_0_yyyyyy_0_xyyyyzz_1,  \
-                             g_0_yyyyyy_0_xyyyzz_1,   \
-                             g_0_yyyyyy_0_xyyyzzz_0,  \
-                             g_0_yyyyyy_0_xyyyzzz_1,  \
-                             g_0_yyyyyy_0_xyyzzz_1,   \
-                             g_0_yyyyyy_0_xyyzzzz_0,  \
-                             g_0_yyyyyy_0_xyyzzzz_1,  \
-                             g_0_yyyyyy_0_xyzzzz_1,   \
-                             g_0_yyyyyy_0_xyzzzzz_0,  \
-                             g_0_yyyyyy_0_xyzzzzz_1,  \
-                             g_0_yyyyyy_0_xzzzzz_1,   \
-                             g_0_yyyyyy_0_xzzzzzz_0,  \
-                             g_0_yyyyyy_0_xzzzzzz_1,  \
-                             g_0_yyyyyy_0_yyyyyy_1,   \
-                             g_0_yyyyyy_0_yyyyyyy_0,  \
-                             g_0_yyyyyy_0_yyyyyyy_1,  \
-                             g_0_yyyyyy_0_yyyyyyz_0,  \
-                             g_0_yyyyyy_0_yyyyyyz_1,  \
-                             g_0_yyyyyy_0_yyyyyz_1,   \
-                             g_0_yyyyyy_0_yyyyyzz_0,  \
-                             g_0_yyyyyy_0_yyyyyzz_1,  \
-                             g_0_yyyyyy_0_yyyyzz_1,   \
-                             g_0_yyyyyy_0_yyyyzzz_0,  \
-                             g_0_yyyyyy_0_yyyyzzz_1,  \
-                             g_0_yyyyyy_0_yyyzzz_1,   \
-                             g_0_yyyyyy_0_yyyzzzz_0,  \
-                             g_0_yyyyyy_0_yyyzzzz_1,  \
-                             g_0_yyyyyy_0_yyzzzz_1,   \
-                             g_0_yyyyyy_0_yyzzzzz_0,  \
-                             g_0_yyyyyy_0_yyzzzzz_1,  \
-                             g_0_yyyyyy_0_yzzzzz_1,   \
-                             g_0_yyyyyy_0_yzzzzzz_0,  \
-                             g_0_yyyyyy_0_yzzzzzz_1,  \
-                             g_0_yyyyyy_0_zzzzzz_1,   \
-                             g_0_yyyyyy_0_zzzzzzz_0,  \
-                             g_0_yyyyyy_0_zzzzzzz_1,  \
-                             g_0_yyyyyyz_0_xxxxxxx_0, \
-                             g_0_yyyyyyz_0_xxxxxxy_0, \
-                             g_0_yyyyyyz_0_xxxxxxz_0, \
-                             g_0_yyyyyyz_0_xxxxxyy_0, \
-                             g_0_yyyyyyz_0_xxxxxyz_0, \
-                             g_0_yyyyyyz_0_xxxxxzz_0, \
-                             g_0_yyyyyyz_0_xxxxyyy_0, \
-                             g_0_yyyyyyz_0_xxxxyyz_0, \
-                             g_0_yyyyyyz_0_xxxxyzz_0, \
-                             g_0_yyyyyyz_0_xxxxzzz_0, \
-                             g_0_yyyyyyz_0_xxxyyyy_0, \
-                             g_0_yyyyyyz_0_xxxyyyz_0, \
-                             g_0_yyyyyyz_0_xxxyyzz_0, \
-                             g_0_yyyyyyz_0_xxxyzzz_0, \
-                             g_0_yyyyyyz_0_xxxzzzz_0, \
-                             g_0_yyyyyyz_0_xxyyyyy_0, \
-                             g_0_yyyyyyz_0_xxyyyyz_0, \
-                             g_0_yyyyyyz_0_xxyyyzz_0, \
-                             g_0_yyyyyyz_0_xxyyzzz_0, \
-                             g_0_yyyyyyz_0_xxyzzzz_0, \
-                             g_0_yyyyyyz_0_xxzzzzz_0, \
-                             g_0_yyyyyyz_0_xyyyyyy_0, \
-                             g_0_yyyyyyz_0_xyyyyyz_0, \
-                             g_0_yyyyyyz_0_xyyyyzz_0, \
-                             g_0_yyyyyyz_0_xyyyzzz_0, \
-                             g_0_yyyyyyz_0_xyyzzzz_0, \
-                             g_0_yyyyyyz_0_xyzzzzz_0, \
-                             g_0_yyyyyyz_0_xzzzzzz_0, \
-                             g_0_yyyyyyz_0_yyyyyyy_0, \
-                             g_0_yyyyyyz_0_yyyyyyz_0, \
-                             g_0_yyyyyyz_0_yyyyyzz_0, \
-                             g_0_yyyyyyz_0_yyyyzzz_0, \
-                             g_0_yyyyyyz_0_yyyzzzz_0, \
-                             g_0_yyyyyyz_0_yyzzzzz_0, \
-                             g_0_yyyyyyz_0_yzzzzzz_0, \
-                             g_0_yyyyyyz_0_zzzzzzz_0, \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_yyyyyy_0_xxxxxx_1, g_0_yyyyyy_0_xxxxxxx_0, g_0_yyyyyy_0_xxxxxxx_1, g_0_yyyyyy_0_xxxxxxy_0, g_0_yyyyyy_0_xxxxxxy_1, g_0_yyyyyy_0_xxxxxxz_0, g_0_yyyyyy_0_xxxxxxz_1, g_0_yyyyyy_0_xxxxxy_1, g_0_yyyyyy_0_xxxxxyy_0, g_0_yyyyyy_0_xxxxxyy_1, g_0_yyyyyy_0_xxxxxyz_0, g_0_yyyyyy_0_xxxxxyz_1, g_0_yyyyyy_0_xxxxxz_1, g_0_yyyyyy_0_xxxxxzz_0, g_0_yyyyyy_0_xxxxxzz_1, g_0_yyyyyy_0_xxxxyy_1, g_0_yyyyyy_0_xxxxyyy_0, g_0_yyyyyy_0_xxxxyyy_1, g_0_yyyyyy_0_xxxxyyz_0, g_0_yyyyyy_0_xxxxyyz_1, g_0_yyyyyy_0_xxxxyz_1, g_0_yyyyyy_0_xxxxyzz_0, g_0_yyyyyy_0_xxxxyzz_1, g_0_yyyyyy_0_xxxxzz_1, g_0_yyyyyy_0_xxxxzzz_0, g_0_yyyyyy_0_xxxxzzz_1, g_0_yyyyyy_0_xxxyyy_1, g_0_yyyyyy_0_xxxyyyy_0, g_0_yyyyyy_0_xxxyyyy_1, g_0_yyyyyy_0_xxxyyyz_0, g_0_yyyyyy_0_xxxyyyz_1, g_0_yyyyyy_0_xxxyyz_1, g_0_yyyyyy_0_xxxyyzz_0, g_0_yyyyyy_0_xxxyyzz_1, g_0_yyyyyy_0_xxxyzz_1, g_0_yyyyyy_0_xxxyzzz_0, g_0_yyyyyy_0_xxxyzzz_1, g_0_yyyyyy_0_xxxzzz_1, g_0_yyyyyy_0_xxxzzzz_0, g_0_yyyyyy_0_xxxzzzz_1, g_0_yyyyyy_0_xxyyyy_1, g_0_yyyyyy_0_xxyyyyy_0, g_0_yyyyyy_0_xxyyyyy_1, g_0_yyyyyy_0_xxyyyyz_0, g_0_yyyyyy_0_xxyyyyz_1, g_0_yyyyyy_0_xxyyyz_1, g_0_yyyyyy_0_xxyyyzz_0, g_0_yyyyyy_0_xxyyyzz_1, g_0_yyyyyy_0_xxyyzz_1, g_0_yyyyyy_0_xxyyzzz_0, g_0_yyyyyy_0_xxyyzzz_1, g_0_yyyyyy_0_xxyzzz_1, g_0_yyyyyy_0_xxyzzzz_0, g_0_yyyyyy_0_xxyzzzz_1, g_0_yyyyyy_0_xxzzzz_1, g_0_yyyyyy_0_xxzzzzz_0, g_0_yyyyyy_0_xxzzzzz_1, g_0_yyyyyy_0_xyyyyy_1, g_0_yyyyyy_0_xyyyyyy_0, g_0_yyyyyy_0_xyyyyyy_1, g_0_yyyyyy_0_xyyyyyz_0, g_0_yyyyyy_0_xyyyyyz_1, g_0_yyyyyy_0_xyyyyz_1, g_0_yyyyyy_0_xyyyyzz_0, g_0_yyyyyy_0_xyyyyzz_1, g_0_yyyyyy_0_xyyyzz_1, g_0_yyyyyy_0_xyyyzzz_0, g_0_yyyyyy_0_xyyyzzz_1, g_0_yyyyyy_0_xyyzzz_1, g_0_yyyyyy_0_xyyzzzz_0, g_0_yyyyyy_0_xyyzzzz_1, g_0_yyyyyy_0_xyzzzz_1, g_0_yyyyyy_0_xyzzzzz_0, g_0_yyyyyy_0_xyzzzzz_1, g_0_yyyyyy_0_xzzzzz_1, g_0_yyyyyy_0_xzzzzzz_0, g_0_yyyyyy_0_xzzzzzz_1, g_0_yyyyyy_0_yyyyyy_1, g_0_yyyyyy_0_yyyyyyy_0, g_0_yyyyyy_0_yyyyyyy_1, g_0_yyyyyy_0_yyyyyyz_0, g_0_yyyyyy_0_yyyyyyz_1, g_0_yyyyyy_0_yyyyyz_1, g_0_yyyyyy_0_yyyyyzz_0, g_0_yyyyyy_0_yyyyyzz_1, g_0_yyyyyy_0_yyyyzz_1, g_0_yyyyyy_0_yyyyzzz_0, g_0_yyyyyy_0_yyyyzzz_1, g_0_yyyyyy_0_yyyzzz_1, g_0_yyyyyy_0_yyyzzzz_0, g_0_yyyyyy_0_yyyzzzz_1, g_0_yyyyyy_0_yyzzzz_1, g_0_yyyyyy_0_yyzzzzz_0, g_0_yyyyyy_0_yyzzzzz_1, g_0_yyyyyy_0_yzzzzz_1, g_0_yyyyyy_0_yzzzzzz_0, g_0_yyyyyy_0_yzzzzzz_1, g_0_yyyyyy_0_zzzzzz_1, g_0_yyyyyy_0_zzzzzzz_0, g_0_yyyyyy_0_zzzzzzz_1, g_0_yyyyyyz_0_xxxxxxx_0, g_0_yyyyyyz_0_xxxxxxy_0, g_0_yyyyyyz_0_xxxxxxz_0, g_0_yyyyyyz_0_xxxxxyy_0, g_0_yyyyyyz_0_xxxxxyz_0, g_0_yyyyyyz_0_xxxxxzz_0, g_0_yyyyyyz_0_xxxxyyy_0, g_0_yyyyyyz_0_xxxxyyz_0, g_0_yyyyyyz_0_xxxxyzz_0, g_0_yyyyyyz_0_xxxxzzz_0, g_0_yyyyyyz_0_xxxyyyy_0, g_0_yyyyyyz_0_xxxyyyz_0, g_0_yyyyyyz_0_xxxyyzz_0, g_0_yyyyyyz_0_xxxyzzz_0, g_0_yyyyyyz_0_xxxzzzz_0, g_0_yyyyyyz_0_xxyyyyy_0, g_0_yyyyyyz_0_xxyyyyz_0, g_0_yyyyyyz_0_xxyyyzz_0, g_0_yyyyyyz_0_xxyyzzz_0, g_0_yyyyyyz_0_xxyzzzz_0, g_0_yyyyyyz_0_xxzzzzz_0, g_0_yyyyyyz_0_xyyyyyy_0, g_0_yyyyyyz_0_xyyyyyz_0, g_0_yyyyyyz_0_xyyyyzz_0, g_0_yyyyyyz_0_xyyyzzz_0, g_0_yyyyyyz_0_xyyzzzz_0, g_0_yyyyyyz_0_xyzzzzz_0, g_0_yyyyyyz_0_xzzzzzz_0, g_0_yyyyyyz_0_yyyyyyy_0, g_0_yyyyyyz_0_yyyyyyz_0, g_0_yyyyyyz_0_yyyyyzz_0, g_0_yyyyyyz_0_yyyyzzz_0, g_0_yyyyyyz_0_yyyzzzz_0, g_0_yyyyyyz_0_yyzzzzz_0, g_0_yyyyyyz_0_yzzzzzz_0, g_0_yyyyyyz_0_zzzzzzz_0, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -16292,88 +10337,67 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         g_0_yyyyyyz_0_xxxxxyz_0[i] = g_0_yyyyyy_0_xxxxxy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxyz_0[i] * pb_z + g_0_yyyyyy_0_xxxxxyz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_xxxxxzz_0[i] =
-            2.0 * g_0_yyyyyy_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxzz_0[i] * pb_z + g_0_yyyyyy_0_xxxxxzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_xxxxxzz_0[i] = 2.0 * g_0_yyyyyy_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxxzz_0[i] * pb_z + g_0_yyyyyy_0_xxxxxzz_1[i] * wp_z[i];
 
         g_0_yyyyyyz_0_xxxxyyy_0[i] = g_0_yyyyyy_0_xxxxyyy_0[i] * pb_z + g_0_yyyyyy_0_xxxxyyy_1[i] * wp_z[i];
 
         g_0_yyyyyyz_0_xxxxyyz_0[i] = g_0_yyyyyy_0_xxxxyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxyyz_0[i] * pb_z + g_0_yyyyyy_0_xxxxyyz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_xxxxyzz_0[i] =
-            2.0 * g_0_yyyyyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxyzz_0[i] * pb_z + g_0_yyyyyy_0_xxxxyzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_xxxxyzz_0[i] = 2.0 * g_0_yyyyyy_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxyzz_0[i] * pb_z + g_0_yyyyyy_0_xxxxyzz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_xxxxzzz_0[i] =
-            3.0 * g_0_yyyyyy_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxzzz_0[i] * pb_z + g_0_yyyyyy_0_xxxxzzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_xxxxzzz_0[i] = 3.0 * g_0_yyyyyy_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxxzzz_0[i] * pb_z + g_0_yyyyyy_0_xxxxzzz_1[i] * wp_z[i];
 
         g_0_yyyyyyz_0_xxxyyyy_0[i] = g_0_yyyyyy_0_xxxyyyy_0[i] * pb_z + g_0_yyyyyy_0_xxxyyyy_1[i] * wp_z[i];
 
         g_0_yyyyyyz_0_xxxyyyz_0[i] = g_0_yyyyyy_0_xxxyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyyyz_0[i] * pb_z + g_0_yyyyyy_0_xxxyyyz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_xxxyyzz_0[i] =
-            2.0 * g_0_yyyyyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyyzz_0[i] * pb_z + g_0_yyyyyy_0_xxxyyzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_xxxyyzz_0[i] = 2.0 * g_0_yyyyyy_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyyzz_0[i] * pb_z + g_0_yyyyyy_0_xxxyyzz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_xxxyzzz_0[i] =
-            3.0 * g_0_yyyyyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyzzz_0[i] * pb_z + g_0_yyyyyy_0_xxxyzzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_xxxyzzz_0[i] = 3.0 * g_0_yyyyyy_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxyzzz_0[i] * pb_z + g_0_yyyyyy_0_xxxyzzz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_xxxzzzz_0[i] =
-            4.0 * g_0_yyyyyy_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxzzzz_0[i] * pb_z + g_0_yyyyyy_0_xxxzzzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_xxxzzzz_0[i] = 4.0 * g_0_yyyyyy_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxxzzzz_0[i] * pb_z + g_0_yyyyyy_0_xxxzzzz_1[i] * wp_z[i];
 
         g_0_yyyyyyz_0_xxyyyyy_0[i] = g_0_yyyyyy_0_xxyyyyy_0[i] * pb_z + g_0_yyyyyy_0_xxyyyyy_1[i] * wp_z[i];
 
         g_0_yyyyyyz_0_xxyyyyz_0[i] = g_0_yyyyyy_0_xxyyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyyyz_0[i] * pb_z + g_0_yyyyyy_0_xxyyyyz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_xxyyyzz_0[i] =
-            2.0 * g_0_yyyyyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyyzz_0[i] * pb_z + g_0_yyyyyy_0_xxyyyzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_xxyyyzz_0[i] = 2.0 * g_0_yyyyyy_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyyzz_0[i] * pb_z + g_0_yyyyyy_0_xxyyyzz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_xxyyzzz_0[i] =
-            3.0 * g_0_yyyyyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyzzz_0[i] * pb_z + g_0_yyyyyy_0_xxyyzzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_xxyyzzz_0[i] = 3.0 * g_0_yyyyyy_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyyzzz_0[i] * pb_z + g_0_yyyyyy_0_xxyyzzz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_xxyzzzz_0[i] =
-            4.0 * g_0_yyyyyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyzzzz_0[i] * pb_z + g_0_yyyyyy_0_xxyzzzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_xxyzzzz_0[i] = 4.0 * g_0_yyyyyy_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxyzzzz_0[i] * pb_z + g_0_yyyyyy_0_xxyzzzz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_xxzzzzz_0[i] =
-            5.0 * g_0_yyyyyy_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxzzzzz_0[i] * pb_z + g_0_yyyyyy_0_xxzzzzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_xxzzzzz_0[i] = 5.0 * g_0_yyyyyy_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xxzzzzz_0[i] * pb_z + g_0_yyyyyy_0_xxzzzzz_1[i] * wp_z[i];
 
         g_0_yyyyyyz_0_xyyyyyy_0[i] = g_0_yyyyyy_0_xyyyyyy_0[i] * pb_z + g_0_yyyyyy_0_xyyyyyy_1[i] * wp_z[i];
 
         g_0_yyyyyyz_0_xyyyyyz_0[i] = g_0_yyyyyy_0_xyyyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyyyyz_0[i] * pb_z + g_0_yyyyyy_0_xyyyyyz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_xyyyyzz_0[i] =
-            2.0 * g_0_yyyyyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyyyzz_0[i] * pb_z + g_0_yyyyyy_0_xyyyyzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_xyyyyzz_0[i] = 2.0 * g_0_yyyyyy_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyyyzz_0[i] * pb_z + g_0_yyyyyy_0_xyyyyzz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_xyyyzzz_0[i] =
-            3.0 * g_0_yyyyyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyyzzz_0[i] * pb_z + g_0_yyyyyy_0_xyyyzzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_xyyyzzz_0[i] = 3.0 * g_0_yyyyyy_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyyzzz_0[i] * pb_z + g_0_yyyyyy_0_xyyyzzz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_xyyzzzz_0[i] =
-            4.0 * g_0_yyyyyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyzzzz_0[i] * pb_z + g_0_yyyyyy_0_xyyzzzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_xyyzzzz_0[i] = 4.0 * g_0_yyyyyy_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyyzzzz_0[i] * pb_z + g_0_yyyyyy_0_xyyzzzz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_xyzzzzz_0[i] =
-            5.0 * g_0_yyyyyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyzzzzz_0[i] * pb_z + g_0_yyyyyy_0_xyzzzzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_xyzzzzz_0[i] = 5.0 * g_0_yyyyyy_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xyzzzzz_0[i] * pb_z + g_0_yyyyyy_0_xyzzzzz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_xzzzzzz_0[i] =
-            6.0 * g_0_yyyyyy_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xzzzzzz_0[i] * pb_z + g_0_yyyyyy_0_xzzzzzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_xzzzzzz_0[i] = 6.0 * g_0_yyyyyy_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_xzzzzzz_0[i] * pb_z + g_0_yyyyyy_0_xzzzzzz_1[i] * wp_z[i];
 
         g_0_yyyyyyz_0_yyyyyyy_0[i] = g_0_yyyyyy_0_yyyyyyy_0[i] * pb_z + g_0_yyyyyy_0_yyyyyyy_1[i] * wp_z[i];
 
         g_0_yyyyyyz_0_yyyyyyz_0[i] = g_0_yyyyyy_0_yyyyyy_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyyyyz_0[i] * pb_z + g_0_yyyyyy_0_yyyyyyz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_yyyyyzz_0[i] =
-            2.0 * g_0_yyyyyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyyyzz_0[i] * pb_z + g_0_yyyyyy_0_yyyyyzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_yyyyyzz_0[i] = 2.0 * g_0_yyyyyy_0_yyyyyz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyyyzz_0[i] * pb_z + g_0_yyyyyy_0_yyyyyzz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_yyyyzzz_0[i] =
-            3.0 * g_0_yyyyyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyyzzz_0[i] * pb_z + g_0_yyyyyy_0_yyyyzzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_yyyyzzz_0[i] = 3.0 * g_0_yyyyyy_0_yyyyzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyyzzz_0[i] * pb_z + g_0_yyyyyy_0_yyyyzzz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_yyyzzzz_0[i] =
-            4.0 * g_0_yyyyyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyzzzz_0[i] * pb_z + g_0_yyyyyy_0_yyyzzzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_yyyzzzz_0[i] = 4.0 * g_0_yyyyyy_0_yyyzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyyzzzz_0[i] * pb_z + g_0_yyyyyy_0_yyyzzzz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_yyzzzzz_0[i] =
-            5.0 * g_0_yyyyyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyzzzzz_0[i] * pb_z + g_0_yyyyyy_0_yyzzzzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_yyzzzzz_0[i] = 5.0 * g_0_yyyyyy_0_yyzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yyzzzzz_0[i] * pb_z + g_0_yyyyyy_0_yyzzzzz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_yzzzzzz_0[i] =
-            6.0 * g_0_yyyyyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yzzzzzz_0[i] * pb_z + g_0_yyyyyy_0_yzzzzzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_yzzzzzz_0[i] = 6.0 * g_0_yyyyyy_0_yzzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_yzzzzzz_0[i] * pb_z + g_0_yyyyyy_0_yzzzzzz_1[i] * wp_z[i];
 
-        g_0_yyyyyyz_0_zzzzzzz_0[i] =
-            7.0 * g_0_yyyyyy_0_zzzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_zzzzzzz_0[i] * pb_z + g_0_yyyyyy_0_zzzzzzz_1[i] * wp_z[i];
+        g_0_yyyyyyz_0_zzzzzzz_0[i] = 7.0 * g_0_yyyyyy_0_zzzzzz_1[i] * fi_abcd_0 + g_0_yyyyyy_0_zzzzzzz_0[i] * pb_z + g_0_yyyyyy_0_zzzzzzz_1[i] * wp_z[i];
     }
 
     /// Set up 1080-1116 components of targeted buffer : SKSK
@@ -16450,211 +10474,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_yyyyyzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 1115);
 
-#pragma omp simd aligned(g_0_yyyyy_0_xxxxxxy_0,       \
-                             g_0_yyyyy_0_xxxxxxy_1,   \
-                             g_0_yyyyy_0_xxxxxyy_0,   \
-                             g_0_yyyyy_0_xxxxxyy_1,   \
-                             g_0_yyyyy_0_xxxxyyy_0,   \
-                             g_0_yyyyy_0_xxxxyyy_1,   \
-                             g_0_yyyyy_0_xxxyyyy_0,   \
-                             g_0_yyyyy_0_xxxyyyy_1,   \
-                             g_0_yyyyy_0_xxyyyyy_0,   \
-                             g_0_yyyyy_0_xxyyyyy_1,   \
-                             g_0_yyyyy_0_xyyyyyy_0,   \
-                             g_0_yyyyy_0_xyyyyyy_1,   \
-                             g_0_yyyyy_0_yyyyyyy_0,   \
-                             g_0_yyyyy_0_yyyyyyy_1,   \
-                             g_0_yyyyyz_0_xxxxxxy_0,  \
-                             g_0_yyyyyz_0_xxxxxxy_1,  \
-                             g_0_yyyyyz_0_xxxxxyy_0,  \
-                             g_0_yyyyyz_0_xxxxxyy_1,  \
-                             g_0_yyyyyz_0_xxxxyyy_0,  \
-                             g_0_yyyyyz_0_xxxxyyy_1,  \
-                             g_0_yyyyyz_0_xxxyyyy_0,  \
-                             g_0_yyyyyz_0_xxxyyyy_1,  \
-                             g_0_yyyyyz_0_xxyyyyy_0,  \
-                             g_0_yyyyyz_0_xxyyyyy_1,  \
-                             g_0_yyyyyz_0_xyyyyyy_0,  \
-                             g_0_yyyyyz_0_xyyyyyy_1,  \
-                             g_0_yyyyyz_0_yyyyyyy_0,  \
-                             g_0_yyyyyz_0_yyyyyyy_1,  \
-                             g_0_yyyyyzz_0_xxxxxxx_0, \
-                             g_0_yyyyyzz_0_xxxxxxy_0, \
-                             g_0_yyyyyzz_0_xxxxxxz_0, \
-                             g_0_yyyyyzz_0_xxxxxyy_0, \
-                             g_0_yyyyyzz_0_xxxxxyz_0, \
-                             g_0_yyyyyzz_0_xxxxxzz_0, \
-                             g_0_yyyyyzz_0_xxxxyyy_0, \
-                             g_0_yyyyyzz_0_xxxxyyz_0, \
-                             g_0_yyyyyzz_0_xxxxyzz_0, \
-                             g_0_yyyyyzz_0_xxxxzzz_0, \
-                             g_0_yyyyyzz_0_xxxyyyy_0, \
-                             g_0_yyyyyzz_0_xxxyyyz_0, \
-                             g_0_yyyyyzz_0_xxxyyzz_0, \
-                             g_0_yyyyyzz_0_xxxyzzz_0, \
-                             g_0_yyyyyzz_0_xxxzzzz_0, \
-                             g_0_yyyyyzz_0_xxyyyyy_0, \
-                             g_0_yyyyyzz_0_xxyyyyz_0, \
-                             g_0_yyyyyzz_0_xxyyyzz_0, \
-                             g_0_yyyyyzz_0_xxyyzzz_0, \
-                             g_0_yyyyyzz_0_xxyzzzz_0, \
-                             g_0_yyyyyzz_0_xxzzzzz_0, \
-                             g_0_yyyyyzz_0_xyyyyyy_0, \
-                             g_0_yyyyyzz_0_xyyyyyz_0, \
-                             g_0_yyyyyzz_0_xyyyyzz_0, \
-                             g_0_yyyyyzz_0_xyyyzzz_0, \
-                             g_0_yyyyyzz_0_xyyzzzz_0, \
-                             g_0_yyyyyzz_0_xyzzzzz_0, \
-                             g_0_yyyyyzz_0_xzzzzzz_0, \
-                             g_0_yyyyyzz_0_yyyyyyy_0, \
-                             g_0_yyyyyzz_0_yyyyyyz_0, \
-                             g_0_yyyyyzz_0_yyyyyzz_0, \
-                             g_0_yyyyyzz_0_yyyyzzz_0, \
-                             g_0_yyyyyzz_0_yyyzzzz_0, \
-                             g_0_yyyyyzz_0_yyzzzzz_0, \
-                             g_0_yyyyyzz_0_yzzzzzz_0, \
-                             g_0_yyyyyzz_0_zzzzzzz_0, \
-                             g_0_yyyyzz_0_xxxxxxx_0,  \
-                             g_0_yyyyzz_0_xxxxxxx_1,  \
-                             g_0_yyyyzz_0_xxxxxxz_0,  \
-                             g_0_yyyyzz_0_xxxxxxz_1,  \
-                             g_0_yyyyzz_0_xxxxxyz_0,  \
-                             g_0_yyyyzz_0_xxxxxyz_1,  \
-                             g_0_yyyyzz_0_xxxxxz_1,   \
-                             g_0_yyyyzz_0_xxxxxzz_0,  \
-                             g_0_yyyyzz_0_xxxxxzz_1,  \
-                             g_0_yyyyzz_0_xxxxyyz_0,  \
-                             g_0_yyyyzz_0_xxxxyyz_1,  \
-                             g_0_yyyyzz_0_xxxxyz_1,   \
-                             g_0_yyyyzz_0_xxxxyzz_0,  \
-                             g_0_yyyyzz_0_xxxxyzz_1,  \
-                             g_0_yyyyzz_0_xxxxzz_1,   \
-                             g_0_yyyyzz_0_xxxxzzz_0,  \
-                             g_0_yyyyzz_0_xxxxzzz_1,  \
-                             g_0_yyyyzz_0_xxxyyyz_0,  \
-                             g_0_yyyyzz_0_xxxyyyz_1,  \
-                             g_0_yyyyzz_0_xxxyyz_1,   \
-                             g_0_yyyyzz_0_xxxyyzz_0,  \
-                             g_0_yyyyzz_0_xxxyyzz_1,  \
-                             g_0_yyyyzz_0_xxxyzz_1,   \
-                             g_0_yyyyzz_0_xxxyzzz_0,  \
-                             g_0_yyyyzz_0_xxxyzzz_1,  \
-                             g_0_yyyyzz_0_xxxzzz_1,   \
-                             g_0_yyyyzz_0_xxxzzzz_0,  \
-                             g_0_yyyyzz_0_xxxzzzz_1,  \
-                             g_0_yyyyzz_0_xxyyyyz_0,  \
-                             g_0_yyyyzz_0_xxyyyyz_1,  \
-                             g_0_yyyyzz_0_xxyyyz_1,   \
-                             g_0_yyyyzz_0_xxyyyzz_0,  \
-                             g_0_yyyyzz_0_xxyyyzz_1,  \
-                             g_0_yyyyzz_0_xxyyzz_1,   \
-                             g_0_yyyyzz_0_xxyyzzz_0,  \
-                             g_0_yyyyzz_0_xxyyzzz_1,  \
-                             g_0_yyyyzz_0_xxyzzz_1,   \
-                             g_0_yyyyzz_0_xxyzzzz_0,  \
-                             g_0_yyyyzz_0_xxyzzzz_1,  \
-                             g_0_yyyyzz_0_xxzzzz_1,   \
-                             g_0_yyyyzz_0_xxzzzzz_0,  \
-                             g_0_yyyyzz_0_xxzzzzz_1,  \
-                             g_0_yyyyzz_0_xyyyyyz_0,  \
-                             g_0_yyyyzz_0_xyyyyyz_1,  \
-                             g_0_yyyyzz_0_xyyyyz_1,   \
-                             g_0_yyyyzz_0_xyyyyzz_0,  \
-                             g_0_yyyyzz_0_xyyyyzz_1,  \
-                             g_0_yyyyzz_0_xyyyzz_1,   \
-                             g_0_yyyyzz_0_xyyyzzz_0,  \
-                             g_0_yyyyzz_0_xyyyzzz_1,  \
-                             g_0_yyyyzz_0_xyyzzz_1,   \
-                             g_0_yyyyzz_0_xyyzzzz_0,  \
-                             g_0_yyyyzz_0_xyyzzzz_1,  \
-                             g_0_yyyyzz_0_xyzzzz_1,   \
-                             g_0_yyyyzz_0_xyzzzzz_0,  \
-                             g_0_yyyyzz_0_xyzzzzz_1,  \
-                             g_0_yyyyzz_0_xzzzzz_1,   \
-                             g_0_yyyyzz_0_xzzzzzz_0,  \
-                             g_0_yyyyzz_0_xzzzzzz_1,  \
-                             g_0_yyyyzz_0_yyyyyyz_0,  \
-                             g_0_yyyyzz_0_yyyyyyz_1,  \
-                             g_0_yyyyzz_0_yyyyyz_1,   \
-                             g_0_yyyyzz_0_yyyyyzz_0,  \
-                             g_0_yyyyzz_0_yyyyyzz_1,  \
-                             g_0_yyyyzz_0_yyyyzz_1,   \
-                             g_0_yyyyzz_0_yyyyzzz_0,  \
-                             g_0_yyyyzz_0_yyyyzzz_1,  \
-                             g_0_yyyyzz_0_yyyzzz_1,   \
-                             g_0_yyyyzz_0_yyyzzzz_0,  \
-                             g_0_yyyyzz_0_yyyzzzz_1,  \
-                             g_0_yyyyzz_0_yyzzzz_1,   \
-                             g_0_yyyyzz_0_yyzzzzz_0,  \
-                             g_0_yyyyzz_0_yyzzzzz_1,  \
-                             g_0_yyyyzz_0_yzzzzz_1,   \
-                             g_0_yyyyzz_0_yzzzzzz_0,  \
-                             g_0_yyyyzz_0_yzzzzzz_1,  \
-                             g_0_yyyyzz_0_zzzzzz_1,   \
-                             g_0_yyyyzz_0_zzzzzzz_0,  \
-                             g_0_yyyyzz_0_zzzzzzz_1,  \
-                             g_0_yyyzz_0_xxxxxxx_0,   \
-                             g_0_yyyzz_0_xxxxxxx_1,   \
-                             g_0_yyyzz_0_xxxxxxz_0,   \
-                             g_0_yyyzz_0_xxxxxxz_1,   \
-                             g_0_yyyzz_0_xxxxxyz_0,   \
-                             g_0_yyyzz_0_xxxxxyz_1,   \
-                             g_0_yyyzz_0_xxxxxzz_0,   \
-                             g_0_yyyzz_0_xxxxxzz_1,   \
-                             g_0_yyyzz_0_xxxxyyz_0,   \
-                             g_0_yyyzz_0_xxxxyyz_1,   \
-                             g_0_yyyzz_0_xxxxyzz_0,   \
-                             g_0_yyyzz_0_xxxxyzz_1,   \
-                             g_0_yyyzz_0_xxxxzzz_0,   \
-                             g_0_yyyzz_0_xxxxzzz_1,   \
-                             g_0_yyyzz_0_xxxyyyz_0,   \
-                             g_0_yyyzz_0_xxxyyyz_1,   \
-                             g_0_yyyzz_0_xxxyyzz_0,   \
-                             g_0_yyyzz_0_xxxyyzz_1,   \
-                             g_0_yyyzz_0_xxxyzzz_0,   \
-                             g_0_yyyzz_0_xxxyzzz_1,   \
-                             g_0_yyyzz_0_xxxzzzz_0,   \
-                             g_0_yyyzz_0_xxxzzzz_1,   \
-                             g_0_yyyzz_0_xxyyyyz_0,   \
-                             g_0_yyyzz_0_xxyyyyz_1,   \
-                             g_0_yyyzz_0_xxyyyzz_0,   \
-                             g_0_yyyzz_0_xxyyyzz_1,   \
-                             g_0_yyyzz_0_xxyyzzz_0,   \
-                             g_0_yyyzz_0_xxyyzzz_1,   \
-                             g_0_yyyzz_0_xxyzzzz_0,   \
-                             g_0_yyyzz_0_xxyzzzz_1,   \
-                             g_0_yyyzz_0_xxzzzzz_0,   \
-                             g_0_yyyzz_0_xxzzzzz_1,   \
-                             g_0_yyyzz_0_xyyyyyz_0,   \
-                             g_0_yyyzz_0_xyyyyyz_1,   \
-                             g_0_yyyzz_0_xyyyyzz_0,   \
-                             g_0_yyyzz_0_xyyyyzz_1,   \
-                             g_0_yyyzz_0_xyyyzzz_0,   \
-                             g_0_yyyzz_0_xyyyzzz_1,   \
-                             g_0_yyyzz_0_xyyzzzz_0,   \
-                             g_0_yyyzz_0_xyyzzzz_1,   \
-                             g_0_yyyzz_0_xyzzzzz_0,   \
-                             g_0_yyyzz_0_xyzzzzz_1,   \
-                             g_0_yyyzz_0_xzzzzzz_0,   \
-                             g_0_yyyzz_0_xzzzzzz_1,   \
-                             g_0_yyyzz_0_yyyyyyz_0,   \
-                             g_0_yyyzz_0_yyyyyyz_1,   \
-                             g_0_yyyzz_0_yyyyyzz_0,   \
-                             g_0_yyyzz_0_yyyyyzz_1,   \
-                             g_0_yyyzz_0_yyyyzzz_0,   \
-                             g_0_yyyzz_0_yyyyzzz_1,   \
-                             g_0_yyyzz_0_yyyzzzz_0,   \
-                             g_0_yyyzz_0_yyyzzzz_1,   \
-                             g_0_yyyzz_0_yyzzzzz_0,   \
-                             g_0_yyyzz_0_yyzzzzz_1,   \
-                             g_0_yyyzz_0_yzzzzzz_0,   \
-                             g_0_yyyzz_0_yzzzzzz_1,   \
-                             g_0_yyyzz_0_zzzzzzz_0,   \
-                             g_0_yyyzz_0_zzzzzzz_1,   \
-                             wp_y,                    \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_yyyyy_0_xxxxxxy_0, g_0_yyyyy_0_xxxxxxy_1, g_0_yyyyy_0_xxxxxyy_0, g_0_yyyyy_0_xxxxxyy_1, g_0_yyyyy_0_xxxxyyy_0, g_0_yyyyy_0_xxxxyyy_1, g_0_yyyyy_0_xxxyyyy_0, g_0_yyyyy_0_xxxyyyy_1, g_0_yyyyy_0_xxyyyyy_0, g_0_yyyyy_0_xxyyyyy_1, g_0_yyyyy_0_xyyyyyy_0, g_0_yyyyy_0_xyyyyyy_1, g_0_yyyyy_0_yyyyyyy_0, g_0_yyyyy_0_yyyyyyy_1, g_0_yyyyyz_0_xxxxxxy_0, g_0_yyyyyz_0_xxxxxxy_1, g_0_yyyyyz_0_xxxxxyy_0, g_0_yyyyyz_0_xxxxxyy_1, g_0_yyyyyz_0_xxxxyyy_0, g_0_yyyyyz_0_xxxxyyy_1, g_0_yyyyyz_0_xxxyyyy_0, g_0_yyyyyz_0_xxxyyyy_1, g_0_yyyyyz_0_xxyyyyy_0, g_0_yyyyyz_0_xxyyyyy_1, g_0_yyyyyz_0_xyyyyyy_0, g_0_yyyyyz_0_xyyyyyy_1, g_0_yyyyyz_0_yyyyyyy_0, g_0_yyyyyz_0_yyyyyyy_1, g_0_yyyyyzz_0_xxxxxxx_0, g_0_yyyyyzz_0_xxxxxxy_0, g_0_yyyyyzz_0_xxxxxxz_0, g_0_yyyyyzz_0_xxxxxyy_0, g_0_yyyyyzz_0_xxxxxyz_0, g_0_yyyyyzz_0_xxxxxzz_0, g_0_yyyyyzz_0_xxxxyyy_0, g_0_yyyyyzz_0_xxxxyyz_0, g_0_yyyyyzz_0_xxxxyzz_0, g_0_yyyyyzz_0_xxxxzzz_0, g_0_yyyyyzz_0_xxxyyyy_0, g_0_yyyyyzz_0_xxxyyyz_0, g_0_yyyyyzz_0_xxxyyzz_0, g_0_yyyyyzz_0_xxxyzzz_0, g_0_yyyyyzz_0_xxxzzzz_0, g_0_yyyyyzz_0_xxyyyyy_0, g_0_yyyyyzz_0_xxyyyyz_0, g_0_yyyyyzz_0_xxyyyzz_0, g_0_yyyyyzz_0_xxyyzzz_0, g_0_yyyyyzz_0_xxyzzzz_0, g_0_yyyyyzz_0_xxzzzzz_0, g_0_yyyyyzz_0_xyyyyyy_0, g_0_yyyyyzz_0_xyyyyyz_0, g_0_yyyyyzz_0_xyyyyzz_0, g_0_yyyyyzz_0_xyyyzzz_0, g_0_yyyyyzz_0_xyyzzzz_0, g_0_yyyyyzz_0_xyzzzzz_0, g_0_yyyyyzz_0_xzzzzzz_0, g_0_yyyyyzz_0_yyyyyyy_0, g_0_yyyyyzz_0_yyyyyyz_0, g_0_yyyyyzz_0_yyyyyzz_0, g_0_yyyyyzz_0_yyyyzzz_0, g_0_yyyyyzz_0_yyyzzzz_0, g_0_yyyyyzz_0_yyzzzzz_0, g_0_yyyyyzz_0_yzzzzzz_0, g_0_yyyyyzz_0_zzzzzzz_0, g_0_yyyyzz_0_xxxxxxx_0, g_0_yyyyzz_0_xxxxxxx_1, g_0_yyyyzz_0_xxxxxxz_0, g_0_yyyyzz_0_xxxxxxz_1, g_0_yyyyzz_0_xxxxxyz_0, g_0_yyyyzz_0_xxxxxyz_1, g_0_yyyyzz_0_xxxxxz_1, g_0_yyyyzz_0_xxxxxzz_0, g_0_yyyyzz_0_xxxxxzz_1, g_0_yyyyzz_0_xxxxyyz_0, g_0_yyyyzz_0_xxxxyyz_1, g_0_yyyyzz_0_xxxxyz_1, g_0_yyyyzz_0_xxxxyzz_0, g_0_yyyyzz_0_xxxxyzz_1, g_0_yyyyzz_0_xxxxzz_1, g_0_yyyyzz_0_xxxxzzz_0, g_0_yyyyzz_0_xxxxzzz_1, g_0_yyyyzz_0_xxxyyyz_0, g_0_yyyyzz_0_xxxyyyz_1, g_0_yyyyzz_0_xxxyyz_1, g_0_yyyyzz_0_xxxyyzz_0, g_0_yyyyzz_0_xxxyyzz_1, g_0_yyyyzz_0_xxxyzz_1, g_0_yyyyzz_0_xxxyzzz_0, g_0_yyyyzz_0_xxxyzzz_1, g_0_yyyyzz_0_xxxzzz_1, g_0_yyyyzz_0_xxxzzzz_0, g_0_yyyyzz_0_xxxzzzz_1, g_0_yyyyzz_0_xxyyyyz_0, g_0_yyyyzz_0_xxyyyyz_1, g_0_yyyyzz_0_xxyyyz_1, g_0_yyyyzz_0_xxyyyzz_0, g_0_yyyyzz_0_xxyyyzz_1, g_0_yyyyzz_0_xxyyzz_1, g_0_yyyyzz_0_xxyyzzz_0, g_0_yyyyzz_0_xxyyzzz_1, g_0_yyyyzz_0_xxyzzz_1, g_0_yyyyzz_0_xxyzzzz_0, g_0_yyyyzz_0_xxyzzzz_1, g_0_yyyyzz_0_xxzzzz_1, g_0_yyyyzz_0_xxzzzzz_0, g_0_yyyyzz_0_xxzzzzz_1, g_0_yyyyzz_0_xyyyyyz_0, g_0_yyyyzz_0_xyyyyyz_1, g_0_yyyyzz_0_xyyyyz_1, g_0_yyyyzz_0_xyyyyzz_0, g_0_yyyyzz_0_xyyyyzz_1, g_0_yyyyzz_0_xyyyzz_1, g_0_yyyyzz_0_xyyyzzz_0, g_0_yyyyzz_0_xyyyzzz_1, g_0_yyyyzz_0_xyyzzz_1, g_0_yyyyzz_0_xyyzzzz_0, g_0_yyyyzz_0_xyyzzzz_1, g_0_yyyyzz_0_xyzzzz_1, g_0_yyyyzz_0_xyzzzzz_0, g_0_yyyyzz_0_xyzzzzz_1, g_0_yyyyzz_0_xzzzzz_1, g_0_yyyyzz_0_xzzzzzz_0, g_0_yyyyzz_0_xzzzzzz_1, g_0_yyyyzz_0_yyyyyyz_0, g_0_yyyyzz_0_yyyyyyz_1, g_0_yyyyzz_0_yyyyyz_1, g_0_yyyyzz_0_yyyyyzz_0, g_0_yyyyzz_0_yyyyyzz_1, g_0_yyyyzz_0_yyyyzz_1, g_0_yyyyzz_0_yyyyzzz_0, g_0_yyyyzz_0_yyyyzzz_1, g_0_yyyyzz_0_yyyzzz_1, g_0_yyyyzz_0_yyyzzzz_0, g_0_yyyyzz_0_yyyzzzz_1, g_0_yyyyzz_0_yyzzzz_1, g_0_yyyyzz_0_yyzzzzz_0, g_0_yyyyzz_0_yyzzzzz_1, g_0_yyyyzz_0_yzzzzz_1, g_0_yyyyzz_0_yzzzzzz_0, g_0_yyyyzz_0_yzzzzzz_1, g_0_yyyyzz_0_zzzzzz_1, g_0_yyyyzz_0_zzzzzzz_0, g_0_yyyyzz_0_zzzzzzz_1, g_0_yyyzz_0_xxxxxxx_0, g_0_yyyzz_0_xxxxxxx_1, g_0_yyyzz_0_xxxxxxz_0, g_0_yyyzz_0_xxxxxxz_1, g_0_yyyzz_0_xxxxxyz_0, g_0_yyyzz_0_xxxxxyz_1, g_0_yyyzz_0_xxxxxzz_0, g_0_yyyzz_0_xxxxxzz_1, g_0_yyyzz_0_xxxxyyz_0, g_0_yyyzz_0_xxxxyyz_1, g_0_yyyzz_0_xxxxyzz_0, g_0_yyyzz_0_xxxxyzz_1, g_0_yyyzz_0_xxxxzzz_0, g_0_yyyzz_0_xxxxzzz_1, g_0_yyyzz_0_xxxyyyz_0, g_0_yyyzz_0_xxxyyyz_1, g_0_yyyzz_0_xxxyyzz_0, g_0_yyyzz_0_xxxyyzz_1, g_0_yyyzz_0_xxxyzzz_0, g_0_yyyzz_0_xxxyzzz_1, g_0_yyyzz_0_xxxzzzz_0, g_0_yyyzz_0_xxxzzzz_1, g_0_yyyzz_0_xxyyyyz_0, g_0_yyyzz_0_xxyyyyz_1, g_0_yyyzz_0_xxyyyzz_0, g_0_yyyzz_0_xxyyyzz_1, g_0_yyyzz_0_xxyyzzz_0, g_0_yyyzz_0_xxyyzzz_1, g_0_yyyzz_0_xxyzzzz_0, g_0_yyyzz_0_xxyzzzz_1, g_0_yyyzz_0_xxzzzzz_0, g_0_yyyzz_0_xxzzzzz_1, g_0_yyyzz_0_xyyyyyz_0, g_0_yyyzz_0_xyyyyyz_1, g_0_yyyzz_0_xyyyyzz_0, g_0_yyyzz_0_xyyyyzz_1, g_0_yyyzz_0_xyyyzzz_0, g_0_yyyzz_0_xyyyzzz_1, g_0_yyyzz_0_xyyzzzz_0, g_0_yyyzz_0_xyyzzzz_1, g_0_yyyzz_0_xyzzzzz_0, g_0_yyyzz_0_xyzzzzz_1, g_0_yyyzz_0_xzzzzzz_0, g_0_yyyzz_0_xzzzzzz_1, g_0_yyyzz_0_yyyyyyz_0, g_0_yyyzz_0_yyyyyyz_1, g_0_yyyzz_0_yyyyyzz_0, g_0_yyyzz_0_yyyyyzz_1, g_0_yyyzz_0_yyyyzzz_0, g_0_yyyzz_0_yyyyzzz_1, g_0_yyyzz_0_yyyzzzz_0, g_0_yyyzz_0_yyyzzzz_1, g_0_yyyzz_0_yyzzzzz_0, g_0_yyyzz_0_yyzzzzz_1, g_0_yyyzz_0_yzzzzzz_0, g_0_yyyzz_0_yzzzzzz_1, g_0_yyyzz_0_zzzzzzz_0, g_0_yyyzz_0_zzzzzzz_1, wp_y, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -16663,128 +10483,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_yyyyyzz_0_xxxxxxx_0[i] = 4.0 * g_0_yyyzz_0_xxxxxxx_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxxxxx_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xxxxxxx_0[i] * pb_y + g_0_yyyyzz_0_xxxxxxx_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xxxxxxx_0[i] = 4.0 * g_0_yyyzz_0_xxxxxxx_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxxxxx_1[i] * fti_ab_0 + g_0_yyyyzz_0_xxxxxxx_0[i] * pb_y + g_0_yyyyzz_0_xxxxxxx_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xxxxxxy_0[i] = g_0_yyyyy_0_xxxxxxy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxxxy_1[i] * fti_ab_0 + g_0_yyyyyz_0_xxxxxxy_0[i] * pb_z +
-                                     g_0_yyyyyz_0_xxxxxxy_1[i] * wp_z[i];
+        g_0_yyyyyzz_0_xxxxxxy_0[i] = g_0_yyyyy_0_xxxxxxy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxxxy_1[i] * fti_ab_0 + g_0_yyyyyz_0_xxxxxxy_0[i] * pb_z + g_0_yyyyyz_0_xxxxxxy_1[i] * wp_z[i];
 
-        g_0_yyyyyzz_0_xxxxxxz_0[i] = 4.0 * g_0_yyyzz_0_xxxxxxz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxxxxz_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xxxxxxz_0[i] * pb_y + g_0_yyyyzz_0_xxxxxxz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xxxxxxz_0[i] = 4.0 * g_0_yyyzz_0_xxxxxxz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxxxxz_1[i] * fti_ab_0 + g_0_yyyyzz_0_xxxxxxz_0[i] * pb_y + g_0_yyyyzz_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xxxxxyy_0[i] = g_0_yyyyy_0_xxxxxyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxxyy_1[i] * fti_ab_0 + g_0_yyyyyz_0_xxxxxyy_0[i] * pb_z +
-                                     g_0_yyyyyz_0_xxxxxyy_1[i] * wp_z[i];
+        g_0_yyyyyzz_0_xxxxxyy_0[i] = g_0_yyyyy_0_xxxxxyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxxyy_1[i] * fti_ab_0 + g_0_yyyyyz_0_xxxxxyy_0[i] * pb_z + g_0_yyyyyz_0_xxxxxyy_1[i] * wp_z[i];
 
-        g_0_yyyyyzz_0_xxxxxyz_0[i] = 4.0 * g_0_yyyzz_0_xxxxxyz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxxyz_0[i] * pb_y + g_0_yyyyzz_0_xxxxxyz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xxxxxyz_0[i] = 4.0 * g_0_yyyzz_0_xxxxxyz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxxxyz_1[i] * fti_ab_0 + g_0_yyyyzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxxyz_0[i] * pb_y + g_0_yyyyzz_0_xxxxxyz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xxxxxzz_0[i] = 4.0 * g_0_yyyzz_0_xxxxxzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxxxzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xxxxxzz_0[i] * pb_y + g_0_yyyyzz_0_xxxxxzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xxxxxzz_0[i] = 4.0 * g_0_yyyzz_0_xxxxxzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxxxzz_1[i] * fti_ab_0 + g_0_yyyyzz_0_xxxxxzz_0[i] * pb_y + g_0_yyyyzz_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xxxxyyy_0[i] = g_0_yyyyy_0_xxxxyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxyyy_1[i] * fti_ab_0 + g_0_yyyyyz_0_xxxxyyy_0[i] * pb_z +
-                                     g_0_yyyyyz_0_xxxxyyy_1[i] * wp_z[i];
+        g_0_yyyyyzz_0_xxxxyyy_0[i] = g_0_yyyyy_0_xxxxyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxxyyy_1[i] * fti_ab_0 + g_0_yyyyyz_0_xxxxyyy_0[i] * pb_z + g_0_yyyyyz_0_xxxxyyy_1[i] * wp_z[i];
 
-        g_0_yyyyyzz_0_xxxxyyz_0[i] = 4.0 * g_0_yyyzz_0_xxxxyyz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyyyzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxyyz_0[i] * pb_y +
-                                     g_0_yyyyzz_0_xxxxyyz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xxxxyyz_0[i] = 4.0 * g_0_yyyzz_0_xxxxyyz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxxyyz_1[i] * fti_ab_0 + 2.0 * g_0_yyyyzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxyyz_0[i] * pb_y + g_0_yyyyzz_0_xxxxyyz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xxxxyzz_0[i] = 4.0 * g_0_yyyzz_0_xxxxyzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxyzz_0[i] * pb_y + g_0_yyyyzz_0_xxxxyzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xxxxyzz_0[i] = 4.0 * g_0_yyyzz_0_xxxxyzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxxyzz_1[i] * fti_ab_0 + g_0_yyyyzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxxyzz_0[i] * pb_y + g_0_yyyyzz_0_xxxxyzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xxxxzzz_0[i] = 4.0 * g_0_yyyzz_0_xxxxzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxxzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xxxxzzz_0[i] * pb_y + g_0_yyyyzz_0_xxxxzzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xxxxzzz_0[i] = 4.0 * g_0_yyyzz_0_xxxxzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxxzzz_1[i] * fti_ab_0 + g_0_yyyyzz_0_xxxxzzz_0[i] * pb_y + g_0_yyyyzz_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xxxyyyy_0[i] = g_0_yyyyy_0_xxxyyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxyyyy_1[i] * fti_ab_0 + g_0_yyyyyz_0_xxxyyyy_0[i] * pb_z +
-                                     g_0_yyyyyz_0_xxxyyyy_1[i] * wp_z[i];
+        g_0_yyyyyzz_0_xxxyyyy_0[i] = g_0_yyyyy_0_xxxyyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxxyyyy_1[i] * fti_ab_0 + g_0_yyyyyz_0_xxxyyyy_0[i] * pb_z + g_0_yyyyyz_0_xxxyyyy_1[i] * wp_z[i];
 
-        g_0_yyyyyzz_0_xxxyyyz_0[i] = 4.0 * g_0_yyyzz_0_xxxyyyz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyyyzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxyyyz_0[i] * pb_y +
-                                     g_0_yyyyzz_0_xxxyyyz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xxxyyyz_0[i] = 4.0 * g_0_yyyzz_0_xxxyyyz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_yyyyzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxyyyz_0[i] * pb_y + g_0_yyyyzz_0_xxxyyyz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xxxyyzz_0[i] = 4.0 * g_0_yyyzz_0_xxxyyzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyyyzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxyyzz_0[i] * pb_y +
-                                     g_0_yyyyzz_0_xxxyyzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xxxyyzz_0[i] = 4.0 * g_0_yyyzz_0_xxxyyzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxyyzz_1[i] * fti_ab_0 + 2.0 * g_0_yyyyzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxyyzz_0[i] * pb_y + g_0_yyyyzz_0_xxxyyzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xxxyzzz_0[i] = 4.0 * g_0_yyyzz_0_xxxyzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxyzzz_0[i] * pb_y + g_0_yyyyzz_0_xxxyzzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xxxyzzz_0[i] = 4.0 * g_0_yyyzz_0_xxxyzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxyzzz_1[i] * fti_ab_0 + g_0_yyyyzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxxyzzz_0[i] * pb_y + g_0_yyyyzz_0_xxxyzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xxxzzzz_0[i] = 4.0 * g_0_yyyzz_0_xxxzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xxxzzzz_0[i] * pb_y + g_0_yyyyzz_0_xxxzzzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xxxzzzz_0[i] = 4.0 * g_0_yyyzz_0_xxxzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxxzzzz_1[i] * fti_ab_0 + g_0_yyyyzz_0_xxxzzzz_0[i] * pb_y + g_0_yyyyzz_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xxyyyyy_0[i] = g_0_yyyyy_0_xxyyyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxyyyyy_1[i] * fti_ab_0 + g_0_yyyyyz_0_xxyyyyy_0[i] * pb_z +
-                                     g_0_yyyyyz_0_xxyyyyy_1[i] * wp_z[i];
+        g_0_yyyyyzz_0_xxyyyyy_0[i] = g_0_yyyyy_0_xxyyyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xxyyyyy_1[i] * fti_ab_0 + g_0_yyyyyz_0_xxyyyyy_0[i] * pb_z + g_0_yyyyyz_0_xxyyyyy_1[i] * wp_z[i];
 
-        g_0_yyyyyzz_0_xxyyyyz_0[i] = 4.0 * g_0_yyyzz_0_xxyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_yyyyzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyyyyz_0[i] * pb_y +
-                                     g_0_yyyyzz_0_xxyyyyz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xxyyyyz_0[i] = 4.0 * g_0_yyyzz_0_xxyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxyyyyz_1[i] * fti_ab_0 + 4.0 * g_0_yyyyzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyyyyz_0[i] * pb_y + g_0_yyyyzz_0_xxyyyyz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xxyyyzz_0[i] = 4.0 * g_0_yyyzz_0_xxyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyyyzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyyyzz_0[i] * pb_y +
-                                     g_0_yyyyzz_0_xxyyyzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xxyyyzz_0[i] = 4.0 * g_0_yyyzz_0_xxyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxyyyzz_1[i] * fti_ab_0 + 3.0 * g_0_yyyyzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyyyzz_0[i] * pb_y + g_0_yyyyzz_0_xxyyyzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xxyyzzz_0[i] = 4.0 * g_0_yyyzz_0_xxyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyyyzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyyzzz_0[i] * pb_y +
-                                     g_0_yyyyzz_0_xxyyzzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xxyyzzz_0[i] = 4.0 * g_0_yyyzz_0_xxyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_yyyyzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyyzzz_0[i] * pb_y + g_0_yyyyzz_0_xxyyzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xxyzzzz_0[i] = 4.0 * g_0_yyyzz_0_xxyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyzzzz_0[i] * pb_y + g_0_yyyyzz_0_xxyzzzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xxyzzzz_0[i] = 4.0 * g_0_yyyzz_0_xxyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxyzzzz_1[i] * fti_ab_0 + g_0_yyyyzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xxyzzzz_0[i] * pb_y + g_0_yyyyzz_0_xxyzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xxzzzzz_0[i] = 4.0 * g_0_yyyzz_0_xxzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xxzzzzz_0[i] * pb_y + g_0_yyyyzz_0_xxzzzzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xxzzzzz_0[i] = 4.0 * g_0_yyyzz_0_xxzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xxzzzzz_1[i] * fti_ab_0 + g_0_yyyyzz_0_xxzzzzz_0[i] * pb_y + g_0_yyyyzz_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xyyyyyy_0[i] = g_0_yyyyy_0_xyyyyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xyyyyyy_1[i] * fti_ab_0 + g_0_yyyyyz_0_xyyyyyy_0[i] * pb_z +
-                                     g_0_yyyyyz_0_xyyyyyy_1[i] * wp_z[i];
+        g_0_yyyyyzz_0_xyyyyyy_0[i] = g_0_yyyyy_0_xyyyyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_xyyyyyy_1[i] * fti_ab_0 + g_0_yyyyyz_0_xyyyyyy_0[i] * pb_z + g_0_yyyyyz_0_xyyyyyy_1[i] * wp_z[i];
 
-        g_0_yyyyyzz_0_xyyyyyz_0[i] = 4.0 * g_0_yyyzz_0_xyyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xyyyyyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_yyyyzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xyyyyyz_0[i] * pb_y +
-                                     g_0_yyyyzz_0_xyyyyyz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xyyyyyz_0[i] = 4.0 * g_0_yyyzz_0_xyyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xyyyyyz_1[i] * fti_ab_0 + 5.0 * g_0_yyyyzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xyyyyyz_0[i] * pb_y + g_0_yyyyzz_0_xyyyyyz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xyyyyzz_0[i] = 4.0 * g_0_yyyzz_0_xyyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xyyyyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_yyyyzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xyyyyzz_0[i] * pb_y +
-                                     g_0_yyyyzz_0_xyyyyzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xyyyyzz_0[i] = 4.0 * g_0_yyyzz_0_xyyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xyyyyzz_1[i] * fti_ab_0 + 4.0 * g_0_yyyyzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xyyyyzz_0[i] * pb_y + g_0_yyyyzz_0_xyyyyzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xyyyzzz_0[i] = 4.0 * g_0_yyyzz_0_xyyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xyyyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyyyzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xyyyzzz_0[i] * pb_y +
-                                     g_0_yyyyzz_0_xyyyzzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xyyyzzz_0[i] = 4.0 * g_0_yyyzz_0_xyyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xyyyzzz_1[i] * fti_ab_0 + 3.0 * g_0_yyyyzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xyyyzzz_0[i] * pb_y + g_0_yyyyzz_0_xyyyzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xyyzzzz_0[i] = 4.0 * g_0_yyyzz_0_xyyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xyyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyyyzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xyyzzzz_0[i] * pb_y +
-                                     g_0_yyyyzz_0_xyyzzzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xyyzzzz_0[i] = 4.0 * g_0_yyyzz_0_xyyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xyyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_yyyyzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xyyzzzz_0[i] * pb_y + g_0_yyyyzz_0_xyyzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xyzzzzz_0[i] = 4.0 * g_0_yyyzz_0_xyzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xyzzzzz_0[i] * pb_y + g_0_yyyyzz_0_xyzzzzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xyzzzzz_0[i] = 4.0 * g_0_yyyzz_0_xyzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xyzzzzz_1[i] * fti_ab_0 + g_0_yyyyzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_xyzzzzz_0[i] * pb_y + g_0_yyyyzz_0_xyzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_xzzzzzz_0[i] = 4.0 * g_0_yyyzz_0_xzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xzzzzzz_0[i] * pb_y + g_0_yyyyzz_0_xzzzzzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_xzzzzzz_0[i] = 4.0 * g_0_yyyzz_0_xzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_xzzzzzz_1[i] * fti_ab_0 + g_0_yyyyzz_0_xzzzzzz_0[i] * pb_y + g_0_yyyyzz_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_yyyyyyy_0[i] = g_0_yyyyy_0_yyyyyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_yyyyyyy_1[i] * fti_ab_0 + g_0_yyyyyz_0_yyyyyyy_0[i] * pb_z +
-                                     g_0_yyyyyz_0_yyyyyyy_1[i] * wp_z[i];
+        g_0_yyyyyzz_0_yyyyyyy_0[i] = g_0_yyyyy_0_yyyyyyy_0[i] * fi_ab_0 - g_0_yyyyy_0_yyyyyyy_1[i] * fti_ab_0 + g_0_yyyyyz_0_yyyyyyy_0[i] * pb_z + g_0_yyyyyz_0_yyyyyyy_1[i] * wp_z[i];
 
-        g_0_yyyyyzz_0_yyyyyyz_0[i] = 4.0 * g_0_yyyzz_0_yyyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_yyyyyyz_1[i] * fti_ab_0 +
-                                     6.0 * g_0_yyyyzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_yyyyyyz_0[i] * pb_y +
-                                     g_0_yyyyzz_0_yyyyyyz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_yyyyyyz_0[i] = 4.0 * g_0_yyyzz_0_yyyyyyz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_yyyyyyz_1[i] * fti_ab_0 + 6.0 * g_0_yyyyzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_yyyyyyz_0[i] * pb_y + g_0_yyyyzz_0_yyyyyyz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_yyyyyzz_0[i] = 4.0 * g_0_yyyzz_0_yyyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_yyyyyzz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_yyyyzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_yyyyyzz_0[i] * pb_y +
-                                     g_0_yyyyzz_0_yyyyyzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_yyyyyzz_0[i] = 4.0 * g_0_yyyzz_0_yyyyyzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_yyyyyzz_1[i] * fti_ab_0 + 5.0 * g_0_yyyyzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_yyyyyzz_0[i] * pb_y + g_0_yyyyzz_0_yyyyyzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_yyyyzzz_0[i] = 4.0 * g_0_yyyzz_0_yyyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_yyyyzzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_yyyyzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_yyyyzzz_0[i] * pb_y +
-                                     g_0_yyyyzz_0_yyyyzzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_yyyyzzz_0[i] = 4.0 * g_0_yyyzz_0_yyyyzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_yyyyzzz_1[i] * fti_ab_0 + 4.0 * g_0_yyyyzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_yyyyzzz_0[i] * pb_y + g_0_yyyyzz_0_yyyyzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_yyyzzzz_0[i] = 4.0 * g_0_yyyzz_0_yyyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_yyyzzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyyyzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_yyyzzzz_0[i] * pb_y +
-                                     g_0_yyyyzz_0_yyyzzzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_yyyzzzz_0[i] = 4.0 * g_0_yyyzz_0_yyyzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_yyyzzzz_1[i] * fti_ab_0 + 3.0 * g_0_yyyyzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_yyyzzzz_0[i] * pb_y + g_0_yyyyzz_0_yyyzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_yyzzzzz_0[i] = 4.0 * g_0_yyyzz_0_yyzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_yyzzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyyyzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_yyzzzzz_0[i] * pb_y +
-                                     g_0_yyyyzz_0_yyzzzzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_yyzzzzz_0[i] = 4.0 * g_0_yyyzz_0_yyzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_yyzzzzz_1[i] * fti_ab_0 + 2.0 * g_0_yyyyzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_yyzzzzz_0[i] * pb_y + g_0_yyyyzz_0_yyzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_yzzzzzz_0[i] = 4.0 * g_0_yyyzz_0_yzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_yzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_yzzzzzz_0[i] * pb_y + g_0_yyyyzz_0_yzzzzzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_yzzzzzz_0[i] = 4.0 * g_0_yyyzz_0_yzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_yzzzzzz_1[i] * fti_ab_0 + g_0_yyyyzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_yyyyzz_0_yzzzzzz_0[i] * pb_y + g_0_yyyyzz_0_yzzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyyzz_0_zzzzzzz_0[i] = 4.0 * g_0_yyyzz_0_zzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_zzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_zzzzzzz_0[i] * pb_y + g_0_yyyyzz_0_zzzzzzz_1[i] * wp_y[i];
+        g_0_yyyyyzz_0_zzzzzzz_0[i] = 4.0 * g_0_yyyzz_0_zzzzzzz_0[i] * fi_ab_0 - 4.0 * g_0_yyyzz_0_zzzzzzz_1[i] * fti_ab_0 + g_0_yyyyzz_0_zzzzzzz_0[i] * pb_y + g_0_yyyyzz_0_zzzzzzz_1[i] * wp_y[i];
     }
 
     /// Set up 1116-1152 components of targeted buffer : SKSK
@@ -16861,211 +10630,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_yyyyzzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 1151);
 
-#pragma omp simd aligned(g_0_yyyyz_0_xxxxxxy_0,       \
-                             g_0_yyyyz_0_xxxxxxy_1,   \
-                             g_0_yyyyz_0_xxxxxyy_0,   \
-                             g_0_yyyyz_0_xxxxxyy_1,   \
-                             g_0_yyyyz_0_xxxxyyy_0,   \
-                             g_0_yyyyz_0_xxxxyyy_1,   \
-                             g_0_yyyyz_0_xxxyyyy_0,   \
-                             g_0_yyyyz_0_xxxyyyy_1,   \
-                             g_0_yyyyz_0_xxyyyyy_0,   \
-                             g_0_yyyyz_0_xxyyyyy_1,   \
-                             g_0_yyyyz_0_xyyyyyy_0,   \
-                             g_0_yyyyz_0_xyyyyyy_1,   \
-                             g_0_yyyyz_0_yyyyyyy_0,   \
-                             g_0_yyyyz_0_yyyyyyy_1,   \
-                             g_0_yyyyzz_0_xxxxxxy_0,  \
-                             g_0_yyyyzz_0_xxxxxxy_1,  \
-                             g_0_yyyyzz_0_xxxxxyy_0,  \
-                             g_0_yyyyzz_0_xxxxxyy_1,  \
-                             g_0_yyyyzz_0_xxxxyyy_0,  \
-                             g_0_yyyyzz_0_xxxxyyy_1,  \
-                             g_0_yyyyzz_0_xxxyyyy_0,  \
-                             g_0_yyyyzz_0_xxxyyyy_1,  \
-                             g_0_yyyyzz_0_xxyyyyy_0,  \
-                             g_0_yyyyzz_0_xxyyyyy_1,  \
-                             g_0_yyyyzz_0_xyyyyyy_0,  \
-                             g_0_yyyyzz_0_xyyyyyy_1,  \
-                             g_0_yyyyzz_0_yyyyyyy_0,  \
-                             g_0_yyyyzz_0_yyyyyyy_1,  \
-                             g_0_yyyyzzz_0_xxxxxxx_0, \
-                             g_0_yyyyzzz_0_xxxxxxy_0, \
-                             g_0_yyyyzzz_0_xxxxxxz_0, \
-                             g_0_yyyyzzz_0_xxxxxyy_0, \
-                             g_0_yyyyzzz_0_xxxxxyz_0, \
-                             g_0_yyyyzzz_0_xxxxxzz_0, \
-                             g_0_yyyyzzz_0_xxxxyyy_0, \
-                             g_0_yyyyzzz_0_xxxxyyz_0, \
-                             g_0_yyyyzzz_0_xxxxyzz_0, \
-                             g_0_yyyyzzz_0_xxxxzzz_0, \
-                             g_0_yyyyzzz_0_xxxyyyy_0, \
-                             g_0_yyyyzzz_0_xxxyyyz_0, \
-                             g_0_yyyyzzz_0_xxxyyzz_0, \
-                             g_0_yyyyzzz_0_xxxyzzz_0, \
-                             g_0_yyyyzzz_0_xxxzzzz_0, \
-                             g_0_yyyyzzz_0_xxyyyyy_0, \
-                             g_0_yyyyzzz_0_xxyyyyz_0, \
-                             g_0_yyyyzzz_0_xxyyyzz_0, \
-                             g_0_yyyyzzz_0_xxyyzzz_0, \
-                             g_0_yyyyzzz_0_xxyzzzz_0, \
-                             g_0_yyyyzzz_0_xxzzzzz_0, \
-                             g_0_yyyyzzz_0_xyyyyyy_0, \
-                             g_0_yyyyzzz_0_xyyyyyz_0, \
-                             g_0_yyyyzzz_0_xyyyyzz_0, \
-                             g_0_yyyyzzz_0_xyyyzzz_0, \
-                             g_0_yyyyzzz_0_xyyzzzz_0, \
-                             g_0_yyyyzzz_0_xyzzzzz_0, \
-                             g_0_yyyyzzz_0_xzzzzzz_0, \
-                             g_0_yyyyzzz_0_yyyyyyy_0, \
-                             g_0_yyyyzzz_0_yyyyyyz_0, \
-                             g_0_yyyyzzz_0_yyyyyzz_0, \
-                             g_0_yyyyzzz_0_yyyyzzz_0, \
-                             g_0_yyyyzzz_0_yyyzzzz_0, \
-                             g_0_yyyyzzz_0_yyzzzzz_0, \
-                             g_0_yyyyzzz_0_yzzzzzz_0, \
-                             g_0_yyyyzzz_0_zzzzzzz_0, \
-                             g_0_yyyzzz_0_xxxxxxx_0,  \
-                             g_0_yyyzzz_0_xxxxxxx_1,  \
-                             g_0_yyyzzz_0_xxxxxxz_0,  \
-                             g_0_yyyzzz_0_xxxxxxz_1,  \
-                             g_0_yyyzzz_0_xxxxxyz_0,  \
-                             g_0_yyyzzz_0_xxxxxyz_1,  \
-                             g_0_yyyzzz_0_xxxxxz_1,   \
-                             g_0_yyyzzz_0_xxxxxzz_0,  \
-                             g_0_yyyzzz_0_xxxxxzz_1,  \
-                             g_0_yyyzzz_0_xxxxyyz_0,  \
-                             g_0_yyyzzz_0_xxxxyyz_1,  \
-                             g_0_yyyzzz_0_xxxxyz_1,   \
-                             g_0_yyyzzz_0_xxxxyzz_0,  \
-                             g_0_yyyzzz_0_xxxxyzz_1,  \
-                             g_0_yyyzzz_0_xxxxzz_1,   \
-                             g_0_yyyzzz_0_xxxxzzz_0,  \
-                             g_0_yyyzzz_0_xxxxzzz_1,  \
-                             g_0_yyyzzz_0_xxxyyyz_0,  \
-                             g_0_yyyzzz_0_xxxyyyz_1,  \
-                             g_0_yyyzzz_0_xxxyyz_1,   \
-                             g_0_yyyzzz_0_xxxyyzz_0,  \
-                             g_0_yyyzzz_0_xxxyyzz_1,  \
-                             g_0_yyyzzz_0_xxxyzz_1,   \
-                             g_0_yyyzzz_0_xxxyzzz_0,  \
-                             g_0_yyyzzz_0_xxxyzzz_1,  \
-                             g_0_yyyzzz_0_xxxzzz_1,   \
-                             g_0_yyyzzz_0_xxxzzzz_0,  \
-                             g_0_yyyzzz_0_xxxzzzz_1,  \
-                             g_0_yyyzzz_0_xxyyyyz_0,  \
-                             g_0_yyyzzz_0_xxyyyyz_1,  \
-                             g_0_yyyzzz_0_xxyyyz_1,   \
-                             g_0_yyyzzz_0_xxyyyzz_0,  \
-                             g_0_yyyzzz_0_xxyyyzz_1,  \
-                             g_0_yyyzzz_0_xxyyzz_1,   \
-                             g_0_yyyzzz_0_xxyyzzz_0,  \
-                             g_0_yyyzzz_0_xxyyzzz_1,  \
-                             g_0_yyyzzz_0_xxyzzz_1,   \
-                             g_0_yyyzzz_0_xxyzzzz_0,  \
-                             g_0_yyyzzz_0_xxyzzzz_1,  \
-                             g_0_yyyzzz_0_xxzzzz_1,   \
-                             g_0_yyyzzz_0_xxzzzzz_0,  \
-                             g_0_yyyzzz_0_xxzzzzz_1,  \
-                             g_0_yyyzzz_0_xyyyyyz_0,  \
-                             g_0_yyyzzz_0_xyyyyyz_1,  \
-                             g_0_yyyzzz_0_xyyyyz_1,   \
-                             g_0_yyyzzz_0_xyyyyzz_0,  \
-                             g_0_yyyzzz_0_xyyyyzz_1,  \
-                             g_0_yyyzzz_0_xyyyzz_1,   \
-                             g_0_yyyzzz_0_xyyyzzz_0,  \
-                             g_0_yyyzzz_0_xyyyzzz_1,  \
-                             g_0_yyyzzz_0_xyyzzz_1,   \
-                             g_0_yyyzzz_0_xyyzzzz_0,  \
-                             g_0_yyyzzz_0_xyyzzzz_1,  \
-                             g_0_yyyzzz_0_xyzzzz_1,   \
-                             g_0_yyyzzz_0_xyzzzzz_0,  \
-                             g_0_yyyzzz_0_xyzzzzz_1,  \
-                             g_0_yyyzzz_0_xzzzzz_1,   \
-                             g_0_yyyzzz_0_xzzzzzz_0,  \
-                             g_0_yyyzzz_0_xzzzzzz_1,  \
-                             g_0_yyyzzz_0_yyyyyyz_0,  \
-                             g_0_yyyzzz_0_yyyyyyz_1,  \
-                             g_0_yyyzzz_0_yyyyyz_1,   \
-                             g_0_yyyzzz_0_yyyyyzz_0,  \
-                             g_0_yyyzzz_0_yyyyyzz_1,  \
-                             g_0_yyyzzz_0_yyyyzz_1,   \
-                             g_0_yyyzzz_0_yyyyzzz_0,  \
-                             g_0_yyyzzz_0_yyyyzzz_1,  \
-                             g_0_yyyzzz_0_yyyzzz_1,   \
-                             g_0_yyyzzz_0_yyyzzzz_0,  \
-                             g_0_yyyzzz_0_yyyzzzz_1,  \
-                             g_0_yyyzzz_0_yyzzzz_1,   \
-                             g_0_yyyzzz_0_yyzzzzz_0,  \
-                             g_0_yyyzzz_0_yyzzzzz_1,  \
-                             g_0_yyyzzz_0_yzzzzz_1,   \
-                             g_0_yyyzzz_0_yzzzzzz_0,  \
-                             g_0_yyyzzz_0_yzzzzzz_1,  \
-                             g_0_yyyzzz_0_zzzzzz_1,   \
-                             g_0_yyyzzz_0_zzzzzzz_0,  \
-                             g_0_yyyzzz_0_zzzzzzz_1,  \
-                             g_0_yyzzz_0_xxxxxxx_0,   \
-                             g_0_yyzzz_0_xxxxxxx_1,   \
-                             g_0_yyzzz_0_xxxxxxz_0,   \
-                             g_0_yyzzz_0_xxxxxxz_1,   \
-                             g_0_yyzzz_0_xxxxxyz_0,   \
-                             g_0_yyzzz_0_xxxxxyz_1,   \
-                             g_0_yyzzz_0_xxxxxzz_0,   \
-                             g_0_yyzzz_0_xxxxxzz_1,   \
-                             g_0_yyzzz_0_xxxxyyz_0,   \
-                             g_0_yyzzz_0_xxxxyyz_1,   \
-                             g_0_yyzzz_0_xxxxyzz_0,   \
-                             g_0_yyzzz_0_xxxxyzz_1,   \
-                             g_0_yyzzz_0_xxxxzzz_0,   \
-                             g_0_yyzzz_0_xxxxzzz_1,   \
-                             g_0_yyzzz_0_xxxyyyz_0,   \
-                             g_0_yyzzz_0_xxxyyyz_1,   \
-                             g_0_yyzzz_0_xxxyyzz_0,   \
-                             g_0_yyzzz_0_xxxyyzz_1,   \
-                             g_0_yyzzz_0_xxxyzzz_0,   \
-                             g_0_yyzzz_0_xxxyzzz_1,   \
-                             g_0_yyzzz_0_xxxzzzz_0,   \
-                             g_0_yyzzz_0_xxxzzzz_1,   \
-                             g_0_yyzzz_0_xxyyyyz_0,   \
-                             g_0_yyzzz_0_xxyyyyz_1,   \
-                             g_0_yyzzz_0_xxyyyzz_0,   \
-                             g_0_yyzzz_0_xxyyyzz_1,   \
-                             g_0_yyzzz_0_xxyyzzz_0,   \
-                             g_0_yyzzz_0_xxyyzzz_1,   \
-                             g_0_yyzzz_0_xxyzzzz_0,   \
-                             g_0_yyzzz_0_xxyzzzz_1,   \
-                             g_0_yyzzz_0_xxzzzzz_0,   \
-                             g_0_yyzzz_0_xxzzzzz_1,   \
-                             g_0_yyzzz_0_xyyyyyz_0,   \
-                             g_0_yyzzz_0_xyyyyyz_1,   \
-                             g_0_yyzzz_0_xyyyyzz_0,   \
-                             g_0_yyzzz_0_xyyyyzz_1,   \
-                             g_0_yyzzz_0_xyyyzzz_0,   \
-                             g_0_yyzzz_0_xyyyzzz_1,   \
-                             g_0_yyzzz_0_xyyzzzz_0,   \
-                             g_0_yyzzz_0_xyyzzzz_1,   \
-                             g_0_yyzzz_0_xyzzzzz_0,   \
-                             g_0_yyzzz_0_xyzzzzz_1,   \
-                             g_0_yyzzz_0_xzzzzzz_0,   \
-                             g_0_yyzzz_0_xzzzzzz_1,   \
-                             g_0_yyzzz_0_yyyyyyz_0,   \
-                             g_0_yyzzz_0_yyyyyyz_1,   \
-                             g_0_yyzzz_0_yyyyyzz_0,   \
-                             g_0_yyzzz_0_yyyyyzz_1,   \
-                             g_0_yyzzz_0_yyyyzzz_0,   \
-                             g_0_yyzzz_0_yyyyzzz_1,   \
-                             g_0_yyzzz_0_yyyzzzz_0,   \
-                             g_0_yyzzz_0_yyyzzzz_1,   \
-                             g_0_yyzzz_0_yyzzzzz_0,   \
-                             g_0_yyzzz_0_yyzzzzz_1,   \
-                             g_0_yyzzz_0_yzzzzzz_0,   \
-                             g_0_yyzzz_0_yzzzzzz_1,   \
-                             g_0_yyzzz_0_zzzzzzz_0,   \
-                             g_0_yyzzz_0_zzzzzzz_1,   \
-                             wp_y,                    \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_yyyyz_0_xxxxxxy_0, g_0_yyyyz_0_xxxxxxy_1, g_0_yyyyz_0_xxxxxyy_0, g_0_yyyyz_0_xxxxxyy_1, g_0_yyyyz_0_xxxxyyy_0, g_0_yyyyz_0_xxxxyyy_1, g_0_yyyyz_0_xxxyyyy_0, g_0_yyyyz_0_xxxyyyy_1, g_0_yyyyz_0_xxyyyyy_0, g_0_yyyyz_0_xxyyyyy_1, g_0_yyyyz_0_xyyyyyy_0, g_0_yyyyz_0_xyyyyyy_1, g_0_yyyyz_0_yyyyyyy_0, g_0_yyyyz_0_yyyyyyy_1, g_0_yyyyzz_0_xxxxxxy_0, g_0_yyyyzz_0_xxxxxxy_1, g_0_yyyyzz_0_xxxxxyy_0, g_0_yyyyzz_0_xxxxxyy_1, g_0_yyyyzz_0_xxxxyyy_0, g_0_yyyyzz_0_xxxxyyy_1, g_0_yyyyzz_0_xxxyyyy_0, g_0_yyyyzz_0_xxxyyyy_1, g_0_yyyyzz_0_xxyyyyy_0, g_0_yyyyzz_0_xxyyyyy_1, g_0_yyyyzz_0_xyyyyyy_0, g_0_yyyyzz_0_xyyyyyy_1, g_0_yyyyzz_0_yyyyyyy_0, g_0_yyyyzz_0_yyyyyyy_1, g_0_yyyyzzz_0_xxxxxxx_0, g_0_yyyyzzz_0_xxxxxxy_0, g_0_yyyyzzz_0_xxxxxxz_0, g_0_yyyyzzz_0_xxxxxyy_0, g_0_yyyyzzz_0_xxxxxyz_0, g_0_yyyyzzz_0_xxxxxzz_0, g_0_yyyyzzz_0_xxxxyyy_0, g_0_yyyyzzz_0_xxxxyyz_0, g_0_yyyyzzz_0_xxxxyzz_0, g_0_yyyyzzz_0_xxxxzzz_0, g_0_yyyyzzz_0_xxxyyyy_0, g_0_yyyyzzz_0_xxxyyyz_0, g_0_yyyyzzz_0_xxxyyzz_0, g_0_yyyyzzz_0_xxxyzzz_0, g_0_yyyyzzz_0_xxxzzzz_0, g_0_yyyyzzz_0_xxyyyyy_0, g_0_yyyyzzz_0_xxyyyyz_0, g_0_yyyyzzz_0_xxyyyzz_0, g_0_yyyyzzz_0_xxyyzzz_0, g_0_yyyyzzz_0_xxyzzzz_0, g_0_yyyyzzz_0_xxzzzzz_0, g_0_yyyyzzz_0_xyyyyyy_0, g_0_yyyyzzz_0_xyyyyyz_0, g_0_yyyyzzz_0_xyyyyzz_0, g_0_yyyyzzz_0_xyyyzzz_0, g_0_yyyyzzz_0_xyyzzzz_0, g_0_yyyyzzz_0_xyzzzzz_0, g_0_yyyyzzz_0_xzzzzzz_0, g_0_yyyyzzz_0_yyyyyyy_0, g_0_yyyyzzz_0_yyyyyyz_0, g_0_yyyyzzz_0_yyyyyzz_0, g_0_yyyyzzz_0_yyyyzzz_0, g_0_yyyyzzz_0_yyyzzzz_0, g_0_yyyyzzz_0_yyzzzzz_0, g_0_yyyyzzz_0_yzzzzzz_0, g_0_yyyyzzz_0_zzzzzzz_0, g_0_yyyzzz_0_xxxxxxx_0, g_0_yyyzzz_0_xxxxxxx_1, g_0_yyyzzz_0_xxxxxxz_0, g_0_yyyzzz_0_xxxxxxz_1, g_0_yyyzzz_0_xxxxxyz_0, g_0_yyyzzz_0_xxxxxyz_1, g_0_yyyzzz_0_xxxxxz_1, g_0_yyyzzz_0_xxxxxzz_0, g_0_yyyzzz_0_xxxxxzz_1, g_0_yyyzzz_0_xxxxyyz_0, g_0_yyyzzz_0_xxxxyyz_1, g_0_yyyzzz_0_xxxxyz_1, g_0_yyyzzz_0_xxxxyzz_0, g_0_yyyzzz_0_xxxxyzz_1, g_0_yyyzzz_0_xxxxzz_1, g_0_yyyzzz_0_xxxxzzz_0, g_0_yyyzzz_0_xxxxzzz_1, g_0_yyyzzz_0_xxxyyyz_0, g_0_yyyzzz_0_xxxyyyz_1, g_0_yyyzzz_0_xxxyyz_1, g_0_yyyzzz_0_xxxyyzz_0, g_0_yyyzzz_0_xxxyyzz_1, g_0_yyyzzz_0_xxxyzz_1, g_0_yyyzzz_0_xxxyzzz_0, g_0_yyyzzz_0_xxxyzzz_1, g_0_yyyzzz_0_xxxzzz_1, g_0_yyyzzz_0_xxxzzzz_0, g_0_yyyzzz_0_xxxzzzz_1, g_0_yyyzzz_0_xxyyyyz_0, g_0_yyyzzz_0_xxyyyyz_1, g_0_yyyzzz_0_xxyyyz_1, g_0_yyyzzz_0_xxyyyzz_0, g_0_yyyzzz_0_xxyyyzz_1, g_0_yyyzzz_0_xxyyzz_1, g_0_yyyzzz_0_xxyyzzz_0, g_0_yyyzzz_0_xxyyzzz_1, g_0_yyyzzz_0_xxyzzz_1, g_0_yyyzzz_0_xxyzzzz_0, g_0_yyyzzz_0_xxyzzzz_1, g_0_yyyzzz_0_xxzzzz_1, g_0_yyyzzz_0_xxzzzzz_0, g_0_yyyzzz_0_xxzzzzz_1, g_0_yyyzzz_0_xyyyyyz_0, g_0_yyyzzz_0_xyyyyyz_1, g_0_yyyzzz_0_xyyyyz_1, g_0_yyyzzz_0_xyyyyzz_0, g_0_yyyzzz_0_xyyyyzz_1, g_0_yyyzzz_0_xyyyzz_1, g_0_yyyzzz_0_xyyyzzz_0, g_0_yyyzzz_0_xyyyzzz_1, g_0_yyyzzz_0_xyyzzz_1, g_0_yyyzzz_0_xyyzzzz_0, g_0_yyyzzz_0_xyyzzzz_1, g_0_yyyzzz_0_xyzzzz_1, g_0_yyyzzz_0_xyzzzzz_0, g_0_yyyzzz_0_xyzzzzz_1, g_0_yyyzzz_0_xzzzzz_1, g_0_yyyzzz_0_xzzzzzz_0, g_0_yyyzzz_0_xzzzzzz_1, g_0_yyyzzz_0_yyyyyyz_0, g_0_yyyzzz_0_yyyyyyz_1, g_0_yyyzzz_0_yyyyyz_1, g_0_yyyzzz_0_yyyyyzz_0, g_0_yyyzzz_0_yyyyyzz_1, g_0_yyyzzz_0_yyyyzz_1, g_0_yyyzzz_0_yyyyzzz_0, g_0_yyyzzz_0_yyyyzzz_1, g_0_yyyzzz_0_yyyzzz_1, g_0_yyyzzz_0_yyyzzzz_0, g_0_yyyzzz_0_yyyzzzz_1, g_0_yyyzzz_0_yyzzzz_1, g_0_yyyzzz_0_yyzzzzz_0, g_0_yyyzzz_0_yyzzzzz_1, g_0_yyyzzz_0_yzzzzz_1, g_0_yyyzzz_0_yzzzzzz_0, g_0_yyyzzz_0_yzzzzzz_1, g_0_yyyzzz_0_zzzzzz_1, g_0_yyyzzz_0_zzzzzzz_0, g_0_yyyzzz_0_zzzzzzz_1, g_0_yyzzz_0_xxxxxxx_0, g_0_yyzzz_0_xxxxxxx_1, g_0_yyzzz_0_xxxxxxz_0, g_0_yyzzz_0_xxxxxxz_1, g_0_yyzzz_0_xxxxxyz_0, g_0_yyzzz_0_xxxxxyz_1, g_0_yyzzz_0_xxxxxzz_0, g_0_yyzzz_0_xxxxxzz_1, g_0_yyzzz_0_xxxxyyz_0, g_0_yyzzz_0_xxxxyyz_1, g_0_yyzzz_0_xxxxyzz_0, g_0_yyzzz_0_xxxxyzz_1, g_0_yyzzz_0_xxxxzzz_0, g_0_yyzzz_0_xxxxzzz_1, g_0_yyzzz_0_xxxyyyz_0, g_0_yyzzz_0_xxxyyyz_1, g_0_yyzzz_0_xxxyyzz_0, g_0_yyzzz_0_xxxyyzz_1, g_0_yyzzz_0_xxxyzzz_0, g_0_yyzzz_0_xxxyzzz_1, g_0_yyzzz_0_xxxzzzz_0, g_0_yyzzz_0_xxxzzzz_1, g_0_yyzzz_0_xxyyyyz_0, g_0_yyzzz_0_xxyyyyz_1, g_0_yyzzz_0_xxyyyzz_0, g_0_yyzzz_0_xxyyyzz_1, g_0_yyzzz_0_xxyyzzz_0, g_0_yyzzz_0_xxyyzzz_1, g_0_yyzzz_0_xxyzzzz_0, g_0_yyzzz_0_xxyzzzz_1, g_0_yyzzz_0_xxzzzzz_0, g_0_yyzzz_0_xxzzzzz_1, g_0_yyzzz_0_xyyyyyz_0, g_0_yyzzz_0_xyyyyyz_1, g_0_yyzzz_0_xyyyyzz_0, g_0_yyzzz_0_xyyyyzz_1, g_0_yyzzz_0_xyyyzzz_0, g_0_yyzzz_0_xyyyzzz_1, g_0_yyzzz_0_xyyzzzz_0, g_0_yyzzz_0_xyyzzzz_1, g_0_yyzzz_0_xyzzzzz_0, g_0_yyzzz_0_xyzzzzz_1, g_0_yyzzz_0_xzzzzzz_0, g_0_yyzzz_0_xzzzzzz_1, g_0_yyzzz_0_yyyyyyz_0, g_0_yyzzz_0_yyyyyyz_1, g_0_yyzzz_0_yyyyyzz_0, g_0_yyzzz_0_yyyyyzz_1, g_0_yyzzz_0_yyyyzzz_0, g_0_yyzzz_0_yyyyzzz_1, g_0_yyzzz_0_yyyzzzz_0, g_0_yyzzz_0_yyyzzzz_1, g_0_yyzzz_0_yyzzzzz_0, g_0_yyzzz_0_yyzzzzz_1, g_0_yyzzz_0_yzzzzzz_0, g_0_yyzzz_0_yzzzzzz_1, g_0_yyzzz_0_zzzzzzz_0, g_0_yyzzz_0_zzzzzzz_1, wp_y, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -17074,128 +10639,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_yyyyzzz_0_xxxxxxx_0[i] = 3.0 * g_0_yyzzz_0_xxxxxxx_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxxxxx_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xxxxxxx_0[i] * pb_y + g_0_yyyzzz_0_xxxxxxx_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xxxxxxx_0[i] = 3.0 * g_0_yyzzz_0_xxxxxxx_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxxxxx_1[i] * fti_ab_0 + g_0_yyyzzz_0_xxxxxxx_0[i] * pb_y + g_0_yyyzzz_0_xxxxxxx_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xxxxxxy_0[i] = 2.0 * g_0_yyyyz_0_xxxxxxy_0[i] * fi_ab_0 - 2.0 * g_0_yyyyz_0_xxxxxxy_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xxxxxxy_0[i] * pb_z + g_0_yyyyzz_0_xxxxxxy_1[i] * wp_z[i];
+        g_0_yyyyzzz_0_xxxxxxy_0[i] = 2.0 * g_0_yyyyz_0_xxxxxxy_0[i] * fi_ab_0 - 2.0 * g_0_yyyyz_0_xxxxxxy_1[i] * fti_ab_0 + g_0_yyyyzz_0_xxxxxxy_0[i] * pb_z + g_0_yyyyzz_0_xxxxxxy_1[i] * wp_z[i];
 
-        g_0_yyyyzzz_0_xxxxxxz_0[i] = 3.0 * g_0_yyzzz_0_xxxxxxz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxxxxz_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xxxxxxz_0[i] * pb_y + g_0_yyyzzz_0_xxxxxxz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xxxxxxz_0[i] = 3.0 * g_0_yyzzz_0_xxxxxxz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxxxxz_1[i] * fti_ab_0 + g_0_yyyzzz_0_xxxxxxz_0[i] * pb_y + g_0_yyyzzz_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xxxxxyy_0[i] = 2.0 * g_0_yyyyz_0_xxxxxyy_0[i] * fi_ab_0 - 2.0 * g_0_yyyyz_0_xxxxxyy_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xxxxxyy_0[i] * pb_z + g_0_yyyyzz_0_xxxxxyy_1[i] * wp_z[i];
+        g_0_yyyyzzz_0_xxxxxyy_0[i] = 2.0 * g_0_yyyyz_0_xxxxxyy_0[i] * fi_ab_0 - 2.0 * g_0_yyyyz_0_xxxxxyy_1[i] * fti_ab_0 + g_0_yyyyzz_0_xxxxxyy_0[i] * pb_z + g_0_yyyyzz_0_xxxxxyy_1[i] * wp_z[i];
 
-        g_0_yyyyzzz_0_xxxxxyz_0[i] = 3.0 * g_0_yyzzz_0_xxxxxyz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxxyz_0[i] * pb_y + g_0_yyyzzz_0_xxxxxyz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xxxxxyz_0[i] = 3.0 * g_0_yyzzz_0_xxxxxyz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxxxyz_1[i] * fti_ab_0 + g_0_yyyzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxxyz_0[i] * pb_y + g_0_yyyzzz_0_xxxxxyz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xxxxxzz_0[i] = 3.0 * g_0_yyzzz_0_xxxxxzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxxxzz_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xxxxxzz_0[i] * pb_y + g_0_yyyzzz_0_xxxxxzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xxxxxzz_0[i] = 3.0 * g_0_yyzzz_0_xxxxxzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxxxzz_1[i] * fti_ab_0 + g_0_yyyzzz_0_xxxxxzz_0[i] * pb_y + g_0_yyyzzz_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xxxxyyy_0[i] = 2.0 * g_0_yyyyz_0_xxxxyyy_0[i] * fi_ab_0 - 2.0 * g_0_yyyyz_0_xxxxyyy_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xxxxyyy_0[i] * pb_z + g_0_yyyyzz_0_xxxxyyy_1[i] * wp_z[i];
+        g_0_yyyyzzz_0_xxxxyyy_0[i] = 2.0 * g_0_yyyyz_0_xxxxyyy_0[i] * fi_ab_0 - 2.0 * g_0_yyyyz_0_xxxxyyy_1[i] * fti_ab_0 + g_0_yyyyzz_0_xxxxyyy_0[i] * pb_z + g_0_yyyyzz_0_xxxxyyy_1[i] * wp_z[i];
 
-        g_0_yyyyzzz_0_xxxxyyz_0[i] = 3.0 * g_0_yyzzz_0_xxxxyyz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyyzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxyyz_0[i] * pb_y +
-                                     g_0_yyyzzz_0_xxxxyyz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xxxxyyz_0[i] = 3.0 * g_0_yyzzz_0_xxxxyyz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxxyyz_1[i] * fti_ab_0 + 2.0 * g_0_yyyzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxyyz_0[i] * pb_y + g_0_yyyzzz_0_xxxxyyz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xxxxyzz_0[i] = 3.0 * g_0_yyzzz_0_xxxxyzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxyzz_0[i] * pb_y + g_0_yyyzzz_0_xxxxyzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xxxxyzz_0[i] = 3.0 * g_0_yyzzz_0_xxxxyzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxxyzz_1[i] * fti_ab_0 + g_0_yyyzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxxyzz_0[i] * pb_y + g_0_yyyzzz_0_xxxxyzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xxxxzzz_0[i] = 3.0 * g_0_yyzzz_0_xxxxzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxxzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xxxxzzz_0[i] * pb_y + g_0_yyyzzz_0_xxxxzzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xxxxzzz_0[i] = 3.0 * g_0_yyzzz_0_xxxxzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxxzzz_1[i] * fti_ab_0 + g_0_yyyzzz_0_xxxxzzz_0[i] * pb_y + g_0_yyyzzz_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xxxyyyy_0[i] = 2.0 * g_0_yyyyz_0_xxxyyyy_0[i] * fi_ab_0 - 2.0 * g_0_yyyyz_0_xxxyyyy_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xxxyyyy_0[i] * pb_z + g_0_yyyyzz_0_xxxyyyy_1[i] * wp_z[i];
+        g_0_yyyyzzz_0_xxxyyyy_0[i] = 2.0 * g_0_yyyyz_0_xxxyyyy_0[i] * fi_ab_0 - 2.0 * g_0_yyyyz_0_xxxyyyy_1[i] * fti_ab_0 + g_0_yyyyzz_0_xxxyyyy_0[i] * pb_z + g_0_yyyyzz_0_xxxyyyy_1[i] * wp_z[i];
 
-        g_0_yyyyzzz_0_xxxyyyz_0[i] = 3.0 * g_0_yyzzz_0_xxxyyyz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyyzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxyyyz_0[i] * pb_y +
-                                     g_0_yyyzzz_0_xxxyyyz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xxxyyyz_0[i] = 3.0 * g_0_yyzzz_0_xxxyyyz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_yyyzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxyyyz_0[i] * pb_y + g_0_yyyzzz_0_xxxyyyz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xxxyyzz_0[i] = 3.0 * g_0_yyzzz_0_xxxyyzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyyzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxyyzz_0[i] * pb_y +
-                                     g_0_yyyzzz_0_xxxyyzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xxxyyzz_0[i] = 3.0 * g_0_yyzzz_0_xxxyyzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxyyzz_1[i] * fti_ab_0 + 2.0 * g_0_yyyzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxyyzz_0[i] * pb_y + g_0_yyyzzz_0_xxxyyzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xxxyzzz_0[i] = 3.0 * g_0_yyzzz_0_xxxyzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxyzzz_0[i] * pb_y + g_0_yyyzzz_0_xxxyzzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xxxyzzz_0[i] = 3.0 * g_0_yyzzz_0_xxxyzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxyzzz_1[i] * fti_ab_0 + g_0_yyyzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxxyzzz_0[i] * pb_y + g_0_yyyzzz_0_xxxyzzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xxxzzzz_0[i] = 3.0 * g_0_yyzzz_0_xxxzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xxxzzzz_0[i] * pb_y + g_0_yyyzzz_0_xxxzzzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xxxzzzz_0[i] = 3.0 * g_0_yyzzz_0_xxxzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxxzzzz_1[i] * fti_ab_0 + g_0_yyyzzz_0_xxxzzzz_0[i] * pb_y + g_0_yyyzzz_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xxyyyyy_0[i] = 2.0 * g_0_yyyyz_0_xxyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_yyyyz_0_xxyyyyy_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xxyyyyy_0[i] * pb_z + g_0_yyyyzz_0_xxyyyyy_1[i] * wp_z[i];
+        g_0_yyyyzzz_0_xxyyyyy_0[i] = 2.0 * g_0_yyyyz_0_xxyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_yyyyz_0_xxyyyyy_1[i] * fti_ab_0 + g_0_yyyyzz_0_xxyyyyy_0[i] * pb_z + g_0_yyyyzz_0_xxyyyyy_1[i] * wp_z[i];
 
-        g_0_yyyyzzz_0_xxyyyyz_0[i] = 3.0 * g_0_yyzzz_0_xxyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_yyyzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyyyyz_0[i] * pb_y +
-                                     g_0_yyyzzz_0_xxyyyyz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xxyyyyz_0[i] = 3.0 * g_0_yyzzz_0_xxyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxyyyyz_1[i] * fti_ab_0 + 4.0 * g_0_yyyzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyyyyz_0[i] * pb_y + g_0_yyyzzz_0_xxyyyyz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xxyyyzz_0[i] = 3.0 * g_0_yyzzz_0_xxyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyyzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyyyzz_0[i] * pb_y +
-                                     g_0_yyyzzz_0_xxyyyzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xxyyyzz_0[i] = 3.0 * g_0_yyzzz_0_xxyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxyyyzz_1[i] * fti_ab_0 + 3.0 * g_0_yyyzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyyyzz_0[i] * pb_y + g_0_yyyzzz_0_xxyyyzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xxyyzzz_0[i] = 3.0 * g_0_yyzzz_0_xxyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyyzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyyzzz_0[i] * pb_y +
-                                     g_0_yyyzzz_0_xxyyzzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xxyyzzz_0[i] = 3.0 * g_0_yyzzz_0_xxyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_yyyzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyyzzz_0[i] * pb_y + g_0_yyyzzz_0_xxyyzzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xxyzzzz_0[i] = 3.0 * g_0_yyzzz_0_xxyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyzzzz_0[i] * pb_y + g_0_yyyzzz_0_xxyzzzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xxyzzzz_0[i] = 3.0 * g_0_yyzzz_0_xxyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxyzzzz_1[i] * fti_ab_0 + g_0_yyyzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xxyzzzz_0[i] * pb_y + g_0_yyyzzz_0_xxyzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xxzzzzz_0[i] = 3.0 * g_0_yyzzz_0_xxzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xxzzzzz_0[i] * pb_y + g_0_yyyzzz_0_xxzzzzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xxzzzzz_0[i] = 3.0 * g_0_yyzzz_0_xxzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xxzzzzz_1[i] * fti_ab_0 + g_0_yyyzzz_0_xxzzzzz_0[i] * pb_y + g_0_yyyzzz_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xyyyyyy_0[i] = 2.0 * g_0_yyyyz_0_xyyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_yyyyz_0_xyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_xyyyyyy_0[i] * pb_z + g_0_yyyyzz_0_xyyyyyy_1[i] * wp_z[i];
+        g_0_yyyyzzz_0_xyyyyyy_0[i] = 2.0 * g_0_yyyyz_0_xyyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_yyyyz_0_xyyyyyy_1[i] * fti_ab_0 + g_0_yyyyzz_0_xyyyyyy_0[i] * pb_z + g_0_yyyyzz_0_xyyyyyy_1[i] * wp_z[i];
 
-        g_0_yyyyzzz_0_xyyyyyz_0[i] = 3.0 * g_0_yyzzz_0_xyyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xyyyyyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_yyyzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xyyyyyz_0[i] * pb_y +
-                                     g_0_yyyzzz_0_xyyyyyz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xyyyyyz_0[i] = 3.0 * g_0_yyzzz_0_xyyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xyyyyyz_1[i] * fti_ab_0 + 5.0 * g_0_yyyzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xyyyyyz_0[i] * pb_y + g_0_yyyzzz_0_xyyyyyz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xyyyyzz_0[i] = 3.0 * g_0_yyzzz_0_xyyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xyyyyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_yyyzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xyyyyzz_0[i] * pb_y +
-                                     g_0_yyyzzz_0_xyyyyzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xyyyyzz_0[i] = 3.0 * g_0_yyzzz_0_xyyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xyyyyzz_1[i] * fti_ab_0 + 4.0 * g_0_yyyzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xyyyyzz_0[i] * pb_y + g_0_yyyzzz_0_xyyyyzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xyyyzzz_0[i] = 3.0 * g_0_yyzzz_0_xyyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xyyyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyyzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xyyyzzz_0[i] * pb_y +
-                                     g_0_yyyzzz_0_xyyyzzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xyyyzzz_0[i] = 3.0 * g_0_yyzzz_0_xyyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xyyyzzz_1[i] * fti_ab_0 + 3.0 * g_0_yyyzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xyyyzzz_0[i] * pb_y + g_0_yyyzzz_0_xyyyzzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xyyzzzz_0[i] = 3.0 * g_0_yyzzz_0_xyyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xyyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyyzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xyyzzzz_0[i] * pb_y +
-                                     g_0_yyyzzz_0_xyyzzzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xyyzzzz_0[i] = 3.0 * g_0_yyzzz_0_xyyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xyyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_yyyzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xyyzzzz_0[i] * pb_y + g_0_yyyzzz_0_xyyzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xyzzzzz_0[i] = 3.0 * g_0_yyzzz_0_xyzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xyzzzzz_0[i] * pb_y + g_0_yyyzzz_0_xyzzzzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xyzzzzz_0[i] = 3.0 * g_0_yyzzz_0_xyzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xyzzzzz_1[i] * fti_ab_0 + g_0_yyyzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_xyzzzzz_0[i] * pb_y + g_0_yyyzzz_0_xyzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_xzzzzzz_0[i] = 3.0 * g_0_yyzzz_0_xzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xzzzzzz_0[i] * pb_y + g_0_yyyzzz_0_xzzzzzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_xzzzzzz_0[i] = 3.0 * g_0_yyzzz_0_xzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_xzzzzzz_1[i] * fti_ab_0 + g_0_yyyzzz_0_xzzzzzz_0[i] * pb_y + g_0_yyyzzz_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_yyyyyyy_0[i] = 2.0 * g_0_yyyyz_0_yyyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_yyyyz_0_yyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_yyyyzz_0_yyyyyyy_0[i] * pb_z + g_0_yyyyzz_0_yyyyyyy_1[i] * wp_z[i];
+        g_0_yyyyzzz_0_yyyyyyy_0[i] = 2.0 * g_0_yyyyz_0_yyyyyyy_0[i] * fi_ab_0 - 2.0 * g_0_yyyyz_0_yyyyyyy_1[i] * fti_ab_0 + g_0_yyyyzz_0_yyyyyyy_0[i] * pb_z + g_0_yyyyzz_0_yyyyyyy_1[i] * wp_z[i];
 
-        g_0_yyyyzzz_0_yyyyyyz_0[i] = 3.0 * g_0_yyzzz_0_yyyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_yyyyyyz_1[i] * fti_ab_0 +
-                                     6.0 * g_0_yyyzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_yyyyyyz_0[i] * pb_y +
-                                     g_0_yyyzzz_0_yyyyyyz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_yyyyyyz_0[i] = 3.0 * g_0_yyzzz_0_yyyyyyz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_yyyyyyz_1[i] * fti_ab_0 + 6.0 * g_0_yyyzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_yyyyyyz_0[i] * pb_y + g_0_yyyzzz_0_yyyyyyz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_yyyyyzz_0[i] = 3.0 * g_0_yyzzz_0_yyyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_yyyyyzz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_yyyzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_yyyyyzz_0[i] * pb_y +
-                                     g_0_yyyzzz_0_yyyyyzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_yyyyyzz_0[i] = 3.0 * g_0_yyzzz_0_yyyyyzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_yyyyyzz_1[i] * fti_ab_0 + 5.0 * g_0_yyyzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_yyyyyzz_0[i] * pb_y + g_0_yyyzzz_0_yyyyyzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_yyyyzzz_0[i] = 3.0 * g_0_yyzzz_0_yyyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_yyyyzzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_yyyzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_yyyyzzz_0[i] * pb_y +
-                                     g_0_yyyzzz_0_yyyyzzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_yyyyzzz_0[i] = 3.0 * g_0_yyzzz_0_yyyyzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_yyyyzzz_1[i] * fti_ab_0 + 4.0 * g_0_yyyzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_yyyyzzz_0[i] * pb_y + g_0_yyyzzz_0_yyyyzzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_yyyzzzz_0[i] = 3.0 * g_0_yyzzz_0_yyyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_yyyzzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyyzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_yyyzzzz_0[i] * pb_y +
-                                     g_0_yyyzzz_0_yyyzzzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_yyyzzzz_0[i] = 3.0 * g_0_yyzzz_0_yyyzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_yyyzzzz_1[i] * fti_ab_0 + 3.0 * g_0_yyyzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_yyyzzzz_0[i] * pb_y + g_0_yyyzzz_0_yyyzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_yyzzzzz_0[i] = 3.0 * g_0_yyzzz_0_yyzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_yyzzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyyzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_yyzzzzz_0[i] * pb_y +
-                                     g_0_yyyzzz_0_yyzzzzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_yyzzzzz_0[i] = 3.0 * g_0_yyzzz_0_yyzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_yyzzzzz_1[i] * fti_ab_0 + 2.0 * g_0_yyyzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_yyzzzzz_0[i] * pb_y + g_0_yyyzzz_0_yyzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_yzzzzzz_0[i] = 3.0 * g_0_yyzzz_0_yzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_yzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_yzzzzzz_0[i] * pb_y + g_0_yyyzzz_0_yzzzzzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_yzzzzzz_0[i] = 3.0 * g_0_yyzzz_0_yzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_yzzzzzz_1[i] * fti_ab_0 + g_0_yyyzzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_yyyzzz_0_yzzzzzz_0[i] * pb_y + g_0_yyyzzz_0_yzzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyyzzz_0_zzzzzzz_0[i] = 3.0 * g_0_yyzzz_0_zzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_zzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_zzzzzzz_0[i] * pb_y + g_0_yyyzzz_0_zzzzzzz_1[i] * wp_y[i];
+        g_0_yyyyzzz_0_zzzzzzz_0[i] = 3.0 * g_0_yyzzz_0_zzzzzzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzzz_0_zzzzzzz_1[i] * fti_ab_0 + g_0_yyyzzz_0_zzzzzzz_0[i] * pb_y + g_0_yyyzzz_0_zzzzzzz_1[i] * wp_y[i];
     }
 
     /// Set up 1152-1188 components of targeted buffer : SKSK
@@ -17272,211 +10786,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_yyyzzzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 1187);
 
-#pragma omp simd aligned(g_0_yyyzz_0_xxxxxxy_0,       \
-                             g_0_yyyzz_0_xxxxxxy_1,   \
-                             g_0_yyyzz_0_xxxxxyy_0,   \
-                             g_0_yyyzz_0_xxxxxyy_1,   \
-                             g_0_yyyzz_0_xxxxyyy_0,   \
-                             g_0_yyyzz_0_xxxxyyy_1,   \
-                             g_0_yyyzz_0_xxxyyyy_0,   \
-                             g_0_yyyzz_0_xxxyyyy_1,   \
-                             g_0_yyyzz_0_xxyyyyy_0,   \
-                             g_0_yyyzz_0_xxyyyyy_1,   \
-                             g_0_yyyzz_0_xyyyyyy_0,   \
-                             g_0_yyyzz_0_xyyyyyy_1,   \
-                             g_0_yyyzz_0_yyyyyyy_0,   \
-                             g_0_yyyzz_0_yyyyyyy_1,   \
-                             g_0_yyyzzz_0_xxxxxxy_0,  \
-                             g_0_yyyzzz_0_xxxxxxy_1,  \
-                             g_0_yyyzzz_0_xxxxxyy_0,  \
-                             g_0_yyyzzz_0_xxxxxyy_1,  \
-                             g_0_yyyzzz_0_xxxxyyy_0,  \
-                             g_0_yyyzzz_0_xxxxyyy_1,  \
-                             g_0_yyyzzz_0_xxxyyyy_0,  \
-                             g_0_yyyzzz_0_xxxyyyy_1,  \
-                             g_0_yyyzzz_0_xxyyyyy_0,  \
-                             g_0_yyyzzz_0_xxyyyyy_1,  \
-                             g_0_yyyzzz_0_xyyyyyy_0,  \
-                             g_0_yyyzzz_0_xyyyyyy_1,  \
-                             g_0_yyyzzz_0_yyyyyyy_0,  \
-                             g_0_yyyzzz_0_yyyyyyy_1,  \
-                             g_0_yyyzzzz_0_xxxxxxx_0, \
-                             g_0_yyyzzzz_0_xxxxxxy_0, \
-                             g_0_yyyzzzz_0_xxxxxxz_0, \
-                             g_0_yyyzzzz_0_xxxxxyy_0, \
-                             g_0_yyyzzzz_0_xxxxxyz_0, \
-                             g_0_yyyzzzz_0_xxxxxzz_0, \
-                             g_0_yyyzzzz_0_xxxxyyy_0, \
-                             g_0_yyyzzzz_0_xxxxyyz_0, \
-                             g_0_yyyzzzz_0_xxxxyzz_0, \
-                             g_0_yyyzzzz_0_xxxxzzz_0, \
-                             g_0_yyyzzzz_0_xxxyyyy_0, \
-                             g_0_yyyzzzz_0_xxxyyyz_0, \
-                             g_0_yyyzzzz_0_xxxyyzz_0, \
-                             g_0_yyyzzzz_0_xxxyzzz_0, \
-                             g_0_yyyzzzz_0_xxxzzzz_0, \
-                             g_0_yyyzzzz_0_xxyyyyy_0, \
-                             g_0_yyyzzzz_0_xxyyyyz_0, \
-                             g_0_yyyzzzz_0_xxyyyzz_0, \
-                             g_0_yyyzzzz_0_xxyyzzz_0, \
-                             g_0_yyyzzzz_0_xxyzzzz_0, \
-                             g_0_yyyzzzz_0_xxzzzzz_0, \
-                             g_0_yyyzzzz_0_xyyyyyy_0, \
-                             g_0_yyyzzzz_0_xyyyyyz_0, \
-                             g_0_yyyzzzz_0_xyyyyzz_0, \
-                             g_0_yyyzzzz_0_xyyyzzz_0, \
-                             g_0_yyyzzzz_0_xyyzzzz_0, \
-                             g_0_yyyzzzz_0_xyzzzzz_0, \
-                             g_0_yyyzzzz_0_xzzzzzz_0, \
-                             g_0_yyyzzzz_0_yyyyyyy_0, \
-                             g_0_yyyzzzz_0_yyyyyyz_0, \
-                             g_0_yyyzzzz_0_yyyyyzz_0, \
-                             g_0_yyyzzzz_0_yyyyzzz_0, \
-                             g_0_yyyzzzz_0_yyyzzzz_0, \
-                             g_0_yyyzzzz_0_yyzzzzz_0, \
-                             g_0_yyyzzzz_0_yzzzzzz_0, \
-                             g_0_yyyzzzz_0_zzzzzzz_0, \
-                             g_0_yyzzzz_0_xxxxxxx_0,  \
-                             g_0_yyzzzz_0_xxxxxxx_1,  \
-                             g_0_yyzzzz_0_xxxxxxz_0,  \
-                             g_0_yyzzzz_0_xxxxxxz_1,  \
-                             g_0_yyzzzz_0_xxxxxyz_0,  \
-                             g_0_yyzzzz_0_xxxxxyz_1,  \
-                             g_0_yyzzzz_0_xxxxxz_1,   \
-                             g_0_yyzzzz_0_xxxxxzz_0,  \
-                             g_0_yyzzzz_0_xxxxxzz_1,  \
-                             g_0_yyzzzz_0_xxxxyyz_0,  \
-                             g_0_yyzzzz_0_xxxxyyz_1,  \
-                             g_0_yyzzzz_0_xxxxyz_1,   \
-                             g_0_yyzzzz_0_xxxxyzz_0,  \
-                             g_0_yyzzzz_0_xxxxyzz_1,  \
-                             g_0_yyzzzz_0_xxxxzz_1,   \
-                             g_0_yyzzzz_0_xxxxzzz_0,  \
-                             g_0_yyzzzz_0_xxxxzzz_1,  \
-                             g_0_yyzzzz_0_xxxyyyz_0,  \
-                             g_0_yyzzzz_0_xxxyyyz_1,  \
-                             g_0_yyzzzz_0_xxxyyz_1,   \
-                             g_0_yyzzzz_0_xxxyyzz_0,  \
-                             g_0_yyzzzz_0_xxxyyzz_1,  \
-                             g_0_yyzzzz_0_xxxyzz_1,   \
-                             g_0_yyzzzz_0_xxxyzzz_0,  \
-                             g_0_yyzzzz_0_xxxyzzz_1,  \
-                             g_0_yyzzzz_0_xxxzzz_1,   \
-                             g_0_yyzzzz_0_xxxzzzz_0,  \
-                             g_0_yyzzzz_0_xxxzzzz_1,  \
-                             g_0_yyzzzz_0_xxyyyyz_0,  \
-                             g_0_yyzzzz_0_xxyyyyz_1,  \
-                             g_0_yyzzzz_0_xxyyyz_1,   \
-                             g_0_yyzzzz_0_xxyyyzz_0,  \
-                             g_0_yyzzzz_0_xxyyyzz_1,  \
-                             g_0_yyzzzz_0_xxyyzz_1,   \
-                             g_0_yyzzzz_0_xxyyzzz_0,  \
-                             g_0_yyzzzz_0_xxyyzzz_1,  \
-                             g_0_yyzzzz_0_xxyzzz_1,   \
-                             g_0_yyzzzz_0_xxyzzzz_0,  \
-                             g_0_yyzzzz_0_xxyzzzz_1,  \
-                             g_0_yyzzzz_0_xxzzzz_1,   \
-                             g_0_yyzzzz_0_xxzzzzz_0,  \
-                             g_0_yyzzzz_0_xxzzzzz_1,  \
-                             g_0_yyzzzz_0_xyyyyyz_0,  \
-                             g_0_yyzzzz_0_xyyyyyz_1,  \
-                             g_0_yyzzzz_0_xyyyyz_1,   \
-                             g_0_yyzzzz_0_xyyyyzz_0,  \
-                             g_0_yyzzzz_0_xyyyyzz_1,  \
-                             g_0_yyzzzz_0_xyyyzz_1,   \
-                             g_0_yyzzzz_0_xyyyzzz_0,  \
-                             g_0_yyzzzz_0_xyyyzzz_1,  \
-                             g_0_yyzzzz_0_xyyzzz_1,   \
-                             g_0_yyzzzz_0_xyyzzzz_0,  \
-                             g_0_yyzzzz_0_xyyzzzz_1,  \
-                             g_0_yyzzzz_0_xyzzzz_1,   \
-                             g_0_yyzzzz_0_xyzzzzz_0,  \
-                             g_0_yyzzzz_0_xyzzzzz_1,  \
-                             g_0_yyzzzz_0_xzzzzz_1,   \
-                             g_0_yyzzzz_0_xzzzzzz_0,  \
-                             g_0_yyzzzz_0_xzzzzzz_1,  \
-                             g_0_yyzzzz_0_yyyyyyz_0,  \
-                             g_0_yyzzzz_0_yyyyyyz_1,  \
-                             g_0_yyzzzz_0_yyyyyz_1,   \
-                             g_0_yyzzzz_0_yyyyyzz_0,  \
-                             g_0_yyzzzz_0_yyyyyzz_1,  \
-                             g_0_yyzzzz_0_yyyyzz_1,   \
-                             g_0_yyzzzz_0_yyyyzzz_0,  \
-                             g_0_yyzzzz_0_yyyyzzz_1,  \
-                             g_0_yyzzzz_0_yyyzzz_1,   \
-                             g_0_yyzzzz_0_yyyzzzz_0,  \
-                             g_0_yyzzzz_0_yyyzzzz_1,  \
-                             g_0_yyzzzz_0_yyzzzz_1,   \
-                             g_0_yyzzzz_0_yyzzzzz_0,  \
-                             g_0_yyzzzz_0_yyzzzzz_1,  \
-                             g_0_yyzzzz_0_yzzzzz_1,   \
-                             g_0_yyzzzz_0_yzzzzzz_0,  \
-                             g_0_yyzzzz_0_yzzzzzz_1,  \
-                             g_0_yyzzzz_0_zzzzzz_1,   \
-                             g_0_yyzzzz_0_zzzzzzz_0,  \
-                             g_0_yyzzzz_0_zzzzzzz_1,  \
-                             g_0_yzzzz_0_xxxxxxx_0,   \
-                             g_0_yzzzz_0_xxxxxxx_1,   \
-                             g_0_yzzzz_0_xxxxxxz_0,   \
-                             g_0_yzzzz_0_xxxxxxz_1,   \
-                             g_0_yzzzz_0_xxxxxyz_0,   \
-                             g_0_yzzzz_0_xxxxxyz_1,   \
-                             g_0_yzzzz_0_xxxxxzz_0,   \
-                             g_0_yzzzz_0_xxxxxzz_1,   \
-                             g_0_yzzzz_0_xxxxyyz_0,   \
-                             g_0_yzzzz_0_xxxxyyz_1,   \
-                             g_0_yzzzz_0_xxxxyzz_0,   \
-                             g_0_yzzzz_0_xxxxyzz_1,   \
-                             g_0_yzzzz_0_xxxxzzz_0,   \
-                             g_0_yzzzz_0_xxxxzzz_1,   \
-                             g_0_yzzzz_0_xxxyyyz_0,   \
-                             g_0_yzzzz_0_xxxyyyz_1,   \
-                             g_0_yzzzz_0_xxxyyzz_0,   \
-                             g_0_yzzzz_0_xxxyyzz_1,   \
-                             g_0_yzzzz_0_xxxyzzz_0,   \
-                             g_0_yzzzz_0_xxxyzzz_1,   \
-                             g_0_yzzzz_0_xxxzzzz_0,   \
-                             g_0_yzzzz_0_xxxzzzz_1,   \
-                             g_0_yzzzz_0_xxyyyyz_0,   \
-                             g_0_yzzzz_0_xxyyyyz_1,   \
-                             g_0_yzzzz_0_xxyyyzz_0,   \
-                             g_0_yzzzz_0_xxyyyzz_1,   \
-                             g_0_yzzzz_0_xxyyzzz_0,   \
-                             g_0_yzzzz_0_xxyyzzz_1,   \
-                             g_0_yzzzz_0_xxyzzzz_0,   \
-                             g_0_yzzzz_0_xxyzzzz_1,   \
-                             g_0_yzzzz_0_xxzzzzz_0,   \
-                             g_0_yzzzz_0_xxzzzzz_1,   \
-                             g_0_yzzzz_0_xyyyyyz_0,   \
-                             g_0_yzzzz_0_xyyyyyz_1,   \
-                             g_0_yzzzz_0_xyyyyzz_0,   \
-                             g_0_yzzzz_0_xyyyyzz_1,   \
-                             g_0_yzzzz_0_xyyyzzz_0,   \
-                             g_0_yzzzz_0_xyyyzzz_1,   \
-                             g_0_yzzzz_0_xyyzzzz_0,   \
-                             g_0_yzzzz_0_xyyzzzz_1,   \
-                             g_0_yzzzz_0_xyzzzzz_0,   \
-                             g_0_yzzzz_0_xyzzzzz_1,   \
-                             g_0_yzzzz_0_xzzzzzz_0,   \
-                             g_0_yzzzz_0_xzzzzzz_1,   \
-                             g_0_yzzzz_0_yyyyyyz_0,   \
-                             g_0_yzzzz_0_yyyyyyz_1,   \
-                             g_0_yzzzz_0_yyyyyzz_0,   \
-                             g_0_yzzzz_0_yyyyyzz_1,   \
-                             g_0_yzzzz_0_yyyyzzz_0,   \
-                             g_0_yzzzz_0_yyyyzzz_1,   \
-                             g_0_yzzzz_0_yyyzzzz_0,   \
-                             g_0_yzzzz_0_yyyzzzz_1,   \
-                             g_0_yzzzz_0_yyzzzzz_0,   \
-                             g_0_yzzzz_0_yyzzzzz_1,   \
-                             g_0_yzzzz_0_yzzzzzz_0,   \
-                             g_0_yzzzz_0_yzzzzzz_1,   \
-                             g_0_yzzzz_0_zzzzzzz_0,   \
-                             g_0_yzzzz_0_zzzzzzz_1,   \
-                             wp_y,                    \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_yyyzz_0_xxxxxxy_0, g_0_yyyzz_0_xxxxxxy_1, g_0_yyyzz_0_xxxxxyy_0, g_0_yyyzz_0_xxxxxyy_1, g_0_yyyzz_0_xxxxyyy_0, g_0_yyyzz_0_xxxxyyy_1, g_0_yyyzz_0_xxxyyyy_0, g_0_yyyzz_0_xxxyyyy_1, g_0_yyyzz_0_xxyyyyy_0, g_0_yyyzz_0_xxyyyyy_1, g_0_yyyzz_0_xyyyyyy_0, g_0_yyyzz_0_xyyyyyy_1, g_0_yyyzz_0_yyyyyyy_0, g_0_yyyzz_0_yyyyyyy_1, g_0_yyyzzz_0_xxxxxxy_0, g_0_yyyzzz_0_xxxxxxy_1, g_0_yyyzzz_0_xxxxxyy_0, g_0_yyyzzz_0_xxxxxyy_1, g_0_yyyzzz_0_xxxxyyy_0, g_0_yyyzzz_0_xxxxyyy_1, g_0_yyyzzz_0_xxxyyyy_0, g_0_yyyzzz_0_xxxyyyy_1, g_0_yyyzzz_0_xxyyyyy_0, g_0_yyyzzz_0_xxyyyyy_1, g_0_yyyzzz_0_xyyyyyy_0, g_0_yyyzzz_0_xyyyyyy_1, g_0_yyyzzz_0_yyyyyyy_0, g_0_yyyzzz_0_yyyyyyy_1, g_0_yyyzzzz_0_xxxxxxx_0, g_0_yyyzzzz_0_xxxxxxy_0, g_0_yyyzzzz_0_xxxxxxz_0, g_0_yyyzzzz_0_xxxxxyy_0, g_0_yyyzzzz_0_xxxxxyz_0, g_0_yyyzzzz_0_xxxxxzz_0, g_0_yyyzzzz_0_xxxxyyy_0, g_0_yyyzzzz_0_xxxxyyz_0, g_0_yyyzzzz_0_xxxxyzz_0, g_0_yyyzzzz_0_xxxxzzz_0, g_0_yyyzzzz_0_xxxyyyy_0, g_0_yyyzzzz_0_xxxyyyz_0, g_0_yyyzzzz_0_xxxyyzz_0, g_0_yyyzzzz_0_xxxyzzz_0, g_0_yyyzzzz_0_xxxzzzz_0, g_0_yyyzzzz_0_xxyyyyy_0, g_0_yyyzzzz_0_xxyyyyz_0, g_0_yyyzzzz_0_xxyyyzz_0, g_0_yyyzzzz_0_xxyyzzz_0, g_0_yyyzzzz_0_xxyzzzz_0, g_0_yyyzzzz_0_xxzzzzz_0, g_0_yyyzzzz_0_xyyyyyy_0, g_0_yyyzzzz_0_xyyyyyz_0, g_0_yyyzzzz_0_xyyyyzz_0, g_0_yyyzzzz_0_xyyyzzz_0, g_0_yyyzzzz_0_xyyzzzz_0, g_0_yyyzzzz_0_xyzzzzz_0, g_0_yyyzzzz_0_xzzzzzz_0, g_0_yyyzzzz_0_yyyyyyy_0, g_0_yyyzzzz_0_yyyyyyz_0, g_0_yyyzzzz_0_yyyyyzz_0, g_0_yyyzzzz_0_yyyyzzz_0, g_0_yyyzzzz_0_yyyzzzz_0, g_0_yyyzzzz_0_yyzzzzz_0, g_0_yyyzzzz_0_yzzzzzz_0, g_0_yyyzzzz_0_zzzzzzz_0, g_0_yyzzzz_0_xxxxxxx_0, g_0_yyzzzz_0_xxxxxxx_1, g_0_yyzzzz_0_xxxxxxz_0, g_0_yyzzzz_0_xxxxxxz_1, g_0_yyzzzz_0_xxxxxyz_0, g_0_yyzzzz_0_xxxxxyz_1, g_0_yyzzzz_0_xxxxxz_1, g_0_yyzzzz_0_xxxxxzz_0, g_0_yyzzzz_0_xxxxxzz_1, g_0_yyzzzz_0_xxxxyyz_0, g_0_yyzzzz_0_xxxxyyz_1, g_0_yyzzzz_0_xxxxyz_1, g_0_yyzzzz_0_xxxxyzz_0, g_0_yyzzzz_0_xxxxyzz_1, g_0_yyzzzz_0_xxxxzz_1, g_0_yyzzzz_0_xxxxzzz_0, g_0_yyzzzz_0_xxxxzzz_1, g_0_yyzzzz_0_xxxyyyz_0, g_0_yyzzzz_0_xxxyyyz_1, g_0_yyzzzz_0_xxxyyz_1, g_0_yyzzzz_0_xxxyyzz_0, g_0_yyzzzz_0_xxxyyzz_1, g_0_yyzzzz_0_xxxyzz_1, g_0_yyzzzz_0_xxxyzzz_0, g_0_yyzzzz_0_xxxyzzz_1, g_0_yyzzzz_0_xxxzzz_1, g_0_yyzzzz_0_xxxzzzz_0, g_0_yyzzzz_0_xxxzzzz_1, g_0_yyzzzz_0_xxyyyyz_0, g_0_yyzzzz_0_xxyyyyz_1, g_0_yyzzzz_0_xxyyyz_1, g_0_yyzzzz_0_xxyyyzz_0, g_0_yyzzzz_0_xxyyyzz_1, g_0_yyzzzz_0_xxyyzz_1, g_0_yyzzzz_0_xxyyzzz_0, g_0_yyzzzz_0_xxyyzzz_1, g_0_yyzzzz_0_xxyzzz_1, g_0_yyzzzz_0_xxyzzzz_0, g_0_yyzzzz_0_xxyzzzz_1, g_0_yyzzzz_0_xxzzzz_1, g_0_yyzzzz_0_xxzzzzz_0, g_0_yyzzzz_0_xxzzzzz_1, g_0_yyzzzz_0_xyyyyyz_0, g_0_yyzzzz_0_xyyyyyz_1, g_0_yyzzzz_0_xyyyyz_1, g_0_yyzzzz_0_xyyyyzz_0, g_0_yyzzzz_0_xyyyyzz_1, g_0_yyzzzz_0_xyyyzz_1, g_0_yyzzzz_0_xyyyzzz_0, g_0_yyzzzz_0_xyyyzzz_1, g_0_yyzzzz_0_xyyzzz_1, g_0_yyzzzz_0_xyyzzzz_0, g_0_yyzzzz_0_xyyzzzz_1, g_0_yyzzzz_0_xyzzzz_1, g_0_yyzzzz_0_xyzzzzz_0, g_0_yyzzzz_0_xyzzzzz_1, g_0_yyzzzz_0_xzzzzz_1, g_0_yyzzzz_0_xzzzzzz_0, g_0_yyzzzz_0_xzzzzzz_1, g_0_yyzzzz_0_yyyyyyz_0, g_0_yyzzzz_0_yyyyyyz_1, g_0_yyzzzz_0_yyyyyz_1, g_0_yyzzzz_0_yyyyyzz_0, g_0_yyzzzz_0_yyyyyzz_1, g_0_yyzzzz_0_yyyyzz_1, g_0_yyzzzz_0_yyyyzzz_0, g_0_yyzzzz_0_yyyyzzz_1, g_0_yyzzzz_0_yyyzzz_1, g_0_yyzzzz_0_yyyzzzz_0, g_0_yyzzzz_0_yyyzzzz_1, g_0_yyzzzz_0_yyzzzz_1, g_0_yyzzzz_0_yyzzzzz_0, g_0_yyzzzz_0_yyzzzzz_1, g_0_yyzzzz_0_yzzzzz_1, g_0_yyzzzz_0_yzzzzzz_0, g_0_yyzzzz_0_yzzzzzz_1, g_0_yyzzzz_0_zzzzzz_1, g_0_yyzzzz_0_zzzzzzz_0, g_0_yyzzzz_0_zzzzzzz_1, g_0_yzzzz_0_xxxxxxx_0, g_0_yzzzz_0_xxxxxxx_1, g_0_yzzzz_0_xxxxxxz_0, g_0_yzzzz_0_xxxxxxz_1, g_0_yzzzz_0_xxxxxyz_0, g_0_yzzzz_0_xxxxxyz_1, g_0_yzzzz_0_xxxxxzz_0, g_0_yzzzz_0_xxxxxzz_1, g_0_yzzzz_0_xxxxyyz_0, g_0_yzzzz_0_xxxxyyz_1, g_0_yzzzz_0_xxxxyzz_0, g_0_yzzzz_0_xxxxyzz_1, g_0_yzzzz_0_xxxxzzz_0, g_0_yzzzz_0_xxxxzzz_1, g_0_yzzzz_0_xxxyyyz_0, g_0_yzzzz_0_xxxyyyz_1, g_0_yzzzz_0_xxxyyzz_0, g_0_yzzzz_0_xxxyyzz_1, g_0_yzzzz_0_xxxyzzz_0, g_0_yzzzz_0_xxxyzzz_1, g_0_yzzzz_0_xxxzzzz_0, g_0_yzzzz_0_xxxzzzz_1, g_0_yzzzz_0_xxyyyyz_0, g_0_yzzzz_0_xxyyyyz_1, g_0_yzzzz_0_xxyyyzz_0, g_0_yzzzz_0_xxyyyzz_1, g_0_yzzzz_0_xxyyzzz_0, g_0_yzzzz_0_xxyyzzz_1, g_0_yzzzz_0_xxyzzzz_0, g_0_yzzzz_0_xxyzzzz_1, g_0_yzzzz_0_xxzzzzz_0, g_0_yzzzz_0_xxzzzzz_1, g_0_yzzzz_0_xyyyyyz_0, g_0_yzzzz_0_xyyyyyz_1, g_0_yzzzz_0_xyyyyzz_0, g_0_yzzzz_0_xyyyyzz_1, g_0_yzzzz_0_xyyyzzz_0, g_0_yzzzz_0_xyyyzzz_1, g_0_yzzzz_0_xyyzzzz_0, g_0_yzzzz_0_xyyzzzz_1, g_0_yzzzz_0_xyzzzzz_0, g_0_yzzzz_0_xyzzzzz_1, g_0_yzzzz_0_xzzzzzz_0, g_0_yzzzz_0_xzzzzzz_1, g_0_yzzzz_0_yyyyyyz_0, g_0_yzzzz_0_yyyyyyz_1, g_0_yzzzz_0_yyyyyzz_0, g_0_yzzzz_0_yyyyyzz_1, g_0_yzzzz_0_yyyyzzz_0, g_0_yzzzz_0_yyyyzzz_1, g_0_yzzzz_0_yyyzzzz_0, g_0_yzzzz_0_yyyzzzz_1, g_0_yzzzz_0_yyzzzzz_0, g_0_yzzzz_0_yyzzzzz_1, g_0_yzzzz_0_yzzzzzz_0, g_0_yzzzz_0_yzzzzzz_1, g_0_yzzzz_0_zzzzzzz_0, g_0_yzzzz_0_zzzzzzz_1, wp_y, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -17485,128 +10795,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_yyyzzzz_0_xxxxxxx_0[i] = 2.0 * g_0_yzzzz_0_xxxxxxx_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxxxxx_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xxxxxxx_0[i] * pb_y + g_0_yyzzzz_0_xxxxxxx_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xxxxxxx_0[i] = 2.0 * g_0_yzzzz_0_xxxxxxx_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxxxxx_1[i] * fti_ab_0 + g_0_yyzzzz_0_xxxxxxx_0[i] * pb_y + g_0_yyzzzz_0_xxxxxxx_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xxxxxxy_0[i] = 3.0 * g_0_yyyzz_0_xxxxxxy_0[i] * fi_ab_0 - 3.0 * g_0_yyyzz_0_xxxxxxy_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xxxxxxy_0[i] * pb_z + g_0_yyyzzz_0_xxxxxxy_1[i] * wp_z[i];
+        g_0_yyyzzzz_0_xxxxxxy_0[i] = 3.0 * g_0_yyyzz_0_xxxxxxy_0[i] * fi_ab_0 - 3.0 * g_0_yyyzz_0_xxxxxxy_1[i] * fti_ab_0 + g_0_yyyzzz_0_xxxxxxy_0[i] * pb_z + g_0_yyyzzz_0_xxxxxxy_1[i] * wp_z[i];
 
-        g_0_yyyzzzz_0_xxxxxxz_0[i] = 2.0 * g_0_yzzzz_0_xxxxxxz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxxxxz_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xxxxxxz_0[i] * pb_y + g_0_yyzzzz_0_xxxxxxz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xxxxxxz_0[i] = 2.0 * g_0_yzzzz_0_xxxxxxz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxxxxz_1[i] * fti_ab_0 + g_0_yyzzzz_0_xxxxxxz_0[i] * pb_y + g_0_yyzzzz_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xxxxxyy_0[i] = 3.0 * g_0_yyyzz_0_xxxxxyy_0[i] * fi_ab_0 - 3.0 * g_0_yyyzz_0_xxxxxyy_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xxxxxyy_0[i] * pb_z + g_0_yyyzzz_0_xxxxxyy_1[i] * wp_z[i];
+        g_0_yyyzzzz_0_xxxxxyy_0[i] = 3.0 * g_0_yyyzz_0_xxxxxyy_0[i] * fi_ab_0 - 3.0 * g_0_yyyzz_0_xxxxxyy_1[i] * fti_ab_0 + g_0_yyyzzz_0_xxxxxyy_0[i] * pb_z + g_0_yyyzzz_0_xxxxxyy_1[i] * wp_z[i];
 
-        g_0_yyyzzzz_0_xxxxxyz_0[i] = 2.0 * g_0_yzzzz_0_xxxxxyz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxxyz_0[i] * pb_y + g_0_yyzzzz_0_xxxxxyz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xxxxxyz_0[i] = 2.0 * g_0_yzzzz_0_xxxxxyz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxxxyz_1[i] * fti_ab_0 + g_0_yyzzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxxyz_0[i] * pb_y + g_0_yyzzzz_0_xxxxxyz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xxxxxzz_0[i] = 2.0 * g_0_yzzzz_0_xxxxxzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxxxzz_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xxxxxzz_0[i] * pb_y + g_0_yyzzzz_0_xxxxxzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xxxxxzz_0[i] = 2.0 * g_0_yzzzz_0_xxxxxzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxxxzz_1[i] * fti_ab_0 + g_0_yyzzzz_0_xxxxxzz_0[i] * pb_y + g_0_yyzzzz_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xxxxyyy_0[i] = 3.0 * g_0_yyyzz_0_xxxxyyy_0[i] * fi_ab_0 - 3.0 * g_0_yyyzz_0_xxxxyyy_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xxxxyyy_0[i] * pb_z + g_0_yyyzzz_0_xxxxyyy_1[i] * wp_z[i];
+        g_0_yyyzzzz_0_xxxxyyy_0[i] = 3.0 * g_0_yyyzz_0_xxxxyyy_0[i] * fi_ab_0 - 3.0 * g_0_yyyzz_0_xxxxyyy_1[i] * fti_ab_0 + g_0_yyyzzz_0_xxxxyyy_0[i] * pb_z + g_0_yyyzzz_0_xxxxyyy_1[i] * wp_z[i];
 
-        g_0_yyyzzzz_0_xxxxyyz_0[i] = 2.0 * g_0_yzzzz_0_xxxxyyz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxyyz_0[i] * pb_y +
-                                     g_0_yyzzzz_0_xxxxyyz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xxxxyyz_0[i] = 2.0 * g_0_yzzzz_0_xxxxyyz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxxyyz_1[i] * fti_ab_0 + 2.0 * g_0_yyzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxyyz_0[i] * pb_y + g_0_yyzzzz_0_xxxxyyz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xxxxyzz_0[i] = 2.0 * g_0_yzzzz_0_xxxxyzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxyzz_0[i] * pb_y + g_0_yyzzzz_0_xxxxyzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xxxxyzz_0[i] = 2.0 * g_0_yzzzz_0_xxxxyzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxxyzz_1[i] * fti_ab_0 + g_0_yyzzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxxyzz_0[i] * pb_y + g_0_yyzzzz_0_xxxxyzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xxxxzzz_0[i] = 2.0 * g_0_yzzzz_0_xxxxzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxxzzz_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xxxxzzz_0[i] * pb_y + g_0_yyzzzz_0_xxxxzzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xxxxzzz_0[i] = 2.0 * g_0_yzzzz_0_xxxxzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxxzzz_1[i] * fti_ab_0 + g_0_yyzzzz_0_xxxxzzz_0[i] * pb_y + g_0_yyzzzz_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xxxyyyy_0[i] = 3.0 * g_0_yyyzz_0_xxxyyyy_0[i] * fi_ab_0 - 3.0 * g_0_yyyzz_0_xxxyyyy_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xxxyyyy_0[i] * pb_z + g_0_yyyzzz_0_xxxyyyy_1[i] * wp_z[i];
+        g_0_yyyzzzz_0_xxxyyyy_0[i] = 3.0 * g_0_yyyzz_0_xxxyyyy_0[i] * fi_ab_0 - 3.0 * g_0_yyyzz_0_xxxyyyy_1[i] * fti_ab_0 + g_0_yyyzzz_0_xxxyyyy_0[i] * pb_z + g_0_yyyzzz_0_xxxyyyy_1[i] * wp_z[i];
 
-        g_0_yyyzzzz_0_xxxyyyz_0[i] = 2.0 * g_0_yzzzz_0_xxxyyyz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxyyyz_0[i] * pb_y +
-                                     g_0_yyzzzz_0_xxxyyyz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xxxyyyz_0[i] = 2.0 * g_0_yzzzz_0_xxxyyyz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_yyzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxyyyz_0[i] * pb_y + g_0_yyzzzz_0_xxxyyyz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xxxyyzz_0[i] = 2.0 * g_0_yzzzz_0_xxxyyzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxyyzz_0[i] * pb_y +
-                                     g_0_yyzzzz_0_xxxyyzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xxxyyzz_0[i] = 2.0 * g_0_yzzzz_0_xxxyyzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxyyzz_1[i] * fti_ab_0 + 2.0 * g_0_yyzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxyyzz_0[i] * pb_y + g_0_yyzzzz_0_xxxyyzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xxxyzzz_0[i] = 2.0 * g_0_yzzzz_0_xxxyzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxyzzz_0[i] * pb_y + g_0_yyzzzz_0_xxxyzzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xxxyzzz_0[i] = 2.0 * g_0_yzzzz_0_xxxyzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxyzzz_1[i] * fti_ab_0 + g_0_yyzzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxxyzzz_0[i] * pb_y + g_0_yyzzzz_0_xxxyzzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xxxzzzz_0[i] = 2.0 * g_0_yzzzz_0_xxxzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xxxzzzz_0[i] * pb_y + g_0_yyzzzz_0_xxxzzzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xxxzzzz_0[i] = 2.0 * g_0_yzzzz_0_xxxzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxxzzzz_1[i] * fti_ab_0 + g_0_yyzzzz_0_xxxzzzz_0[i] * pb_y + g_0_yyzzzz_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xxyyyyy_0[i] = 3.0 * g_0_yyyzz_0_xxyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_yyyzz_0_xxyyyyy_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xxyyyyy_0[i] * pb_z + g_0_yyyzzz_0_xxyyyyy_1[i] * wp_z[i];
+        g_0_yyyzzzz_0_xxyyyyy_0[i] = 3.0 * g_0_yyyzz_0_xxyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_yyyzz_0_xxyyyyy_1[i] * fti_ab_0 + g_0_yyyzzz_0_xxyyyyy_0[i] * pb_z + g_0_yyyzzz_0_xxyyyyy_1[i] * wp_z[i];
 
-        g_0_yyyzzzz_0_xxyyyyz_0[i] = 2.0 * g_0_yzzzz_0_xxyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_yyzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyyyyz_0[i] * pb_y +
-                                     g_0_yyzzzz_0_xxyyyyz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xxyyyyz_0[i] = 2.0 * g_0_yzzzz_0_xxyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxyyyyz_1[i] * fti_ab_0 + 4.0 * g_0_yyzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyyyyz_0[i] * pb_y + g_0_yyzzzz_0_xxyyyyz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xxyyyzz_0[i] = 2.0 * g_0_yzzzz_0_xxyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyyyzz_0[i] * pb_y +
-                                     g_0_yyzzzz_0_xxyyyzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xxyyyzz_0[i] = 2.0 * g_0_yzzzz_0_xxyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxyyyzz_1[i] * fti_ab_0 + 3.0 * g_0_yyzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyyyzz_0[i] * pb_y + g_0_yyzzzz_0_xxyyyzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xxyyzzz_0[i] = 2.0 * g_0_yzzzz_0_xxyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyyzzz_0[i] * pb_y +
-                                     g_0_yyzzzz_0_xxyyzzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xxyyzzz_0[i] = 2.0 * g_0_yzzzz_0_xxyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_yyzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyyzzz_0[i] * pb_y + g_0_yyzzzz_0_xxyyzzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xxyzzzz_0[i] = 2.0 * g_0_yzzzz_0_xxyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyzzzz_0[i] * pb_y + g_0_yyzzzz_0_xxyzzzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xxyzzzz_0[i] = 2.0 * g_0_yzzzz_0_xxyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxyzzzz_1[i] * fti_ab_0 + g_0_yyzzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xxyzzzz_0[i] * pb_y + g_0_yyzzzz_0_xxyzzzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xxzzzzz_0[i] = 2.0 * g_0_yzzzz_0_xxzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xxzzzzz_0[i] * pb_y + g_0_yyzzzz_0_xxzzzzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xxzzzzz_0[i] = 2.0 * g_0_yzzzz_0_xxzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xxzzzzz_1[i] * fti_ab_0 + g_0_yyzzzz_0_xxzzzzz_0[i] * pb_y + g_0_yyzzzz_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xyyyyyy_0[i] = 3.0 * g_0_yyyzz_0_xyyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_yyyzz_0_xyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_xyyyyyy_0[i] * pb_z + g_0_yyyzzz_0_xyyyyyy_1[i] * wp_z[i];
+        g_0_yyyzzzz_0_xyyyyyy_0[i] = 3.0 * g_0_yyyzz_0_xyyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_yyyzz_0_xyyyyyy_1[i] * fti_ab_0 + g_0_yyyzzz_0_xyyyyyy_0[i] * pb_z + g_0_yyyzzz_0_xyyyyyy_1[i] * wp_z[i];
 
-        g_0_yyyzzzz_0_xyyyyyz_0[i] = 2.0 * g_0_yzzzz_0_xyyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xyyyyyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_yyzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xyyyyyz_0[i] * pb_y +
-                                     g_0_yyzzzz_0_xyyyyyz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xyyyyyz_0[i] = 2.0 * g_0_yzzzz_0_xyyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xyyyyyz_1[i] * fti_ab_0 + 5.0 * g_0_yyzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xyyyyyz_0[i] * pb_y + g_0_yyzzzz_0_xyyyyyz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xyyyyzz_0[i] = 2.0 * g_0_yzzzz_0_xyyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xyyyyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_yyzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xyyyyzz_0[i] * pb_y +
-                                     g_0_yyzzzz_0_xyyyyzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xyyyyzz_0[i] = 2.0 * g_0_yzzzz_0_xyyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xyyyyzz_1[i] * fti_ab_0 + 4.0 * g_0_yyzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xyyyyzz_0[i] * pb_y + g_0_yyzzzz_0_xyyyyzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xyyyzzz_0[i] = 2.0 * g_0_yzzzz_0_xyyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xyyyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xyyyzzz_0[i] * pb_y +
-                                     g_0_yyzzzz_0_xyyyzzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xyyyzzz_0[i] = 2.0 * g_0_yzzzz_0_xyyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xyyyzzz_1[i] * fti_ab_0 + 3.0 * g_0_yyzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xyyyzzz_0[i] * pb_y + g_0_yyzzzz_0_xyyyzzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xyyzzzz_0[i] = 2.0 * g_0_yzzzz_0_xyyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xyyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xyyzzzz_0[i] * pb_y +
-                                     g_0_yyzzzz_0_xyyzzzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xyyzzzz_0[i] = 2.0 * g_0_yzzzz_0_xyyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xyyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_yyzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xyyzzzz_0[i] * pb_y + g_0_yyzzzz_0_xyyzzzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xyzzzzz_0[i] = 2.0 * g_0_yzzzz_0_xyzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xyzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xyzzzzz_0[i] * pb_y + g_0_yyzzzz_0_xyzzzzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xyzzzzz_0[i] = 2.0 * g_0_yzzzz_0_xyzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xyzzzzz_1[i] * fti_ab_0 + g_0_yyzzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_xyzzzzz_0[i] * pb_y + g_0_yyzzzz_0_xyzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_xzzzzzz_0[i] = 2.0 * g_0_yzzzz_0_xzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xzzzzzz_0[i] * pb_y + g_0_yyzzzz_0_xzzzzzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_xzzzzzz_0[i] = 2.0 * g_0_yzzzz_0_xzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_xzzzzzz_1[i] * fti_ab_0 + g_0_yyzzzz_0_xzzzzzz_0[i] * pb_y + g_0_yyzzzz_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_yyyyyyy_0[i] = 3.0 * g_0_yyyzz_0_yyyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_yyyzz_0_yyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_yyyzzz_0_yyyyyyy_0[i] * pb_z + g_0_yyyzzz_0_yyyyyyy_1[i] * wp_z[i];
+        g_0_yyyzzzz_0_yyyyyyy_0[i] = 3.0 * g_0_yyyzz_0_yyyyyyy_0[i] * fi_ab_0 - 3.0 * g_0_yyyzz_0_yyyyyyy_1[i] * fti_ab_0 + g_0_yyyzzz_0_yyyyyyy_0[i] * pb_z + g_0_yyyzzz_0_yyyyyyy_1[i] * wp_z[i];
 
-        g_0_yyyzzzz_0_yyyyyyz_0[i] = 2.0 * g_0_yzzzz_0_yyyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_yyyyyyz_1[i] * fti_ab_0 +
-                                     6.0 * g_0_yyzzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_yyyyyyz_0[i] * pb_y +
-                                     g_0_yyzzzz_0_yyyyyyz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_yyyyyyz_0[i] = 2.0 * g_0_yzzzz_0_yyyyyyz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_yyyyyyz_1[i] * fti_ab_0 + 6.0 * g_0_yyzzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_yyyyyyz_0[i] * pb_y + g_0_yyzzzz_0_yyyyyyz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_yyyyyzz_0[i] = 2.0 * g_0_yzzzz_0_yyyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_yyyyyzz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_yyzzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_yyyyyzz_0[i] * pb_y +
-                                     g_0_yyzzzz_0_yyyyyzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_yyyyyzz_0[i] = 2.0 * g_0_yzzzz_0_yyyyyzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_yyyyyzz_1[i] * fti_ab_0 + 5.0 * g_0_yyzzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_yyyyyzz_0[i] * pb_y + g_0_yyzzzz_0_yyyyyzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_yyyyzzz_0[i] = 2.0 * g_0_yzzzz_0_yyyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_yyyyzzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_yyzzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_yyyyzzz_0[i] * pb_y +
-                                     g_0_yyzzzz_0_yyyyzzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_yyyyzzz_0[i] = 2.0 * g_0_yzzzz_0_yyyyzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_yyyyzzz_1[i] * fti_ab_0 + 4.0 * g_0_yyzzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_yyyyzzz_0[i] * pb_y + g_0_yyzzzz_0_yyyyzzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_yyyzzzz_0[i] = 2.0 * g_0_yzzzz_0_yyyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_yyyzzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yyzzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_yyyzzzz_0[i] * pb_y +
-                                     g_0_yyzzzz_0_yyyzzzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_yyyzzzz_0[i] = 2.0 * g_0_yzzzz_0_yyyzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_yyyzzzz_1[i] * fti_ab_0 + 3.0 * g_0_yyzzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_yyyzzzz_0[i] * pb_y + g_0_yyzzzz_0_yyyzzzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_yyzzzzz_0[i] = 2.0 * g_0_yzzzz_0_yyzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_yyzzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yyzzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_yyzzzzz_0[i] * pb_y +
-                                     g_0_yyzzzz_0_yyzzzzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_yyzzzzz_0[i] = 2.0 * g_0_yzzzz_0_yyzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_yyzzzzz_1[i] * fti_ab_0 + 2.0 * g_0_yyzzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_yyzzzzz_0[i] * pb_y + g_0_yyzzzz_0_yyzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_yzzzzzz_0[i] = 2.0 * g_0_yzzzz_0_yzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_yzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_yzzzzzz_0[i] * pb_y + g_0_yyzzzz_0_yzzzzzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_yzzzzzz_0[i] = 2.0 * g_0_yzzzz_0_yzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_yzzzzzz_1[i] * fti_ab_0 + g_0_yyzzzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_yyzzzz_0_yzzzzzz_0[i] * pb_y + g_0_yyzzzz_0_yzzzzzz_1[i] * wp_y[i];
 
-        g_0_yyyzzzz_0_zzzzzzz_0[i] = 2.0 * g_0_yzzzz_0_zzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_zzzzzzz_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_zzzzzzz_0[i] * pb_y + g_0_yyzzzz_0_zzzzzzz_1[i] * wp_y[i];
+        g_0_yyyzzzz_0_zzzzzzz_0[i] = 2.0 * g_0_yzzzz_0_zzzzzzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzzz_0_zzzzzzz_1[i] * fti_ab_0 + g_0_yyzzzz_0_zzzzzzz_0[i] * pb_y + g_0_yyzzzz_0_zzzzzzz_1[i] * wp_y[i];
     }
 
     /// Set up 1188-1224 components of targeted buffer : SKSK
@@ -17683,211 +10942,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_yyzzzzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 1223);
 
-#pragma omp simd aligned(g_0_yyzzz_0_xxxxxxy_0,       \
-                             g_0_yyzzz_0_xxxxxxy_1,   \
-                             g_0_yyzzz_0_xxxxxyy_0,   \
-                             g_0_yyzzz_0_xxxxxyy_1,   \
-                             g_0_yyzzz_0_xxxxyyy_0,   \
-                             g_0_yyzzz_0_xxxxyyy_1,   \
-                             g_0_yyzzz_0_xxxyyyy_0,   \
-                             g_0_yyzzz_0_xxxyyyy_1,   \
-                             g_0_yyzzz_0_xxyyyyy_0,   \
-                             g_0_yyzzz_0_xxyyyyy_1,   \
-                             g_0_yyzzz_0_xyyyyyy_0,   \
-                             g_0_yyzzz_0_xyyyyyy_1,   \
-                             g_0_yyzzz_0_yyyyyyy_0,   \
-                             g_0_yyzzz_0_yyyyyyy_1,   \
-                             g_0_yyzzzz_0_xxxxxxy_0,  \
-                             g_0_yyzzzz_0_xxxxxxy_1,  \
-                             g_0_yyzzzz_0_xxxxxyy_0,  \
-                             g_0_yyzzzz_0_xxxxxyy_1,  \
-                             g_0_yyzzzz_0_xxxxyyy_0,  \
-                             g_0_yyzzzz_0_xxxxyyy_1,  \
-                             g_0_yyzzzz_0_xxxyyyy_0,  \
-                             g_0_yyzzzz_0_xxxyyyy_1,  \
-                             g_0_yyzzzz_0_xxyyyyy_0,  \
-                             g_0_yyzzzz_0_xxyyyyy_1,  \
-                             g_0_yyzzzz_0_xyyyyyy_0,  \
-                             g_0_yyzzzz_0_xyyyyyy_1,  \
-                             g_0_yyzzzz_0_yyyyyyy_0,  \
-                             g_0_yyzzzz_0_yyyyyyy_1,  \
-                             g_0_yyzzzzz_0_xxxxxxx_0, \
-                             g_0_yyzzzzz_0_xxxxxxy_0, \
-                             g_0_yyzzzzz_0_xxxxxxz_0, \
-                             g_0_yyzzzzz_0_xxxxxyy_0, \
-                             g_0_yyzzzzz_0_xxxxxyz_0, \
-                             g_0_yyzzzzz_0_xxxxxzz_0, \
-                             g_0_yyzzzzz_0_xxxxyyy_0, \
-                             g_0_yyzzzzz_0_xxxxyyz_0, \
-                             g_0_yyzzzzz_0_xxxxyzz_0, \
-                             g_0_yyzzzzz_0_xxxxzzz_0, \
-                             g_0_yyzzzzz_0_xxxyyyy_0, \
-                             g_0_yyzzzzz_0_xxxyyyz_0, \
-                             g_0_yyzzzzz_0_xxxyyzz_0, \
-                             g_0_yyzzzzz_0_xxxyzzz_0, \
-                             g_0_yyzzzzz_0_xxxzzzz_0, \
-                             g_0_yyzzzzz_0_xxyyyyy_0, \
-                             g_0_yyzzzzz_0_xxyyyyz_0, \
-                             g_0_yyzzzzz_0_xxyyyzz_0, \
-                             g_0_yyzzzzz_0_xxyyzzz_0, \
-                             g_0_yyzzzzz_0_xxyzzzz_0, \
-                             g_0_yyzzzzz_0_xxzzzzz_0, \
-                             g_0_yyzzzzz_0_xyyyyyy_0, \
-                             g_0_yyzzzzz_0_xyyyyyz_0, \
-                             g_0_yyzzzzz_0_xyyyyzz_0, \
-                             g_0_yyzzzzz_0_xyyyzzz_0, \
-                             g_0_yyzzzzz_0_xyyzzzz_0, \
-                             g_0_yyzzzzz_0_xyzzzzz_0, \
-                             g_0_yyzzzzz_0_xzzzzzz_0, \
-                             g_0_yyzzzzz_0_yyyyyyy_0, \
-                             g_0_yyzzzzz_0_yyyyyyz_0, \
-                             g_0_yyzzzzz_0_yyyyyzz_0, \
-                             g_0_yyzzzzz_0_yyyyzzz_0, \
-                             g_0_yyzzzzz_0_yyyzzzz_0, \
-                             g_0_yyzzzzz_0_yyzzzzz_0, \
-                             g_0_yyzzzzz_0_yzzzzzz_0, \
-                             g_0_yyzzzzz_0_zzzzzzz_0, \
-                             g_0_yzzzzz_0_xxxxxxx_0,  \
-                             g_0_yzzzzz_0_xxxxxxx_1,  \
-                             g_0_yzzzzz_0_xxxxxxz_0,  \
-                             g_0_yzzzzz_0_xxxxxxz_1,  \
-                             g_0_yzzzzz_0_xxxxxyz_0,  \
-                             g_0_yzzzzz_0_xxxxxyz_1,  \
-                             g_0_yzzzzz_0_xxxxxz_1,   \
-                             g_0_yzzzzz_0_xxxxxzz_0,  \
-                             g_0_yzzzzz_0_xxxxxzz_1,  \
-                             g_0_yzzzzz_0_xxxxyyz_0,  \
-                             g_0_yzzzzz_0_xxxxyyz_1,  \
-                             g_0_yzzzzz_0_xxxxyz_1,   \
-                             g_0_yzzzzz_0_xxxxyzz_0,  \
-                             g_0_yzzzzz_0_xxxxyzz_1,  \
-                             g_0_yzzzzz_0_xxxxzz_1,   \
-                             g_0_yzzzzz_0_xxxxzzz_0,  \
-                             g_0_yzzzzz_0_xxxxzzz_1,  \
-                             g_0_yzzzzz_0_xxxyyyz_0,  \
-                             g_0_yzzzzz_0_xxxyyyz_1,  \
-                             g_0_yzzzzz_0_xxxyyz_1,   \
-                             g_0_yzzzzz_0_xxxyyzz_0,  \
-                             g_0_yzzzzz_0_xxxyyzz_1,  \
-                             g_0_yzzzzz_0_xxxyzz_1,   \
-                             g_0_yzzzzz_0_xxxyzzz_0,  \
-                             g_0_yzzzzz_0_xxxyzzz_1,  \
-                             g_0_yzzzzz_0_xxxzzz_1,   \
-                             g_0_yzzzzz_0_xxxzzzz_0,  \
-                             g_0_yzzzzz_0_xxxzzzz_1,  \
-                             g_0_yzzzzz_0_xxyyyyz_0,  \
-                             g_0_yzzzzz_0_xxyyyyz_1,  \
-                             g_0_yzzzzz_0_xxyyyz_1,   \
-                             g_0_yzzzzz_0_xxyyyzz_0,  \
-                             g_0_yzzzzz_0_xxyyyzz_1,  \
-                             g_0_yzzzzz_0_xxyyzz_1,   \
-                             g_0_yzzzzz_0_xxyyzzz_0,  \
-                             g_0_yzzzzz_0_xxyyzzz_1,  \
-                             g_0_yzzzzz_0_xxyzzz_1,   \
-                             g_0_yzzzzz_0_xxyzzzz_0,  \
-                             g_0_yzzzzz_0_xxyzzzz_1,  \
-                             g_0_yzzzzz_0_xxzzzz_1,   \
-                             g_0_yzzzzz_0_xxzzzzz_0,  \
-                             g_0_yzzzzz_0_xxzzzzz_1,  \
-                             g_0_yzzzzz_0_xyyyyyz_0,  \
-                             g_0_yzzzzz_0_xyyyyyz_1,  \
-                             g_0_yzzzzz_0_xyyyyz_1,   \
-                             g_0_yzzzzz_0_xyyyyzz_0,  \
-                             g_0_yzzzzz_0_xyyyyzz_1,  \
-                             g_0_yzzzzz_0_xyyyzz_1,   \
-                             g_0_yzzzzz_0_xyyyzzz_0,  \
-                             g_0_yzzzzz_0_xyyyzzz_1,  \
-                             g_0_yzzzzz_0_xyyzzz_1,   \
-                             g_0_yzzzzz_0_xyyzzzz_0,  \
-                             g_0_yzzzzz_0_xyyzzzz_1,  \
-                             g_0_yzzzzz_0_xyzzzz_1,   \
-                             g_0_yzzzzz_0_xyzzzzz_0,  \
-                             g_0_yzzzzz_0_xyzzzzz_1,  \
-                             g_0_yzzzzz_0_xzzzzz_1,   \
-                             g_0_yzzzzz_0_xzzzzzz_0,  \
-                             g_0_yzzzzz_0_xzzzzzz_1,  \
-                             g_0_yzzzzz_0_yyyyyyz_0,  \
-                             g_0_yzzzzz_0_yyyyyyz_1,  \
-                             g_0_yzzzzz_0_yyyyyz_1,   \
-                             g_0_yzzzzz_0_yyyyyzz_0,  \
-                             g_0_yzzzzz_0_yyyyyzz_1,  \
-                             g_0_yzzzzz_0_yyyyzz_1,   \
-                             g_0_yzzzzz_0_yyyyzzz_0,  \
-                             g_0_yzzzzz_0_yyyyzzz_1,  \
-                             g_0_yzzzzz_0_yyyzzz_1,   \
-                             g_0_yzzzzz_0_yyyzzzz_0,  \
-                             g_0_yzzzzz_0_yyyzzzz_1,  \
-                             g_0_yzzzzz_0_yyzzzz_1,   \
-                             g_0_yzzzzz_0_yyzzzzz_0,  \
-                             g_0_yzzzzz_0_yyzzzzz_1,  \
-                             g_0_yzzzzz_0_yzzzzz_1,   \
-                             g_0_yzzzzz_0_yzzzzzz_0,  \
-                             g_0_yzzzzz_0_yzzzzzz_1,  \
-                             g_0_yzzzzz_0_zzzzzz_1,   \
-                             g_0_yzzzzz_0_zzzzzzz_0,  \
-                             g_0_yzzzzz_0_zzzzzzz_1,  \
-                             g_0_zzzzz_0_xxxxxxx_0,   \
-                             g_0_zzzzz_0_xxxxxxx_1,   \
-                             g_0_zzzzz_0_xxxxxxz_0,   \
-                             g_0_zzzzz_0_xxxxxxz_1,   \
-                             g_0_zzzzz_0_xxxxxyz_0,   \
-                             g_0_zzzzz_0_xxxxxyz_1,   \
-                             g_0_zzzzz_0_xxxxxzz_0,   \
-                             g_0_zzzzz_0_xxxxxzz_1,   \
-                             g_0_zzzzz_0_xxxxyyz_0,   \
-                             g_0_zzzzz_0_xxxxyyz_1,   \
-                             g_0_zzzzz_0_xxxxyzz_0,   \
-                             g_0_zzzzz_0_xxxxyzz_1,   \
-                             g_0_zzzzz_0_xxxxzzz_0,   \
-                             g_0_zzzzz_0_xxxxzzz_1,   \
-                             g_0_zzzzz_0_xxxyyyz_0,   \
-                             g_0_zzzzz_0_xxxyyyz_1,   \
-                             g_0_zzzzz_0_xxxyyzz_0,   \
-                             g_0_zzzzz_0_xxxyyzz_1,   \
-                             g_0_zzzzz_0_xxxyzzz_0,   \
-                             g_0_zzzzz_0_xxxyzzz_1,   \
-                             g_0_zzzzz_0_xxxzzzz_0,   \
-                             g_0_zzzzz_0_xxxzzzz_1,   \
-                             g_0_zzzzz_0_xxyyyyz_0,   \
-                             g_0_zzzzz_0_xxyyyyz_1,   \
-                             g_0_zzzzz_0_xxyyyzz_0,   \
-                             g_0_zzzzz_0_xxyyyzz_1,   \
-                             g_0_zzzzz_0_xxyyzzz_0,   \
-                             g_0_zzzzz_0_xxyyzzz_1,   \
-                             g_0_zzzzz_0_xxyzzzz_0,   \
-                             g_0_zzzzz_0_xxyzzzz_1,   \
-                             g_0_zzzzz_0_xxzzzzz_0,   \
-                             g_0_zzzzz_0_xxzzzzz_1,   \
-                             g_0_zzzzz_0_xyyyyyz_0,   \
-                             g_0_zzzzz_0_xyyyyyz_1,   \
-                             g_0_zzzzz_0_xyyyyzz_0,   \
-                             g_0_zzzzz_0_xyyyyzz_1,   \
-                             g_0_zzzzz_0_xyyyzzz_0,   \
-                             g_0_zzzzz_0_xyyyzzz_1,   \
-                             g_0_zzzzz_0_xyyzzzz_0,   \
-                             g_0_zzzzz_0_xyyzzzz_1,   \
-                             g_0_zzzzz_0_xyzzzzz_0,   \
-                             g_0_zzzzz_0_xyzzzzz_1,   \
-                             g_0_zzzzz_0_xzzzzzz_0,   \
-                             g_0_zzzzz_0_xzzzzzz_1,   \
-                             g_0_zzzzz_0_yyyyyyz_0,   \
-                             g_0_zzzzz_0_yyyyyyz_1,   \
-                             g_0_zzzzz_0_yyyyyzz_0,   \
-                             g_0_zzzzz_0_yyyyyzz_1,   \
-                             g_0_zzzzz_0_yyyyzzz_0,   \
-                             g_0_zzzzz_0_yyyyzzz_1,   \
-                             g_0_zzzzz_0_yyyzzzz_0,   \
-                             g_0_zzzzz_0_yyyzzzz_1,   \
-                             g_0_zzzzz_0_yyzzzzz_0,   \
-                             g_0_zzzzz_0_yyzzzzz_1,   \
-                             g_0_zzzzz_0_yzzzzzz_0,   \
-                             g_0_zzzzz_0_yzzzzzz_1,   \
-                             g_0_zzzzz_0_zzzzzzz_0,   \
-                             g_0_zzzzz_0_zzzzzzz_1,   \
-                             wp_y,                    \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_yyzzz_0_xxxxxxy_0, g_0_yyzzz_0_xxxxxxy_1, g_0_yyzzz_0_xxxxxyy_0, g_0_yyzzz_0_xxxxxyy_1, g_0_yyzzz_0_xxxxyyy_0, g_0_yyzzz_0_xxxxyyy_1, g_0_yyzzz_0_xxxyyyy_0, g_0_yyzzz_0_xxxyyyy_1, g_0_yyzzz_0_xxyyyyy_0, g_0_yyzzz_0_xxyyyyy_1, g_0_yyzzz_0_xyyyyyy_0, g_0_yyzzz_0_xyyyyyy_1, g_0_yyzzz_0_yyyyyyy_0, g_0_yyzzz_0_yyyyyyy_1, g_0_yyzzzz_0_xxxxxxy_0, g_0_yyzzzz_0_xxxxxxy_1, g_0_yyzzzz_0_xxxxxyy_0, g_0_yyzzzz_0_xxxxxyy_1, g_0_yyzzzz_0_xxxxyyy_0, g_0_yyzzzz_0_xxxxyyy_1, g_0_yyzzzz_0_xxxyyyy_0, g_0_yyzzzz_0_xxxyyyy_1, g_0_yyzzzz_0_xxyyyyy_0, g_0_yyzzzz_0_xxyyyyy_1, g_0_yyzzzz_0_xyyyyyy_0, g_0_yyzzzz_0_xyyyyyy_1, g_0_yyzzzz_0_yyyyyyy_0, g_0_yyzzzz_0_yyyyyyy_1, g_0_yyzzzzz_0_xxxxxxx_0, g_0_yyzzzzz_0_xxxxxxy_0, g_0_yyzzzzz_0_xxxxxxz_0, g_0_yyzzzzz_0_xxxxxyy_0, g_0_yyzzzzz_0_xxxxxyz_0, g_0_yyzzzzz_0_xxxxxzz_0, g_0_yyzzzzz_0_xxxxyyy_0, g_0_yyzzzzz_0_xxxxyyz_0, g_0_yyzzzzz_0_xxxxyzz_0, g_0_yyzzzzz_0_xxxxzzz_0, g_0_yyzzzzz_0_xxxyyyy_0, g_0_yyzzzzz_0_xxxyyyz_0, g_0_yyzzzzz_0_xxxyyzz_0, g_0_yyzzzzz_0_xxxyzzz_0, g_0_yyzzzzz_0_xxxzzzz_0, g_0_yyzzzzz_0_xxyyyyy_0, g_0_yyzzzzz_0_xxyyyyz_0, g_0_yyzzzzz_0_xxyyyzz_0, g_0_yyzzzzz_0_xxyyzzz_0, g_0_yyzzzzz_0_xxyzzzz_0, g_0_yyzzzzz_0_xxzzzzz_0, g_0_yyzzzzz_0_xyyyyyy_0, g_0_yyzzzzz_0_xyyyyyz_0, g_0_yyzzzzz_0_xyyyyzz_0, g_0_yyzzzzz_0_xyyyzzz_0, g_0_yyzzzzz_0_xyyzzzz_0, g_0_yyzzzzz_0_xyzzzzz_0, g_0_yyzzzzz_0_xzzzzzz_0, g_0_yyzzzzz_0_yyyyyyy_0, g_0_yyzzzzz_0_yyyyyyz_0, g_0_yyzzzzz_0_yyyyyzz_0, g_0_yyzzzzz_0_yyyyzzz_0, g_0_yyzzzzz_0_yyyzzzz_0, g_0_yyzzzzz_0_yyzzzzz_0, g_0_yyzzzzz_0_yzzzzzz_0, g_0_yyzzzzz_0_zzzzzzz_0, g_0_yzzzzz_0_xxxxxxx_0, g_0_yzzzzz_0_xxxxxxx_1, g_0_yzzzzz_0_xxxxxxz_0, g_0_yzzzzz_0_xxxxxxz_1, g_0_yzzzzz_0_xxxxxyz_0, g_0_yzzzzz_0_xxxxxyz_1, g_0_yzzzzz_0_xxxxxz_1, g_0_yzzzzz_0_xxxxxzz_0, g_0_yzzzzz_0_xxxxxzz_1, g_0_yzzzzz_0_xxxxyyz_0, g_0_yzzzzz_0_xxxxyyz_1, g_0_yzzzzz_0_xxxxyz_1, g_0_yzzzzz_0_xxxxyzz_0, g_0_yzzzzz_0_xxxxyzz_1, g_0_yzzzzz_0_xxxxzz_1, g_0_yzzzzz_0_xxxxzzz_0, g_0_yzzzzz_0_xxxxzzz_1, g_0_yzzzzz_0_xxxyyyz_0, g_0_yzzzzz_0_xxxyyyz_1, g_0_yzzzzz_0_xxxyyz_1, g_0_yzzzzz_0_xxxyyzz_0, g_0_yzzzzz_0_xxxyyzz_1, g_0_yzzzzz_0_xxxyzz_1, g_0_yzzzzz_0_xxxyzzz_0, g_0_yzzzzz_0_xxxyzzz_1, g_0_yzzzzz_0_xxxzzz_1, g_0_yzzzzz_0_xxxzzzz_0, g_0_yzzzzz_0_xxxzzzz_1, g_0_yzzzzz_0_xxyyyyz_0, g_0_yzzzzz_0_xxyyyyz_1, g_0_yzzzzz_0_xxyyyz_1, g_0_yzzzzz_0_xxyyyzz_0, g_0_yzzzzz_0_xxyyyzz_1, g_0_yzzzzz_0_xxyyzz_1, g_0_yzzzzz_0_xxyyzzz_0, g_0_yzzzzz_0_xxyyzzz_1, g_0_yzzzzz_0_xxyzzz_1, g_0_yzzzzz_0_xxyzzzz_0, g_0_yzzzzz_0_xxyzzzz_1, g_0_yzzzzz_0_xxzzzz_1, g_0_yzzzzz_0_xxzzzzz_0, g_0_yzzzzz_0_xxzzzzz_1, g_0_yzzzzz_0_xyyyyyz_0, g_0_yzzzzz_0_xyyyyyz_1, g_0_yzzzzz_0_xyyyyz_1, g_0_yzzzzz_0_xyyyyzz_0, g_0_yzzzzz_0_xyyyyzz_1, g_0_yzzzzz_0_xyyyzz_1, g_0_yzzzzz_0_xyyyzzz_0, g_0_yzzzzz_0_xyyyzzz_1, g_0_yzzzzz_0_xyyzzz_1, g_0_yzzzzz_0_xyyzzzz_0, g_0_yzzzzz_0_xyyzzzz_1, g_0_yzzzzz_0_xyzzzz_1, g_0_yzzzzz_0_xyzzzzz_0, g_0_yzzzzz_0_xyzzzzz_1, g_0_yzzzzz_0_xzzzzz_1, g_0_yzzzzz_0_xzzzzzz_0, g_0_yzzzzz_0_xzzzzzz_1, g_0_yzzzzz_0_yyyyyyz_0, g_0_yzzzzz_0_yyyyyyz_1, g_0_yzzzzz_0_yyyyyz_1, g_0_yzzzzz_0_yyyyyzz_0, g_0_yzzzzz_0_yyyyyzz_1, g_0_yzzzzz_0_yyyyzz_1, g_0_yzzzzz_0_yyyyzzz_0, g_0_yzzzzz_0_yyyyzzz_1, g_0_yzzzzz_0_yyyzzz_1, g_0_yzzzzz_0_yyyzzzz_0, g_0_yzzzzz_0_yyyzzzz_1, g_0_yzzzzz_0_yyzzzz_1, g_0_yzzzzz_0_yyzzzzz_0, g_0_yzzzzz_0_yyzzzzz_1, g_0_yzzzzz_0_yzzzzz_1, g_0_yzzzzz_0_yzzzzzz_0, g_0_yzzzzz_0_yzzzzzz_1, g_0_yzzzzz_0_zzzzzz_1, g_0_yzzzzz_0_zzzzzzz_0, g_0_yzzzzz_0_zzzzzzz_1, g_0_zzzzz_0_xxxxxxx_0, g_0_zzzzz_0_xxxxxxx_1, g_0_zzzzz_0_xxxxxxz_0, g_0_zzzzz_0_xxxxxxz_1, g_0_zzzzz_0_xxxxxyz_0, g_0_zzzzz_0_xxxxxyz_1, g_0_zzzzz_0_xxxxxzz_0, g_0_zzzzz_0_xxxxxzz_1, g_0_zzzzz_0_xxxxyyz_0, g_0_zzzzz_0_xxxxyyz_1, g_0_zzzzz_0_xxxxyzz_0, g_0_zzzzz_0_xxxxyzz_1, g_0_zzzzz_0_xxxxzzz_0, g_0_zzzzz_0_xxxxzzz_1, g_0_zzzzz_0_xxxyyyz_0, g_0_zzzzz_0_xxxyyyz_1, g_0_zzzzz_0_xxxyyzz_0, g_0_zzzzz_0_xxxyyzz_1, g_0_zzzzz_0_xxxyzzz_0, g_0_zzzzz_0_xxxyzzz_1, g_0_zzzzz_0_xxxzzzz_0, g_0_zzzzz_0_xxxzzzz_1, g_0_zzzzz_0_xxyyyyz_0, g_0_zzzzz_0_xxyyyyz_1, g_0_zzzzz_0_xxyyyzz_0, g_0_zzzzz_0_xxyyyzz_1, g_0_zzzzz_0_xxyyzzz_0, g_0_zzzzz_0_xxyyzzz_1, g_0_zzzzz_0_xxyzzzz_0, g_0_zzzzz_0_xxyzzzz_1, g_0_zzzzz_0_xxzzzzz_0, g_0_zzzzz_0_xxzzzzz_1, g_0_zzzzz_0_xyyyyyz_0, g_0_zzzzz_0_xyyyyyz_1, g_0_zzzzz_0_xyyyyzz_0, g_0_zzzzz_0_xyyyyzz_1, g_0_zzzzz_0_xyyyzzz_0, g_0_zzzzz_0_xyyyzzz_1, g_0_zzzzz_0_xyyzzzz_0, g_0_zzzzz_0_xyyzzzz_1, g_0_zzzzz_0_xyzzzzz_0, g_0_zzzzz_0_xyzzzzz_1, g_0_zzzzz_0_xzzzzzz_0, g_0_zzzzz_0_xzzzzzz_1, g_0_zzzzz_0_yyyyyyz_0, g_0_zzzzz_0_yyyyyyz_1, g_0_zzzzz_0_yyyyyzz_0, g_0_zzzzz_0_yyyyyzz_1, g_0_zzzzz_0_yyyyzzz_0, g_0_zzzzz_0_yyyyzzz_1, g_0_zzzzz_0_yyyzzzz_0, g_0_zzzzz_0_yyyzzzz_1, g_0_zzzzz_0_yyzzzzz_0, g_0_zzzzz_0_yyzzzzz_1, g_0_zzzzz_0_yzzzzzz_0, g_0_zzzzz_0_yzzzzzz_1, g_0_zzzzz_0_zzzzzzz_0, g_0_zzzzz_0_zzzzzzz_1, wp_y, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -17896,128 +10951,77 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_yyzzzzz_0_xxxxxxx_0[i] = g_0_zzzzz_0_xxxxxxx_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxxxx_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxxxxxx_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xxxxxxx_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xxxxxxx_0[i] = g_0_zzzzz_0_xxxxxxx_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxxxx_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxxxxxx_0[i] * pb_y + g_0_yzzzzz_0_xxxxxxx_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xxxxxxy_0[i] = 4.0 * g_0_yyzzz_0_xxxxxxy_0[i] * fi_ab_0 - 4.0 * g_0_yyzzz_0_xxxxxxy_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xxxxxxy_0[i] * pb_z + g_0_yyzzzz_0_xxxxxxy_1[i] * wp_z[i];
+        g_0_yyzzzzz_0_xxxxxxy_0[i] = 4.0 * g_0_yyzzz_0_xxxxxxy_0[i] * fi_ab_0 - 4.0 * g_0_yyzzz_0_xxxxxxy_1[i] * fti_ab_0 + g_0_yyzzzz_0_xxxxxxy_0[i] * pb_z + g_0_yyzzzz_0_xxxxxxy_1[i] * wp_z[i];
 
-        g_0_yyzzzzz_0_xxxxxxz_0[i] = g_0_zzzzz_0_xxxxxxz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxxxz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxxxxxz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xxxxxxz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xxxxxxz_0[i] = g_0_zzzzz_0_xxxxxxz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxxxz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxxxxxz_0[i] * pb_y + g_0_yzzzzz_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xxxxxyy_0[i] = 4.0 * g_0_yyzzz_0_xxxxxyy_0[i] * fi_ab_0 - 4.0 * g_0_yyzzz_0_xxxxxyy_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xxxxxyy_0[i] * pb_z + g_0_yyzzzz_0_xxxxxyy_1[i] * wp_z[i];
+        g_0_yyzzzzz_0_xxxxxyy_0[i] = 4.0 * g_0_yyzzz_0_xxxxxyy_0[i] * fi_ab_0 - 4.0 * g_0_yyzzz_0_xxxxxyy_1[i] * fti_ab_0 + g_0_yyzzzz_0_xxxxxyy_0[i] * pb_z + g_0_yyzzzz_0_xxxxxyy_1[i] * wp_z[i];
 
-        g_0_yyzzzzz_0_xxxxxyz_0[i] = g_0_zzzzz_0_xxxxxyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxxyz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxxxxz_1[i] * fi_abcd_0 +
-                                     g_0_yzzzzz_0_xxxxxyz_0[i] * pb_y + g_0_yzzzzz_0_xxxxxyz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xxxxxyz_0[i] = g_0_zzzzz_0_xxxxxyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxxyz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxxxyz_0[i] * pb_y + g_0_yzzzzz_0_xxxxxyz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xxxxxzz_0[i] = g_0_zzzzz_0_xxxxxzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxxzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxxxxzz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xxxxxzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xxxxxzz_0[i] = g_0_zzzzz_0_xxxxxzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxxzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxxxxzz_0[i] * pb_y + g_0_yzzzzz_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xxxxyyy_0[i] = 4.0 * g_0_yyzzz_0_xxxxyyy_0[i] * fi_ab_0 - 4.0 * g_0_yyzzz_0_xxxxyyy_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xxxxyyy_0[i] * pb_z + g_0_yyzzzz_0_xxxxyyy_1[i] * wp_z[i];
+        g_0_yyzzzzz_0_xxxxyyy_0[i] = 4.0 * g_0_yyzzz_0_xxxxyyy_0[i] * fi_ab_0 - 4.0 * g_0_yyzzz_0_xxxxyyy_1[i] * fti_ab_0 + g_0_yyzzzz_0_xxxxyyy_0[i] * pb_z + g_0_yyzzzz_0_xxxxyyy_1[i] * wp_z[i];
 
-        g_0_yyzzzzz_0_xxxxyyz_0[i] = g_0_zzzzz_0_xxxxyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yzzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxxyyz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xxxxyyz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xxxxyyz_0[i] = g_0_zzzzz_0_xxxxyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxyyz_1[i] * fti_ab_0 + 2.0 * g_0_yzzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxxyyz_0[i] * pb_y + g_0_yzzzzz_0_xxxxyyz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xxxxyzz_0[i] = g_0_zzzzz_0_xxxxyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxyzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxxxzz_1[i] * fi_abcd_0 +
-                                     g_0_yzzzzz_0_xxxxyzz_0[i] * pb_y + g_0_yzzzzz_0_xxxxyzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xxxxyzz_0[i] = g_0_zzzzz_0_xxxxyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxyzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxxyzz_0[i] * pb_y + g_0_yzzzzz_0_xxxxyzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xxxxzzz_0[i] = g_0_zzzzz_0_xxxxzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxxxzzz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xxxxzzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xxxxzzz_0[i] = g_0_zzzzz_0_xxxxzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxxzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxxxzzz_0[i] * pb_y + g_0_yzzzzz_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xxxyyyy_0[i] = 4.0 * g_0_yyzzz_0_xxxyyyy_0[i] * fi_ab_0 - 4.0 * g_0_yyzzz_0_xxxyyyy_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xxxyyyy_0[i] * pb_z + g_0_yyzzzz_0_xxxyyyy_1[i] * wp_z[i];
+        g_0_yyzzzzz_0_xxxyyyy_0[i] = 4.0 * g_0_yyzzz_0_xxxyyyy_0[i] * fi_ab_0 - 4.0 * g_0_yyzzz_0_xxxyyyy_1[i] * fti_ab_0 + g_0_yyzzzz_0_xxxyyyy_0[i] * pb_z + g_0_yyzzzz_0_xxxyyyy_1[i] * wp_z[i];
 
-        g_0_yyzzzzz_0_xxxyyyz_0[i] = g_0_zzzzz_0_xxxyyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yzzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxyyyz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xxxyyyz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xxxyyyz_0[i] = g_0_zzzzz_0_xxxyyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxyyyz_1[i] * fti_ab_0 + 3.0 * g_0_yzzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxyyyz_0[i] * pb_y + g_0_yzzzzz_0_xxxyyyz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xxxyyzz_0[i] = g_0_zzzzz_0_xxxyyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yzzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxyyzz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xxxyyzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xxxyyzz_0[i] = g_0_zzzzz_0_xxxyyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxyyzz_1[i] * fti_ab_0 + 2.0 * g_0_yzzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxyyzz_0[i] * pb_y + g_0_yzzzzz_0_xxxyyzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xxxyzzz_0[i] = g_0_zzzzz_0_xxxyzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxyzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxxzzz_1[i] * fi_abcd_0 +
-                                     g_0_yzzzzz_0_xxxyzzz_0[i] * pb_y + g_0_yzzzzz_0_xxxyzzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xxxyzzz_0[i] = g_0_zzzzz_0_xxxyzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxyzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxxyzzz_0[i] * pb_y + g_0_yzzzzz_0_xxxyzzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xxxzzzz_0[i] = g_0_zzzzz_0_xxxzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxzzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxxzzzz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xxxzzzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xxxzzzz_0[i] = g_0_zzzzz_0_xxxzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxxzzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxxzzzz_0[i] * pb_y + g_0_yzzzzz_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xxyyyyy_0[i] = 4.0 * g_0_yyzzz_0_xxyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_yyzzz_0_xxyyyyy_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xxyyyyy_0[i] * pb_z + g_0_yyzzzz_0_xxyyyyy_1[i] * wp_z[i];
+        g_0_yyzzzzz_0_xxyyyyy_0[i] = 4.0 * g_0_yyzzz_0_xxyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_yyzzz_0_xxyyyyy_1[i] * fti_ab_0 + g_0_yyzzzz_0_xxyyyyy_0[i] * pb_z + g_0_yyzzzz_0_xxyyyyy_1[i] * wp_z[i];
 
-        g_0_yyzzzzz_0_xxyyyyz_0[i] = g_0_zzzzz_0_xxyyyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_yzzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyyyyz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xxyyyyz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xxyyyyz_0[i] = g_0_zzzzz_0_xxyyyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxyyyyz_1[i] * fti_ab_0 + 4.0 * g_0_yzzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyyyyz_0[i] * pb_y + g_0_yzzzzz_0_xxyyyyz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xxyyyzz_0[i] = g_0_zzzzz_0_xxyyyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yzzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyyyzz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xxyyyzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xxyyyzz_0[i] = g_0_zzzzz_0_xxyyyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxyyyzz_1[i] * fti_ab_0 + 3.0 * g_0_yzzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyyyzz_0[i] * pb_y + g_0_yzzzzz_0_xxyyyzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xxyyzzz_0[i] = g_0_zzzzz_0_xxyyzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yzzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyyzzz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xxyyzzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xxyyzzz_0[i] = g_0_zzzzz_0_xxyyzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxyyzzz_1[i] * fti_ab_0 + 2.0 * g_0_yzzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyyzzz_0[i] * pb_y + g_0_yzzzzz_0_xxyyzzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xxyzzzz_0[i] = g_0_zzzzz_0_xxyzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxyzzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxzzzz_1[i] * fi_abcd_0 +
-                                     g_0_yzzzzz_0_xxyzzzz_0[i] * pb_y + g_0_yzzzzz_0_xxyzzzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xxyzzzz_0[i] = g_0_zzzzz_0_xxyzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxyzzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xxyzzzz_0[i] * pb_y + g_0_yzzzzz_0_xxyzzzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xxzzzzz_0[i] = g_0_zzzzz_0_xxzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxzzzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxzzzzz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xxzzzzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xxzzzzz_0[i] = g_0_zzzzz_0_xxzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xxzzzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xxzzzzz_0[i] * pb_y + g_0_yzzzzz_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xyyyyyy_0[i] = 4.0 * g_0_yyzzz_0_xyyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_yyzzz_0_xyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_xyyyyyy_0[i] * pb_z + g_0_yyzzzz_0_xyyyyyy_1[i] * wp_z[i];
+        g_0_yyzzzzz_0_xyyyyyy_0[i] = 4.0 * g_0_yyzzz_0_xyyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_yyzzz_0_xyyyyyy_1[i] * fti_ab_0 + g_0_yyzzzz_0_xyyyyyy_0[i] * pb_z + g_0_yyzzzz_0_xyyyyyy_1[i] * wp_z[i];
 
-        g_0_yyzzzzz_0_xyyyyyz_0[i] = g_0_zzzzz_0_xyyyyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyyyyyz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_yzzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xyyyyyz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xyyyyyz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xyyyyyz_0[i] = g_0_zzzzz_0_xyyyyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyyyyyz_1[i] * fti_ab_0 + 5.0 * g_0_yzzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xyyyyyz_0[i] * pb_y + g_0_yzzzzz_0_xyyyyyz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xyyyyzz_0[i] = g_0_zzzzz_0_xyyyyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyyyyzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_yzzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xyyyyzz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xyyyyzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xyyyyzz_0[i] = g_0_zzzzz_0_xyyyyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyyyyzz_1[i] * fti_ab_0 + 4.0 * g_0_yzzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xyyyyzz_0[i] * pb_y + g_0_yzzzzz_0_xyyyyzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xyyyzzz_0[i] = g_0_zzzzz_0_xyyyzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyyyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yzzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xyyyzzz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xyyyzzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xyyyzzz_0[i] = g_0_zzzzz_0_xyyyzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyyyzzz_1[i] * fti_ab_0 + 3.0 * g_0_yzzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xyyyzzz_0[i] * pb_y + g_0_yzzzzz_0_xyyyzzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xyyzzzz_0[i] = g_0_zzzzz_0_xyyzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyyzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yzzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xyyzzzz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xyyzzzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xyyzzzz_0[i] = g_0_zzzzz_0_xyyzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyyzzzz_1[i] * fti_ab_0 + 2.0 * g_0_yzzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xyyzzzz_0[i] * pb_y + g_0_yzzzzz_0_xyyzzzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xyzzzzz_0[i] = g_0_zzzzz_0_xyzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyzzzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xzzzzz_1[i] * fi_abcd_0 +
-                                     g_0_yzzzzz_0_xyzzzzz_0[i] * pb_y + g_0_yzzzzz_0_xyzzzzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xyzzzzz_0[i] = g_0_zzzzz_0_xyzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xyzzzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_xyzzzzz_0[i] * pb_y + g_0_yzzzzz_0_xyzzzzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_xzzzzzz_0[i] = g_0_zzzzz_0_xzzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xzzzzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xzzzzzz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_xzzzzzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_xzzzzzz_0[i] = g_0_zzzzz_0_xzzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_xzzzzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_xzzzzzz_0[i] * pb_y + g_0_yzzzzz_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_yyyyyyy_0[i] = 4.0 * g_0_yyzzz_0_yyyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_yyzzz_0_yyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_yyzzzz_0_yyyyyyy_0[i] * pb_z + g_0_yyzzzz_0_yyyyyyy_1[i] * wp_z[i];
+        g_0_yyzzzzz_0_yyyyyyy_0[i] = 4.0 * g_0_yyzzz_0_yyyyyyy_0[i] * fi_ab_0 - 4.0 * g_0_yyzzz_0_yyyyyyy_1[i] * fti_ab_0 + g_0_yyzzzz_0_yyyyyyy_0[i] * pb_z + g_0_yyzzzz_0_yyyyyyy_1[i] * wp_z[i];
 
-        g_0_yyzzzzz_0_yyyyyyz_0[i] = g_0_zzzzz_0_yyyyyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyyyyz_1[i] * fti_ab_0 +
-                                     6.0 * g_0_yzzzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_yyyyyyz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_yyyyyyz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_yyyyyyz_0[i] = g_0_zzzzz_0_yyyyyyz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyyyyz_1[i] * fti_ab_0 + 6.0 * g_0_yzzzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_yyyyyyz_0[i] * pb_y + g_0_yzzzzz_0_yyyyyyz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_yyyyyzz_0[i] = g_0_zzzzz_0_yyyyyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyyyzz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_yzzzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_yyyyyzz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_yyyyyzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_yyyyyzz_0[i] = g_0_zzzzz_0_yyyyyzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyyyzz_1[i] * fti_ab_0 + 5.0 * g_0_yzzzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_yyyyyzz_0[i] * pb_y + g_0_yzzzzz_0_yyyyyzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_yyyyzzz_0[i] = g_0_zzzzz_0_yyyyzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyyzzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_yzzzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_yyyyzzz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_yyyyzzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_yyyyzzz_0[i] = g_0_zzzzz_0_yyyyzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyyzzz_1[i] * fti_ab_0 + 4.0 * g_0_yzzzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_yyyyzzz_0[i] * pb_y + g_0_yzzzzz_0_yyyyzzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_yyyzzzz_0[i] = g_0_zzzzz_0_yyyzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyzzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_yzzzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_yyyzzzz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_yyyzzzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_yyyzzzz_0[i] = g_0_zzzzz_0_yyyzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyyzzzz_1[i] * fti_ab_0 + 3.0 * g_0_yzzzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_yyyzzzz_0[i] * pb_y + g_0_yzzzzz_0_yyyzzzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_yyzzzzz_0[i] = g_0_zzzzz_0_yyzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyzzzzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_yzzzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_yyzzzzz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_yyzzzzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_yyzzzzz_0[i] = g_0_zzzzz_0_yyzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yyzzzzz_1[i] * fti_ab_0 + 2.0 * g_0_yzzzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_yyzzzzz_0[i] * pb_y + g_0_yzzzzz_0_yyzzzzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_yzzzzzz_0[i] = g_0_zzzzz_0_yzzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yzzzzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_zzzzzz_1[i] * fi_abcd_0 +
-                                     g_0_yzzzzz_0_yzzzzzz_0[i] * pb_y + g_0_yzzzzz_0_yzzzzzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_yzzzzzz_0[i] = g_0_zzzzz_0_yzzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_yzzzzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_yzzzzz_0_yzzzzzz_0[i] * pb_y + g_0_yzzzzz_0_yzzzzzz_1[i] * wp_y[i];
 
-        g_0_yyzzzzz_0_zzzzzzz_0[i] = g_0_zzzzz_0_zzzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_zzzzzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_zzzzzzz_0[i] * pb_y +
-                                     g_0_yzzzzz_0_zzzzzzz_1[i] * wp_y[i];
+        g_0_yyzzzzz_0_zzzzzzz_0[i] = g_0_zzzzz_0_zzzzzzz_0[i] * fi_ab_0 - g_0_zzzzz_0_zzzzzzz_1[i] * fti_ab_0 + g_0_yzzzzz_0_zzzzzzz_0[i] * pb_y + g_0_yzzzzz_0_zzzzzzz_1[i] * wp_y[i];
     }
 
     /// Set up 1224-1260 components of targeted buffer : SKSK
@@ -18094,145 +11098,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_yzzzzzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 1259);
 
-#pragma omp simd aligned(g_0_yzzzzzz_0_xxxxxxx_0,     \
-                             g_0_yzzzzzz_0_xxxxxxy_0, \
-                             g_0_yzzzzzz_0_xxxxxxz_0, \
-                             g_0_yzzzzzz_0_xxxxxyy_0, \
-                             g_0_yzzzzzz_0_xxxxxyz_0, \
-                             g_0_yzzzzzz_0_xxxxxzz_0, \
-                             g_0_yzzzzzz_0_xxxxyyy_0, \
-                             g_0_yzzzzzz_0_xxxxyyz_0, \
-                             g_0_yzzzzzz_0_xxxxyzz_0, \
-                             g_0_yzzzzzz_0_xxxxzzz_0, \
-                             g_0_yzzzzzz_0_xxxyyyy_0, \
-                             g_0_yzzzzzz_0_xxxyyyz_0, \
-                             g_0_yzzzzzz_0_xxxyyzz_0, \
-                             g_0_yzzzzzz_0_xxxyzzz_0, \
-                             g_0_yzzzzzz_0_xxxzzzz_0, \
-                             g_0_yzzzzzz_0_xxyyyyy_0, \
-                             g_0_yzzzzzz_0_xxyyyyz_0, \
-                             g_0_yzzzzzz_0_xxyyyzz_0, \
-                             g_0_yzzzzzz_0_xxyyzzz_0, \
-                             g_0_yzzzzzz_0_xxyzzzz_0, \
-                             g_0_yzzzzzz_0_xxzzzzz_0, \
-                             g_0_yzzzzzz_0_xyyyyyy_0, \
-                             g_0_yzzzzzz_0_xyyyyyz_0, \
-                             g_0_yzzzzzz_0_xyyyyzz_0, \
-                             g_0_yzzzzzz_0_xyyyzzz_0, \
-                             g_0_yzzzzzz_0_xyyzzzz_0, \
-                             g_0_yzzzzzz_0_xyzzzzz_0, \
-                             g_0_yzzzzzz_0_xzzzzzz_0, \
-                             g_0_yzzzzzz_0_yyyyyyy_0, \
-                             g_0_yzzzzzz_0_yyyyyyz_0, \
-                             g_0_yzzzzzz_0_yyyyyzz_0, \
-                             g_0_yzzzzzz_0_yyyyzzz_0, \
-                             g_0_yzzzzzz_0_yyyzzzz_0, \
-                             g_0_yzzzzzz_0_yyzzzzz_0, \
-                             g_0_yzzzzzz_0_yzzzzzz_0, \
-                             g_0_yzzzzzz_0_zzzzzzz_0, \
-                             g_0_zzzzzz_0_xxxxxx_1,   \
-                             g_0_zzzzzz_0_xxxxxxx_0,  \
-                             g_0_zzzzzz_0_xxxxxxx_1,  \
-                             g_0_zzzzzz_0_xxxxxxy_0,  \
-                             g_0_zzzzzz_0_xxxxxxy_1,  \
-                             g_0_zzzzzz_0_xxxxxxz_0,  \
-                             g_0_zzzzzz_0_xxxxxxz_1,  \
-                             g_0_zzzzzz_0_xxxxxy_1,   \
-                             g_0_zzzzzz_0_xxxxxyy_0,  \
-                             g_0_zzzzzz_0_xxxxxyy_1,  \
-                             g_0_zzzzzz_0_xxxxxyz_0,  \
-                             g_0_zzzzzz_0_xxxxxyz_1,  \
-                             g_0_zzzzzz_0_xxxxxz_1,   \
-                             g_0_zzzzzz_0_xxxxxzz_0,  \
-                             g_0_zzzzzz_0_xxxxxzz_1,  \
-                             g_0_zzzzzz_0_xxxxyy_1,   \
-                             g_0_zzzzzz_0_xxxxyyy_0,  \
-                             g_0_zzzzzz_0_xxxxyyy_1,  \
-                             g_0_zzzzzz_0_xxxxyyz_0,  \
-                             g_0_zzzzzz_0_xxxxyyz_1,  \
-                             g_0_zzzzzz_0_xxxxyz_1,   \
-                             g_0_zzzzzz_0_xxxxyzz_0,  \
-                             g_0_zzzzzz_0_xxxxyzz_1,  \
-                             g_0_zzzzzz_0_xxxxzz_1,   \
-                             g_0_zzzzzz_0_xxxxzzz_0,  \
-                             g_0_zzzzzz_0_xxxxzzz_1,  \
-                             g_0_zzzzzz_0_xxxyyy_1,   \
-                             g_0_zzzzzz_0_xxxyyyy_0,  \
-                             g_0_zzzzzz_0_xxxyyyy_1,  \
-                             g_0_zzzzzz_0_xxxyyyz_0,  \
-                             g_0_zzzzzz_0_xxxyyyz_1,  \
-                             g_0_zzzzzz_0_xxxyyz_1,   \
-                             g_0_zzzzzz_0_xxxyyzz_0,  \
-                             g_0_zzzzzz_0_xxxyyzz_1,  \
-                             g_0_zzzzzz_0_xxxyzz_1,   \
-                             g_0_zzzzzz_0_xxxyzzz_0,  \
-                             g_0_zzzzzz_0_xxxyzzz_1,  \
-                             g_0_zzzzzz_0_xxxzzz_1,   \
-                             g_0_zzzzzz_0_xxxzzzz_0,  \
-                             g_0_zzzzzz_0_xxxzzzz_1,  \
-                             g_0_zzzzzz_0_xxyyyy_1,   \
-                             g_0_zzzzzz_0_xxyyyyy_0,  \
-                             g_0_zzzzzz_0_xxyyyyy_1,  \
-                             g_0_zzzzzz_0_xxyyyyz_0,  \
-                             g_0_zzzzzz_0_xxyyyyz_1,  \
-                             g_0_zzzzzz_0_xxyyyz_1,   \
-                             g_0_zzzzzz_0_xxyyyzz_0,  \
-                             g_0_zzzzzz_0_xxyyyzz_1,  \
-                             g_0_zzzzzz_0_xxyyzz_1,   \
-                             g_0_zzzzzz_0_xxyyzzz_0,  \
-                             g_0_zzzzzz_0_xxyyzzz_1,  \
-                             g_0_zzzzzz_0_xxyzzz_1,   \
-                             g_0_zzzzzz_0_xxyzzzz_0,  \
-                             g_0_zzzzzz_0_xxyzzzz_1,  \
-                             g_0_zzzzzz_0_xxzzzz_1,   \
-                             g_0_zzzzzz_0_xxzzzzz_0,  \
-                             g_0_zzzzzz_0_xxzzzzz_1,  \
-                             g_0_zzzzzz_0_xyyyyy_1,   \
-                             g_0_zzzzzz_0_xyyyyyy_0,  \
-                             g_0_zzzzzz_0_xyyyyyy_1,  \
-                             g_0_zzzzzz_0_xyyyyyz_0,  \
-                             g_0_zzzzzz_0_xyyyyyz_1,  \
-                             g_0_zzzzzz_0_xyyyyz_1,   \
-                             g_0_zzzzzz_0_xyyyyzz_0,  \
-                             g_0_zzzzzz_0_xyyyyzz_1,  \
-                             g_0_zzzzzz_0_xyyyzz_1,   \
-                             g_0_zzzzzz_0_xyyyzzz_0,  \
-                             g_0_zzzzzz_0_xyyyzzz_1,  \
-                             g_0_zzzzzz_0_xyyzzz_1,   \
-                             g_0_zzzzzz_0_xyyzzzz_0,  \
-                             g_0_zzzzzz_0_xyyzzzz_1,  \
-                             g_0_zzzzzz_0_xyzzzz_1,   \
-                             g_0_zzzzzz_0_xyzzzzz_0,  \
-                             g_0_zzzzzz_0_xyzzzzz_1,  \
-                             g_0_zzzzzz_0_xzzzzz_1,   \
-                             g_0_zzzzzz_0_xzzzzzz_0,  \
-                             g_0_zzzzzz_0_xzzzzzz_1,  \
-                             g_0_zzzzzz_0_yyyyyy_1,   \
-                             g_0_zzzzzz_0_yyyyyyy_0,  \
-                             g_0_zzzzzz_0_yyyyyyy_1,  \
-                             g_0_zzzzzz_0_yyyyyyz_0,  \
-                             g_0_zzzzzz_0_yyyyyyz_1,  \
-                             g_0_zzzzzz_0_yyyyyz_1,   \
-                             g_0_zzzzzz_0_yyyyyzz_0,  \
-                             g_0_zzzzzz_0_yyyyyzz_1,  \
-                             g_0_zzzzzz_0_yyyyzz_1,   \
-                             g_0_zzzzzz_0_yyyyzzz_0,  \
-                             g_0_zzzzzz_0_yyyyzzz_1,  \
-                             g_0_zzzzzz_0_yyyzzz_1,   \
-                             g_0_zzzzzz_0_yyyzzzz_0,  \
-                             g_0_zzzzzz_0_yyyzzzz_1,  \
-                             g_0_zzzzzz_0_yyzzzz_1,   \
-                             g_0_zzzzzz_0_yyzzzzz_0,  \
-                             g_0_zzzzzz_0_yyzzzzz_1,  \
-                             g_0_zzzzzz_0_yzzzzz_1,   \
-                             g_0_zzzzzz_0_yzzzzzz_0,  \
-                             g_0_zzzzzz_0_yzzzzzz_1,  \
-                             g_0_zzzzzz_0_zzzzzz_1,   \
-                             g_0_zzzzzz_0_zzzzzzz_0,  \
-                             g_0_zzzzzz_0_zzzzzzz_1,  \
-                             wp_y,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_yzzzzzz_0_xxxxxxx_0, g_0_yzzzzzz_0_xxxxxxy_0, g_0_yzzzzzz_0_xxxxxxz_0, g_0_yzzzzzz_0_xxxxxyy_0, g_0_yzzzzzz_0_xxxxxyz_0, g_0_yzzzzzz_0_xxxxxzz_0, g_0_yzzzzzz_0_xxxxyyy_0, g_0_yzzzzzz_0_xxxxyyz_0, g_0_yzzzzzz_0_xxxxyzz_0, g_0_yzzzzzz_0_xxxxzzz_0, g_0_yzzzzzz_0_xxxyyyy_0, g_0_yzzzzzz_0_xxxyyyz_0, g_0_yzzzzzz_0_xxxyyzz_0, g_0_yzzzzzz_0_xxxyzzz_0, g_0_yzzzzzz_0_xxxzzzz_0, g_0_yzzzzzz_0_xxyyyyy_0, g_0_yzzzzzz_0_xxyyyyz_0, g_0_yzzzzzz_0_xxyyyzz_0, g_0_yzzzzzz_0_xxyyzzz_0, g_0_yzzzzzz_0_xxyzzzz_0, g_0_yzzzzzz_0_xxzzzzz_0, g_0_yzzzzzz_0_xyyyyyy_0, g_0_yzzzzzz_0_xyyyyyz_0, g_0_yzzzzzz_0_xyyyyzz_0, g_0_yzzzzzz_0_xyyyzzz_0, g_0_yzzzzzz_0_xyyzzzz_0, g_0_yzzzzzz_0_xyzzzzz_0, g_0_yzzzzzz_0_xzzzzzz_0, g_0_yzzzzzz_0_yyyyyyy_0, g_0_yzzzzzz_0_yyyyyyz_0, g_0_yzzzzzz_0_yyyyyzz_0, g_0_yzzzzzz_0_yyyyzzz_0, g_0_yzzzzzz_0_yyyzzzz_0, g_0_yzzzzzz_0_yyzzzzz_0, g_0_yzzzzzz_0_yzzzzzz_0, g_0_yzzzzzz_0_zzzzzzz_0, g_0_zzzzzz_0_xxxxxx_1, g_0_zzzzzz_0_xxxxxxx_0, g_0_zzzzzz_0_xxxxxxx_1, g_0_zzzzzz_0_xxxxxxy_0, g_0_zzzzzz_0_xxxxxxy_1, g_0_zzzzzz_0_xxxxxxz_0, g_0_zzzzzz_0_xxxxxxz_1, g_0_zzzzzz_0_xxxxxy_1, g_0_zzzzzz_0_xxxxxyy_0, g_0_zzzzzz_0_xxxxxyy_1, g_0_zzzzzz_0_xxxxxyz_0, g_0_zzzzzz_0_xxxxxyz_1, g_0_zzzzzz_0_xxxxxz_1, g_0_zzzzzz_0_xxxxxzz_0, g_0_zzzzzz_0_xxxxxzz_1, g_0_zzzzzz_0_xxxxyy_1, g_0_zzzzzz_0_xxxxyyy_0, g_0_zzzzzz_0_xxxxyyy_1, g_0_zzzzzz_0_xxxxyyz_0, g_0_zzzzzz_0_xxxxyyz_1, g_0_zzzzzz_0_xxxxyz_1, g_0_zzzzzz_0_xxxxyzz_0, g_0_zzzzzz_0_xxxxyzz_1, g_0_zzzzzz_0_xxxxzz_1, g_0_zzzzzz_0_xxxxzzz_0, g_0_zzzzzz_0_xxxxzzz_1, g_0_zzzzzz_0_xxxyyy_1, g_0_zzzzzz_0_xxxyyyy_0, g_0_zzzzzz_0_xxxyyyy_1, g_0_zzzzzz_0_xxxyyyz_0, g_0_zzzzzz_0_xxxyyyz_1, g_0_zzzzzz_0_xxxyyz_1, g_0_zzzzzz_0_xxxyyzz_0, g_0_zzzzzz_0_xxxyyzz_1, g_0_zzzzzz_0_xxxyzz_1, g_0_zzzzzz_0_xxxyzzz_0, g_0_zzzzzz_0_xxxyzzz_1, g_0_zzzzzz_0_xxxzzz_1, g_0_zzzzzz_0_xxxzzzz_0, g_0_zzzzzz_0_xxxzzzz_1, g_0_zzzzzz_0_xxyyyy_1, g_0_zzzzzz_0_xxyyyyy_0, g_0_zzzzzz_0_xxyyyyy_1, g_0_zzzzzz_0_xxyyyyz_0, g_0_zzzzzz_0_xxyyyyz_1, g_0_zzzzzz_0_xxyyyz_1, g_0_zzzzzz_0_xxyyyzz_0, g_0_zzzzzz_0_xxyyyzz_1, g_0_zzzzzz_0_xxyyzz_1, g_0_zzzzzz_0_xxyyzzz_0, g_0_zzzzzz_0_xxyyzzz_1, g_0_zzzzzz_0_xxyzzz_1, g_0_zzzzzz_0_xxyzzzz_0, g_0_zzzzzz_0_xxyzzzz_1, g_0_zzzzzz_0_xxzzzz_1, g_0_zzzzzz_0_xxzzzzz_0, g_0_zzzzzz_0_xxzzzzz_1, g_0_zzzzzz_0_xyyyyy_1, g_0_zzzzzz_0_xyyyyyy_0, g_0_zzzzzz_0_xyyyyyy_1, g_0_zzzzzz_0_xyyyyyz_0, g_0_zzzzzz_0_xyyyyyz_1, g_0_zzzzzz_0_xyyyyz_1, g_0_zzzzzz_0_xyyyyzz_0, g_0_zzzzzz_0_xyyyyzz_1, g_0_zzzzzz_0_xyyyzz_1, g_0_zzzzzz_0_xyyyzzz_0, g_0_zzzzzz_0_xyyyzzz_1, g_0_zzzzzz_0_xyyzzz_1, g_0_zzzzzz_0_xyyzzzz_0, g_0_zzzzzz_0_xyyzzzz_1, g_0_zzzzzz_0_xyzzzz_1, g_0_zzzzzz_0_xyzzzzz_0, g_0_zzzzzz_0_xyzzzzz_1, g_0_zzzzzz_0_xzzzzz_1, g_0_zzzzzz_0_xzzzzzz_0, g_0_zzzzzz_0_xzzzzzz_1, g_0_zzzzzz_0_yyyyyy_1, g_0_zzzzzz_0_yyyyyyy_0, g_0_zzzzzz_0_yyyyyyy_1, g_0_zzzzzz_0_yyyyyyz_0, g_0_zzzzzz_0_yyyyyyz_1, g_0_zzzzzz_0_yyyyyz_1, g_0_zzzzzz_0_yyyyyzz_0, g_0_zzzzzz_0_yyyyyzz_1, g_0_zzzzzz_0_yyyyzz_1, g_0_zzzzzz_0_yyyyzzz_0, g_0_zzzzzz_0_yyyyzzz_1, g_0_zzzzzz_0_yyyzzz_1, g_0_zzzzzz_0_yyyzzzz_0, g_0_zzzzzz_0_yyyzzzz_1, g_0_zzzzzz_0_yyzzzz_1, g_0_zzzzzz_0_yyzzzzz_0, g_0_zzzzzz_0_yyzzzzz_1, g_0_zzzzzz_0_yzzzzz_1, g_0_zzzzzz_0_yzzzzzz_0, g_0_zzzzzz_0_yzzzzzz_1, g_0_zzzzzz_0_zzzzzz_1, g_0_zzzzzz_0_zzzzzzz_0, g_0_zzzzzz_0_zzzzzzz_1, wp_y, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -18243,88 +11109,67 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         g_0_yzzzzzz_0_xxxxxxz_0[i] = g_0_zzzzzz_0_xxxxxxz_0[i] * pb_y + g_0_zzzzzz_0_xxxxxxz_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_xxxxxyy_0[i] =
-            2.0 * g_0_zzzzzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxyy_0[i] * pb_y + g_0_zzzzzz_0_xxxxxyy_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_xxxxxyy_0[i] = 2.0 * g_0_zzzzzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxyy_0[i] * pb_y + g_0_zzzzzz_0_xxxxxyy_1[i] * wp_y[i];
 
         g_0_yzzzzzz_0_xxxxxyz_0[i] = g_0_zzzzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxyz_0[i] * pb_y + g_0_zzzzzz_0_xxxxxyz_1[i] * wp_y[i];
 
         g_0_yzzzzzz_0_xxxxxzz_0[i] = g_0_zzzzzz_0_xxxxxzz_0[i] * pb_y + g_0_zzzzzz_0_xxxxxzz_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_xxxxyyy_0[i] =
-            3.0 * g_0_zzzzzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxyyy_0[i] * pb_y + g_0_zzzzzz_0_xxxxyyy_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_xxxxyyy_0[i] = 3.0 * g_0_zzzzzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxyyy_0[i] * pb_y + g_0_zzzzzz_0_xxxxyyy_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_xxxxyyz_0[i] =
-            2.0 * g_0_zzzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxyyz_0[i] * pb_y + g_0_zzzzzz_0_xxxxyyz_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_xxxxyyz_0[i] = 2.0 * g_0_zzzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxyyz_0[i] * pb_y + g_0_zzzzzz_0_xxxxyyz_1[i] * wp_y[i];
 
         g_0_yzzzzzz_0_xxxxyzz_0[i] = g_0_zzzzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxyzz_0[i] * pb_y + g_0_zzzzzz_0_xxxxyzz_1[i] * wp_y[i];
 
         g_0_yzzzzzz_0_xxxxzzz_0[i] = g_0_zzzzzz_0_xxxxzzz_0[i] * pb_y + g_0_zzzzzz_0_xxxxzzz_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_xxxyyyy_0[i] =
-            4.0 * g_0_zzzzzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyyyy_0[i] * pb_y + g_0_zzzzzz_0_xxxyyyy_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_xxxyyyy_0[i] = 4.0 * g_0_zzzzzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyyyy_0[i] * pb_y + g_0_zzzzzz_0_xxxyyyy_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_xxxyyyz_0[i] =
-            3.0 * g_0_zzzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyyyz_0[i] * pb_y + g_0_zzzzzz_0_xxxyyyz_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_xxxyyyz_0[i] = 3.0 * g_0_zzzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyyyz_0[i] * pb_y + g_0_zzzzzz_0_xxxyyyz_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_xxxyyzz_0[i] =
-            2.0 * g_0_zzzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyyzz_0[i] * pb_y + g_0_zzzzzz_0_xxxyyzz_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_xxxyyzz_0[i] = 2.0 * g_0_zzzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyyzz_0[i] * pb_y + g_0_zzzzzz_0_xxxyyzz_1[i] * wp_y[i];
 
         g_0_yzzzzzz_0_xxxyzzz_0[i] = g_0_zzzzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyzzz_0[i] * pb_y + g_0_zzzzzz_0_xxxyzzz_1[i] * wp_y[i];
 
         g_0_yzzzzzz_0_xxxzzzz_0[i] = g_0_zzzzzz_0_xxxzzzz_0[i] * pb_y + g_0_zzzzzz_0_xxxzzzz_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_xxyyyyy_0[i] =
-            5.0 * g_0_zzzzzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyyyy_0[i] * pb_y + g_0_zzzzzz_0_xxyyyyy_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_xxyyyyy_0[i] = 5.0 * g_0_zzzzzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyyyy_0[i] * pb_y + g_0_zzzzzz_0_xxyyyyy_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_xxyyyyz_0[i] =
-            4.0 * g_0_zzzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyyyz_0[i] * pb_y + g_0_zzzzzz_0_xxyyyyz_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_xxyyyyz_0[i] = 4.0 * g_0_zzzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyyyz_0[i] * pb_y + g_0_zzzzzz_0_xxyyyyz_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_xxyyyzz_0[i] =
-            3.0 * g_0_zzzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyyzz_0[i] * pb_y + g_0_zzzzzz_0_xxyyyzz_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_xxyyyzz_0[i] = 3.0 * g_0_zzzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyyzz_0[i] * pb_y + g_0_zzzzzz_0_xxyyyzz_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_xxyyzzz_0[i] =
-            2.0 * g_0_zzzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyzzz_0[i] * pb_y + g_0_zzzzzz_0_xxyyzzz_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_xxyyzzz_0[i] = 2.0 * g_0_zzzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyzzz_0[i] * pb_y + g_0_zzzzzz_0_xxyyzzz_1[i] * wp_y[i];
 
         g_0_yzzzzzz_0_xxyzzzz_0[i] = g_0_zzzzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyzzzz_0[i] * pb_y + g_0_zzzzzz_0_xxyzzzz_1[i] * wp_y[i];
 
         g_0_yzzzzzz_0_xxzzzzz_0[i] = g_0_zzzzzz_0_xxzzzzz_0[i] * pb_y + g_0_zzzzzz_0_xxzzzzz_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_xyyyyyy_0[i] =
-            6.0 * g_0_zzzzzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyyyyy_0[i] * pb_y + g_0_zzzzzz_0_xyyyyyy_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_xyyyyyy_0[i] = 6.0 * g_0_zzzzzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyyyyy_0[i] * pb_y + g_0_zzzzzz_0_xyyyyyy_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_xyyyyyz_0[i] =
-            5.0 * g_0_zzzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyyyyz_0[i] * pb_y + g_0_zzzzzz_0_xyyyyyz_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_xyyyyyz_0[i] = 5.0 * g_0_zzzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyyyyz_0[i] * pb_y + g_0_zzzzzz_0_xyyyyyz_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_xyyyyzz_0[i] =
-            4.0 * g_0_zzzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyyyzz_0[i] * pb_y + g_0_zzzzzz_0_xyyyyzz_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_xyyyyzz_0[i] = 4.0 * g_0_zzzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyyyzz_0[i] * pb_y + g_0_zzzzzz_0_xyyyyzz_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_xyyyzzz_0[i] =
-            3.0 * g_0_zzzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyyzzz_0[i] * pb_y + g_0_zzzzzz_0_xyyyzzz_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_xyyyzzz_0[i] = 3.0 * g_0_zzzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyyzzz_0[i] * pb_y + g_0_zzzzzz_0_xyyyzzz_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_xyyzzzz_0[i] =
-            2.0 * g_0_zzzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyzzzz_0[i] * pb_y + g_0_zzzzzz_0_xyyzzzz_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_xyyzzzz_0[i] = 2.0 * g_0_zzzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyzzzz_0[i] * pb_y + g_0_zzzzzz_0_xyyzzzz_1[i] * wp_y[i];
 
         g_0_yzzzzzz_0_xyzzzzz_0[i] = g_0_zzzzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyzzzzz_0[i] * pb_y + g_0_zzzzzz_0_xyzzzzz_1[i] * wp_y[i];
 
         g_0_yzzzzzz_0_xzzzzzz_0[i] = g_0_zzzzzz_0_xzzzzzz_0[i] * pb_y + g_0_zzzzzz_0_xzzzzzz_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_yyyyyyy_0[i] =
-            7.0 * g_0_zzzzzz_0_yyyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyyyyy_0[i] * pb_y + g_0_zzzzzz_0_yyyyyyy_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_yyyyyyy_0[i] = 7.0 * g_0_zzzzzz_0_yyyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyyyyy_0[i] * pb_y + g_0_zzzzzz_0_yyyyyyy_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_yyyyyyz_0[i] =
-            6.0 * g_0_zzzzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyyyyz_0[i] * pb_y + g_0_zzzzzz_0_yyyyyyz_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_yyyyyyz_0[i] = 6.0 * g_0_zzzzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyyyyz_0[i] * pb_y + g_0_zzzzzz_0_yyyyyyz_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_yyyyyzz_0[i] =
-            5.0 * g_0_zzzzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyyyzz_0[i] * pb_y + g_0_zzzzzz_0_yyyyyzz_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_yyyyyzz_0[i] = 5.0 * g_0_zzzzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyyyzz_0[i] * pb_y + g_0_zzzzzz_0_yyyyyzz_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_yyyyzzz_0[i] =
-            4.0 * g_0_zzzzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyyzzz_0[i] * pb_y + g_0_zzzzzz_0_yyyyzzz_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_yyyyzzz_0[i] = 4.0 * g_0_zzzzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyyzzz_0[i] * pb_y + g_0_zzzzzz_0_yyyyzzz_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_yyyzzzz_0[i] =
-            3.0 * g_0_zzzzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyzzzz_0[i] * pb_y + g_0_zzzzzz_0_yyyzzzz_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_yyyzzzz_0[i] = 3.0 * g_0_zzzzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyzzzz_0[i] * pb_y + g_0_zzzzzz_0_yyyzzzz_1[i] * wp_y[i];
 
-        g_0_yzzzzzz_0_yyzzzzz_0[i] =
-            2.0 * g_0_zzzzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyzzzzz_0[i] * pb_y + g_0_zzzzzz_0_yyzzzzz_1[i] * wp_y[i];
+        g_0_yzzzzzz_0_yyzzzzz_0[i] = 2.0 * g_0_zzzzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyzzzzz_0[i] * pb_y + g_0_zzzzzz_0_yyzzzzz_1[i] * wp_y[i];
 
         g_0_yzzzzzz_0_yzzzzzz_0[i] = g_0_zzzzzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yzzzzzz_0[i] * pb_y + g_0_zzzzzz_0_yzzzzzz_1[i] * wp_y[i];
 
@@ -18405,217 +11250,7 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
     auto g_0_zzzzzzz_0_zzzzzzz_0 = pbuffer.data(idx_eri_0_sksk + 1295);
 
-#pragma omp simd aligned(g_0_zzzzz_0_xxxxxxx_0,       \
-                             g_0_zzzzz_0_xxxxxxx_1,   \
-                             g_0_zzzzz_0_xxxxxxy_0,   \
-                             g_0_zzzzz_0_xxxxxxy_1,   \
-                             g_0_zzzzz_0_xxxxxxz_0,   \
-                             g_0_zzzzz_0_xxxxxxz_1,   \
-                             g_0_zzzzz_0_xxxxxyy_0,   \
-                             g_0_zzzzz_0_xxxxxyy_1,   \
-                             g_0_zzzzz_0_xxxxxyz_0,   \
-                             g_0_zzzzz_0_xxxxxyz_1,   \
-                             g_0_zzzzz_0_xxxxxzz_0,   \
-                             g_0_zzzzz_0_xxxxxzz_1,   \
-                             g_0_zzzzz_0_xxxxyyy_0,   \
-                             g_0_zzzzz_0_xxxxyyy_1,   \
-                             g_0_zzzzz_0_xxxxyyz_0,   \
-                             g_0_zzzzz_0_xxxxyyz_1,   \
-                             g_0_zzzzz_0_xxxxyzz_0,   \
-                             g_0_zzzzz_0_xxxxyzz_1,   \
-                             g_0_zzzzz_0_xxxxzzz_0,   \
-                             g_0_zzzzz_0_xxxxzzz_1,   \
-                             g_0_zzzzz_0_xxxyyyy_0,   \
-                             g_0_zzzzz_0_xxxyyyy_1,   \
-                             g_0_zzzzz_0_xxxyyyz_0,   \
-                             g_0_zzzzz_0_xxxyyyz_1,   \
-                             g_0_zzzzz_0_xxxyyzz_0,   \
-                             g_0_zzzzz_0_xxxyyzz_1,   \
-                             g_0_zzzzz_0_xxxyzzz_0,   \
-                             g_0_zzzzz_0_xxxyzzz_1,   \
-                             g_0_zzzzz_0_xxxzzzz_0,   \
-                             g_0_zzzzz_0_xxxzzzz_1,   \
-                             g_0_zzzzz_0_xxyyyyy_0,   \
-                             g_0_zzzzz_0_xxyyyyy_1,   \
-                             g_0_zzzzz_0_xxyyyyz_0,   \
-                             g_0_zzzzz_0_xxyyyyz_1,   \
-                             g_0_zzzzz_0_xxyyyzz_0,   \
-                             g_0_zzzzz_0_xxyyyzz_1,   \
-                             g_0_zzzzz_0_xxyyzzz_0,   \
-                             g_0_zzzzz_0_xxyyzzz_1,   \
-                             g_0_zzzzz_0_xxyzzzz_0,   \
-                             g_0_zzzzz_0_xxyzzzz_1,   \
-                             g_0_zzzzz_0_xxzzzzz_0,   \
-                             g_0_zzzzz_0_xxzzzzz_1,   \
-                             g_0_zzzzz_0_xyyyyyy_0,   \
-                             g_0_zzzzz_0_xyyyyyy_1,   \
-                             g_0_zzzzz_0_xyyyyyz_0,   \
-                             g_0_zzzzz_0_xyyyyyz_1,   \
-                             g_0_zzzzz_0_xyyyyzz_0,   \
-                             g_0_zzzzz_0_xyyyyzz_1,   \
-                             g_0_zzzzz_0_xyyyzzz_0,   \
-                             g_0_zzzzz_0_xyyyzzz_1,   \
-                             g_0_zzzzz_0_xyyzzzz_0,   \
-                             g_0_zzzzz_0_xyyzzzz_1,   \
-                             g_0_zzzzz_0_xyzzzzz_0,   \
-                             g_0_zzzzz_0_xyzzzzz_1,   \
-                             g_0_zzzzz_0_xzzzzzz_0,   \
-                             g_0_zzzzz_0_xzzzzzz_1,   \
-                             g_0_zzzzz_0_yyyyyyy_0,   \
-                             g_0_zzzzz_0_yyyyyyy_1,   \
-                             g_0_zzzzz_0_yyyyyyz_0,   \
-                             g_0_zzzzz_0_yyyyyyz_1,   \
-                             g_0_zzzzz_0_yyyyyzz_0,   \
-                             g_0_zzzzz_0_yyyyyzz_1,   \
-                             g_0_zzzzz_0_yyyyzzz_0,   \
-                             g_0_zzzzz_0_yyyyzzz_1,   \
-                             g_0_zzzzz_0_yyyzzzz_0,   \
-                             g_0_zzzzz_0_yyyzzzz_1,   \
-                             g_0_zzzzz_0_yyzzzzz_0,   \
-                             g_0_zzzzz_0_yyzzzzz_1,   \
-                             g_0_zzzzz_0_yzzzzzz_0,   \
-                             g_0_zzzzz_0_yzzzzzz_1,   \
-                             g_0_zzzzz_0_zzzzzzz_0,   \
-                             g_0_zzzzz_0_zzzzzzz_1,   \
-                             g_0_zzzzzz_0_xxxxxx_1,   \
-                             g_0_zzzzzz_0_xxxxxxx_0,  \
-                             g_0_zzzzzz_0_xxxxxxx_1,  \
-                             g_0_zzzzzz_0_xxxxxxy_0,  \
-                             g_0_zzzzzz_0_xxxxxxy_1,  \
-                             g_0_zzzzzz_0_xxxxxxz_0,  \
-                             g_0_zzzzzz_0_xxxxxxz_1,  \
-                             g_0_zzzzzz_0_xxxxxy_1,   \
-                             g_0_zzzzzz_0_xxxxxyy_0,  \
-                             g_0_zzzzzz_0_xxxxxyy_1,  \
-                             g_0_zzzzzz_0_xxxxxyz_0,  \
-                             g_0_zzzzzz_0_xxxxxyz_1,  \
-                             g_0_zzzzzz_0_xxxxxz_1,   \
-                             g_0_zzzzzz_0_xxxxxzz_0,  \
-                             g_0_zzzzzz_0_xxxxxzz_1,  \
-                             g_0_zzzzzz_0_xxxxyy_1,   \
-                             g_0_zzzzzz_0_xxxxyyy_0,  \
-                             g_0_zzzzzz_0_xxxxyyy_1,  \
-                             g_0_zzzzzz_0_xxxxyyz_0,  \
-                             g_0_zzzzzz_0_xxxxyyz_1,  \
-                             g_0_zzzzzz_0_xxxxyz_1,   \
-                             g_0_zzzzzz_0_xxxxyzz_0,  \
-                             g_0_zzzzzz_0_xxxxyzz_1,  \
-                             g_0_zzzzzz_0_xxxxzz_1,   \
-                             g_0_zzzzzz_0_xxxxzzz_0,  \
-                             g_0_zzzzzz_0_xxxxzzz_1,  \
-                             g_0_zzzzzz_0_xxxyyy_1,   \
-                             g_0_zzzzzz_0_xxxyyyy_0,  \
-                             g_0_zzzzzz_0_xxxyyyy_1,  \
-                             g_0_zzzzzz_0_xxxyyyz_0,  \
-                             g_0_zzzzzz_0_xxxyyyz_1,  \
-                             g_0_zzzzzz_0_xxxyyz_1,   \
-                             g_0_zzzzzz_0_xxxyyzz_0,  \
-                             g_0_zzzzzz_0_xxxyyzz_1,  \
-                             g_0_zzzzzz_0_xxxyzz_1,   \
-                             g_0_zzzzzz_0_xxxyzzz_0,  \
-                             g_0_zzzzzz_0_xxxyzzz_1,  \
-                             g_0_zzzzzz_0_xxxzzz_1,   \
-                             g_0_zzzzzz_0_xxxzzzz_0,  \
-                             g_0_zzzzzz_0_xxxzzzz_1,  \
-                             g_0_zzzzzz_0_xxyyyy_1,   \
-                             g_0_zzzzzz_0_xxyyyyy_0,  \
-                             g_0_zzzzzz_0_xxyyyyy_1,  \
-                             g_0_zzzzzz_0_xxyyyyz_0,  \
-                             g_0_zzzzzz_0_xxyyyyz_1,  \
-                             g_0_zzzzzz_0_xxyyyz_1,   \
-                             g_0_zzzzzz_0_xxyyyzz_0,  \
-                             g_0_zzzzzz_0_xxyyyzz_1,  \
-                             g_0_zzzzzz_0_xxyyzz_1,   \
-                             g_0_zzzzzz_0_xxyyzzz_0,  \
-                             g_0_zzzzzz_0_xxyyzzz_1,  \
-                             g_0_zzzzzz_0_xxyzzz_1,   \
-                             g_0_zzzzzz_0_xxyzzzz_0,  \
-                             g_0_zzzzzz_0_xxyzzzz_1,  \
-                             g_0_zzzzzz_0_xxzzzz_1,   \
-                             g_0_zzzzzz_0_xxzzzzz_0,  \
-                             g_0_zzzzzz_0_xxzzzzz_1,  \
-                             g_0_zzzzzz_0_xyyyyy_1,   \
-                             g_0_zzzzzz_0_xyyyyyy_0,  \
-                             g_0_zzzzzz_0_xyyyyyy_1,  \
-                             g_0_zzzzzz_0_xyyyyyz_0,  \
-                             g_0_zzzzzz_0_xyyyyyz_1,  \
-                             g_0_zzzzzz_0_xyyyyz_1,   \
-                             g_0_zzzzzz_0_xyyyyzz_0,  \
-                             g_0_zzzzzz_0_xyyyyzz_1,  \
-                             g_0_zzzzzz_0_xyyyzz_1,   \
-                             g_0_zzzzzz_0_xyyyzzz_0,  \
-                             g_0_zzzzzz_0_xyyyzzz_1,  \
-                             g_0_zzzzzz_0_xyyzzz_1,   \
-                             g_0_zzzzzz_0_xyyzzzz_0,  \
-                             g_0_zzzzzz_0_xyyzzzz_1,  \
-                             g_0_zzzzzz_0_xyzzzz_1,   \
-                             g_0_zzzzzz_0_xyzzzzz_0,  \
-                             g_0_zzzzzz_0_xyzzzzz_1,  \
-                             g_0_zzzzzz_0_xzzzzz_1,   \
-                             g_0_zzzzzz_0_xzzzzzz_0,  \
-                             g_0_zzzzzz_0_xzzzzzz_1,  \
-                             g_0_zzzzzz_0_yyyyyy_1,   \
-                             g_0_zzzzzz_0_yyyyyyy_0,  \
-                             g_0_zzzzzz_0_yyyyyyy_1,  \
-                             g_0_zzzzzz_0_yyyyyyz_0,  \
-                             g_0_zzzzzz_0_yyyyyyz_1,  \
-                             g_0_zzzzzz_0_yyyyyz_1,   \
-                             g_0_zzzzzz_0_yyyyyzz_0,  \
-                             g_0_zzzzzz_0_yyyyyzz_1,  \
-                             g_0_zzzzzz_0_yyyyzz_1,   \
-                             g_0_zzzzzz_0_yyyyzzz_0,  \
-                             g_0_zzzzzz_0_yyyyzzz_1,  \
-                             g_0_zzzzzz_0_yyyzzz_1,   \
-                             g_0_zzzzzz_0_yyyzzzz_0,  \
-                             g_0_zzzzzz_0_yyyzzzz_1,  \
-                             g_0_zzzzzz_0_yyzzzz_1,   \
-                             g_0_zzzzzz_0_yyzzzzz_0,  \
-                             g_0_zzzzzz_0_yyzzzzz_1,  \
-                             g_0_zzzzzz_0_yzzzzz_1,   \
-                             g_0_zzzzzz_0_yzzzzzz_0,  \
-                             g_0_zzzzzz_0_yzzzzzz_1,  \
-                             g_0_zzzzzz_0_zzzzzz_1,   \
-                             g_0_zzzzzz_0_zzzzzzz_0,  \
-                             g_0_zzzzzz_0_zzzzzzz_1,  \
-                             g_0_zzzzzzz_0_xxxxxxx_0, \
-                             g_0_zzzzzzz_0_xxxxxxy_0, \
-                             g_0_zzzzzzz_0_xxxxxxz_0, \
-                             g_0_zzzzzzz_0_xxxxxyy_0, \
-                             g_0_zzzzzzz_0_xxxxxyz_0, \
-                             g_0_zzzzzzz_0_xxxxxzz_0, \
-                             g_0_zzzzzzz_0_xxxxyyy_0, \
-                             g_0_zzzzzzz_0_xxxxyyz_0, \
-                             g_0_zzzzzzz_0_xxxxyzz_0, \
-                             g_0_zzzzzzz_0_xxxxzzz_0, \
-                             g_0_zzzzzzz_0_xxxyyyy_0, \
-                             g_0_zzzzzzz_0_xxxyyyz_0, \
-                             g_0_zzzzzzz_0_xxxyyzz_0, \
-                             g_0_zzzzzzz_0_xxxyzzz_0, \
-                             g_0_zzzzzzz_0_xxxzzzz_0, \
-                             g_0_zzzzzzz_0_xxyyyyy_0, \
-                             g_0_zzzzzzz_0_xxyyyyz_0, \
-                             g_0_zzzzzzz_0_xxyyyzz_0, \
-                             g_0_zzzzzzz_0_xxyyzzz_0, \
-                             g_0_zzzzzzz_0_xxyzzzz_0, \
-                             g_0_zzzzzzz_0_xxzzzzz_0, \
-                             g_0_zzzzzzz_0_xyyyyyy_0, \
-                             g_0_zzzzzzz_0_xyyyyyz_0, \
-                             g_0_zzzzzzz_0_xyyyyzz_0, \
-                             g_0_zzzzzzz_0_xyyyzzz_0, \
-                             g_0_zzzzzzz_0_xyyzzzz_0, \
-                             g_0_zzzzzzz_0_xyzzzzz_0, \
-                             g_0_zzzzzzz_0_xzzzzzz_0, \
-                             g_0_zzzzzzz_0_yyyyyyy_0, \
-                             g_0_zzzzzzz_0_yyyyyyz_0, \
-                             g_0_zzzzzzz_0_yyyyyzz_0, \
-                             g_0_zzzzzzz_0_yyyyzzz_0, \
-                             g_0_zzzzzzz_0_yyyzzzz_0, \
-                             g_0_zzzzzzz_0_yyzzzzz_0, \
-                             g_0_zzzzzzz_0_yzzzzzz_0, \
-                             g_0_zzzzzzz_0_zzzzzzz_0, \
-                             wp_z,                    \
-                             c_exps,                  \
-                             d_exps : 64)
+    #pragma omp simd aligned(g_0_zzzzz_0_xxxxxxx_0, g_0_zzzzz_0_xxxxxxx_1, g_0_zzzzz_0_xxxxxxy_0, g_0_zzzzz_0_xxxxxxy_1, g_0_zzzzz_0_xxxxxxz_0, g_0_zzzzz_0_xxxxxxz_1, g_0_zzzzz_0_xxxxxyy_0, g_0_zzzzz_0_xxxxxyy_1, g_0_zzzzz_0_xxxxxyz_0, g_0_zzzzz_0_xxxxxyz_1, g_0_zzzzz_0_xxxxxzz_0, g_0_zzzzz_0_xxxxxzz_1, g_0_zzzzz_0_xxxxyyy_0, g_0_zzzzz_0_xxxxyyy_1, g_0_zzzzz_0_xxxxyyz_0, g_0_zzzzz_0_xxxxyyz_1, g_0_zzzzz_0_xxxxyzz_0, g_0_zzzzz_0_xxxxyzz_1, g_0_zzzzz_0_xxxxzzz_0, g_0_zzzzz_0_xxxxzzz_1, g_0_zzzzz_0_xxxyyyy_0, g_0_zzzzz_0_xxxyyyy_1, g_0_zzzzz_0_xxxyyyz_0, g_0_zzzzz_0_xxxyyyz_1, g_0_zzzzz_0_xxxyyzz_0, g_0_zzzzz_0_xxxyyzz_1, g_0_zzzzz_0_xxxyzzz_0, g_0_zzzzz_0_xxxyzzz_1, g_0_zzzzz_0_xxxzzzz_0, g_0_zzzzz_0_xxxzzzz_1, g_0_zzzzz_0_xxyyyyy_0, g_0_zzzzz_0_xxyyyyy_1, g_0_zzzzz_0_xxyyyyz_0, g_0_zzzzz_0_xxyyyyz_1, g_0_zzzzz_0_xxyyyzz_0, g_0_zzzzz_0_xxyyyzz_1, g_0_zzzzz_0_xxyyzzz_0, g_0_zzzzz_0_xxyyzzz_1, g_0_zzzzz_0_xxyzzzz_0, g_0_zzzzz_0_xxyzzzz_1, g_0_zzzzz_0_xxzzzzz_0, g_0_zzzzz_0_xxzzzzz_1, g_0_zzzzz_0_xyyyyyy_0, g_0_zzzzz_0_xyyyyyy_1, g_0_zzzzz_0_xyyyyyz_0, g_0_zzzzz_0_xyyyyyz_1, g_0_zzzzz_0_xyyyyzz_0, g_0_zzzzz_0_xyyyyzz_1, g_0_zzzzz_0_xyyyzzz_0, g_0_zzzzz_0_xyyyzzz_1, g_0_zzzzz_0_xyyzzzz_0, g_0_zzzzz_0_xyyzzzz_1, g_0_zzzzz_0_xyzzzzz_0, g_0_zzzzz_0_xyzzzzz_1, g_0_zzzzz_0_xzzzzzz_0, g_0_zzzzz_0_xzzzzzz_1, g_0_zzzzz_0_yyyyyyy_0, g_0_zzzzz_0_yyyyyyy_1, g_0_zzzzz_0_yyyyyyz_0, g_0_zzzzz_0_yyyyyyz_1, g_0_zzzzz_0_yyyyyzz_0, g_0_zzzzz_0_yyyyyzz_1, g_0_zzzzz_0_yyyyzzz_0, g_0_zzzzz_0_yyyyzzz_1, g_0_zzzzz_0_yyyzzzz_0, g_0_zzzzz_0_yyyzzzz_1, g_0_zzzzz_0_yyzzzzz_0, g_0_zzzzz_0_yyzzzzz_1, g_0_zzzzz_0_yzzzzzz_0, g_0_zzzzz_0_yzzzzzz_1, g_0_zzzzz_0_zzzzzzz_0, g_0_zzzzz_0_zzzzzzz_1, g_0_zzzzzz_0_xxxxxx_1, g_0_zzzzzz_0_xxxxxxx_0, g_0_zzzzzz_0_xxxxxxx_1, g_0_zzzzzz_0_xxxxxxy_0, g_0_zzzzzz_0_xxxxxxy_1, g_0_zzzzzz_0_xxxxxxz_0, g_0_zzzzzz_0_xxxxxxz_1, g_0_zzzzzz_0_xxxxxy_1, g_0_zzzzzz_0_xxxxxyy_0, g_0_zzzzzz_0_xxxxxyy_1, g_0_zzzzzz_0_xxxxxyz_0, g_0_zzzzzz_0_xxxxxyz_1, g_0_zzzzzz_0_xxxxxz_1, g_0_zzzzzz_0_xxxxxzz_0, g_0_zzzzzz_0_xxxxxzz_1, g_0_zzzzzz_0_xxxxyy_1, g_0_zzzzzz_0_xxxxyyy_0, g_0_zzzzzz_0_xxxxyyy_1, g_0_zzzzzz_0_xxxxyyz_0, g_0_zzzzzz_0_xxxxyyz_1, g_0_zzzzzz_0_xxxxyz_1, g_0_zzzzzz_0_xxxxyzz_0, g_0_zzzzzz_0_xxxxyzz_1, g_0_zzzzzz_0_xxxxzz_1, g_0_zzzzzz_0_xxxxzzz_0, g_0_zzzzzz_0_xxxxzzz_1, g_0_zzzzzz_0_xxxyyy_1, g_0_zzzzzz_0_xxxyyyy_0, g_0_zzzzzz_0_xxxyyyy_1, g_0_zzzzzz_0_xxxyyyz_0, g_0_zzzzzz_0_xxxyyyz_1, g_0_zzzzzz_0_xxxyyz_1, g_0_zzzzzz_0_xxxyyzz_0, g_0_zzzzzz_0_xxxyyzz_1, g_0_zzzzzz_0_xxxyzz_1, g_0_zzzzzz_0_xxxyzzz_0, g_0_zzzzzz_0_xxxyzzz_1, g_0_zzzzzz_0_xxxzzz_1, g_0_zzzzzz_0_xxxzzzz_0, g_0_zzzzzz_0_xxxzzzz_1, g_0_zzzzzz_0_xxyyyy_1, g_0_zzzzzz_0_xxyyyyy_0, g_0_zzzzzz_0_xxyyyyy_1, g_0_zzzzzz_0_xxyyyyz_0, g_0_zzzzzz_0_xxyyyyz_1, g_0_zzzzzz_0_xxyyyz_1, g_0_zzzzzz_0_xxyyyzz_0, g_0_zzzzzz_0_xxyyyzz_1, g_0_zzzzzz_0_xxyyzz_1, g_0_zzzzzz_0_xxyyzzz_0, g_0_zzzzzz_0_xxyyzzz_1, g_0_zzzzzz_0_xxyzzz_1, g_0_zzzzzz_0_xxyzzzz_0, g_0_zzzzzz_0_xxyzzzz_1, g_0_zzzzzz_0_xxzzzz_1, g_0_zzzzzz_0_xxzzzzz_0, g_0_zzzzzz_0_xxzzzzz_1, g_0_zzzzzz_0_xyyyyy_1, g_0_zzzzzz_0_xyyyyyy_0, g_0_zzzzzz_0_xyyyyyy_1, g_0_zzzzzz_0_xyyyyyz_0, g_0_zzzzzz_0_xyyyyyz_1, g_0_zzzzzz_0_xyyyyz_1, g_0_zzzzzz_0_xyyyyzz_0, g_0_zzzzzz_0_xyyyyzz_1, g_0_zzzzzz_0_xyyyzz_1, g_0_zzzzzz_0_xyyyzzz_0, g_0_zzzzzz_0_xyyyzzz_1, g_0_zzzzzz_0_xyyzzz_1, g_0_zzzzzz_0_xyyzzzz_0, g_0_zzzzzz_0_xyyzzzz_1, g_0_zzzzzz_0_xyzzzz_1, g_0_zzzzzz_0_xyzzzzz_0, g_0_zzzzzz_0_xyzzzzz_1, g_0_zzzzzz_0_xzzzzz_1, g_0_zzzzzz_0_xzzzzzz_0, g_0_zzzzzz_0_xzzzzzz_1, g_0_zzzzzz_0_yyyyyy_1, g_0_zzzzzz_0_yyyyyyy_0, g_0_zzzzzz_0_yyyyyyy_1, g_0_zzzzzz_0_yyyyyyz_0, g_0_zzzzzz_0_yyyyyyz_1, g_0_zzzzzz_0_yyyyyz_1, g_0_zzzzzz_0_yyyyyzz_0, g_0_zzzzzz_0_yyyyyzz_1, g_0_zzzzzz_0_yyyyzz_1, g_0_zzzzzz_0_yyyyzzz_0, g_0_zzzzzz_0_yyyyzzz_1, g_0_zzzzzz_0_yyyzzz_1, g_0_zzzzzz_0_yyyzzzz_0, g_0_zzzzzz_0_yyyzzzz_1, g_0_zzzzzz_0_yyzzzz_1, g_0_zzzzzz_0_yyzzzzz_0, g_0_zzzzzz_0_yyzzzzz_1, g_0_zzzzzz_0_yzzzzz_1, g_0_zzzzzz_0_yzzzzzz_0, g_0_zzzzzz_0_yzzzzzz_1, g_0_zzzzzz_0_zzzzzz_1, g_0_zzzzzz_0_zzzzzzz_0, g_0_zzzzzz_0_zzzzzzz_1, g_0_zzzzzzz_0_xxxxxxx_0, g_0_zzzzzzz_0_xxxxxxy_0, g_0_zzzzzzz_0_xxxxxxz_0, g_0_zzzzzzz_0_xxxxxyy_0, g_0_zzzzzzz_0_xxxxxyz_0, g_0_zzzzzzz_0_xxxxxzz_0, g_0_zzzzzzz_0_xxxxyyy_0, g_0_zzzzzzz_0_xxxxyyz_0, g_0_zzzzzzz_0_xxxxyzz_0, g_0_zzzzzzz_0_xxxxzzz_0, g_0_zzzzzzz_0_xxxyyyy_0, g_0_zzzzzzz_0_xxxyyyz_0, g_0_zzzzzzz_0_xxxyyzz_0, g_0_zzzzzzz_0_xxxyzzz_0, g_0_zzzzzzz_0_xxxzzzz_0, g_0_zzzzzzz_0_xxyyyyy_0, g_0_zzzzzzz_0_xxyyyyz_0, g_0_zzzzzzz_0_xxyyyzz_0, g_0_zzzzzzz_0_xxyyzzz_0, g_0_zzzzzzz_0_xxyzzzz_0, g_0_zzzzzzz_0_xxzzzzz_0, g_0_zzzzzzz_0_xyyyyyy_0, g_0_zzzzzzz_0_xyyyyyz_0, g_0_zzzzzzz_0_xyyyyzz_0, g_0_zzzzzzz_0_xyyyzzz_0, g_0_zzzzzzz_0_xyyzzzz_0, g_0_zzzzzzz_0_xyzzzzz_0, g_0_zzzzzzz_0_xzzzzzz_0, g_0_zzzzzzz_0_yyyyyyy_0, g_0_zzzzzzz_0_yyyyyyz_0, g_0_zzzzzzz_0_yyyyyzz_0, g_0_zzzzzzz_0_yyyyzzz_0, g_0_zzzzzzz_0_yyyzzzz_0, g_0_zzzzzzz_0_yyzzzzz_0, g_0_zzzzzzz_0_yzzzzzz_0, g_0_zzzzzzz_0_zzzzzzz_0, wp_z, c_exps, d_exps  : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -18624,135 +11259,79 @@ comp_prim_electron_repulsion_sksk(CSimdArray<double>&   pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_zzzzzzz_0_xxxxxxx_0[i] = 6.0 * g_0_zzzzz_0_xxxxxxx_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxxxx_1[i] * fti_ab_0 +
-                                     g_0_zzzzzz_0_xxxxxxx_0[i] * pb_z + g_0_zzzzzz_0_xxxxxxx_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxxxxxx_0[i] = 6.0 * g_0_zzzzz_0_xxxxxxx_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxxxx_1[i] * fti_ab_0 + g_0_zzzzzz_0_xxxxxxx_0[i] * pb_z + g_0_zzzzzz_0_xxxxxxx_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxxxxxy_0[i] = 6.0 * g_0_zzzzz_0_xxxxxxy_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxxxy_1[i] * fti_ab_0 +
-                                     g_0_zzzzzz_0_xxxxxxy_0[i] * pb_z + g_0_zzzzzz_0_xxxxxxy_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxxxxxy_0[i] = 6.0 * g_0_zzzzz_0_xxxxxxy_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxxxy_1[i] * fti_ab_0 + g_0_zzzzzz_0_xxxxxxy_0[i] * pb_z + g_0_zzzzzz_0_xxxxxxy_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxxxxxz_0[i] = 6.0 * g_0_zzzzz_0_xxxxxxz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxxxz_1[i] * fti_ab_0 +
-                                     g_0_zzzzzz_0_xxxxxx_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxxz_0[i] * pb_z + g_0_zzzzzz_0_xxxxxxz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxxxxxz_0[i] = 6.0 * g_0_zzzzz_0_xxxxxxz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxxxz_1[i] * fti_ab_0 + g_0_zzzzzz_0_xxxxxx_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxxz_0[i] * pb_z + g_0_zzzzzz_0_xxxxxxz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxxxxyy_0[i] = 6.0 * g_0_zzzzz_0_xxxxxyy_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxxyy_1[i] * fti_ab_0 +
-                                     g_0_zzzzzz_0_xxxxxyy_0[i] * pb_z + g_0_zzzzzz_0_xxxxxyy_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxxxxyy_0[i] = 6.0 * g_0_zzzzz_0_xxxxxyy_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxxyy_1[i] * fti_ab_0 + g_0_zzzzzz_0_xxxxxyy_0[i] * pb_z + g_0_zzzzzz_0_xxxxxyy_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxxxxyz_0[i] = 6.0 * g_0_zzzzz_0_xxxxxyz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxxyz_1[i] * fti_ab_0 +
-                                     g_0_zzzzzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxyz_0[i] * pb_z + g_0_zzzzzz_0_xxxxxyz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxxxxyz_0[i] = 6.0 * g_0_zzzzz_0_xxxxxyz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxxyz_1[i] * fti_ab_0 + g_0_zzzzzz_0_xxxxxy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxyz_0[i] * pb_z + g_0_zzzzzz_0_xxxxxyz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxxxxzz_0[i] = 6.0 * g_0_zzzzz_0_xxxxxzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxxzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_zzzzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_xxxxxzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxxxxzz_0[i] = 6.0 * g_0_zzzzz_0_xxxxxzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxxzz_1[i] * fti_ab_0 + 2.0 * g_0_zzzzzz_0_xxxxxz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxxzz_0[i] * pb_z + g_0_zzzzzz_0_xxxxxzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxxxyyy_0[i] = 6.0 * g_0_zzzzz_0_xxxxyyy_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxyyy_1[i] * fti_ab_0 +
-                                     g_0_zzzzzz_0_xxxxyyy_0[i] * pb_z + g_0_zzzzzz_0_xxxxyyy_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxxxyyy_0[i] = 6.0 * g_0_zzzzz_0_xxxxyyy_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxyyy_1[i] * fti_ab_0 + g_0_zzzzzz_0_xxxxyyy_0[i] * pb_z + g_0_zzzzzz_0_xxxxyyy_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxxxyyz_0[i] = 6.0 * g_0_zzzzz_0_xxxxyyz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxyyz_1[i] * fti_ab_0 +
-                                     g_0_zzzzzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxyyz_0[i] * pb_z + g_0_zzzzzz_0_xxxxyyz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxxxyyz_0[i] = 6.0 * g_0_zzzzz_0_xxxxyyz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxyyz_1[i] * fti_ab_0 + g_0_zzzzzz_0_xxxxyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxyyz_0[i] * pb_z + g_0_zzzzzz_0_xxxxyyz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxxxyzz_0[i] = 6.0 * g_0_zzzzz_0_xxxxyzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_zzzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxyzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_xxxxyzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxxxyzz_0[i] = 6.0 * g_0_zzzzz_0_xxxxyzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxyzz_1[i] * fti_ab_0 + 2.0 * g_0_zzzzzz_0_xxxxyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxyzz_0[i] * pb_z + g_0_zzzzzz_0_xxxxyzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxxxzzz_0[i] = 6.0 * g_0_zzzzz_0_xxxxzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_zzzzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxzzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_xxxxzzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxxxzzz_0[i] = 6.0 * g_0_zzzzz_0_xxxxzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxxzzz_1[i] * fti_ab_0 + 3.0 * g_0_zzzzzz_0_xxxxzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxxzzz_0[i] * pb_z + g_0_zzzzzz_0_xxxxzzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxxyyyy_0[i] = 6.0 * g_0_zzzzz_0_xxxyyyy_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxyyyy_1[i] * fti_ab_0 +
-                                     g_0_zzzzzz_0_xxxyyyy_0[i] * pb_z + g_0_zzzzzz_0_xxxyyyy_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxxyyyy_0[i] = 6.0 * g_0_zzzzz_0_xxxyyyy_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxyyyy_1[i] * fti_ab_0 + g_0_zzzzzz_0_xxxyyyy_0[i] * pb_z + g_0_zzzzzz_0_xxxyyyy_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxxyyyz_0[i] = 6.0 * g_0_zzzzz_0_xxxyyyz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxyyyz_1[i] * fti_ab_0 +
-                                     g_0_zzzzzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyyyz_0[i] * pb_z + g_0_zzzzzz_0_xxxyyyz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxxyyyz_0[i] = 6.0 * g_0_zzzzz_0_xxxyyyz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxyyyz_1[i] * fti_ab_0 + g_0_zzzzzz_0_xxxyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyyyz_0[i] * pb_z + g_0_zzzzzz_0_xxxyyyz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxxyyzz_0[i] = 6.0 * g_0_zzzzz_0_xxxyyzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_zzzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyyzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_xxxyyzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxxyyzz_0[i] = 6.0 * g_0_zzzzz_0_xxxyyzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxyyzz_1[i] * fti_ab_0 + 2.0 * g_0_zzzzzz_0_xxxyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyyzz_0[i] * pb_z + g_0_zzzzzz_0_xxxyyzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxxyzzz_0[i] = 6.0 * g_0_zzzzz_0_xxxyzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_zzzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyzzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_xxxyzzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxxyzzz_0[i] = 6.0 * g_0_zzzzz_0_xxxyzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxyzzz_1[i] * fti_ab_0 + 3.0 * g_0_zzzzzz_0_xxxyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxyzzz_0[i] * pb_z + g_0_zzzzzz_0_xxxyzzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxxzzzz_0[i] = 6.0 * g_0_zzzzz_0_xxxzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxzzzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_zzzzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxzzzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_xxxzzzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxxzzzz_0[i] = 6.0 * g_0_zzzzz_0_xxxzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxxzzzz_1[i] * fti_ab_0 + 4.0 * g_0_zzzzzz_0_xxxzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxxzzzz_0[i] * pb_z + g_0_zzzzzz_0_xxxzzzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxyyyyy_0[i] = 6.0 * g_0_zzzzz_0_xxyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxyyyyy_1[i] * fti_ab_0 +
-                                     g_0_zzzzzz_0_xxyyyyy_0[i] * pb_z + g_0_zzzzzz_0_xxyyyyy_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxyyyyy_0[i] = 6.0 * g_0_zzzzz_0_xxyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxyyyyy_1[i] * fti_ab_0 + g_0_zzzzzz_0_xxyyyyy_0[i] * pb_z + g_0_zzzzzz_0_xxyyyyy_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxyyyyz_0[i] = 6.0 * g_0_zzzzz_0_xxyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxyyyyz_1[i] * fti_ab_0 +
-                                     g_0_zzzzzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyyyz_0[i] * pb_z + g_0_zzzzzz_0_xxyyyyz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxyyyyz_0[i] = 6.0 * g_0_zzzzz_0_xxyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxyyyyz_1[i] * fti_ab_0 + g_0_zzzzzz_0_xxyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyyyz_0[i] * pb_z + g_0_zzzzzz_0_xxyyyyz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxyyyzz_0[i] = 6.0 * g_0_zzzzz_0_xxyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxyyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_zzzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyyzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_xxyyyzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxyyyzz_0[i] = 6.0 * g_0_zzzzz_0_xxyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxyyyzz_1[i] * fti_ab_0 + 2.0 * g_0_zzzzzz_0_xxyyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyyzz_0[i] * pb_z + g_0_zzzzzz_0_xxyyyzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxyyzzz_0[i] = 6.0 * g_0_zzzzz_0_xxyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxyyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_zzzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyzzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_xxyyzzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxyyzzz_0[i] = 6.0 * g_0_zzzzz_0_xxyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxyyzzz_1[i] * fti_ab_0 + 3.0 * g_0_zzzzzz_0_xxyyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyyzzz_0[i] * pb_z + g_0_zzzzzz_0_xxyyzzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxyzzzz_0[i] = 6.0 * g_0_zzzzz_0_xxyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxyzzzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_zzzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyzzzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_xxyzzzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxyzzzz_0[i] = 6.0 * g_0_zzzzz_0_xxyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxyzzzz_1[i] * fti_ab_0 + 4.0 * g_0_zzzzzz_0_xxyzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxyzzzz_0[i] * pb_z + g_0_zzzzzz_0_xxyzzzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xxzzzzz_0[i] = 6.0 * g_0_zzzzz_0_xxzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxzzzzz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_zzzzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxzzzzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_xxzzzzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xxzzzzz_0[i] = 6.0 * g_0_zzzzz_0_xxzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xxzzzzz_1[i] * fti_ab_0 + 5.0 * g_0_zzzzzz_0_xxzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xxzzzzz_0[i] * pb_z + g_0_zzzzzz_0_xxzzzzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xyyyyyy_0[i] = 6.0 * g_0_zzzzz_0_xyyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_zzzzzz_0_xyyyyyy_0[i] * pb_z + g_0_zzzzzz_0_xyyyyyy_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xyyyyyy_0[i] = 6.0 * g_0_zzzzz_0_xyyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xyyyyyy_1[i] * fti_ab_0 + g_0_zzzzzz_0_xyyyyyy_0[i] * pb_z + g_0_zzzzzz_0_xyyyyyy_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xyyyyyz_0[i] = 6.0 * g_0_zzzzz_0_xyyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_zzzzzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyyyyz_0[i] * pb_z + g_0_zzzzzz_0_xyyyyyz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xyyyyyz_0[i] = 6.0 * g_0_zzzzz_0_xyyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xyyyyyz_1[i] * fti_ab_0 + g_0_zzzzzz_0_xyyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyyyyz_0[i] * pb_z + g_0_zzzzzz_0_xyyyyyz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xyyyyzz_0[i] = 6.0 * g_0_zzzzz_0_xyyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xyyyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_zzzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyyyzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_xyyyyzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xyyyyzz_0[i] = 6.0 * g_0_zzzzz_0_xyyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xyyyyzz_1[i] * fti_ab_0 + 2.0 * g_0_zzzzzz_0_xyyyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyyyzz_0[i] * pb_z + g_0_zzzzzz_0_xyyyyzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xyyyzzz_0[i] = 6.0 * g_0_zzzzz_0_xyyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xyyyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_zzzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyyzzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_xyyyzzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xyyyzzz_0[i] = 6.0 * g_0_zzzzz_0_xyyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xyyyzzz_1[i] * fti_ab_0 + 3.0 * g_0_zzzzzz_0_xyyyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyyzzz_0[i] * pb_z + g_0_zzzzzz_0_xyyyzzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xyyzzzz_0[i] = 6.0 * g_0_zzzzz_0_xyyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xyyzzzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_zzzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyzzzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_xyyzzzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xyyzzzz_0[i] = 6.0 * g_0_zzzzz_0_xyyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xyyzzzz_1[i] * fti_ab_0 + 4.0 * g_0_zzzzzz_0_xyyzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyyzzzz_0[i] * pb_z + g_0_zzzzzz_0_xyyzzzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xyzzzzz_0[i] = 6.0 * g_0_zzzzz_0_xyzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xyzzzzz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_zzzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyzzzzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_xyzzzzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xyzzzzz_0[i] = 6.0 * g_0_zzzzz_0_xyzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xyzzzzz_1[i] * fti_ab_0 + 5.0 * g_0_zzzzzz_0_xyzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xyzzzzz_0[i] * pb_z + g_0_zzzzzz_0_xyzzzzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_xzzzzzz_0[i] = 6.0 * g_0_zzzzz_0_xzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xzzzzzz_1[i] * fti_ab_0 +
-                                     6.0 * g_0_zzzzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xzzzzzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_xzzzzzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_xzzzzzz_0[i] = 6.0 * g_0_zzzzz_0_xzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_xzzzzzz_1[i] * fti_ab_0 + 6.0 * g_0_zzzzzz_0_xzzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_xzzzzzz_0[i] * pb_z + g_0_zzzzzz_0_xzzzzzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_yyyyyyy_0[i] = 6.0 * g_0_zzzzz_0_yyyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_yyyyyyy_1[i] * fti_ab_0 +
-                                     g_0_zzzzzz_0_yyyyyyy_0[i] * pb_z + g_0_zzzzzz_0_yyyyyyy_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_yyyyyyy_0[i] = 6.0 * g_0_zzzzz_0_yyyyyyy_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_yyyyyyy_1[i] * fti_ab_0 + g_0_zzzzzz_0_yyyyyyy_0[i] * pb_z + g_0_zzzzzz_0_yyyyyyy_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_yyyyyyz_0[i] = 6.0 * g_0_zzzzz_0_yyyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_yyyyyyz_1[i] * fti_ab_0 +
-                                     g_0_zzzzzz_0_yyyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyyyyz_0[i] * pb_z + g_0_zzzzzz_0_yyyyyyz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_yyyyyyz_0[i] = 6.0 * g_0_zzzzz_0_yyyyyyz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_yyyyyyz_1[i] * fti_ab_0 + g_0_zzzzzz_0_yyyyyy_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyyyyz_0[i] * pb_z + g_0_zzzzzz_0_yyyyyyz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_yyyyyzz_0[i] = 6.0 * g_0_zzzzz_0_yyyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_yyyyyzz_1[i] * fti_ab_0 +
-                                     2.0 * g_0_zzzzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyyyzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_yyyyyzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_yyyyyzz_0[i] = 6.0 * g_0_zzzzz_0_yyyyyzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_yyyyyzz_1[i] * fti_ab_0 + 2.0 * g_0_zzzzzz_0_yyyyyz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyyyzz_0[i] * pb_z + g_0_zzzzzz_0_yyyyyzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_yyyyzzz_0[i] = 6.0 * g_0_zzzzz_0_yyyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_yyyyzzz_1[i] * fti_ab_0 +
-                                     3.0 * g_0_zzzzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyyzzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_yyyyzzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_yyyyzzz_0[i] = 6.0 * g_0_zzzzz_0_yyyyzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_yyyyzzz_1[i] * fti_ab_0 + 3.0 * g_0_zzzzzz_0_yyyyzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyyzzz_0[i] * pb_z + g_0_zzzzzz_0_yyyyzzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_yyyzzzz_0[i] = 6.0 * g_0_zzzzz_0_yyyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_yyyzzzz_1[i] * fti_ab_0 +
-                                     4.0 * g_0_zzzzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyzzzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_yyyzzzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_yyyzzzz_0[i] = 6.0 * g_0_zzzzz_0_yyyzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_yyyzzzz_1[i] * fti_ab_0 + 4.0 * g_0_zzzzzz_0_yyyzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyyzzzz_0[i] * pb_z + g_0_zzzzzz_0_yyyzzzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_yyzzzzz_0[i] = 6.0 * g_0_zzzzz_0_yyzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_yyzzzzz_1[i] * fti_ab_0 +
-                                     5.0 * g_0_zzzzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyzzzzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_yyzzzzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_yyzzzzz_0[i] = 6.0 * g_0_zzzzz_0_yyzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_yyzzzzz_1[i] * fti_ab_0 + 5.0 * g_0_zzzzzz_0_yyzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yyzzzzz_0[i] * pb_z + g_0_zzzzzz_0_yyzzzzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_yzzzzzz_0[i] = 6.0 * g_0_zzzzz_0_yzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_yzzzzzz_1[i] * fti_ab_0 +
-                                     6.0 * g_0_zzzzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yzzzzzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_yzzzzzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_yzzzzzz_0[i] = 6.0 * g_0_zzzzz_0_yzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_yzzzzzz_1[i] * fti_ab_0 + 6.0 * g_0_zzzzzz_0_yzzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_yzzzzzz_0[i] * pb_z + g_0_zzzzzz_0_yzzzzzz_1[i] * wp_z[i];
 
-        g_0_zzzzzzz_0_zzzzzzz_0[i] = 6.0 * g_0_zzzzz_0_zzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_zzzzzzz_1[i] * fti_ab_0 +
-                                     7.0 * g_0_zzzzzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_zzzzzzz_0[i] * pb_z +
-                                     g_0_zzzzzz_0_zzzzzzz_1[i] * wp_z[i];
+        g_0_zzzzzzz_0_zzzzzzz_0[i] = 6.0 * g_0_zzzzz_0_zzzzzzz_0[i] * fi_ab_0 - 6.0 * g_0_zzzzz_0_zzzzzzz_1[i] * fti_ab_0 + 7.0 * g_0_zzzzzz_0_zzzzzz_1[i] * fi_abcd_0 + g_0_zzzzzz_0_zzzzzzz_0[i] * pb_z + g_0_zzzzzz_0_zzzzzzz_1[i] * wp_z[i];
     }
 }
 
-}  // namespace erirec
+} // erirec namespace
+

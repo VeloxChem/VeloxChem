@@ -2,27 +2,23 @@
 
 #include "TensorComponents.hpp"
 
-namespace erirec {  // erirec namespace
+namespace erirec { // erirec namespace
 
 auto
-comp_ket_hrr_electron_repulsion_xxdh(CSimdArray<double>&       cbuffer,
-                                     const size_t              idx_xxdh,
-                                     const size_t              idx_xxph,
-                                     const size_t              idx_xxpi,
+comp_ket_hrr_electron_repulsion_xxdh(CSimdArray<double>& cbuffer,
+                                     const size_t idx_xxdh,
+                                     const size_t idx_xxph,
+                                     const size_t idx_xxpi,
                                      const CSimdArray<double>& factors,
-                                     const size_t              idx_cd,
-                                     const int                 a_angmom,
-                                     const int                 b_angmom) -> void
+                                     const size_t idx_cd,
+                                     const int a_angmom,
+                                     const int b_angmom) -> void
 {
     const auto nelems = cbuffer.number_of_active_elements();
 
-    const auto acomps = tensor::number_of_cartesian_components(std::array<int, 1>{
-        a_angmom,
-    });
+    const auto acomps = tensor::number_of_cartesian_components(std::array<int, 1>{a_angmom,});
 
-    const auto bcomps = tensor::number_of_cartesian_components(std::array<int, 1>{
-        b_angmom,
-    });
+    const auto bcomps = tensor::number_of_cartesian_components(std::array<int, 1>{b_angmom,});
 
     // Set up R(CD) distances
 
@@ -370,70 +366,7 @@ comp_ket_hrr_electron_repulsion_xxdh(CSimdArray<double>&       cbuffer,
 
             auto g_xx_zzzzz = cbuffer.data(dh_off + 20);
 
-#pragma omp simd aligned(cd_x,           \
-                             g_x_xxxxx,  \
-                             g_x_xxxxxx, \
-                             g_x_xxxxxy, \
-                             g_x_xxxxxz, \
-                             g_x_xxxxy,  \
-                             g_x_xxxxyy, \
-                             g_x_xxxxyz, \
-                             g_x_xxxxz,  \
-                             g_x_xxxxzz, \
-                             g_x_xxxyy,  \
-                             g_x_xxxyyy, \
-                             g_x_xxxyyz, \
-                             g_x_xxxyz,  \
-                             g_x_xxxyzz, \
-                             g_x_xxxzz,  \
-                             g_x_xxxzzz, \
-                             g_x_xxyyy,  \
-                             g_x_xxyyyy, \
-                             g_x_xxyyyz, \
-                             g_x_xxyyz,  \
-                             g_x_xxyyzz, \
-                             g_x_xxyzz,  \
-                             g_x_xxyzzz, \
-                             g_x_xxzzz,  \
-                             g_x_xxzzzz, \
-                             g_x_xyyyy,  \
-                             g_x_xyyyyy, \
-                             g_x_xyyyyz, \
-                             g_x_xyyyz,  \
-                             g_x_xyyyzz, \
-                             g_x_xyyzz,  \
-                             g_x_xyyzzz, \
-                             g_x_xyzzz,  \
-                             g_x_xyzzzz, \
-                             g_x_xzzzz,  \
-                             g_x_xzzzzz, \
-                             g_x_yyyyy,  \
-                             g_x_yyyyz,  \
-                             g_x_yyyzz,  \
-                             g_x_yyzzz,  \
-                             g_x_yzzzz,  \
-                             g_x_zzzzz,  \
-                             g_xx_xxxxx, \
-                             g_xx_xxxxy, \
-                             g_xx_xxxxz, \
-                             g_xx_xxxyy, \
-                             g_xx_xxxyz, \
-                             g_xx_xxxzz, \
-                             g_xx_xxyyy, \
-                             g_xx_xxyyz, \
-                             g_xx_xxyzz, \
-                             g_xx_xxzzz, \
-                             g_xx_xyyyy, \
-                             g_xx_xyyyz, \
-                             g_xx_xyyzz, \
-                             g_xx_xyzzz, \
-                             g_xx_xzzzz, \
-                             g_xx_yyyyy, \
-                             g_xx_yyyyz, \
-                             g_xx_yyyzz, \
-                             g_xx_yyzzz, \
-                             g_xx_yzzzz, \
-                             g_xx_zzzzz : 64)
+            #pragma omp simd aligned(cd_x, g_x_xxxxx, g_x_xxxxxx, g_x_xxxxxy, g_x_xxxxxz, g_x_xxxxy, g_x_xxxxyy, g_x_xxxxyz, g_x_xxxxz, g_x_xxxxzz, g_x_xxxyy, g_x_xxxyyy, g_x_xxxyyz, g_x_xxxyz, g_x_xxxyzz, g_x_xxxzz, g_x_xxxzzz, g_x_xxyyy, g_x_xxyyyy, g_x_xxyyyz, g_x_xxyyz, g_x_xxyyzz, g_x_xxyzz, g_x_xxyzzz, g_x_xxzzz, g_x_xxzzzz, g_x_xyyyy, g_x_xyyyyy, g_x_xyyyyz, g_x_xyyyz, g_x_xyyyzz, g_x_xyyzz, g_x_xyyzzz, g_x_xyzzz, g_x_xyzzzz, g_x_xzzzz, g_x_xzzzzz, g_x_yyyyy, g_x_yyyyz, g_x_yyyzz, g_x_yyzzz, g_x_yzzzz, g_x_zzzzz, g_xx_xxxxx, g_xx_xxxxy, g_xx_xxxxz, g_xx_xxxyy, g_xx_xxxyz, g_xx_xxxzz, g_xx_xxyyy, g_xx_xxyyz, g_xx_xxyzz, g_xx_xxzzz, g_xx_xyyyy, g_xx_xyyyz, g_xx_xyyzz, g_xx_xyzzz, g_xx_xzzzz, g_xx_yyyyy, g_xx_yyyyz, g_xx_yyyzz, g_xx_yyzzz, g_xx_yzzzz, g_xx_zzzzz  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_xx_xxxxx[k] = -g_x_xxxxx[k] * cd_x[k] + g_x_xxxxxx[k];
@@ -523,70 +456,7 @@ comp_ket_hrr_electron_repulsion_xxdh(CSimdArray<double>&       cbuffer,
 
             auto g_xy_zzzzz = cbuffer.data(dh_off + 41);
 
-#pragma omp simd aligned(cd_x,           \
-                             g_xy_xxxxx, \
-                             g_xy_xxxxy, \
-                             g_xy_xxxxz, \
-                             g_xy_xxxyy, \
-                             g_xy_xxxyz, \
-                             g_xy_xxxzz, \
-                             g_xy_xxyyy, \
-                             g_xy_xxyyz, \
-                             g_xy_xxyzz, \
-                             g_xy_xxzzz, \
-                             g_xy_xyyyy, \
-                             g_xy_xyyyz, \
-                             g_xy_xyyzz, \
-                             g_xy_xyzzz, \
-                             g_xy_xzzzz, \
-                             g_xy_yyyyy, \
-                             g_xy_yyyyz, \
-                             g_xy_yyyzz, \
-                             g_xy_yyzzz, \
-                             g_xy_yzzzz, \
-                             g_xy_zzzzz, \
-                             g_y_xxxxx,  \
-                             g_y_xxxxxx, \
-                             g_y_xxxxxy, \
-                             g_y_xxxxxz, \
-                             g_y_xxxxy,  \
-                             g_y_xxxxyy, \
-                             g_y_xxxxyz, \
-                             g_y_xxxxz,  \
-                             g_y_xxxxzz, \
-                             g_y_xxxyy,  \
-                             g_y_xxxyyy, \
-                             g_y_xxxyyz, \
-                             g_y_xxxyz,  \
-                             g_y_xxxyzz, \
-                             g_y_xxxzz,  \
-                             g_y_xxxzzz, \
-                             g_y_xxyyy,  \
-                             g_y_xxyyyy, \
-                             g_y_xxyyyz, \
-                             g_y_xxyyz,  \
-                             g_y_xxyyzz, \
-                             g_y_xxyzz,  \
-                             g_y_xxyzzz, \
-                             g_y_xxzzz,  \
-                             g_y_xxzzzz, \
-                             g_y_xyyyy,  \
-                             g_y_xyyyyy, \
-                             g_y_xyyyyz, \
-                             g_y_xyyyz,  \
-                             g_y_xyyyzz, \
-                             g_y_xyyzz,  \
-                             g_y_xyyzzz, \
-                             g_y_xyzzz,  \
-                             g_y_xyzzzz, \
-                             g_y_xzzzz,  \
-                             g_y_xzzzzz, \
-                             g_y_yyyyy,  \
-                             g_y_yyyyz,  \
-                             g_y_yyyzz,  \
-                             g_y_yyzzz,  \
-                             g_y_yzzzz,  \
-                             g_y_zzzzz : 64)
+            #pragma omp simd aligned(cd_x, g_xy_xxxxx, g_xy_xxxxy, g_xy_xxxxz, g_xy_xxxyy, g_xy_xxxyz, g_xy_xxxzz, g_xy_xxyyy, g_xy_xxyyz, g_xy_xxyzz, g_xy_xxzzz, g_xy_xyyyy, g_xy_xyyyz, g_xy_xyyzz, g_xy_xyzzz, g_xy_xzzzz, g_xy_yyyyy, g_xy_yyyyz, g_xy_yyyzz, g_xy_yyzzz, g_xy_yzzzz, g_xy_zzzzz, g_y_xxxxx, g_y_xxxxxx, g_y_xxxxxy, g_y_xxxxxz, g_y_xxxxy, g_y_xxxxyy, g_y_xxxxyz, g_y_xxxxz, g_y_xxxxzz, g_y_xxxyy, g_y_xxxyyy, g_y_xxxyyz, g_y_xxxyz, g_y_xxxyzz, g_y_xxxzz, g_y_xxxzzz, g_y_xxyyy, g_y_xxyyyy, g_y_xxyyyz, g_y_xxyyz, g_y_xxyyzz, g_y_xxyzz, g_y_xxyzzz, g_y_xxzzz, g_y_xxzzzz, g_y_xyyyy, g_y_xyyyyy, g_y_xyyyyz, g_y_xyyyz, g_y_xyyyzz, g_y_xyyzz, g_y_xyyzzz, g_y_xyzzz, g_y_xyzzzz, g_y_xzzzz, g_y_xzzzzz, g_y_yyyyy, g_y_yyyyz, g_y_yyyzz, g_y_yyzzz, g_y_yzzzz, g_y_zzzzz  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_xy_xxxxx[k] = -g_y_xxxxx[k] * cd_x[k] + g_y_xxxxxx[k];
@@ -676,70 +546,7 @@ comp_ket_hrr_electron_repulsion_xxdh(CSimdArray<double>&       cbuffer,
 
             auto g_xz_zzzzz = cbuffer.data(dh_off + 62);
 
-#pragma omp simd aligned(cd_x,           \
-                             g_xz_xxxxx, \
-                             g_xz_xxxxy, \
-                             g_xz_xxxxz, \
-                             g_xz_xxxyy, \
-                             g_xz_xxxyz, \
-                             g_xz_xxxzz, \
-                             g_xz_xxyyy, \
-                             g_xz_xxyyz, \
-                             g_xz_xxyzz, \
-                             g_xz_xxzzz, \
-                             g_xz_xyyyy, \
-                             g_xz_xyyyz, \
-                             g_xz_xyyzz, \
-                             g_xz_xyzzz, \
-                             g_xz_xzzzz, \
-                             g_xz_yyyyy, \
-                             g_xz_yyyyz, \
-                             g_xz_yyyzz, \
-                             g_xz_yyzzz, \
-                             g_xz_yzzzz, \
-                             g_xz_zzzzz, \
-                             g_z_xxxxx,  \
-                             g_z_xxxxxx, \
-                             g_z_xxxxxy, \
-                             g_z_xxxxxz, \
-                             g_z_xxxxy,  \
-                             g_z_xxxxyy, \
-                             g_z_xxxxyz, \
-                             g_z_xxxxz,  \
-                             g_z_xxxxzz, \
-                             g_z_xxxyy,  \
-                             g_z_xxxyyy, \
-                             g_z_xxxyyz, \
-                             g_z_xxxyz,  \
-                             g_z_xxxyzz, \
-                             g_z_xxxzz,  \
-                             g_z_xxxzzz, \
-                             g_z_xxyyy,  \
-                             g_z_xxyyyy, \
-                             g_z_xxyyyz, \
-                             g_z_xxyyz,  \
-                             g_z_xxyyzz, \
-                             g_z_xxyzz,  \
-                             g_z_xxyzzz, \
-                             g_z_xxzzz,  \
-                             g_z_xxzzzz, \
-                             g_z_xyyyy,  \
-                             g_z_xyyyyy, \
-                             g_z_xyyyyz, \
-                             g_z_xyyyz,  \
-                             g_z_xyyyzz, \
-                             g_z_xyyzz,  \
-                             g_z_xyyzzz, \
-                             g_z_xyzzz,  \
-                             g_z_xyzzzz, \
-                             g_z_xzzzz,  \
-                             g_z_xzzzzz, \
-                             g_z_yyyyy,  \
-                             g_z_yyyyz,  \
-                             g_z_yyyzz,  \
-                             g_z_yyzzz,  \
-                             g_z_yzzzz,  \
-                             g_z_zzzzz : 64)
+            #pragma omp simd aligned(cd_x, g_xz_xxxxx, g_xz_xxxxy, g_xz_xxxxz, g_xz_xxxyy, g_xz_xxxyz, g_xz_xxxzz, g_xz_xxyyy, g_xz_xxyyz, g_xz_xxyzz, g_xz_xxzzz, g_xz_xyyyy, g_xz_xyyyz, g_xz_xyyzz, g_xz_xyzzz, g_xz_xzzzz, g_xz_yyyyy, g_xz_yyyyz, g_xz_yyyzz, g_xz_yyzzz, g_xz_yzzzz, g_xz_zzzzz, g_z_xxxxx, g_z_xxxxxx, g_z_xxxxxy, g_z_xxxxxz, g_z_xxxxy, g_z_xxxxyy, g_z_xxxxyz, g_z_xxxxz, g_z_xxxxzz, g_z_xxxyy, g_z_xxxyyy, g_z_xxxyyz, g_z_xxxyz, g_z_xxxyzz, g_z_xxxzz, g_z_xxxzzz, g_z_xxyyy, g_z_xxyyyy, g_z_xxyyyz, g_z_xxyyz, g_z_xxyyzz, g_z_xxyzz, g_z_xxyzzz, g_z_xxzzz, g_z_xxzzzz, g_z_xyyyy, g_z_xyyyyy, g_z_xyyyyz, g_z_xyyyz, g_z_xyyyzz, g_z_xyyzz, g_z_xyyzzz, g_z_xyzzz, g_z_xyzzzz, g_z_xzzzz, g_z_xzzzzz, g_z_yyyyy, g_z_yyyyz, g_z_yyyzz, g_z_yyzzz, g_z_yzzzz, g_z_zzzzz  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_xz_xxxxx[k] = -g_z_xxxxx[k] * cd_x[k] + g_z_xxxxxx[k];
@@ -829,70 +636,7 @@ comp_ket_hrr_electron_repulsion_xxdh(CSimdArray<double>&       cbuffer,
 
             auto g_yy_zzzzz = cbuffer.data(dh_off + 83);
 
-#pragma omp simd aligned(cd_y,           \
-                             g_y_xxxxx,  \
-                             g_y_xxxxxy, \
-                             g_y_xxxxy,  \
-                             g_y_xxxxyy, \
-                             g_y_xxxxyz, \
-                             g_y_xxxxz,  \
-                             g_y_xxxyy,  \
-                             g_y_xxxyyy, \
-                             g_y_xxxyyz, \
-                             g_y_xxxyz,  \
-                             g_y_xxxyzz, \
-                             g_y_xxxzz,  \
-                             g_y_xxyyy,  \
-                             g_y_xxyyyy, \
-                             g_y_xxyyyz, \
-                             g_y_xxyyz,  \
-                             g_y_xxyyzz, \
-                             g_y_xxyzz,  \
-                             g_y_xxyzzz, \
-                             g_y_xxzzz,  \
-                             g_y_xyyyy,  \
-                             g_y_xyyyyy, \
-                             g_y_xyyyyz, \
-                             g_y_xyyyz,  \
-                             g_y_xyyyzz, \
-                             g_y_xyyzz,  \
-                             g_y_xyyzzz, \
-                             g_y_xyzzz,  \
-                             g_y_xyzzzz, \
-                             g_y_xzzzz,  \
-                             g_y_yyyyy,  \
-                             g_y_yyyyyy, \
-                             g_y_yyyyyz, \
-                             g_y_yyyyz,  \
-                             g_y_yyyyzz, \
-                             g_y_yyyzz,  \
-                             g_y_yyyzzz, \
-                             g_y_yyzzz,  \
-                             g_y_yyzzzz, \
-                             g_y_yzzzz,  \
-                             g_y_yzzzzz, \
-                             g_y_zzzzz,  \
-                             g_yy_xxxxx, \
-                             g_yy_xxxxy, \
-                             g_yy_xxxxz, \
-                             g_yy_xxxyy, \
-                             g_yy_xxxyz, \
-                             g_yy_xxxzz, \
-                             g_yy_xxyyy, \
-                             g_yy_xxyyz, \
-                             g_yy_xxyzz, \
-                             g_yy_xxzzz, \
-                             g_yy_xyyyy, \
-                             g_yy_xyyyz, \
-                             g_yy_xyyzz, \
-                             g_yy_xyzzz, \
-                             g_yy_xzzzz, \
-                             g_yy_yyyyy, \
-                             g_yy_yyyyz, \
-                             g_yy_yyyzz, \
-                             g_yy_yyzzz, \
-                             g_yy_yzzzz, \
-                             g_yy_zzzzz : 64)
+            #pragma omp simd aligned(cd_y, g_y_xxxxx, g_y_xxxxxy, g_y_xxxxy, g_y_xxxxyy, g_y_xxxxyz, g_y_xxxxz, g_y_xxxyy, g_y_xxxyyy, g_y_xxxyyz, g_y_xxxyz, g_y_xxxyzz, g_y_xxxzz, g_y_xxyyy, g_y_xxyyyy, g_y_xxyyyz, g_y_xxyyz, g_y_xxyyzz, g_y_xxyzz, g_y_xxyzzz, g_y_xxzzz, g_y_xyyyy, g_y_xyyyyy, g_y_xyyyyz, g_y_xyyyz, g_y_xyyyzz, g_y_xyyzz, g_y_xyyzzz, g_y_xyzzz, g_y_xyzzzz, g_y_xzzzz, g_y_yyyyy, g_y_yyyyyy, g_y_yyyyyz, g_y_yyyyz, g_y_yyyyzz, g_y_yyyzz, g_y_yyyzzz, g_y_yyzzz, g_y_yyzzzz, g_y_yzzzz, g_y_yzzzzz, g_y_zzzzz, g_yy_xxxxx, g_yy_xxxxy, g_yy_xxxxz, g_yy_xxxyy, g_yy_xxxyz, g_yy_xxxzz, g_yy_xxyyy, g_yy_xxyyz, g_yy_xxyzz, g_yy_xxzzz, g_yy_xyyyy, g_yy_xyyyz, g_yy_xyyzz, g_yy_xyzzz, g_yy_xzzzz, g_yy_yyyyy, g_yy_yyyyz, g_yy_yyyzz, g_yy_yyzzz, g_yy_yzzzz, g_yy_zzzzz  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_yy_xxxxx[k] = -g_y_xxxxx[k] * cd_y[k] + g_y_xxxxxy[k];
@@ -982,70 +726,7 @@ comp_ket_hrr_electron_repulsion_xxdh(CSimdArray<double>&       cbuffer,
 
             auto g_yz_zzzzz = cbuffer.data(dh_off + 104);
 
-#pragma omp simd aligned(cd_y,           \
-                             g_yz_xxxxx, \
-                             g_yz_xxxxy, \
-                             g_yz_xxxxz, \
-                             g_yz_xxxyy, \
-                             g_yz_xxxyz, \
-                             g_yz_xxxzz, \
-                             g_yz_xxyyy, \
-                             g_yz_xxyyz, \
-                             g_yz_xxyzz, \
-                             g_yz_xxzzz, \
-                             g_yz_xyyyy, \
-                             g_yz_xyyyz, \
-                             g_yz_xyyzz, \
-                             g_yz_xyzzz, \
-                             g_yz_xzzzz, \
-                             g_yz_yyyyy, \
-                             g_yz_yyyyz, \
-                             g_yz_yyyzz, \
-                             g_yz_yyzzz, \
-                             g_yz_yzzzz, \
-                             g_yz_zzzzz, \
-                             g_z_xxxxx,  \
-                             g_z_xxxxxy, \
-                             g_z_xxxxy,  \
-                             g_z_xxxxyy, \
-                             g_z_xxxxyz, \
-                             g_z_xxxxz,  \
-                             g_z_xxxyy,  \
-                             g_z_xxxyyy, \
-                             g_z_xxxyyz, \
-                             g_z_xxxyz,  \
-                             g_z_xxxyzz, \
-                             g_z_xxxzz,  \
-                             g_z_xxyyy,  \
-                             g_z_xxyyyy, \
-                             g_z_xxyyyz, \
-                             g_z_xxyyz,  \
-                             g_z_xxyyzz, \
-                             g_z_xxyzz,  \
-                             g_z_xxyzzz, \
-                             g_z_xxzzz,  \
-                             g_z_xyyyy,  \
-                             g_z_xyyyyy, \
-                             g_z_xyyyyz, \
-                             g_z_xyyyz,  \
-                             g_z_xyyyzz, \
-                             g_z_xyyzz,  \
-                             g_z_xyyzzz, \
-                             g_z_xyzzz,  \
-                             g_z_xyzzzz, \
-                             g_z_xzzzz,  \
-                             g_z_yyyyy,  \
-                             g_z_yyyyyy, \
-                             g_z_yyyyyz, \
-                             g_z_yyyyz,  \
-                             g_z_yyyyzz, \
-                             g_z_yyyzz,  \
-                             g_z_yyyzzz, \
-                             g_z_yyzzz,  \
-                             g_z_yyzzzz, \
-                             g_z_yzzzz,  \
-                             g_z_yzzzzz, \
-                             g_z_zzzzz : 64)
+            #pragma omp simd aligned(cd_y, g_yz_xxxxx, g_yz_xxxxy, g_yz_xxxxz, g_yz_xxxyy, g_yz_xxxyz, g_yz_xxxzz, g_yz_xxyyy, g_yz_xxyyz, g_yz_xxyzz, g_yz_xxzzz, g_yz_xyyyy, g_yz_xyyyz, g_yz_xyyzz, g_yz_xyzzz, g_yz_xzzzz, g_yz_yyyyy, g_yz_yyyyz, g_yz_yyyzz, g_yz_yyzzz, g_yz_yzzzz, g_yz_zzzzz, g_z_xxxxx, g_z_xxxxxy, g_z_xxxxy, g_z_xxxxyy, g_z_xxxxyz, g_z_xxxxz, g_z_xxxyy, g_z_xxxyyy, g_z_xxxyyz, g_z_xxxyz, g_z_xxxyzz, g_z_xxxzz, g_z_xxyyy, g_z_xxyyyy, g_z_xxyyyz, g_z_xxyyz, g_z_xxyyzz, g_z_xxyzz, g_z_xxyzzz, g_z_xxzzz, g_z_xyyyy, g_z_xyyyyy, g_z_xyyyyz, g_z_xyyyz, g_z_xyyyzz, g_z_xyyzz, g_z_xyyzzz, g_z_xyzzz, g_z_xyzzzz, g_z_xzzzz, g_z_yyyyy, g_z_yyyyyy, g_z_yyyyyz, g_z_yyyyz, g_z_yyyyzz, g_z_yyyzz, g_z_yyyzzz, g_z_yyzzz, g_z_yyzzzz, g_z_yzzzz, g_z_yzzzzz, g_z_zzzzz  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_yz_xxxxx[k] = -g_z_xxxxx[k] * cd_y[k] + g_z_xxxxxy[k];
@@ -1135,70 +816,7 @@ comp_ket_hrr_electron_repulsion_xxdh(CSimdArray<double>&       cbuffer,
 
             auto g_zz_zzzzz = cbuffer.data(dh_off + 125);
 
-#pragma omp simd aligned(cd_z,           \
-                             g_z_xxxxx,  \
-                             g_z_xxxxxz, \
-                             g_z_xxxxy,  \
-                             g_z_xxxxyz, \
-                             g_z_xxxxz,  \
-                             g_z_xxxxzz, \
-                             g_z_xxxyy,  \
-                             g_z_xxxyyz, \
-                             g_z_xxxyz,  \
-                             g_z_xxxyzz, \
-                             g_z_xxxzz,  \
-                             g_z_xxxzzz, \
-                             g_z_xxyyy,  \
-                             g_z_xxyyyz, \
-                             g_z_xxyyz,  \
-                             g_z_xxyyzz, \
-                             g_z_xxyzz,  \
-                             g_z_xxyzzz, \
-                             g_z_xxzzz,  \
-                             g_z_xxzzzz, \
-                             g_z_xyyyy,  \
-                             g_z_xyyyyz, \
-                             g_z_xyyyz,  \
-                             g_z_xyyyzz, \
-                             g_z_xyyzz,  \
-                             g_z_xyyzzz, \
-                             g_z_xyzzz,  \
-                             g_z_xyzzzz, \
-                             g_z_xzzzz,  \
-                             g_z_xzzzzz, \
-                             g_z_yyyyy,  \
-                             g_z_yyyyyz, \
-                             g_z_yyyyz,  \
-                             g_z_yyyyzz, \
-                             g_z_yyyzz,  \
-                             g_z_yyyzzz, \
-                             g_z_yyzzz,  \
-                             g_z_yyzzzz, \
-                             g_z_yzzzz,  \
-                             g_z_yzzzzz, \
-                             g_z_zzzzz,  \
-                             g_z_zzzzzz, \
-                             g_zz_xxxxx, \
-                             g_zz_xxxxy, \
-                             g_zz_xxxxz, \
-                             g_zz_xxxyy, \
-                             g_zz_xxxyz, \
-                             g_zz_xxxzz, \
-                             g_zz_xxyyy, \
-                             g_zz_xxyyz, \
-                             g_zz_xxyzz, \
-                             g_zz_xxzzz, \
-                             g_zz_xyyyy, \
-                             g_zz_xyyyz, \
-                             g_zz_xyyzz, \
-                             g_zz_xyzzz, \
-                             g_zz_xzzzz, \
-                             g_zz_yyyyy, \
-                             g_zz_yyyyz, \
-                             g_zz_yyyzz, \
-                             g_zz_yyzzz, \
-                             g_zz_yzzzz, \
-                             g_zz_zzzzz : 64)
+            #pragma omp simd aligned(cd_z, g_z_xxxxx, g_z_xxxxxz, g_z_xxxxy, g_z_xxxxyz, g_z_xxxxz, g_z_xxxxzz, g_z_xxxyy, g_z_xxxyyz, g_z_xxxyz, g_z_xxxyzz, g_z_xxxzz, g_z_xxxzzz, g_z_xxyyy, g_z_xxyyyz, g_z_xxyyz, g_z_xxyyzz, g_z_xxyzz, g_z_xxyzzz, g_z_xxzzz, g_z_xxzzzz, g_z_xyyyy, g_z_xyyyyz, g_z_xyyyz, g_z_xyyyzz, g_z_xyyzz, g_z_xyyzzz, g_z_xyzzz, g_z_xyzzzz, g_z_xzzzz, g_z_xzzzzz, g_z_yyyyy, g_z_yyyyyz, g_z_yyyyz, g_z_yyyyzz, g_z_yyyzz, g_z_yyyzzz, g_z_yyzzz, g_z_yyzzzz, g_z_yzzzz, g_z_yzzzzz, g_z_zzzzz, g_z_zzzzzz, g_zz_xxxxx, g_zz_xxxxy, g_zz_xxxxz, g_zz_xxxyy, g_zz_xxxyz, g_zz_xxxzz, g_zz_xxyyy, g_zz_xxyyz, g_zz_xxyzz, g_zz_xxzzz, g_zz_xyyyy, g_zz_xyyyz, g_zz_xyyzz, g_zz_xyzzz, g_zz_xzzzz, g_zz_yyyyy, g_zz_yyyyz, g_zz_yyyzz, g_zz_yyzzz, g_zz_yzzzz, g_zz_zzzzz  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_zz_xxxxx[k] = -g_z_xxxxx[k] * cd_z[k] + g_z_xxxxxz[k];
@@ -1247,4 +865,5 @@ comp_ket_hrr_electron_repulsion_xxdh(CSimdArray<double>&       cbuffer,
     }
 }
 
-}  // namespace erirec
+} // erirec namespace
+
