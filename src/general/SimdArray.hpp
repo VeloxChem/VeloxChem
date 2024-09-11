@@ -16,7 +16,7 @@ namespace simd {  // simd namespace
 constexpr auto
 ipo_size() -> size_t
 {
-    return 2;
+    return 16;
 }
 
 /// @brief Gets width of SIMD vector.

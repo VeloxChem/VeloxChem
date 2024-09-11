@@ -94,7 +94,7 @@ class TestFockDriver:
         # check full Fock matrix
         fmat = fock_mat.full_matrix()
         fref = SubMatrix([0, 0, 78, 78])
-        fref.set_values(np.ascontiguousarray(ref_mat))
+        fref.set_values(np.ascontiguousarray(ref_mat)) 
 
         assert fmat == fref
         
