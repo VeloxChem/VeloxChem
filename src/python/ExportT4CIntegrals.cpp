@@ -4,8 +4,8 @@
 #include <pybind11/stl.h>
 
 #include "FockDriver.hpp"
-#include "T4CUtils.hpp"
 #include "T4CScreener.hpp"
+#include "T4CUtils.hpp"
 
 namespace vlx_t4cintegrals {  // vlx_t4cintegrals namespace
 
@@ -28,14 +28,25 @@ export_t4cintegrals(py::module& m)
                const double           omega) -> std::shared_ptr<CMatrix> {
                 return std::make_shared<CMatrix>(fock_drv.compute(basis, molecule, density, label, exchange_factor, omega));
             },
-             "Computes single Fock matrix of requested type for given molecule and basis.");
-    
+            "Computes single Fock matrix of requested type for given molecule and basis.")
+        .def(
+            "compute",
+            [](const CFockDriver&  fock_drv,
+               const CT4CScreener& screener,
+               const CMatrix&      density,
+               const std::string&  label,
+               const double        exchange_factor,
+               const double        omega,
+               const int           ithreshold) -> std::shared_ptr<CMatrix> {
+                return std::make_shared<CMatrix>(fock_drv.compute(screener, density, label, exchange_factor, omega, ithreshold));
+            },
+            "Computes single Fock matrix of requested type for two-electron integrals screener.");
+
     // CT4CScreener class
     PyClass<CT4CScreener>(m, "T4CScreener")
         .def(py::init<>())
         .def("partition", &CT4CScreener::partition, "Partition basis funtion pairs blocks for given molecule and basis.")
         .def("gto_pair_blocks", &CT4CScreener::gto_pair_blocks, "Gets vector of blocked basis function pairs blocks.");
-
 }
 
 }  // namespace vlx_t4cintegrals

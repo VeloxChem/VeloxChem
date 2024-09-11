@@ -7,6 +7,7 @@
 #include "Matrix.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
+#include "T4CScreener.hpp"
 
 /// Class CFockDriver provides methods for computing Fock matrices
 /// using four center electron repulsion integrals..
@@ -61,6 +62,20 @@ class CFockDriver
                  const std::string     &label,
                  const double           exchange_factor,
                  const double           omega) const -> CMatrix;
+
+    /// @brief Computes Fock matrix for given density, basis and molecule (N^4 scaling).
+    /// @param screener The screener with basis function pairs data.
+    /// @param density The density matrix to construct Fock matrix.
+    /// @param label The label of Fock matrix type.
+    /// @param exchange_factor The exchange-correlation factors.
+    /// @param omega The range separation factor.
+    /// @return The Fock matrix.
+    auto compute(const CT4CScreener &screener,
+                 const CMatrix      &density,
+                 const std::string  &label,
+                 const double        exchange_factor,
+                 const double        omega,
+                 const int           ithreshold) const -> CMatrix;
 };
 
 #endif /* FockDriver_hpp */
