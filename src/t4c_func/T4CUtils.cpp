@@ -462,7 +462,7 @@ comp_ovl_factors(CSimdArray<double>& buffer,
 }
 
 auto
-update_max_values(std::vector<double>& max_values, const CSimdArray<double>& buffer, const int index) -> void
+update_max_values(std::vector<double>& max_values, const CSimdArray<double>& buffer, const size_t index) -> void
 {
     for (int i = 0; i < buffer.number_of_rows(); i++)
     {

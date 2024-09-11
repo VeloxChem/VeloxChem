@@ -165,7 +165,7 @@ auto comp_ovl_factors(CSimdArray<double>& buffer,
 /// - Parameter max_values : the vector of maximum values of integral shells.
 /// - Parameter buffer: the buffer of integrals.
 /// - Parameter index: the index in vector of maximum values.
-auto update_max_values(std::vector<double>& max_values, const CSimdArray<double>& buffer, const int index) -> void;
+auto update_max_values(std::vector<double>& max_values, const CSimdArray<double>& buffer, const size_t index) -> void;
 
 /// Updates maximum values.
 /// - Parameter buffer: the buffer to store integrals.

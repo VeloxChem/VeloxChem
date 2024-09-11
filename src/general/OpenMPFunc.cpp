@@ -87,8 +87,6 @@ make_work_tasks(const std::vector<CGtoBlock>& bra_gto_blocks, const std::vector<
 auto
 make_diag_work_group(const std::vector<CGtoPairBlock>& gto_pair_blocks) -> std::vector<std::array<size_t, 3>>
 {
-    const auto ntasks = omp::get_number_of_threads();
-
     auto wtasks = std::vector<std::array<size_t, 3>>();
 
     if (const auto nblocks = gto_pair_blocks.size(); nblocks > 0)

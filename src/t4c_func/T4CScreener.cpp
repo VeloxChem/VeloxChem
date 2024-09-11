@@ -5,8 +5,8 @@
 
 #include "GtoPairBlockFunc.hpp"
 #include "OpenMPFunc.hpp"
-//#include "T4CDiagonalDistributor.hpp"
-//#include "DiagonalElectronRepulsionFunc.hpp"
+#include "T4CDiagonalDistributor.hpp"
+#include "DiagonalElectronRepulsionFunc.hpp"
 
 auto
 CT4CScreener::partition(const CMolecularBasis& basis,
@@ -27,59 +27,35 @@ CT4CScreener::partition(const CMolecularBasis& basis,
             return std::vector<double>(gpblock.number_of_contracted_pairs(), 0.0);
         });
         
-        // set up work groups
-        
-        const auto work_groups = omp::make_diag_work_group(gto_pair_blocks);
-        
         // prepare pointers for OMP parallel region
-//
-//        auto ptr_gto_pair_blocks = gto_pair_blocks.data();
-//
-//        auto ptr_work_groups = work_groups.data();
-//
-//        auto ptr_max_values = max_values.data();
-//
-//        // execute OMP tasks with static scheduling
-//
-//        omp::set_static_scheduler();
-//
-//        const auto ntasks = work_groups.size();
-//        
-//        #pragma omp parallel num_threads(ntasks) shared(ntasks, ptr_gto_pair_blocks, ptr_work_groups, ptr_max_values)
-//        {
-//            #pragma omp single nowait
-//            {
-//                for (size_t i = 0; i < ntasks; i++)
-//                {
-//                    #pragma omp task firstprivate(i)
-//                    {
-//                        for (const auto& wtask : ptr_work_groups[i])
-//                        {
-//                            const auto gto_pair_block = ptr_gto_pair_blocks[wtask[0]];
-//                            
-//                            CT4CDiagonalDistributor distributor(ptr_max_values[wtask[0]].data());
-//                            
-//                            if (label == "eri")
-//                            {
-//                                erifunc::diag_compute<CT4CDiagonalDistributor>(distributor, gto_pair_block, {wtask[1], wtask[2]});
-//                            }
-//                        }
-//                    }
-//                }
-//            }
-//        }
-        
-//        for (size_t i = 0; i < max_values.size(); i++)
-//        {
-//            std::cout << "*** GTO pair block : " << gto_pair_blocks[i].angular_momentums()[0] << gto_pair_blocks[i].angular_momentums()[1] << std::endl;
-//            
-//            for (size_t j = 0; j < max_values[i].size(); j++)
-//            {
-//                std::cout << max_values[i][j] << " ";
-//            }
-//            
-//            std::cout << std::endl; 
-//        }
+
+        auto ptr_gto_pair_blocks = &gto_pair_blocks;
+
+        auto ptr_max_values = max_values.data();
+
+        // execute OMP tasks with static scheduling
+
+        #pragma omp parallel shared(ptr_gto_pair_blocks, ptr_max_values, label)
+        {
+            #pragma omp single nowait
+            {
+                const auto work_tasks = omp::make_diag_work_group(*ptr_gto_pair_blocks);
+                
+                std::ranges::for_each(std::views::reverse(work_tasks), [&](const auto& task) {
+                    const auto index = task[0];
+                    const auto gto_range = std::pair<size_t, size_t>{task[1], task[2]};
+                    #pragma omp task firstprivate(index, gto_range)
+                    {
+                        const auto gto_pair_block = ptr_gto_pair_blocks->at(index);
+                        CT4CDiagonalDistributor distributor(ptr_max_values[index].data());
+                        if (label == "eri")
+                        {
+                            erifunc::diag_compute<CT4CDiagonalDistributor>(distributor, gto_pair_block, gto_range);
+                        }
+                    }
+                });
+            }
+        }
         
         // apply Cauchy–Schwarz partitioning
         
