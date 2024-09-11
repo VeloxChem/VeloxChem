@@ -27,18 +27,18 @@ class TestOverlapGeom100Driver:
         # compute overlap gradient matrix
         grad_drv = OverlapGeom100Driver()
         grad_mats = grad_drv.compute(mol, bas, 0)
-        
+
         # load reference overlap gradient for C atom
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'co.qzvp.overlap.geom.100.c.npy')
         ref_mat = np.load(npyfile)
-        
+
         # dimension of molecular basis
         basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
         labels = ['X', 'Y', 'Z']
-        
+
         for k, label in enumerate(labels):
             fmat = grad_mats.matrix(label)
             for i in range(0, 5):
@@ -61,7 +61,7 @@ class TestOverlapGeom100Driver:
             fref = SubMatrix([0, 0, 114, 114])
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
             assert smat == fref
-        
+
     def test_overlap_co_qzvp_for_o(self):
 
         mol, bas = self.get_data()
@@ -69,18 +69,18 @@ class TestOverlapGeom100Driver:
         # compute overlap gradient matrix
         grad_drv = OverlapGeom100Driver()
         grad_mats = grad_drv.compute(mol, bas, 1)
-        
+
         # load reference overlap gradient for O atom
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'co.qzvp.overlap.geom.100.o.npy')
         ref_mat = np.load(npyfile)
-        
+
         # dimension of molecular basis
         basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
         labels = ['X', 'Y', 'Z']
-        
+
         for k, label in enumerate(labels):
             fmat = grad_mats.matrix(label)
             for i in range(0, 5):

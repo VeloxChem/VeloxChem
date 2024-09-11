@@ -1,6 +1,7 @@
 #include "OpenMPFunc.hpp"
 
 #include <algorithm>
+#include <ranges>
 #include <utility>
 
 #include "BatchFunc.hpp"
@@ -81,6 +82,37 @@ make_work_tasks(const std::vector<CGtoBlock>& bra_gto_blocks, const std::vector<
     }
 
     return tasks;
+}
+
+auto
+make_diag_work_group(const std::vector<CGtoPairBlock>& gto_pair_blocks) -> std::vector<std::array<size_t, 3>>
+{
+    auto wtasks = std::vector<std::array<size_t, 3>>();
+
+    if (const auto nblocks = gto_pair_blocks.size(); nblocks > 0)
+    {
+        const auto nthreads = omp::get_number_of_threads();
+        
+        for (size_t i = 0; i < nblocks; i++)
+        {
+            const auto gp_size = gto_pair_blocks[i].number_of_contracted_pairs();
+            
+            auto bsize = gp_size / nthreads;
+            
+            if (bsize < simd::width<double>()) bsize = simd::width<double>();
+            
+            const auto bblocks = batch::number_of_batches(gp_size, bsize);
+            
+            for (size_t j = 0; j < bblocks; j++)
+            {
+                const auto bindices = batch::batch_range(j, gp_size, bsize);
+                
+                wtasks.push_back(std::array<size_t, 3>({i, bindices.first, bindices.second}));
+            }
+        }
+    }
+   
+    return wtasks;
 }
 
 }  // namespace omp

@@ -24,6 +24,7 @@ from .veloxchemlib import NuclearPotentialGeom110Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import ElectricDipoleMomentumGeom100Driver
 from .veloxchemlib import FockDriver
+from .veloxchemlib import T4CScreener
 
 # C++ functions
 from .veloxchemlib import upper_case
@@ -54,6 +55,7 @@ from .veloxchemlib import batch_range
 from .veloxchemlib import set_number_of_threads
 from .veloxchemlib import get_number_of_threads
 from .veloxchemlib import make_work_tasks
+from .veloxchemlib import make_diag_work_tasks
 from .veloxchemlib import spherical_momentum_s_factors
 from .veloxchemlib import spherical_momentum_p_factors
 from .veloxchemlib import spherical_momentum_d_factors

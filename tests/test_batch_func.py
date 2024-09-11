@@ -27,7 +27,7 @@ class TestBatchFunc:
         assert batch_range(2, 10, 5) == (10, 10)
         assert batch_range(0, 3, 4) == (0, 3)
         assert batch_range(1, 3, 4) == (3, 3)
-        
+
     def test_batch_range_with_offset(self):
 
         assert batch_range(0, 10, 3, 2) == (2, 5)

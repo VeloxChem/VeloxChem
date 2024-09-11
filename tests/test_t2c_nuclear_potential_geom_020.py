@@ -23,38 +23,54 @@ class TestNuclearPotentialGeom020Driver:
     def test_nuclear_potential_geom_020_co_qzvp(self):
 
         mol_co, bas_qzvp = self.get_data()
-        
+
         # external dipoles, coordinates
-        quadrupoles = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5,]
-        coords = [[0.1, 0.2, 0.3], [1.0, 1.2, 1.4], ]
-        
+        quadrupoles = [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            1.5,
+            2.5,
+            3.5,
+            4.5,
+            5.5,
+            6.5,
+        ]
+        coords = [
+            [0.1, 0.2, 0.3],
+            [1.0, 1.2, 1.4],
+        ]
+
         # compute nuclear potential matrix
         geom_drv = NuclearPotentialGeom020Driver()
         geom_mat = geom_drv.compute(mol_co, bas_qzvp, quadrupoles, coords)
 
-       # TODO: Need test data for electric field integrals
-       
+    # TODO: Need test data for electric field integrals
+
     def test_nuclear_potential_co_qzvp_for_c(self):
 
         mol_co, bas_qzvp = self.get_data()
-        
+
         # compute nuclear potential matrix
         geom_drv = NuclearPotentialGeom020Driver()
         geom_mats = geom_drv.compute(mol_co, bas_qzvp, 0)
-        
+
         # load reference nuclear potential hessian for C,C atom
         #here = Path(__file__).parent
         #npyfile = str(here / 'data' / 'co.qzvp.nuclear.potential.geom.020.c.npy')
         #ref_mat = np.load(npyfile)
         #ref_mat = -ref_mat;
-        
+
         # dimension of molecular basis
         #indexes = np.triu_indices(5)
         #basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
         #labels = ['X', 'Y', 'Z']
-        
+
         #for k, label in enumerate(labels):
         #    fmat = geom_mats.matrix(label)
         #    for i, j in zip(indexes[0], indexes[1]):
@@ -76,28 +92,28 @@ class TestNuclearPotentialGeom020Driver:
         #    fref = SubMatrix([0, 0, 114, 114])
         #    fref.set_values(np.ascontiguousarray(ref_mat[k]))
         #    assert smat == fref
-            
+
     def test_nuclear_potential_co_qzvp_for_o(self):
 
         mol_co, bas_qzvp = self.get_data()
-        
+
         # compute nuclear potential matrix
         geom_drv = NuclearPotentialGeom020Driver()
         geom_mats = geom_drv.compute(mol_co, bas_qzvp, 1)
-        
+
         # load reference nuclear potential for O atom
         #here = Path(__file__).parent
         #npyfile = str(here / 'data' / 'co.qzvp.nuclear.potential.geom.010.o.npy')
         #ref_mat = np.load(npyfile)
         #ref_mat = -ref_mat;
-        
+
         # dimension of molecular basis
         #indexes = np.triu_indices(5)
         #basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
         #labels = ['X', 'Y', 'Z']
-        
+
         #for k, label in enumerate(labels):
         #    fmat = geom_mats.matrix(label)
         #    for i, j in zip(indexes[0], indexes[1]):

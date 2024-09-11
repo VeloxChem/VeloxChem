@@ -23,13 +23,19 @@ class TestNuclearPotentialErfDriver:
     def test_nuclear_potential_erf_co_qzvp(self):
 
         mol_co, bas_qzvp = self.get_data()
-        
+
         # external charges, coordinates
-        charges = [1.0, 2.0,]
-        coords = [[0.1, 0.2, 0.3], [1.0, 1.2, 1.4], ]
-        
+        charges = [
+            1.0,
+            2.0,
+        ]
+        coords = [
+            [0.1, 0.2, 0.3],
+            [1.0, 1.2, 1.4],
+        ]
+
         # compute range separated nuclear potential matrix
         npot_drv = NuclearPotentialErfDriver()
         npot_mat = npot_drv.compute(mol_co, bas_qzvp, charges, coords, 0.64)
 
-       # TODO: Need test data for range-separated nuclear potential
+    # TODO: Need test data for range-separated nuclear potential

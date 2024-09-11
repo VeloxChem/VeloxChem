@@ -27,21 +27,21 @@ class TestOverlapGeom101Driver:
         # compute overlap hessian matrix
         hess_drv = OverlapGeom101Driver()
         hess_mats = hess_drv.compute(mol, bas, 0, 0)
-        
+
         # load reference overlap hessian for C,C atom
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'co.qzvp.overlap.geom.101.cc.npy')
         ref_mat = np.load(npyfile)
-        
+
         # dimension of molecular basis
         indexes = np.triu_indices(5)
         basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
-        labels = ['X_X', 'X_Y', 'X_Z',
-                  'Y_X', 'Y_Y', 'Y_Z',
-                  'Z_X', 'Z_Y', 'Z_Z']
-        
+        labels = [
+            'X_X', 'X_Y', 'X_Z', 'Y_X', 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'
+        ]
+
         for k, label in enumerate(labels):
             fmat = hess_mats.matrix(label)
             for i in range(0, 5):
@@ -64,7 +64,7 @@ class TestOverlapGeom101Driver:
             fref = SubMatrix([0, 0, 114, 114])
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
             assert smat == fref
-        
+
     def test_overlap_co_qzvp_for_co(self):
 
         mol, bas = self.get_data()
@@ -72,21 +72,21 @@ class TestOverlapGeom101Driver:
         # compute overlap gradient matrix
         hess_drv = OverlapGeom101Driver()
         hess_mats = hess_drv.compute(mol, bas, 0, 1)
-        
+
         # load reference overlap hessian for C,O atom
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'co.qzvp.overlap.geom.101.co.npy')
         ref_mat = np.load(npyfile)
-        
+
         # dimension of molecular basis
         indexes = np.triu_indices(5)
         basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
-        labels = ['X_X', 'X_Y', 'X_Z',
-                  'Y_X', 'Y_Y', 'Y_Z',
-                  'Z_X', 'Z_Y', 'Z_Z']
-        
+        labels = [
+            'X_X', 'X_Y', 'X_Z', 'Y_X', 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'
+        ]
+
         for k, label in enumerate(labels):
             fmat = hess_mats.matrix(label)
             for i in range(0, 5):
@@ -109,7 +109,7 @@ class TestOverlapGeom101Driver:
             fref = SubMatrix([0, 0, 114, 114])
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
             assert smat == fref
-        
+
     def test_overlap_co_qzvp_for_oc(self):
 
         mol, bas = self.get_data()
@@ -117,21 +117,21 @@ class TestOverlapGeom101Driver:
         # compute overlap gradient matrix
         hess_drv = OverlapGeom101Driver()
         hess_mats = hess_drv.compute(mol, bas, 1, 0)
-        
+
         # load reference overlap hessian for O, C atom
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'co.qzvp.overlap.geom.101.oc.npy')
         ref_mat = np.load(npyfile)
-        
+
         # dimension of molecular basis
         indexes = np.triu_indices(5)
         basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
-        labels = ['X_X', 'X_Y', 'X_Z',
-                  'Y_X', 'Y_Y', 'Y_Z',
-                  'Z_X', 'Z_Y', 'Z_Z']
-        
+        labels = [
+            'X_X', 'X_Y', 'X_Z', 'Y_X', 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'
+        ]
+
         for k, label in enumerate(labels):
             fmat = hess_mats.matrix(label)
             for i in range(0, 5):
@@ -154,7 +154,7 @@ class TestOverlapGeom101Driver:
             fref = SubMatrix([0, 0, 114, 114])
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
             assert smat == fref
-        
+
     def test_overlap_co_qzvp_for_oo(self):
 
         mol, bas = self.get_data()
@@ -162,21 +162,21 @@ class TestOverlapGeom101Driver:
         # compute overlap gradient matrix
         hess_drv = OverlapGeom101Driver()
         hess_mats = hess_drv.compute(mol, bas, 1, 1)
-        
+
         # load reference overlap hessian for O, O atom
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'co.qzvp.overlap.geom.101.oo.npy')
         ref_mat = np.load(npyfile)
-        
+
         # dimension of molecular basis
         indexes = np.triu_indices(5)
         basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
-        labels = ['X_X', 'X_Y', 'X_Z',
-                  'Y_X', 'Y_Y', 'Y_Z',
-                  'Z_X', 'Z_Y', 'Z_Z']
-        
+        labels = [
+            'X_X', 'X_Y', 'X_Z', 'Y_X', 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'
+        ]
+
         for k, label in enumerate(labels):
             fmat = hess_mats.matrix(label)
             for i in range(0, 5):

@@ -30,18 +30,19 @@ class TestElectricDipoleMomentDriver:
 
         # load reference overlap data
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'co.qzvp.electric.dipole.moment.geom.100.c.npy')
+        npyfile = str(here / 'data' /
+                      'co.qzvp.electric.dipole.moment.geom.100.c.npy')
         ref_mat = np.load(npyfile)
         ref_mat = ref_mat.transpose(0, 2, 1)
 
         # dimension of molecular basis
         basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
-        labels = ['X_X', 'Y_X', 'Z_X',
-                  'X_Y', 'Y_Y', 'Z_Y',
-                  'X_Z', 'Y_Z', 'Z_Z']
-        
+        labels = [
+            'X_X', 'Y_X', 'Z_X', 'X_Y', 'Y_Y', 'Z_Y', 'X_Z', 'Y_Z', 'Z_Z'
+        ]
+
         for k, label in enumerate(labels):
             fmat = dip_mats.matrix(label)
             for i in range(0, 5):
@@ -64,7 +65,7 @@ class TestElectricDipoleMomentDriver:
             fref = SubMatrix([0, 0, 114, 114])
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
             assert smat == fref
-            
+
     def test_electric_dipole_moment_co_qzvp_for_o(self):
 
         mol, bas = self.get_data()
@@ -75,18 +76,19 @@ class TestElectricDipoleMomentDriver:
 
         # load reference overlap data
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'co.qzvp.electric.dipole.moment.geom.100.o.npy')
+        npyfile = str(here / 'data' /
+                      'co.qzvp.electric.dipole.moment.geom.100.o.npy')
         ref_mat = np.load(npyfile)
         ref_mat = ref_mat.transpose(0, 2, 1)
 
         # dimension of molecular basis
         basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
-        labels = ['X_X', 'Y_X', 'Z_X',
-                  'X_Y', 'Y_Y', 'Z_Y',
-                  'X_Z', 'Y_Z', 'Z_Z']
-        
+        labels = [
+            'X_X', 'Y_X', 'Z_X', 'X_Y', 'Y_Y', 'Z_Y', 'X_Z', 'Y_Z', 'Z_Z'
+        ]
+
         for k, label in enumerate(labels):
             fmat = dip_mats.matrix(label)
             for i in range(0, 5):
@@ -109,5 +111,3 @@ class TestElectricDipoleMomentDriver:
             fref = SubMatrix([0, 0, 114, 114])
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
             assert smat == fref
-
-      

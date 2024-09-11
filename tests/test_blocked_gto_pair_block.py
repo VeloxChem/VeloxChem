@@ -111,12 +111,12 @@ class TestBlockedGtoPairBlock:
         fcoords = t0_pairs.bra_coordinates()
         assert len(fcoords) == 2
         assert fcoords[0] == Point([0.100, -0.400, -1.000])
-        assert fcoords[1] == Point([0.300,  1.400, -2.100])
+        assert fcoords[1] == Point([0.300, 1.400, -2.100])
         fcoords = t0_pairs.ket_coordinates()
         assert len(fcoords) == 2
         assert fcoords[0] == Point([0.100, -0.400, -1.000])
-        assert fcoords[1] == Point([0.300,  1.400, -2.100])
-        
+        assert fcoords[1] == Point([0.300, 1.400, -2.100])
+
         # Check second GTO pair
         assert t1_pairs.number_of_contracted_pairs() == 1
         assert t1_pairs.number_of_primitive_pairs() == 9

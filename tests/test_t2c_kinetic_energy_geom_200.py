@@ -27,19 +27,19 @@ class TestKineticEnergyGeom200Driver:
         # compute kinetic energy hessian matrix
         hess_drv = KineticEnergyGeom200Driver()
         hess_mats = hess_drv.compute(mol, bas, 0)
-        
+
         # load reference kinetic energy hessian for C,C atom
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'co.qzvp.kinetic.energy.geom.200.cc.npy')
         ref_mat = np.load(npyfile)
-        
+
         # dimension of molecular basis
         basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
         labels = ['XX', 'XY', 'XZ', 'YY', 'YZ', 'ZZ']
         matids = [0, 1, 2, 4, 5, 8]
-        
+
         for k, label in zip(matids, labels):
             fmat = hess_mats.matrix(label)
             for i in range(0, 5):
@@ -64,7 +64,7 @@ class TestKineticEnergyGeom200Driver:
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
             # NOTE: See test cases with numerical problems.
             #assert smat == fref
-        
+
     def test_kinetic_energy_co_qzvp_for_oo(self):
 
         mol, bas = self.get_data()
@@ -72,19 +72,19 @@ class TestKineticEnergyGeom200Driver:
         # compute kinetic energy hessian matrix
         hess_drv = KineticEnergyGeom200Driver()
         hess_mats = hess_drv.compute(mol, bas, 1)
-        
+
         # load reference kinetic energy hessian for O,O atom
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'co.qzvp.kinetic.energy.geom.200.oo.npy')
         ref_mat = np.load(npyfile)
-        
+
         # dimension of molecular basis
         basdims = [0, 14, 38, 68, 96, 114]
-        
+
         # indices map
         labels = ['XX', 'XY', 'XZ', 'YY', 'YZ', 'ZZ']
         matids = [0, 1, 2, 4, 5, 8]
-        
+
         for k, label in zip(matids, labels):
             fmat = hess_mats.matrix(label)
             for i in range(0, 5):
