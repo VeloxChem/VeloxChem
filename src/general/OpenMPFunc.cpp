@@ -133,12 +133,12 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
                 if (gto_pair_blocks[i].is_empty_gto_pair_block(bra_idx)) continue;
 
                 const auto bra_block = gto_pair_blocks[i].gto_pair_block(bra_idx);
+                
+                const auto bra_angpair = bra_block.angular_momentums();
 
                 const auto bra_size = bra_block.number_of_contracted_pairs();
                 
-                auto bra_bsize = bra_size / nthreads;
-                
-                if (bra_bsize < simd::width<double>()) bra_bsize = simd::width<double>();
+                auto bra_bsize = omp::angular_momentum_scale(bra_angpair) * simd::width<double>();
                 
                 const auto bra_blocks = batch::number_of_batches(bra_size, bra_bsize);
                 
@@ -147,12 +147,12 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
                     if (gto_pair_blocks[i].is_empty_gto_pair_block(ket_idx)) continue;
                     
                     const auto ket_block = gto_pair_blocks[i].gto_pair_block(ket_idx);
+                    
+                    const auto ket_angpair = ket_block.angular_momentums();
 
                     const auto ket_size = ket_block.number_of_contracted_pairs();
                     
-                    auto ket_bsize = ket_size / nthreads;
-                    
-                    if (ket_bsize < simd::width<double>()) ket_bsize = simd::width<double>();
+                    auto ket_bsize = omp::angular_momentum_scale(ket_angpair)  * simd::width<double>();
                     
                     const auto ket_blocks = batch::number_of_batches(ket_size, ket_bsize);
                     
@@ -188,14 +188,14 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
                 for (int bra_idx = 0; bra_idx < 16; bra_idx++)
                 {
                     if (gto_pair_blocks[i].is_empty_gto_pair_block(bra_idx)) continue;
-
+                    
                     const auto bra_block = gto_pair_blocks[i].gto_pair_block(bra_idx);
+                    
+                    const auto bra_angpair = bra_block.angular_momentums();
 
                     const auto bra_size = bra_block.number_of_contracted_pairs();
-                    
-                    auto bra_bsize = bra_size / nthreads;
-                    
-                    if (bra_bsize < simd::width<double>()) bra_bsize = simd::width<double>();
+                
+                    auto bra_bsize = omp::angular_momentum_scale(bra_angpair) * simd::width<double>();
                     
                     const auto bra_blocks = batch::number_of_batches(bra_size, bra_bsize);
 
@@ -204,12 +204,12 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
                         if (gto_pair_blocks[j].is_empty_gto_pair_block(ket_idx)) continue;
                         
                         const auto ket_block = gto_pair_blocks[j].gto_pair_block(ket_idx);
+                        
+                        const auto ket_angpair = ket_block.angular_momentums();
 
                         const auto ket_size = ket_block.number_of_contracted_pairs();
                         
-                        auto ket_bsize = ket_size / nthreads;
-                        
-                        if (ket_bsize < simd::width<double>()) ket_bsize = simd::width<double>();
+                        auto ket_bsize = omp::angular_momentum_scale(ket_angpair) * simd::width<double>();
                         
                         const auto ket_blocks = batch::number_of_batches(ket_size, ket_bsize);
                     
@@ -240,6 +240,18 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
     }
 
     return wtasks;
+}
+
+auto
+angular_momentum_scale(const std::pair<int, int>& ang_pair) -> size_t
+{
+    const auto angmom = ang_pair.first + ang_pair.second;
+    
+    if (angmom > 8) return 16;
+    
+    if (angmom > 4) return 32;
+    
+    return 64;
 }
 
 }  // namespace omp

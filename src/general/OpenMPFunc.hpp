@@ -57,6 +57,11 @@ auto make_diag_work_group(const std::vector<CGtoPairBlock>& gto_pair_blocks) -> 
 /// @return The vector of work tasks.
 auto make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const int ithreshold) -> std::vector<std::array<size_t, 8>>;
 
+/// @brief Gets angular momentum scaling factor for SIMD width.
+/// @param ang_pair The angular momentum pair.
+/// @return The scaling factor for SIMD width
+auto angular_momentum_scale(const std::pair<int, int>& ang_pair) -> size_t;
+
 }  // namespace omp
 
 #endif /* OpenMPFunc_hpp */
