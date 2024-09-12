@@ -122,8 +122,6 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
    
     if (const auto nblocks = gto_pair_blocks.size(); nblocks > 0)
     {
-        const auto nthreads = omp::get_number_of_threads();
-        
         for (size_t i = 0; i < nblocks; i++)
         {
             // apply threshold to blocked GTOs pair blocks on bra side
@@ -247,11 +245,11 @@ angular_momentum_scale(const std::pair<int, int>& ang_pair) -> size_t
 {
     const auto angmom = ang_pair.first + ang_pair.second;
     
-    if (angmom > 8) return 16;
+    if (angmom > 8) return 32;
     
-    if (angmom > 4) return 32;
+    if (angmom > 4) return 64;
     
-    return 64;
+    return 128;
 }
 
 }  // namespace omp
