@@ -51,7 +51,6 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .sanitychecks import molecule_sanity_check
 from .errorhandler import assert_msg_critical
-from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
 
 class ScfDriver:
@@ -432,15 +431,7 @@ class ScfDriver:
             self.print_level = 3
 
         if self.restart:
-            self.restart = self.validate_checkpoint(molecule.get_element_ids(),
-                                                    ao_basis.get_label(),
-                                                    self.scf_type)
-
-        if self.restart:
             self.acc_type = 'DIIS'
-            if self.rank == mpi_master():
-                self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
-                    self.checkpoint_file)
 
         # nuclear repulsion energy
         self._nuc_energy = molecule.nuclear_repulsion_energy()
@@ -475,11 +466,8 @@ class ScfDriver:
             profiler = Profiler()
 
             if self.rank == mpi_master():
-                if self.restart:
-                    den_mat = self.gen_initial_density_restart(molecule)
-                else:
-                    den_mat = self.gen_initial_density_sad(
-                        molecule, ao_basis, min_basis)
+                den_mat = self.gen_initial_density_sad(
+                    molecule, ao_basis, min_basis)
                 naos = den_mat.shape[0]
             else:
                 naos = None
@@ -511,11 +499,8 @@ class ScfDriver:
             val_basis = ao_basis.reduce_to_valence_basis()
 
             if self.rank == mpi_master():
-                if self.restart:
-                    den_mat = self.gen_initial_density_restart(molecule)
-                else:
-                    den_mat = self.gen_initial_density_sad(
-                        molecule, val_basis, min_basis)
+                den_mat = self.gen_initial_density_sad(
+                    molecule, val_basis, min_basis)
                 naos = den_mat.shape[0]
             else:
                 naos = None
@@ -645,57 +630,6 @@ class ScfDriver:
 
         return proj_mo.get_density(molecule, self.scf_type)
 
-    def gen_initial_density_restart(self, molecule):
-        """
-        Reads initial molecular orbitals and AO density from checkpoint file.
-
-        :param molecule:
-            The molecule.
-
-        :return:
-            The AO density matrix.
-        """
-
-        self._molecular_orbitals = MolecularOrbitals.read_hdf5(
-            self.checkpoint_file)
-        den_mat = self._molecular_orbitals.get_density(molecule, self.scf_type)
-
-        restart_text = 'Restarting from checkpoint file: '
-        restart_text += self.checkpoint_file
-        self.ostream.print_info(restart_text)
-        self.ostream.print_blank()
-
-        return den_mat
-
-    def validate_checkpoint(self, nuclear_charges, basis_set, scf_type):
-        """
-        Validates the checkpoint file by checking nuclear charges and basis set.
-
-        :param nuclear_charges:
-            Numpy array of the nuclear charges.
-        :param basis_set:
-            Name of the AO basis.
-        :param scf_type:
-            The type of SCF calculation (restricted, unrestricted, or
-            restricted_openshell).
-
-        :return:
-            Validity of the checkpoint file.
-        """
-
-        valid = False
-
-        if self.rank == mpi_master():
-            if (isinstance(self.checkpoint_file, str) and
-                    Path(self.checkpoint_file).is_file()):
-                valid = MolecularOrbitals.match_hdf5(self.checkpoint_file,
-                                                     nuclear_charges, basis_set,
-                                                     scf_type)
-
-        valid = self.comm.bcast(valid, root=mpi_master())
-
-        return valid
-
     def maximum_overlap(self, molecule, basis, orbitals, alpha_list, beta_list):
         """
         Constraint the SCF calculation to find orbitals that maximize overlap
@@ -751,111 +685,6 @@ class ScfDriver:
             self.set_start_orbitals(molecule, basis, (C_start_a, C_start_b))
         else:
             self.set_start_orbitals(molecule, basis, C_start_a)
-
-    def set_start_orbitals(self, molecule, basis, array):
-        """
-        Creates checkpoint file from numpy array containing starting orbitals.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param array:
-            The numpy array (or list/tuple of numpy arrays).
-        """
-
-        # create MolecularOrbitals object from numpy array
-
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                isinstance(array, (np.ndarray, tuple, list)),
-                'ScfDriver.set_start_orbitals: invalid input for alpha ' +
-                'orbitals')
-
-            C_alpha, C_beta = None, None
-
-            if isinstance(array, np.ndarray):
-                C_alpha, C_beta = array, None
-
-            elif isinstance(array, (tuple, list)):
-                if len(array) == 1:
-                    C_alpha, C_beta = array[0], None
-                elif len(array) == 2:
-                    C_alpha, C_beta = array[0], array[1]
-                else:
-                    assert_msg_critical(
-                        False,
-                        'ScfDriver.set_start_orbitals: expecting one or two ' +
-                        'input orbitals')
-
-            err_array = 'ScfDriver.set_start_orbitals: expecting numpy array'
-            err_mo = 'ScfDriver.set_start_orbitals: inconsistent number of MOs'
-            err_ao = 'ScfDriver.set_start_orbitals: inconsistent number of AOs'
-
-            n_ao = basis.get_dimension_of_basis(molecule)
-
-            assert_msg_critical(isinstance(C_alpha, np.ndarray), err_array)
-            assert_msg_critical(n_ao == C_alpha.shape[0], err_ao)
-            n_mo = C_alpha.shape[1]
-
-            ene_a = np.zeros(n_mo)
-            occ_a = molecule.get_aufbau_alpha_occupation(n_mo)
-
-            if self.scf_type == 'restricted':
-                self._molecular_orbitals = MolecularOrbitals([C_alpha], [ene_a],
-                                                             [occ_a],
-                                                             molorb.rest)
-
-            elif self.scf_type == 'unrestricted':
-                assert_msg_critical(isinstance(C_beta, np.ndarray), err_array)
-                assert_msg_critical(n_ao == C_beta.shape[0], err_ao)
-                assert_msg_critical(n_mo == C_beta.shape[1], err_mo)
-                ene_b = np.zeros(n_mo)
-                occ_b = molecule.get_aufbau_beta_occupation(n_mo)
-                self._molecular_orbitals = MolecularOrbitals([C_alpha, C_beta],
-                                                             [ene_a, ene_b],
-                                                             [occ_a, occ_b],
-                                                             molorb.unrest)
-
-            elif self.scf_type == 'restricted_openshell':
-                occ_b = molecule.get_aufbau_beta_occupation(n_mo)
-                self._molecular_orbitals = MolecularOrbitals([C_alpha], [ene_a],
-                                                             [occ_a, occ_b],
-                                                             molorb.restopen)
-
-        else:
-            self._molecular_orbitals = MolecularOrbitals()
-
-        # write checkpoint file and sychronize MPI processes
-
-        self.restart = True
-        self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
-        self.comm.barrier()
-
-    def write_checkpoint(self, nuclear_charges, basis_set):
-        """
-        Writes molecular orbitals to checkpoint file.
-
-        :param nuclear_charges:
-            The nuclear charges.
-        :param basis_set:
-            Name of the basis set.
-        """
-
-        if self.checkpoint_file is None and self._filename is None:
-            return
-
-        if self.checkpoint_file is None and self._filename is not None:
-            self.checkpoint_file = f'{self._filename}.scf.h5'
-
-        if self.checkpoint_file and isinstance(self.checkpoint_file, str):
-            if self.rank == mpi_master():
-                self.molecular_orbitals.write_hdf5(self.checkpoint_file,
-                                                   nuclear_charges, basis_set)
-                self.ostream.print_blank()
-                checkpoint_text = 'Checkpoint written to file: '
-                checkpoint_text += self.checkpoint_file
-                self.ostream.print_info(checkpoint_text)
 
     def _get_num_gpus_per_node(self):
         """
@@ -1089,18 +918,9 @@ class ScfDriver:
             profiler.check_memory_usage('Iteration {:d} Fock diag.'.format(
                 self._num_iter))
 
-            if not self._first_step:
-                iter_in_hours = (tm.time() - iter_start_time) / 3600
-                if self._need_graceful_exit(iter_in_hours):
-                    self._graceful_exit(molecule, ao_basis)
-
         if self.rank == mpi_master():
             acc_diis.clear()
             self._V_es = None
-
-        if not self._first_step:
-            self.write_checkpoint(molecule.get_element_ids(),
-                                  ao_basis.get_label())
 
         if (not self._first_step) and self.is_converged:
 
@@ -1151,61 +971,10 @@ class ScfDriver:
             else:
                 self._scf_tensors = None
 
-            if self.rank == mpi_master():
-                self._write_final_hdf5(molecule, ao_basis)
-
         if self.rank == mpi_master():
             self._print_scf_finish(diis_start_time)
 
         profiler.check_memory_usage('End of SCF')
-
-    def _need_graceful_exit(self, iter_in_hours):
-        """
-        Checks if a graceful exit is needed.
-
-        :param iter_in_hours:
-            The time spent in one iteration (in hours).
-
-        :return:
-            True if a graceful exit is needed, False otherwise.
-        """
-
-        if self.program_end_time is not None:
-            remaining_hours = (self.program_end_time -
-                               datetime.now()).total_seconds() / 3600
-            # exit gracefully when the remaining time is not sufficient to
-            # complete the next iteration (plus 25% to be on the safe side).
-            if remaining_hours < iter_in_hours * 1.25:
-                return True
-        return False
-
-    def _graceful_exit(self, molecule, basis):
-        """
-        Gracefully exits the program.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The basis set.
-
-        :return:
-            The return code.
-        """
-
-        self.ostream.print_blank()
-        self.ostream.print_info('Preparing for a graceful termination...')
-        self.ostream.flush()
-
-        self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
-
-        self.ostream.print_blank()
-        self.ostream.print_info('...done.')
-        self.ostream.print_blank()
-        self.ostream.print_info('Exiting program.')
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-        sys.exit(0)
 
     def _comp_one_ints(self, molecule, basis, screener):
         """
@@ -1973,28 +1742,3 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_blank()
-
-    def _write_final_hdf5(self, molecule, ao_basis):
-        """
-        Writes final HDF5 that contains SCF results.
-
-        :param molecule:
-            The molecule.
-        :param ao_basis:
-            The AO basis set.
-        """
-
-        if self.checkpoint_file is None:
-            return
-
-        final_h5_fname = str(
-            Path(self.checkpoint_file).with_suffix('.results.h5'))
-
-        create_hdf5(final_h5_fname, molecule, ao_basis, 'HF', '')
-        write_scf_results_to_hdf5(final_h5_fname, self.scf_tensors,
-                                  self.history)
-
-        self.ostream.print_blank()
-        checkpoint_text = 'SCF results written to file: '
-        checkpoint_text += final_h5_fname
-        self.ostream.print_info(checkpoint_text)
