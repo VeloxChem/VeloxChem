@@ -8,6 +8,7 @@
 #include "SimdArray.hpp"
 #include "SphericalMomentum.hpp"
 #include "SubMatrix.hpp"
+#include "Matrices.hpp"
 #include "TensorComponents.hpp"
 
 namespace t4cfunc {  // t2cfunc namespace
@@ -310,6 +311,24 @@ bra_transform(CSimdArray<double>&       sbuffer,
         }
     }
 }
+
+/// @brief Adds batch of  local matrices to matrices container.
+/// @param matrices The matrices container to be added to.
+/// @param label The identifier of Fock matrix type. 
+/// @param mtype The matrix type.
+/// @param suffix The suffix of local matrices identifiers.
+/// @param adims The dimensions along center A.
+/// @param bdims The dimensions along center B.
+/// @param cdims The dimensions along center C.
+/// @param ddims The dimensions along center D.
+auto add_local_matrices(      CMatrices& matrices,
+                        const std::string& label,
+                        const mat_t        mtype,
+                        const std::string& suffix,
+                        const size_t       adims,
+                        const size_t       bdims,
+                        const size_t       cdims,
+                        const size_t       ddims) -> void;
 
 }  // namespace t4cfunc
 

@@ -9,6 +9,7 @@ namespace t4cfunc {  // t2cfunc namespace
 
 auto
 local_distribute_rest_jk(CMatrices&                       focks,
+                         const std::string&               suffix,
                          const CMatrix*                   density,
                          const CSimdArray<double>&        buffer,
                          const size_t                     offset,
@@ -44,17 +45,17 @@ local_distribute_rest_jk(CMatrices&                       focks,
 
     // set up Fock submatrices
 
-    auto submat_pq = focks.matrix("PQ")->sub_matrix({0, 0});
+    auto submat_pq = focks.matrix("PQ_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_rs = focks.matrix("RS")->sub_matrix({0, 0});
+    auto submat_rs = focks.matrix("RS_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_pr = focks.matrix("PR")->sub_matrix({0, 0});
+    auto submat_pr = focks.matrix("PR_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_ps = focks.matrix("PS")->sub_matrix({0, 0});
+    auto submat_ps = focks.matrix("PS_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_qr = focks.matrix("QR")->sub_matrix({0, 0});
+    auto submat_qr = focks.matrix("QR_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_qs = focks.matrix("QS")->sub_matrix({0, 0});
+    auto submat_qs = focks.matrix("QS_" + suffix)->sub_matrix({0, 0});
 
     // set up AO density submatrix
 
@@ -285,6 +286,7 @@ local_distribute_rest_jk(CMatrices&                       focks,
 
 auto
 local_distribute_rest_jkx(CMatrices&                       focks,
+                          const std::string&               suffix,
                           const CMatrix*                   density,
                           const CSimdArray<double>&        buffer,
                           const size_t                     offset,
@@ -321,17 +323,17 @@ local_distribute_rest_jkx(CMatrices&                       focks,
 
     // set up Fock submatrices
 
-    auto submat_pq = focks.matrix("PQ")->sub_matrix({0, 0});
+    auto submat_pq = focks.matrix("PQ_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_rs = focks.matrix("RS")->sub_matrix({0, 0});
+    auto submat_rs = focks.matrix("RS_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_pr = focks.matrix("PR")->sub_matrix({0, 0});
+    auto submat_pr = focks.matrix("PR_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_ps = focks.matrix("PS")->sub_matrix({0, 0});
+    auto submat_ps = focks.matrix("PS_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_qr = focks.matrix("QR")->sub_matrix({0, 0});
+    auto submat_qr = focks.matrix("QR_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_qs = focks.matrix("QS")->sub_matrix({0, 0});
+    auto submat_qs = focks.matrix("QS_" + suffix)->sub_matrix({0, 0});
 
     // set up AO density submatrix
 
@@ -564,6 +566,7 @@ local_distribute_rest_jkx(CMatrices&                       focks,
 
 auto
 local_distribute_rest_j(CMatrices&                       focks,
+                        const std::string&               suffix,
                         const CMatrix*                   density,
                         const CSimdArray<double>&        buffer,
                         const size_t                     offset,
@@ -591,9 +594,9 @@ local_distribute_rest_j(CMatrices&                       focks,
 
     // set up Fock submatrices
 
-    auto submat_pq = focks.matrix("PQ")->sub_matrix({0, 0});
+    auto submat_pq = focks.matrix("PQ_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_rs = focks.matrix("RS")->sub_matrix({0, 0});
+    auto submat_rs = focks.matrix("RS_" + suffix)->sub_matrix({0, 0});
 
     // set up AO density submatrix
 
@@ -728,13 +731,6 @@ local_distribute_rest_j(CMatrices&                       focks,
 
                         auto fval = curr_buffer[m - ket_range.first];
 
-                        //                        if ((a_angmom == 3) && (b_angmom == 3) && (c_angmom == 3) && (d_angmom == 3))
-                        //                        {
-                        //                            std::cout << std::setprecision(15);
-                        //
-                        //                            std::cout  << p << " " << q << " " << r << " " << s << " " << fval << std::endl;
-                        //                        }
-
                         if (p == q) fval *= 0.5;
 
                         if (r == s) fval *= 0.5;
@@ -771,6 +767,7 @@ local_distribute_rest_j(CMatrices&                       focks,
 
 auto
 local_distribute_rest_k(CMatrices&                       focks,
+                        const std::string&               suffix,
                         const CMatrix*                   density,
                         const CSimdArray<double>&        buffer,
                         const size_t                     offset,
@@ -802,13 +799,13 @@ local_distribute_rest_k(CMatrices&                       focks,
 
     // set up Fock submatrices
 
-    auto submat_pr = focks.matrix("PR")->sub_matrix({0, 0});
+    auto submat_pr = focks.matrix("PR_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_ps = focks.matrix("PS")->sub_matrix({0, 0});
+    auto submat_ps = focks.matrix("PS_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_qr = focks.matrix("QR")->sub_matrix({0, 0});
+    auto submat_qr = focks.matrix("QR_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_qs = focks.matrix("QS")->sub_matrix({0, 0});
+    auto submat_qs = focks.matrix("QS_" + suffix)->sub_matrix({0, 0});
 
     // set up AO density submatrix
 
@@ -1009,6 +1006,7 @@ local_distribute_rest_k(CMatrices&                       focks,
 
 auto
 local_distribute_rest_kx(CMatrices&                       focks,
+                         const std::string&               suffix,
                          const CMatrix*                   density,
                          const CSimdArray<double>&        buffer,
                          const size_t                     offset,
@@ -1041,13 +1039,13 @@ local_distribute_rest_kx(CMatrices&                       focks,
 
     // set up Fock submatrices
 
-    auto submat_pr = focks.matrix("PR")->sub_matrix({0, 0});
+    auto submat_pr = focks.matrix("PR_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_ps = focks.matrix("PS")->sub_matrix({0, 0});
+    auto submat_ps = focks.matrix("PS_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_qr = focks.matrix("QR")->sub_matrix({0, 0});
+    auto submat_qr = focks.matrix("QR_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_qs = focks.matrix("QS")->sub_matrix({0, 0});
+    auto submat_qs = focks.matrix("QS_" + suffix)->sub_matrix({0, 0});
 
     // set up AO density submatrix
 
@@ -1248,6 +1246,7 @@ local_distribute_rest_kx(CMatrices&                       focks,
 
 auto
 local_distribute_gen_jk(CMatrices&                       focks,
+                        const std::string&               suffix,
                         const CMatrix*                   density,
                         const CSimdArray<double>&        buffer,
                         const size_t                     offset,
@@ -1295,29 +1294,29 @@ local_distribute_gen_jk(CMatrices&                       focks,
     
     // set up Fock submatrices
     
-    auto submat_pq = focks.matrix("PQ")->sub_matrix({0, 0});
+    auto submat_pq = focks.matrix("PQ_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_qp = focks.matrix("QP")->sub_matrix({0, 0});
+    auto submat_qp = focks.matrix("QP_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_rs = focks.matrix("RS")->sub_matrix({0, 0});
+    auto submat_rs = focks.matrix("RS_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_sr = focks.matrix("SR")->sub_matrix({0, 0});
+    auto submat_sr = focks.matrix("SR_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_pr = focks.matrix("PR")->sub_matrix({0, 0});
+    auto submat_pr = focks.matrix("PR_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_rp = focks.matrix("RP")->sub_matrix({0, 0});
+    auto submat_rp = focks.matrix("RP_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_ps = focks.matrix("PS")->sub_matrix({0, 0});;
+    auto submat_ps = focks.matrix("PS_" + suffix)->sub_matrix({0, 0});;
     
-    auto submat_sp = focks.matrix("SP")->sub_matrix({0, 0});
+    auto submat_sp = focks.matrix("SP_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_qr = focks.matrix("QR")->sub_matrix({0, 0});
+    auto submat_qr = focks.matrix("QR_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_rq = focks.matrix("RQ")->sub_matrix({0, 0});
+    auto submat_rq = focks.matrix("RQ_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_qs = focks.matrix("QS")->sub_matrix({0, 0});
+    auto submat_qs = focks.matrix("QS_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_sq = focks.matrix("SQ")->sub_matrix({0, 0});
+    auto submat_sq = focks.matrix("SQ_" + suffix)->sub_matrix({0, 0});
     
     // set up AO density submatrix
     
@@ -1514,6 +1513,7 @@ local_distribute_gen_jk(CMatrices&                       focks,
 
 auto
 local_distribute_gen_jkx(CMatrices&                       focks,
+                         const std::string&               suffix,
                         const CMatrix*                   density,
                         const CSimdArray<double>&        buffer,
                         const size_t                     offset,
@@ -1562,29 +1562,29 @@ local_distribute_gen_jkx(CMatrices&                       focks,
     
     // set up Fock submatrices
     
-    auto submat_pq = focks.matrix("PQ")->sub_matrix({0, 0});
+    auto submat_pq = focks.matrix("PQ_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_qp = focks.matrix("QP")->sub_matrix({0, 0});
+    auto submat_qp = focks.matrix("QP_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_rs = focks.matrix("RS")->sub_matrix({0, 0});
+    auto submat_rs = focks.matrix("RS_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_sr = focks.matrix("SR")->sub_matrix({0, 0});
+    auto submat_sr = focks.matrix("SR_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_pr = focks.matrix("PR")->sub_matrix({0, 0});
+    auto submat_pr = focks.matrix("PR_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_rp = focks.matrix("RP")->sub_matrix({0, 0});
+    auto submat_rp = focks.matrix("RP_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_ps = focks.matrix("PS")->sub_matrix({0, 0});;
+    auto submat_ps = focks.matrix("PS_" + suffix)->sub_matrix({0, 0});;
     
-    auto submat_sp = focks.matrix("SP")->sub_matrix({0, 0});
+    auto submat_sp = focks.matrix("SP_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_qr = focks.matrix("QR")->sub_matrix({0, 0});
+    auto submat_qr = focks.matrix("QR_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_rq = focks.matrix("RQ")->sub_matrix({0, 0});
+    auto submat_rq = focks.matrix("RQ_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_qs = focks.matrix("QS")->sub_matrix({0, 0});
+    auto submat_qs = focks.matrix("QS_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_sq = focks.matrix("SQ")->sub_matrix({0, 0});
+    auto submat_sq = focks.matrix("SQ_" + suffix)->sub_matrix({0, 0});
     
     // set up AO density submatrix
     
@@ -1757,7 +1757,7 @@ local_distribute_gen_jkx(CMatrices&                       focks,
                         
                         // Exchange contributions
                         
-                        fval *= factor; 
+                        fval *= factor;
                     
                         submat_pr->at({loc_p, loc_r}) -= fval * denmat_qs->operator[]({q, s});
                         
@@ -1783,6 +1783,7 @@ local_distribute_gen_jkx(CMatrices&                       focks,
 
 auto
 local_distribute_gen_j(CMatrices&                       focks,
+                       const std::string&               suffix,
                         const CMatrix*                   density,
                         const CSimdArray<double>&        buffer,
                         const size_t                     offset,
@@ -1814,13 +1815,13 @@ local_distribute_gen_j(CMatrices&                       focks,
 
     // set up Fock submatrices
 
-    auto submat_pq = focks.matrix("PQ")->sub_matrix({0, 0});
+    auto submat_pq = focks.matrix("PQ_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_qp = focks.matrix("QP")->sub_matrix({0, 0});
+    auto submat_qp = focks.matrix("QP_" + suffix)->sub_matrix({0, 0});
 
-    auto submat_rs = focks.matrix("RS")->sub_matrix({0, 0});
+    auto submat_rs = focks.matrix("RS_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_sr = focks.matrix("SR")->sub_matrix({0, 0});
+    auto submat_sr = focks.matrix("SR_" + suffix)->sub_matrix({0, 0});
 
     // set up AO density submatrix
 
@@ -1983,6 +1984,7 @@ local_distribute_gen_j(CMatrices&                       focks,
 
 auto
 local_distribute_gen_k(CMatrices&                       focks,
+                       const std::string&               suffix,
                         const CMatrix*                   density,
                         const CSimdArray<double>&        buffer,
                         const size_t                     offset,
@@ -2022,21 +2024,21 @@ local_distribute_gen_k(CMatrices&                       focks,
     
     // set up Fock submatrices
     
-    auto submat_pr = focks.matrix("PR")->sub_matrix({0, 0});
+    auto submat_pr = focks.matrix("PR_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_rp = focks.matrix("RP")->sub_matrix({0, 0});
+    auto submat_rp = focks.matrix("RP_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_ps = focks.matrix("PS")->sub_matrix({0, 0});;
+    auto submat_ps = focks.matrix("PS_" + suffix)->sub_matrix({0, 0});;
     
-    auto submat_sp = focks.matrix("SP")->sub_matrix({0, 0});
+    auto submat_sp = focks.matrix("SP_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_qr = focks.matrix("QR")->sub_matrix({0, 0});
+    auto submat_qr = focks.matrix("QR_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_rq = focks.matrix("RQ")->sub_matrix({0, 0});
+    auto submat_rq = focks.matrix("RQ_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_qs = focks.matrix("QS")->sub_matrix({0, 0});
+    auto submat_qs = focks.matrix("QS_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_sq = focks.matrix("SQ")->sub_matrix({0, 0});
+    auto submat_sq = focks.matrix("SQ_" + suffix)->sub_matrix({0, 0});
     
     // set up AO density submatrix
     
@@ -2209,6 +2211,7 @@ local_distribute_gen_k(CMatrices&                       focks,
 
 auto
 local_distribute_gen_kx(CMatrices&                       focks,
+                        const std::string&               suffix,
                         const CMatrix*                   density,
                         const CSimdArray<double>&        buffer,
                         const size_t                     offset,
@@ -2249,21 +2252,21 @@ local_distribute_gen_kx(CMatrices&                       focks,
     
     // set up Fock submatrices
     
-    auto submat_pr = focks.matrix("PR")->sub_matrix({0, 0});
+    auto submat_pr = focks.matrix("PR_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_rp = focks.matrix("RP")->sub_matrix({0, 0});
+    auto submat_rp = focks.matrix("RP_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_ps = focks.matrix("PS")->sub_matrix({0, 0});;
+    auto submat_ps = focks.matrix("PS_" + suffix)->sub_matrix({0, 0});;
     
-    auto submat_sp = focks.matrix("SP")->sub_matrix({0, 0});
+    auto submat_sp = focks.matrix("SP_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_qr = focks.matrix("QR")->sub_matrix({0, 0});
+    auto submat_qr = focks.matrix("QR_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_rq = focks.matrix("RQ")->sub_matrix({0, 0});
+    auto submat_rq = focks.matrix("RQ_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_qs = focks.matrix("QS")->sub_matrix({0, 0});
+    auto submat_qs = focks.matrix("QS_" + suffix)->sub_matrix({0, 0});
     
-    auto submat_sq = focks.matrix("SQ")->sub_matrix({0, 0});
+    auto submat_sq = focks.matrix("SQ_" + suffix)->sub_matrix({0, 0});
     
     // set up AO density submatrix
     
@@ -2433,7 +2436,5 @@ local_distribute_gen_kx(CMatrices&                       focks,
         }
     }
 }
-
-
 
 }  // namespace t4cfunc

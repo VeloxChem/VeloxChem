@@ -12,6 +12,7 @@ namespace t4cfunc {  // t2cfunc namespace
 
 /// Distributes buffer of integrals into Fock matrix: restricted  2J - K.
 /// @param focks  The local Fock matrices.
+/// @param suffix The suffix of Fock matrix identifier.
 /// @param density  The pointer to AO density matrix.
 /// @param buffer  The integrals buffer.
 /// @param offset  The intgeral buffer offset.
@@ -31,6 +32,7 @@ namespace t4cfunc {  // t2cfunc namespace
 /// @param ket_range The index of the range [ket_first, ket_last) of GTOs on ket side.
 /// @param diagonal The flag indicating to use block diagonal distribution pattern of  integrals.
 auto local_distribute_rest_jk(CMatrices&                       focks,
+                              const std::string&               suffix,
                               const CMatrix*                   density,
                               const CSimdArray<double>&        buffer,
                               const size_t                     offset,
@@ -52,6 +54,7 @@ auto local_distribute_rest_jk(CMatrices&                       focks,
 
 /// Distributes buffer of integrals into Fock matrix: restricted scaled 2J - xK.
 /// @param focks  The local Fock matrices.
+/// @param suffix The suffix of Fock matrix identifier.
 /// @param density  The pointer to AO density matrix.
 /// @param buffer  The integrals buffer.
 /// @param offset  The intgeral buffer offset.
@@ -72,6 +75,7 @@ auto local_distribute_rest_jk(CMatrices&                       focks,
 /// @param ket_range The index of the range [ket_first, ket_last) of GTOs on ket side.
 /// @param diagonal The flag indicating to use block diagonal distribution pattern of  integrals.
 auto local_distribute_rest_jkx(CMatrices&                       focks,
+                               const std::string&               suffix,
                                const CMatrix*                   density,
                                const CSimdArray<double>&        buffer,
                                const size_t                     offset,
@@ -94,6 +98,7 @@ auto local_distribute_rest_jkx(CMatrices&                       focks,
 
 /// Distributes buffer of integrals into Fock matrix: restricted  J.
 /// @param focks  The local Fock matrices.
+/// @param suffix The suffix of Fock matrix identifier.
 /// @param density  The pointer to AO density matrix.
 /// @param buffer  The integrals buffer.
 /// @param offset  The intgeral buffer offset.
@@ -113,6 +118,7 @@ auto local_distribute_rest_jkx(CMatrices&                       focks,
 /// @param ket_range The index of the range [ket_first, ket_last) of GTOs on ket side.
 /// @param diagonal The flag indicating to use block diagonal distribution pattern of  integrals.
 auto local_distribute_rest_j(CMatrices&                       focks,
+                             const std::string&               suffix,
                              const CMatrix*                   density,
                              const CSimdArray<double>&        buffer,
                              const size_t                     offset,
@@ -134,6 +140,7 @@ auto local_distribute_rest_j(CMatrices&                       focks,
 
 /// Distributes buffer of integrals into Fock matrix: restricted  K.
 /// @param focks  The local Fock matrices.
+/// @param suffix The suffix of Fock matrix identifier.
 /// @param density  The pointer to AO density matrix.
 /// @param buffer  The integrals buffer.
 /// @param offset  The intgeral buffer offset.
@@ -153,6 +160,7 @@ auto local_distribute_rest_j(CMatrices&                       focks,
 /// @param ket_range The index of the range [ket_first, ket_last) of GTOs on ket side.
 /// @param diagonal The flag indicating to use block diagonal distribution pattern of  integrals.
 auto local_distribute_rest_k(CMatrices&                       focks,
+                             const std::string&               suffix,
                              const CMatrix*                   density,
                              const CSimdArray<double>&        buffer,
                              const size_t                     offset,
@@ -174,6 +182,7 @@ auto local_distribute_rest_k(CMatrices&                       focks,
 
 /// Distributes buffer of integrals into Fock matrix: restricted  scaled xK.
 /// @param focks  The local Fock matrices.
+/// @param suffix The suffix of Fock matrix identifier.
 /// @param density  The pointer to AO density matrix.
 /// @param buffer  The integrals buffer.
 /// @param offset  The intgeral buffer offset.
@@ -194,6 +203,7 @@ auto local_distribute_rest_k(CMatrices&                       focks,
 /// @param ket_range The index of the range [ket_first, ket_last) of GTOs on ket side.
 /// @param diagonal The flag indicating to use block diagonal distribution pattern of  integrals.
 auto local_distribute_rest_kx(CMatrices&                       focks,
+                              const std::string&               suffix,
                               const CMatrix*                   density,
                               const CSimdArray<double>&        buffer,
                               const size_t                     offset,
@@ -216,6 +226,7 @@ auto local_distribute_rest_kx(CMatrices&                       focks,
 
 /// Distributes buffer of integrals into Fock matrix: general  2J - K.
 /// @param focks  The local Fock matrices.
+/// @param suffix The suffix of Fock matrix identifier.
 /// @param density  The pointer to AO density matrix.
 /// @param buffer  The integrals buffer.
 /// @param offset  The intgeral buffer offset.
@@ -235,6 +246,7 @@ auto local_distribute_rest_kx(CMatrices&                       focks,
 /// @param ket_range The index of the range [ket_first, ket_last) of GTOs on ket side.
 /// @param diagonal The flag indicating to use block diagonal distribution pattern of  integrals.
 auto local_distribute_gen_jk(CMatrices&                       focks,
+                             const std::string&               suffix,
                               const CMatrix*                   density,
                               const CSimdArray<double>&        buffer,
                               const size_t                     offset,
@@ -256,6 +268,7 @@ auto local_distribute_gen_jk(CMatrices&                       focks,
 
 /// Distributes buffer of integrals into Fock matrix: general scaled  2J - xK.
 /// @param focks  The local Fock matrices.
+/// @param suffix The suffix of Fock matrix identifier.
 /// @param density  The pointer to AO density matrix.
 /// @param buffer  The integrals buffer.
 /// @param offset  The intgeral buffer offset.
@@ -276,6 +289,7 @@ auto local_distribute_gen_jk(CMatrices&                       focks,
 /// @param ket_range The index of the range [ket_first, ket_last) of GTOs on ket side.
 /// @param diagonal The flag indicating to use block diagonal distribution pattern of  integrals.
 auto local_distribute_gen_jkx(CMatrices&                       focks,
+                              const std::string&               suffix,
                                const CMatrix*                   density,
                                const CSimdArray<double>&        buffer,
                                const size_t                     offset,
@@ -298,6 +312,7 @@ auto local_distribute_gen_jkx(CMatrices&                       focks,
 
 /// Distributes buffer of integrals into Fock matrix: general  J.
 /// @param focks  The local Fock matrices.
+/// @param suffix The suffix of Fock matrix identifier.
 /// @param density  The pointer to AO density matrix.
 /// @param buffer  The integrals buffer.
 /// @param offset  The intgeral buffer offset.
@@ -317,6 +332,7 @@ auto local_distribute_gen_jkx(CMatrices&                       focks,
 /// @param ket_range The index of the range [ket_first, ket_last) of GTOs on ket side.
 /// @param diagonal The flag indicating to use block diagonal distribution pattern of  integrals.
 auto local_distribute_gen_j(CMatrices&                       focks,
+                            const std::string&               suffix,
                              const CMatrix*                   density,
                              const CSimdArray<double>&        buffer,
                              const size_t                     offset,
@@ -338,6 +354,7 @@ auto local_distribute_gen_j(CMatrices&                       focks,
 
 /// Distributes buffer of integrals into Fock matrix: general  K.
 /// @param focks  The local Fock matrices.
+/// @param suffix The suffix of Fock matrix identifier.
 /// @param density  The pointer to AO density matrix.
 /// @param buffer  The integrals buffer.
 /// @param offset  The intgeral buffer offset.
@@ -357,6 +374,7 @@ auto local_distribute_gen_j(CMatrices&                       focks,
 /// @param ket_range The index of the range [ket_first, ket_last) of GTOs on ket side.
 /// @param diagonal The flag indicating to use block diagonal distribution pattern of  integrals.
 auto local_distribute_gen_k(CMatrices&                       focks,
+                            const std::string&               suffix,
                              const CMatrix*                   density,
                              const CSimdArray<double>&        buffer,
                              const size_t                     offset,
@@ -378,6 +396,7 @@ auto local_distribute_gen_k(CMatrices&                       focks,
 
 /// Distributes buffer of integrals into Fock matrix: general  scaled xK.
 /// @param focks  The local Fock matrices.
+/// @param suffix The suffix of Fock matrix identifier.
 /// @param density  The pointer to AO density matrix.
 /// @param buffer  The integrals buffer.
 /// @param offset  The intgeral buffer offset.
@@ -398,6 +417,7 @@ auto local_distribute_gen_k(CMatrices&                       focks,
 /// @param ket_range The index of the range [ket_first, ket_last) of GTOs on ket side.
 /// @param diagonal The flag indicating to use block diagonal distribution pattern of  integrals.
 auto local_distribute_gen_kx(CMatrices&                       focks,
+                             const std::string&               suffix,
                              const CMatrix*                   density,
                              const CSimdArray<double>&        buffer,
                              const size_t                     offset,

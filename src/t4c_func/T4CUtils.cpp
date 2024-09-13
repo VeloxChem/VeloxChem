@@ -540,4 +540,150 @@ accumulate(CSubMatrix*                glob_matrix,
     }
 }
 
+auto add_local_matrices(      CMatrices&   matrices,
+                        const std::string& label,
+                        const mat_t        mtype,
+                        const std::string& suffix,
+                        const size_t       adims,
+                        const size_t       bdims,
+                        const size_t       cdims,
+                        const size_t       ddims) -> void
+{
+    // Coulomb matrices
+
+    if ((label == "2jk") || (label == "2jkx") || (label == "j"))
+    {
+        matrices.add(CMatrix(
+                          {
+                              {0, 0},
+                          },
+                          {
+                              CSubMatrix({0, 0, adims, bdims}),
+                          },
+                          mtype),
+                      "PQ_" + suffix);
+
+        matrices.add(CMatrix(
+                          {
+                              {0, 0},
+                          },
+                          {
+                              CSubMatrix({0, 0, cdims, ddims}),
+                          },
+                          mtype),
+                      "RS_"  + suffix);
+
+        if (mtype == mat_t::general)
+        {
+            matrices.add(CMatrix(
+                              {
+                                  {0, 0},
+                              },
+                              {
+                                  CSubMatrix({0, 0, bdims, adims}),
+                              },
+                              mtype),
+                          "QP_"  + suffix);
+
+            matrices.add(CMatrix(
+                              {
+                                  {0, 0},
+                              },
+                              {
+                                  CSubMatrix({0, 0, ddims, cdims}),
+                              },
+                              mtype),
+                          "SR_"  + suffix);
+        }
+    }
+
+    // Exchange matrices
+
+    if ((label == "2jk") || (label == "2jkx") || (label == "k") || (label == "kx"))
+    {
+        matrices.add(CMatrix(
+                          {
+                              {0, 0},
+                          },
+                          {
+                              CSubMatrix({0, 0, adims, cdims}),
+                          },
+                          mtype),
+                      "PR_"  + suffix);
+
+        matrices.add(CMatrix(
+                          {
+                              {0, 0},
+                          },
+                          {
+                              CSubMatrix({0, 0, adims, ddims}),
+                          },
+                          mtype),
+                      "PS_"  + suffix);
+
+        matrices.add(CMatrix(
+                          {
+                              {0, 0},
+                          },
+                          {
+                              CSubMatrix({0, 0, bdims, cdims}),
+                          },
+                          mtype),
+                      "QR_"  + suffix);
+
+        matrices.add(CMatrix(
+                          {
+                              {0, 0},
+                          },
+                          {
+                              CSubMatrix({0, 0, bdims, ddims}),
+                          },
+                          mtype),
+                      "QS_"  + suffix);
+
+        if (mtype == mat_t::general)
+        {
+            matrices.add(CMatrix(
+                              {
+                                  {0, 0},
+                              },
+                              {
+                                  CSubMatrix({0, 0, cdims, adims}),
+                              },
+                              mtype),
+                          "RP_"  + suffix);
+
+            matrices.add(CMatrix(
+                              {
+                                  {0, 0},
+                              },
+                              {
+                                  CSubMatrix({0, 0, ddims, adims}),
+                              },
+                              mtype),
+                          "SP_"  + suffix);
+
+            matrices.add(CMatrix(
+                              {
+                                  {0, 0},
+                              },
+                              {
+                                  CSubMatrix({0, 0, cdims, bdims}),
+                              },
+                              mtype),
+                          "RQ_"  + suffix);
+
+            matrices.add(CMatrix(
+                              {
+                                  {0, 0},
+                              },
+                              {
+                                  CSubMatrix({0, 0, ddims, bdims}),
+                              },
+                              mtype),
+                          "SQ_"  + suffix);
+        }
+    }
+}
+
 }  // namespace t4cfunc
