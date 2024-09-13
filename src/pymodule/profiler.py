@@ -24,7 +24,6 @@
 
 import numpy as np
 import time as tm
-import psutil
 import sys
 import os
 
@@ -39,13 +38,11 @@ class Profiler:
     Instance variable
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
-        - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation using
         - start_time: The starting time.
         - start_avail_mem: The starting available memory.
         - timing_dict: The dictionary containing information about timing.
         - timing_key: The key for the timing dictionary.
-        - memory_usage: The list containing information about memory usage.
         - pr: The Profile object.
     """
 
@@ -59,7 +56,6 @@ class Profiler:
 
         self.timing = False
         self.profiling = False
-        self.memory_profiling = False
         self.memory_tracing = False
 
         self.start_time = None
@@ -68,7 +64,6 @@ class Profiler:
         self.timing_dict = None
         self.timing_key = None
 
-        self.memory_usage = None
         self.pr = None
 
         if settings is not None:
@@ -86,16 +81,12 @@ class Profiler:
             self.timing = settings['timing']
         if 'profiling' in settings:
             self.profiling = settings['profiling']
-        if 'memory_profiling' in settings:
-            self.memory_profiling = settings['memory_profiling']
         if 'memory_tracing' in settings:
             self.memory_tracing = settings['memory_tracing']
 
         self.start_time = tm.time()
-        self.start_avail_mem = psutil.virtual_memory().available
 
         self.timing_dict = {}
-        self.memory_usage = []
 
         if self.profiling:
             import cProfile
@@ -118,7 +109,6 @@ class Profiler:
 
         self.print_timing(ostream, scf_flag)
         self.print_profiling_summary(ostream)
-        self.print_memory_usage(ostream, scf_flag)
         self.print_memory_tracing(ostream)
 
     def print_profiling_summary(self, ostream):
@@ -274,149 +264,6 @@ class Profiler:
 
             ostream.print_blank()
             ostream.print_blank()
-
-    def check_memory_usage(self, remark=''):
-        """
-        Checks memory usage.
-
-        :param remark:
-            Descriptive text about the point of checking.
-        """
-
-        if self.memory_profiling:
-            avail_mem = psutil.virtual_memory().available
-            used_mem = max(0, self.start_avail_mem - avail_mem)
-            self.memory_usage.append(
-                (tm.time() - self.start_time, used_mem, remark))
-
-    def print_memory_usage(self, ostream, scf_flag=False):
-        """
-        Prints memory usage.
-
-        :param ostream:
-            The output stream.
-        :param scf_flag:
-            The flag for SCF.
-        """
-
-        if self.memory_profiling:
-            mem_str = 'Estimated memory usage'
-            ostream.print_header(mem_str.ljust(92))
-            ostream.print_header(('-' * len(mem_str)).ljust(92))
-
-            mem_str = '{:20s}'.format('Elapsed Time')
-            mem_str += ' {:20s}'.format('Memory Usage')
-            mem_str += ' {:s}'.format('Remark')
-            ostream.print_header(mem_str.ljust(92))
-
-            for dt, mem, remark in self.memory_usage:
-                if scf_flag and remark.lower() == 'iteration 0':
-                    continue
-                mem_str = '{:.2f} sec'.format(dt).ljust(20)
-                mem_str += ' {:20s}'.format(self.memory_to_string(mem))
-                mem_str += ' {:s}'.format(remark)
-                ostream.print_header(mem_str.ljust(92))
-
-            ostream.print_blank()
-            ostream.print_blank()
-
-    def comp_memory_object(self, obj, counted_ids=None):
-        """
-        Computes the memory usage of an object recursively.
-
-        :param obj:
-            The object.
-        :param counted_ids:
-            The list of id's of counted objects.
-        :return:
-            The memory usage in bytes.
-        """
-
-        memsize = 0
-        if counted_ids is None:
-            counted_ids = []
-        if id(obj) not in counted_ids:
-            memsize += sys.getsizeof(obj)
-            counted_ids.append(id(obj))
-
-        obj_is_dict = isinstance(obj, dict)
-        if isinstance(obj, (dict, list, tuple, set, frozenset)):
-            for x in obj:
-                memsize += self.comp_memory_object(x, counted_ids)
-                if obj_is_dict:
-                    memsize += self.comp_memory_object(obj[x], counted_ids)
-
-        return memsize
-
-    def get_memory_object(self, obj):
-        """
-        Gets memory usage of an object as text string.
-
-        :param obj:
-            The object.
-        :return:
-            The amount of memory usage of the object as text string.
-        """
-
-        return self.memory_to_string(self.comp_memory_object(obj))
-
-    def print_memory_subspace(self, d, ostream):
-        """
-        Prints memory usage in subspace solver.
-
-        :param d:
-            The dictionary containing the data used in subspace.
-        :param ostream:
-            The output stream.
-        """
-
-        mem_usage, mem_detail = self.get_memory_dictionary(d)
-        mem_avail = self.get_available_memory()
-
-        ostream.print_info(
-            '{:s} of memory used for subspace procedure on the master node'.
-            format(mem_usage))
-        if self.memory_profiling:
-            for m in mem_detail:
-                ostream.print_info('  {:<15s} {:s}'.format(*m))
-        ostream.print_info(
-            '{:s} of memory available for the solver on the master node'.format(
-                mem_avail))
-        ostream.print_blank()
-
-    def get_memory_dictionary(self, d):
-        """
-        Gets memory usage of a dictionary.
-
-        :param d:
-            The dictionary.
-        :return:
-            Memory usage of the dictionary and the list of memory usage of each
-            item.
-        """
-
-        mem_usage = 0.0
-        mem_detail = []
-
-        for key, obj in d.items():
-            flag = ''
-            if isinstance(obj, np.ndarray) and not obj.flags.owndata:
-                flag = '  (not accurate)'
-            mem_obj = self.comp_memory_object(obj)
-            mem_usage += mem_obj
-            mem_detail.append((key, self.memory_to_string(mem_obj) + flag))
-
-        return self.memory_to_string(mem_usage), mem_detail
-
-    def get_available_memory(self):
-        """
-        Gets available memory as text string.
-
-        :return:
-            The amount of available memory as text string.
-        """
-
-        return self.memory_to_string(psutil.virtual_memory().available)
 
     def memory_to_string(self, memsize):
         """
