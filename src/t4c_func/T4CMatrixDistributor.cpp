@@ -363,6 +363,126 @@ CT4CMatrixDistributor::distribute(const CSimdArray<double>&        buffer,
                                               diagonal);
         }
     }
+    
+    if (_density->get_type() == mat_t::general)
+    {
+        if (_label == "2jk")
+        {
+            t4cfunc::local_distribute_gen_jk(_matrices,
+                                              _density,
+                                              buffer,
+                                              offset,
+                                              a_indices,
+                                              b_indices,
+                                              c_indices,
+                                              d_indices,
+                                              _a_loc_indices,
+                                              _b_loc_indices,
+                                              _c_loc_indices,
+                                              _d_loc_indices,
+                                              a_angmom,
+                                              b_angmom,
+                                              c_angmom,
+                                              d_angmom,
+                                              ibra_gto,
+                                              ket_range,
+                                              diagonal);
+        }
+
+        if (_label == "2jkx")
+        {
+            t4cfunc::local_distribute_gen_jkx(_matrices,
+                                               _density,
+                                               buffer,
+                                               offset,
+                                               _exchange_factor,
+                                               a_indices,
+                                               b_indices,
+                                               c_indices,
+                                               d_indices,
+                                               _a_loc_indices,
+                                               _b_loc_indices,
+                                               _c_loc_indices,
+                                               _d_loc_indices,
+                                               a_angmom,
+                                               b_angmom,
+                                               c_angmom,
+                                               d_angmom,
+                                               ibra_gto,
+                                               ket_range,
+                                               diagonal);
+        }
+
+        if (_label == "j")
+        {
+            t4cfunc::local_distribute_gen_j(_matrices,
+                                             _density,
+                                             buffer,
+                                             offset,
+                                             a_indices,
+                                             b_indices,
+                                             c_indices,
+                                             d_indices,
+                                             _a_loc_indices,
+                                             _b_loc_indices,
+                                             _c_loc_indices,
+                                             _d_loc_indices,
+                                             a_angmom,
+                                             b_angmom,
+                                             c_angmom,
+                                             d_angmom,
+                                             ibra_gto,
+                                             ket_range,
+                                             diagonal);
+        }
+
+        if (_label == "k")
+        {
+            t4cfunc::local_distribute_gen_k(_matrices,
+                                             _density,
+                                             buffer,
+                                             offset,
+                                             a_indices,
+                                             b_indices,
+                                             c_indices,
+                                             d_indices,
+                                             _a_loc_indices,
+                                             _b_loc_indices,
+                                             _c_loc_indices,
+                                             _d_loc_indices,
+                                             a_angmom,
+                                             b_angmom,
+                                             c_angmom,
+                                             d_angmom,
+                                             ibra_gto,
+                                             ket_range,
+                                             diagonal);
+        }
+
+        if (_label == "kx")
+        {
+            t4cfunc::local_distribute_gen_kx(_matrices,
+                                              _density,
+                                              buffer,
+                                              offset,
+                                              _exchange_factor,
+                                              a_indices,
+                                              b_indices,
+                                              c_indices,
+                                              d_indices,
+                                              _a_loc_indices,
+                                              _b_loc_indices,
+                                              _c_loc_indices,
+                                              _d_loc_indices,
+                                              a_angmom,
+                                              b_angmom,
+                                              c_angmom,
+                                              d_angmom,
+                                              ibra_gto,
+                                              ket_range,
+                                              diagonal);
+        }
+    }
 }
 
 auto
