@@ -551,7 +551,7 @@ auto add_local_matrices(      CMatrices&   matrices,
 {
     // Coulomb matrices
 
-    if ((label == "2jk") || (label == "2jkx") || (label == "j"))
+    if ((label == "2jk") || (label == "2jkx") || (label == "jk") || (label == "jkx") || (label == "j"))
     {
         matrices.add(CMatrix(
                           {
@@ -599,7 +599,7 @@ auto add_local_matrices(      CMatrices&   matrices,
 
     // Exchange matrices
 
-    if ((label == "2jk") || (label == "2jkx") || (label == "k") || (label == "kx"))
+    if ((label == "2jk") || (label == "2jkx") || (label == "jk") || (label == "jkx") || (label == "k") || (label == "kx"))
     {
         matrices.add(CMatrix(
                           {
