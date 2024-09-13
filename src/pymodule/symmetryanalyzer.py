@@ -47,6 +47,26 @@ class SymmetryAnalyzer:
         self._secondary_axis = [0., 1., 0.]
         self._molecule_type = ''
 
+        # Define tolerance parameters
+        self._tolerance_params = {
+            'very loose': {
+                'eig': 0.6,
+                'ang': np.radians(5.0),
+            },
+            'loose': {
+                'eig': 0.4,
+                'ang': np.radians(4.0),
+            },
+            'tight': {
+                'eig': 0.05,
+                'ang': np.radians(1.5),
+            },
+            'very tight': {
+                'eig': 0.008,
+                'ang': np.radians(0.2),
+            },
+        }
+
         # Define all the expected symmetry elements for each point group
         self._all_symmetry_elements = {
             "C1": ["E"],
@@ -141,21 +161,12 @@ class SymmetryAnalyzer:
                 - An array with the reoriented geometry in bohr.
         """
 
-        # Define the tolerance parameters
-        tolerance = tolerance.lower()
-
-        if tolerance == 'very loose':
-            self._tolerance_eig = 0.6
-            self._tolerance_ang = np.radians(5.0)
-        elif tolerance == 'loose':
-            self._tolerance_eig = 0.4
-            self._tolerance_ang = np.radians(4.0)
-        elif tolerance == 'tight':
-            self._tolerance_eig = 0.05
-            self._tolerance_ang = np.radians(1.5)
-        elif tolerance == 'very tight':
-            self._tolerance_eig = 0.008
-            self._tolerance_ang = np.radians(0.2)
+        # Get tolerance parameters
+        assert_msg_critical(
+            tolerance.lower() in self._tolerance_params,
+            'SymmetryAnalyzer.identify_pointgroup: Invalid tolerance keyword')
+        self._tolerance_eig = self._tolerance_params[tolerance.lower()]['eig']
+        self._tolerance_ang = self._tolerance_params[tolerance.lower()]['ang']
 
         # Read and express geometry in center of mass (COM) frame
         # Geom and COM in bohr because moments of inertia are defined in bohr
@@ -244,6 +255,16 @@ class SymmetryAnalyzer:
             if 'expected_symmetry_elements' in results_dict:
                 print('Expected symmetry elements: ' +
                       ', '.join(results_dict["expected_symmetry_elements"]))
+
+    def print_tolerance_keywords(self):
+        """
+        Print the available tolerance keywords.
+
+        :return:
+            The available tolerance keywords.
+        """
+
+        print(list(self._tolerance_params.keys()))
 
     @staticmethod
     def _get_sym_op_name(sym_elem):
