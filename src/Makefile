@@ -30,7 +30,8 @@ include Makefile.setup
 
 VLX_BAS := ../basis
 VLX_TARGET := veloxchemlib.so
-VLX_MODULE := $(wildcard pymodule/*.py)
+VLX_SCRIPT := pymodule/vlxscript.py
+VLX_MODULE := $(filter-out pymodule/vlxscript.py, $(wildcard pymodule/*.py))
 
 LIB_LIST += -shared $(PYTHON_LD) $(OPENMP_LD)
 
@@ -74,9 +75,12 @@ debug: $(VLX_LIBS)
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
 	@echo ====== Moving $(VLX_TARGET) and copying $(PYVLX_MAIN)...
 	mkdir -p ../build/python/veloxchem
+	mkdir -p ../build/bin
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
+	$(CP) $(VLX_SCRIPT) $(CURDIR)/../build/bin/vlx
+	chmod +x $(CURDIR)/../build/bin/vlx
 
 # Release
 release: $(VLX_LIBS)
@@ -85,9 +89,12 @@ release: $(VLX_LIBS)
 	$(VLX_LIBS_OBJS) $(LIB_LIST)
 	@echo ====== Moving $(VLX_TARGET) and copying $(PYVLX_MAIN)...
 	mkdir -p ../build/python/veloxchem
+	mkdir -p ../build/bin
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
+	$(CP) $(VLX_SCRIPT) $(CURDIR)/../build/bin/vlx
+	chmod +x $(CURDIR)/../build/bin/vlx
 
 # Clean up
 clean:
