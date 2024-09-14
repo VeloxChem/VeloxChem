@@ -185,7 +185,7 @@ CT4CMatricesDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, con
                     // acummulate contributions to Fock matrix
 
                     t4cfunc::accumulate(fock->sub_matrix(bra_ang_moms),
-                                        _matrices.matrix("PQ_0" + suffix)->sub_matrix({0, 0}),
+                                        _matrices.matrix("PQ_" + suffix)->sub_matrix({0, 0}),
                                         _a_loc_indices,
                                         _b_loc_indices,
                                         _a_glob_indices,
