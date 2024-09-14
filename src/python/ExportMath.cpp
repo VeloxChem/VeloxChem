@@ -11,6 +11,8 @@
 #include <vector>
 
 #include "CustomViews.hpp"
+#include "ErrorHandler.hpp"
+#include "ExportGeneral.hpp"
 #include "MathConst.hpp"
 #include "Matrices.hpp"
 #include "MatricesFunc.hpp"
@@ -23,6 +25,61 @@ namespace py = pybind11;
 using namespace py::literals;
 
 namespace vlx_math {
+
+// Helper function for CDenseMatrix constructor
+
+auto
+CDenseMatrix_from_numpy(const py::array_t<double>& arr) -> std::shared_ptr<CDenseMatrix>
+{
+    // check dimension
+
+    std::string errdim("DenseMatrix: Expecting a 2D numpy array");
+
+    errors::assertMsgCritical(arr.ndim() == 2, errdim);
+
+    if (arr.data() == nullptr || arr.size() == 0)
+    {
+        return std::make_shared<CDenseMatrix>();
+    }
+
+    // check that the numpy array is c-style contiguous
+
+    std::string errsrc("DenseMatrix: Expecting a contiguous numpy array");
+
+    auto c_style = py::detail::check_flags(arr.ptr(), py::array::c_style);
+
+    auto f_style = py::detail::check_flags(arr.ptr(), py::array::f_style);
+
+    errors::assertMsgCritical(c_style | f_style, errsrc);
+
+    // create CDenseMatrix from numpy array
+
+    auto nrows = static_cast<int>(arr.shape(0));
+
+    auto ncols = static_cast<int>(arr.shape(1));
+
+    CDenseMatrix submat(nrows, ncols);
+
+    auto submat_ptr = submat.values();
+
+    if (c_style)
+    {
+        std::memcpy(submat_ptr, arr.data(), arr.size() * sizeof(double));
+    }
+    else if (f_style)
+    {
+        for (py::ssize_t i = 0; i < arr.shape(0); i++)
+        {
+            for (py::ssize_t j = 0; j < arr.shape(1); j++)
+            {
+                submat_ptr[i * arr.shape(1) + j] = arr.data()[j * arr.shape(0) + i];
+            }
+        }
+    }
+
+    return std::make_shared<CDenseMatrix>(submat);
+}
+
 auto
 export_math(py::module &m) -> void
 {

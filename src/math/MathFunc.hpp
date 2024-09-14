@@ -47,6 +47,58 @@ count_elements_by_values(const std::vector<T>& values,
     return static_cast<T>(std::ranges::count(values, selector));
 }
 
+inline auto
+batch_sizes(const int nElements, const int nodes) -> std::vector<int>
+{
+    int ave = nElements / nodes;
+
+    int rem = nElements % nodes;
+
+    std::vector<int> counts;
+
+    for (int p = 0; p < nodes; p++)
+    {
+        counts.push_back((p < rem) ? (ave + 1) : ave);
+    }
+
+    return counts;
+}
+
+inline auto
+batch_offsets(const int nElements, const int nodes) -> std::vector<int>
+{
+    auto counts = mathfunc::batch_sizes(nElements, nodes);
+
+    std::vector<int> displs;
+
+    int index = 0;
+
+    for (int p = 0; p < nodes; p++)
+    {
+        displs.push_back(index);
+
+        index += counts[p];
+    }
+
+    return displs;
+}
+
+inline auto
+batch_size(const int nElements, const int rank, const int nodes) -> int
+{
+    auto counts = mathfunc::batch_sizes(nElements, nodes);
+
+    return counts[rank];
+}
+
+inline auto
+batch_offset(const int nElements, const int rank, const int nodes) -> int
+{
+    auto displs = mathfunc::batch_offsets(nElements, nodes);
+
+    return displs[rank];
+}
+
 }  // namespace mathfunc
 
 #endif /* MathFunc_hpp */

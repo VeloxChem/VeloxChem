@@ -21,6 +21,8 @@ class CMolecule
     /// @param unit The unit used to define coordinates of atoms.
     CMolecule(const std::vector<int> &identifiers, const std::vector<TPoint<double>> &coordinates, const std::string &unit);
 
+    CMolecule(const std::vector<int> &identifiers, const std::vector<TPoint<double>> &coordinates, const std::string &unit, const std::vector<std::string>& atom_basis_labels);
+
     /// @brief The constructor with two molecular fragments.
     /// @param molecule_one The first molecule to merge.
     /// @param molecule_two The second molecule to merge.
@@ -59,6 +61,8 @@ class CMolecule
     /// @param coordinates The coordinates of atom.
     /// @param unit The unit used to define coordinates of atoms.
     auto add_atom(const int identifier, const TPoint<double> &coordinates, const std::string &unit) -> void;
+
+    auto add_atom(const int identifier, const TPoint<double> &coordinates, const std::string &unit, const std::string& atom_basis_label) -> void;
 
     /// @brief Slices given set of atoms into new molecule.
     /// @param atoms The vector of atom indices to be slinced.
@@ -110,6 +114,9 @@ class CMolecule
     /// @brief Gets vector of chemical element identifiers.
     /// @return The vector og chemical element identifiers.
     auto identifiers() const -> std::vector<int>;
+
+    /// Gets vector of atom basis set labels.
+    auto atom_basis_labels() const -> std::vector<std::string>;
 
     /// @brief Gets vector Cartesian coordinates of atoms in molecule.
     /// @param unit The unit used to define coordinates of atoms.
@@ -172,6 +179,11 @@ class CMolecule
 
     /// @brief The vector of chemical element identifiers of atoms.
     std::vector<int> _identifiers;
+
+    /**
+     The vector of basis set names of atoms.
+     */
+    std::vector<std::string> _atom_basis_labels;
 
     /// @brief Checks if coordinates of atoms are given in Angstrom.
     /// @param unit The unit used to define coordinates of atoms.

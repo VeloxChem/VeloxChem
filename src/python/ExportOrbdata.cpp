@@ -9,8 +9,11 @@
 #include <vector>
 
 #include "AtomBasis.hpp"
+#include "AODensityMatrix.hpp"
 #include "BasisFunction.hpp"
 #include "BlockedGtoPairBlock.hpp"
+#include "ExportGeneral.hpp"
+#include "ExportMath.hpp"
 #include "GtoBlock.hpp"
 #include "GtoFunc.hpp"
 #include "GtoPairBlock.hpp"
@@ -21,6 +24,21 @@ namespace py = pybind11;
 using namespace py::literals;
 
 namespace vlx_orbdata {  // vlx_orbdata namespace
+
+// Helper function for CAODensityMatrix constructor
+
+static std::shared_ptr<CAODensityMatrix>
+CAODensityMatrix_from_numpy_list(const std::vector<py::array_t<double>> &arrays, const denmat den_type)
+{
+    std::vector<CDenseMatrix> dmat;
+
+    for (size_t i = 0; i < arrays.size(); i++)
+    {
+        dmat.push_back(*vlx_math::CDenseMatrix_from_numpy(arrays[i]));
+    }
+
+    return std::make_shared<CAODensityMatrix>(dmat, den_type);
+}
 
 void
 export_orbdata(py::module &m)
@@ -120,6 +138,9 @@ export_orbdata(py::module &m)
         .def("reduce_to_valence_basis", &CMolecularBasis::reduce_to_valence_basis, "Reduces molecular basis to it's valence only form.")
         .def("basis_sets", &CMolecularBasis::basis_sets, "Gets unique atomic basis sets in molecular basis")
         .def("basis_sets_indices", &CMolecularBasis::basis_sets_indices, "Gets vector of basis sets indices.")
+        .def("set_label", &CMolecularBasis::set_label, "Sets name of molecular basis.", "label"_a)
+        .def("get_label", &CMolecularBasis::get_label, "Gets name of molecular basis.")
+        .def("get_ao_basis_map", &CMolecularBasis::get_ao_basis_map, "Creates string representation map of basis functions.", "molecule"_a)
         .def("max_angular_momentum",
              py::overload_cast<>(&CMolecularBasis::max_angular_momentum, py::const_),
              "Gets maximum angular momentum of molecular basis.")
@@ -287,6 +308,40 @@ export_orbdata(py::module &m)
         .def("__eq__", [](const CBlockedGtoPairBlock &self, const CBlockedGtoPairBlock &other) { return self == other; })
         .def("__copy__", [](const CBlockedGtoPairBlock &self) { return CBlockedGtoPairBlock(self); })
         .def("__deepcopy__", [](const CBlockedGtoPairBlock &self, py::dict) { return CBlockedGtoPairBlock(self); });
+
+    // CAODensityMatrix class
+
+    // clang-format off
+    py::enum_<denmat>(m, "denmat")
+        .value("rest", denmat::rest)
+        .value("unrest", denmat::unrest);
+    // clang-format on
+
+    PyClass<CAODensityMatrix>(m, "AODensityMatrix")
+        .def(py::init<>())
+        .def(py::init<const CAODensityMatrix &>())
+        .def(py::init(&CAODensityMatrix_from_numpy_list))
+        .def(
+            "alpha_to_numpy",
+            [](const CAODensityMatrix &self, const int iDensityMatrix) -> py::array_t<double> {
+                auto numRows = self.getNumberOfRows(iDensityMatrix);
+                auto numCols = self.getNumberOfColumns(iDensityMatrix);
+                return vlx_general::pointer_to_numpy(self.alphaDensity(iDensityMatrix), {numRows, numCols});
+            },
+            "Converts alpha density matrix to numpy array.",
+            "i_dens"_a)
+        .def(
+            "beta_to_numpy",
+            [](const CAODensityMatrix &self, const int iDensityMatrix) -> py::array_t<double> {
+                auto numRows = self.getNumberOfRows(iDensityMatrix);
+                auto numCols = self.getNumberOfColumns(iDensityMatrix);
+                return vlx_general::pointer_to_numpy(self.betaDensity(iDensityMatrix), {numRows, numCols});
+            },
+            "Converts beta density matrix to numpy array.",
+            "i_dens"_a)
+        .def("number_of_density_matrices", &CAODensityMatrix::getNumberOfDensityMatrices, "Gets number of density matrices.")
+        .def("get_density_type", &CAODensityMatrix::getDensityType, "Gets type of density matrix.")
+        .def(py::self == py::self);
 }
 
 }  // namespace vlx_orbdata

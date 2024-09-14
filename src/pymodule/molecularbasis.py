@@ -1,3 +1,27 @@
+#
+#                              VELOXCHEM
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from os import environ
 from pathlib import Path
 
@@ -101,12 +125,19 @@ def _read_atom_basis(basis_data, elem_id, basis_name):
 
     atom_basis = AtomBasis()
 
-    while basis_data:
-        shell_title = basis_data.pop(0).split()
+    basis_data_copy = list(basis_data)
+
+    while basis_data_copy:
+        shell_title = basis_data_copy.pop(0).split()
         assert_msg_critical(
-            len(shell_title) == 2,
-            'Basis set parser: {}'.format(' '.join(shell_title)),
-        )
+            len(shell_title) == 2 or len(shell_title) == 3,
+            'Basis set parser: {}'.format(' '.join(shell_title)))
+
+        if len(shell_title) == 3:
+            ncgto = int(shell_title[2])
+            err_gc = 'MolcularBasis.read: '
+            err_gc += 'General contraction format is currently not supported'
+            assert_msg_critical(ncgto == 1, err_gc)
 
         if shell_title[0] == 'ECP':
             atom_basis.set_ecp_label(shell_title)
@@ -118,7 +149,7 @@ def _read_atom_basis(basis_data, elem_id, basis_name):
             coeffs = [0.0] * npgto
 
             for i in range(npgto):
-                prims = basis_data.pop(0).split()
+                prims = basis_data_copy.pop(0).split()
                 assert_msg_critical(
                     len(prims) == 2,
                     'Basis set parser: {}'.format(' '.join(prims)))
@@ -174,10 +205,8 @@ def _read_basis_file(basis_name, basis_path, ostream):
 
     basis_dict = InputParser(str(basis_file)).input_dict
 
-    assert_msg_critical(
-        fname.upper() == basis_dict['basis_set_name'].upper(),
-        '_read_basis_file: Inconsistent basis set name',
-    )
+    assert_msg_critical(fname.upper() == basis_dict['basis_set_name'].upper(),
+                        '_read_basis_file: Inconsistent basis set name')
 
     return basis_dict
 
@@ -198,9 +227,9 @@ def _gen_basis_key(elem_id, basis_dict):
     basis_key = 'atombasis_{}'.format(chemical_element_name(elem_id).lower())
     assert_msg_critical(
         basis_key in basis_dict,
-        ('MolecularBasis.read: Unsupported chemical element {chemical_element_name(elem_id)}'
-         + ' in {basis_set_name}.'),
-    )
+        'MolecularBasis.read: Unsupported chemical element ' +
+        f'{chemical_element_name(elem_id)} in ' +
+        basis_dict['basis_set_name'].upper())
 
     return basis_key
 
@@ -229,15 +258,47 @@ def _MolecularBasis_read(molecule,
     if ostream is None:
         ostream = OutputStream(None)
 
-    basis_dict = _read_basis_file(basis_name, basis_path, ostream)
+    basis_dict = {}
+
+    atom_basis_labels = molecule.get_atom_basis_labels()
+
+    # read atom basis sets defined in molecule
+    for atom_bas_label in set(atom_basis_labels):
+        if atom_bas_label != '':
+            basis_dict[atom_bas_label.upper()] = _read_basis_file(
+                atom_bas_label, basis_path, ostream)
+
+    # read default basis set
+    if basis_name.upper() not in basis_dict:
+        basis_dict[basis_name.upper()] = _read_basis_file(
+            basis_name, basis_path, ostream)
 
     mol_basis = MolecularBasis()
 
-    for elem_id in molecule.get_identifiers():
-        basis_key = _gen_basis_key(elem_id, basis_dict)
-        atom_basis = _read_atom_basis(basis_dict[basis_key], elem_id,
-                                      basis_name)
+    all_basis_set_names = []
+
+    for idx, elem_id in enumerate(molecule.get_identifiers()):
+        if basis_name.upper() == 'AO-START-GUESS':
+            atom_bas_label = basis_name.upper()
+        else:
+            atom_bas_label = atom_basis_labels[idx].upper()
+            if atom_bas_label == '':
+                atom_bas_label = basis_name.upper()
+
+        basis_key = _gen_basis_key(elem_id, basis_dict[atom_bas_label])
+
+        atom_basis = _read_atom_basis(basis_dict[atom_bas_label][basis_key],
+                                      elem_id, atom_bas_label)
+
         mol_basis.add(atom_basis)
+
+        if atom_bas_label not in all_basis_set_names:
+            all_basis_set_names.append(atom_bas_label)
+
+    if len(all_basis_set_names) == 1:
+        mol_basis.set_label(all_basis_set_names[0])
+    else:
+        mol_basis.set_label('MIXED-BASIS-SETS')
 
     ostream.print_block(mol_basis.info_str('Atomic Basis'))
     ostream.flush()

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "AtomBasis.hpp"
+#include "Molecule.hpp"
 
 /// @brief Class CMolecularBasis stores data about molecular basis and provides
 /// set of methods for handling of molecular basis data.
@@ -230,6 +231,20 @@ class CMolecularBasis
     /// @return The number of primitive atomic orbitals.
     auto dimensions_of_primitive_basis() const -> size_t;
 
+    /**
+     Sets name of molecular basis.
+
+     @param label the name of molecular basis.
+     */
+    void set_label(const std::string& label);
+
+    /**
+     Gets name of molecular basis.
+
+     @return the name of molecular basis.
+     */
+    std::string get_label() const;
+
     /// @brief Creates map indices for basis functions with specific angular
     /// momentum and number of primitives in molecular basis.
     /// @param angular_momentum The angular momentum of basis functions.
@@ -249,12 +264,25 @@ class CMolecularBasis
     /// @return The main atom basis label.
     auto main_basis_label() const -> std::string;
 
+    /**
+     Creates string representation map of basis functions.
+
+     @param molecule the molecule.
+     @return the string map of basis functions.
+     */
+    auto get_ao_basis_map(const CMolecule& molecule) const -> std::vector<std::string>;
+
    private:
     /// @brief The vector of atom basis sets.
     std::vector<CAtomBasis> _basis_sets;
 
     /// @brief The vector of atom basis sets indices.
     std::vector<int> _indices;
+
+    /**
+     The name of molecular basis.
+     */
+    std::string _label;
 
     /// @brief Gets atom basis labels frequency map.
     /// @return The labels frequency map.

@@ -1,5 +1,8 @@
 target_sources(vlxobjs
   PRIVATE
+    Codata.cpp
+    ErrorHandler.cpp
+    MpiFunc.cpp
     OpenMPFunc.cpp
     StringFormat.cpp
     TensorLabels.cpp

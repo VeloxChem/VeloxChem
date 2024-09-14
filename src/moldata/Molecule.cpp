@@ -19,6 +19,8 @@ CMolecule::CMolecule()
     , _coordinates{}
 
     , _identifiers{}
+
+    , _atom_basis_labels{}
 {
 }
 
@@ -31,6 +33,29 @@ CMolecule::CMolecule(const std::vector<int> &identifiers, const std::vector<TPoi
     , _coordinates(coordinates)
 
     , _identifiers(identifiers)
+{
+    for (std::vector<int>::size_type i = 0; i < _identifiers.size(); i++)
+    {
+        _atom_basis_labels.push_back(std::string(""));
+    }
+
+    if (_is_angstrom(unit))
+    {
+        std::ranges::for_each(_coordinates, [=](TPoint<double> &pnt) { pnt.scale(1.0 / units::bohr_in_angstrom()); });
+    }
+}
+
+CMolecule::CMolecule(const std::vector<int> &identifiers, const std::vector<TPoint<double>> &coordinates, const std::string &unit, const std::vector<std::string>& atom_basis_labels)
+
+    : _charge{0.0}
+
+    , _multiplicity{1}
+
+    , _coordinates(coordinates)
+
+    , _identifiers(identifiers)
+
+    , _atom_basis_labels(atom_basis_labels)
 {
     if (_is_angstrom(unit))
     {
@@ -52,6 +77,12 @@ CMolecule::CMolecule(const CMolecule &molecule_one, const CMolecule &molecule_tw
 
     std::ranges::copy(molecule_two._coordinates, std::back_inserter(_coordinates));
 
+    _atom_basis_labels.reserve(molecule_one._atom_basis_labels.size() + molecule_two._atom_basis_labels.size());
+
+    std::ranges::copy(molecule_one._atom_basis_labels, std::back_inserter(_atom_basis_labels));
+
+    std::ranges::copy(molecule_two._atom_basis_labels, std::back_inserter(_atom_basis_labels));
+
     _charge = molecule_one._charge + molecule_two._charge;
 
     const auto spin_a = (molecule_one._multiplicity - 1) / 2;
@@ -70,6 +101,8 @@ CMolecule::CMolecule(const CMolecule &other)
     , _coordinates(other._coordinates)
 
     , _identifiers(other._identifiers)
+
+    , _atom_basis_labels(other._atom_basis_labels)
 {
 }
 
@@ -82,6 +115,8 @@ CMolecule::CMolecule(CMolecule &&other) noexcept
     , _coordinates{}
 
     , _identifiers{}
+
+    , _atom_basis_labels{}
 {
     std::swap(_charge, other._charge);
 
@@ -90,6 +125,8 @@ CMolecule::CMolecule(CMolecule &&other) noexcept
     std::swap(_coordinates, other._coordinates);
 
     std::swap(_identifiers, other._identifiers);
+
+    std::swap(_atom_basis_labels, other._atom_basis_labels);
 }
 
 auto
@@ -102,6 +139,8 @@ CMolecule::operator=(const CMolecule &other) -> CMolecule &
     _coordinates = other._coordinates;
 
     _identifiers = other._identifiers;
+
+    _atom_basis_labels = other._atom_basis_labels;
 
     return *this;
 }
@@ -116,6 +155,8 @@ CMolecule::operator=(CMolecule &&other) noexcept -> CMolecule &
     std::swap(_coordinates, other._coordinates);
 
     std::swap(_identifiers, other._identifiers);
+
+    std::swap(_atom_basis_labels, other._atom_basis_labels);
 
     return *this;
 }
@@ -135,6 +176,10 @@ CMolecule::operator==(const CMolecule &other) const -> bool
     {
         return false;
     }
+    else if (_atom_basis_labels != other._atom_basis_labels)
+    {
+        return false;
+    }
     else
     {
         return _coordinates == other._coordinates;
@@ -142,9 +187,17 @@ CMolecule::operator==(const CMolecule &other) const -> bool
 }
 
 auto
-CMolecule::add_atom(const int identifier, const TPoint<double> &coordinates, const std::string &unit) -> void
+CMolecule::add_atom(const int identifier, const TPoint<double>& coordinates, const std::string& unit) -> void
+{
+    add_atom(identifier, coordinates, unit, std::string(""));
+}
+
+auto
+CMolecule::add_atom(const int identifier, const TPoint<double> &coordinates, const std::string &unit, const std::string& atom_basis_label) -> void
 {
     _identifiers.push_back(identifier);
+
+    _atom_basis_labels.push_back(atom_basis_label);
 
     _coordinates.push_back(coordinates);
 
@@ -159,7 +212,7 @@ CMolecule::slice(const std::vector<int> &atoms) const -> CMolecule
 {
     CMolecule molfrag;
 
-    std::ranges::for_each(atoms, [&](const int i) { molfrag.add_atom(_identifiers.at(i), _coordinates.at(i), "au"); });
+    std::ranges::for_each(atoms, [&](const int i) { molfrag.add_atom(_identifiers.at(i), _coordinates.at(i), "au", _atom_basis_labels.at(i)); });
 
     if ((molfrag.number_of_electrons() % 2) == 1) molfrag.set_multiplicity(2);
 
@@ -233,6 +286,12 @@ CMolecule::identifiers() const -> std::vector<int>
 }
 
 auto
+CMolecule::atom_basis_labels() const -> std::vector<std::string>
+{
+    return _atom_basis_labels;
+}
+
+auto
 CMolecule::coordinates(const std::string &unit) const -> std::vector<TPoint<double>>
 {
     if (_is_angstrom(unit))
@@ -241,7 +300,7 @@ CMolecule::coordinates(const std::string &unit) const -> std::vector<TPoint<doub
 
         coords.reserve(_coordinates.size());
 
-        constexpr auto fact = units::bohr_in_angstrom();
+        auto fact = units::bohr_in_angstrom();
 
         std::ranges::transform(_coordinates, std::back_inserter(coords), [&](const TPoint<double> &pnt) {
             TPoint<double> rpnt = pnt;

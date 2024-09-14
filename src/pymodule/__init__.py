@@ -25,6 +25,7 @@ from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import ElectricDipoleMomentumGeom100Driver
 from .veloxchemlib import FockDriver
 from .veloxchemlib import T4CScreener
+from .veloxchemlib import AODensityMatrix
 
 # C++ functions
 from .veloxchemlib import upper_case
@@ -62,6 +63,7 @@ from .veloxchemlib import spherical_momentum_p_factors
 from .veloxchemlib import spherical_momentum_d_factors
 from .veloxchemlib import spherical_momentum_f_factors
 from .veloxchemlib import spherical_momentum_g_factors
+from .veloxchemlib import mpi_master
 
 # C++ enums
 from .veloxchemlib import mat_t
@@ -77,6 +79,10 @@ from .matrix import Matrix
 from .matrices import Matrices
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
+from .molecularorbitals import MolecularOrbitals, molorb
+from .scfrestdriver import ScfRestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
+from .scfrestopendriver import ScfRestrictedOpenDriver
 
 # Environment variable: basis set path
 from .environment import (set_vlxbasispath, get_basis_path)

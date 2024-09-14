@@ -3,9 +3,12 @@
 #include <algorithm>
 #include <numeric>
 #include <ranges>
+#include <sstream>
 
 #include "ChemicalElement.hpp"
+#include "StringFormat.hpp"
 #include "TensorComponents.hpp"
+#include "TensorLabels.hpp"
 
 CMolecularBasis::CMolecularBasis()
 
@@ -418,6 +421,18 @@ CMolecularBasis::dimensions_of_primitive_basis() const -> size_t
 }
 
 auto
+CMolecularBasis::set_label(const std::string& label) -> void
+{
+    _label = label;
+}
+
+auto
+CMolecularBasis::get_label() const -> std::string
+{
+    return _label;
+}
+
+auto
 CMolecularBasis::index_map(const int angular_momentum, const size_t npgtos) const -> std::vector<size_t>
 {
     std::vector<size_t> ao_indices;
@@ -481,4 +496,66 @@ CMolecularBasis::_labels_frequency_map() const -> std::unordered_map<std::string
     std::ranges::for_each(_indices, [&](const int i) { freqmap[_basis_sets[i].get_name()]++; });
 
     return freqmap;
+}
+
+auto
+CMolecularBasis::get_ao_basis_map(const CMolecule& molecule) const -> std::vector<std::string>
+{
+    std::vector<std::string> strmap;
+
+    auto natoms = molecule.number_of_atoms();
+
+    auto idselm = molecule.identifiers();
+
+    for (int i = 0; i <= max_angular_momentum(); i++)
+    {
+        for (int j = 0; j < tensor::number_of_spherical_components(std::array<int, 1>{i}); j++)
+        {
+            for (int k = 0; k < natoms; k++)
+            {
+                std::vector<int> atom_ids({k});
+
+                auto gtos = basis_functions(atom_ids, i);
+
+                auto ngtos = static_cast<int>(gtos.size());
+
+                for (int l = 0; l < ngtos; l++)
+                {
+                    std::stringstream st;
+
+                    st.setf(std::ios::fixed);
+
+                    st.width(4);
+
+                    st << k + 1;
+
+                    st << " ";
+
+                    auto lbl = molecule.label(k);
+
+                    st << lbl;
+
+                    if (lbl.size() == 1) st << " ";
+
+                    st << " ";
+
+                    st.setf(std::ios::fixed);
+
+                    st.width(2);
+
+                    st << l + 1;
+
+                    st.setf(std::ios::left);
+
+                    st.width(3);
+
+                    st << format::lower_case(tensor::spherical_labels(i)[j]);
+
+                    strmap.push_back(st.str());
+                }
+            }
+        }
+    }
+
+    return strmap;
 }
