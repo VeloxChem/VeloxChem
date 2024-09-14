@@ -1,13 +1,24 @@
 #ifndef SimdArray_hpp
 #define SimdArray_hpp
 
+#ifdef _MSC_VER
+#include <malloc.h>
+#else  // _MSC_VER
+#include <cstdlib>
+#endif
+
 #include <array>
 #include <cstddef>
-#include <cstdlib>
 #include <vector>
 
-#include "Point.hpp"
+#ifdef ENABLE_MKL
+#include <mkl_service.h>  // needed for mkl_malloc and mkl_free
+#endif  // ENABLE_MKL
+
 #include "omp.h"
+
+#include "ErrorHandler.hpp"
+#include "Point.hpp"
 
 namespace simd {  // simd namespace
 
@@ -47,13 +58,33 @@ class CSimdArray
 
         , _active_width{simd::width<T>()}
     {
+        errors::assertMsgCritical(rows * columns > 0, "SimdArray: invalid size for memory allocation");
+
         if (auto nelems = _rows * _columns; nelems > 0)
         {
+#ifdef ENABLE_MKL
+
+            _data = (T*)mkl_malloc(nelems * simd::width<T>() * sizeof(T), 64);
+
+#else  // ENABLE_MKL
+#ifdef _MSC_VER
+
+            _data = (T*)_aligned_malloc(nelems * simd::width<T>() * sizeof(T), 64);
+
+#else  // _MSC_VER
+
             void *ptr = nullptr;
 
             ::posix_memalign(&ptr, 64, nelems * simd::width<T>() * sizeof(T));
 
             _data = (T*)ptr;
+
+#endif
+#endif
+            if (!_data)
+            {
+                errors::assertMsgCritical(false, "SimdArray: aligned allocation failed");
+            }
         }
     }
 
@@ -68,7 +99,25 @@ class CSimdArray
     /// @brief The custom destructor.
     ~CSimdArray()
     {
-        if (_data != nullptr) ::free((void*)_data);
+        if (_data != nullptr)
+        {
+#ifdef ENABLE_MKL
+
+            mkl_free((void*)_data);
+
+#else  // ENABLE_MKL
+#ifdef _MSC_VER
+
+            _aligned_free((void*)_data);
+
+#else  // _MSC_VER
+
+            ::free((void*)_data);
+
+#endif
+#endif
+            _data = nullptr;
+        }
     };
 
     /// @brief The default copy assignment operator.
