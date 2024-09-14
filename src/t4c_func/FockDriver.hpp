@@ -63,7 +63,7 @@ class CFockDriver
                  const double           exchange_factor,
                  const double           omega) const -> CMatrix;
 
-    /// @brief Computes Fock matrix for given density, basis and molecule (N^4 scaling).
+    /// @brief Computes Fock matrix for given density..
     /// @param screener The screener with basis function pairs data.
     /// @param density The density matrix to construct Fock matrix.
     /// @param label The label of Fock matrix type.
@@ -76,6 +76,20 @@ class CFockDriver
                  const double        exchange_factor,
                  const double        omega,
                  const int           ithreshold) const -> CMatrix;
+
+    /// @brief Computes Fock matrices for given densities.
+    /// @param screener The screener with basis function pairs data.
+    /// @param densities The density matrices to construct Fock matrix.
+    /// @param labels The vector of  Fock matrix type labels.
+    /// @param exchange_factor The exchange-correlation factors.
+    /// @param omega The range separation factor.
+    /// @return The Fock matrix.
+    auto compute(const CT4CScreener             &screener,
+                 const CMatrices                &densities,
+                 const std::vector<std::string> &labels,
+                 const double                    exchange_factor,
+                 const double                    omega,
+                 const int                       ithreshold) const -> CMatrices;
 };
 
 #endif /* FockDriver_hpp */
