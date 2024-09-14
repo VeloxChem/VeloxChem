@@ -238,7 +238,8 @@ def _gen_basis_key(elem_id, basis_dict):
 def _MolecularBasis_read(molecule,
                          basis_name,
                          basis_path='.',
-                         ostream=OutputStream()):
+                         ostream=None,
+                         verbose=False):
     """
     Reads AO basis set from file for given molecule.
 
@@ -256,7 +257,10 @@ def _MolecularBasis_read(molecule,
     """
 
     if ostream is None:
-        ostream = OutputStream(None)
+        if verbose:
+            ostream = OutputStream()
+        else:
+            ostream = OutputStream(None)
 
     basis_dict = {}
 

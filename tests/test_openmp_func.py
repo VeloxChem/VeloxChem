@@ -52,7 +52,7 @@ class TestOpenMPFunc:
         assert wtasks == rtasks
 
         wtasks = make_work_tasks(gblocks, gblocks)
-        print(wtasks)
+        #print(wtasks)
         rtasks = [[0, 0, 0, 4, 0, 4], [0, 1, 0, 4, 0, 2], [0, 2, 0, 4, 0, 1],
                   [0, 3, 0, 4, 0, 3], [0, 4, 0, 4, 0, 1], [0, 5, 0, 4, 0, 1],
                   [1, 0, 0, 2, 0, 4], [1, 1, 0, 2, 0, 2], [1, 2, 0, 2, 0, 1],
