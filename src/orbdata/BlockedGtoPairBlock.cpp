@@ -5,6 +5,13 @@
 
 #include "MathFunc.hpp"
 
+CBlockedGtoPairBlock::CBlockedGtoPairBlock(const std::array<CGtoPairBlock, 16>& gto_pair_blocks)
+
+    : _gto_pair_blocks(gto_pair_blocks)
+{
+    
+}
+
 CBlockedGtoPairBlock::CBlockedGtoPairBlock(const std::vector<CGtoPairBlock> &gto_pair_blocks, const std::vector<int> &block_indices)
 
     : _gto_pair_blocks{}
@@ -195,4 +202,10 @@ auto
 CBlockedGtoPairBlock::is_empty_gto_pair_block(const int index) const -> bool
 {
     return (_gto_pair_blocks[index].number_of_contracted_pairs() == 0);
+}
+
+auto
+CBlockedGtoPairBlock::gto_pair_blocks() const -> std::array<CGtoPairBlock, 16>
+{
+    return _gto_pair_blocks;
 }

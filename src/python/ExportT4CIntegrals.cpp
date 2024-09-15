@@ -57,8 +57,16 @@ export_t4cintegrals(py::module& m)
     // CT4CScreener class
     PyClass<CT4CScreener>(m, "T4CScreener")
         .def(py::init<>())
+        .def(py::init<const CT4CScreener &>())
+        .def(py::init<const std::vector<CBlockedGtoPairBlock>&>())
+        .def(py::pickle([](const CT4CScreener &screener) { return py::make_tuple(screener.gto_pair_blocks()); },
+                        [](py::tuple t) { return CT4CScreener(t[0].cast<std::vector<CBlockedGtoPairBlock>>()); }))
         .def("partition", &CT4CScreener::partition, "Partition basis funtion pairs blocks for given molecule and basis.")
-        .def("gto_pair_blocks", &CT4CScreener::gto_pair_blocks, "Gets vector of blocked basis function pairs blocks.");
+        .def("gto_pair_blocks", &CT4CScreener::gto_pair_blocks, "Gets vector of blocked basis function pairs blocks.")
+        .def("__eq__", [](const CT4CScreener &self, const CT4CScreener &other) { return self == other; })
+        .def("__ne__", [](const CT4CScreener &self, const CT4CScreener &other) { return self != other; })
+        .def("__copy__", [](const CT4CScreener &self) { return CT4CScreener(self); })
+        .def("__deepcopy__", [](const CT4CScreener &self, py::dict) { return CT4CScreener(self); });
 }
 
 }  // namespace vlx_t4cintegrals
