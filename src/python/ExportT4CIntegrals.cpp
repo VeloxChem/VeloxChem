@@ -52,7 +52,21 @@ export_t4cintegrals(py::module& m)
                const int           ithreshold) -> std::shared_ptr<CMatrices> {
                 return std::make_shared<CMatrices>(fock_drv.compute(screener, densities, labels, exchange_factor, omega, ithreshold));
             },
-            "Computes Fock matrices of requested type for two-electron integrals screener.");
+            "Computes Fock matrices of requested type for two-electron integrals screener.")
+        .def(
+            "compute",
+            [](const CFockDriver&  fock_drv,
+               const CT4CScreener& screener,
+               const int           rank,
+               const int           nodes,
+               const CMatrix&      density,
+               const std::string&  label,
+               const double        exchange_factor,
+               const double        omega,
+               const int           ithreshold) -> std::shared_ptr<CMatrix> {
+                return std::make_shared<CMatrix>(fock_drv.compute(screener, rank, nodes, density, label, exchange_factor, omega, ithreshold));
+            },
+             "Computes single Fock matrix of requested type for two-electron integrals screener.");
 
     // CT4CScreener class
     PyClass<CT4CScreener>(m, "T4CScreener")

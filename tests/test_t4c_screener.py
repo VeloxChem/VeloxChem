@@ -77,7 +77,7 @@ class TestT4CScreener:
         if comm.Get_rank() == 0:
             t4c_drv_a = T4CScreener()
             t4c_drv_a.partition(bas_sto3g, mol_h2o, 'eri')
-        t4c_drv_a = comm.bcast(t4c_drv_a)
+        t4c_drv_a = comm.bcast(t4c_drv_a, 0)
         t4c_drv_b = T4CScreener()
         t4c_drv_b.partition(bas_sto3g, mol_h2o, 'eri')
         assert t4c_drv_a == t4c_drv_b

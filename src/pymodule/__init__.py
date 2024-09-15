@@ -23,7 +23,6 @@ from .veloxchemlib import NuclearPotentialGeom200Driver
 from .veloxchemlib import NuclearPotentialGeom110Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import ElectricDipoleMomentumGeom100Driver
-from .veloxchemlib import FockDriver
 from .veloxchemlib import T4CScreener
 
 # C++ functions
@@ -77,6 +76,7 @@ from .matrix import Matrix
 from .matrices import Matrices
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
+from .fockdriver import FockDriver
 
 # Environment variable: basis set path
 from .environment import (set_vlxbasispath, get_basis_path)
