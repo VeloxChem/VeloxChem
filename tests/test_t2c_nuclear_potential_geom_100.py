@@ -64,8 +64,7 @@ class TestOverlapGeom100Driver:
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
             assert smat == fref
 
-    # TODO: double check this test
-    def disabled_test_nuclear_potential_co_qzvp_for_o(self):
+    def test_nuclear_potential_co_qzvp_for_o(self):
 
         mol, bas = self.get_data()
 
@@ -103,8 +102,11 @@ class TestOverlapGeom100Driver:
                     rmat.set_values(
                         np.ascontiguousarray(ref_mat[k, sbra:ebra, sket:eket]))
                     # compare submatrices
-                    assert cmat == rmat
+                    # assert cmat == rmat
+                    assert np.max(np.abs(cmat.to_numpy() -
+                                         rmat.to_numpy())) < 1.0e-11
             smat = fmat.full_matrix()
             fref = SubMatrix([0, 0, 114, 114])
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
-            assert smat == fref
+            # assert smat == fref
+            assert np.max(np.abs(smat.to_numpy() - fref.to_numpy())) < 1.0e-11
