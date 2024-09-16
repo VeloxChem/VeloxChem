@@ -4,6 +4,7 @@
 
 #include "CustomViews.hpp"
 #include "TensorComponents.hpp"
+#include "StringFormat.hpp"
 
 namespace matfunc {  // matfunc namespace
 
@@ -51,5 +52,65 @@ make_matrix(const CMolecularBasis& bra_basis, const CMolecularBasis& ket_basis) 
 
     return matrix;
 }
+
+auto
+make_matrix(const std::string& label, const size_t nrows, const size_t ncols) -> CMatrix
+{
+    // set up matrix
+
+    auto matrix = CMatrix();
+
+    matrix.set_type(mat_t::general);
+    
+    // add submatrices for LDA case
+    
+    if (format::upper_case(label) == "LDA")
+    {
+        matrix.add({0, 0, nrows, ncols}, {0, 0});
+    }
+    
+    // add submatrices for GGA case
+    
+    if (format::upper_case(label) == "GGA")
+    {
+        matrix.add({0, 0, nrows, ncols}, {0, 0});
+        
+        matrix.add({0, 0, nrows, ncols}, {1, 0});
+        
+        matrix.add({0, 0, nrows, ncols}, {1, 1});
+        
+        matrix.add({0, 0, nrows, ncols}, {1, 2});
+    }
+    
+    // add submatrices for GGA case
+    
+    if (format::upper_case(label) == "MGGA")
+    {
+        matrix.add({0, 0, nrows, ncols}, {0, 0});
+        
+        matrix.add({0, 0, nrows, ncols}, {1, 0});
+        
+        matrix.add({0, 0, nrows, ncols}, {1, 1});
+        
+        matrix.add({0, 0, nrows, ncols}, {1, 2});
+        
+        matrix.add({0, 0, nrows, ncols}, {2, 0});
+        
+        matrix.add({0, 0, nrows, ncols}, {2, 1});
+        
+        matrix.add({0, 0, nrows, ncols}, {2, 2});
+        
+        matrix.add({0, 0, nrows, ncols}, {2, 3});
+        
+        matrix.add({0, 0, nrows, ncols}, {2, 4});
+        
+        matrix.add({0, 0, nrows, ncols}, {2, 5});
+    }
+    
+    return matrix;
+}
+
+
+
 
 }  // namespace matfunc
