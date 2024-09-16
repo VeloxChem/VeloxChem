@@ -81,6 +81,15 @@ pointer_to_numpy(const double* ptr, const std::vector<int>& dimension) -> py::ar
 auto
 export_general(py::module &m) -> void
 {
+    // initialize mpi4py's C-API
+
+    if (import_mpi4py() < 0)
+    {
+        // mpi4py calls the Python C API
+        // we let pybind11 give us the detailed traceback
+        throw py::error_already_set();
+    }
+
     /// exposing functions from StringFormat.hpp
     m.def("upper_case", &format::upper_case, "Creates upper cased copy of given string.");
     m.def("lower_case", &format::lower_case, "Creates lower cased copy of given string.");
