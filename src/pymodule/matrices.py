@@ -1,13 +1,10 @@
 from .veloxchemlib import Matrices
 
 
-@staticmethod
-def _Matrices_bcast(matrices, comm, root_rank):
+def _Matrices_bcast(self, comm, root_rank):
     """
     Broadcasts matrices.
 
-    :param matrices:
-        The matrices to be broadcasted.
     :param comm:
         The MPI communicator.
     :param root_rank:
@@ -18,7 +15,7 @@ def _Matrices_bcast(matrices, comm, root_rank):
     """
 
     if comm.Get_rank() == root_rank:
-        keys = matrices.keys()
+        keys = self.keys()
     else:
         keys = None
     keys = comm.bcast(keys, root=root_rank)
@@ -26,7 +23,7 @@ def _Matrices_bcast(matrices, comm, root_rank):
     new_matrices = Matrices()
     for key in keys:
         if comm.Get_rank() == root_rank:
-            matrix = matrices.matrix(key)
+            matrix = self.matrix(key)
         else:
             matrix = None
         matrix = comm.bcast(matrix, root_rank)

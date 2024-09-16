@@ -1528,21 +1528,15 @@ class ScfDriver:
 
                 den_mat_for_Jab = make_matrix(basis, mat_t.symmetric)
                 den_mat_for_Jab.set_values(den_mat[0] + den_mat[1])
+
+                den_mat_for_fock = Matrices()
+                den_mat_for_fock.add(den_mat_for_Ka, "0")
+                den_mat_for_fock.add(den_mat_for_Kb, "1")
+                den_mat_for_fock.add(den_mat_for_Jab, "2")
             else:
-                den_mat_for_Ka = None
-                den_mat_for_Kb = None
-                den_mat_for_Jab = None
+                den_mat_for_fock = Matrices()
 
-            # TODO: pickle Matrices object
-            den_mat_for_Ka = self.comm.bcast(den_mat_for_Ka, root=mpi_master())
-            den_mat_for_Kb = self.comm.bcast(den_mat_for_Kb, root=mpi_master())
-            den_mat_for_Jab = self.comm.bcast(den_mat_for_Jab,
-                                              root=mpi_master())
-
-            den_mat_for_fock = Matrices()
-            den_mat_for_fock.add(den_mat_for_Ka, "0")
-            den_mat_for_fock.add(den_mat_for_Kb, "1")
-            den_mat_for_fock.add(den_mat_for_Jab, "2")
+            den_mat_for_fock = den_mat_for_fock.bcast(self.comm, mpi_master())
 
         # TODO: add MPI communicator to FockDriver constructor
         # TODO: replace mpi_compute by compute
