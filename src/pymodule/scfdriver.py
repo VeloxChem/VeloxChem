@@ -1596,31 +1596,16 @@ class ScfDriver:
                     if fock_type == 'j':
                         fock_mat[0] *= 2.0
             else:
-                fock_mat_Ka = fock_drv.mpi_compute(self.comm, screener,
-                                                   den_mat_for_Ka, 'kx',
-                                                   exchange_scaling_factor, 0.0,
-                                                   thresh_int)
-                fock_mat_Kb = fock_drv.mpi_compute(self.comm, screener,
-                                                   den_mat_for_Kb, 'kx',
-                                                   exchange_scaling_factor, 0.0,
-                                                   thresh_int)
-                fock_mat_Jab = fock_drv.mpi_compute(self.comm, screener,
-                                                    den_mat_for_Jab, 'j',
-                                                    exchange_scaling_factor,
-                                                    0.0, thresh_int)
-                #fock_mat = fock_drv.mpi_compute(self.comm, screener,
-                #                                den_mat_for_fock,
-                #                                ["kx", "kx", "j"],
-                #                                exchange_scaling_factor, 0.0,
-                #                                thresh_int)
+                fock_mat = fock_drv.mpi_compute(self.comm, screener,
+                                                den_mat_for_fock,
+                                                ["kx", "kx", "j"],
+                                                exchange_scaling_factor, 0.0,
+                                                thresh_int)
                 if self.rank == mpi_master():
                     # Note: make fock_mat a list
-                    #K_a = fock_mat.matrix("0").full_matrix().to_numpy()
-                    #K_b = fock_mat.matrix("1").full_matrix().to_numpy()
-                    #J_ab = fock_mat.matrix("2").full_matrix().to_numpy()
-                    K_a = fock_mat_Ka.full_matrix().to_numpy()
-                    K_b = fock_mat_Kb.full_matrix().to_numpy()
-                    J_ab = fock_mat_Jab.full_matrix().to_numpy()
+                    K_a = fock_mat.matrix("0").full_matrix().to_numpy()
+                    K_b = fock_mat.matrix("1").full_matrix().to_numpy()
+                    J_ab = fock_mat.matrix("2").full_matrix().to_numpy()
                     fock_mat = [J_ab - K_a, J_ab - K_b]
 
         # TODO: reduce_sum fock_mat

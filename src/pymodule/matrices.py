@@ -1,11 +1,8 @@
-from mpi4py import MPI
-
 from .veloxchemlib import Matrices
-from .matrix import Matrix
 
 
 @staticmethod
-def _Matrices_bcast(matrices, comm, mpi_id):
+def _Matrices_bcast(matrices, comm, root_rank):
     """
     Broadcasts matrices.
 
@@ -13,61 +10,58 @@ def _Matrices_bcast(matrices, comm, mpi_id):
         The matrices to be broadcasted.
     :param comm:
         The MPI communicator.
-    :param mpi_id:
-        The identifier of root process.
+    :param root_rank:
+        The rank of root process.
 
     :return:
         Broadcasted matrices.
     """
 
-    keys = None
-    if comm.Get_rank() == mpi_id:
+    if comm.Get_rank() == root_rank:
         keys = matrices.keys()
-    keys = comm.bcast(keys)
-    comm.Barrier()
+    else:
+        keys = None
+    keys = comm.bcast(keys, root=root_rank)
 
     new_matrices = Matrices()
     for key in keys:
-        matrix = None
-        if comm.Get_rank() == mpi_id:
+        if comm.Get_rank() == root_rank:
             matrix = matrices.matrix(key)
-        matrix = comm.bcast(matrix, mpi_id)
-        comm.Barrier()
+        else:
+            matrix = None
+        matrix = comm.bcast(matrix, root_rank)
         new_matrices.add(matrix, key)
-        comm.Barrier()
 
     return new_matrices
 
 
-@staticmethod
-def _Matrices_reduce(matrices, comm, mpi_id):
+def _Matrices_reduce(self, comm, root_rank):
     """
     Reduces matrices over MPI communicator to specific root process.
-    
+
     :param matrices:
         The matrices to reduce.
     :param comm:
         The MPI communicator.
-    :param mpi_id:
-        The identifier of root process.
+    :param root_rank:
+        The rank of root process.
 
     :return:
         The reduced matrices.
     """
 
-    red_matrices = None
-    if comm.Get_rank() == mpi_id:
-        red_matrices = Matrices()
+    reduced_matrices = None
 
-    for key in matrices.keys():
-        matrix = matrices.matrix(key)
-        red_matrix = Matrix.reduce(matrix, comm, mpi_id)
-        comm.Barrier()
-        if red_matrices is not None:
-            red_matrices.add(red_matrix, key)
-        comm.Barrier()
+    if comm.Get_rank() == root_rank:
+        reduced_matrices = Matrices()
 
-    return red_matrices
+    for key in self.keys():
+        matrix = self.matrix(key)
+        reduced_matrix = matrix.reduce(comm, root_rank)
+        if comm.Get_rank() == root_rank:
+            reduced_matrices.add(reduced_matrix, key)
+
+    return reduced_matrices
 
 
 Matrices.bcast = _Matrices_bcast
