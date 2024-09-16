@@ -8,7 +8,6 @@ from veloxchem import Molecule
 from veloxchem import FockDriver
 from veloxchem import T4CScreener
 from veloxchem import SubMatrix
-from veloxchem import Matrix
 from veloxchem import Matrices
 from veloxchem import make_matrix
 from veloxchem import mat_t
@@ -43,14 +42,14 @@ class TestFockDriver:
         bas = MolecularBasis.read(mol, 'sto-3g')
 
         return mol, bas
-        
+
     def test_h2o_dimer_focks_svpd_with_mpi(self):
-    
+
         comm = MPI.COMM_WORLD
-        
+
         t4c_drv = None
         den_mats = None
-        
+
         if comm.Get_rank() == 0:
             mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
 
@@ -62,31 +61,32 @@ class TestFockDriver:
             den_mats = Matrices()
             den_mats.add(dmat, "0")
             den_mats.add(dmat, "1")
-            
+
             # screen basis function pairs
             t4c_drv = T4CScreener()
             t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
-            
+
         # broadcast data
         t4c_drv = comm.bcast(t4c_drv, 0)
         den_mats = Matrices.bcast(den_mats, comm, 0)
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mats = fock_drv.mpi_multi_compute(comm, t4c_drv, den_mats, ["j", "k"], 0.0, 0.0, 15)
-        
+        fock_mats = fock_drv.mpi_compute(comm, t4c_drv, den_mats, ["j", "k"],
+                                         0.0, 0.0, 15)
+
         if comm.Get_rank() == 0:
             # dimension of molecular basis
             basdims = [0, 16, 58, 78]
-        
+
             # load reference Fock matrix
             here = Path(__file__).parent
             npyfile = str(here / 'data' / 'h2o.dimer.svpd.j.gen.npy')
             ref_mat = np.load(npyfile)
-        
+
             # retrieve first Fock matrix
             fock_mat = fock_mats.matrix("0")
-        
+
             # check individual overlap submatrices
             for i in range(3):
                 for j in range(3):
@@ -100,8 +100,8 @@ class TestFockDriver:
                     cmat = fock_mat.submatrix((i, j))
                     # load reference submatrix
                     rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-                    rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                            sket:eket]))
+                    rmat.set_values(
+                        np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
                     # compare submatrices
                     assert cmat == rmat
 
@@ -115,10 +115,10 @@ class TestFockDriver:
             npyfile = str(here / 'data' / 'h2o.dimer.svpd.k.gen.npy')
             ref_mat = np.load(npyfile)
             ref_mat = ref_mat.T
-        
+
             # retrieve second Fock matrix
             fock_mat = fock_mats.matrix("1")
-        
+
             # check individual overlap submatrices
             for i in range(3):
                 for j in range(3):
@@ -132,8 +132,8 @@ class TestFockDriver:
                     cmat = fock_mat.submatrix((i, j))
                     # load reference submatrix
                     rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-                    rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                            sket:eket]))
+                    rmat.set_values(
+                        np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
                     # compare submatrices
                     assert cmat == rmat
 
@@ -141,11 +141,13 @@ class TestFockDriver:
             fmat = fock_mat.full_matrix()
             fref = SubMatrix([0, 0, 78, 78])
             fref.set_values(np.ascontiguousarray(ref_mat))
-        
+
+            assert fmat == fref
+
     def test_h2o_dimer_fock_2jk_svpd_with_mpi(self):
 
         comm = MPI.COMM_WORLD
-        
+
         t4c_drv = None
         den_mat = None
         if comm.Get_rank() == 0:
@@ -158,15 +160,16 @@ class TestFockDriver:
             # screen basis function pairs
             t4c_drv = T4CScreener()
             t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
-        
+
         # broadcast data
         t4c_drv = comm.bcast(t4c_drv, 0)
         den_mat = comm.bcast(den_mat, 0)
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.mpi_compute(comm, t4c_drv, den_mat, "2jk", 0.0, 0.0, 15)
-        
+        fock_mat = fock_drv.mpi_compute(comm, t4c_drv, den_mat, "2jk", 0.0, 0.0,
+                                        15)
+
         if comm.Get_rank() == 0:
             # load reference Fock matrix
             here = Path(__file__).parent
@@ -194,8 +197,8 @@ class TestFockDriver:
                 cmat = fock_mat.submatrix((i, j))
                 # load reference submatrix
                 rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                            sket:eket]))
+                rmat.set_values(
+                    np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
                 # compare submatrices
                 assert cmat == rmat
 
@@ -205,7 +208,7 @@ class TestFockDriver:
             fref.set_values(np.ascontiguousarray(ref_mat))
 
             assert fmat == fref
-        
+
     def test_h2o_dimer_focks_svpd_with_screener(self):
 
         mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
@@ -219,26 +222,27 @@ class TestFockDriver:
         den_mats = Matrices()
         den_mats.add(dmat, "0")
         den_mats.add(dmat, "1")
-        
+
         # screen basis function pairs
         t4c_drv = T4CScreener()
         t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mats = fock_drv.compute(t4c_drv, den_mats, ["j", "k"], 0.0, 0.0, 15)
-        
+        fock_mats = fock_drv.compute(t4c_drv, den_mats, ["j", "k"], 0.0, 0.0,
+                                     15)
+
         # dimension of molecular basis
         basdims = [0, 16, 58, 78]
-        
+
         # load reference Fock matrix
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.j.gen.npy')
         ref_mat = np.load(npyfile)
-        
+
         # retrieve first Fock matrix
         fock_mat = fock_mats.matrix("0")
-        
+
         # check individual overlap submatrices
         for i in range(3):
             for j in range(3):
@@ -252,8 +256,8 @@ class TestFockDriver:
                 cmat = fock_mat.submatrix((i, j))
                 # load reference submatrix
                 rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+                rmat.set_values(
+                    np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
                 # compare submatrices
                 assert cmat == rmat
 
@@ -267,10 +271,10 @@ class TestFockDriver:
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.k.gen.npy')
         ref_mat = np.load(npyfile)
         ref_mat = ref_mat.T
-        
+
         # retrieve second Fock matrix
         fock_mat = fock_mats.matrix("1")
-        
+
         # check individual overlap submatrices
         for i in range(3):
             for j in range(3):
@@ -284,8 +288,8 @@ class TestFockDriver:
                 cmat = fock_mat.submatrix((i, j))
                 # load reference submatrix
                 rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+                rmat.set_values(
+                    np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
                 # compare submatrices
                 assert cmat == rmat
 
@@ -293,7 +297,9 @@ class TestFockDriver:
         fmat = fock_mat.full_matrix()
         fref = SubMatrix([0, 0, 78, 78])
         fref.set_values(np.ascontiguousarray(ref_mat))
-    
+
+        assert fmat == fref
+
     def test_h2o_dimer_fock_gen_jk_svpd_with_screener(self):
 
         mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
@@ -303,7 +309,7 @@ class TestFockDriver:
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.gen.npy')
         den_mat = make_matrix(bas_svpd, mat_t.general)
         den_mat.set_values(np.load(npyfile))
-        
+
         # screen basis function pairs
         t4c_drv = T4CScreener()
         t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
@@ -311,7 +317,7 @@ class TestFockDriver:
         # compute Fock matrix
         fock_drv = FockDriver()
         fock_mat = fock_drv.compute(t4c_drv, den_mat, "jk", 0.0, 0.0, 15)
-        
+
         # load reference Fock matrix
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.j.gen.npy')
@@ -339,8 +345,8 @@ class TestFockDriver:
                 cmat = fock_mat.submatrix((i, j))
                 # load reference submatrix
                 rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+                rmat.set_values(
+                    np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
                 # compare submatrices
                 assert cmat == rmat
 
@@ -350,7 +356,7 @@ class TestFockDriver:
         fref.set_values(np.ascontiguousarray(ref_mat))
 
         assert fmat == fref
-        
+
     def test_h2o_dimer_fock_gen_jkx_svpd_with_screener(self):
 
         mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
@@ -360,7 +366,7 @@ class TestFockDriver:
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.gen.npy')
         den_mat = make_matrix(bas_svpd, mat_t.general)
         den_mat.set_values(np.load(npyfile))
-        
+
         # screen basis function pairs
         t4c_drv = T4CScreener()
         t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
@@ -368,7 +374,7 @@ class TestFockDriver:
         # compute Fock matrix
         fock_drv = FockDriver()
         fock_mat = fock_drv.compute(t4c_drv, den_mat, "jkx", 0.28, 0.0, 15)
-        
+
         # load reference Fock matrix
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.j.gen.npy')
@@ -396,8 +402,8 @@ class TestFockDriver:
                 cmat = fock_mat.submatrix((i, j))
                 # load reference submatrix
                 rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+                rmat.set_values(
+                    np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
                 # compare submatrices
                 assert cmat == rmat
 
@@ -407,7 +413,7 @@ class TestFockDriver:
         fref.set_values(np.ascontiguousarray(ref_mat))
 
         assert fmat == fref
-        
+
     def test_h2o_dimer_fock_gen_j_svpd_with_screener(self):
 
         mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
@@ -417,7 +423,7 @@ class TestFockDriver:
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.gen.npy')
         den_mat = make_matrix(bas_svpd, mat_t.general)
         den_mat.set_values(np.load(npyfile))
-        
+
         # screen basis function pairs
         t4c_drv = T4CScreener()
         t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
@@ -447,8 +453,8 @@ class TestFockDriver:
                 cmat = fock_mat.submatrix((i, j))
                 # load reference submatrix
                 rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+                rmat.set_values(
+                    np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
                 # compare submatrices
                 assert cmat == rmat
 
@@ -458,7 +464,7 @@ class TestFockDriver:
         fref.set_values(np.ascontiguousarray(ref_mat))
 
         assert fmat == fref
-        
+
     def test_h2o_dimer_fock_gen_k_svpd_with_screener(self):
 
         mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
@@ -468,7 +474,7 @@ class TestFockDriver:
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.gen.npy')
         den_mat = make_matrix(bas_svpd, mat_t.general)
         den_mat.set_values(np.load(npyfile))
-        
+
         # screen basis function pairs
         t4c_drv = T4CScreener()
         t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
@@ -499,8 +505,8 @@ class TestFockDriver:
                 cmat = fock_mat.submatrix((i, j))
                 # load reference submatrix
                 rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+                rmat.set_values(
+                    np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
                 # compare submatrices
                 assert cmat == rmat
 
@@ -520,7 +526,7 @@ class TestFockDriver:
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.gen.npy')
         den_mat = make_matrix(bas_svpd, mat_t.general)
         den_mat.set_values(np.load(npyfile))
-        
+
         # screen basis function pairs
         t4c_drv = T4CScreener()
         t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
@@ -551,8 +557,8 @@ class TestFockDriver:
                 cmat = fock_mat.submatrix((i, j))
                 # load reference submatrix
                 rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+                rmat.set_values(
+                    np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
                 # compare submatrices
                 assert cmat == rmat
 
@@ -562,7 +568,7 @@ class TestFockDriver:
         fref.set_values(np.ascontiguousarray(ref_mat))
 
         assert fmat == fref
-        
+
     def test_h2o_dimer_fock_2jk_svpd_with_screener(self):
 
         mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
@@ -572,7 +578,7 @@ class TestFockDriver:
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.npy')
         den_mat = make_matrix(bas_svpd, mat_t.symmetric)
         den_mat.set_values(np.load(npyfile))
-        
+
         # screen basis function pairs
         t4c_drv = T4CScreener()
         t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
@@ -607,18 +613,17 @@ class TestFockDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
         # check full Fock matrix
         fmat = fock_mat.full_matrix()
         fref = SubMatrix([0, 0, 78, 78])
-        fref.set_values(np.ascontiguousarray(ref_mat)) 
+        fref.set_values(np.ascontiguousarray(ref_mat))
 
         assert fmat == fref
-        
+
     def test_h2o_dimer_fock_2jkx_svpd_with_screener(self):
 
         mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
@@ -628,7 +633,7 @@ class TestFockDriver:
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.npy')
         den_mat = make_matrix(bas_svpd, mat_t.symmetric)
         den_mat.set_values(np.load(npyfile))
-        
+
         # screen basis function pairs
         t4c_drv = T4CScreener()
         t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
@@ -663,8 +668,7 @@ class TestFockDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
@@ -684,7 +688,7 @@ class TestFockDriver:
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.npy')
         den_mat = make_matrix(bas_svpd, mat_t.symmetric)
         den_mat.set_values(np.load(npyfile))
-        
+
         # screen basis function pairs
         t4c_drv = T4CScreener()
         t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
@@ -714,8 +718,7 @@ class TestFockDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
@@ -725,7 +728,7 @@ class TestFockDriver:
         fref.set_values(np.ascontiguousarray(ref_mat))
 
         assert fmat == fref
-        
+
     def test_h2o_dimer_fock_k_svpd_with_screener(self):
 
         mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
@@ -735,7 +738,7 @@ class TestFockDriver:
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.npy')
         den_mat = make_matrix(bas_svpd, mat_t.symmetric)
         den_mat.set_values(np.load(npyfile))
-        
+
         # screen basis function pairs
         t4c_drv = T4CScreener()
         t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
@@ -765,8 +768,7 @@ class TestFockDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
@@ -776,7 +778,7 @@ class TestFockDriver:
         fref.set_values(np.ascontiguousarray(ref_mat))
 
         assert fmat == fref
-        
+
     def test_h2o_dimer_fock_kx_svpd_with_screener(self):
 
         mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
@@ -786,7 +788,7 @@ class TestFockDriver:
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.npy')
         den_mat = make_matrix(bas_svpd, mat_t.symmetric)
         den_mat.set_values(np.load(npyfile))
-        
+
         # screen basis function pairs
         t4c_drv = T4CScreener()
         t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
@@ -816,8 +818,7 @@ class TestFockDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
@@ -869,8 +870,7 @@ class TestFockDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
@@ -922,8 +922,7 @@ class TestFockDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
@@ -970,8 +969,7 @@ class TestFockDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
@@ -1018,8 +1016,7 @@ class TestFockDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
@@ -1066,8 +1063,7 @@ class TestFockDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
@@ -1119,8 +1115,7 @@ class TestFockDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
@@ -1172,8 +1167,7 @@ class TestFockDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
@@ -1219,8 +1213,7 @@ class TestFockDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
@@ -1266,8 +1259,7 @@ class TestFockDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
@@ -1314,8 +1306,7 @@ class TestFockDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
