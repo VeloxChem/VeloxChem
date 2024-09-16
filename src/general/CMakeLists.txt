@@ -3,9 +3,11 @@ target_sources(vlxobjs
     Codata.cpp
     ErrorHandler.cpp
     MpiFunc.cpp
+    MultiTimer.cpp
     OpenMPFunc.cpp
     StringFormat.cpp
     TensorLabels.cpp
+    Timer.cpp
   )
 
 target_include_directories(vlxobjs

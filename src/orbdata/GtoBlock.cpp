@@ -304,6 +304,29 @@ CGtoBlock::atomic_indices() const -> std::vector<int>
 }
 
 auto
+CGtoBlock::getAtomicOrbitalsIndexes() const -> std::vector<int>
+{
+    std::vector<int> ao_inds;
+
+    // go through spherical harmonics components
+
+    for (int comp = 0; comp < _angular_momentum * 2 + 1; comp++)
+    {
+        // go through CGTOs in this block
+        // note that ind starts from 1
+        // because _orb_indices[0] is the total number of CGTOs of _angular_momentum
+        // which could be larger than the number of CGTOs in this block
+
+        for (size_t ind = 1; ind < _orb_indices.size(); ind++)
+        {
+            ao_inds.push_back(comp * _orb_indices[0] + _orb_indices[ind]);
+        }
+    }
+
+    return ao_inds;
+}
+
+auto
 CGtoBlock::angular_momentum() const -> int
 {
     return _angular_momentum;

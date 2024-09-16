@@ -1,10 +1,28 @@
 target_sources(vlxobjs
   PRIVATE
+    AOKohnShamMatrix.cpp
+    DensityGridGenerator.cpp
     DftFunc.cpp
+    DftSubMatrix.cpp
+    FunctionalParser.cpp
+    GridBox.cpp
+    GridDriver.cpp
+    GridPartitioner.cpp
+    GridScreener.cpp
     GtoValues.cpp
     GtoValuesRecD.cpp
     GtoValuesRecP.cpp
     GtoValuesRecS.cpp
+    LebedevLaikovQuadrature.cpp
+    M4T2Quadrature.cpp
+    MolecularGrid.cpp
+    PartitionFunc.cpp
+    Prescreener.cpp
+    XCComponent.cpp
+    XCFunctional.cpp
+    XCIntegrator.cpp
+    XCIntegratorForGGA.cpp
+    XCIntegratorForLDA.cpp
   )
 
 target_include_directories(vlxobjs

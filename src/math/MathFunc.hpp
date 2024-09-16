@@ -1,14 +1,42 @@
 #ifndef MathFunc_hpp
 #define MathFunc_hpp
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <vector>
 #include <ranges>
 
 #include "CustomConstrains.hpp"
+#include "MathConst.hpp"
 
 namespace mathfunc {  // mathfunc
+
+/// Computes distance between two points in 3D space.
+inline auto
+distance(const double rax, const double ray, const double raz, const double rbx, const double rby, const double rbz) -> double
+{
+    const auto ab_x = rax - rbx;
+    const auto ab_y = ray - rby;
+    const auto ab_z = raz - rbz;
+
+    return std::sqrt(ab_x * ab_x + ab_y * ab_y + ab_z * ab_z);
+}
+
+/// Computes distance between two points in 3D space.
+/// - Parameter r_a: the first point coordinates.
+/// - Parameter r_b: the first point coordinates.
+inline auto
+distance(const std::array<double, 3>& ra, const std::array<double, 3>& rb) -> double
+{
+    const auto ab_x = ra[0] - rb[0];
+
+    const auto ab_y = ra[1] - rb[1];
+
+    const auto ab_z = ra[2] - rb[2];
+
+    return std::sqrt(ab_x * ab_x + ab_y * ab_y + ab_z * ab_z);
+}
 
 /// @brief Compares two floating point values.
 /// @tparam T The floating point type.
@@ -45,6 +73,25 @@ count_elements_by_values(const std::vector<T>& values,
                          const T               selector) -> T
 {
     return static_cast<T>(std::ranges::count(values, selector));
+}
+
+inline auto
+quadChebyshevOfKindTwo(double* coordinates, double* weights, const int nPoints) -> void
+{
+    // prefactor
+    auto fstep = mathconst::pi_value() / (static_cast<double>(nPoints) + 1.0);
+
+    // loop over grid points
+    for (int i = 1; i < nPoints + 1; i++)
+    {
+        auto farg = static_cast<double>(i) * fstep;
+
+        coordinates[i - 1] = std::cos(farg);
+
+        auto warg = std::sin(farg);
+
+        weights[i - 1] = fstep * warg * warg;
+    }
 }
 
 inline auto

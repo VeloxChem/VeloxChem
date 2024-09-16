@@ -138,6 +138,18 @@ class CSubMatrix
     /// @return The vector with submatrix elements.
     auto get_values() const -> std::vector<double>;
 
+    inline auto
+    data() -> double*
+    {
+        return _values.data();
+    }
+
+    inline auto
+    data() const -> const double*
+    {
+        return _values.data();
+    }
+
     /// @brief Gets offset of matrix rows in global indexing scheme.
     /// @return The offset of matrix rows.
     inline auto
