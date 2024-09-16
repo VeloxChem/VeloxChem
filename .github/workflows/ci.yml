@@ -1,4 +1,4 @@
-name: build
+name: VeloxChem CI workflow
 
 on:
   push:
@@ -32,10 +32,15 @@ jobs:
           ulimit -a
           ulimit -s unlimited
           lscpu | egrep 'Thread|Core|Socket|^CPU\('
-          echo "=== Intel OneAPI ==="
-          source /opt/intel/oneapi/setvars.sh
-          mpiicc -cc=icx --version
-          mpiicpc -cxx=icpx --version
+          #echo "=== Intel OneAPI ==="
+          #source /opt/intel/oneapi/setvars.sh
+          #mpiicc -cc=icx --version
+          #mpiicpc -cxx=icpx --version
+          echo "=== GNU Compiler ==="
+          mpicc --version
+          mpicc -show
+          mpicxx --version
+          mpicxx -show
           echo "=== Python ==="
           which python
           python -V
@@ -46,10 +51,13 @@ jobs:
           python -V
           echo "=== Python dependencies ==="
           python -m pip install --upgrade pip setuptools wheel
-          CC=icx MPICC="mpiicc -cc=icx" python -m pip install mpi4py --no-binary=mpi4py
+          #CC=icx MPICC="mpiicc -cc=icx" python -m pip install mpi4py --no-binary=mpi4py
+          CC=gcc MPICC=mpicc python -m pip install mpi4py --no-binary=mpi4py
           CC=gcc CXX=g++ python -m pip install cppe MDAnalysis
           echo "=== VeloxChem build ==="
-          SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpiicpc -DCMAKE_CXX_FLAGS=\"-cxx=icpx\"" \
+          #SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpiicpc -DCMAKE_CXX_FLAGS=\"-cxx=icpx\"" \
+          #  python -m pip install -v .[test,qmmm]
+          SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpicxx" \
             python -m pip install -v .[test,qmmm]
           echo "=== VeloxChem test ==="
           python -c "import veloxchem; print(veloxchem.__version__)"
