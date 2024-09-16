@@ -257,31 +257,33 @@ export_orbdata(py::module &m)
         .def(py::init<const CGtoPairBlock &>())
         .def(py::init<const CGtoBlock &>())
         .def(py::init<const CGtoBlock &, const CGtoBlock &>())
-        .def(py::init<const std::vector<TPoint<double>>&,
-                      const std::vector<TPoint<double>>&,
-                      const std::vector<double>&,
-                      const std::vector<double>&,
-                      const std::vector<double>&,
-                      const std::vector<double>&,
-                      const std::vector<size_t>&,
-                      const std::vector<size_t>&,
-                      const std::vector<int>&,
-                      const std::vector<int>&,
-                      const std::pair<int, int>&,
+        .def(py::init<const std::vector<TPoint<double>> &,
+                      const std::vector<TPoint<double>> &,
+                      const std::vector<double> &,
+                      const std::vector<double> &,
+                      const std::vector<double> &,
+                      const std::vector<double> &,
+                      const std::vector<size_t> &,
+                      const std::vector<size_t> &,
+                      const std::vector<int> &,
+                      const std::vector<int> &,
+                      const std::pair<int, int> &,
                       const int>())
         .def(py::pickle(
-            [](const CGtoPairBlock& gp_block) { return py::make_tuple(gp_block.bra_coordinates(),
-                                                                      gp_block.ket_coordinates(),
-                                                                      gp_block.bra_exponents(),
-                                                                      gp_block.ket_exponents(),
-                                                                      gp_block.normalization_factors(),
-                                                                      gp_block.overlap_factors(),
-                                                                      gp_block.bra_orbital_indices(),
-                                                                      gp_block.ket_orbital_indices(),
-                                                                      gp_block.bra_atomic_indices(),
-                                                                      gp_block.ket_atomic_indices(),
-                                                                      gp_block.angular_momentums(),
-                                                                      gp_block.number_of_primitive_pairs()); },
+            [](const CGtoPairBlock &gp_block) {
+                return py::make_tuple(gp_block.bra_coordinates(),
+                                      gp_block.ket_coordinates(),
+                                      gp_block.bra_exponents(),
+                                      gp_block.ket_exponents(),
+                                      gp_block.normalization_factors(),
+                                      gp_block.overlap_factors(),
+                                      gp_block.bra_orbital_indices(),
+                                      gp_block.ket_orbital_indices(),
+                                      gp_block.bra_atomic_indices(),
+                                      gp_block.ket_atomic_indices(),
+                                      gp_block.angular_momentums(),
+                                      gp_block.number_of_primitive_pairs());
+            },
             [](py::tuple t) {
                 auto gp_block = CGtoPairBlock(t[0].cast<const std::vector<TPoint<double>>>(),
                                               t[1].cast<const std::vector<TPoint<double>>>(),
@@ -321,7 +323,7 @@ export_orbdata(py::module &m)
     PyClass<CBlockedGtoPairBlock>(m, "BlockedGtoPairBlock")
         .def(py::init<>())
         .def(py::init<const CBlockedGtoPairBlock &>())
-        .def(py::init<const std::array<CGtoPairBlock, 16>&>())
+        .def(py::init<const std::array<CGtoPairBlock, 16> &>())
         .def(py::init<const std::vector<CGtoPairBlock> &, const std::vector<int> &>())
         .def(py::init<const CGtoPairBlock &, const std::vector<double> &>())
         .def(py::pickle([](const CBlockedGtoPairBlock &bgto_block) { return py::make_tuple(bgto_block.gto_pair_blocks()); },

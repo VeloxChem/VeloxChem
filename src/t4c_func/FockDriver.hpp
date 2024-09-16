@@ -109,6 +109,24 @@ class CFockDriver
                  const double        omega,
                  const int           ithreshold) const -> CMatrix;
     
+    /// @brief Computes Fock matrices for given densities.
+    /// @param screener The screener with basis function pairs data.
+    /// @param rank The rank of specific node.
+    /// @param nodes The number of nodes.
+    /// @param densities The density matrices to construct Fock matrix.
+    /// @param labels The vector of  Fock matrix type labels.
+    /// @param exchange_factor The exchange-correlation factors.
+    /// @param omega The range separation factor.
+    /// @return The Fock matrix.
+    auto compute(const CT4CScreener             &screener,
+                 const int          rank,
+                 const int          nodes,
+                 const CMatrices                &densities,
+                 const std::vector<std::string> &labels,
+                 const double                    exchange_factor,
+                 const double                    omega,
+                 const int                       ithreshold) const -> CMatrices;
+    
    
 };
 
