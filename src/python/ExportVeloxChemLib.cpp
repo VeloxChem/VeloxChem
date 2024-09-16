@@ -1,5 +1,6 @@
 #include <pybind11/pybind11.h>
 
+#include "ExportDft.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 #include "ExportMoldata.hpp"
@@ -9,6 +10,8 @@
 
 PYBIND11_MODULE(veloxchemlib, m)
 {
+    vlx_dft::export_dft(m);
+
     vlx_general::export_general(m);
 
     vlx_math::export_math(m);

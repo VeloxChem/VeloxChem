@@ -42,6 +42,7 @@ endif()
 # * explicitly disable LTO, even for release builds
 pybind11_add_module(veloxchemlib
   NO_EXTRAS
+    ExportDft.cpp
     ExportGeneral.cpp
     ExportMath.cpp
     ExportMoldata.cpp
