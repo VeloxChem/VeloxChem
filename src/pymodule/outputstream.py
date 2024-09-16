@@ -1,3 +1,27 @@
+#
+#                              VELOXCHEM
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from os import environ
 from pathlib import Path
 import sys
@@ -54,6 +78,7 @@ class OutputStream:
             assert_msg_critical(self.state, errio)
 
         self._state_backup = None
+        self._mute_level = 0
 
     def __del__(self):
         """
@@ -74,15 +99,25 @@ class OutputStream:
                 self.stream.close()
             self.state = False
 
+    @property
+    def is_muted(self):
+        """
+        Checks if the output stream is muted.
+        """
+
+        return (self._state_backup is not None and self._mute_level > 0)
+
     def mute(self):
         """
         Mutes the output stream.
         """
 
-        # only mute from an unmuted state (i.e. when _state_backup is None)
+        self._mute_level += 1
+
         if self._state_backup is None:
             self._state_backup = self.state
-            self.state = False
+
+        self.state = False
 
     def unmute(self):
         """
@@ -90,8 +125,10 @@ class OutputStream:
         state of the output stream.
         """
 
-        # only unmute from an muted state (i.e. when _state_backup is not None)
-        if self._state_backup is not None:
+        if self._mute_level > 0:
+            self._mute_level -= 1
+
+        if self._mute_level == 0 and self._state_backup is not None:
             self.state = self._state_backup
             self._state_backup = None
 
@@ -299,6 +336,27 @@ class OutputStream:
         for line in lines:
             self.print_header(line)
 
+    def print_reference(self, line):
+        """
+        Prints reference to output stream.
+
+        :param lines:
+            The reference line.
+        """
+
+        if not self.state:
+            return
+
+        cur_line = line
+        spaces = ' ' * 9
+
+        while len(cur_line) > 100:
+            index = cur_line[:100].strip().rfind(' ')
+            self.buffer_lines.append(spaces + cur_line[:index].strip())
+            cur_line = cur_line[index:]
+
+        self.buffer_lines.append(spaces + cur_line.strip())
+
     def print_start_header(self, num_nodes):
         """
         Prints start header to output stream.
@@ -317,7 +375,7 @@ class OutputStream:
         self.print_title('VELOXCHEM')
         self.print_title('AN ELECTRONIC STRUCTURE CODE')
         self.print_title('')
-        self.print_title('Copyright (C) 2018-2023 VeloxChem developers.')
+        self.print_title('Copyright (C) 2018-2024 VeloxChem developers.')
         self.print_title('All rights reserved.')
         self.print_separator()
         exec_str = 'VeloxChem execution started'

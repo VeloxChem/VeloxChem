@@ -22,9 +22,9 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#from .veloxchemlib import parse_xc_func
+from .veloxchemlib import parse_xc_func
 from .veloxchemlib import mpi_master
-#from .dftutils import get_default_grid_level
+from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 
 

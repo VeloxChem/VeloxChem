@@ -28,7 +28,7 @@ class TestScfRestrictedOpenDriver:
 
         scf_drv = ScfRestrictedOpenDriver()
         scf_drv.ostream.mute()
-        #scf_drv.xcfun = xcfun_label
+        scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas, min_bas)
 
         if scf_drv.rank == mpi_master():
@@ -39,7 +39,6 @@ class TestScfRestrictedOpenDriver:
         self.run_scf_restopen('hf', 1, 2, -75.5576463523, 1.0e-8)
         self.run_scf_restopen('hf', 0, 3, -75.7069341237, 1.0e-8)
 
-    """
     def test_slda(self):
 
         self.run_scf_restopen('slda', 1, 2, -75.5020555275, 1.0e-6)
@@ -50,6 +49,7 @@ class TestScfRestrictedOpenDriver:
         self.run_scf_restopen('b3lyp', 1, 2, -75.9000931681, 1.0e-6)
         self.run_scf_restopen('b3lyp', 0, 3, -76.0815511111, 1.0e-6)
 
+    """
     def test_tpssh(self):
 
         self.run_scf_restopen('tpssh', 1, 2, -75.9023473162, 1.0e-6)

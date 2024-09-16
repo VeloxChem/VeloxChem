@@ -28,7 +28,7 @@ class TestScfUnrestrictedDriver:
 
         scf_drv = ScfUnrestrictedDriver()
         scf_drv.ostream.mute()
-        #scf_drv.xcfun = xcfun_label
+        scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas, min_bas)
 
         if scf_drv.rank == mpi_master():
@@ -39,7 +39,6 @@ class TestScfUnrestrictedDriver:
         self.run_scf_unrest('hf', 1, 2, -75.5622230223, 1.0e-8)
         self.run_scf_unrest('hf', 0, 3, -75.7122812456, 1.0e-8)
 
-    """
     def test_slda(self):
 
         self.run_scf_unrest('slda', 1, 2, -75.5030096846, 1.0e-6)
@@ -50,6 +49,7 @@ class TestScfUnrestrictedDriver:
         self.run_scf_unrest('b3lyp', 1, 2, -75.9017886760, 1.0e-6)
         self.run_scf_unrest('b3lyp', 0, 3, -76.0832193747, 1.0e-6)
 
+    """
     def test_tpssh(self):
 
         self.run_scf_unrest('tpssh', 1, 2, -75.9044411187, 1.0e-6)

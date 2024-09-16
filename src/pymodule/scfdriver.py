@@ -35,12 +35,12 @@ from .veloxchemlib import (OverlapDriver, KineticEnergyDriver,
                            NuclearPotentialDriver)
 #from .veloxchemlib import ElectricDipoleMomentDriver
 from .veloxchemlib import FockDriver, T4CScreener
-#from .veloxchemlib import GridDriver, XCIntegrator
+from .veloxchemlib import GridDriver, XCIntegrator
 from .veloxchemlib import AODensityMatrix, Matrices
 from .veloxchemlib import make_matrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat, mat_t
-#from .veloxchemlib import xcfun
+from .veloxchemlib import xcfun
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -48,7 +48,7 @@ from .sadguessdriver import SadGuessDriver
 from .subcommunicators import SubCommunicators
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
-#from .dftutils import get_default_grid_level, print_libxc_reference
+from .dftutils import get_default_grid_level, print_libxc_reference
 from .sanitychecks import molecule_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
@@ -1614,14 +1614,14 @@ class ScfDriver:
         if self._dft and not self._first_step:
             if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga, xcfun.mgga]:
                 xc_drv = XCIntegrator(self.comm)
+                # Note: vxc_mat will remain distributed across MPI processes.
+                # XC energy and Vxc matrix will be reduced in _comp_energy
+                # and _comp_full_fock
                 vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, den_mat,
                                                     self._mol_grid, self.xcfun)
             else:
                 assert_msg_critical(
                     False, 'SCF driver: Unsupported XC functional type')
-
-            # TODO: reduce_sum vxc_mat
-
         else:
             vxc_mat = None
 
@@ -1695,6 +1695,10 @@ class ScfDriver:
             energy.
         """
 
+        xc_ene = 0.0
+        if self._dft and not self._first_step:
+            xc_ene = self.comm.reduce(vxc_mat.get_energy(), root=mpi_master())
+
         if self.rank == mpi_master():
             # electronic, kinetic, nuclear energy
             D = den_mat
@@ -1710,7 +1714,7 @@ class ScfDriver:
                 e_kin = np.sum((D[0] + D[1]) * T)
                 e_en = np.sum((D[0] + D[1]) * V)
             if self._dft and not self._first_step:
-                e_ee += vxc_mat.get_energy()
+                e_ee += xc_ene
             if self._pe and not self._first_step:
                 e_ee += e_pe
             e_sum = e_ee + e_kin + e_en
@@ -1738,6 +1742,14 @@ class ScfDriver:
             The nuclear potential matrix.
         """
 
+        np_xcmat_a, np_xcmat_b = None, None
+        if self._dft and not self._first_step:
+            np_xcmat_a = self.comm.reduce(vxc_mat.alpha_to_numpy(),
+                                          root=mpi_master())
+            if self.scf_type != 'restricted':
+                np_xcmat_b = self.comm.reduce(vxc_mat.beta_to_numpy(),
+                                              root=mpi_master())
+
         if self.rank == mpi_master():
             T = kin_mat
             V = npot_mat
@@ -1746,9 +1758,9 @@ class ScfDriver:
                 fock_mat[1] += (T + V)
 
             if self._dft and not self._first_step:
-                fock_mat[0] += vxc_mat.alpha_to_numpy()
+                fock_mat[0] += np_xcmat_a
                 if self.scf_type != 'restricted':
-                    fock_mat[1] += vxc_mat.beta_to_numpy()
+                    fock_mat[1] += np_xcmat_b
 
             # TODO: add PE contribution to Fock
             if self._pe and not self._first_step:
