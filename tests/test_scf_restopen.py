@@ -1,3 +1,4 @@
+from veloxchem import mpi_master
 from veloxchem import Molecule, MolecularBasis
 from veloxchem import ScfRestrictedOpenDriver
 
@@ -27,7 +28,8 @@ class TestScfRestrictedOpenDriver:
         #scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas, min_bas)
 
-        assert abs(ref_scf_energy - scf_results['scf_energy']) < tol
+        if scf_drv.rank == mpi_master():
+            assert abs(ref_scf_energy - scf_results['scf_energy']) < tol
 
     def test_hf(self):
 

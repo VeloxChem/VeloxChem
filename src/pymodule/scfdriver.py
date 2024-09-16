@@ -1063,8 +1063,12 @@ class ScfDriver:
                 self.ostream.print_info(
                     'Using sub-communicators for {}.'.format(valstr))
         else:
-            screener = T4CScreener()
-            screener.partition(ao_basis, molecule, 'eri')
+            if self.rank == mpi_master():
+                screener = T4CScreener()
+                screener.partition(ao_basis, molecule, 'eri')
+            else:
+                screener = None
+            screener = self.comm.bcast(screener, root=mpi_master())
 
         profiler.check_memory_usage('Initial guess')
 
@@ -1506,19 +1510,36 @@ class ScfDriver:
         """
 
         if self.scf_type == 'restricted':
-            den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
-            den_mat_for_fock.set_values(den_mat[0])
+            if self.rank == mpi_master():
+                den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
+                den_mat_for_fock.set_values(den_mat[0])
+            else:
+                den_mat_for_fock = None
+
+            den_mat_for_fock = self.comm.bcast(den_mat_for_fock,
+                                               root=mpi_master())
 
         else:
-            # for now we calculate Ka, Kb and Jab separately for open-shell
-            den_mat_for_Ka = make_matrix(basis, mat_t.symmetric)
-            den_mat_for_Ka.set_values(den_mat[0])
+            if self.rank == mpi_master():
+                # for now we calculate Ka, Kb and Jab separately for open-shell
+                den_mat_for_Ka = make_matrix(basis, mat_t.symmetric)
+                den_mat_for_Ka.set_values(den_mat[0])
 
-            den_mat_for_Kb = make_matrix(basis, mat_t.symmetric)
-            den_mat_for_Kb.set_values(den_mat[1])
+                den_mat_for_Kb = make_matrix(basis, mat_t.symmetric)
+                den_mat_for_Kb.set_values(den_mat[1])
 
-            den_mat_for_Jab = make_matrix(basis, mat_t.symmetric)
-            den_mat_for_Jab.set_values(den_mat[0] + den_mat[1])
+                den_mat_for_Jab = make_matrix(basis, mat_t.symmetric)
+                den_mat_for_Jab.set_values(den_mat[0] + den_mat[1])
+            else:
+                den_mat_for_Ka = None
+                den_mat_for_Kb = None
+                den_mat_for_Jab = None
+
+            # TODO: pickle Matrices object
+            den_mat_for_Ka = self.comm.bcast(den_mat_for_Ka, root=mpi_master())
+            den_mat_for_Kb = self.comm.bcast(den_mat_for_Kb, root=mpi_master())
+            den_mat_for_Jab = self.comm.bcast(den_mat_for_Jab,
+                                              root=mpi_master())
 
             den_mat_for_fock = Matrices()
             den_mat_for_fock.add(den_mat_for_Ka, "0")
@@ -1558,27 +1579,31 @@ class ScfDriver:
             fock_mat_erf_k = fock_drv.compute(screener, den_mat_for_fock,
                                               fock_type, erf_k_coef, omega,
                                               thresh_int)
-            # Note: make fock_mat a list
-            fock_mat = [(fock_mat_full_k.get_full_matrix().to_numpy() -
-                         fock_mat_erf_k.get_full_matrix().to_numpy())]
+            if self.rank == mpi_master():
+                # Note: make fock_mat a list
+                fock_mat = [(fock_mat_full_k.get_full_matrix().to_numpy() -
+                             fock_mat_erf_k.get_full_matrix().to_numpy())]
         else:
             if self.scf_type == 'restricted':
                 fock_mat = fock_drv.compute(screener, den_mat_for_fock,
                                             fock_type, exchange_scaling_factor,
                                             0.0, thresh_int)
-                # Note: make fock_mat a list
-                fock_mat = [fock_mat.full_matrix().to_numpy()]
-                if fock_type == 'j':
-                    fock_mat[0] *= 2.0
+                if self.rank == mpi_master():
+                    # Note: make fock_mat a list
+                    fock_mat = [fock_mat.full_matrix().to_numpy()]
+                    if fock_type == 'j':
+                        fock_mat[0] *= 2.0
             else:
                 fock_mat = fock_drv.compute(screener, den_mat_for_fock,
                                             ["kx", "kx", "j"],
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
-                K_a = fock_mat.matrix("0").full_matrix().to_numpy()
-                K_b = fock_mat.matrix("1").full_matrix().to_numpy()
-                J_ab = fock_mat.matrix("2").full_matrix().to_numpy()
-                fock_mat = [J_ab - K_a, J_ab - K_b]
+                if self.rank == mpi_master():
+                    # Note: make fock_mat a list
+                    K_a = fock_mat.matrix("0").full_matrix().to_numpy()
+                    K_b = fock_mat.matrix("1").full_matrix().to_numpy()
+                    J_ab = fock_mat.matrix("2").full_matrix().to_numpy()
+                    fock_mat = [J_ab - K_a, J_ab - K_b]
 
         # TODO: reduce_sum fock_mat
 
