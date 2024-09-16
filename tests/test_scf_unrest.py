@@ -1,8 +1,11 @@
+import pytest
+
 from veloxchem import mpi_master
 from veloxchem import Molecule, MolecularBasis
 from veloxchem import ScfUnrestrictedDriver
 
 
+@pytest.mark.solvers
 class TestScfUnrestrictedDriver:
 
     def run_scf_unrest(self, xcfun_label, charge, mult, ref_scf_energy, tol):

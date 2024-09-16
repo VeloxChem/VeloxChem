@@ -1,8 +1,11 @@
+import pytest
+
 from veloxchem import mpi_master
 from veloxchem import Molecule, MolecularBasis
 from veloxchem import ScfRestrictedDriver
 
 
+@pytest.mark.solvers
 class TestScfRestrictedDriver:
 
     def run_scf_rest(self, xcfun_label, ref_scf_energy, tol):
