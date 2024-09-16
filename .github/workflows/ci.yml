@@ -1,4 +1,4 @@
-name: VeloxChem CI workflow
+name: build
 
 on:
   push:

@@ -23,7 +23,6 @@ from .veloxchemlib import NuclearPotentialGeom200Driver
 from .veloxchemlib import NuclearPotentialGeom110Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import ElectricDipoleMomentumGeom100Driver
-from .veloxchemlib import FockDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import AODensityMatrix
 
@@ -83,6 +82,7 @@ from .molecularorbitals import MolecularOrbitals, molorb
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
+from .fockdriver import FockDriver
 
 # Environment variable: basis set path
 from .environment import (set_vlxbasispath, get_basis_path)

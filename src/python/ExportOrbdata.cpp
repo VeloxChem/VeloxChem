@@ -278,6 +278,46 @@ export_orbdata(py::module &m)
         .def(py::init<const CGtoPairBlock &>())
         .def(py::init<const CGtoBlock &>())
         .def(py::init<const CGtoBlock &, const CGtoBlock &>())
+        .def(py::init<const std::vector<TPoint<double>>&,
+                      const std::vector<TPoint<double>>&,
+                      const std::vector<double>&,
+                      const std::vector<double>&,
+                      const std::vector<double>&,
+                      const std::vector<double>&,
+                      const std::vector<size_t>&,
+                      const std::vector<size_t>&,
+                      const std::vector<int>&,
+                      const std::vector<int>&,
+                      const std::pair<int, int>&,
+                      const int>())
+        .def(py::pickle(
+            [](const CGtoPairBlock& gp_block) { return py::make_tuple(gp_block.bra_coordinates(),
+                                                                      gp_block.ket_coordinates(),
+                                                                      gp_block.bra_exponents(),
+                                                                      gp_block.ket_exponents(),
+                                                                      gp_block.normalization_factors(),
+                                                                      gp_block.overlap_factors(),
+                                                                      gp_block.bra_orbital_indices(),
+                                                                      gp_block.ket_orbital_indices(),
+                                                                      gp_block.bra_atomic_indices(),
+                                                                      gp_block.ket_atomic_indices(),
+                                                                      gp_block.angular_momentums(),
+                                                                      gp_block.number_of_primitive_pairs()); },
+            [](py::tuple t) {
+                auto gp_block = CGtoPairBlock(t[0].cast<const std::vector<TPoint<double>>>(),
+                                              t[1].cast<const std::vector<TPoint<double>>>(),
+                                              t[2].cast<const std::vector<double>>(),
+                                              t[3].cast<const std::vector<double>>(),
+                                              t[4].cast<const std::vector<double>>(),
+                                              t[5].cast<const std::vector<double>>(),
+                                              t[6].cast<const std::vector<size_t>>(),
+                                              t[7].cast<const std::vector<size_t>>(),
+                                              t[8].cast<const std::vector<int>>(),
+                                              t[9].cast<const std::vector<int>>(),
+                                              t[10].cast<const std::pair<int, int>>(),
+                                              t[11].cast<const int>());
+                return gp_block;
+            }))
         .def("bra_coordinates", &CGtoPairBlock::bra_coordinates, "Gets vector of Cartesian coordinates of center A.")
         .def("ket_coordinates", &CGtoPairBlock::ket_coordinates, "Gets vector of Cartesian coordinates of center B.")
         .def("bra_exponents", &CGtoPairBlock::bra_exponents, "Gets vector of basis function exponents of center A.")
@@ -294,6 +334,7 @@ export_orbdata(py::module &m)
              &CGtoPairBlock::number_of_contracted_pairs,
              "Gets number of contracted GTO pairs in basis function pairs block.")
         .def("__eq__", [](const CGtoPairBlock &self, const CGtoPairBlock &other) { return self == other; })
+        .def("__neq__", [](const CGtoPairBlock &self, const CGtoPairBlock &other) { return self != other; })
         .def("__copy__", [](const CGtoPairBlock &self) { return CGtoPairBlock(self); })
         .def("__deepcopy__", [](const CGtoPairBlock &self, py::dict) { return CGtoPairBlock(self); });
 
@@ -301,11 +342,16 @@ export_orbdata(py::module &m)
     PyClass<CBlockedGtoPairBlock>(m, "BlockedGtoPairBlock")
         .def(py::init<>())
         .def(py::init<const CBlockedGtoPairBlock &>())
+        .def(py::init<const std::array<CGtoPairBlock, 16>&>())
         .def(py::init<const std::vector<CGtoPairBlock> &, const std::vector<int> &>())
         .def(py::init<const CGtoPairBlock &, const std::vector<double> &>())
+        .def(py::pickle([](const CBlockedGtoPairBlock &bgto_block) { return py::make_tuple(bgto_block.gto_pair_blocks()); },
+                        [](py::tuple t) { return CBlockedGtoPairBlock(t[0].cast<const std::array<CGtoPairBlock, 16>>()); }))
         .def("gto_pair_block", &CBlockedGtoPairBlock::gto_pair_block, "Gets specific basis function pairs block.")
         .def("is_empty_gto_pair_block", &CBlockedGtoPairBlock::is_empty_gto_pair_block, "Checks if specific basis function pairs block is empty.")
+        .def("gto_pair_blocks", &CBlockedGtoPairBlock::gto_pair_blocks, "Gets array of basis function pairs blocks.")
         .def("__eq__", [](const CBlockedGtoPairBlock &self, const CBlockedGtoPairBlock &other) { return self == other; })
+        .def("__neq__", [](const CBlockedGtoPairBlock &self, const CBlockedGtoPairBlock &other) { return self != other; })
         .def("__copy__", [](const CBlockedGtoPairBlock &self) { return CBlockedGtoPairBlock(self); })
         .def("__deepcopy__", [](const CBlockedGtoPairBlock &self, py::dict) { return CBlockedGtoPairBlock(self); });
 

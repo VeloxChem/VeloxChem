@@ -3,6 +3,7 @@ target_sources(vlxobjs
     FockDriver.cpp
     T4CDiagonalDistributor.cpp
     T4CLocalDistributor.cpp
+    T4CMatricesDistributor.cpp
     T4CMatrixDistributor.cpp
     T4CScreener.cpp
     T4CUtils.cpp

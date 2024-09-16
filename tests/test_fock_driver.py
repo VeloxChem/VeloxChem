@@ -1,6 +1,8 @@
 from pathlib import Path
 import numpy as np
 
+from mpi4py import MPI
+
 from veloxchem import MolecularBasis
 from veloxchem import Molecule
 from veloxchem import FockDriver
@@ -16,7 +18,7 @@ class TestFockDriver:
 
     def get_data_h2o_dimer(self):
 
-        h4str = """
+        h2o_dimer_str = """
             O -1.464  0.099  0.300
             H -1.956  0.624 -0.340
             H -1.797 -0.799  0.206
@@ -24,7 +26,7 @@ class TestFockDriver:
             H  1.894  0.486  0.335
             H  0.451  0.163 -0.083
         """
-        mol = Molecule.read_str(h4str, 'angstrom')
+        mol = Molecule.read_str(h2o_dimer_str, 'angstrom')
         bas = MolecularBasis.read(mol, 'def2-svpd')
 
         return mol, bas
@@ -41,6 +43,427 @@ class TestFockDriver:
         bas = MolecularBasis.read(mol, 'sto-3g')
 
         return mol, bas
+        
+    def test_h2o_dimer_fock_2jk_svpd_with_mpi(self):
+
+        comm = MPI.COMM_WORLD
+        
+        t4c_drv = None
+        den_mat = None
+        if comm.Get_rank() == 0:
+            mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
+            # load density matrix
+            here = Path(__file__).parent
+            npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.npy')
+            den_mat = make_matrix(bas_svpd, mat_t.symmetric)
+            den_mat.set_values(np.load(npyfile))
+            # screen basis function pairs
+            t4c_drv = T4CScreener()
+            t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
+        
+        # broadcast data
+        t4c_drv = comm.bcast(t4c_drv, 0)
+        den_mat = comm.bcast(den_mat, 0)
+
+        # compute Fock matrix
+        fock_drv = FockDriver()
+        fock_mat = fock_drv.mpi_compute(comm, t4c_drv, den_mat, "2jk", 0.0, 0.0, 15)
+        
+        if comm.Get_rank() == 0:
+            # load reference Fock matrix
+            here = Path(__file__).parent
+            npyfile = str(here / 'data' / 'h2o.dimer.svpd.j.npy')
+            ref_mat = 2.0 * np.load(npyfile)
+
+            # load reference Fock matrix
+            here = Path(__file__).parent
+            npyfile = str(here / 'data' / 'h2o.dimer.svpd.k.npy')
+            ref_mat -= np.load(npyfile)
+
+            # dimension of molecular basis
+            indexes = np.triu_indices(3)
+            basdims = [0, 16, 58, 78]
+
+            # check individual overlap submatrices
+            for i, j in zip(indexes[0], indexes[1]):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
+                                                            sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+            # check full Fock matrix
+            fmat = fock_mat.full_matrix()
+            fref = SubMatrix([0, 0, 78, 78])
+            fref.set_values(np.ascontiguousarray(ref_mat))
+
+            assert fmat == fref
+        
+    def test_h2o_dimer_focks_svpd_with_screener(self):
+
+        mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
+
+        # load density matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.gen.npy')
+        dmat = make_matrix(bas_svpd, mat_t.general)
+        dmat.set_values(np.load(npyfile))
+
+        den_mats = Matrices()
+        den_mats.add(dmat, "0")
+        den_mats.add(dmat, "1")
+        
+        # screen basis function pairs
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
+
+        # compute Fock matrix
+        fock_drv = FockDriver()
+        fock_mats = fock_drv.compute(t4c_drv, den_mats, ["j", "k"], 0.0, 0.0, 15)
+        
+        # dimension of molecular basis
+        basdims = [0, 16, 58, 78]
+        
+        # load reference Fock matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.j.gen.npy')
+        ref_mat = np.load(npyfile)
+        
+        # retrieve first Fock matrix
+        fock_mat = fock_mats.matrix("0")
+        
+        # check individual overlap submatrices
+        for i in range(3):
+            for j in range(3):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
+                                                         sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat.full_matrix()
+        fref = SubMatrix([0, 0, 78, 78])
+        fref.set_values(np.ascontiguousarray(ref_mat))
+
+        # load reference Fock matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.k.gen.npy')
+        ref_mat = np.load(npyfile)
+        ref_mat = ref_mat.T
+        
+        # retrieve second Fock matrix
+        fock_mat = fock_mats.matrix("1")
+        
+        # check individual overlap submatrices
+        for i in range(3):
+            for j in range(3):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
+                                                         sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat.full_matrix()
+        fref = SubMatrix([0, 0, 78, 78])
+        fref.set_values(np.ascontiguousarray(ref_mat))
+    
+    def test_h2o_dimer_fock_gen_jk_svpd_with_screener(self):
+
+        mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
+
+        # load density matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.gen.npy')
+        den_mat = make_matrix(bas_svpd, mat_t.general)
+        den_mat.set_values(np.load(npyfile))
+        
+        # screen basis function pairs
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
+
+        # compute Fock matrix
+        fock_drv = FockDriver()
+        fock_mat = fock_drv.compute(t4c_drv, den_mat, "jk", 0.0, 0.0, 15)
+        
+        # load reference Fock matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.j.gen.npy')
+        ref_mat = np.load(npyfile)
+
+        # load reference Fock matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.k.gen.npy')
+        ref_kmat = np.load(npyfile)
+        ref_mat = ref_mat - ref_kmat.T
+
+        # dimension of molecular basis
+        basdims = [0, 16, 58, 78]
+
+        # check individual overlap submatrices
+        for i in range(3):
+            for j in range(3):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
+                                                         sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat.full_matrix()
+        fref = SubMatrix([0, 0, 78, 78])
+        fref.set_values(np.ascontiguousarray(ref_mat))
+
+        assert fmat == fref
+        
+    def test_h2o_dimer_fock_gen_jkx_svpd_with_screener(self):
+
+        mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
+
+        # load density matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.gen.npy')
+        den_mat = make_matrix(bas_svpd, mat_t.general)
+        den_mat.set_values(np.load(npyfile))
+        
+        # screen basis function pairs
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
+
+        # compute Fock matrix
+        fock_drv = FockDriver()
+        fock_mat = fock_drv.compute(t4c_drv, den_mat, "jkx", 0.28, 0.0, 15)
+        
+        # load reference Fock matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.j.gen.npy')
+        ref_mat = np.load(npyfile)
+
+        # load reference Fock matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.k.gen.npy')
+        ref_kmat = np.load(npyfile)
+        ref_mat = ref_mat - 0.28 * ref_kmat.T
+
+        # dimension of molecular basis
+        basdims = [0, 16, 58, 78]
+
+        # check individual overlap submatrices
+        for i in range(3):
+            for j in range(3):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
+                                                         sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat.full_matrix()
+        fref = SubMatrix([0, 0, 78, 78])
+        fref.set_values(np.ascontiguousarray(ref_mat))
+
+        assert fmat == fref
+        
+    def test_h2o_dimer_fock_gen_j_svpd_with_screener(self):
+
+        mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
+
+        # load density matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.gen.npy')
+        den_mat = make_matrix(bas_svpd, mat_t.general)
+        den_mat.set_values(np.load(npyfile))
+        
+        # screen basis function pairs
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
+
+        # compute Fock matrix
+        fock_drv = FockDriver()
+        fock_mat = fock_drv.compute(t4c_drv, den_mat, "j", 0.0, 0.0, 15)
+
+        # load reference Fock matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.j.gen.npy')
+        ref_mat = np.load(npyfile)
+
+        # dimension of molecular basis
+        basdims = [0, 16, 58, 78]
+
+        # check individual overlap submatrices
+        for i in range(3):
+            for j in range(3):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
+                                                         sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat.full_matrix()
+        fref = SubMatrix([0, 0, 78, 78])
+        fref.set_values(np.ascontiguousarray(ref_mat))
+
+        assert fmat == fref
+        
+    def test_h2o_dimer_fock_gen_k_svpd_with_screener(self):
+
+        mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
+
+        # load density matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.gen.npy')
+        den_mat = make_matrix(bas_svpd, mat_t.general)
+        den_mat.set_values(np.load(npyfile))
+        
+        # screen basis function pairs
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
+
+        # compute Fock matrix
+        fock_drv = FockDriver()
+        fock_mat = fock_drv.compute(t4c_drv, den_mat, "k", 0.0, 0.0, 15)
+
+        # load reference Fock matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.k.gen.npy')
+        ref_mat = np.load(npyfile)
+        ref_mat = ref_mat.T
+
+        # dimension of molecular basis
+        basdims = [0, 16, 58, 78]
+
+        # check individual overlap submatrices
+        for i in range(3):
+            for j in range(3):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
+                                                         sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat.full_matrix()
+        fref = SubMatrix([0, 0, 78, 78])
+        fref.set_values(np.ascontiguousarray(ref_mat))
+
+        assert fmat == fref
+
+    def test_h2o_dimer_fock_gen_kx_svpd_with_screener(self):
+
+        mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
+
+        # load density matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.gen.npy')
+        den_mat = make_matrix(bas_svpd, mat_t.general)
+        den_mat.set_values(np.load(npyfile))
+        
+        # screen basis function pairs
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(bas_svpd, mol_h2o_dimer, "eri")
+
+        # compute Fock matrix
+        fock_drv = FockDriver()
+        fock_mat = fock_drv.compute(t4c_drv, den_mat, "kx", 0.73, 0.0, 15)
+
+        # load reference Fock matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.k.gen.npy')
+        ref_mat = np.load(npyfile)
+        ref_mat = 0.73 * ref_mat.T
+
+        # dimension of molecular basis
+        basdims = [0, 16, 58, 78]
+
+        # check individual overlap submatrices
+        for i in range(3):
+            for j in range(3):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
+                                                         sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat.full_matrix()
+        fref = SubMatrix([0, 0, 78, 78])
+        fref.set_values(np.ascontiguousarray(ref_mat))
+
+        assert fmat == fref
         
     def test_h2o_dimer_fock_2jk_svpd_with_screener(self):
 

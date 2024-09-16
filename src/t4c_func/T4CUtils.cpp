@@ -5,6 +5,7 @@
 #include <set>
 
 #include "MathConst.hpp"
+#include "T4CLocalDistributor.hpp"
 
 namespace t4cfunc {  // t2cfunc namespace
 
@@ -536,6 +537,428 @@ accumulate(CSubMatrix*                glob_matrix,
                     }
                 }
             }
+        }
+    }
+}
+
+auto
+add_local_matrices(CMatrices&         matrices,
+                   const std::string& label,
+                   const mat_t        mtype,
+                   const std::string& suffix,
+                   const size_t       adims,
+                   const size_t       bdims,
+                   const size_t       cdims,
+                   const size_t       ddims) -> void
+{
+    // Coulomb matrices
+
+    if ((label == "2jk") || (label == "2jkx") || (label == "jk") || (label == "jkx") || (label == "j"))
+    {
+        matrices.add(CMatrix(
+                         {
+                             {0, 0},
+                         },
+                         {
+                             CSubMatrix({0, 0, adims, bdims}),
+                         },
+                         mtype),
+                     "PQ_" + suffix);
+
+        matrices.add(CMatrix(
+                         {
+                             {0, 0},
+                         },
+                         {
+                             CSubMatrix({0, 0, cdims, ddims}),
+                         },
+                         mtype),
+                     "RS_" + suffix);
+
+        if (mtype == mat_t::general)
+        {
+            matrices.add(CMatrix(
+                             {
+                                 {0, 0},
+                             },
+                             {
+                                 CSubMatrix({0, 0, bdims, adims}),
+                             },
+                             mtype),
+                         "QP_" + suffix);
+
+            matrices.add(CMatrix(
+                             {
+                                 {0, 0},
+                             },
+                             {
+                                 CSubMatrix({0, 0, ddims, cdims}),
+                             },
+                             mtype),
+                         "SR_" + suffix);
+        }
+    }
+
+    // Exchange matrices
+
+    if ((label == "2jk") || (label == "2jkx") || (label == "jk") || (label == "jkx") || (label == "k") || (label == "kx"))
+    {
+        matrices.add(CMatrix(
+                         {
+                             {0, 0},
+                         },
+                         {
+                             CSubMatrix({0, 0, adims, cdims}),
+                         },
+                         mtype),
+                     "PR_" + suffix);
+
+        matrices.add(CMatrix(
+                         {
+                             {0, 0},
+                         },
+                         {
+                             CSubMatrix({0, 0, adims, ddims}),
+                         },
+                         mtype),
+                     "PS_" + suffix);
+
+        matrices.add(CMatrix(
+                         {
+                             {0, 0},
+                         },
+                         {
+                             CSubMatrix({0, 0, bdims, cdims}),
+                         },
+                         mtype),
+                     "QR_" + suffix);
+
+        matrices.add(CMatrix(
+                         {
+                             {0, 0},
+                         },
+                         {
+                             CSubMatrix({0, 0, bdims, ddims}),
+                         },
+                         mtype),
+                     "QS_" + suffix);
+
+        if (mtype == mat_t::general)
+        {
+            matrices.add(CMatrix(
+                             {
+                                 {0, 0},
+                             },
+                             {
+                                 CSubMatrix({0, 0, cdims, adims}),
+                             },
+                             mtype),
+                         "RP_" + suffix);
+
+            matrices.add(CMatrix(
+                             {
+                                 {0, 0},
+                             },
+                             {
+                                 CSubMatrix({0, 0, ddims, adims}),
+                             },
+                             mtype),
+                         "SP_" + suffix);
+
+            matrices.add(CMatrix(
+                             {
+                                 {0, 0},
+                             },
+                             {
+                                 CSubMatrix({0, 0, cdims, bdims}),
+                             },
+                             mtype),
+                         "RQ_" + suffix);
+
+            matrices.add(CMatrix(
+                             {
+                                 {0, 0},
+                             },
+                             {
+                                 CSubMatrix({0, 0, ddims, bdims}),
+                             },
+                             mtype),
+                         "SQ_" + suffix);
+        }
+    }
+}
+
+auto
+local_distribute(CMatrices&                       focks,
+                 const std::string&               suffix,
+                 const CMatrix*                   density,
+                 const std::string&               label,
+                 const double                     exchange_factor,
+                 const CSimdArray<double>&        buffer,
+                 const size_t                     offset,
+                 const std::vector<size_t>&       a_indices,
+                 const std::vector<size_t>&       b_indices,
+                 const std::vector<size_t>&       c_indices,
+                 const std::vector<size_t>&       d_indices,
+                 const std::vector<size_t>&       a_loc_indices,
+                 const std::vector<size_t>&       b_loc_indices,
+                 const std::vector<size_t>&       c_loc_indices,
+                 const std::vector<size_t>&       d_loc_indices,
+                 const int                        a_angmom,
+                 const int                        b_angmom,
+                 const int                        c_angmom,
+                 const int                        d_angmom,
+                 const size_t                     bra_igto,
+                 const std::pair<size_t, size_t>& ket_range,
+                 const bool                       diagonal) -> void
+{
+    if (density->get_type() == mat_t::symmetric)
+    {
+        if (label == "2jk")
+        {
+            t4cfunc::local_distribute_rest_jk(focks,
+                                              suffix,
+                                              density,
+                                              buffer,
+                                              offset,
+                                              a_indices,
+                                              b_indices,
+                                              c_indices,
+                                              d_indices,
+                                              a_loc_indices,
+                                              b_loc_indices,
+                                              c_loc_indices,
+                                              d_loc_indices,
+                                              a_angmom,
+                                              b_angmom,
+                                              c_angmom,
+                                              d_angmom,
+                                              bra_igto,
+                                              ket_range,
+                                              diagonal);
+        }
+
+        if (label == "2jkx")
+        {
+            t4cfunc::local_distribute_rest_jkx(focks,
+                                               suffix,
+                                               density,
+                                               buffer,
+                                               offset,
+                                               exchange_factor,
+                                               a_indices,
+                                               b_indices,
+                                               c_indices,
+                                               d_indices,
+                                               a_loc_indices,
+                                               b_loc_indices,
+                                               c_loc_indices,
+                                               d_loc_indices,
+                                               a_angmom,
+                                               b_angmom,
+                                               c_angmom,
+                                               d_angmom,
+                                               bra_igto,
+                                               ket_range,
+                                               diagonal);
+        }
+
+        if (label == "j")
+        {
+            t4cfunc::local_distribute_rest_j(focks,
+                                             suffix,
+                                             density,
+                                             buffer,
+                                             offset,
+                                             a_indices,
+                                             b_indices,
+                                             c_indices,
+                                             d_indices,
+                                             a_loc_indices,
+                                             b_loc_indices,
+                                             c_loc_indices,
+                                             d_loc_indices,
+                                             a_angmom,
+                                             b_angmom,
+                                             c_angmom,
+                                             d_angmom,
+                                             bra_igto,
+                                             ket_range,
+                                             diagonal);
+        }
+
+        if (label == "k")
+        {
+            t4cfunc::local_distribute_rest_k(focks,
+                                             suffix,
+                                             density,
+                                             buffer,
+                                             offset,
+                                             a_indices,
+                                             b_indices,
+                                             c_indices,
+                                             d_indices,
+                                             a_loc_indices,
+                                             b_loc_indices,
+                                             c_loc_indices,
+                                             d_loc_indices,
+                                             a_angmom,
+                                             b_angmom,
+                                             c_angmom,
+                                             d_angmom,
+                                             bra_igto,
+                                             ket_range,
+                                             diagonal);
+        }
+
+        if (label == "kx")
+        {
+            t4cfunc::local_distribute_rest_kx(focks,
+                                              suffix,
+                                              density,
+                                              buffer,
+                                              offset,
+                                              exchange_factor,
+                                              a_indices,
+                                              b_indices,
+                                              c_indices,
+                                              d_indices,
+                                              a_loc_indices,
+                                              b_loc_indices,
+                                              c_loc_indices,
+                                              d_loc_indices,
+                                              a_angmom,
+                                              b_angmom,
+                                              c_angmom,
+                                              d_angmom,
+                                              bra_igto,
+                                              ket_range,
+                                              diagonal);
+        }
+    }
+
+    if (density->get_type() == mat_t::general)
+    {
+        if (label == "jk")
+        {
+            t4cfunc::local_distribute_gen_jk(focks,
+                                             suffix,
+                                             density,
+                                             buffer,
+                                             offset,
+                                             a_indices,
+                                             b_indices,
+                                             c_indices,
+                                             d_indices,
+                                             a_loc_indices,
+                                             b_loc_indices,
+                                             c_loc_indices,
+                                             d_loc_indices,
+                                             a_angmom,
+                                             b_angmom,
+                                             c_angmom,
+                                             d_angmom,
+                                             bra_igto,
+                                             ket_range,
+                                             diagonal);
+        }
+
+        if (label == "jkx")
+        {
+            t4cfunc::local_distribute_gen_jkx(focks,
+                                              suffix,
+                                              density,
+                                              buffer,
+                                              offset,
+                                              exchange_factor,
+                                              a_indices,
+                                              b_indices,
+                                              c_indices,
+                                              d_indices,
+                                              a_loc_indices,
+                                              b_loc_indices,
+                                              c_loc_indices,
+                                              d_loc_indices,
+                                              a_angmom,
+                                              b_angmom,
+                                              c_angmom,
+                                              d_angmom,
+                                              bra_igto,
+                                              ket_range,
+                                              diagonal);
+        }
+
+        if (label == "j")
+        {
+            t4cfunc::local_distribute_gen_j(focks,
+                                            suffix,
+                                            density,
+                                            buffer,
+                                            offset,
+                                            a_indices,
+                                            b_indices,
+                                            c_indices,
+                                            d_indices,
+                                            a_loc_indices,
+                                            b_loc_indices,
+                                            c_loc_indices,
+                                            d_loc_indices,
+                                            a_angmom,
+                                            b_angmom,
+                                            c_angmom,
+                                            d_angmom,
+                                            bra_igto,
+                                            ket_range,
+                                            diagonal);
+        }
+
+        if (label == "k")
+        {
+            t4cfunc::local_distribute_gen_k(focks,
+                                            suffix,
+                                            density,
+                                            buffer,
+                                            offset,
+                                            a_indices,
+                                            b_indices,
+                                            c_indices,
+                                            d_indices,
+                                            a_loc_indices,
+                                            b_loc_indices,
+                                            c_loc_indices,
+                                            d_loc_indices,
+                                            a_angmom,
+                                            b_angmom,
+                                            c_angmom,
+                                            d_angmom,
+                                            bra_igto,
+                                            ket_range,
+                                            diagonal);
+        }
+
+        if (label == "kx")
+        {
+            t4cfunc::local_distribute_gen_kx(focks,
+                                             suffix,
+                                             density,
+                                             buffer,
+                                             offset,
+                                             exchange_factor,
+                                             a_indices,
+                                             b_indices,
+                                             c_indices,
+                                             d_indices,
+                                             a_loc_indices,
+                                             b_loc_indices,
+                                             c_loc_indices,
+                                             d_loc_indices,
+                                             a_angmom,
+                                             b_angmom,
+                                             c_angmom,
+                                             d_angmom,
+                                             bra_igto,
+                                             ket_range,
+                                             diagonal);
         }
     }
 }

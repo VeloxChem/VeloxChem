@@ -4,6 +4,8 @@
 #include <array>
 #include <cstddef>
 #include <vector>
+#include <algorithm>
+#include <ranges>
 
 #include "GtoBlock.hpp"
 #include "GtoPairBlock.hpp"
@@ -61,6 +63,36 @@ auto make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, c
 /// @param ang_pair The angular momentum pair.
 /// @return The scaling factor for SIMD width
 auto angular_momentum_scale(const std::pair<int, int>& ang_pair) -> size_t;
+
+/// @brief Partitions vector of tasks into reduced vection using round robin scheme.
+/// @param tasks The vector of task to partition.
+/// @param rank The rank of requested node.
+/// @param nodes The number of nodes used in partitioning.
+/// @return The reduced vector of work tasks.
+template<class T>
+inline
+auto partition_tasks(const std::vector<T>& tasks, const int rank, const int nodes) -> std::vector<T>
+{
+    std::vector<T> rtasks;
+    
+    const auto nblocks = tasks.size() / nodes;
+    
+    rtasks.reserve(nblocks + 1);
+    
+    if (nblocks > 0)
+    {
+        std::ranges::for_each(std::views::iota(size_t{0}, nblocks), [&](const auto i) {
+            rtasks.push_back(tasks[i * nodes + rank]);
+        });
+    }
+    
+    if (const auto rblocks = tasks.size() % nodes; rank < rblocks)
+    {
+        rtasks.push_back(tasks[nblocks * nodes + rank]);
+    }
+    
+    return rtasks;
+}
 
 }  // namespace omp
 

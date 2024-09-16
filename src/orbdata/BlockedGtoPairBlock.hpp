@@ -13,6 +13,10 @@ class CBlockedGtoPairBlock
    public:
     /// Creates an empty  blocked basis function pairs block.
     CBlockedGtoPairBlock() = default;
+    
+    /// @brief Creates a blocked basis function pairs block.
+    /// @param gto_pair_blocks  The array of  basis function pairs blocks.
+    CBlockedGtoPairBlock(const std::array<CGtoPairBlock, 16>& gto_pair_blocks);
 
     /// @brief Creates a blocked basis function pairs block.
     /// @param gto_pair_blocks  The vector of  basis function pairs blocks.
@@ -65,6 +69,10 @@ class CBlockedGtoPairBlock
     /// @param index  The index of basis function pairs block.
     /// @return True if selected basis function pairs block is empty, False otherwise.
     auto is_empty_gto_pair_block(const int index) const -> bool;
+    
+    /// @brief Gets array of basis function pairs blocks.
+    /// @return The array of basis function pairs blocks.
+    auto gto_pair_blocks() const -> std::array<CGtoPairBlock, 16>;
 
    private:
     /// @brief The array of basis function pairs blocks.

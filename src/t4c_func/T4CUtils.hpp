@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "CustomConstrains.hpp"
+#include "Matrices.hpp"
 #include "SimdArray.hpp"
 #include "SphericalMomentum.hpp"
 #include "SubMatrix.hpp"
@@ -192,6 +193,66 @@ auto accumulate(CSubMatrix*                glob_matrix,
                 const int                  bra_comps,
                 const int                  ket_comps,
                 const bool                 ang_order) -> void;
+
+/// @brief Adds batch of  local matrices to matrices container.
+/// @param matrices The matrices container to be added to.
+/// @param label The identifier of Fock matrix type.
+/// @param mtype The matrix type.
+/// @param suffix The suffix of local matrices identifiers.
+/// @param adims The dimensions along center A.
+/// @param bdims The dimensions along center B.
+/// @param cdims The dimensions along center C.
+/// @param ddims The dimensions along center D.
+auto add_local_matrices(CMatrices&         matrices,
+                        const std::string& label,
+                        const mat_t        mtype,
+                        const std::string& suffix,
+                        const size_t       adims,
+                        const size_t       bdims,
+                        const size_t       cdims,
+                        const size_t       ddims) -> void;
+
+/// @brief Distributes buffer of integrals into local Fock matrix.
+/// @param focks  The local Fock matrices.
+/// @param suffix The suffix of Fock matrix identifier.
+/// @param density  The pointer to AO density matrix.
+/// @param label The label of Fock matrix.
+/// @param exchange_factor The exchange scaling factor.
+/// @param buffer The integrals buffer.
+/// @param offset  The intgeral buffer offset.
+/// @param a_indices The compressed basis function indexes on center A.
+/// @param b_indices The compressed basis function indexes on center B.
+/// @param c_indices The compressed basis function indexes on center C.
+/// @param d_indices The compressed basis function indexes on center D.
+/// @param a_angmom The angular momentum of integrals buffer on center A.
+/// @param b_angmom The angular momentum of integrals buffer on center B.
+/// @param c_angmom The angular momentum of integrals buffer on center C.
+/// @param d_angmom Tthe angular momentum of integrals buffer on center D.
+/// @param bra_igto The index of basis function on bra side.
+/// @param ket_range The index of the range [ket_first, ket_last) of basis functions on ket side.
+/// @param diagonal The flag to indicate diagonal subblock of matrix.
+auto local_distribute(CMatrices&                       focks,
+                      const std::string&               suffix,
+                      const CMatrix*                   density,
+                      const std::string&               label,
+                      const double                     exchange_factor,
+                      const CSimdArray<double>&        buffer,
+                      const size_t                     offset,
+                      const std::vector<size_t>&       a_indices,
+                      const std::vector<size_t>&       b_indices,
+                      const std::vector<size_t>&       c_indices,
+                      const std::vector<size_t>&       d_indices,
+                      const std::vector<size_t>&       a_loc_indices,
+                      const std::vector<size_t>&       b_loc_indices,
+                      const std::vector<size_t>&       c_loc_indices,
+                      const std::vector<size_t>&       d_loc_indices,
+                      const int                        a_angmom,
+                      const int                        b_angmom,
+                      const int                        c_angmom,
+                      const int                        d_angmom,
+                      const size_t                     bra_igto,
+                      const std::pair<size_t, size_t>& ket_range,
+                      const bool                       diagonal) -> void;
 
 /// Transforms Cartesian integrals buffer to half-transformed integrals buffer.
 /// - Parameter sbuffer: the spherical  integrals array.
