@@ -49,6 +49,7 @@ target_link_libraries(vlxobjs
     Libxc::xc
   )
 
+add_subdirectory(dft_func)
 add_subdirectory(general)
 add_subdirectory(math)
 add_subdirectory(moldata)
