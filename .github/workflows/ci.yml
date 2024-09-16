@@ -32,8 +32,8 @@ jobs:
           ulimit -a
           ulimit -s unlimited
           lscpu | egrep 'Thread|Core|Socket|^CPU\('
-          #echo "=== Intel OneAPI ==="
-          #source /opt/intel/oneapi/setvars.sh
+          echo "=== Intel OneAPI ==="
+          source /opt/intel/oneapi/setvars.sh
           #mpiicc -cc=icx --version
           #mpiicpc -cxx=icpx --version
           echo "=== GNU Compiler ==="
