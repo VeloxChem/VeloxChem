@@ -1467,7 +1467,7 @@ class ScfDriver:
             The profiler.
 
         :return:
-            The AO Kohn-Sham (Vxc) matrix.
+            The Fock matrix, AO Kohn-Sham (Vxc) matrix, etc.
         """
 
         if self.use_split_comm and not self._first_step:
@@ -1490,8 +1490,6 @@ class ScfDriver:
         """
         Computes Fock/Kohn-Sham matrix on single communicator.
 
-        :param fock_mat:
-            The AO Fock matrix (only 2e-part).
         :param den_mat:
             The AO density matrix.
         :param molecule:
@@ -1506,7 +1504,7 @@ class ScfDriver:
             The profiler.
 
         :return:
-            The AO Kohn-Sham (Vxc) matrix.
+            The Fock matrix, AO Kohn-Sham (Vxc) matrix, etc.
         """
 
         if self.scf_type == 'restricted':
@@ -1547,6 +1545,7 @@ class ScfDriver:
             den_mat_for_fock.add(den_mat_for_Jab, "2")
 
         # TODO: add MPI communicator to FockDriver constructor
+        # TODO: replace mpi_compute by compute
 
         if e_grad is None:
             thresh_int = int(-math.log10(self.eri_thresh))
@@ -1567,42 +1566,61 @@ class ScfDriver:
                 fock_type = 'j'
                 exchange_scaling_factor = 0.0
 
+        fock_mat = None
+
         if (self._dft and (not self._first_step) and
                 self.xcfun.is_range_separated()):
             full_k_coef = self.xcfun.get_rs_alpha() + self.xcfun.get_rs_beta()
             erf_k_coef = -self.xcfun.get_rs_beta()
             omega = self.xcfun.get_rs_omega()
             # TODO: range-separated Fock
-            fock_mat_full_k = fock_drv.compute(screener, den_mat_for_fock,
-                                               fock_type, full_k_coef, 0.0,
-                                               thresh_int)
-            fock_mat_erf_k = fock_drv.compute(screener, den_mat_for_fock,
-                                              fock_type, erf_k_coef, omega,
-                                              thresh_int)
+            fock_mat_full_k = fock_drv.mpi_compute(self.comm, screener,
+                                                   den_mat_for_fock, fock_type,
+                                                   full_k_coef, 0.0, thresh_int)
+            fock_mat_erf_k = fock_drv.mpi_compute(self.comm, screener,
+                                                  den_mat_for_fock, fock_type,
+                                                  erf_k_coef, omega, thresh_int)
             if self.rank == mpi_master():
                 # Note: make fock_mat a list
                 fock_mat = [(fock_mat_full_k.get_full_matrix().to_numpy() -
                              fock_mat_erf_k.get_full_matrix().to_numpy())]
         else:
             if self.scf_type == 'restricted':
-                fock_mat = fock_drv.compute(screener, den_mat_for_fock,
-                                            fock_type, exchange_scaling_factor,
-                                            0.0, thresh_int)
+                fock_mat = fock_drv.mpi_compute(self.comm, screener,
+                                                den_mat_for_fock, fock_type,
+                                                exchange_scaling_factor, 0.0,
+                                                thresh_int)
                 if self.rank == mpi_master():
                     # Note: make fock_mat a list
                     fock_mat = [fock_mat.full_matrix().to_numpy()]
                     if fock_type == 'j':
                         fock_mat[0] *= 2.0
             else:
-                fock_mat = fock_drv.compute(screener, den_mat_for_fock,
-                                            ["kx", "kx", "j"],
-                                            exchange_scaling_factor, 0.0,
-                                            thresh_int)
+                fock_mat_Ka = fock_drv.mpi_compute(self.comm, screener,
+                                                   den_mat_for_Ka, 'kx',
+                                                   exchange_scaling_factor, 0.0,
+                                                   thresh_int)
+                fock_mat_Kb = fock_drv.mpi_compute(self.comm, screener,
+                                                   den_mat_for_Kb, 'kx',
+                                                   exchange_scaling_factor, 0.0,
+                                                   thresh_int)
+                fock_mat_Jab = fock_drv.mpi_compute(self.comm, screener,
+                                                    den_mat_for_Jab, 'j',
+                                                    exchange_scaling_factor,
+                                                    0.0, thresh_int)
+                #fock_mat = fock_drv.mpi_compute(self.comm, screener,
+                #                                den_mat_for_fock,
+                #                                ["kx", "kx", "j"],
+                #                                exchange_scaling_factor, 0.0,
+                #                                thresh_int)
                 if self.rank == mpi_master():
                     # Note: make fock_mat a list
-                    K_a = fock_mat.matrix("0").full_matrix().to_numpy()
-                    K_b = fock_mat.matrix("1").full_matrix().to_numpy()
-                    J_ab = fock_mat.matrix("2").full_matrix().to_numpy()
+                    #K_a = fock_mat.matrix("0").full_matrix().to_numpy()
+                    #K_b = fock_mat.matrix("1").full_matrix().to_numpy()
+                    #J_ab = fock_mat.matrix("2").full_matrix().to_numpy()
+                    K_a = fock_mat_Ka.full_matrix().to_numpy()
+                    K_b = fock_mat_Kb.full_matrix().to_numpy()
+                    J_ab = fock_mat_Jab.full_matrix().to_numpy()
                     fock_mat = [J_ab - K_a, J_ab - K_b]
 
         # TODO: reduce_sum fock_mat

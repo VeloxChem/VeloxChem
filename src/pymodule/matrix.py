@@ -20,27 +20,26 @@ def _Matrix_sum(matrix_a, matrix_b, datatype):
     return matrix_a + matrix_b
 
 
-@staticmethod
-def _Matrix_reduce(matrix, comm, mpi_id):
+def _Matrix_reduce(self, comm, root_rank):
     """
     Reduces matrix over MPI communicator to specific root process.
-    
+
     TODO: Replace this implementation with direct submatrices reduction
     code to overcome 2Gb limit in MPI4PY communications.
-    
-    :param matrix:
-        The matrix to reduce.
+
     :param comm:
         The MPI communicator.
-    :param mpi_id:
-        The identifier of root process.
+    :param root_rank:
+        The rank of root process.
 
     :return:
         The reduced matrix.
     """
 
     sum_op = MPI.Op.Create(_Matrix_sum, commute=True)
-    return comm.reduce(matrix, op=sum_op, root=mpi_id)
+    mat = comm.reduce(self, op=sum_op, root=root_rank)
+    sum_op.Free()
+    return mat
 
 
 Matrix.reduce = _Matrix_reduce
