@@ -21,6 +21,9 @@
 #include "TensorComponents.hpp"
 #include "TensorLabels.hpp"
 
+namespace py = pybind11;
+using namespace py::literals;
+
 namespace vlx_general {
 
 // Gets MPI_Comm pointer from a mpi4py communicator object

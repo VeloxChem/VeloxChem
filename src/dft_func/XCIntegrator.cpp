@@ -47,6 +47,7 @@
 #include "StringFormat.hpp"
 #include "XCIntegratorForGGA.hpp"
 #include "XCIntegratorForLDA.hpp"
+#include "XCIntegratorForMGGA.hpp"
 
 CXCIntegrator::CXCIntegrator(MPI_Comm comm)
 
@@ -90,15 +91,12 @@ CXCIntegrator::integrateVxcFock(const CMolecule&                  molecule,
         return xcintgga::integrateVxcFockForGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, flag);
     }
 
-    /*
     if (xcfuntype == xcfun::mgga)
     {
         return xcintmgga::integrateVxcFockForMGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, flag);
     }
-    */
 
-    //std::string errxcfuntype("XCIntegrator.integrateVxcFock: Only implemented for LDA/GGA/meta-GGA");
-    std::string errxcfuntype("XCIntegrator.integrateVxcFock: Only implemented for LDA/GGA");
+    std::string errxcfuntype("XCIntegrator.integrateVxcFock: Only implemented for LDA/GGA/meta-GGA");
 
     errors::assertMsgCritical(false, errxcfuntype);
 
@@ -142,17 +140,14 @@ CXCIntegrator::integrateFxcFock(const std::vector<double*>&       aoFockPointers
             xcintgga::integrateFxcFockForGGA(
                 aoFockPointers, molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
-        /*
         else if (xcfuntype == xcfun::mgga)
         {
             xcintmgga::integrateFxcFockForMGGA(
                 aoFockPointers, molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
-        */
         else
         {
-            //std::string errxcfuntype("XCIntegrator.integrateFxcFock: Only implemented for LDA/GGA/meta-GGA");
-            std::string errxcfuntype("XCIntegrator.integrateFxcFock: Only implemented for LDA/GGA");
+            std::string errxcfuntype("XCIntegrator.integrateFxcFock: Only implemented for LDA/GGA/meta-GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }

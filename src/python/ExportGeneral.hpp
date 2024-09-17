@@ -14,6 +14,7 @@
 #include "ExportHelpers.hpp"
 
 namespace py = pybind11;
+using namespace py::literals;
 
 namespace vlx_general {
 
