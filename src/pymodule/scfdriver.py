@@ -587,7 +587,6 @@ class ScfDriver:
             else:
                 den_mat = None
             den_mat = self.comm.bcast(den_mat, root=mpi_master())
-            np.set_printoptions(suppress=True, precision=5, linewidth=120)
             self._comp_diis(molecule, ao_basis, min_basis, den_mat, profiler)
 
         # two level C2-DIIS method

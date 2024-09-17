@@ -79,10 +79,11 @@ from .matrices import Matrices
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
+from .fockdriver import FockDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
-from .fockdriver import FockDriver
+from .lrsolver import LinearResponseSolver
 
 # Environment variable: basis set path
 from .environment import (set_vlxbasispath, get_basis_path)
