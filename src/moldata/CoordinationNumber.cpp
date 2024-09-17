@@ -128,9 +128,13 @@ getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr) -> std::ve
 
     for (int i = 0; i < natoms; i++)
     {
+        const auto rixyz = xyzcoord[i].coordinates();
+
         for (int j = 0; j < i; j++)
         {
-            std::vector<double> rij({xyzcoord[j].coordinates()[0] - xyzcoord[i].coordinates()[0], xyzcoord[j].coordinates()[1] - xyzcoord[i].coordinates()[1], xyzcoord[j].coordinates()[2] - xyzcoord[i].coordinates()[2]});
+            const auto rjxyz = xyzcoord[j].coordinates();
+
+            std::vector<double> rij({rjxyz[0] - rixyz[0], rjxyz[1] - rixyz[1], rjxyz[2] - rixyz[2]});
 
             double r2 = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
@@ -270,9 +274,13 @@ getCovalentCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcovcndr)
 
     for (int i = 0; i < natoms; i++)
     {
+        const auto rixyz = xyzcoord[i].coordinates();
+
         for (int j = 0; j < i; j++)
         {
-            std::vector<double> rij({xyzcoord[j].coordinates()[0] - xyzcoord[i].coordinates()[0], xyzcoord[j].coordinates()[1] - xyzcoord[i].coordinates()[1], xyzcoord[j].coordinates()[2] - xyzcoord[i].coordinates()[2]});
+            const auto rjxyz = xyzcoord[j].coordinates();
+
+            std::vector<double> rij({rjxyz[0] - rixyz[0], rjxyz[1] - rixyz[1], rjxyz[2] - rixyz[2]});
 
             double r2 = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 

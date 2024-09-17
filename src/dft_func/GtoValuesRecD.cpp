@@ -22,7 +22,7 @@ auto get_lda_values_rec_d(const CGtoBlock&            gto_block,
     
     // set up GTO values storage
 
-    if (const size_t nrows = std::ranges::count(gtos_mask, 1); nrows > 0)
+    if (const size_t nrows = static_cast<size_t>(std::ranges::count(gtos_mask, 1)); nrows > 0)
     {
         const size_t ncols = grid_coords_x.size();
         
@@ -188,7 +188,7 @@ get_gga_values_rec_d(const CGtoBlock&            gto_block,
 
     // set up GTO values storage
 
-    if (const size_t nrows = std::ranges::count(gtos_mask, 1); nrows > 0)
+    if (const size_t nrows = static_cast<size_t>(std::ranges::count(gtos_mask, 1)); nrows > 0)
     {
         const size_t ncols = grid_coords_x.size();
         

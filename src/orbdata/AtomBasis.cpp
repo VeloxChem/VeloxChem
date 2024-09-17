@@ -223,15 +223,15 @@ CAtomBasis::max_angular_momentum() const -> int
 auto
 CAtomBasis::number_of_basis_functions(const int angular_momentum) const -> size_t
 {
-    return std::ranges::count_if(_functions, [=](const auto &bf) { return bf.get_angular_momentum() == angular_momentum; });
+    return static_cast<size_t>(std::ranges::count_if(_functions, [=](const auto &bf) { return bf.get_angular_momentum() == angular_momentum; }));
 }
 
 auto
 CAtomBasis::number_of_basis_functions(const int angular_momentum, const size_t npgtos) const -> size_t
 {
-    return std::ranges::count_if(_functions, [=](const auto &bf) {
+    return static_cast<size_t>(std::ranges::count_if(_functions, [=](const auto &bf) {
         return (bf.get_angular_momentum() == angular_momentum) && (bf.number_of_primitive_functions() == npgtos);
-    });
+    }));
 }
 
 auto

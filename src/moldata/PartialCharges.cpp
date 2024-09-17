@@ -148,9 +148,13 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     for (int i = 0; i < natoms; i++)
     {
+        const auto rixyz = xyzcoord[i].coordinates();
+
         for (int j = 0; j < i; j++)
         {
-            std::vector<double> rij({xyzcoord[i].coordinates()[0] - xyzcoord[j].coordinates()[0], xyzcoord[i].coordinates()[1] - xyzcoord[j].coordinates()[1], xyzcoord[i].coordinates()[2] - xyzcoord[j].coordinates()[2]});
+            const auto rjxyz = xyzcoord[j].coordinates();
+
+            std::vector<double> rij({rixyz[0] - rjxyz[0], rixyz[1] - rjxyz[1], rixyz[2] - rjxyz[2]});
 
             double r = std::sqrt(rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2]);
 
@@ -222,9 +226,13 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
             dXvecdr.values()[dj * natoms_1 + i] = dcndr.values()[dj * natoms + i] * Xfac.values()[i];
         }
 
+        const auto rixyz = xyzcoord[i].coordinates();
+
         for (int j = 0; j < i; j++)
         {
-            std::vector<double> rij({xyzcoord[i].coordinates()[0] - xyzcoord[j].coordinates()[0], xyzcoord[i].coordinates()[1] - xyzcoord[j].coordinates()[1], xyzcoord[i].coordinates()[2] - xyzcoord[j].coordinates()[2]});
+            const auto rjxyz = xyzcoord[j].coordinates();
+
+            std::vector<double> rij({rixyz[0] - rjxyz[0], rixyz[1] - rjxyz[1], rixyz[2] - rjxyz[2]});
 
             double r2 = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 

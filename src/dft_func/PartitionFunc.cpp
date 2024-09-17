@@ -70,7 +70,9 @@ ssf(CDenseMatrix*   rawGridPoints,
 
         // weights screening
 
-        auto rig = mathfunc::distance(atomCoordinates[idAtomic].coordinates()[0], atomCoordinates[idAtomic].coordinates()[1], atomCoordinates[idAtomic].coordinates()[2], rgx, rgy, rgz);
+        auto atomxyz = atomCoordinates[idAtomic].coordinates();
+
+        auto rig = mathfunc::distance(atomxyz[0], atomxyz[1], atomxyz[2], rgx, rgy, rgz);
 
         // min. distance scale 0.5 * (1 - a), SSF parameter a = 0.64
 
@@ -86,15 +88,11 @@ ssf(CDenseMatrix*   rawGridPoints,
         {
             // molecular coodinates
 
-            double rax = atomCoordinates[j].coordinates()[0];
-
-            double ray = atomCoordinates[j].coordinates()[1];
-
-            double raz = atomCoordinates[j].coordinates()[2];
+            auto raxyz = atomCoordinates[j].coordinates();
 
             // distance from grid point to j-th atom
 
-            double rag = mathfunc::distance(rax, ray, raz, rgx, rgy, rgz);
+            double rag = mathfunc::distance(raxyz[0], raxyz[1], raxyz[2], rgx, rgy, rgz);
 
             // loop over atoms
 
@@ -102,19 +100,15 @@ ssf(CDenseMatrix*   rawGridPoints,
             {
                 // molecular coodinates
 
-                double rbx = atomCoordinates[k].coordinates()[0];
-
-                double rby = atomCoordinates[k].coordinates()[1];
-
-                double rbz = atomCoordinates[k].coordinates()[2];
+                auto rbxyz = atomCoordinates[k].coordinates();
 
                 // distance from grid point to k-th atom
 
-                double rbg = mathfunc::distance(rbx, rby, rbz, rgx, rgy, rgz);
+                double rbg = mathfunc::distance(rbxyz[0], rbxyz[1], rbxyz[2], rgx, rgy, rgz);
 
                 // distance from j-th atom to k-th atom
 
-                double rab = mathfunc::distance(rax, ray, raz, rbx, rby, rbz);
+                double rab = mathfunc::distance(raxyz[0], raxyz[1], raxyz[2], rbxyz[0], rbxyz[1], rbxyz[2]);
 
                 // eliptical coordinate
 

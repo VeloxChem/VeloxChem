@@ -293,11 +293,13 @@ CGridDriver::_genAtomGridPoints(CDenseMatrix*   rawGridPoints,
 
     // atom coordinates
 
-    auto atmx = atomCoordinates[idAtomic].coordinates()[0];
+    auto atmxyz = atomCoordinates[idAtomic].coordinates();
 
-    auto atmy = atomCoordinates[idAtomic].coordinates()[1];
+    auto atmx = atmxyz[0];
 
-    auto atmz = atomCoordinates[idAtomic].coordinates()[2];
+    auto atmy = atmxyz[1];
+
+    auto atmz = atmxyz[2];
 
     // assemble atom grid points from quadratures
 

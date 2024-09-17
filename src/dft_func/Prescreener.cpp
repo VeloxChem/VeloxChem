@@ -98,13 +98,11 @@ preScreenGtoBlock(const CGtoBlock& gtoBlock, const int gtoDeriv, const double gt
     {
         // GTO coordinates
 
-        const auto gto_x = gto_coords[i].coordinates()[0];
-        const auto gto_y = gto_coords[i].coordinates()[1];
-        const auto gto_z = gto_coords[i].coordinates()[2];
+        const auto gto_xyz = gto_coords[i].coordinates();
 
-        double rx = std::max({xmin - gto_x, gto_x - xmax, 0.0});
-        double ry = std::max({ymin - gto_y, gto_y - ymax, 0.0});
-        double rz = std::max({zmin - gto_z, gto_z - zmax, 0.0});
+        double rx = std::max({xmin - gto_xyz[0], gto_xyz[0] - xmax, 0.0});
+        double ry = std::max({ymin - gto_xyz[1], gto_xyz[1] - ymax, 0.0});
+        double rz = std::max({zmin - gto_xyz[2], gto_xyz[2] - zmax, 0.0});
 
         auto r2 = rx * rx + ry * ry + rz * rz;
 
