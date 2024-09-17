@@ -49,9 +49,7 @@ class TestScfRestrictedOpenDriver:
         self.run_scf_restopen('b3lyp', 1, 2, -75.9000931681, 1.0e-6)
         self.run_scf_restopen('b3lyp', 0, 3, -76.0815511111, 1.0e-6)
 
-    """
     def test_tpssh(self):
 
         self.run_scf_restopen('tpssh', 1, 2, -75.9023473162, 1.0e-6)
         self.run_scf_restopen('tpssh', 0, 3, -76.0759108977, 1.0e-6)
-    """
