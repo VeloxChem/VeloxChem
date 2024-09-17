@@ -199,6 +199,8 @@ integrateVxcFockForLDA(const CMolecule&                  molecule,
 
                 auto cmat = gtoval::get_gto_values_for_lda(gto_block, grid_x, grid_y, grid_z, cgto_mask);
 
+                if (cmat.is_empty()) continue;
+
                 auto submat_ptr = cmat.sub_matrix({0, 0});
 
                 auto submat_data = submat_ptr->data();
@@ -550,6 +552,8 @@ integrateFxcFockForLDA(const std::vector<double*>&       aoFockPointers,
                 const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
 
                 auto cmat = gtoval::get_gto_values_for_lda(gto_block, grid_x, grid_y, grid_z, cgto_mask);
+
+                if (cmat.is_empty()) continue;
 
                 auto submat_ptr = cmat.sub_matrix({0, 0});
 

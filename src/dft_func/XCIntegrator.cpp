@@ -234,6 +234,8 @@ CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule&       molecule,
 
                 auto cmat = gtoval::get_gto_values_for_lda(gto_block, grid_x, grid_y, grid_z, cgto_mask);
 
+                if (cmat.is_empty()) continue;
+
                 auto submat_ptr = cmat.sub_matrix({0, 0});
 
                 auto subgaos_ptr = submat_ptr->data();

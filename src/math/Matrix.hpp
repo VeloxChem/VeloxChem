@@ -125,6 +125,10 @@ class CMatrix
     /// @return True if submatrix is stored in matrix, False otherwise.
     auto is_angular_order(const std::pair<int, int> &angpair) const -> bool;
 
+    /// @brief Checks if matrix is empty.
+    /// @return True if matrix is empty, False otherwise.
+    auto is_empty() const -> bool;
+
     /// @brief Gets number of rows in matrix.
     /// @return The number of rows in matrix.
     auto number_of_rows() const -> size_t;

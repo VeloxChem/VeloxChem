@@ -25,7 +25,6 @@
 #include "GtoValues.hpp"
 
 #include "GtoValuesRecD.hpp"
-#include "GtoValuesRecF.hpp"
 #include "GtoValuesRecP.hpp"
 #include "GtoValuesRecS.hpp"
 #include "Matrix.hpp"
@@ -43,19 +42,15 @@ get_gto_values_for_lda(const CGtoBlock&            gto_block,
 
     if (gto_ang == 0)
     {
-        return gtoval::getLdaValuesRecS(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
+        return gtoval::get_lda_values_rec_s(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
     }
     else if (gto_ang == 1)
     {
-        return gtoval::getLdaValuesRecP(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
+        return gtoval::get_lda_values_rec_p(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
     }
     else if (gto_ang == 2)
     {
-        return gtoval::getLdaValuesRecD(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
-    }
-    else if (gto_ang == 3)
-    {
-        return gtoval::getLdaValuesRecF(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
+        return gtoval::get_lda_values_rec_d(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
     }
 
     return CMatrix();
@@ -72,15 +67,15 @@ get_gto_values_for_gga(const CGtoBlock&            gto_block,
 
     if (gto_ang == 0)
     {
-        return gtoval::getGgaValuesRecS(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
+        return gtoval::get_gga_values_rec_s(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
     }
     else if (gto_ang == 1)
     {
-        return gtoval::getGgaValuesRecP(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
+        return gtoval::get_gga_values_rec_p(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
     }
     else if (gto_ang == 2)
     {
-        return gtoval::getGgaValuesRecD(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
+        return gtoval::get_gga_values_rec_d(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
     }
 
     return CMatrix();

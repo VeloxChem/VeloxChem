@@ -208,6 +208,8 @@ integrateVxcFockForGGA(const CMolecule&                  molecule,
 
                 auto cmat = gtoval::get_gto_values_for_gga(gto_block, grid_x, grid_y, grid_z, cgto_mask);
 
+                if (cmat.is_empty()) continue;
+
                 auto submat_0_ptr = cmat.sub_matrix({0, 0});
                 auto submat_x_ptr = cmat.sub_matrix({1, 0});
                 auto submat_y_ptr = cmat.sub_matrix({1, 1});
@@ -649,6 +651,8 @@ integrateFxcFockForGGA(const std::vector<double*>&       aoFockPointers,
                 const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
 
                 auto cmat = gtoval::get_gto_values_for_gga(gto_block, grid_x, grid_y, grid_z, cgto_mask);
+
+                if (cmat.is_empty()) continue;
 
                 auto submat_0_ptr = cmat.sub_matrix({0, 0});
                 auto submat_x_ptr = cmat.sub_matrix({1, 0});

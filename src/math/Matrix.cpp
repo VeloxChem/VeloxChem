@@ -238,6 +238,16 @@ CMatrix::is_angular_order(const std::pair<int, int> &angpair) const -> bool
 }
 
 auto
+CMatrix::is_empty() const -> bool
+{
+    const auto row_keys = _row_angular_keys();
+
+    const auto col_keys = _column_angular_keys();
+
+    return (row_keys.empty() || col_keys.empty());
+}
+
+auto
 CMatrix::number_of_rows() const -> size_t
 {
     const auto row_keys = _row_angular_keys();
