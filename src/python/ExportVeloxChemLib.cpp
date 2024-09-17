@@ -10,8 +10,6 @@
 
 PYBIND11_MODULE(veloxchemlib, m)
 {
-    vlx_dft::export_dft(m);
-
     vlx_general::export_general(m);
 
     vlx_math::export_math(m);
@@ -19,6 +17,8 @@ PYBIND11_MODULE(veloxchemlib, m)
     vlx_moldata::export_moldata(m);
 
     vlx_orbdata::export_orbdata(m);
+
+    vlx_dft::export_dft(m);
 
     vlx_t2cintegrals::export_t2cintegrals(m);
 
