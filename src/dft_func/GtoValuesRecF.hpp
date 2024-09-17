@@ -22,8 +22,8 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef GtoValuesRecP_hpp
-#define GtoValuesRecP_hpp
+#ifndef GtoValuesRecF_hpp
+#define GtoValuesRecF_hpp
 
 #include <cstdint>
 #include <vector>
@@ -34,7 +34,7 @@
 namespace gtoval {  // gtoval namespace
 
 /**
- Computes LDA GTO values on given grid for P type GTOs.
+ Computes GTO values on given grid for F type GTOs.
 
  @param gto_block the GTOs block.
  @param grid_coords_x the vector of Cartesian X coordinates of grid.
@@ -42,22 +42,7 @@ namespace gtoval {  // gtoval namespace
  @param grid_coords_z the vector of Cartesian Z coordinates of grid.
  @param gtos_mask the mask for GTOs (1 evaluate, 0 skip).
  */
-auto getLdaValuesRecP(const CGtoBlock&            gto_block,
-                      const std::vector<double>&  grid_coords_x,
-                      const std::vector<double>&  grid_coords_y,
-                      const std::vector<double>&  grid_coords_z,
-                      const std::vector<int>& gtos_mask) -> CMatrix;
-
-/**
- Computes GGA GTO values on given grid for P type GTOs.
-
- @param gto_block the GTOs block.
- @param grid_coords_x the vector of Cartesian X coordinates of grid.
- @param grid_coords_y the vector of Cartesian Y coordinates of grid.
- @param grid_coords_z the vector of Cartesian Z coordinates of grid.
- @param gtos_mask the mask for GTOs (1 evaluate, 0 skip).
- */
-auto getGgaValuesRecP(const CGtoBlock&            gto_block,
+auto getLdaValuesRecF(const CGtoBlock&            gto_block,
                       const std::vector<double>&  grid_coords_x,
                       const std::vector<double>&  grid_coords_y,
                       const std::vector<double>&  grid_coords_z,
@@ -65,4 +50,4 @@ auto getGgaValuesRecP(const CGtoBlock&            gto_block,
 
 }  // namespace gtoval
 
-#endif /* GtoValuesRecP_hpp */
+#endif /* GtoValuesRecF_hpp */

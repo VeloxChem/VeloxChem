@@ -63,6 +63,16 @@ uplo_index(const T i, const T j) -> T
     return i + j * (j + 1) / 2;
 }
 
+inline auto
+countSignificantElements(const std::vector<int>& mask) -> int
+{
+    int nelems = 0;
+
+    for (auto mvalue : mask) if (mvalue == 1) nelems++;
+
+    return nelems;
+}
+
 /// @brief Counts number of elements in vector matching given selector.
 /// @param values  The vector of values.
 /// @param selector  The selector to march vector values.
@@ -73,6 +83,12 @@ count_elements_by_values(const std::vector<T>& values,
                          const T               selector) -> T
 {
     return static_cast<T>(std::ranges::count(values, selector));
+}
+
+inline auto
+zero(std::vector<double>& values) -> void
+{
+    std::fill(values.begin(), values.end(), 0.0);
 }
 
 inline auto
