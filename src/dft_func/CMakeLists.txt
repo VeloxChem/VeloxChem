@@ -23,6 +23,7 @@ target_sources(vlxobjs
     XCIntegrator.cpp
     XCIntegratorForGGA.cpp
     XCIntegratorForLDA.cpp
+    XCIntegratorForMGGA.cpp
   )
 
 target_include_directories(vlxobjs
