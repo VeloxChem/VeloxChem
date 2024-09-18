@@ -876,11 +876,11 @@ class LinearSolver:
         fock_arrays = []
 
         # TODO: double check fock_type for mat_t.general
-        fock_type = 'jk'
+        fock_type = '2jk'
         exchange_scaling_factor = 1.0
         if self._dft:
             if self.xcfun.is_hybrid():
-                fock_type = 'jkx'
+                fock_type = '2jkx'
                 exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
             else:
                 fock_type = 'j'
