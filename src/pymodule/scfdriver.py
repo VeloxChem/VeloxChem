@@ -1537,9 +1537,6 @@ class ScfDriver:
 
             den_mat_for_fock = den_mat_for_fock.bcast(self.comm, mpi_master())
 
-        # TODO: add MPI communicator to FockDriver constructor
-        # TODO: replace mpi_compute by compute
-
         if e_grad is None:
             thresh_int = int(-math.log10(self.eri_thresh))
         else:
@@ -1571,45 +1568,65 @@ class ScfDriver:
 
             # TODO: open-shell case for range-separated
 
-            fock_mat_full_k = fock_drv.mpi_compute(self.comm, screener,
-                                                   den_mat_for_fock, '2jkx',
-                                                   full_k_coef, 0.0, thresh_int)
+            fock_mat_full_k = fock_drv.compute(screener, self.rank, self.nodes,
+                                               den_mat_for_fock, '2jkx',
+                                               full_k_coef, 0.0, thresh_int)
 
-            fock_mat_erf_k = fock_drv.mpi_compute(self.comm, screener,
-                                                  den_mat_for_fock, 'kx',
-                                                  erf_k_coef, omega, thresh_int)
+            fock_mat_erf_k = fock_drv.compute(screener, self.rank, self.nodes,
+                                              den_mat_for_fock, 'kx',
+                                              erf_k_coef, omega, thresh_int)
+
+            fock_mat_np = (fock_mat_full_k.full_matrix().to_numpy() -
+                           fock_mat_erf_k.full_matrix().to_numpy())
+
+            fock_mat_np = self.comm.reduce(fock_mat_np, root=mpi_master())
 
             if self.rank == mpi_master():
                 # Note: make fock_mat a list
-                fock_mat = [(fock_mat_full_k.full_matrix().to_numpy() -
-                             fock_mat_erf_k.full_matrix().to_numpy())]
+                fock_mat = [fock_mat_np]
 
         else:
             if self.scf_type == 'restricted':
-                fock_mat = fock_drv.mpi_compute(self.comm, screener,
-                                                den_mat_for_fock, fock_type,
-                                                exchange_scaling_factor, 0.0,
-                                                thresh_int)
+                fock_mat = fock_drv.compute(screener, self.rank, self.nodes,
+                                            den_mat_for_fock, fock_type,
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+
+                fock_mat_np = fock_mat.full_matrix().to_numpy()
+                if fock_type == 'j':
+                    fock_mat_np *= 2.0
+
+                fock_mat_np = self.comm.reduce(fock_mat_np, root=mpi_master())
 
                 if self.rank == mpi_master():
                     # Note: make fock_mat a list
-                    fock_mat = [fock_mat.full_matrix().to_numpy()]
-                    if fock_type == 'j':
-                        fock_mat[0] *= 2.0
+                    fock_mat = [fock_mat_np]
+                else:
+                    fock_mat = None
 
             else:
-                fock_mat = fock_drv.mpi_compute(self.comm, screener,
-                                                den_mat_for_fock,
-                                                ["kx", "kx", "j"],
-                                                exchange_scaling_factor, 0.0,
-                                                thresh_int)
+                fock_mat = fock_drv.compute(screener, self.rank, self.nodes,
+                                            den_mat_for_fock, ["kx", "kx", "j"],
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+
+                K_a_np = fock_mat.matrix("0").full_matrix().to_numpy()
+                K_b_np = fock_mat.matrix("1").full_matrix().to_numpy()
+                J_ab_np = fock_mat.matrix("2").full_matrix().to_numpy()
+
+                fock_mat_a_np = J_ab_np - K_a_np
+                fock_mat_b_np = J_ab_np - K_b_np
+
+                fock_mat_a_np = self.comm.reduce(fock_mat_a_np,
+                                                 root=mpi_master())
+                fock_mat_b_np = self.comm.reduce(fock_mat_b_np,
+                                                 root=mpi_master())
 
                 if self.rank == mpi_master():
                     # Note: make fock_mat a list
-                    K_a = fock_mat.matrix("0").full_matrix().to_numpy()
-                    K_b = fock_mat.matrix("1").full_matrix().to_numpy()
-                    J_ab = fock_mat.matrix("2").full_matrix().to_numpy()
-                    fock_mat = [J_ab - K_a, J_ab - K_b]
+                    fock_mat = [fock_mat_a_np, fock_mat_b_np]
+                else:
+                    fock_mat = None
 
         if self.timing:
             profiler.add_timing_info('FockERI', tm.time() - eri_t0)
