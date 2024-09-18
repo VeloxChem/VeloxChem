@@ -38,7 +38,7 @@ from .veloxchemlib import FockDriver, T4CScreener
 from .veloxchemlib import Matrices, make_matrix, mat_t
 from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, hartree_in_ev
-from .veloxchemlib import rotatory_strength_in_cgs, hartree_in_ev
+from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import AODensityMatrix, denmat
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
@@ -693,6 +693,8 @@ class LinearSolver:
             if self.rank == mpi_master():
                 dks = []
                 kns = []
+            else:
+                dks = None
 
             for col in range(batch_start, batch_end):
                 if col < n_ger:
@@ -726,8 +728,6 @@ class LinearSolver:
 
                     dks.append(dak)
                     kns.append(kn)
-
-            # TODO: broadcast dks
 
             # form Fock matrices
 
@@ -847,10 +847,23 @@ class LinearSolver:
         #V_es = pe_dict['V_es']
         #pe_drv = pe_dict['pe_drv']
 
+        if self.rank == mpi_master():
+            num_densities = len(dens)
+        else:
+            num_densities = None
+        num_densities = self.comm.bcast(num_densities, root=mpi_master())
+
+        if self.rank != mpi_master():
+            dens = [None for idx in range(num_densities)]
+
+        for idx in range(num_densities):
+            dens[idx] = self.comm.bcast(dens[idx], root=mpi_master())
+
         den_mat_for_fock = Matrices()
-        for idx, dmat in enumerate(dens):
+
+        for idx in range(num_densities):
             den_mat = make_matrix(basis, mat_t.general)
-            den_mat.set_values(dmat)
+            den_mat.set_values(dens[idx])
             den_mat_for_fock.add(den_mat, str(idx))
 
         thresh_int = int(-math.log10(self.eri_thresh))
@@ -880,33 +893,36 @@ class LinearSolver:
 
             # TODO: double check range-separated case
 
-            fock_mat_full_K = fock_drv.mpi_compute(self.comm, screening,
-                                                   den_mat_for_fock,
-                                                   ['2jkx' for x in range(len(dens))],
-                                                   full_k_coef, 0.0, thresh_int)
+            # TODO: enable mpi for range-separated case
 
-            fock_mat_erf_K = fock_drv.mpi_compute(self.comm, screening,
-                                                  den_mat_for_fock,
-                                                  ['kx' for x in range(len(dens))],
-                                                  erf_k_coef, omega, thresh_int)
+            fock_mat_full_K = fock_drv.compute(
+                screening, self.rank, self.nodes, den_mat_for_fock,
+                ['2jkx' for x in range(len(dens))], full_k_coef, 0.0,
+                thresh_int)
+
+            fock_mat_erf_K = fock_drv.compute(screening, self.rank, self.nodes,
+                                              den_mat_for_fock,
+                                              ['kx' for x in range(len(dens))],
+                                              erf_k_coef, omega, thresh_int)
 
             for idx in range(len(dens)):
-                fock_full_K = fock_mat_full_K.matrix(str(idx)).full_matrix().to_numpy()
-                fock_erf_K = fock_mat_erf_K.matrix(str(idx)).full_matrix().to_numpy()
+                fock_full_K = fock_mat_full_K.matrix(
+                    str(idx)).full_matrix().to_numpy()
+                fock_erf_K = fock_mat_erf_K.matrix(
+                    str(idx)).full_matrix().to_numpy()
                 fock_arrays.append(fock_full_K - fock_erf_K)
 
         else:
-            fock_mat = fock_drv.mpi_compute(self.comm, screening,
-                                            den_mat_for_fock,
-                                            [fock_type for x in range(len(dens))],
-                                            exchange_scaling_factor, 0.0,
-                                            thresh_int)
+            fock_mat = fock_drv.compute(
+                screening, self.rank, self.nodes, den_mat_for_fock,
+                [fock_type for x in range(num_densities)],
+                exchange_scaling_factor, 0.0, thresh_int)
 
-            for idx in range(len(dens)):
-                fock = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
+            for idx in range(num_densities):
+                fock_np = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
                 if fock_type == 'j':
-                    fock *= 2.0
-                fock_arrays.append(fock)
+                    fock_np *= 2.0
+                fock_arrays.append(fock_np)
 
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)
@@ -916,6 +932,7 @@ class LinearSolver:
             xc_drv = XCIntegrator(self.comm)
             xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis, dens,
                                       gs_density, molgrid, self.xcfun)
+
             if profiler is not None:
                 profiler.add_timing_info('FockXC', tm.time() - t0)
 
@@ -927,7 +944,14 @@ class LinearSolver:
 
         # TODO: look into split communicator
 
-        return fock_arrays
+        for idx in range(len(fock_arrays)):
+            fock_arrays[idx] = self.comm.reduce(fock_arrays[idx],
+                                                root=mpi_master())
+
+        if self.rank == mpi_master():
+            return fock_arrays
+        else:
+            return None
 
     def _comp_lr_fock_split_comm(self,
                                  fock,
@@ -2164,9 +2188,9 @@ class LinearSolver:
 
         for i in range(nocc):
             if getattr(self, 'core_excitation', False):
-                homo_str = f'core_{i+1}'
+                homo_str = f'core_{i + 1}'
             else:
-                homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc-1-i}'
+                homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc - 1 - i}'
 
             for a in range(nvir):
                 lumo_str = 'LUMO' if a == 0 else f'LUMO+{a}'
