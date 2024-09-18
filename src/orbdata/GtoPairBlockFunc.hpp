@@ -16,7 +16,10 @@ namespace gtofunc {  // gtofunc namespace
 /// @return The vector of basis function pairs blocks.
 auto make_gto_pair_blocks(const CMolecularBasis& basis, const CMolecule& molecule) -> std::vector<CGtoPairBlock>;
 
-
+/// @brief Creates vector of basis function pairs blocks for vector of basis functions blocks.
+/// @param gto_blocks The vector of basis functions blocks on bra and ket sides.
+/// @return The vector of basis function pairs blocks.
+auto make_gto_pair_blocks(const std::vector<CGtoBlock>& gto_blocks) -> std::vector<CGtoPairBlock>;
 
 /// @brief Creates vector of basis function pairs blocks for pair of vectors of basis functions blocks.
 /// @param bra_gto_blocks The vector of basis functions blocks on bra side.

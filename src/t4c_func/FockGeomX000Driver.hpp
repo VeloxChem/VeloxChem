@@ -3,14 +3,17 @@
 
 #include <string>
 
+#include "Matrices.hpp"
+#include "MatricesFunc.hpp"
+#include "Matrix.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
-#include "Matrix.hpp"
-#include "Matrices.hpp"
+#include "GtoFunc.hpp"
+#include "GtoPairBlockFunc.hpp"
 
 /// Class CFockGeomX000Driver provides methods for computing Fock matrices
 /// using derivatives of four center electron repulsion integrals.
-template<int N>
+template <int N>
 class CFockGeomX000Driver
 {
    public:
@@ -57,26 +60,44 @@ class CFockGeomX000Driver
     /// @param exchange_factor The exchange-correlation factors.
     /// @param omega The range separation factor.
     /// @return The Fock matrices.
-    auto compute(const int             iatom,
-                 const CMolecularBasis &basis,
+    auto compute(const CMolecularBasis &basis,
                  const CMolecule       &molecule,
                  const CMatrix         &density,
+                 const int              iatom,
                  const std::string     &label,
-                 const double          exchange_factor,
-                 const double          omega) const -> CMatrices;
+                 const double           exchange_factor,
+                 const double           omega) const -> CMatrices;
 };
 
-template<int N>
+template <int N>
 auto
-CFockGeomX000Driver::compute(const int             iatom,
-                             const CMolecularBasis &basis,
-                             const CMolecule       &molecule,
-                             const CMatrix         &density,
-                             const std::string     &label,
-                             const double          exchange_factor,
-                             const double          omega) const -> CMatrices
+CFockGeomX000Driver<N>::compute(const CMolecularBasis &basis,
+                                const CMolecule       &molecule,
+                                const CMatrix         &density,
+                                const int              iatom,
+                                const std::string     &label,
+                                const double           exchange_factor,
+                                const double           omega) const -> CMatrices
 {
-    return CMatrices(); 
+    // set up Fock matrices
+    
+    auto focks = matfunc::make_matrices(std::array<int, 1>{1, }, basis, mat_t::general);
+    
+    focks.zero();
+    
+    // set basis function pair blocks
+    
+    const auto bra_pairs = gtofunc::make_gto_blocks(basis, molecule, {iatom, });
+    
+    const auto ket_pairs = gtofunc::make_gto_blocks(basis, molecule);
+    
+    const auto bra_gto_pair_blocks = gtofunc::make_gto_pair_blocks(bra_pairs, ket_pairs);
+    
+    const auto ket_gto_pair_blocks = gtofunc::make_gto_pair_blocks(ket_pairs);
+
+
+
+    return focks;
 }
 
 #endif /* FockGeomX000Driver_hpp */

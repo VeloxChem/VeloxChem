@@ -13,47 +13,45 @@ CT4CScreener::CT4CScreener(const std::vector<CBlockedGtoPairBlock>& gto_pair_blo
 
     : _gto_pair_blocks(gto_pair_blocks)
 {
-    
 }
 
-CT4CScreener::CT4CScreener(const CT4CScreener &other)
+CT4CScreener::CT4CScreener(const CT4CScreener& other)
 
     : _gto_pair_blocks(other._gto_pair_blocks)
 {
-    
 }
 
-CT4CScreener::CT4CScreener(CT4CScreener &&other) noexcept
+CT4CScreener::CT4CScreener(CT4CScreener&& other) noexcept
 
     : _gto_pair_blocks{}
 {
     std::swap(_gto_pair_blocks, other._gto_pair_blocks);
 }
 
-auto 
-CT4CScreener::operator=(const CT4CScreener &other) -> CT4CScreener &
+auto
+CT4CScreener::operator=(const CT4CScreener& other) -> CT4CScreener&
 {
     _gto_pair_blocks = other._gto_pair_blocks;
-    
+
     return *this;
 }
 
-auto 
-CT4CScreener::operator=(CT4CScreener &&other) noexcept -> CT4CScreener &
+auto
+CT4CScreener::operator=(CT4CScreener&& other) noexcept -> CT4CScreener&
 {
-    std::swap(_gto_pair_blocks , other._gto_pair_blocks);
+    std::swap(_gto_pair_blocks, other._gto_pair_blocks);
 
     return *this;
 }
 
-auto 
-CT4CScreener::operator==(const CT4CScreener &other) const -> bool
+auto
+CT4CScreener::operator==(const CT4CScreener& other) const -> bool
 {
     return _gto_pair_blocks == other._gto_pair_blocks;
 }
 
-auto 
-CT4CScreener::operator!=(const CT4CScreener &other) const -> bool
+auto
+CT4CScreener::operator!=(const CT4CScreener& other) const -> bool
 {
     return !(*this == other);
 }
