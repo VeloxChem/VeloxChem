@@ -1567,17 +1567,22 @@ class ScfDriver:
             erf_k_coef = -self.xcfun.get_rs_beta()
             omega = self.xcfun.get_rs_omega()
 
+            # TODO: double check range-separated integrals
+
+            # TODO: open-shell case for range-separated
+
             fock_mat_full_k = fock_drv.mpi_compute(self.comm, screener,
-                                                   den_mat_for_fock, fock_type,
+                                                   den_mat_for_fock, '2jkx',
                                                    full_k_coef, 0.0, thresh_int)
+
             fock_mat_erf_k = fock_drv.mpi_compute(self.comm, screener,
-                                                  den_mat_for_fock, fock_type,
+                                                  den_mat_for_fock, 'kx',
                                                   erf_k_coef, omega, thresh_int)
 
             if self.rank == mpi_master():
                 # Note: make fock_mat a list
-                fock_mat = [(fock_mat_full_k.get_full_matrix().to_numpy() -
-                             fock_mat_erf_k.get_full_matrix().to_numpy())]
+                fock_mat = [(fock_mat_full_k.full_matrix().to_numpy() -
+                             fock_mat_erf_k.full_matrix().to_numpy())]
 
         else:
             if self.scf_type == 'restricted':
