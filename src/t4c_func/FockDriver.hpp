@@ -10,7 +10,7 @@
 #include "T4CScreener.hpp"
 
 /// Class CFockDriver provides methods for computing Fock matrices
-/// using four center electron repulsion integrals..
+/// using four center electron repulsion integrals.
 class CFockDriver
 {
    public:

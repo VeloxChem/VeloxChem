@@ -1474,9 +1474,9 @@ local_distribute_gen_jk(CMatrices&                       focks,
 
                         // precomputed integrals
 
-                        const auto f2rs = fval * (denmat_rs->operator[]({r, s}) + denmat_sr->operator[]({s, r}));
+                        const auto f2rs = 2.0 * fval * (denmat_rs->operator[]({r, s}) + denmat_sr->operator[]({s, r}));
 
-                        const auto f2pq = fval * (denmat_pq->operator[]({p, q}) + denmat_qp->operator[]({q, p}));
+                        const auto f2pq = 2.0 * fval * (denmat_pq->operator[]({p, q}) + denmat_qp->operator[]({q, p}));
 
                         // Coulomb contributions
 
@@ -1743,9 +1743,9 @@ local_distribute_gen_jkx(CMatrices&                       focks,
 
                         // precomputed integrals
 
-                        const auto f2rs = fval * (denmat_rs->operator[]({r, s}) + denmat_sr->operator[]({s, r}));
+                        const auto f2rs = 2.0 * fval * (denmat_rs->operator[]({r, s}) + denmat_sr->operator[]({s, r}));
 
-                        const auto f2pq = fval * (denmat_pq->operator[]({p, q}) + denmat_qp->operator[]({q, p}));
+                        const auto f2pq = 2.0 * fval * (denmat_pq->operator[]({p, q}) + denmat_qp->operator[]({q, p}));
 
                         // Coulomb contributions
 
