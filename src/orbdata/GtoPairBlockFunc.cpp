@@ -38,4 +38,29 @@ make_gto_pair_blocks(const CMolecularBasis& basis, const CMolecule& molecule) ->
     }
 }
 
+auto
+make_gto_pair_blocks(const std::vector<CGtoBlock>& bra_gto_blocks,
+                     const std::vector<CGtoBlock>& ket_gto_blocks) -> std::vector<CGtoPairBlock>
+{
+    const auto nbra_blocks = bra_gto_blocks.size();
+    
+    const auto nket_blocks = ket_gto_blocks.size();
+    
+    if  ((nbra_blocks > 0) && (nket_blocks > 0))
+    {
+        std::vector<CGtoPairBlock> gto_pair_blocks;
+            
+        std::ranges::for_each(views::rectangular(nbra_blocks, nket_blocks), [&](const auto& index) {
+            const auto [i, j] = index;
+            gto_pair_blocks.push_back(CGtoPairBlock(bra_gto_blocks[i], ket_gto_blocks[j]));
+        });
+            
+        return gto_pair_blocks;
+    }
+    else
+    {
+        return std::vector<CGtoPairBlock>();
+    }
+}
+
 }  // namespace gtofunc
