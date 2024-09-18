@@ -877,29 +877,36 @@ class LinearSolver:
             full_k_coef = self.xcfun.get_rs_alpha() + self.xcfun.get_rs_beta()
             erf_k_coef = -self.xcfun.get_rs_beta()
             omega = self.xcfun.get_rs_omega()
-            # TODO: range-separated Fock
 
-        else:
-            fock_mat_J = fock_drv.mpi_compute(self.comm, screening,
-                                              den_mat_for_fock,
-                                              ['j' for x in range(len(dens))],
-                                              0.0, 0.0,
-                                              thresh_int)
+            # TODO: double check range-separated case
 
-            fock_mat_K = fock_drv.mpi_compute(self.comm, screening,
-                                              den_mat_for_fock,
-                                              ['kx' for x in range(len(dens))],
-                                              exchange_scaling_factor, 0.0,
-                                              thresh_int)
+            fock_mat_full_K = fock_drv.mpi_compute(self.comm, screening,
+                                                   den_mat_for_fock,
+                                                   ['2jkx' for x in range(len(dens))],
+                                                   full_k_coef, 0.0, thresh_int)
+
+            fock_mat_erf_K = fock_drv.mpi_compute(self.comm, screening,
+                                                  den_mat_for_fock,
+                                                  ['kx' for x in range(len(dens))],
+                                                  erf_k_coef, omega, thresh_int)
 
             for idx in range(len(dens)):
-                fock_J = fock_mat_J.matrix(str(idx)).full_matrix().to_numpy()
-                fock_K = fock_mat_K.matrix(str(idx)).full_matrix().to_numpy()
-                if fock_type == 'j':
-                    fock_J *= 2.0
-                fock_arrays.append(fock_J * 2.0 - fock_K)
+                fock_full_K = fock_mat_full_K.matrix(str(idx)).full_matrix().to_numpy()
+                fock_erf_K = fock_mat_erf_K.matrix(str(idx)).full_matrix().to_numpy()
+                fock_arrays.append(fock_full_K - fock_erf_K)
 
-            # TODO: reduce_sum fock_arrays
+        else:
+            fock_mat = fock_drv.mpi_compute(self.comm, screening,
+                                            den_mat_for_fock,
+                                            [fock_type for x in range(len(dens))],
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+
+            for idx in range(len(dens)):
+                fock = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
+                if fock_type == 'j':
+                    fock *= 2.0
+                fock_arrays.append(fock)
 
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)
