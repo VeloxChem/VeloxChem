@@ -321,7 +321,7 @@ class TestFockDriver:
         # load reference Fock matrix
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.j.gen.npy')
-        ref_mat = np.load(npyfile)
+        ref_mat = 2.0 * np.load(npyfile)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -378,7 +378,7 @@ class TestFockDriver:
         # load reference Fock matrix
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.j.gen.npy')
-        ref_mat = np.load(npyfile)
+        ref_mat = 2.0 * np.load(npyfile)
 
         # load reference Fock matrix
         here = Path(__file__).parent
