@@ -839,7 +839,7 @@ local_distribute(CMatrices&                       focks,
 
     if (density->get_type() == mat_t::general)
     {
-        if (label == "jk")
+        if (label == "2jk")
         {
             t4cfunc::local_distribute_gen_jk(focks,
                                              suffix,
@@ -863,7 +863,7 @@ local_distribute(CMatrices&                       focks,
                                              diagonal);
         }
 
-        if (label == "jkx")
+        if (label == "2jkx")
         {
             t4cfunc::local_distribute_gen_jkx(focks,
                                               suffix,

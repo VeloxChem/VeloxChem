@@ -147,7 +147,7 @@ CT4CMatrixDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, const
 
         const auto d_comps = tensor::number_of_spherical_components(std::array<int, 1>{ket_ang_moms.second});
 
-        if ((_label == "2jk") || (_label == "2jkx") || (_label == "jk") || (_label == "jkx") || (_label == "j"))
+        if ((_label == "2jk") || (_label == "2jkx") || (_label == "j"))
         {
             // acummulate contributions to Fock matrix
 
@@ -201,7 +201,7 @@ CT4CMatrixDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, const
             }
         }
 
-        if ((_label == "2jk") || (_label == "2jkx") || (_label == "jk") || (_label == "jkx") || (_label == "k") || (_label == "kx"))
+        if ((_label == "2jk") || (_label == "2jkx") || (_label == "k") || (_label == "kx"))
         {
             // set up angular pairs
 

@@ -53,8 +53,15 @@ export_orbdata(py::module &m)
           "Creates vector of basis functions blocks for selected atoms in given "
           "basis and molecule.");
 
-    // exposing functions from GtoPairBlockFunc.hpp
-    m.def("make_gto_pair_blocks", &gtofunc::make_gto_pair_blocks, "Creates vector of GTOs pair blocks for given basis and molecule.");
+    m.def("make_gto_pair_blocks",
+          py::overload_cast<const CMolecularBasis &, const CMolecule &>(&gtofunc::make_gto_pair_blocks),
+          "Creates vector of basis function pairs blocks for given basis and molecule.");
+    m.def("make_gto_pair_blocks",
+          py::overload_cast<const std::vector<CGtoBlock>&>(&gtofunc::make_gto_pair_blocks),
+          "Creates vector of basis function pairs blocks for given vector of basis function blocks.");
+    m.def("make_gto_pair_blocks",
+          py::overload_cast<const std::vector<CGtoBlock> &, const std::vector<CGtoBlock> &>(&gtofunc::make_gto_pair_blocks),
+          "Creates vector of basis function pairs blocks for given pair of vectors of basis function blocks.");
 
     // CBasisFunction class
     PyClass<CBasisFunction>(m, "BasisFunction")

@@ -4,6 +4,7 @@
 #include <pybind11/stl.h>
 
 #include "FockDriver.hpp"
+#include "FockGeomX000Driver.hpp"
 #include "T4CScreener.hpp"
 #include "T4CUtils.hpp"
 
@@ -95,6 +96,23 @@ export_t4cintegrals(py::module& m)
         .def("__ne__", [](const CT4CScreener& self, const CT4CScreener& other) { return self != other; })
         .def("__copy__", [](const CT4CScreener& self) { return CT4CScreener(self); })
         .def("__deepcopy__", [](const CT4CScreener& self, py::dict) { return CT4CScreener(self); });
+
+    // CFockGeom1000Driver class
+    PyClass<CFockGeomX000Driver<1>>(m, "FockGeom1000Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CFockGeomX000Driver<1>& fock_drv,
+               const CMolecularBasis&        basis,
+               const CMolecule&              molecule,
+               const CMatrix&                density,
+               const int                     iatom,
+               const std::string&            label,
+               const double                  exchange_factor,
+               const double                  omega) -> std::shared_ptr<CMatrices> {
+                return std::make_shared<CMatrices>(fock_drv.compute(basis, molecule, density, iatom, label, exchange_factor, omega));
+            },
+            "Computes gradient of Fock matrix of requested type for given molecule and basis.");
 }
 
 }  // namespace vlx_t4cintegrals

@@ -181,12 +181,12 @@ CFockDriver::compute(const CT4CScreener&             screener,
     return fock_mats;
 }
 
-auto 
-CFockDriver::compute(const CT4CScreener &screener,
-                     const int          rank,
-                     const int          nodes,
-                     const CMatrix      &density,
-                     const std::string  &label,
+auto
+CFockDriver::compute(const CT4CScreener& screener,
+                     const int           rank,
+                     const int           nodes,
+                     const CMatrix&      density,
+                     const std::string&  label,
                      const double        exchange_factor,
                      const double        omega,
                      const int           ithreshold) const -> CMatrix
@@ -214,7 +214,7 @@ CFockDriver::compute(const CT4CScreener &screener,
             auto gto_pair_blocks = ptr_screener->gto_pair_blocks();
 
             const auto work_tasks = omp::make_work_group(gto_pair_blocks, ithreshold);
-            
+
             const auto red_tasks = omp::partition_tasks(work_tasks, rank, nodes);
 
             std::ranges::for_each(std::views::reverse(red_tasks), [&](const auto& task) {
@@ -237,13 +237,12 @@ CFockDriver::compute(const CT4CScreener &screener,
     fock_mat.symmetrize();
 
     return fock_mat;
-    
 }
 
 auto
 CFockDriver::compute(const CT4CScreener&             screener,
-                     const int          rank,
-                     const int          nodes,
+                     const int                       rank,
+                     const int                       nodes,
                      const CMatrices&                densities,
                      const std::vector<std::string>& labels,
                      const double                    exchange_factor,
@@ -275,7 +274,7 @@ CFockDriver::compute(const CT4CScreener&             screener,
             auto gto_pair_blocks = ptr_screener->gto_pair_blocks();
 
             const auto work_tasks = omp::make_work_group(gto_pair_blocks, ithreshold);
-            
+
             const auto red_tasks = omp::partition_tasks(work_tasks, rank, nodes);
 
             std::ranges::for_each(std::views::reverse(red_tasks), [&](const auto& task) {

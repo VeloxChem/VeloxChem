@@ -90,25 +90,25 @@ class CFockDriver
                  const double                    exchange_factor,
                  const double                    omega,
                  const int                       ithreshold) const -> CMatrices;
-    
+
     /// @brief Computes Fock matrix for given density..
     /// @param screener The screener with basis function pairs data.
     /// @param rank The rank of specific node.
-    /// @param nodes The number of nodes. 
+    /// @param nodes The number of nodes.
     /// @param density The density matrix to construct Fock matrix.
     /// @param label The label of Fock matrix type.
     /// @param exchange_factor The exchange-correlation factors.
     /// @param omega The range separation factor.
     /// @return The Fock matrix.
     auto compute(const CT4CScreener &screener,
-                 const int          rank,
-                 const int          nodes,
+                 const int           rank,
+                 const int           nodes,
                  const CMatrix      &density,
                  const std::string  &label,
                  const double        exchange_factor,
                  const double        omega,
                  const int           ithreshold) const -> CMatrix;
-    
+
     /// @brief Computes Fock matrices for given densities.
     /// @param screener The screener with basis function pairs data.
     /// @param rank The rank of specific node.
@@ -119,15 +119,13 @@ class CFockDriver
     /// @param omega The range separation factor.
     /// @return The Fock matrix.
     auto compute(const CT4CScreener             &screener,
-                 const int          rank,
-                 const int          nodes,
+                 const int                       rank,
+                 const int                       nodes,
                  const CMatrices                &densities,
                  const std::vector<std::string> &labels,
                  const double                    exchange_factor,
                  const double                    omega,
                  const int                       ithreshold) const -> CMatrices;
-    
-   
 };
 
 #endif /* FockDriver_hpp */

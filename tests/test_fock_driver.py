@@ -300,7 +300,7 @@ class TestFockDriver:
 
         assert fmat == fref
 
-    def test_h2o_dimer_fock_gen_jk_svpd_with_screener(self):
+    def test_h2o_dimer_fock_gen_2jk_svpd_with_screener(self):
 
         mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
 
@@ -316,8 +316,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "jk", 0.0, 0.0, 15)
-
+        fock_mat = fock_drv.compute(t4c_drv, den_mat, "2jk", 0.0, 0.0, 15)
+        
         # load reference Fock matrix
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.j.gen.npy')
@@ -357,7 +357,7 @@ class TestFockDriver:
 
         assert fmat == fref
 
-    def test_h2o_dimer_fock_gen_jkx_svpd_with_screener(self):
+    def test_h2o_dimer_fock_gen_2jkx_svpd_with_screener(self):
 
         mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
 
@@ -373,7 +373,7 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "jkx", 0.28, 0.0, 15)
+        fock_mat = fock_drv.compute(t4c_drv, den_mat, "2jkx", 0.28, 0.0, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent

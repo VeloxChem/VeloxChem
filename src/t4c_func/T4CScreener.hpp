@@ -15,10 +15,10 @@ class CT4CScreener
    public:
     /// Creates an four center integrals screener.
     CT4CScreener() = default;
-    
+
     /// @brief The creates an four center integral screener.
     /// @param gto_pair_blocks The vector of basis function pair blocks.
-    CT4CScreener(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks);
+    CT4CScreener(const std::vector<CBlockedGtoPairBlock> &gto_pair_blocks);
 
     /// @brief The default copy constructor.
     /// @param other The integrals screener to be copied.
