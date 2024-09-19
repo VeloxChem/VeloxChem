@@ -1573,7 +1573,7 @@ class ScfDriver:
                                                full_k_coef, 0.0, thresh_int)
 
             fock_mat_erf_k = fock_drv.compute(screener, self.rank, self.nodes,
-                                              den_mat_for_fock, 'kx',
+                                              den_mat_for_fock, 'kx_rs',
                                               erf_k_coef, omega, thresh_int)
 
             fock_mat_np = (fock_mat_full_k.full_matrix().to_numpy() -
