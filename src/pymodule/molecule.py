@@ -1092,6 +1092,8 @@ Molecule._find_connected_atoms = _Molecule_find_connected_atoms
 Molecule._rotate_around_vector = _Molecule_rotate_around_vector
 
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
+Molecule.read_gro_file = _Molecule_read_gro_file
+Molecule.read_pdb_file = _Molecule_read_pdb_file
 Molecule.show = _Molecule_show
 Molecule.draw_2d = _Molecule_draw_2d
 Molecule.read_smiles = _Molecule_read_smiles
