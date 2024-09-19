@@ -24930,9 +24930,9 @@ CBoysFunc<N>::compute(CSimdArray<double>&       buffer,
 
     // Set up exponents
 
-    auto c_exps = buffer.data(0);
+    auto c_exps = factors.data(0);
 
-    auto d_exps = buffer.data(1);
+    auto d_exps = factors.data(1);
 
     // rescale computed Boys function values
 
