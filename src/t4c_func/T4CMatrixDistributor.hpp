@@ -60,6 +60,10 @@ class CT4CMatrixDistributor
     /// @brief The gets range separation factors.
     /// @return The range separation
     auto get_omega() const -> double;
+    
+    /// @brief Checks if range separation factor is needed.
+    /// @return The range separation
+    auto need_omega() const -> bool;
 
     /// Sets local matrices and their local/global indices.
     /// @param bra_gto_pair_block The basis function pairs block on bra side.

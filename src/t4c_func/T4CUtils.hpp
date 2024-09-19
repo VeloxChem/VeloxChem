@@ -144,6 +144,22 @@ auto comp_boys_args(CSimdArray<double>&       bf_data,
                     const double              a_exp,
                     const double              b_exp) -> void;
 
+/// @brief Computes Boys function arguments.
+/// @param bf_data The Boys function data.
+/// @param index_args The primary row index of arguments in Boys function data.
+/// @param buffer The SIMD array containing factors data.
+/// @param index_pq The primary row index of R(PQ) distances in SIMD array.
+/// @param a_exp The exponent on A center.
+/// @param b_exp The exponent on B center.
+/// @param omega The range separation parameter. 
+auto comp_boys_args(CSimdArray<double>&       bf_data,
+                    const size_t              index_args,
+                    const CSimdArray<double>& buffer,
+                    const size_t              index_pq,
+                    const double              a_exp,
+                    const double              b_exp,
+                    const double              omega) -> void;
+
 /// @brief Computes combined overlap factors.
 /// @param buffer The SIMD array containing factors data.
 /// @param index_ovl The primary row index of combined overlap in SIMD array.

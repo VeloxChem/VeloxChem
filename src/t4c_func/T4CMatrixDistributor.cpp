@@ -47,6 +47,12 @@ CT4CMatrixDistributor::get_omega() const -> double
     return _omega;
 }
 
+auto 
+CT4CMatrixDistributor::need_omega() const -> bool
+{
+    return (_label == "j_rs") || (_label == "k_rs") || (_label == "kx_rs");
+}
+
 auto
 CT4CMatrixDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, const CGtoPairBlock& ket_gto_pair_block) -> void
 {
@@ -147,7 +153,7 @@ CT4CMatrixDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, const
 
         const auto d_comps = tensor::number_of_spherical_components(std::array<int, 1>{ket_ang_moms.second});
 
-        if ((_label == "2jk") || (_label == "2jkx") || (_label == "j"))
+        if ((_label == "2jk") || (_label == "2jkx") || (_label == "j") || (_label == "j_rs"))
         {
             // acummulate contributions to Fock matrix
 
@@ -201,7 +207,7 @@ CT4CMatrixDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, const
             }
         }
 
-        if ((_label == "2jk") || (_label == "2jkx") || (_label == "k") || (_label == "kx"))
+        if ((_label == "2jk") || (_label == "2jkx") || (_label == "k") || (_label == "kx") || (_label == "k_rs") || (_label == "kx_rs"))
         {
             // set up angular pairs
 

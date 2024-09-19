@@ -417,6 +417,53 @@ comp_boys_args(CSimdArray<double>&       bf_data,
     }
 }
 
+
+auto
+comp_boys_args(CSimdArray<double>&       bf_data,
+               const size_t              index_args,
+               const CSimdArray<double>& buffer,
+               const size_t              index_pq,
+               const double              a_exp,
+               const double              b_exp,
+               const double              omega) -> void
+{
+    // Set up exponents
+
+    auto c_exps = buffer.data(0);
+
+    auto d_exps = buffer.data(1);
+
+    // set up R(PQ) distances
+
+    auto pq_x = buffer.data(index_pq);
+
+    auto pq_y = buffer.data(index_pq + 1);
+
+    auto pq_z = buffer.data(index_pq + 2);
+
+    // set up Boys function arguments
+
+    auto bargs = bf_data.data(index_args);
+
+    // compute Boys function arguments
+
+    const auto nelems = buffer.number_of_active_elements();
+
+#pragma omp simd aligned(bargs, pq_x, pq_y, pq_z, c_exps, d_exps : 64)
+    for (size_t i = 0; i < nelems; i++)
+    {
+        double ab_exp = a_exp + b_exp;
+
+        double cd_exp = c_exps[i] + d_exps[i];
+        
+        double frho = ab_exp * cd_exp / (ab_exp + cd_exp);
+        
+        bargs[i] = omega * omega / (omega * omega + frho);
+
+        bargs[i] *= frho * (pq_x[i] * pq_x[i] + pq_y[i] * pq_y[i] + pq_z[i] * pq_z[i]);
+    }
+}
+
 auto
 comp_ovl_factors(CSimdArray<double>& buffer,
                  const size_t        index_ovl,
@@ -553,7 +600,7 @@ add_local_matrices(CMatrices&         matrices,
 {
     // Coulomb matrices
 
-    if ((label == "2jk") || (label == "2jkx") || (label == "jk") || (label == "jkx") || (label == "j"))
+    if ((label == "2jk") || (label == "2jkx") || (label == "j") || (label == "j_rs"))
     {
         matrices.add(CMatrix(
                          {
@@ -601,7 +648,7 @@ add_local_matrices(CMatrices&         matrices,
 
     // Exchange matrices
 
-    if ((label == "2jk") || (label == "2jkx") || (label == "jk") || (label == "jkx") || (label == "k") || (label == "kx"))
+    if ((label == "2jk") || (label == "2jkx") || (label == "k") || (label == "kx") || (label == "k_rs") || (label == "kx_rs"))
     {
         matrices.add(CMatrix(
                          {
@@ -763,7 +810,7 @@ local_distribute(CMatrices&                       focks,
                                                diagonal);
         }
 
-        if (label == "j")
+        if ((label == "j") || (label == "j_rs"))
         {
             t4cfunc::local_distribute_rest_j(focks,
                                              suffix,
@@ -787,7 +834,7 @@ local_distribute(CMatrices&                       focks,
                                              diagonal);
         }
 
-        if (label == "k")
+        if ((label == "k") || (label == "k_rs"))
         {
             t4cfunc::local_distribute_rest_k(focks,
                                              suffix,
@@ -811,7 +858,7 @@ local_distribute(CMatrices&                       focks,
                                              diagonal);
         }
 
-        if (label == "kx")
+        if ((label == "kx") || (label == "kx_rs"))
         {
             t4cfunc::local_distribute_rest_kx(focks,
                                               suffix,
@@ -888,7 +935,7 @@ local_distribute(CMatrices&                       focks,
                                               diagonal);
         }
 
-        if (label == "j")
+        if ((label == "j") || (label == "j_rs"))
         {
             t4cfunc::local_distribute_gen_j(focks,
                                             suffix,
@@ -912,7 +959,7 @@ local_distribute(CMatrices&                       focks,
                                             diagonal);
         }
 
-        if (label == "k")
+        if ((label == "k") || (label == "k_rs"))
         {
             t4cfunc::local_distribute_gen_k(focks,
                                             suffix,
@@ -936,7 +983,7 @@ local_distribute(CMatrices&                       focks,
                                             diagonal);
         }
 
-        if (label == "kx")
+        if ((label == "kx") || (label == "kx_rs"))
         {
             t4cfunc::local_distribute_gen_kx(focks,
                                              suffix,
