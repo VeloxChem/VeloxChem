@@ -24958,7 +24958,7 @@ CBoysFunc<N>::compute(CSimdArray<double>&       buffer,
 
     for (int i = 1; i <= N; i++)
     {
-        auto bvals = buffer.data(index_vals + i);
+        bvals = buffer.data(index_vals + i);
 
 #pragma omp simd aligned(bvals, facts, c_exps, d_exps : 64)
         for (size_t j = 0; j < nelems; j++)

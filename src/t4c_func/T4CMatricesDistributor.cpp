@@ -194,7 +194,7 @@ CT4CMatricesDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, con
 
                 auto density = _densities->matrix(keys[i]);
 
-                if ((label == "2jk") || (label == "2jkx") || (label == "jk") || (label == "jkx") || (label == "j"))
+                if ((label == "2jk") || (label == "2jkx")  || (label == "j") || (label == "j_rs"))
                 {
                     // acummulate contributions to Fock matrix
 
@@ -248,7 +248,7 @@ CT4CMatricesDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, con
                     }
                 }
 
-                if ((label == "2jk") || (label == "2jkx") || (label == "jk") || (label == "jkx") || (label == "k") || (label == "kx"))
+                if ((label == "2jk") || (label == "2jkx") || (label == "k") || (label == "kx") || (label == "k_rs") || (label == "kx_rs"))
                 {
                     // set up angular pairs
 
