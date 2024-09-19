@@ -2,9 +2,10 @@
 #define ElectronRepulsionDiagRecPGPG_hpp
 
 #include <cstddef>
-#include <vector>
 #include <utility>
+#include <vector>
 
+#include "BoysFunc.hpp"
 #include "ElectronRepulsionContrRecPGXX.hpp"
 #include "ElectronRepulsionContrRecXXPG.hpp"
 #include "ElectronRepulsionPrimRecSDSD.hpp"
@@ -33,13 +34,12 @@
 #include "ElectronRepulsionPrimRecSSSH.hpp"
 #include "ElectronRepulsionPrimRecSSSP.hpp"
 #include "ElectronRepulsionPrimRecSSSS.hpp"
-#include "SimdArray.hpp"
-#include "BoysFunc.hpp"
-#include "T4CUtils.hpp"
-#include "T2CUtils.hpp"
 #include "GtoPairBlock.hpp"
+#include "SimdArray.hpp"
+#include "T2CUtils.hpp"
+#include "T4CUtils.hpp"
 
-namespace erirec { // erirec namespace
+namespace erirec {  // erirec namespace
 
 /// @brief Computes (PG|1/|r-r'||PG)  integrals for GTOs pair block.
 /// @param distributor The pointer to screening data distributor.
@@ -47,9 +47,7 @@ namespace erirec { // erirec namespace
 /// @param gto_indices The range [gto_first, gto_last) of GTOs on bra and ket sides.
 template <class T>
 auto
-comp_diag_electron_repulsion_pgpg(T& distributor,
-                                  const CGtoPairBlock& gto_pair_block,
-                                  const std::pair<size_t, size_t>& gto_indices) -> void
+comp_diag_electron_repulsion_pgpg(T& distributor, const CGtoPairBlock& gto_pair_block, const std::pair<size_t, size_t>& gto_indices) -> void
 {
     // intialize GTOs pair data
 
@@ -428,7 +426,6 @@ comp_diag_electron_repulsion_pgpg(T& distributor,
             t2cfunc::reduce(cbuffer, 540, pbuffer, 4845, 315, ket_width, npgtos);
 
             t2cfunc::reduce(cbuffer, 855, pbuffer, 5160, 441, ket_width, npgtos);
-
         }
 
         erirec::comp_ket_hrr_electron_repulsion_xxpg(ckbuffer, 0, cbuffer, 0, 225, cfactors, 6, 0, 4);
@@ -443,12 +440,12 @@ comp_diag_electron_repulsion_pgpg(T& distributor,
 
         t4cfunc::bra_transform<1, 4>(sbuffer, 0, skbuffer, 972, 1, 4);
 
-        t4cfunc::update_max_values(max_values, sbuffer, i - gto_indices.first); 
+        t4cfunc::update_max_values(max_values, sbuffer, i - gto_indices.first);
     }
 
     distributor.distribute(max_values, gto_indices);
 }
 
-} // erirec namespace
+}  // namespace erirec
 
 #endif /* ElectronRepulsionDiagRecPGPG_hpp */

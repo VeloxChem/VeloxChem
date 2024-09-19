@@ -2,17 +2,17 @@
 #define ElectronRepulsionDiagRecSSSS_hpp
 
 #include <cstddef>
-#include <vector>
 #include <utility>
+#include <vector>
 
-#include "ElectronRepulsionPrimRecSSSS.hpp"
-#include "SimdArray.hpp"
 #include "BoysFunc.hpp"
-#include "T4CUtils.hpp"
-#include "T2CUtils.hpp"
+#include "ElectronRepulsionPrimRecSSSS.hpp"
 #include "GtoPairBlock.hpp"
+#include "SimdArray.hpp"
+#include "T2CUtils.hpp"
+#include "T4CUtils.hpp"
 
-namespace erirec { // erirec namespace
+namespace erirec {  // erirec namespace
 
 /// @brief Computes (SS|1/|r-r'||SS)  integrals for GTOs pair block.
 /// @param distributor The pointer to screening data distributor.
@@ -20,9 +20,7 @@ namespace erirec { // erirec namespace
 /// @param gto_indices The range [gto_first, gto_last) of GTOs on bra and ket sides.
 template <class T>
 auto
-comp_diag_electron_repulsion_ssss(T& distributor,
-                                  const CGtoPairBlock& gto_pair_block,
-                                  const std::pair<size_t, size_t>& gto_indices) -> void
+comp_diag_electron_repulsion_ssss(T& distributor, const CGtoPairBlock& gto_pair_block, const std::pair<size_t, size_t>& gto_indices) -> void
 {
     // intialize GTOs pair data
 
@@ -161,19 +159,18 @@ comp_diag_electron_repulsion_ssss(T& distributor,
             erirec::comp_prim_electron_repulsion_ssss(pbuffer, 0, pfactors, 16, bf_data, 0);
 
             t2cfunc::reduce(cbuffer, 0, pbuffer, 0, 1, ket_width, npgtos);
-
         }
 
         t4cfunc::ket_transform<0, 0>(skbuffer, 0, cbuffer, 0, 0, 0);
 
         t4cfunc::bra_transform<0, 0>(sbuffer, 0, skbuffer, 0, 0, 0);
 
-        t4cfunc::update_max_values(max_values, sbuffer, i - gto_indices.first); 
+        t4cfunc::update_max_values(max_values, sbuffer, i - gto_indices.first);
     }
 
     distributor.distribute(max_values, gto_indices);
 }
 
-} // erirec namespace
+}  // namespace erirec
 
 #endif /* ElectronRepulsionDiagRecSSSS_hpp */

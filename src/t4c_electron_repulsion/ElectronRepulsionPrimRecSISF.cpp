@@ -1,20 +1,20 @@
 #include "ElectronRepulsionPrimRecSISF.hpp"
 
-namespace erirec { // erirec namespace
+namespace erirec {  // erirec namespace
 
 auto
-comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
-                                  const size_t idx_eri_0_sisf,
-                                  size_t idx_eri_0_sgsf,
-                                  size_t idx_eri_1_sgsf,
-                                  size_t idx_eri_1_shsd,
-                                  size_t idx_eri_0_shsf,
-                                  size_t idx_eri_1_shsf,
-                                  CSimdArray<double>& factors,
-                                  const size_t idx_wp,
+comp_prim_electron_repulsion_sisf(CSimdArray<double>&   pbuffer,
+                                  const size_t          idx_eri_0_sisf,
+                                  size_t                idx_eri_0_sgsf,
+                                  size_t                idx_eri_1_sgsf,
+                                  size_t                idx_eri_1_shsd,
+                                  size_t                idx_eri_0_shsf,
+                                  size_t                idx_eri_1_shsf,
+                                  CSimdArray<double>&   factors,
+                                  const size_t          idx_wp,
                                   const TPoint<double>& r_pb,
-                                  const double a_exp,
-                                  const double b_exp) -> void
+                                  const double          a_exp,
+                                  const double          b_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -1178,7 +1178,65 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xxxxxx_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 9);
 
-    #pragma omp simd aligned(g_0_xxxx_0_xxx_0, g_0_xxxx_0_xxx_1, g_0_xxxx_0_xxy_0, g_0_xxxx_0_xxy_1, g_0_xxxx_0_xxz_0, g_0_xxxx_0_xxz_1, g_0_xxxx_0_xyy_0, g_0_xxxx_0_xyy_1, g_0_xxxx_0_xyz_0, g_0_xxxx_0_xyz_1, g_0_xxxx_0_xzz_0, g_0_xxxx_0_xzz_1, g_0_xxxx_0_yyy_0, g_0_xxxx_0_yyy_1, g_0_xxxx_0_yyz_0, g_0_xxxx_0_yyz_1, g_0_xxxx_0_yzz_0, g_0_xxxx_0_yzz_1, g_0_xxxx_0_zzz_0, g_0_xxxx_0_zzz_1, g_0_xxxxx_0_xx_1, g_0_xxxxx_0_xxx_0, g_0_xxxxx_0_xxx_1, g_0_xxxxx_0_xxy_0, g_0_xxxxx_0_xxy_1, g_0_xxxxx_0_xxz_0, g_0_xxxxx_0_xxz_1, g_0_xxxxx_0_xy_1, g_0_xxxxx_0_xyy_0, g_0_xxxxx_0_xyy_1, g_0_xxxxx_0_xyz_0, g_0_xxxxx_0_xyz_1, g_0_xxxxx_0_xz_1, g_0_xxxxx_0_xzz_0, g_0_xxxxx_0_xzz_1, g_0_xxxxx_0_yy_1, g_0_xxxxx_0_yyy_0, g_0_xxxxx_0_yyy_1, g_0_xxxxx_0_yyz_0, g_0_xxxxx_0_yyz_1, g_0_xxxxx_0_yz_1, g_0_xxxxx_0_yzz_0, g_0_xxxxx_0_yzz_1, g_0_xxxxx_0_zz_1, g_0_xxxxx_0_zzz_0, g_0_xxxxx_0_zzz_1, g_0_xxxxxx_0_xxx_0, g_0_xxxxxx_0_xxy_0, g_0_xxxxxx_0_xxz_0, g_0_xxxxxx_0_xyy_0, g_0_xxxxxx_0_xyz_0, g_0_xxxxxx_0_xzz_0, g_0_xxxxxx_0_yyy_0, g_0_xxxxxx_0_yyz_0, g_0_xxxxxx_0_yzz_0, g_0_xxxxxx_0_zzz_0, wp_x, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xxxx_0_xxx_0,       \
+                             g_0_xxxx_0_xxx_1,   \
+                             g_0_xxxx_0_xxy_0,   \
+                             g_0_xxxx_0_xxy_1,   \
+                             g_0_xxxx_0_xxz_0,   \
+                             g_0_xxxx_0_xxz_1,   \
+                             g_0_xxxx_0_xyy_0,   \
+                             g_0_xxxx_0_xyy_1,   \
+                             g_0_xxxx_0_xyz_0,   \
+                             g_0_xxxx_0_xyz_1,   \
+                             g_0_xxxx_0_xzz_0,   \
+                             g_0_xxxx_0_xzz_1,   \
+                             g_0_xxxx_0_yyy_0,   \
+                             g_0_xxxx_0_yyy_1,   \
+                             g_0_xxxx_0_yyz_0,   \
+                             g_0_xxxx_0_yyz_1,   \
+                             g_0_xxxx_0_yzz_0,   \
+                             g_0_xxxx_0_yzz_1,   \
+                             g_0_xxxx_0_zzz_0,   \
+                             g_0_xxxx_0_zzz_1,   \
+                             g_0_xxxxx_0_xx_1,   \
+                             g_0_xxxxx_0_xxx_0,  \
+                             g_0_xxxxx_0_xxx_1,  \
+                             g_0_xxxxx_0_xxy_0,  \
+                             g_0_xxxxx_0_xxy_1,  \
+                             g_0_xxxxx_0_xxz_0,  \
+                             g_0_xxxxx_0_xxz_1,  \
+                             g_0_xxxxx_0_xy_1,   \
+                             g_0_xxxxx_0_xyy_0,  \
+                             g_0_xxxxx_0_xyy_1,  \
+                             g_0_xxxxx_0_xyz_0,  \
+                             g_0_xxxxx_0_xyz_1,  \
+                             g_0_xxxxx_0_xz_1,   \
+                             g_0_xxxxx_0_xzz_0,  \
+                             g_0_xxxxx_0_xzz_1,  \
+                             g_0_xxxxx_0_yy_1,   \
+                             g_0_xxxxx_0_yyy_0,  \
+                             g_0_xxxxx_0_yyy_1,  \
+                             g_0_xxxxx_0_yyz_0,  \
+                             g_0_xxxxx_0_yyz_1,  \
+                             g_0_xxxxx_0_yz_1,   \
+                             g_0_xxxxx_0_yzz_0,  \
+                             g_0_xxxxx_0_yzz_1,  \
+                             g_0_xxxxx_0_zz_1,   \
+                             g_0_xxxxx_0_zzz_0,  \
+                             g_0_xxxxx_0_zzz_1,  \
+                             g_0_xxxxxx_0_xxx_0, \
+                             g_0_xxxxxx_0_xxy_0, \
+                             g_0_xxxxxx_0_xxz_0, \
+                             g_0_xxxxxx_0_xyy_0, \
+                             g_0_xxxxxx_0_xyz_0, \
+                             g_0_xxxxxx_0_xzz_0, \
+                             g_0_xxxxxx_0_yyy_0, \
+                             g_0_xxxxxx_0_yyz_0, \
+                             g_0_xxxxxx_0_yzz_0, \
+                             g_0_xxxxxx_0_zzz_0, \
+                             wp_x,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -1187,25 +1245,35 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxxxxx_0_xxx_0[i] = 5.0 * g_0_xxxx_0_xxx_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_xxx_1[i] * fti_ab_0 + 3.0 * g_0_xxxxx_0_xx_1[i] * fi_abcd_0 + g_0_xxxxx_0_xxx_0[i] * pb_x + g_0_xxxxx_0_xxx_1[i] * wp_x[i];
+        g_0_xxxxxx_0_xxx_0[i] = 5.0 * g_0_xxxx_0_xxx_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_xxx_1[i] * fti_ab_0 + 3.0 * g_0_xxxxx_0_xx_1[i] * fi_abcd_0 +
+                                g_0_xxxxx_0_xxx_0[i] * pb_x + g_0_xxxxx_0_xxx_1[i] * wp_x[i];
 
-        g_0_xxxxxx_0_xxy_0[i] = 5.0 * g_0_xxxx_0_xxy_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_xxy_1[i] * fti_ab_0 + 2.0 * g_0_xxxxx_0_xy_1[i] * fi_abcd_0 + g_0_xxxxx_0_xxy_0[i] * pb_x + g_0_xxxxx_0_xxy_1[i] * wp_x[i];
+        g_0_xxxxxx_0_xxy_0[i] = 5.0 * g_0_xxxx_0_xxy_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_xxy_1[i] * fti_ab_0 + 2.0 * g_0_xxxxx_0_xy_1[i] * fi_abcd_0 +
+                                g_0_xxxxx_0_xxy_0[i] * pb_x + g_0_xxxxx_0_xxy_1[i] * wp_x[i];
 
-        g_0_xxxxxx_0_xxz_0[i] = 5.0 * g_0_xxxx_0_xxz_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_xxz_1[i] * fti_ab_0 + 2.0 * g_0_xxxxx_0_xz_1[i] * fi_abcd_0 + g_0_xxxxx_0_xxz_0[i] * pb_x + g_0_xxxxx_0_xxz_1[i] * wp_x[i];
+        g_0_xxxxxx_0_xxz_0[i] = 5.0 * g_0_xxxx_0_xxz_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_xxz_1[i] * fti_ab_0 + 2.0 * g_0_xxxxx_0_xz_1[i] * fi_abcd_0 +
+                                g_0_xxxxx_0_xxz_0[i] * pb_x + g_0_xxxxx_0_xxz_1[i] * wp_x[i];
 
-        g_0_xxxxxx_0_xyy_0[i] = 5.0 * g_0_xxxx_0_xyy_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_xyy_1[i] * fti_ab_0 + g_0_xxxxx_0_yy_1[i] * fi_abcd_0 + g_0_xxxxx_0_xyy_0[i] * pb_x + g_0_xxxxx_0_xyy_1[i] * wp_x[i];
+        g_0_xxxxxx_0_xyy_0[i] = 5.0 * g_0_xxxx_0_xyy_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_xyy_1[i] * fti_ab_0 + g_0_xxxxx_0_yy_1[i] * fi_abcd_0 +
+                                g_0_xxxxx_0_xyy_0[i] * pb_x + g_0_xxxxx_0_xyy_1[i] * wp_x[i];
 
-        g_0_xxxxxx_0_xyz_0[i] = 5.0 * g_0_xxxx_0_xyz_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_xyz_1[i] * fti_ab_0 + g_0_xxxxx_0_yz_1[i] * fi_abcd_0 + g_0_xxxxx_0_xyz_0[i] * pb_x + g_0_xxxxx_0_xyz_1[i] * wp_x[i];
+        g_0_xxxxxx_0_xyz_0[i] = 5.0 * g_0_xxxx_0_xyz_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_xyz_1[i] * fti_ab_0 + g_0_xxxxx_0_yz_1[i] * fi_abcd_0 +
+                                g_0_xxxxx_0_xyz_0[i] * pb_x + g_0_xxxxx_0_xyz_1[i] * wp_x[i];
 
-        g_0_xxxxxx_0_xzz_0[i] = 5.0 * g_0_xxxx_0_xzz_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_xzz_1[i] * fti_ab_0 + g_0_xxxxx_0_zz_1[i] * fi_abcd_0 + g_0_xxxxx_0_xzz_0[i] * pb_x + g_0_xxxxx_0_xzz_1[i] * wp_x[i];
+        g_0_xxxxxx_0_xzz_0[i] = 5.0 * g_0_xxxx_0_xzz_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_xzz_1[i] * fti_ab_0 + g_0_xxxxx_0_zz_1[i] * fi_abcd_0 +
+                                g_0_xxxxx_0_xzz_0[i] * pb_x + g_0_xxxxx_0_xzz_1[i] * wp_x[i];
 
-        g_0_xxxxxx_0_yyy_0[i] = 5.0 * g_0_xxxx_0_yyy_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_yyy_1[i] * fti_ab_0 + g_0_xxxxx_0_yyy_0[i] * pb_x + g_0_xxxxx_0_yyy_1[i] * wp_x[i];
+        g_0_xxxxxx_0_yyy_0[i] =
+            5.0 * g_0_xxxx_0_yyy_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_yyy_1[i] * fti_ab_0 + g_0_xxxxx_0_yyy_0[i] * pb_x + g_0_xxxxx_0_yyy_1[i] * wp_x[i];
 
-        g_0_xxxxxx_0_yyz_0[i] = 5.0 * g_0_xxxx_0_yyz_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_yyz_1[i] * fti_ab_0 + g_0_xxxxx_0_yyz_0[i] * pb_x + g_0_xxxxx_0_yyz_1[i] * wp_x[i];
+        g_0_xxxxxx_0_yyz_0[i] =
+            5.0 * g_0_xxxx_0_yyz_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_yyz_1[i] * fti_ab_0 + g_0_xxxxx_0_yyz_0[i] * pb_x + g_0_xxxxx_0_yyz_1[i] * wp_x[i];
 
-        g_0_xxxxxx_0_yzz_0[i] = 5.0 * g_0_xxxx_0_yzz_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_yzz_1[i] * fti_ab_0 + g_0_xxxxx_0_yzz_0[i] * pb_x + g_0_xxxxx_0_yzz_1[i] * wp_x[i];
+        g_0_xxxxxx_0_yzz_0[i] =
+            5.0 * g_0_xxxx_0_yzz_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_yzz_1[i] * fti_ab_0 + g_0_xxxxx_0_yzz_0[i] * pb_x + g_0_xxxxx_0_yzz_1[i] * wp_x[i];
 
-        g_0_xxxxxx_0_zzz_0[i] = 5.0 * g_0_xxxx_0_zzz_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_zzz_1[i] * fti_ab_0 + g_0_xxxxx_0_zzz_0[i] * pb_x + g_0_xxxxx_0_zzz_1[i] * wp_x[i];
+        g_0_xxxxxx_0_zzz_0[i] =
+            5.0 * g_0_xxxx_0_zzz_0[i] * fi_ab_0 - 5.0 * g_0_xxxx_0_zzz_1[i] * fti_ab_0 + g_0_xxxxx_0_zzz_0[i] * pb_x + g_0_xxxxx_0_zzz_1[i] * wp_x[i];
     }
 
     /// Set up 10-20 components of targeted buffer : SISF
@@ -1230,7 +1298,45 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xxxxxy_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 19);
 
-    #pragma omp simd aligned(g_0_xxxxx_0_xx_1, g_0_xxxxx_0_xxx_0, g_0_xxxxx_0_xxx_1, g_0_xxxxx_0_xxy_0, g_0_xxxxx_0_xxy_1, g_0_xxxxx_0_xxz_0, g_0_xxxxx_0_xxz_1, g_0_xxxxx_0_xy_1, g_0_xxxxx_0_xyy_0, g_0_xxxxx_0_xyy_1, g_0_xxxxx_0_xyz_0, g_0_xxxxx_0_xyz_1, g_0_xxxxx_0_xz_1, g_0_xxxxx_0_xzz_0, g_0_xxxxx_0_xzz_1, g_0_xxxxx_0_yy_1, g_0_xxxxx_0_yyy_0, g_0_xxxxx_0_yyy_1, g_0_xxxxx_0_yyz_0, g_0_xxxxx_0_yyz_1, g_0_xxxxx_0_yz_1, g_0_xxxxx_0_yzz_0, g_0_xxxxx_0_yzz_1, g_0_xxxxx_0_zz_1, g_0_xxxxx_0_zzz_0, g_0_xxxxx_0_zzz_1, g_0_xxxxxy_0_xxx_0, g_0_xxxxxy_0_xxy_0, g_0_xxxxxy_0_xxz_0, g_0_xxxxxy_0_xyy_0, g_0_xxxxxy_0_xyz_0, g_0_xxxxxy_0_xzz_0, g_0_xxxxxy_0_yyy_0, g_0_xxxxxy_0_yyz_0, g_0_xxxxxy_0_yzz_0, g_0_xxxxxy_0_zzz_0, wp_y, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xxxxx_0_xx_1,       \
+                             g_0_xxxxx_0_xxx_0,  \
+                             g_0_xxxxx_0_xxx_1,  \
+                             g_0_xxxxx_0_xxy_0,  \
+                             g_0_xxxxx_0_xxy_1,  \
+                             g_0_xxxxx_0_xxz_0,  \
+                             g_0_xxxxx_0_xxz_1,  \
+                             g_0_xxxxx_0_xy_1,   \
+                             g_0_xxxxx_0_xyy_0,  \
+                             g_0_xxxxx_0_xyy_1,  \
+                             g_0_xxxxx_0_xyz_0,  \
+                             g_0_xxxxx_0_xyz_1,  \
+                             g_0_xxxxx_0_xz_1,   \
+                             g_0_xxxxx_0_xzz_0,  \
+                             g_0_xxxxx_0_xzz_1,  \
+                             g_0_xxxxx_0_yy_1,   \
+                             g_0_xxxxx_0_yyy_0,  \
+                             g_0_xxxxx_0_yyy_1,  \
+                             g_0_xxxxx_0_yyz_0,  \
+                             g_0_xxxxx_0_yyz_1,  \
+                             g_0_xxxxx_0_yz_1,   \
+                             g_0_xxxxx_0_yzz_0,  \
+                             g_0_xxxxx_0_yzz_1,  \
+                             g_0_xxxxx_0_zz_1,   \
+                             g_0_xxxxx_0_zzz_0,  \
+                             g_0_xxxxx_0_zzz_1,  \
+                             g_0_xxxxxy_0_xxx_0, \
+                             g_0_xxxxxy_0_xxy_0, \
+                             g_0_xxxxxy_0_xxz_0, \
+                             g_0_xxxxxy_0_xyy_0, \
+                             g_0_xxxxxy_0_xyz_0, \
+                             g_0_xxxxxy_0_xzz_0, \
+                             g_0_xxxxxy_0_yyy_0, \
+                             g_0_xxxxxy_0_yyz_0, \
+                             g_0_xxxxxy_0_yzz_0, \
+                             g_0_xxxxxy_0_zzz_0, \
+                             wp_y,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -1278,7 +1384,45 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xxxxxz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 29);
 
-    #pragma omp simd aligned(g_0_xxxxx_0_xx_1, g_0_xxxxx_0_xxx_0, g_0_xxxxx_0_xxx_1, g_0_xxxxx_0_xxy_0, g_0_xxxxx_0_xxy_1, g_0_xxxxx_0_xxz_0, g_0_xxxxx_0_xxz_1, g_0_xxxxx_0_xy_1, g_0_xxxxx_0_xyy_0, g_0_xxxxx_0_xyy_1, g_0_xxxxx_0_xyz_0, g_0_xxxxx_0_xyz_1, g_0_xxxxx_0_xz_1, g_0_xxxxx_0_xzz_0, g_0_xxxxx_0_xzz_1, g_0_xxxxx_0_yy_1, g_0_xxxxx_0_yyy_0, g_0_xxxxx_0_yyy_1, g_0_xxxxx_0_yyz_0, g_0_xxxxx_0_yyz_1, g_0_xxxxx_0_yz_1, g_0_xxxxx_0_yzz_0, g_0_xxxxx_0_yzz_1, g_0_xxxxx_0_zz_1, g_0_xxxxx_0_zzz_0, g_0_xxxxx_0_zzz_1, g_0_xxxxxz_0_xxx_0, g_0_xxxxxz_0_xxy_0, g_0_xxxxxz_0_xxz_0, g_0_xxxxxz_0_xyy_0, g_0_xxxxxz_0_xyz_0, g_0_xxxxxz_0_xzz_0, g_0_xxxxxz_0_yyy_0, g_0_xxxxxz_0_yyz_0, g_0_xxxxxz_0_yzz_0, g_0_xxxxxz_0_zzz_0, wp_z, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xxxxx_0_xx_1,       \
+                             g_0_xxxxx_0_xxx_0,  \
+                             g_0_xxxxx_0_xxx_1,  \
+                             g_0_xxxxx_0_xxy_0,  \
+                             g_0_xxxxx_0_xxy_1,  \
+                             g_0_xxxxx_0_xxz_0,  \
+                             g_0_xxxxx_0_xxz_1,  \
+                             g_0_xxxxx_0_xy_1,   \
+                             g_0_xxxxx_0_xyy_0,  \
+                             g_0_xxxxx_0_xyy_1,  \
+                             g_0_xxxxx_0_xyz_0,  \
+                             g_0_xxxxx_0_xyz_1,  \
+                             g_0_xxxxx_0_xz_1,   \
+                             g_0_xxxxx_0_xzz_0,  \
+                             g_0_xxxxx_0_xzz_1,  \
+                             g_0_xxxxx_0_yy_1,   \
+                             g_0_xxxxx_0_yyy_0,  \
+                             g_0_xxxxx_0_yyy_1,  \
+                             g_0_xxxxx_0_yyz_0,  \
+                             g_0_xxxxx_0_yyz_1,  \
+                             g_0_xxxxx_0_yz_1,   \
+                             g_0_xxxxx_0_yzz_0,  \
+                             g_0_xxxxx_0_yzz_1,  \
+                             g_0_xxxxx_0_zz_1,   \
+                             g_0_xxxxx_0_zzz_0,  \
+                             g_0_xxxxx_0_zzz_1,  \
+                             g_0_xxxxxz_0_xxx_0, \
+                             g_0_xxxxxz_0_xxy_0, \
+                             g_0_xxxxxz_0_xxz_0, \
+                             g_0_xxxxxz_0_xyy_0, \
+                             g_0_xxxxxz_0_xyz_0, \
+                             g_0_xxxxxz_0_xzz_0, \
+                             g_0_xxxxxz_0_yyy_0, \
+                             g_0_xxxxxz_0_yyz_0, \
+                             g_0_xxxxxz_0_yzz_0, \
+                             g_0_xxxxxz_0_zzz_0, \
+                             wp_z,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -1326,7 +1470,63 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xxxxyy_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 39);
 
-    #pragma omp simd aligned(g_0_xxxx_0_xxx_0, g_0_xxxx_0_xxx_1, g_0_xxxx_0_xxz_0, g_0_xxxx_0_xxz_1, g_0_xxxx_0_xzz_0, g_0_xxxx_0_xzz_1, g_0_xxxxy_0_xxx_0, g_0_xxxxy_0_xxx_1, g_0_xxxxy_0_xxz_0, g_0_xxxxy_0_xxz_1, g_0_xxxxy_0_xzz_0, g_0_xxxxy_0_xzz_1, g_0_xxxxyy_0_xxx_0, g_0_xxxxyy_0_xxy_0, g_0_xxxxyy_0_xxz_0, g_0_xxxxyy_0_xyy_0, g_0_xxxxyy_0_xyz_0, g_0_xxxxyy_0_xzz_0, g_0_xxxxyy_0_yyy_0, g_0_xxxxyy_0_yyz_0, g_0_xxxxyy_0_yzz_0, g_0_xxxxyy_0_zzz_0, g_0_xxxyy_0_xxy_0, g_0_xxxyy_0_xxy_1, g_0_xxxyy_0_xy_1, g_0_xxxyy_0_xyy_0, g_0_xxxyy_0_xyy_1, g_0_xxxyy_0_xyz_0, g_0_xxxyy_0_xyz_1, g_0_xxxyy_0_yy_1, g_0_xxxyy_0_yyy_0, g_0_xxxyy_0_yyy_1, g_0_xxxyy_0_yyz_0, g_0_xxxyy_0_yyz_1, g_0_xxxyy_0_yz_1, g_0_xxxyy_0_yzz_0, g_0_xxxyy_0_yzz_1, g_0_xxxyy_0_zzz_0, g_0_xxxyy_0_zzz_1, g_0_xxyy_0_xxy_0, g_0_xxyy_0_xxy_1, g_0_xxyy_0_xyy_0, g_0_xxyy_0_xyy_1, g_0_xxyy_0_xyz_0, g_0_xxyy_0_xyz_1, g_0_xxyy_0_yyy_0, g_0_xxyy_0_yyy_1, g_0_xxyy_0_yyz_0, g_0_xxyy_0_yyz_1, g_0_xxyy_0_yzz_0, g_0_xxyy_0_yzz_1, g_0_xxyy_0_zzz_0, g_0_xxyy_0_zzz_1, wp_x, wp_y, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xxxx_0_xxx_0,       \
+                             g_0_xxxx_0_xxx_1,   \
+                             g_0_xxxx_0_xxz_0,   \
+                             g_0_xxxx_0_xxz_1,   \
+                             g_0_xxxx_0_xzz_0,   \
+                             g_0_xxxx_0_xzz_1,   \
+                             g_0_xxxxy_0_xxx_0,  \
+                             g_0_xxxxy_0_xxx_1,  \
+                             g_0_xxxxy_0_xxz_0,  \
+                             g_0_xxxxy_0_xxz_1,  \
+                             g_0_xxxxy_0_xzz_0,  \
+                             g_0_xxxxy_0_xzz_1,  \
+                             g_0_xxxxyy_0_xxx_0, \
+                             g_0_xxxxyy_0_xxy_0, \
+                             g_0_xxxxyy_0_xxz_0, \
+                             g_0_xxxxyy_0_xyy_0, \
+                             g_0_xxxxyy_0_xyz_0, \
+                             g_0_xxxxyy_0_xzz_0, \
+                             g_0_xxxxyy_0_yyy_0, \
+                             g_0_xxxxyy_0_yyz_0, \
+                             g_0_xxxxyy_0_yzz_0, \
+                             g_0_xxxxyy_0_zzz_0, \
+                             g_0_xxxyy_0_xxy_0,  \
+                             g_0_xxxyy_0_xxy_1,  \
+                             g_0_xxxyy_0_xy_1,   \
+                             g_0_xxxyy_0_xyy_0,  \
+                             g_0_xxxyy_0_xyy_1,  \
+                             g_0_xxxyy_0_xyz_0,  \
+                             g_0_xxxyy_0_xyz_1,  \
+                             g_0_xxxyy_0_yy_1,   \
+                             g_0_xxxyy_0_yyy_0,  \
+                             g_0_xxxyy_0_yyy_1,  \
+                             g_0_xxxyy_0_yyz_0,  \
+                             g_0_xxxyy_0_yyz_1,  \
+                             g_0_xxxyy_0_yz_1,   \
+                             g_0_xxxyy_0_yzz_0,  \
+                             g_0_xxxyy_0_yzz_1,  \
+                             g_0_xxxyy_0_zzz_0,  \
+                             g_0_xxxyy_0_zzz_1,  \
+                             g_0_xxyy_0_xxy_0,   \
+                             g_0_xxyy_0_xxy_1,   \
+                             g_0_xxyy_0_xyy_0,   \
+                             g_0_xxyy_0_xyy_1,   \
+                             g_0_xxyy_0_xyz_0,   \
+                             g_0_xxyy_0_xyz_1,   \
+                             g_0_xxyy_0_yyy_0,   \
+                             g_0_xxyy_0_yyy_1,   \
+                             g_0_xxyy_0_yyz_0,   \
+                             g_0_xxyy_0_yyz_1,   \
+                             g_0_xxyy_0_yzz_0,   \
+                             g_0_xxyy_0_yzz_1,   \
+                             g_0_xxyy_0_zzz_0,   \
+                             g_0_xxyy_0_zzz_1,   \
+                             wp_x,               \
+                             wp_y,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -1335,25 +1535,35 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxxxyy_0_xxx_0[i] = g_0_xxxx_0_xxx_0[i] * fi_ab_0 - g_0_xxxx_0_xxx_1[i] * fti_ab_0 + g_0_xxxxy_0_xxx_0[i] * pb_y + g_0_xxxxy_0_xxx_1[i] * wp_y[i];
+        g_0_xxxxyy_0_xxx_0[i] =
+            g_0_xxxx_0_xxx_0[i] * fi_ab_0 - g_0_xxxx_0_xxx_1[i] * fti_ab_0 + g_0_xxxxy_0_xxx_0[i] * pb_y + g_0_xxxxy_0_xxx_1[i] * wp_y[i];
 
-        g_0_xxxxyy_0_xxy_0[i] = 3.0 * g_0_xxyy_0_xxy_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_xxy_1[i] * fti_ab_0 + 2.0 * g_0_xxxyy_0_xy_1[i] * fi_abcd_0 + g_0_xxxyy_0_xxy_0[i] * pb_x + g_0_xxxyy_0_xxy_1[i] * wp_x[i];
+        g_0_xxxxyy_0_xxy_0[i] = 3.0 * g_0_xxyy_0_xxy_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_xxy_1[i] * fti_ab_0 + 2.0 * g_0_xxxyy_0_xy_1[i] * fi_abcd_0 +
+                                g_0_xxxyy_0_xxy_0[i] * pb_x + g_0_xxxyy_0_xxy_1[i] * wp_x[i];
 
-        g_0_xxxxyy_0_xxz_0[i] = g_0_xxxx_0_xxz_0[i] * fi_ab_0 - g_0_xxxx_0_xxz_1[i] * fti_ab_0 + g_0_xxxxy_0_xxz_0[i] * pb_y + g_0_xxxxy_0_xxz_1[i] * wp_y[i];
+        g_0_xxxxyy_0_xxz_0[i] =
+            g_0_xxxx_0_xxz_0[i] * fi_ab_0 - g_0_xxxx_0_xxz_1[i] * fti_ab_0 + g_0_xxxxy_0_xxz_0[i] * pb_y + g_0_xxxxy_0_xxz_1[i] * wp_y[i];
 
-        g_0_xxxxyy_0_xyy_0[i] = 3.0 * g_0_xxyy_0_xyy_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_xyy_1[i] * fti_ab_0 + g_0_xxxyy_0_yy_1[i] * fi_abcd_0 + g_0_xxxyy_0_xyy_0[i] * pb_x + g_0_xxxyy_0_xyy_1[i] * wp_x[i];
+        g_0_xxxxyy_0_xyy_0[i] = 3.0 * g_0_xxyy_0_xyy_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_xyy_1[i] * fti_ab_0 + g_0_xxxyy_0_yy_1[i] * fi_abcd_0 +
+                                g_0_xxxyy_0_xyy_0[i] * pb_x + g_0_xxxyy_0_xyy_1[i] * wp_x[i];
 
-        g_0_xxxxyy_0_xyz_0[i] = 3.0 * g_0_xxyy_0_xyz_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_xyz_1[i] * fti_ab_0 + g_0_xxxyy_0_yz_1[i] * fi_abcd_0 + g_0_xxxyy_0_xyz_0[i] * pb_x + g_0_xxxyy_0_xyz_1[i] * wp_x[i];
+        g_0_xxxxyy_0_xyz_0[i] = 3.0 * g_0_xxyy_0_xyz_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_xyz_1[i] * fti_ab_0 + g_0_xxxyy_0_yz_1[i] * fi_abcd_0 +
+                                g_0_xxxyy_0_xyz_0[i] * pb_x + g_0_xxxyy_0_xyz_1[i] * wp_x[i];
 
-        g_0_xxxxyy_0_xzz_0[i] = g_0_xxxx_0_xzz_0[i] * fi_ab_0 - g_0_xxxx_0_xzz_1[i] * fti_ab_0 + g_0_xxxxy_0_xzz_0[i] * pb_y + g_0_xxxxy_0_xzz_1[i] * wp_y[i];
+        g_0_xxxxyy_0_xzz_0[i] =
+            g_0_xxxx_0_xzz_0[i] * fi_ab_0 - g_0_xxxx_0_xzz_1[i] * fti_ab_0 + g_0_xxxxy_0_xzz_0[i] * pb_y + g_0_xxxxy_0_xzz_1[i] * wp_y[i];
 
-        g_0_xxxxyy_0_yyy_0[i] = 3.0 * g_0_xxyy_0_yyy_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_yyy_1[i] * fti_ab_0 + g_0_xxxyy_0_yyy_0[i] * pb_x + g_0_xxxyy_0_yyy_1[i] * wp_x[i];
+        g_0_xxxxyy_0_yyy_0[i] =
+            3.0 * g_0_xxyy_0_yyy_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_yyy_1[i] * fti_ab_0 + g_0_xxxyy_0_yyy_0[i] * pb_x + g_0_xxxyy_0_yyy_1[i] * wp_x[i];
 
-        g_0_xxxxyy_0_yyz_0[i] = 3.0 * g_0_xxyy_0_yyz_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_yyz_1[i] * fti_ab_0 + g_0_xxxyy_0_yyz_0[i] * pb_x + g_0_xxxyy_0_yyz_1[i] * wp_x[i];
+        g_0_xxxxyy_0_yyz_0[i] =
+            3.0 * g_0_xxyy_0_yyz_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_yyz_1[i] * fti_ab_0 + g_0_xxxyy_0_yyz_0[i] * pb_x + g_0_xxxyy_0_yyz_1[i] * wp_x[i];
 
-        g_0_xxxxyy_0_yzz_0[i] = 3.0 * g_0_xxyy_0_yzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_yzz_1[i] * fti_ab_0 + g_0_xxxyy_0_yzz_0[i] * pb_x + g_0_xxxyy_0_yzz_1[i] * wp_x[i];
+        g_0_xxxxyy_0_yzz_0[i] =
+            3.0 * g_0_xxyy_0_yzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_yzz_1[i] * fti_ab_0 + g_0_xxxyy_0_yzz_0[i] * pb_x + g_0_xxxyy_0_yzz_1[i] * wp_x[i];
 
-        g_0_xxxxyy_0_zzz_0[i] = 3.0 * g_0_xxyy_0_zzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_zzz_1[i] * fti_ab_0 + g_0_xxxyy_0_zzz_0[i] * pb_x + g_0_xxxyy_0_zzz_1[i] * wp_x[i];
+        g_0_xxxxyy_0_zzz_0[i] =
+            3.0 * g_0_xxyy_0_zzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_zzz_1[i] * fti_ab_0 + g_0_xxxyy_0_zzz_0[i] * pb_x + g_0_xxxyy_0_zzz_1[i] * wp_x[i];
     }
 
     /// Set up 40-50 components of targeted buffer : SISF
@@ -1378,7 +1588,43 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xxxxyz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 49);
 
-    #pragma omp simd aligned(g_0_xxxxy_0_xxy_0, g_0_xxxxy_0_xxy_1, g_0_xxxxy_0_xyy_0, g_0_xxxxy_0_xyy_1, g_0_xxxxy_0_yyy_0, g_0_xxxxy_0_yyy_1, g_0_xxxxyz_0_xxx_0, g_0_xxxxyz_0_xxy_0, g_0_xxxxyz_0_xxz_0, g_0_xxxxyz_0_xyy_0, g_0_xxxxyz_0_xyz_0, g_0_xxxxyz_0_xzz_0, g_0_xxxxyz_0_yyy_0, g_0_xxxxyz_0_yyz_0, g_0_xxxxyz_0_yzz_0, g_0_xxxxyz_0_zzz_0, g_0_xxxxz_0_xxx_0, g_0_xxxxz_0_xxx_1, g_0_xxxxz_0_xxz_0, g_0_xxxxz_0_xxz_1, g_0_xxxxz_0_xyz_0, g_0_xxxxz_0_xyz_1, g_0_xxxxz_0_xz_1, g_0_xxxxz_0_xzz_0, g_0_xxxxz_0_xzz_1, g_0_xxxxz_0_yyz_0, g_0_xxxxz_0_yyz_1, g_0_xxxxz_0_yz_1, g_0_xxxxz_0_yzz_0, g_0_xxxxz_0_yzz_1, g_0_xxxxz_0_zz_1, g_0_xxxxz_0_zzz_0, g_0_xxxxz_0_zzz_1, wp_y, wp_z, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xxxxy_0_xxy_0,      \
+                             g_0_xxxxy_0_xxy_1,  \
+                             g_0_xxxxy_0_xyy_0,  \
+                             g_0_xxxxy_0_xyy_1,  \
+                             g_0_xxxxy_0_yyy_0,  \
+                             g_0_xxxxy_0_yyy_1,  \
+                             g_0_xxxxyz_0_xxx_0, \
+                             g_0_xxxxyz_0_xxy_0, \
+                             g_0_xxxxyz_0_xxz_0, \
+                             g_0_xxxxyz_0_xyy_0, \
+                             g_0_xxxxyz_0_xyz_0, \
+                             g_0_xxxxyz_0_xzz_0, \
+                             g_0_xxxxyz_0_yyy_0, \
+                             g_0_xxxxyz_0_yyz_0, \
+                             g_0_xxxxyz_0_yzz_0, \
+                             g_0_xxxxyz_0_zzz_0, \
+                             g_0_xxxxz_0_xxx_0,  \
+                             g_0_xxxxz_0_xxx_1,  \
+                             g_0_xxxxz_0_xxz_0,  \
+                             g_0_xxxxz_0_xxz_1,  \
+                             g_0_xxxxz_0_xyz_0,  \
+                             g_0_xxxxz_0_xyz_1,  \
+                             g_0_xxxxz_0_xz_1,   \
+                             g_0_xxxxz_0_xzz_0,  \
+                             g_0_xxxxz_0_xzz_1,  \
+                             g_0_xxxxz_0_yyz_0,  \
+                             g_0_xxxxz_0_yyz_1,  \
+                             g_0_xxxxz_0_yz_1,   \
+                             g_0_xxxxz_0_yzz_0,  \
+                             g_0_xxxxz_0_yzz_1,  \
+                             g_0_xxxxz_0_zz_1,   \
+                             g_0_xxxxz_0_zzz_0,  \
+                             g_0_xxxxz_0_zzz_1,  \
+                             wp_y,               \
+                             wp_z,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -1426,7 +1672,63 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xxxxzz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 59);
 
-    #pragma omp simd aligned(g_0_xxxx_0_xxx_0, g_0_xxxx_0_xxx_1, g_0_xxxx_0_xxy_0, g_0_xxxx_0_xxy_1, g_0_xxxx_0_xyy_0, g_0_xxxx_0_xyy_1, g_0_xxxxz_0_xxx_0, g_0_xxxxz_0_xxx_1, g_0_xxxxz_0_xxy_0, g_0_xxxxz_0_xxy_1, g_0_xxxxz_0_xyy_0, g_0_xxxxz_0_xyy_1, g_0_xxxxzz_0_xxx_0, g_0_xxxxzz_0_xxy_0, g_0_xxxxzz_0_xxz_0, g_0_xxxxzz_0_xyy_0, g_0_xxxxzz_0_xyz_0, g_0_xxxxzz_0_xzz_0, g_0_xxxxzz_0_yyy_0, g_0_xxxxzz_0_yyz_0, g_0_xxxxzz_0_yzz_0, g_0_xxxxzz_0_zzz_0, g_0_xxxzz_0_xxz_0, g_0_xxxzz_0_xxz_1, g_0_xxxzz_0_xyz_0, g_0_xxxzz_0_xyz_1, g_0_xxxzz_0_xz_1, g_0_xxxzz_0_xzz_0, g_0_xxxzz_0_xzz_1, g_0_xxxzz_0_yyy_0, g_0_xxxzz_0_yyy_1, g_0_xxxzz_0_yyz_0, g_0_xxxzz_0_yyz_1, g_0_xxxzz_0_yz_1, g_0_xxxzz_0_yzz_0, g_0_xxxzz_0_yzz_1, g_0_xxxzz_0_zz_1, g_0_xxxzz_0_zzz_0, g_0_xxxzz_0_zzz_1, g_0_xxzz_0_xxz_0, g_0_xxzz_0_xxz_1, g_0_xxzz_0_xyz_0, g_0_xxzz_0_xyz_1, g_0_xxzz_0_xzz_0, g_0_xxzz_0_xzz_1, g_0_xxzz_0_yyy_0, g_0_xxzz_0_yyy_1, g_0_xxzz_0_yyz_0, g_0_xxzz_0_yyz_1, g_0_xxzz_0_yzz_0, g_0_xxzz_0_yzz_1, g_0_xxzz_0_zzz_0, g_0_xxzz_0_zzz_1, wp_x, wp_z, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xxxx_0_xxx_0,       \
+                             g_0_xxxx_0_xxx_1,   \
+                             g_0_xxxx_0_xxy_0,   \
+                             g_0_xxxx_0_xxy_1,   \
+                             g_0_xxxx_0_xyy_0,   \
+                             g_0_xxxx_0_xyy_1,   \
+                             g_0_xxxxz_0_xxx_0,  \
+                             g_0_xxxxz_0_xxx_1,  \
+                             g_0_xxxxz_0_xxy_0,  \
+                             g_0_xxxxz_0_xxy_1,  \
+                             g_0_xxxxz_0_xyy_0,  \
+                             g_0_xxxxz_0_xyy_1,  \
+                             g_0_xxxxzz_0_xxx_0, \
+                             g_0_xxxxzz_0_xxy_0, \
+                             g_0_xxxxzz_0_xxz_0, \
+                             g_0_xxxxzz_0_xyy_0, \
+                             g_0_xxxxzz_0_xyz_0, \
+                             g_0_xxxxzz_0_xzz_0, \
+                             g_0_xxxxzz_0_yyy_0, \
+                             g_0_xxxxzz_0_yyz_0, \
+                             g_0_xxxxzz_0_yzz_0, \
+                             g_0_xxxxzz_0_zzz_0, \
+                             g_0_xxxzz_0_xxz_0,  \
+                             g_0_xxxzz_0_xxz_1,  \
+                             g_0_xxxzz_0_xyz_0,  \
+                             g_0_xxxzz_0_xyz_1,  \
+                             g_0_xxxzz_0_xz_1,   \
+                             g_0_xxxzz_0_xzz_0,  \
+                             g_0_xxxzz_0_xzz_1,  \
+                             g_0_xxxzz_0_yyy_0,  \
+                             g_0_xxxzz_0_yyy_1,  \
+                             g_0_xxxzz_0_yyz_0,  \
+                             g_0_xxxzz_0_yyz_1,  \
+                             g_0_xxxzz_0_yz_1,   \
+                             g_0_xxxzz_0_yzz_0,  \
+                             g_0_xxxzz_0_yzz_1,  \
+                             g_0_xxxzz_0_zz_1,   \
+                             g_0_xxxzz_0_zzz_0,  \
+                             g_0_xxxzz_0_zzz_1,  \
+                             g_0_xxzz_0_xxz_0,   \
+                             g_0_xxzz_0_xxz_1,   \
+                             g_0_xxzz_0_xyz_0,   \
+                             g_0_xxzz_0_xyz_1,   \
+                             g_0_xxzz_0_xzz_0,   \
+                             g_0_xxzz_0_xzz_1,   \
+                             g_0_xxzz_0_yyy_0,   \
+                             g_0_xxzz_0_yyy_1,   \
+                             g_0_xxzz_0_yyz_0,   \
+                             g_0_xxzz_0_yyz_1,   \
+                             g_0_xxzz_0_yzz_0,   \
+                             g_0_xxzz_0_yzz_1,   \
+                             g_0_xxzz_0_zzz_0,   \
+                             g_0_xxzz_0_zzz_1,   \
+                             wp_x,               \
+                             wp_z,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -1435,25 +1737,35 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxxxzz_0_xxx_0[i] = g_0_xxxx_0_xxx_0[i] * fi_ab_0 - g_0_xxxx_0_xxx_1[i] * fti_ab_0 + g_0_xxxxz_0_xxx_0[i] * pb_z + g_0_xxxxz_0_xxx_1[i] * wp_z[i];
+        g_0_xxxxzz_0_xxx_0[i] =
+            g_0_xxxx_0_xxx_0[i] * fi_ab_0 - g_0_xxxx_0_xxx_1[i] * fti_ab_0 + g_0_xxxxz_0_xxx_0[i] * pb_z + g_0_xxxxz_0_xxx_1[i] * wp_z[i];
 
-        g_0_xxxxzz_0_xxy_0[i] = g_0_xxxx_0_xxy_0[i] * fi_ab_0 - g_0_xxxx_0_xxy_1[i] * fti_ab_0 + g_0_xxxxz_0_xxy_0[i] * pb_z + g_0_xxxxz_0_xxy_1[i] * wp_z[i];
+        g_0_xxxxzz_0_xxy_0[i] =
+            g_0_xxxx_0_xxy_0[i] * fi_ab_0 - g_0_xxxx_0_xxy_1[i] * fti_ab_0 + g_0_xxxxz_0_xxy_0[i] * pb_z + g_0_xxxxz_0_xxy_1[i] * wp_z[i];
 
-        g_0_xxxxzz_0_xxz_0[i] = 3.0 * g_0_xxzz_0_xxz_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_xxz_1[i] * fti_ab_0 + 2.0 * g_0_xxxzz_0_xz_1[i] * fi_abcd_0 + g_0_xxxzz_0_xxz_0[i] * pb_x + g_0_xxxzz_0_xxz_1[i] * wp_x[i];
+        g_0_xxxxzz_0_xxz_0[i] = 3.0 * g_0_xxzz_0_xxz_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_xxz_1[i] * fti_ab_0 + 2.0 * g_0_xxxzz_0_xz_1[i] * fi_abcd_0 +
+                                g_0_xxxzz_0_xxz_0[i] * pb_x + g_0_xxxzz_0_xxz_1[i] * wp_x[i];
 
-        g_0_xxxxzz_0_xyy_0[i] = g_0_xxxx_0_xyy_0[i] * fi_ab_0 - g_0_xxxx_0_xyy_1[i] * fti_ab_0 + g_0_xxxxz_0_xyy_0[i] * pb_z + g_0_xxxxz_0_xyy_1[i] * wp_z[i];
+        g_0_xxxxzz_0_xyy_0[i] =
+            g_0_xxxx_0_xyy_0[i] * fi_ab_0 - g_0_xxxx_0_xyy_1[i] * fti_ab_0 + g_0_xxxxz_0_xyy_0[i] * pb_z + g_0_xxxxz_0_xyy_1[i] * wp_z[i];
 
-        g_0_xxxxzz_0_xyz_0[i] = 3.0 * g_0_xxzz_0_xyz_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_xyz_1[i] * fti_ab_0 + g_0_xxxzz_0_yz_1[i] * fi_abcd_0 + g_0_xxxzz_0_xyz_0[i] * pb_x + g_0_xxxzz_0_xyz_1[i] * wp_x[i];
+        g_0_xxxxzz_0_xyz_0[i] = 3.0 * g_0_xxzz_0_xyz_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_xyz_1[i] * fti_ab_0 + g_0_xxxzz_0_yz_1[i] * fi_abcd_0 +
+                                g_0_xxxzz_0_xyz_0[i] * pb_x + g_0_xxxzz_0_xyz_1[i] * wp_x[i];
 
-        g_0_xxxxzz_0_xzz_0[i] = 3.0 * g_0_xxzz_0_xzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_xzz_1[i] * fti_ab_0 + g_0_xxxzz_0_zz_1[i] * fi_abcd_0 + g_0_xxxzz_0_xzz_0[i] * pb_x + g_0_xxxzz_0_xzz_1[i] * wp_x[i];
+        g_0_xxxxzz_0_xzz_0[i] = 3.0 * g_0_xxzz_0_xzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_xzz_1[i] * fti_ab_0 + g_0_xxxzz_0_zz_1[i] * fi_abcd_0 +
+                                g_0_xxxzz_0_xzz_0[i] * pb_x + g_0_xxxzz_0_xzz_1[i] * wp_x[i];
 
-        g_0_xxxxzz_0_yyy_0[i] = 3.0 * g_0_xxzz_0_yyy_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_yyy_1[i] * fti_ab_0 + g_0_xxxzz_0_yyy_0[i] * pb_x + g_0_xxxzz_0_yyy_1[i] * wp_x[i];
+        g_0_xxxxzz_0_yyy_0[i] =
+            3.0 * g_0_xxzz_0_yyy_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_yyy_1[i] * fti_ab_0 + g_0_xxxzz_0_yyy_0[i] * pb_x + g_0_xxxzz_0_yyy_1[i] * wp_x[i];
 
-        g_0_xxxxzz_0_yyz_0[i] = 3.0 * g_0_xxzz_0_yyz_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_yyz_1[i] * fti_ab_0 + g_0_xxxzz_0_yyz_0[i] * pb_x + g_0_xxxzz_0_yyz_1[i] * wp_x[i];
+        g_0_xxxxzz_0_yyz_0[i] =
+            3.0 * g_0_xxzz_0_yyz_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_yyz_1[i] * fti_ab_0 + g_0_xxxzz_0_yyz_0[i] * pb_x + g_0_xxxzz_0_yyz_1[i] * wp_x[i];
 
-        g_0_xxxxzz_0_yzz_0[i] = 3.0 * g_0_xxzz_0_yzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_yzz_1[i] * fti_ab_0 + g_0_xxxzz_0_yzz_0[i] * pb_x + g_0_xxxzz_0_yzz_1[i] * wp_x[i];
+        g_0_xxxxzz_0_yzz_0[i] =
+            3.0 * g_0_xxzz_0_yzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_yzz_1[i] * fti_ab_0 + g_0_xxxzz_0_yzz_0[i] * pb_x + g_0_xxxzz_0_yzz_1[i] * wp_x[i];
 
-        g_0_xxxxzz_0_zzz_0[i] = 3.0 * g_0_xxzz_0_zzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_zzz_1[i] * fti_ab_0 + g_0_xxxzz_0_zzz_0[i] * pb_x + g_0_xxxzz_0_zzz_1[i] * wp_x[i];
+        g_0_xxxxzz_0_zzz_0[i] =
+            3.0 * g_0_xxzz_0_zzz_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_zzz_1[i] * fti_ab_0 + g_0_xxxzz_0_zzz_0[i] * pb_x + g_0_xxxzz_0_zzz_1[i] * wp_x[i];
     }
 
     /// Set up 60-70 components of targeted buffer : SISF
@@ -1478,7 +1790,63 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xxxyyy_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 69);
 
-    #pragma omp simd aligned(g_0_xxxy_0_xxx_0, g_0_xxxy_0_xxx_1, g_0_xxxy_0_xxz_0, g_0_xxxy_0_xxz_1, g_0_xxxy_0_xzz_0, g_0_xxxy_0_xzz_1, g_0_xxxyy_0_xxx_0, g_0_xxxyy_0_xxx_1, g_0_xxxyy_0_xxz_0, g_0_xxxyy_0_xxz_1, g_0_xxxyy_0_xzz_0, g_0_xxxyy_0_xzz_1, g_0_xxxyyy_0_xxx_0, g_0_xxxyyy_0_xxy_0, g_0_xxxyyy_0_xxz_0, g_0_xxxyyy_0_xyy_0, g_0_xxxyyy_0_xyz_0, g_0_xxxyyy_0_xzz_0, g_0_xxxyyy_0_yyy_0, g_0_xxxyyy_0_yyz_0, g_0_xxxyyy_0_yzz_0, g_0_xxxyyy_0_zzz_0, g_0_xxyyy_0_xxy_0, g_0_xxyyy_0_xxy_1, g_0_xxyyy_0_xy_1, g_0_xxyyy_0_xyy_0, g_0_xxyyy_0_xyy_1, g_0_xxyyy_0_xyz_0, g_0_xxyyy_0_xyz_1, g_0_xxyyy_0_yy_1, g_0_xxyyy_0_yyy_0, g_0_xxyyy_0_yyy_1, g_0_xxyyy_0_yyz_0, g_0_xxyyy_0_yyz_1, g_0_xxyyy_0_yz_1, g_0_xxyyy_0_yzz_0, g_0_xxyyy_0_yzz_1, g_0_xxyyy_0_zzz_0, g_0_xxyyy_0_zzz_1, g_0_xyyy_0_xxy_0, g_0_xyyy_0_xxy_1, g_0_xyyy_0_xyy_0, g_0_xyyy_0_xyy_1, g_0_xyyy_0_xyz_0, g_0_xyyy_0_xyz_1, g_0_xyyy_0_yyy_0, g_0_xyyy_0_yyy_1, g_0_xyyy_0_yyz_0, g_0_xyyy_0_yyz_1, g_0_xyyy_0_yzz_0, g_0_xyyy_0_yzz_1, g_0_xyyy_0_zzz_0, g_0_xyyy_0_zzz_1, wp_x, wp_y, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xxxy_0_xxx_0,       \
+                             g_0_xxxy_0_xxx_1,   \
+                             g_0_xxxy_0_xxz_0,   \
+                             g_0_xxxy_0_xxz_1,   \
+                             g_0_xxxy_0_xzz_0,   \
+                             g_0_xxxy_0_xzz_1,   \
+                             g_0_xxxyy_0_xxx_0,  \
+                             g_0_xxxyy_0_xxx_1,  \
+                             g_0_xxxyy_0_xxz_0,  \
+                             g_0_xxxyy_0_xxz_1,  \
+                             g_0_xxxyy_0_xzz_0,  \
+                             g_0_xxxyy_0_xzz_1,  \
+                             g_0_xxxyyy_0_xxx_0, \
+                             g_0_xxxyyy_0_xxy_0, \
+                             g_0_xxxyyy_0_xxz_0, \
+                             g_0_xxxyyy_0_xyy_0, \
+                             g_0_xxxyyy_0_xyz_0, \
+                             g_0_xxxyyy_0_xzz_0, \
+                             g_0_xxxyyy_0_yyy_0, \
+                             g_0_xxxyyy_0_yyz_0, \
+                             g_0_xxxyyy_0_yzz_0, \
+                             g_0_xxxyyy_0_zzz_0, \
+                             g_0_xxyyy_0_xxy_0,  \
+                             g_0_xxyyy_0_xxy_1,  \
+                             g_0_xxyyy_0_xy_1,   \
+                             g_0_xxyyy_0_xyy_0,  \
+                             g_0_xxyyy_0_xyy_1,  \
+                             g_0_xxyyy_0_xyz_0,  \
+                             g_0_xxyyy_0_xyz_1,  \
+                             g_0_xxyyy_0_yy_1,   \
+                             g_0_xxyyy_0_yyy_0,  \
+                             g_0_xxyyy_0_yyy_1,  \
+                             g_0_xxyyy_0_yyz_0,  \
+                             g_0_xxyyy_0_yyz_1,  \
+                             g_0_xxyyy_0_yz_1,   \
+                             g_0_xxyyy_0_yzz_0,  \
+                             g_0_xxyyy_0_yzz_1,  \
+                             g_0_xxyyy_0_zzz_0,  \
+                             g_0_xxyyy_0_zzz_1,  \
+                             g_0_xyyy_0_xxy_0,   \
+                             g_0_xyyy_0_xxy_1,   \
+                             g_0_xyyy_0_xyy_0,   \
+                             g_0_xyyy_0_xyy_1,   \
+                             g_0_xyyy_0_xyz_0,   \
+                             g_0_xyyy_0_xyz_1,   \
+                             g_0_xyyy_0_yyy_0,   \
+                             g_0_xyyy_0_yyy_1,   \
+                             g_0_xyyy_0_yyz_0,   \
+                             g_0_xyyy_0_yyz_1,   \
+                             g_0_xyyy_0_yzz_0,   \
+                             g_0_xyyy_0_yzz_1,   \
+                             g_0_xyyy_0_zzz_0,   \
+                             g_0_xyyy_0_zzz_1,   \
+                             wp_x,               \
+                             wp_y,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -1487,25 +1855,35 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxxyyy_0_xxx_0[i] = 2.0 * g_0_xxxy_0_xxx_0[i] * fi_ab_0 - 2.0 * g_0_xxxy_0_xxx_1[i] * fti_ab_0 + g_0_xxxyy_0_xxx_0[i] * pb_y + g_0_xxxyy_0_xxx_1[i] * wp_y[i];
+        g_0_xxxyyy_0_xxx_0[i] =
+            2.0 * g_0_xxxy_0_xxx_0[i] * fi_ab_0 - 2.0 * g_0_xxxy_0_xxx_1[i] * fti_ab_0 + g_0_xxxyy_0_xxx_0[i] * pb_y + g_0_xxxyy_0_xxx_1[i] * wp_y[i];
 
-        g_0_xxxyyy_0_xxy_0[i] = 2.0 * g_0_xyyy_0_xxy_0[i] * fi_ab_0 - 2.0 * g_0_xyyy_0_xxy_1[i] * fti_ab_0 + 2.0 * g_0_xxyyy_0_xy_1[i] * fi_abcd_0 + g_0_xxyyy_0_xxy_0[i] * pb_x + g_0_xxyyy_0_xxy_1[i] * wp_x[i];
+        g_0_xxxyyy_0_xxy_0[i] = 2.0 * g_0_xyyy_0_xxy_0[i] * fi_ab_0 - 2.0 * g_0_xyyy_0_xxy_1[i] * fti_ab_0 + 2.0 * g_0_xxyyy_0_xy_1[i] * fi_abcd_0 +
+                                g_0_xxyyy_0_xxy_0[i] * pb_x + g_0_xxyyy_0_xxy_1[i] * wp_x[i];
 
-        g_0_xxxyyy_0_xxz_0[i] = 2.0 * g_0_xxxy_0_xxz_0[i] * fi_ab_0 - 2.0 * g_0_xxxy_0_xxz_1[i] * fti_ab_0 + g_0_xxxyy_0_xxz_0[i] * pb_y + g_0_xxxyy_0_xxz_1[i] * wp_y[i];
+        g_0_xxxyyy_0_xxz_0[i] =
+            2.0 * g_0_xxxy_0_xxz_0[i] * fi_ab_0 - 2.0 * g_0_xxxy_0_xxz_1[i] * fti_ab_0 + g_0_xxxyy_0_xxz_0[i] * pb_y + g_0_xxxyy_0_xxz_1[i] * wp_y[i];
 
-        g_0_xxxyyy_0_xyy_0[i] = 2.0 * g_0_xyyy_0_xyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyy_0_xyy_1[i] * fti_ab_0 + g_0_xxyyy_0_yy_1[i] * fi_abcd_0 + g_0_xxyyy_0_xyy_0[i] * pb_x + g_0_xxyyy_0_xyy_1[i] * wp_x[i];
+        g_0_xxxyyy_0_xyy_0[i] = 2.0 * g_0_xyyy_0_xyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyy_0_xyy_1[i] * fti_ab_0 + g_0_xxyyy_0_yy_1[i] * fi_abcd_0 +
+                                g_0_xxyyy_0_xyy_0[i] * pb_x + g_0_xxyyy_0_xyy_1[i] * wp_x[i];
 
-        g_0_xxxyyy_0_xyz_0[i] = 2.0 * g_0_xyyy_0_xyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyy_0_xyz_1[i] * fti_ab_0 + g_0_xxyyy_0_yz_1[i] * fi_abcd_0 + g_0_xxyyy_0_xyz_0[i] * pb_x + g_0_xxyyy_0_xyz_1[i] * wp_x[i];
+        g_0_xxxyyy_0_xyz_0[i] = 2.0 * g_0_xyyy_0_xyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyy_0_xyz_1[i] * fti_ab_0 + g_0_xxyyy_0_yz_1[i] * fi_abcd_0 +
+                                g_0_xxyyy_0_xyz_0[i] * pb_x + g_0_xxyyy_0_xyz_1[i] * wp_x[i];
 
-        g_0_xxxyyy_0_xzz_0[i] = 2.0 * g_0_xxxy_0_xzz_0[i] * fi_ab_0 - 2.0 * g_0_xxxy_0_xzz_1[i] * fti_ab_0 + g_0_xxxyy_0_xzz_0[i] * pb_y + g_0_xxxyy_0_xzz_1[i] * wp_y[i];
+        g_0_xxxyyy_0_xzz_0[i] =
+            2.0 * g_0_xxxy_0_xzz_0[i] * fi_ab_0 - 2.0 * g_0_xxxy_0_xzz_1[i] * fti_ab_0 + g_0_xxxyy_0_xzz_0[i] * pb_y + g_0_xxxyy_0_xzz_1[i] * wp_y[i];
 
-        g_0_xxxyyy_0_yyy_0[i] = 2.0 * g_0_xyyy_0_yyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyy_0_yyy_1[i] * fti_ab_0 + g_0_xxyyy_0_yyy_0[i] * pb_x + g_0_xxyyy_0_yyy_1[i] * wp_x[i];
+        g_0_xxxyyy_0_yyy_0[i] =
+            2.0 * g_0_xyyy_0_yyy_0[i] * fi_ab_0 - 2.0 * g_0_xyyy_0_yyy_1[i] * fti_ab_0 + g_0_xxyyy_0_yyy_0[i] * pb_x + g_0_xxyyy_0_yyy_1[i] * wp_x[i];
 
-        g_0_xxxyyy_0_yyz_0[i] = 2.0 * g_0_xyyy_0_yyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyy_0_yyz_1[i] * fti_ab_0 + g_0_xxyyy_0_yyz_0[i] * pb_x + g_0_xxyyy_0_yyz_1[i] * wp_x[i];
+        g_0_xxxyyy_0_yyz_0[i] =
+            2.0 * g_0_xyyy_0_yyz_0[i] * fi_ab_0 - 2.0 * g_0_xyyy_0_yyz_1[i] * fti_ab_0 + g_0_xxyyy_0_yyz_0[i] * pb_x + g_0_xxyyy_0_yyz_1[i] * wp_x[i];
 
-        g_0_xxxyyy_0_yzz_0[i] = 2.0 * g_0_xyyy_0_yzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyy_0_yzz_1[i] * fti_ab_0 + g_0_xxyyy_0_yzz_0[i] * pb_x + g_0_xxyyy_0_yzz_1[i] * wp_x[i];
+        g_0_xxxyyy_0_yzz_0[i] =
+            2.0 * g_0_xyyy_0_yzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyy_0_yzz_1[i] * fti_ab_0 + g_0_xxyyy_0_yzz_0[i] * pb_x + g_0_xxyyy_0_yzz_1[i] * wp_x[i];
 
-        g_0_xxxyyy_0_zzz_0[i] = 2.0 * g_0_xyyy_0_zzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyy_0_zzz_1[i] * fti_ab_0 + g_0_xxyyy_0_zzz_0[i] * pb_x + g_0_xxyyy_0_zzz_1[i] * wp_x[i];
+        g_0_xxxyyy_0_zzz_0[i] =
+            2.0 * g_0_xyyy_0_zzz_0[i] * fi_ab_0 - 2.0 * g_0_xyyy_0_zzz_1[i] * fti_ab_0 + g_0_xxyyy_0_zzz_0[i] * pb_x + g_0_xxyyy_0_zzz_1[i] * wp_x[i];
     }
 
     /// Set up 70-80 components of targeted buffer : SISF
@@ -1530,7 +1908,45 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xxxyyz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 79);
 
-    #pragma omp simd aligned(g_0_xxxyy_0_xx_1, g_0_xxxyy_0_xxx_0, g_0_xxxyy_0_xxx_1, g_0_xxxyy_0_xxy_0, g_0_xxxyy_0_xxy_1, g_0_xxxyy_0_xxz_0, g_0_xxxyy_0_xxz_1, g_0_xxxyy_0_xy_1, g_0_xxxyy_0_xyy_0, g_0_xxxyy_0_xyy_1, g_0_xxxyy_0_xyz_0, g_0_xxxyy_0_xyz_1, g_0_xxxyy_0_xz_1, g_0_xxxyy_0_xzz_0, g_0_xxxyy_0_xzz_1, g_0_xxxyy_0_yy_1, g_0_xxxyy_0_yyy_0, g_0_xxxyy_0_yyy_1, g_0_xxxyy_0_yyz_0, g_0_xxxyy_0_yyz_1, g_0_xxxyy_0_yz_1, g_0_xxxyy_0_yzz_0, g_0_xxxyy_0_yzz_1, g_0_xxxyy_0_zz_1, g_0_xxxyy_0_zzz_0, g_0_xxxyy_0_zzz_1, g_0_xxxyyz_0_xxx_0, g_0_xxxyyz_0_xxy_0, g_0_xxxyyz_0_xxz_0, g_0_xxxyyz_0_xyy_0, g_0_xxxyyz_0_xyz_0, g_0_xxxyyz_0_xzz_0, g_0_xxxyyz_0_yyy_0, g_0_xxxyyz_0_yyz_0, g_0_xxxyyz_0_yzz_0, g_0_xxxyyz_0_zzz_0, wp_z, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xxxyy_0_xx_1,       \
+                             g_0_xxxyy_0_xxx_0,  \
+                             g_0_xxxyy_0_xxx_1,  \
+                             g_0_xxxyy_0_xxy_0,  \
+                             g_0_xxxyy_0_xxy_1,  \
+                             g_0_xxxyy_0_xxz_0,  \
+                             g_0_xxxyy_0_xxz_1,  \
+                             g_0_xxxyy_0_xy_1,   \
+                             g_0_xxxyy_0_xyy_0,  \
+                             g_0_xxxyy_0_xyy_1,  \
+                             g_0_xxxyy_0_xyz_0,  \
+                             g_0_xxxyy_0_xyz_1,  \
+                             g_0_xxxyy_0_xz_1,   \
+                             g_0_xxxyy_0_xzz_0,  \
+                             g_0_xxxyy_0_xzz_1,  \
+                             g_0_xxxyy_0_yy_1,   \
+                             g_0_xxxyy_0_yyy_0,  \
+                             g_0_xxxyy_0_yyy_1,  \
+                             g_0_xxxyy_0_yyz_0,  \
+                             g_0_xxxyy_0_yyz_1,  \
+                             g_0_xxxyy_0_yz_1,   \
+                             g_0_xxxyy_0_yzz_0,  \
+                             g_0_xxxyy_0_yzz_1,  \
+                             g_0_xxxyy_0_zz_1,   \
+                             g_0_xxxyy_0_zzz_0,  \
+                             g_0_xxxyy_0_zzz_1,  \
+                             g_0_xxxyyz_0_xxx_0, \
+                             g_0_xxxyyz_0_xxy_0, \
+                             g_0_xxxyyz_0_xxz_0, \
+                             g_0_xxxyyz_0_xyy_0, \
+                             g_0_xxxyyz_0_xyz_0, \
+                             g_0_xxxyyz_0_xzz_0, \
+                             g_0_xxxyyz_0_yyy_0, \
+                             g_0_xxxyyz_0_yyz_0, \
+                             g_0_xxxyyz_0_yzz_0, \
+                             g_0_xxxyyz_0_zzz_0, \
+                             wp_z,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -1578,7 +1994,45 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xxxyzz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 89);
 
-    #pragma omp simd aligned(g_0_xxxyzz_0_xxx_0, g_0_xxxyzz_0_xxy_0, g_0_xxxyzz_0_xxz_0, g_0_xxxyzz_0_xyy_0, g_0_xxxyzz_0_xyz_0, g_0_xxxyzz_0_xzz_0, g_0_xxxyzz_0_yyy_0, g_0_xxxyzz_0_yyz_0, g_0_xxxyzz_0_yzz_0, g_0_xxxyzz_0_zzz_0, g_0_xxxzz_0_xx_1, g_0_xxxzz_0_xxx_0, g_0_xxxzz_0_xxx_1, g_0_xxxzz_0_xxy_0, g_0_xxxzz_0_xxy_1, g_0_xxxzz_0_xxz_0, g_0_xxxzz_0_xxz_1, g_0_xxxzz_0_xy_1, g_0_xxxzz_0_xyy_0, g_0_xxxzz_0_xyy_1, g_0_xxxzz_0_xyz_0, g_0_xxxzz_0_xyz_1, g_0_xxxzz_0_xz_1, g_0_xxxzz_0_xzz_0, g_0_xxxzz_0_xzz_1, g_0_xxxzz_0_yy_1, g_0_xxxzz_0_yyy_0, g_0_xxxzz_0_yyy_1, g_0_xxxzz_0_yyz_0, g_0_xxxzz_0_yyz_1, g_0_xxxzz_0_yz_1, g_0_xxxzz_0_yzz_0, g_0_xxxzz_0_yzz_1, g_0_xxxzz_0_zz_1, g_0_xxxzz_0_zzz_0, g_0_xxxzz_0_zzz_1, wp_y, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xxxyzz_0_xxx_0,     \
+                             g_0_xxxyzz_0_xxy_0, \
+                             g_0_xxxyzz_0_xxz_0, \
+                             g_0_xxxyzz_0_xyy_0, \
+                             g_0_xxxyzz_0_xyz_0, \
+                             g_0_xxxyzz_0_xzz_0, \
+                             g_0_xxxyzz_0_yyy_0, \
+                             g_0_xxxyzz_0_yyz_0, \
+                             g_0_xxxyzz_0_yzz_0, \
+                             g_0_xxxyzz_0_zzz_0, \
+                             g_0_xxxzz_0_xx_1,   \
+                             g_0_xxxzz_0_xxx_0,  \
+                             g_0_xxxzz_0_xxx_1,  \
+                             g_0_xxxzz_0_xxy_0,  \
+                             g_0_xxxzz_0_xxy_1,  \
+                             g_0_xxxzz_0_xxz_0,  \
+                             g_0_xxxzz_0_xxz_1,  \
+                             g_0_xxxzz_0_xy_1,   \
+                             g_0_xxxzz_0_xyy_0,  \
+                             g_0_xxxzz_0_xyy_1,  \
+                             g_0_xxxzz_0_xyz_0,  \
+                             g_0_xxxzz_0_xyz_1,  \
+                             g_0_xxxzz_0_xz_1,   \
+                             g_0_xxxzz_0_xzz_0,  \
+                             g_0_xxxzz_0_xzz_1,  \
+                             g_0_xxxzz_0_yy_1,   \
+                             g_0_xxxzz_0_yyy_0,  \
+                             g_0_xxxzz_0_yyy_1,  \
+                             g_0_xxxzz_0_yyz_0,  \
+                             g_0_xxxzz_0_yyz_1,  \
+                             g_0_xxxzz_0_yz_1,   \
+                             g_0_xxxzz_0_yzz_0,  \
+                             g_0_xxxzz_0_yzz_1,  \
+                             g_0_xxxzz_0_zz_1,   \
+                             g_0_xxxzz_0_zzz_0,  \
+                             g_0_xxxzz_0_zzz_1,  \
+                             wp_y,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -1626,7 +2080,63 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xxxzzz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 99);
 
-    #pragma omp simd aligned(g_0_xxxz_0_xxx_0, g_0_xxxz_0_xxx_1, g_0_xxxz_0_xxy_0, g_0_xxxz_0_xxy_1, g_0_xxxz_0_xyy_0, g_0_xxxz_0_xyy_1, g_0_xxxzz_0_xxx_0, g_0_xxxzz_0_xxx_1, g_0_xxxzz_0_xxy_0, g_0_xxxzz_0_xxy_1, g_0_xxxzz_0_xyy_0, g_0_xxxzz_0_xyy_1, g_0_xxxzzz_0_xxx_0, g_0_xxxzzz_0_xxy_0, g_0_xxxzzz_0_xxz_0, g_0_xxxzzz_0_xyy_0, g_0_xxxzzz_0_xyz_0, g_0_xxxzzz_0_xzz_0, g_0_xxxzzz_0_yyy_0, g_0_xxxzzz_0_yyz_0, g_0_xxxzzz_0_yzz_0, g_0_xxxzzz_0_zzz_0, g_0_xxzzz_0_xxz_0, g_0_xxzzz_0_xxz_1, g_0_xxzzz_0_xyz_0, g_0_xxzzz_0_xyz_1, g_0_xxzzz_0_xz_1, g_0_xxzzz_0_xzz_0, g_0_xxzzz_0_xzz_1, g_0_xxzzz_0_yyy_0, g_0_xxzzz_0_yyy_1, g_0_xxzzz_0_yyz_0, g_0_xxzzz_0_yyz_1, g_0_xxzzz_0_yz_1, g_0_xxzzz_0_yzz_0, g_0_xxzzz_0_yzz_1, g_0_xxzzz_0_zz_1, g_0_xxzzz_0_zzz_0, g_0_xxzzz_0_zzz_1, g_0_xzzz_0_xxz_0, g_0_xzzz_0_xxz_1, g_0_xzzz_0_xyz_0, g_0_xzzz_0_xyz_1, g_0_xzzz_0_xzz_0, g_0_xzzz_0_xzz_1, g_0_xzzz_0_yyy_0, g_0_xzzz_0_yyy_1, g_0_xzzz_0_yyz_0, g_0_xzzz_0_yyz_1, g_0_xzzz_0_yzz_0, g_0_xzzz_0_yzz_1, g_0_xzzz_0_zzz_0, g_0_xzzz_0_zzz_1, wp_x, wp_z, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xxxz_0_xxx_0,       \
+                             g_0_xxxz_0_xxx_1,   \
+                             g_0_xxxz_0_xxy_0,   \
+                             g_0_xxxz_0_xxy_1,   \
+                             g_0_xxxz_0_xyy_0,   \
+                             g_0_xxxz_0_xyy_1,   \
+                             g_0_xxxzz_0_xxx_0,  \
+                             g_0_xxxzz_0_xxx_1,  \
+                             g_0_xxxzz_0_xxy_0,  \
+                             g_0_xxxzz_0_xxy_1,  \
+                             g_0_xxxzz_0_xyy_0,  \
+                             g_0_xxxzz_0_xyy_1,  \
+                             g_0_xxxzzz_0_xxx_0, \
+                             g_0_xxxzzz_0_xxy_0, \
+                             g_0_xxxzzz_0_xxz_0, \
+                             g_0_xxxzzz_0_xyy_0, \
+                             g_0_xxxzzz_0_xyz_0, \
+                             g_0_xxxzzz_0_xzz_0, \
+                             g_0_xxxzzz_0_yyy_0, \
+                             g_0_xxxzzz_0_yyz_0, \
+                             g_0_xxxzzz_0_yzz_0, \
+                             g_0_xxxzzz_0_zzz_0, \
+                             g_0_xxzzz_0_xxz_0,  \
+                             g_0_xxzzz_0_xxz_1,  \
+                             g_0_xxzzz_0_xyz_0,  \
+                             g_0_xxzzz_0_xyz_1,  \
+                             g_0_xxzzz_0_xz_1,   \
+                             g_0_xxzzz_0_xzz_0,  \
+                             g_0_xxzzz_0_xzz_1,  \
+                             g_0_xxzzz_0_yyy_0,  \
+                             g_0_xxzzz_0_yyy_1,  \
+                             g_0_xxzzz_0_yyz_0,  \
+                             g_0_xxzzz_0_yyz_1,  \
+                             g_0_xxzzz_0_yz_1,   \
+                             g_0_xxzzz_0_yzz_0,  \
+                             g_0_xxzzz_0_yzz_1,  \
+                             g_0_xxzzz_0_zz_1,   \
+                             g_0_xxzzz_0_zzz_0,  \
+                             g_0_xxzzz_0_zzz_1,  \
+                             g_0_xzzz_0_xxz_0,   \
+                             g_0_xzzz_0_xxz_1,   \
+                             g_0_xzzz_0_xyz_0,   \
+                             g_0_xzzz_0_xyz_1,   \
+                             g_0_xzzz_0_xzz_0,   \
+                             g_0_xzzz_0_xzz_1,   \
+                             g_0_xzzz_0_yyy_0,   \
+                             g_0_xzzz_0_yyy_1,   \
+                             g_0_xzzz_0_yyz_0,   \
+                             g_0_xzzz_0_yyz_1,   \
+                             g_0_xzzz_0_yzz_0,   \
+                             g_0_xzzz_0_yzz_1,   \
+                             g_0_xzzz_0_zzz_0,   \
+                             g_0_xzzz_0_zzz_1,   \
+                             wp_x,               \
+                             wp_z,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -1635,25 +2145,35 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxxzzz_0_xxx_0[i] = 2.0 * g_0_xxxz_0_xxx_0[i] * fi_ab_0 - 2.0 * g_0_xxxz_0_xxx_1[i] * fti_ab_0 + g_0_xxxzz_0_xxx_0[i] * pb_z + g_0_xxxzz_0_xxx_1[i] * wp_z[i];
+        g_0_xxxzzz_0_xxx_0[i] =
+            2.0 * g_0_xxxz_0_xxx_0[i] * fi_ab_0 - 2.0 * g_0_xxxz_0_xxx_1[i] * fti_ab_0 + g_0_xxxzz_0_xxx_0[i] * pb_z + g_0_xxxzz_0_xxx_1[i] * wp_z[i];
 
-        g_0_xxxzzz_0_xxy_0[i] = 2.0 * g_0_xxxz_0_xxy_0[i] * fi_ab_0 - 2.0 * g_0_xxxz_0_xxy_1[i] * fti_ab_0 + g_0_xxxzz_0_xxy_0[i] * pb_z + g_0_xxxzz_0_xxy_1[i] * wp_z[i];
+        g_0_xxxzzz_0_xxy_0[i] =
+            2.0 * g_0_xxxz_0_xxy_0[i] * fi_ab_0 - 2.0 * g_0_xxxz_0_xxy_1[i] * fti_ab_0 + g_0_xxxzz_0_xxy_0[i] * pb_z + g_0_xxxzz_0_xxy_1[i] * wp_z[i];
 
-        g_0_xxxzzz_0_xxz_0[i] = 2.0 * g_0_xzzz_0_xxz_0[i] * fi_ab_0 - 2.0 * g_0_xzzz_0_xxz_1[i] * fti_ab_0 + 2.0 * g_0_xxzzz_0_xz_1[i] * fi_abcd_0 + g_0_xxzzz_0_xxz_0[i] * pb_x + g_0_xxzzz_0_xxz_1[i] * wp_x[i];
+        g_0_xxxzzz_0_xxz_0[i] = 2.0 * g_0_xzzz_0_xxz_0[i] * fi_ab_0 - 2.0 * g_0_xzzz_0_xxz_1[i] * fti_ab_0 + 2.0 * g_0_xxzzz_0_xz_1[i] * fi_abcd_0 +
+                                g_0_xxzzz_0_xxz_0[i] * pb_x + g_0_xxzzz_0_xxz_1[i] * wp_x[i];
 
-        g_0_xxxzzz_0_xyy_0[i] = 2.0 * g_0_xxxz_0_xyy_0[i] * fi_ab_0 - 2.0 * g_0_xxxz_0_xyy_1[i] * fti_ab_0 + g_0_xxxzz_0_xyy_0[i] * pb_z + g_0_xxxzz_0_xyy_1[i] * wp_z[i];
+        g_0_xxxzzz_0_xyy_0[i] =
+            2.0 * g_0_xxxz_0_xyy_0[i] * fi_ab_0 - 2.0 * g_0_xxxz_0_xyy_1[i] * fti_ab_0 + g_0_xxxzz_0_xyy_0[i] * pb_z + g_0_xxxzz_0_xyy_1[i] * wp_z[i];
 
-        g_0_xxxzzz_0_xyz_0[i] = 2.0 * g_0_xzzz_0_xyz_0[i] * fi_ab_0 - 2.0 * g_0_xzzz_0_xyz_1[i] * fti_ab_0 + g_0_xxzzz_0_yz_1[i] * fi_abcd_0 + g_0_xxzzz_0_xyz_0[i] * pb_x + g_0_xxzzz_0_xyz_1[i] * wp_x[i];
+        g_0_xxxzzz_0_xyz_0[i] = 2.0 * g_0_xzzz_0_xyz_0[i] * fi_ab_0 - 2.0 * g_0_xzzz_0_xyz_1[i] * fti_ab_0 + g_0_xxzzz_0_yz_1[i] * fi_abcd_0 +
+                                g_0_xxzzz_0_xyz_0[i] * pb_x + g_0_xxzzz_0_xyz_1[i] * wp_x[i];
 
-        g_0_xxxzzz_0_xzz_0[i] = 2.0 * g_0_xzzz_0_xzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzz_0_xzz_1[i] * fti_ab_0 + g_0_xxzzz_0_zz_1[i] * fi_abcd_0 + g_0_xxzzz_0_xzz_0[i] * pb_x + g_0_xxzzz_0_xzz_1[i] * wp_x[i];
+        g_0_xxxzzz_0_xzz_0[i] = 2.0 * g_0_xzzz_0_xzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzz_0_xzz_1[i] * fti_ab_0 + g_0_xxzzz_0_zz_1[i] * fi_abcd_0 +
+                                g_0_xxzzz_0_xzz_0[i] * pb_x + g_0_xxzzz_0_xzz_1[i] * wp_x[i];
 
-        g_0_xxxzzz_0_yyy_0[i] = 2.0 * g_0_xzzz_0_yyy_0[i] * fi_ab_0 - 2.0 * g_0_xzzz_0_yyy_1[i] * fti_ab_0 + g_0_xxzzz_0_yyy_0[i] * pb_x + g_0_xxzzz_0_yyy_1[i] * wp_x[i];
+        g_0_xxxzzz_0_yyy_0[i] =
+            2.0 * g_0_xzzz_0_yyy_0[i] * fi_ab_0 - 2.0 * g_0_xzzz_0_yyy_1[i] * fti_ab_0 + g_0_xxzzz_0_yyy_0[i] * pb_x + g_0_xxzzz_0_yyy_1[i] * wp_x[i];
 
-        g_0_xxxzzz_0_yyz_0[i] = 2.0 * g_0_xzzz_0_yyz_0[i] * fi_ab_0 - 2.0 * g_0_xzzz_0_yyz_1[i] * fti_ab_0 + g_0_xxzzz_0_yyz_0[i] * pb_x + g_0_xxzzz_0_yyz_1[i] * wp_x[i];
+        g_0_xxxzzz_0_yyz_0[i] =
+            2.0 * g_0_xzzz_0_yyz_0[i] * fi_ab_0 - 2.0 * g_0_xzzz_0_yyz_1[i] * fti_ab_0 + g_0_xxzzz_0_yyz_0[i] * pb_x + g_0_xxzzz_0_yyz_1[i] * wp_x[i];
 
-        g_0_xxxzzz_0_yzz_0[i] = 2.0 * g_0_xzzz_0_yzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzz_0_yzz_1[i] * fti_ab_0 + g_0_xxzzz_0_yzz_0[i] * pb_x + g_0_xxzzz_0_yzz_1[i] * wp_x[i];
+        g_0_xxxzzz_0_yzz_0[i] =
+            2.0 * g_0_xzzz_0_yzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzz_0_yzz_1[i] * fti_ab_0 + g_0_xxzzz_0_yzz_0[i] * pb_x + g_0_xxzzz_0_yzz_1[i] * wp_x[i];
 
-        g_0_xxxzzz_0_zzz_0[i] = 2.0 * g_0_xzzz_0_zzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzz_0_zzz_1[i] * fti_ab_0 + g_0_xxzzz_0_zzz_0[i] * pb_x + g_0_xxzzz_0_zzz_1[i] * wp_x[i];
+        g_0_xxxzzz_0_zzz_0[i] =
+            2.0 * g_0_xzzz_0_zzz_0[i] * fi_ab_0 - 2.0 * g_0_xzzz_0_zzz_1[i] * fti_ab_0 + g_0_xxzzz_0_zzz_0[i] * pb_x + g_0_xxzzz_0_zzz_1[i] * wp_x[i];
     }
 
     /// Set up 100-110 components of targeted buffer : SISF
@@ -1678,7 +2198,63 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xxyyyy_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 109);
 
-    #pragma omp simd aligned(g_0_xxyy_0_xxx_0, g_0_xxyy_0_xxx_1, g_0_xxyy_0_xxz_0, g_0_xxyy_0_xxz_1, g_0_xxyy_0_xzz_0, g_0_xxyy_0_xzz_1, g_0_xxyyy_0_xxx_0, g_0_xxyyy_0_xxx_1, g_0_xxyyy_0_xxz_0, g_0_xxyyy_0_xxz_1, g_0_xxyyy_0_xzz_0, g_0_xxyyy_0_xzz_1, g_0_xxyyyy_0_xxx_0, g_0_xxyyyy_0_xxy_0, g_0_xxyyyy_0_xxz_0, g_0_xxyyyy_0_xyy_0, g_0_xxyyyy_0_xyz_0, g_0_xxyyyy_0_xzz_0, g_0_xxyyyy_0_yyy_0, g_0_xxyyyy_0_yyz_0, g_0_xxyyyy_0_yzz_0, g_0_xxyyyy_0_zzz_0, g_0_xyyyy_0_xxy_0, g_0_xyyyy_0_xxy_1, g_0_xyyyy_0_xy_1, g_0_xyyyy_0_xyy_0, g_0_xyyyy_0_xyy_1, g_0_xyyyy_0_xyz_0, g_0_xyyyy_0_xyz_1, g_0_xyyyy_0_yy_1, g_0_xyyyy_0_yyy_0, g_0_xyyyy_0_yyy_1, g_0_xyyyy_0_yyz_0, g_0_xyyyy_0_yyz_1, g_0_xyyyy_0_yz_1, g_0_xyyyy_0_yzz_0, g_0_xyyyy_0_yzz_1, g_0_xyyyy_0_zzz_0, g_0_xyyyy_0_zzz_1, g_0_yyyy_0_xxy_0, g_0_yyyy_0_xxy_1, g_0_yyyy_0_xyy_0, g_0_yyyy_0_xyy_1, g_0_yyyy_0_xyz_0, g_0_yyyy_0_xyz_1, g_0_yyyy_0_yyy_0, g_0_yyyy_0_yyy_1, g_0_yyyy_0_yyz_0, g_0_yyyy_0_yyz_1, g_0_yyyy_0_yzz_0, g_0_yyyy_0_yzz_1, g_0_yyyy_0_zzz_0, g_0_yyyy_0_zzz_1, wp_x, wp_y, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xxyy_0_xxx_0,       \
+                             g_0_xxyy_0_xxx_1,   \
+                             g_0_xxyy_0_xxz_0,   \
+                             g_0_xxyy_0_xxz_1,   \
+                             g_0_xxyy_0_xzz_0,   \
+                             g_0_xxyy_0_xzz_1,   \
+                             g_0_xxyyy_0_xxx_0,  \
+                             g_0_xxyyy_0_xxx_1,  \
+                             g_0_xxyyy_0_xxz_0,  \
+                             g_0_xxyyy_0_xxz_1,  \
+                             g_0_xxyyy_0_xzz_0,  \
+                             g_0_xxyyy_0_xzz_1,  \
+                             g_0_xxyyyy_0_xxx_0, \
+                             g_0_xxyyyy_0_xxy_0, \
+                             g_0_xxyyyy_0_xxz_0, \
+                             g_0_xxyyyy_0_xyy_0, \
+                             g_0_xxyyyy_0_xyz_0, \
+                             g_0_xxyyyy_0_xzz_0, \
+                             g_0_xxyyyy_0_yyy_0, \
+                             g_0_xxyyyy_0_yyz_0, \
+                             g_0_xxyyyy_0_yzz_0, \
+                             g_0_xxyyyy_0_zzz_0, \
+                             g_0_xyyyy_0_xxy_0,  \
+                             g_0_xyyyy_0_xxy_1,  \
+                             g_0_xyyyy_0_xy_1,   \
+                             g_0_xyyyy_0_xyy_0,  \
+                             g_0_xyyyy_0_xyy_1,  \
+                             g_0_xyyyy_0_xyz_0,  \
+                             g_0_xyyyy_0_xyz_1,  \
+                             g_0_xyyyy_0_yy_1,   \
+                             g_0_xyyyy_0_yyy_0,  \
+                             g_0_xyyyy_0_yyy_1,  \
+                             g_0_xyyyy_0_yyz_0,  \
+                             g_0_xyyyy_0_yyz_1,  \
+                             g_0_xyyyy_0_yz_1,   \
+                             g_0_xyyyy_0_yzz_0,  \
+                             g_0_xyyyy_0_yzz_1,  \
+                             g_0_xyyyy_0_zzz_0,  \
+                             g_0_xyyyy_0_zzz_1,  \
+                             g_0_yyyy_0_xxy_0,   \
+                             g_0_yyyy_0_xxy_1,   \
+                             g_0_yyyy_0_xyy_0,   \
+                             g_0_yyyy_0_xyy_1,   \
+                             g_0_yyyy_0_xyz_0,   \
+                             g_0_yyyy_0_xyz_1,   \
+                             g_0_yyyy_0_yyy_0,   \
+                             g_0_yyyy_0_yyy_1,   \
+                             g_0_yyyy_0_yyz_0,   \
+                             g_0_yyyy_0_yyz_1,   \
+                             g_0_yyyy_0_yzz_0,   \
+                             g_0_yyyy_0_yzz_1,   \
+                             g_0_yyyy_0_zzz_0,   \
+                             g_0_yyyy_0_zzz_1,   \
+                             wp_x,               \
+                             wp_y,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -1687,25 +2263,35 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxyyyy_0_xxx_0[i] = 3.0 * g_0_xxyy_0_xxx_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_xxx_1[i] * fti_ab_0 + g_0_xxyyy_0_xxx_0[i] * pb_y + g_0_xxyyy_0_xxx_1[i] * wp_y[i];
+        g_0_xxyyyy_0_xxx_0[i] =
+            3.0 * g_0_xxyy_0_xxx_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_xxx_1[i] * fti_ab_0 + g_0_xxyyy_0_xxx_0[i] * pb_y + g_0_xxyyy_0_xxx_1[i] * wp_y[i];
 
-        g_0_xxyyyy_0_xxy_0[i] = g_0_yyyy_0_xxy_0[i] * fi_ab_0 - g_0_yyyy_0_xxy_1[i] * fti_ab_0 + 2.0 * g_0_xyyyy_0_xy_1[i] * fi_abcd_0 + g_0_xyyyy_0_xxy_0[i] * pb_x + g_0_xyyyy_0_xxy_1[i] * wp_x[i];
+        g_0_xxyyyy_0_xxy_0[i] = g_0_yyyy_0_xxy_0[i] * fi_ab_0 - g_0_yyyy_0_xxy_1[i] * fti_ab_0 + 2.0 * g_0_xyyyy_0_xy_1[i] * fi_abcd_0 +
+                                g_0_xyyyy_0_xxy_0[i] * pb_x + g_0_xyyyy_0_xxy_1[i] * wp_x[i];
 
-        g_0_xxyyyy_0_xxz_0[i] = 3.0 * g_0_xxyy_0_xxz_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_xxz_1[i] * fti_ab_0 + g_0_xxyyy_0_xxz_0[i] * pb_y + g_0_xxyyy_0_xxz_1[i] * wp_y[i];
+        g_0_xxyyyy_0_xxz_0[i] =
+            3.0 * g_0_xxyy_0_xxz_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_xxz_1[i] * fti_ab_0 + g_0_xxyyy_0_xxz_0[i] * pb_y + g_0_xxyyy_0_xxz_1[i] * wp_y[i];
 
-        g_0_xxyyyy_0_xyy_0[i] = g_0_yyyy_0_xyy_0[i] * fi_ab_0 - g_0_yyyy_0_xyy_1[i] * fti_ab_0 + g_0_xyyyy_0_yy_1[i] * fi_abcd_0 + g_0_xyyyy_0_xyy_0[i] * pb_x + g_0_xyyyy_0_xyy_1[i] * wp_x[i];
+        g_0_xxyyyy_0_xyy_0[i] = g_0_yyyy_0_xyy_0[i] * fi_ab_0 - g_0_yyyy_0_xyy_1[i] * fti_ab_0 + g_0_xyyyy_0_yy_1[i] * fi_abcd_0 +
+                                g_0_xyyyy_0_xyy_0[i] * pb_x + g_0_xyyyy_0_xyy_1[i] * wp_x[i];
 
-        g_0_xxyyyy_0_xyz_0[i] = g_0_yyyy_0_xyz_0[i] * fi_ab_0 - g_0_yyyy_0_xyz_1[i] * fti_ab_0 + g_0_xyyyy_0_yz_1[i] * fi_abcd_0 + g_0_xyyyy_0_xyz_0[i] * pb_x + g_0_xyyyy_0_xyz_1[i] * wp_x[i];
+        g_0_xxyyyy_0_xyz_0[i] = g_0_yyyy_0_xyz_0[i] * fi_ab_0 - g_0_yyyy_0_xyz_1[i] * fti_ab_0 + g_0_xyyyy_0_yz_1[i] * fi_abcd_0 +
+                                g_0_xyyyy_0_xyz_0[i] * pb_x + g_0_xyyyy_0_xyz_1[i] * wp_x[i];
 
-        g_0_xxyyyy_0_xzz_0[i] = 3.0 * g_0_xxyy_0_xzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_xzz_1[i] * fti_ab_0 + g_0_xxyyy_0_xzz_0[i] * pb_y + g_0_xxyyy_0_xzz_1[i] * wp_y[i];
+        g_0_xxyyyy_0_xzz_0[i] =
+            3.0 * g_0_xxyy_0_xzz_0[i] * fi_ab_0 - 3.0 * g_0_xxyy_0_xzz_1[i] * fti_ab_0 + g_0_xxyyy_0_xzz_0[i] * pb_y + g_0_xxyyy_0_xzz_1[i] * wp_y[i];
 
-        g_0_xxyyyy_0_yyy_0[i] = g_0_yyyy_0_yyy_0[i] * fi_ab_0 - g_0_yyyy_0_yyy_1[i] * fti_ab_0 + g_0_xyyyy_0_yyy_0[i] * pb_x + g_0_xyyyy_0_yyy_1[i] * wp_x[i];
+        g_0_xxyyyy_0_yyy_0[i] =
+            g_0_yyyy_0_yyy_0[i] * fi_ab_0 - g_0_yyyy_0_yyy_1[i] * fti_ab_0 + g_0_xyyyy_0_yyy_0[i] * pb_x + g_0_xyyyy_0_yyy_1[i] * wp_x[i];
 
-        g_0_xxyyyy_0_yyz_0[i] = g_0_yyyy_0_yyz_0[i] * fi_ab_0 - g_0_yyyy_0_yyz_1[i] * fti_ab_0 + g_0_xyyyy_0_yyz_0[i] * pb_x + g_0_xyyyy_0_yyz_1[i] * wp_x[i];
+        g_0_xxyyyy_0_yyz_0[i] =
+            g_0_yyyy_0_yyz_0[i] * fi_ab_0 - g_0_yyyy_0_yyz_1[i] * fti_ab_0 + g_0_xyyyy_0_yyz_0[i] * pb_x + g_0_xyyyy_0_yyz_1[i] * wp_x[i];
 
-        g_0_xxyyyy_0_yzz_0[i] = g_0_yyyy_0_yzz_0[i] * fi_ab_0 - g_0_yyyy_0_yzz_1[i] * fti_ab_0 + g_0_xyyyy_0_yzz_0[i] * pb_x + g_0_xyyyy_0_yzz_1[i] * wp_x[i];
+        g_0_xxyyyy_0_yzz_0[i] =
+            g_0_yyyy_0_yzz_0[i] * fi_ab_0 - g_0_yyyy_0_yzz_1[i] * fti_ab_0 + g_0_xyyyy_0_yzz_0[i] * pb_x + g_0_xyyyy_0_yzz_1[i] * wp_x[i];
 
-        g_0_xxyyyy_0_zzz_0[i] = g_0_yyyy_0_zzz_0[i] * fi_ab_0 - g_0_yyyy_0_zzz_1[i] * fti_ab_0 + g_0_xyyyy_0_zzz_0[i] * pb_x + g_0_xyyyy_0_zzz_1[i] * wp_x[i];
+        g_0_xxyyyy_0_zzz_0[i] =
+            g_0_yyyy_0_zzz_0[i] * fi_ab_0 - g_0_yyyy_0_zzz_1[i] * fti_ab_0 + g_0_xyyyy_0_zzz_0[i] * pb_x + g_0_xyyyy_0_zzz_1[i] * wp_x[i];
     }
 
     /// Set up 110-120 components of targeted buffer : SISF
@@ -1730,7 +2316,45 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xxyyyz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 119);
 
-    #pragma omp simd aligned(g_0_xxyyy_0_xx_1, g_0_xxyyy_0_xxx_0, g_0_xxyyy_0_xxx_1, g_0_xxyyy_0_xxy_0, g_0_xxyyy_0_xxy_1, g_0_xxyyy_0_xxz_0, g_0_xxyyy_0_xxz_1, g_0_xxyyy_0_xy_1, g_0_xxyyy_0_xyy_0, g_0_xxyyy_0_xyy_1, g_0_xxyyy_0_xyz_0, g_0_xxyyy_0_xyz_1, g_0_xxyyy_0_xz_1, g_0_xxyyy_0_xzz_0, g_0_xxyyy_0_xzz_1, g_0_xxyyy_0_yy_1, g_0_xxyyy_0_yyy_0, g_0_xxyyy_0_yyy_1, g_0_xxyyy_0_yyz_0, g_0_xxyyy_0_yyz_1, g_0_xxyyy_0_yz_1, g_0_xxyyy_0_yzz_0, g_0_xxyyy_0_yzz_1, g_0_xxyyy_0_zz_1, g_0_xxyyy_0_zzz_0, g_0_xxyyy_0_zzz_1, g_0_xxyyyz_0_xxx_0, g_0_xxyyyz_0_xxy_0, g_0_xxyyyz_0_xxz_0, g_0_xxyyyz_0_xyy_0, g_0_xxyyyz_0_xyz_0, g_0_xxyyyz_0_xzz_0, g_0_xxyyyz_0_yyy_0, g_0_xxyyyz_0_yyz_0, g_0_xxyyyz_0_yzz_0, g_0_xxyyyz_0_zzz_0, wp_z, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xxyyy_0_xx_1,       \
+                             g_0_xxyyy_0_xxx_0,  \
+                             g_0_xxyyy_0_xxx_1,  \
+                             g_0_xxyyy_0_xxy_0,  \
+                             g_0_xxyyy_0_xxy_1,  \
+                             g_0_xxyyy_0_xxz_0,  \
+                             g_0_xxyyy_0_xxz_1,  \
+                             g_0_xxyyy_0_xy_1,   \
+                             g_0_xxyyy_0_xyy_0,  \
+                             g_0_xxyyy_0_xyy_1,  \
+                             g_0_xxyyy_0_xyz_0,  \
+                             g_0_xxyyy_0_xyz_1,  \
+                             g_0_xxyyy_0_xz_1,   \
+                             g_0_xxyyy_0_xzz_0,  \
+                             g_0_xxyyy_0_xzz_1,  \
+                             g_0_xxyyy_0_yy_1,   \
+                             g_0_xxyyy_0_yyy_0,  \
+                             g_0_xxyyy_0_yyy_1,  \
+                             g_0_xxyyy_0_yyz_0,  \
+                             g_0_xxyyy_0_yyz_1,  \
+                             g_0_xxyyy_0_yz_1,   \
+                             g_0_xxyyy_0_yzz_0,  \
+                             g_0_xxyyy_0_yzz_1,  \
+                             g_0_xxyyy_0_zz_1,   \
+                             g_0_xxyyy_0_zzz_0,  \
+                             g_0_xxyyy_0_zzz_1,  \
+                             g_0_xxyyyz_0_xxx_0, \
+                             g_0_xxyyyz_0_xxy_0, \
+                             g_0_xxyyyz_0_xxz_0, \
+                             g_0_xxyyyz_0_xyy_0, \
+                             g_0_xxyyyz_0_xyz_0, \
+                             g_0_xxyyyz_0_xzz_0, \
+                             g_0_xxyyyz_0_yyy_0, \
+                             g_0_xxyyyz_0_yyz_0, \
+                             g_0_xxyyyz_0_yzz_0, \
+                             g_0_xxyyyz_0_zzz_0, \
+                             wp_z,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -1778,7 +2402,62 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xxyyzz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 129);
 
-    #pragma omp simd aligned(g_0_xxyy_0_xxy_0, g_0_xxyy_0_xxy_1, g_0_xxyy_0_xyy_0, g_0_xxyy_0_xyy_1, g_0_xxyyz_0_xxy_0, g_0_xxyyz_0_xxy_1, g_0_xxyyz_0_xyy_0, g_0_xxyyz_0_xyy_1, g_0_xxyyzz_0_xxx_0, g_0_xxyyzz_0_xxy_0, g_0_xxyyzz_0_xxz_0, g_0_xxyyzz_0_xyy_0, g_0_xxyyzz_0_xyz_0, g_0_xxyyzz_0_xzz_0, g_0_xxyyzz_0_yyy_0, g_0_xxyyzz_0_yyz_0, g_0_xxyyzz_0_yzz_0, g_0_xxyyzz_0_zzz_0, g_0_xxyzz_0_xxx_0, g_0_xxyzz_0_xxx_1, g_0_xxyzz_0_xxz_0, g_0_xxyzz_0_xxz_1, g_0_xxyzz_0_xzz_0, g_0_xxyzz_0_xzz_1, g_0_xxzz_0_xxx_0, g_0_xxzz_0_xxx_1, g_0_xxzz_0_xxz_0, g_0_xxzz_0_xxz_1, g_0_xxzz_0_xzz_0, g_0_xxzz_0_xzz_1, g_0_xyyzz_0_xyz_0, g_0_xyyzz_0_xyz_1, g_0_xyyzz_0_yyy_0, g_0_xyyzz_0_yyy_1, g_0_xyyzz_0_yyz_0, g_0_xyyzz_0_yyz_1, g_0_xyyzz_0_yz_1, g_0_xyyzz_0_yzz_0, g_0_xyyzz_0_yzz_1, g_0_xyyzz_0_zzz_0, g_0_xyyzz_0_zzz_1, g_0_yyzz_0_xyz_0, g_0_yyzz_0_xyz_1, g_0_yyzz_0_yyy_0, g_0_yyzz_0_yyy_1, g_0_yyzz_0_yyz_0, g_0_yyzz_0_yyz_1, g_0_yyzz_0_yzz_0, g_0_yyzz_0_yzz_1, g_0_yyzz_0_zzz_0, g_0_yyzz_0_zzz_1, wp_x, wp_y, wp_z, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xxyy_0_xxy_0,       \
+                             g_0_xxyy_0_xxy_1,   \
+                             g_0_xxyy_0_xyy_0,   \
+                             g_0_xxyy_0_xyy_1,   \
+                             g_0_xxyyz_0_xxy_0,  \
+                             g_0_xxyyz_0_xxy_1,  \
+                             g_0_xxyyz_0_xyy_0,  \
+                             g_0_xxyyz_0_xyy_1,  \
+                             g_0_xxyyzz_0_xxx_0, \
+                             g_0_xxyyzz_0_xxy_0, \
+                             g_0_xxyyzz_0_xxz_0, \
+                             g_0_xxyyzz_0_xyy_0, \
+                             g_0_xxyyzz_0_xyz_0, \
+                             g_0_xxyyzz_0_xzz_0, \
+                             g_0_xxyyzz_0_yyy_0, \
+                             g_0_xxyyzz_0_yyz_0, \
+                             g_0_xxyyzz_0_yzz_0, \
+                             g_0_xxyyzz_0_zzz_0, \
+                             g_0_xxyzz_0_xxx_0,  \
+                             g_0_xxyzz_0_xxx_1,  \
+                             g_0_xxyzz_0_xxz_0,  \
+                             g_0_xxyzz_0_xxz_1,  \
+                             g_0_xxyzz_0_xzz_0,  \
+                             g_0_xxyzz_0_xzz_1,  \
+                             g_0_xxzz_0_xxx_0,   \
+                             g_0_xxzz_0_xxx_1,   \
+                             g_0_xxzz_0_xxz_0,   \
+                             g_0_xxzz_0_xxz_1,   \
+                             g_0_xxzz_0_xzz_0,   \
+                             g_0_xxzz_0_xzz_1,   \
+                             g_0_xyyzz_0_xyz_0,  \
+                             g_0_xyyzz_0_xyz_1,  \
+                             g_0_xyyzz_0_yyy_0,  \
+                             g_0_xyyzz_0_yyy_1,  \
+                             g_0_xyyzz_0_yyz_0,  \
+                             g_0_xyyzz_0_yyz_1,  \
+                             g_0_xyyzz_0_yz_1,   \
+                             g_0_xyyzz_0_yzz_0,  \
+                             g_0_xyyzz_0_yzz_1,  \
+                             g_0_xyyzz_0_zzz_0,  \
+                             g_0_xyyzz_0_zzz_1,  \
+                             g_0_yyzz_0_xyz_0,   \
+                             g_0_yyzz_0_xyz_1,   \
+                             g_0_yyzz_0_yyy_0,   \
+                             g_0_yyzz_0_yyy_1,   \
+                             g_0_yyzz_0_yyz_0,   \
+                             g_0_yyzz_0_yyz_1,   \
+                             g_0_yyzz_0_yzz_0,   \
+                             g_0_yyzz_0_yzz_1,   \
+                             g_0_yyzz_0_zzz_0,   \
+                             g_0_yyzz_0_zzz_1,   \
+                             wp_x,               \
+                             wp_y,               \
+                             wp_z,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -1787,25 +2466,35 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxyyzz_0_xxx_0[i] = g_0_xxzz_0_xxx_0[i] * fi_ab_0 - g_0_xxzz_0_xxx_1[i] * fti_ab_0 + g_0_xxyzz_0_xxx_0[i] * pb_y + g_0_xxyzz_0_xxx_1[i] * wp_y[i];
+        g_0_xxyyzz_0_xxx_0[i] =
+            g_0_xxzz_0_xxx_0[i] * fi_ab_0 - g_0_xxzz_0_xxx_1[i] * fti_ab_0 + g_0_xxyzz_0_xxx_0[i] * pb_y + g_0_xxyzz_0_xxx_1[i] * wp_y[i];
 
-        g_0_xxyyzz_0_xxy_0[i] = g_0_xxyy_0_xxy_0[i] * fi_ab_0 - g_0_xxyy_0_xxy_1[i] * fti_ab_0 + g_0_xxyyz_0_xxy_0[i] * pb_z + g_0_xxyyz_0_xxy_1[i] * wp_z[i];
+        g_0_xxyyzz_0_xxy_0[i] =
+            g_0_xxyy_0_xxy_0[i] * fi_ab_0 - g_0_xxyy_0_xxy_1[i] * fti_ab_0 + g_0_xxyyz_0_xxy_0[i] * pb_z + g_0_xxyyz_0_xxy_1[i] * wp_z[i];
 
-        g_0_xxyyzz_0_xxz_0[i] = g_0_xxzz_0_xxz_0[i] * fi_ab_0 - g_0_xxzz_0_xxz_1[i] * fti_ab_0 + g_0_xxyzz_0_xxz_0[i] * pb_y + g_0_xxyzz_0_xxz_1[i] * wp_y[i];
+        g_0_xxyyzz_0_xxz_0[i] =
+            g_0_xxzz_0_xxz_0[i] * fi_ab_0 - g_0_xxzz_0_xxz_1[i] * fti_ab_0 + g_0_xxyzz_0_xxz_0[i] * pb_y + g_0_xxyzz_0_xxz_1[i] * wp_y[i];
 
-        g_0_xxyyzz_0_xyy_0[i] = g_0_xxyy_0_xyy_0[i] * fi_ab_0 - g_0_xxyy_0_xyy_1[i] * fti_ab_0 + g_0_xxyyz_0_xyy_0[i] * pb_z + g_0_xxyyz_0_xyy_1[i] * wp_z[i];
+        g_0_xxyyzz_0_xyy_0[i] =
+            g_0_xxyy_0_xyy_0[i] * fi_ab_0 - g_0_xxyy_0_xyy_1[i] * fti_ab_0 + g_0_xxyyz_0_xyy_0[i] * pb_z + g_0_xxyyz_0_xyy_1[i] * wp_z[i];
 
-        g_0_xxyyzz_0_xyz_0[i] = g_0_yyzz_0_xyz_0[i] * fi_ab_0 - g_0_yyzz_0_xyz_1[i] * fti_ab_0 + g_0_xyyzz_0_yz_1[i] * fi_abcd_0 + g_0_xyyzz_0_xyz_0[i] * pb_x + g_0_xyyzz_0_xyz_1[i] * wp_x[i];
+        g_0_xxyyzz_0_xyz_0[i] = g_0_yyzz_0_xyz_0[i] * fi_ab_0 - g_0_yyzz_0_xyz_1[i] * fti_ab_0 + g_0_xyyzz_0_yz_1[i] * fi_abcd_0 +
+                                g_0_xyyzz_0_xyz_0[i] * pb_x + g_0_xyyzz_0_xyz_1[i] * wp_x[i];
 
-        g_0_xxyyzz_0_xzz_0[i] = g_0_xxzz_0_xzz_0[i] * fi_ab_0 - g_0_xxzz_0_xzz_1[i] * fti_ab_0 + g_0_xxyzz_0_xzz_0[i] * pb_y + g_0_xxyzz_0_xzz_1[i] * wp_y[i];
+        g_0_xxyyzz_0_xzz_0[i] =
+            g_0_xxzz_0_xzz_0[i] * fi_ab_0 - g_0_xxzz_0_xzz_1[i] * fti_ab_0 + g_0_xxyzz_0_xzz_0[i] * pb_y + g_0_xxyzz_0_xzz_1[i] * wp_y[i];
 
-        g_0_xxyyzz_0_yyy_0[i] = g_0_yyzz_0_yyy_0[i] * fi_ab_0 - g_0_yyzz_0_yyy_1[i] * fti_ab_0 + g_0_xyyzz_0_yyy_0[i] * pb_x + g_0_xyyzz_0_yyy_1[i] * wp_x[i];
+        g_0_xxyyzz_0_yyy_0[i] =
+            g_0_yyzz_0_yyy_0[i] * fi_ab_0 - g_0_yyzz_0_yyy_1[i] * fti_ab_0 + g_0_xyyzz_0_yyy_0[i] * pb_x + g_0_xyyzz_0_yyy_1[i] * wp_x[i];
 
-        g_0_xxyyzz_0_yyz_0[i] = g_0_yyzz_0_yyz_0[i] * fi_ab_0 - g_0_yyzz_0_yyz_1[i] * fti_ab_0 + g_0_xyyzz_0_yyz_0[i] * pb_x + g_0_xyyzz_0_yyz_1[i] * wp_x[i];
+        g_0_xxyyzz_0_yyz_0[i] =
+            g_0_yyzz_0_yyz_0[i] * fi_ab_0 - g_0_yyzz_0_yyz_1[i] * fti_ab_0 + g_0_xyyzz_0_yyz_0[i] * pb_x + g_0_xyyzz_0_yyz_1[i] * wp_x[i];
 
-        g_0_xxyyzz_0_yzz_0[i] = g_0_yyzz_0_yzz_0[i] * fi_ab_0 - g_0_yyzz_0_yzz_1[i] * fti_ab_0 + g_0_xyyzz_0_yzz_0[i] * pb_x + g_0_xyyzz_0_yzz_1[i] * wp_x[i];
+        g_0_xxyyzz_0_yzz_0[i] =
+            g_0_yyzz_0_yzz_0[i] * fi_ab_0 - g_0_yyzz_0_yzz_1[i] * fti_ab_0 + g_0_xyyzz_0_yzz_0[i] * pb_x + g_0_xyyzz_0_yzz_1[i] * wp_x[i];
 
-        g_0_xxyyzz_0_zzz_0[i] = g_0_yyzz_0_zzz_0[i] * fi_ab_0 - g_0_yyzz_0_zzz_1[i] * fti_ab_0 + g_0_xyyzz_0_zzz_0[i] * pb_x + g_0_xyyzz_0_zzz_1[i] * wp_x[i];
+        g_0_xxyyzz_0_zzz_0[i] =
+            g_0_yyzz_0_zzz_0[i] * fi_ab_0 - g_0_yyzz_0_zzz_1[i] * fti_ab_0 + g_0_xyyzz_0_zzz_0[i] * pb_x + g_0_xyyzz_0_zzz_1[i] * wp_x[i];
     }
 
     /// Set up 130-140 components of targeted buffer : SISF
@@ -1830,7 +2519,45 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xxyzzz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 139);
 
-    #pragma omp simd aligned(g_0_xxyzzz_0_xxx_0, g_0_xxyzzz_0_xxy_0, g_0_xxyzzz_0_xxz_0, g_0_xxyzzz_0_xyy_0, g_0_xxyzzz_0_xyz_0, g_0_xxyzzz_0_xzz_0, g_0_xxyzzz_0_yyy_0, g_0_xxyzzz_0_yyz_0, g_0_xxyzzz_0_yzz_0, g_0_xxyzzz_0_zzz_0, g_0_xxzzz_0_xx_1, g_0_xxzzz_0_xxx_0, g_0_xxzzz_0_xxx_1, g_0_xxzzz_0_xxy_0, g_0_xxzzz_0_xxy_1, g_0_xxzzz_0_xxz_0, g_0_xxzzz_0_xxz_1, g_0_xxzzz_0_xy_1, g_0_xxzzz_0_xyy_0, g_0_xxzzz_0_xyy_1, g_0_xxzzz_0_xyz_0, g_0_xxzzz_0_xyz_1, g_0_xxzzz_0_xz_1, g_0_xxzzz_0_xzz_0, g_0_xxzzz_0_xzz_1, g_0_xxzzz_0_yy_1, g_0_xxzzz_0_yyy_0, g_0_xxzzz_0_yyy_1, g_0_xxzzz_0_yyz_0, g_0_xxzzz_0_yyz_1, g_0_xxzzz_0_yz_1, g_0_xxzzz_0_yzz_0, g_0_xxzzz_0_yzz_1, g_0_xxzzz_0_zz_1, g_0_xxzzz_0_zzz_0, g_0_xxzzz_0_zzz_1, wp_y, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xxyzzz_0_xxx_0,     \
+                             g_0_xxyzzz_0_xxy_0, \
+                             g_0_xxyzzz_0_xxz_0, \
+                             g_0_xxyzzz_0_xyy_0, \
+                             g_0_xxyzzz_0_xyz_0, \
+                             g_0_xxyzzz_0_xzz_0, \
+                             g_0_xxyzzz_0_yyy_0, \
+                             g_0_xxyzzz_0_yyz_0, \
+                             g_0_xxyzzz_0_yzz_0, \
+                             g_0_xxyzzz_0_zzz_0, \
+                             g_0_xxzzz_0_xx_1,   \
+                             g_0_xxzzz_0_xxx_0,  \
+                             g_0_xxzzz_0_xxx_1,  \
+                             g_0_xxzzz_0_xxy_0,  \
+                             g_0_xxzzz_0_xxy_1,  \
+                             g_0_xxzzz_0_xxz_0,  \
+                             g_0_xxzzz_0_xxz_1,  \
+                             g_0_xxzzz_0_xy_1,   \
+                             g_0_xxzzz_0_xyy_0,  \
+                             g_0_xxzzz_0_xyy_1,  \
+                             g_0_xxzzz_0_xyz_0,  \
+                             g_0_xxzzz_0_xyz_1,  \
+                             g_0_xxzzz_0_xz_1,   \
+                             g_0_xxzzz_0_xzz_0,  \
+                             g_0_xxzzz_0_xzz_1,  \
+                             g_0_xxzzz_0_yy_1,   \
+                             g_0_xxzzz_0_yyy_0,  \
+                             g_0_xxzzz_0_yyy_1,  \
+                             g_0_xxzzz_0_yyz_0,  \
+                             g_0_xxzzz_0_yyz_1,  \
+                             g_0_xxzzz_0_yz_1,   \
+                             g_0_xxzzz_0_yzz_0,  \
+                             g_0_xxzzz_0_yzz_1,  \
+                             g_0_xxzzz_0_zz_1,   \
+                             g_0_xxzzz_0_zzz_0,  \
+                             g_0_xxzzz_0_zzz_1,  \
+                             wp_y,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -1878,7 +2605,63 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xxzzzz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 149);
 
-    #pragma omp simd aligned(g_0_xxzz_0_xxx_0, g_0_xxzz_0_xxx_1, g_0_xxzz_0_xxy_0, g_0_xxzz_0_xxy_1, g_0_xxzz_0_xyy_0, g_0_xxzz_0_xyy_1, g_0_xxzzz_0_xxx_0, g_0_xxzzz_0_xxx_1, g_0_xxzzz_0_xxy_0, g_0_xxzzz_0_xxy_1, g_0_xxzzz_0_xyy_0, g_0_xxzzz_0_xyy_1, g_0_xxzzzz_0_xxx_0, g_0_xxzzzz_0_xxy_0, g_0_xxzzzz_0_xxz_0, g_0_xxzzzz_0_xyy_0, g_0_xxzzzz_0_xyz_0, g_0_xxzzzz_0_xzz_0, g_0_xxzzzz_0_yyy_0, g_0_xxzzzz_0_yyz_0, g_0_xxzzzz_0_yzz_0, g_0_xxzzzz_0_zzz_0, g_0_xzzzz_0_xxz_0, g_0_xzzzz_0_xxz_1, g_0_xzzzz_0_xyz_0, g_0_xzzzz_0_xyz_1, g_0_xzzzz_0_xz_1, g_0_xzzzz_0_xzz_0, g_0_xzzzz_0_xzz_1, g_0_xzzzz_0_yyy_0, g_0_xzzzz_0_yyy_1, g_0_xzzzz_0_yyz_0, g_0_xzzzz_0_yyz_1, g_0_xzzzz_0_yz_1, g_0_xzzzz_0_yzz_0, g_0_xzzzz_0_yzz_1, g_0_xzzzz_0_zz_1, g_0_xzzzz_0_zzz_0, g_0_xzzzz_0_zzz_1, g_0_zzzz_0_xxz_0, g_0_zzzz_0_xxz_1, g_0_zzzz_0_xyz_0, g_0_zzzz_0_xyz_1, g_0_zzzz_0_xzz_0, g_0_zzzz_0_xzz_1, g_0_zzzz_0_yyy_0, g_0_zzzz_0_yyy_1, g_0_zzzz_0_yyz_0, g_0_zzzz_0_yyz_1, g_0_zzzz_0_yzz_0, g_0_zzzz_0_yzz_1, g_0_zzzz_0_zzz_0, g_0_zzzz_0_zzz_1, wp_x, wp_z, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xxzz_0_xxx_0,       \
+                             g_0_xxzz_0_xxx_1,   \
+                             g_0_xxzz_0_xxy_0,   \
+                             g_0_xxzz_0_xxy_1,   \
+                             g_0_xxzz_0_xyy_0,   \
+                             g_0_xxzz_0_xyy_1,   \
+                             g_0_xxzzz_0_xxx_0,  \
+                             g_0_xxzzz_0_xxx_1,  \
+                             g_0_xxzzz_0_xxy_0,  \
+                             g_0_xxzzz_0_xxy_1,  \
+                             g_0_xxzzz_0_xyy_0,  \
+                             g_0_xxzzz_0_xyy_1,  \
+                             g_0_xxzzzz_0_xxx_0, \
+                             g_0_xxzzzz_0_xxy_0, \
+                             g_0_xxzzzz_0_xxz_0, \
+                             g_0_xxzzzz_0_xyy_0, \
+                             g_0_xxzzzz_0_xyz_0, \
+                             g_0_xxzzzz_0_xzz_0, \
+                             g_0_xxzzzz_0_yyy_0, \
+                             g_0_xxzzzz_0_yyz_0, \
+                             g_0_xxzzzz_0_yzz_0, \
+                             g_0_xxzzzz_0_zzz_0, \
+                             g_0_xzzzz_0_xxz_0,  \
+                             g_0_xzzzz_0_xxz_1,  \
+                             g_0_xzzzz_0_xyz_0,  \
+                             g_0_xzzzz_0_xyz_1,  \
+                             g_0_xzzzz_0_xz_1,   \
+                             g_0_xzzzz_0_xzz_0,  \
+                             g_0_xzzzz_0_xzz_1,  \
+                             g_0_xzzzz_0_yyy_0,  \
+                             g_0_xzzzz_0_yyy_1,  \
+                             g_0_xzzzz_0_yyz_0,  \
+                             g_0_xzzzz_0_yyz_1,  \
+                             g_0_xzzzz_0_yz_1,   \
+                             g_0_xzzzz_0_yzz_0,  \
+                             g_0_xzzzz_0_yzz_1,  \
+                             g_0_xzzzz_0_zz_1,   \
+                             g_0_xzzzz_0_zzz_0,  \
+                             g_0_xzzzz_0_zzz_1,  \
+                             g_0_zzzz_0_xxz_0,   \
+                             g_0_zzzz_0_xxz_1,   \
+                             g_0_zzzz_0_xyz_0,   \
+                             g_0_zzzz_0_xyz_1,   \
+                             g_0_zzzz_0_xzz_0,   \
+                             g_0_zzzz_0_xzz_1,   \
+                             g_0_zzzz_0_yyy_0,   \
+                             g_0_zzzz_0_yyy_1,   \
+                             g_0_zzzz_0_yyz_0,   \
+                             g_0_zzzz_0_yyz_1,   \
+                             g_0_zzzz_0_yzz_0,   \
+                             g_0_zzzz_0_yzz_1,   \
+                             g_0_zzzz_0_zzz_0,   \
+                             g_0_zzzz_0_zzz_1,   \
+                             wp_x,               \
+                             wp_z,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -1887,25 +2670,35 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_xxzzzz_0_xxx_0[i] = 3.0 * g_0_xxzz_0_xxx_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_xxx_1[i] * fti_ab_0 + g_0_xxzzz_0_xxx_0[i] * pb_z + g_0_xxzzz_0_xxx_1[i] * wp_z[i];
+        g_0_xxzzzz_0_xxx_0[i] =
+            3.0 * g_0_xxzz_0_xxx_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_xxx_1[i] * fti_ab_0 + g_0_xxzzz_0_xxx_0[i] * pb_z + g_0_xxzzz_0_xxx_1[i] * wp_z[i];
 
-        g_0_xxzzzz_0_xxy_0[i] = 3.0 * g_0_xxzz_0_xxy_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_xxy_1[i] * fti_ab_0 + g_0_xxzzz_0_xxy_0[i] * pb_z + g_0_xxzzz_0_xxy_1[i] * wp_z[i];
+        g_0_xxzzzz_0_xxy_0[i] =
+            3.0 * g_0_xxzz_0_xxy_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_xxy_1[i] * fti_ab_0 + g_0_xxzzz_0_xxy_0[i] * pb_z + g_0_xxzzz_0_xxy_1[i] * wp_z[i];
 
-        g_0_xxzzzz_0_xxz_0[i] = g_0_zzzz_0_xxz_0[i] * fi_ab_0 - g_0_zzzz_0_xxz_1[i] * fti_ab_0 + 2.0 * g_0_xzzzz_0_xz_1[i] * fi_abcd_0 + g_0_xzzzz_0_xxz_0[i] * pb_x + g_0_xzzzz_0_xxz_1[i] * wp_x[i];
+        g_0_xxzzzz_0_xxz_0[i] = g_0_zzzz_0_xxz_0[i] * fi_ab_0 - g_0_zzzz_0_xxz_1[i] * fti_ab_0 + 2.0 * g_0_xzzzz_0_xz_1[i] * fi_abcd_0 +
+                                g_0_xzzzz_0_xxz_0[i] * pb_x + g_0_xzzzz_0_xxz_1[i] * wp_x[i];
 
-        g_0_xxzzzz_0_xyy_0[i] = 3.0 * g_0_xxzz_0_xyy_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_xyy_1[i] * fti_ab_0 + g_0_xxzzz_0_xyy_0[i] * pb_z + g_0_xxzzz_0_xyy_1[i] * wp_z[i];
+        g_0_xxzzzz_0_xyy_0[i] =
+            3.0 * g_0_xxzz_0_xyy_0[i] * fi_ab_0 - 3.0 * g_0_xxzz_0_xyy_1[i] * fti_ab_0 + g_0_xxzzz_0_xyy_0[i] * pb_z + g_0_xxzzz_0_xyy_1[i] * wp_z[i];
 
-        g_0_xxzzzz_0_xyz_0[i] = g_0_zzzz_0_xyz_0[i] * fi_ab_0 - g_0_zzzz_0_xyz_1[i] * fti_ab_0 + g_0_xzzzz_0_yz_1[i] * fi_abcd_0 + g_0_xzzzz_0_xyz_0[i] * pb_x + g_0_xzzzz_0_xyz_1[i] * wp_x[i];
+        g_0_xxzzzz_0_xyz_0[i] = g_0_zzzz_0_xyz_0[i] * fi_ab_0 - g_0_zzzz_0_xyz_1[i] * fti_ab_0 + g_0_xzzzz_0_yz_1[i] * fi_abcd_0 +
+                                g_0_xzzzz_0_xyz_0[i] * pb_x + g_0_xzzzz_0_xyz_1[i] * wp_x[i];
 
-        g_0_xxzzzz_0_xzz_0[i] = g_0_zzzz_0_xzz_0[i] * fi_ab_0 - g_0_zzzz_0_xzz_1[i] * fti_ab_0 + g_0_xzzzz_0_zz_1[i] * fi_abcd_0 + g_0_xzzzz_0_xzz_0[i] * pb_x + g_0_xzzzz_0_xzz_1[i] * wp_x[i];
+        g_0_xxzzzz_0_xzz_0[i] = g_0_zzzz_0_xzz_0[i] * fi_ab_0 - g_0_zzzz_0_xzz_1[i] * fti_ab_0 + g_0_xzzzz_0_zz_1[i] * fi_abcd_0 +
+                                g_0_xzzzz_0_xzz_0[i] * pb_x + g_0_xzzzz_0_xzz_1[i] * wp_x[i];
 
-        g_0_xxzzzz_0_yyy_0[i] = g_0_zzzz_0_yyy_0[i] * fi_ab_0 - g_0_zzzz_0_yyy_1[i] * fti_ab_0 + g_0_xzzzz_0_yyy_0[i] * pb_x + g_0_xzzzz_0_yyy_1[i] * wp_x[i];
+        g_0_xxzzzz_0_yyy_0[i] =
+            g_0_zzzz_0_yyy_0[i] * fi_ab_0 - g_0_zzzz_0_yyy_1[i] * fti_ab_0 + g_0_xzzzz_0_yyy_0[i] * pb_x + g_0_xzzzz_0_yyy_1[i] * wp_x[i];
 
-        g_0_xxzzzz_0_yyz_0[i] = g_0_zzzz_0_yyz_0[i] * fi_ab_0 - g_0_zzzz_0_yyz_1[i] * fti_ab_0 + g_0_xzzzz_0_yyz_0[i] * pb_x + g_0_xzzzz_0_yyz_1[i] * wp_x[i];
+        g_0_xxzzzz_0_yyz_0[i] =
+            g_0_zzzz_0_yyz_0[i] * fi_ab_0 - g_0_zzzz_0_yyz_1[i] * fti_ab_0 + g_0_xzzzz_0_yyz_0[i] * pb_x + g_0_xzzzz_0_yyz_1[i] * wp_x[i];
 
-        g_0_xxzzzz_0_yzz_0[i] = g_0_zzzz_0_yzz_0[i] * fi_ab_0 - g_0_zzzz_0_yzz_1[i] * fti_ab_0 + g_0_xzzzz_0_yzz_0[i] * pb_x + g_0_xzzzz_0_yzz_1[i] * wp_x[i];
+        g_0_xxzzzz_0_yzz_0[i] =
+            g_0_zzzz_0_yzz_0[i] * fi_ab_0 - g_0_zzzz_0_yzz_1[i] * fti_ab_0 + g_0_xzzzz_0_yzz_0[i] * pb_x + g_0_xzzzz_0_yzz_1[i] * wp_x[i];
 
-        g_0_xxzzzz_0_zzz_0[i] = g_0_zzzz_0_zzz_0[i] * fi_ab_0 - g_0_zzzz_0_zzz_1[i] * fti_ab_0 + g_0_xzzzz_0_zzz_0[i] * pb_x + g_0_xzzzz_0_zzz_1[i] * wp_x[i];
+        g_0_xxzzzz_0_zzz_0[i] =
+            g_0_zzzz_0_zzz_0[i] * fi_ab_0 - g_0_zzzz_0_zzz_1[i] * fti_ab_0 + g_0_xzzzz_0_zzz_0[i] * pb_x + g_0_xzzzz_0_zzz_1[i] * wp_x[i];
     }
 
     /// Set up 150-160 components of targeted buffer : SISF
@@ -1930,7 +2723,45 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xyyyyy_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 159);
 
-    #pragma omp simd aligned(g_0_xyyyyy_0_xxx_0, g_0_xyyyyy_0_xxy_0, g_0_xyyyyy_0_xxz_0, g_0_xyyyyy_0_xyy_0, g_0_xyyyyy_0_xyz_0, g_0_xyyyyy_0_xzz_0, g_0_xyyyyy_0_yyy_0, g_0_xyyyyy_0_yyz_0, g_0_xyyyyy_0_yzz_0, g_0_xyyyyy_0_zzz_0, g_0_yyyyy_0_xx_1, g_0_yyyyy_0_xxx_0, g_0_yyyyy_0_xxx_1, g_0_yyyyy_0_xxy_0, g_0_yyyyy_0_xxy_1, g_0_yyyyy_0_xxz_0, g_0_yyyyy_0_xxz_1, g_0_yyyyy_0_xy_1, g_0_yyyyy_0_xyy_0, g_0_yyyyy_0_xyy_1, g_0_yyyyy_0_xyz_0, g_0_yyyyy_0_xyz_1, g_0_yyyyy_0_xz_1, g_0_yyyyy_0_xzz_0, g_0_yyyyy_0_xzz_1, g_0_yyyyy_0_yy_1, g_0_yyyyy_0_yyy_0, g_0_yyyyy_0_yyy_1, g_0_yyyyy_0_yyz_0, g_0_yyyyy_0_yyz_1, g_0_yyyyy_0_yz_1, g_0_yyyyy_0_yzz_0, g_0_yyyyy_0_yzz_1, g_0_yyyyy_0_zz_1, g_0_yyyyy_0_zzz_0, g_0_yyyyy_0_zzz_1, wp_x, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xyyyyy_0_xxx_0,     \
+                             g_0_xyyyyy_0_xxy_0, \
+                             g_0_xyyyyy_0_xxz_0, \
+                             g_0_xyyyyy_0_xyy_0, \
+                             g_0_xyyyyy_0_xyz_0, \
+                             g_0_xyyyyy_0_xzz_0, \
+                             g_0_xyyyyy_0_yyy_0, \
+                             g_0_xyyyyy_0_yyz_0, \
+                             g_0_xyyyyy_0_yzz_0, \
+                             g_0_xyyyyy_0_zzz_0, \
+                             g_0_yyyyy_0_xx_1,   \
+                             g_0_yyyyy_0_xxx_0,  \
+                             g_0_yyyyy_0_xxx_1,  \
+                             g_0_yyyyy_0_xxy_0,  \
+                             g_0_yyyyy_0_xxy_1,  \
+                             g_0_yyyyy_0_xxz_0,  \
+                             g_0_yyyyy_0_xxz_1,  \
+                             g_0_yyyyy_0_xy_1,   \
+                             g_0_yyyyy_0_xyy_0,  \
+                             g_0_yyyyy_0_xyy_1,  \
+                             g_0_yyyyy_0_xyz_0,  \
+                             g_0_yyyyy_0_xyz_1,  \
+                             g_0_yyyyy_0_xz_1,   \
+                             g_0_yyyyy_0_xzz_0,  \
+                             g_0_yyyyy_0_xzz_1,  \
+                             g_0_yyyyy_0_yy_1,   \
+                             g_0_yyyyy_0_yyy_0,  \
+                             g_0_yyyyy_0_yyy_1,  \
+                             g_0_yyyyy_0_yyz_0,  \
+                             g_0_yyyyy_0_yyz_1,  \
+                             g_0_yyyyy_0_yz_1,   \
+                             g_0_yyyyy_0_yzz_0,  \
+                             g_0_yyyyy_0_yzz_1,  \
+                             g_0_yyyyy_0_zz_1,   \
+                             g_0_yyyyy_0_zzz_0,  \
+                             g_0_yyyyy_0_zzz_1,  \
+                             wp_x,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -1978,7 +2809,43 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xyyyyz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 169);
 
-    #pragma omp simd aligned(g_0_xyyyy_0_xxx_0, g_0_xyyyy_0_xxx_1, g_0_xyyyy_0_xxy_0, g_0_xyyyy_0_xxy_1, g_0_xyyyy_0_xyy_0, g_0_xyyyy_0_xyy_1, g_0_xyyyyz_0_xxx_0, g_0_xyyyyz_0_xxy_0, g_0_xyyyyz_0_xxz_0, g_0_xyyyyz_0_xyy_0, g_0_xyyyyz_0_xyz_0, g_0_xyyyyz_0_xzz_0, g_0_xyyyyz_0_yyy_0, g_0_xyyyyz_0_yyz_0, g_0_xyyyyz_0_yzz_0, g_0_xyyyyz_0_zzz_0, g_0_yyyyz_0_xxz_0, g_0_yyyyz_0_xxz_1, g_0_yyyyz_0_xyz_0, g_0_yyyyz_0_xyz_1, g_0_yyyyz_0_xz_1, g_0_yyyyz_0_xzz_0, g_0_yyyyz_0_xzz_1, g_0_yyyyz_0_yyy_0, g_0_yyyyz_0_yyy_1, g_0_yyyyz_0_yyz_0, g_0_yyyyz_0_yyz_1, g_0_yyyyz_0_yz_1, g_0_yyyyz_0_yzz_0, g_0_yyyyz_0_yzz_1, g_0_yyyyz_0_zz_1, g_0_yyyyz_0_zzz_0, g_0_yyyyz_0_zzz_1, wp_x, wp_z, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xyyyy_0_xxx_0,      \
+                             g_0_xyyyy_0_xxx_1,  \
+                             g_0_xyyyy_0_xxy_0,  \
+                             g_0_xyyyy_0_xxy_1,  \
+                             g_0_xyyyy_0_xyy_0,  \
+                             g_0_xyyyy_0_xyy_1,  \
+                             g_0_xyyyyz_0_xxx_0, \
+                             g_0_xyyyyz_0_xxy_0, \
+                             g_0_xyyyyz_0_xxz_0, \
+                             g_0_xyyyyz_0_xyy_0, \
+                             g_0_xyyyyz_0_xyz_0, \
+                             g_0_xyyyyz_0_xzz_0, \
+                             g_0_xyyyyz_0_yyy_0, \
+                             g_0_xyyyyz_0_yyz_0, \
+                             g_0_xyyyyz_0_yzz_0, \
+                             g_0_xyyyyz_0_zzz_0, \
+                             g_0_yyyyz_0_xxz_0,  \
+                             g_0_yyyyz_0_xxz_1,  \
+                             g_0_yyyyz_0_xyz_0,  \
+                             g_0_yyyyz_0_xyz_1,  \
+                             g_0_yyyyz_0_xz_1,   \
+                             g_0_yyyyz_0_xzz_0,  \
+                             g_0_yyyyz_0_xzz_1,  \
+                             g_0_yyyyz_0_yyy_0,  \
+                             g_0_yyyyz_0_yyy_1,  \
+                             g_0_yyyyz_0_yyz_0,  \
+                             g_0_yyyyz_0_yyz_1,  \
+                             g_0_yyyyz_0_yz_1,   \
+                             g_0_yyyyz_0_yzz_0,  \
+                             g_0_yyyyz_0_yzz_1,  \
+                             g_0_yyyyz_0_zz_1,   \
+                             g_0_yyyyz_0_zzz_0,  \
+                             g_0_yyyyz_0_zzz_1,  \
+                             wp_x,               \
+                             wp_z,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -2026,7 +2893,45 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xyyyzz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 179);
 
-    #pragma omp simd aligned(g_0_xyyyzz_0_xxx_0, g_0_xyyyzz_0_xxy_0, g_0_xyyyzz_0_xxz_0, g_0_xyyyzz_0_xyy_0, g_0_xyyyzz_0_xyz_0, g_0_xyyyzz_0_xzz_0, g_0_xyyyzz_0_yyy_0, g_0_xyyyzz_0_yyz_0, g_0_xyyyzz_0_yzz_0, g_0_xyyyzz_0_zzz_0, g_0_yyyzz_0_xx_1, g_0_yyyzz_0_xxx_0, g_0_yyyzz_0_xxx_1, g_0_yyyzz_0_xxy_0, g_0_yyyzz_0_xxy_1, g_0_yyyzz_0_xxz_0, g_0_yyyzz_0_xxz_1, g_0_yyyzz_0_xy_1, g_0_yyyzz_0_xyy_0, g_0_yyyzz_0_xyy_1, g_0_yyyzz_0_xyz_0, g_0_yyyzz_0_xyz_1, g_0_yyyzz_0_xz_1, g_0_yyyzz_0_xzz_0, g_0_yyyzz_0_xzz_1, g_0_yyyzz_0_yy_1, g_0_yyyzz_0_yyy_0, g_0_yyyzz_0_yyy_1, g_0_yyyzz_0_yyz_0, g_0_yyyzz_0_yyz_1, g_0_yyyzz_0_yz_1, g_0_yyyzz_0_yzz_0, g_0_yyyzz_0_yzz_1, g_0_yyyzz_0_zz_1, g_0_yyyzz_0_zzz_0, g_0_yyyzz_0_zzz_1, wp_x, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xyyyzz_0_xxx_0,     \
+                             g_0_xyyyzz_0_xxy_0, \
+                             g_0_xyyyzz_0_xxz_0, \
+                             g_0_xyyyzz_0_xyy_0, \
+                             g_0_xyyyzz_0_xyz_0, \
+                             g_0_xyyyzz_0_xzz_0, \
+                             g_0_xyyyzz_0_yyy_0, \
+                             g_0_xyyyzz_0_yyz_0, \
+                             g_0_xyyyzz_0_yzz_0, \
+                             g_0_xyyyzz_0_zzz_0, \
+                             g_0_yyyzz_0_xx_1,   \
+                             g_0_yyyzz_0_xxx_0,  \
+                             g_0_yyyzz_0_xxx_1,  \
+                             g_0_yyyzz_0_xxy_0,  \
+                             g_0_yyyzz_0_xxy_1,  \
+                             g_0_yyyzz_0_xxz_0,  \
+                             g_0_yyyzz_0_xxz_1,  \
+                             g_0_yyyzz_0_xy_1,   \
+                             g_0_yyyzz_0_xyy_0,  \
+                             g_0_yyyzz_0_xyy_1,  \
+                             g_0_yyyzz_0_xyz_0,  \
+                             g_0_yyyzz_0_xyz_1,  \
+                             g_0_yyyzz_0_xz_1,   \
+                             g_0_yyyzz_0_xzz_0,  \
+                             g_0_yyyzz_0_xzz_1,  \
+                             g_0_yyyzz_0_yy_1,   \
+                             g_0_yyyzz_0_yyy_0,  \
+                             g_0_yyyzz_0_yyy_1,  \
+                             g_0_yyyzz_0_yyz_0,  \
+                             g_0_yyyzz_0_yyz_1,  \
+                             g_0_yyyzz_0_yz_1,   \
+                             g_0_yyyzz_0_yzz_0,  \
+                             g_0_yyyzz_0_yzz_1,  \
+                             g_0_yyyzz_0_zz_1,   \
+                             g_0_yyyzz_0_zzz_0,  \
+                             g_0_yyyzz_0_zzz_1,  \
+                             wp_x,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -2074,7 +2979,45 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xyyzzz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 189);
 
-    #pragma omp simd aligned(g_0_xyyzzz_0_xxx_0, g_0_xyyzzz_0_xxy_0, g_0_xyyzzz_0_xxz_0, g_0_xyyzzz_0_xyy_0, g_0_xyyzzz_0_xyz_0, g_0_xyyzzz_0_xzz_0, g_0_xyyzzz_0_yyy_0, g_0_xyyzzz_0_yyz_0, g_0_xyyzzz_0_yzz_0, g_0_xyyzzz_0_zzz_0, g_0_yyzzz_0_xx_1, g_0_yyzzz_0_xxx_0, g_0_yyzzz_0_xxx_1, g_0_yyzzz_0_xxy_0, g_0_yyzzz_0_xxy_1, g_0_yyzzz_0_xxz_0, g_0_yyzzz_0_xxz_1, g_0_yyzzz_0_xy_1, g_0_yyzzz_0_xyy_0, g_0_yyzzz_0_xyy_1, g_0_yyzzz_0_xyz_0, g_0_yyzzz_0_xyz_1, g_0_yyzzz_0_xz_1, g_0_yyzzz_0_xzz_0, g_0_yyzzz_0_xzz_1, g_0_yyzzz_0_yy_1, g_0_yyzzz_0_yyy_0, g_0_yyzzz_0_yyy_1, g_0_yyzzz_0_yyz_0, g_0_yyzzz_0_yyz_1, g_0_yyzzz_0_yz_1, g_0_yyzzz_0_yzz_0, g_0_yyzzz_0_yzz_1, g_0_yyzzz_0_zz_1, g_0_yyzzz_0_zzz_0, g_0_yyzzz_0_zzz_1, wp_x, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xyyzzz_0_xxx_0,     \
+                             g_0_xyyzzz_0_xxy_0, \
+                             g_0_xyyzzz_0_xxz_0, \
+                             g_0_xyyzzz_0_xyy_0, \
+                             g_0_xyyzzz_0_xyz_0, \
+                             g_0_xyyzzz_0_xzz_0, \
+                             g_0_xyyzzz_0_yyy_0, \
+                             g_0_xyyzzz_0_yyz_0, \
+                             g_0_xyyzzz_0_yzz_0, \
+                             g_0_xyyzzz_0_zzz_0, \
+                             g_0_yyzzz_0_xx_1,   \
+                             g_0_yyzzz_0_xxx_0,  \
+                             g_0_yyzzz_0_xxx_1,  \
+                             g_0_yyzzz_0_xxy_0,  \
+                             g_0_yyzzz_0_xxy_1,  \
+                             g_0_yyzzz_0_xxz_0,  \
+                             g_0_yyzzz_0_xxz_1,  \
+                             g_0_yyzzz_0_xy_1,   \
+                             g_0_yyzzz_0_xyy_0,  \
+                             g_0_yyzzz_0_xyy_1,  \
+                             g_0_yyzzz_0_xyz_0,  \
+                             g_0_yyzzz_0_xyz_1,  \
+                             g_0_yyzzz_0_xz_1,   \
+                             g_0_yyzzz_0_xzz_0,  \
+                             g_0_yyzzz_0_xzz_1,  \
+                             g_0_yyzzz_0_yy_1,   \
+                             g_0_yyzzz_0_yyy_0,  \
+                             g_0_yyzzz_0_yyy_1,  \
+                             g_0_yyzzz_0_yyz_0,  \
+                             g_0_yyzzz_0_yyz_1,  \
+                             g_0_yyzzz_0_yz_1,   \
+                             g_0_yyzzz_0_yzz_0,  \
+                             g_0_yyzzz_0_yzz_1,  \
+                             g_0_yyzzz_0_zz_1,   \
+                             g_0_yyzzz_0_zzz_0,  \
+                             g_0_yyzzz_0_zzz_1,  \
+                             wp_x,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -2122,7 +3065,43 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xyzzzz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 199);
 
-    #pragma omp simd aligned(g_0_xyzzzz_0_xxx_0, g_0_xyzzzz_0_xxy_0, g_0_xyzzzz_0_xxz_0, g_0_xyzzzz_0_xyy_0, g_0_xyzzzz_0_xyz_0, g_0_xyzzzz_0_xzz_0, g_0_xyzzzz_0_yyy_0, g_0_xyzzzz_0_yyz_0, g_0_xyzzzz_0_yzz_0, g_0_xyzzzz_0_zzz_0, g_0_xzzzz_0_xxx_0, g_0_xzzzz_0_xxx_1, g_0_xzzzz_0_xxz_0, g_0_xzzzz_0_xxz_1, g_0_xzzzz_0_xzz_0, g_0_xzzzz_0_xzz_1, g_0_yzzzz_0_xxy_0, g_0_yzzzz_0_xxy_1, g_0_yzzzz_0_xy_1, g_0_yzzzz_0_xyy_0, g_0_yzzzz_0_xyy_1, g_0_yzzzz_0_xyz_0, g_0_yzzzz_0_xyz_1, g_0_yzzzz_0_yy_1, g_0_yzzzz_0_yyy_0, g_0_yzzzz_0_yyy_1, g_0_yzzzz_0_yyz_0, g_0_yzzzz_0_yyz_1, g_0_yzzzz_0_yz_1, g_0_yzzzz_0_yzz_0, g_0_yzzzz_0_yzz_1, g_0_yzzzz_0_zzz_0, g_0_yzzzz_0_zzz_1, wp_x, wp_y, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xyzzzz_0_xxx_0,     \
+                             g_0_xyzzzz_0_xxy_0, \
+                             g_0_xyzzzz_0_xxz_0, \
+                             g_0_xyzzzz_0_xyy_0, \
+                             g_0_xyzzzz_0_xyz_0, \
+                             g_0_xyzzzz_0_xzz_0, \
+                             g_0_xyzzzz_0_yyy_0, \
+                             g_0_xyzzzz_0_yyz_0, \
+                             g_0_xyzzzz_0_yzz_0, \
+                             g_0_xyzzzz_0_zzz_0, \
+                             g_0_xzzzz_0_xxx_0,  \
+                             g_0_xzzzz_0_xxx_1,  \
+                             g_0_xzzzz_0_xxz_0,  \
+                             g_0_xzzzz_0_xxz_1,  \
+                             g_0_xzzzz_0_xzz_0,  \
+                             g_0_xzzzz_0_xzz_1,  \
+                             g_0_yzzzz_0_xxy_0,  \
+                             g_0_yzzzz_0_xxy_1,  \
+                             g_0_yzzzz_0_xy_1,   \
+                             g_0_yzzzz_0_xyy_0,  \
+                             g_0_yzzzz_0_xyy_1,  \
+                             g_0_yzzzz_0_xyz_0,  \
+                             g_0_yzzzz_0_xyz_1,  \
+                             g_0_yzzzz_0_yy_1,   \
+                             g_0_yzzzz_0_yyy_0,  \
+                             g_0_yzzzz_0_yyy_1,  \
+                             g_0_yzzzz_0_yyz_0,  \
+                             g_0_yzzzz_0_yyz_1,  \
+                             g_0_yzzzz_0_yz_1,   \
+                             g_0_yzzzz_0_yzz_0,  \
+                             g_0_yzzzz_0_yzz_1,  \
+                             g_0_yzzzz_0_zzz_0,  \
+                             g_0_yzzzz_0_zzz_1,  \
+                             wp_x,               \
+                             wp_y,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -2170,7 +3149,45 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_xzzzzz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 209);
 
-    #pragma omp simd aligned(g_0_xzzzzz_0_xxx_0, g_0_xzzzzz_0_xxy_0, g_0_xzzzzz_0_xxz_0, g_0_xzzzzz_0_xyy_0, g_0_xzzzzz_0_xyz_0, g_0_xzzzzz_0_xzz_0, g_0_xzzzzz_0_yyy_0, g_0_xzzzzz_0_yyz_0, g_0_xzzzzz_0_yzz_0, g_0_xzzzzz_0_zzz_0, g_0_zzzzz_0_xx_1, g_0_zzzzz_0_xxx_0, g_0_zzzzz_0_xxx_1, g_0_zzzzz_0_xxy_0, g_0_zzzzz_0_xxy_1, g_0_zzzzz_0_xxz_0, g_0_zzzzz_0_xxz_1, g_0_zzzzz_0_xy_1, g_0_zzzzz_0_xyy_0, g_0_zzzzz_0_xyy_1, g_0_zzzzz_0_xyz_0, g_0_zzzzz_0_xyz_1, g_0_zzzzz_0_xz_1, g_0_zzzzz_0_xzz_0, g_0_zzzzz_0_xzz_1, g_0_zzzzz_0_yy_1, g_0_zzzzz_0_yyy_0, g_0_zzzzz_0_yyy_1, g_0_zzzzz_0_yyz_0, g_0_zzzzz_0_yyz_1, g_0_zzzzz_0_yz_1, g_0_zzzzz_0_yzz_0, g_0_zzzzz_0_yzz_1, g_0_zzzzz_0_zz_1, g_0_zzzzz_0_zzz_0, g_0_zzzzz_0_zzz_1, wp_x, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_xzzzzz_0_xxx_0,     \
+                             g_0_xzzzzz_0_xxy_0, \
+                             g_0_xzzzzz_0_xxz_0, \
+                             g_0_xzzzzz_0_xyy_0, \
+                             g_0_xzzzzz_0_xyz_0, \
+                             g_0_xzzzzz_0_xzz_0, \
+                             g_0_xzzzzz_0_yyy_0, \
+                             g_0_xzzzzz_0_yyz_0, \
+                             g_0_xzzzzz_0_yzz_0, \
+                             g_0_xzzzzz_0_zzz_0, \
+                             g_0_zzzzz_0_xx_1,   \
+                             g_0_zzzzz_0_xxx_0,  \
+                             g_0_zzzzz_0_xxx_1,  \
+                             g_0_zzzzz_0_xxy_0,  \
+                             g_0_zzzzz_0_xxy_1,  \
+                             g_0_zzzzz_0_xxz_0,  \
+                             g_0_zzzzz_0_xxz_1,  \
+                             g_0_zzzzz_0_xy_1,   \
+                             g_0_zzzzz_0_xyy_0,  \
+                             g_0_zzzzz_0_xyy_1,  \
+                             g_0_zzzzz_0_xyz_0,  \
+                             g_0_zzzzz_0_xyz_1,  \
+                             g_0_zzzzz_0_xz_1,   \
+                             g_0_zzzzz_0_xzz_0,  \
+                             g_0_zzzzz_0_xzz_1,  \
+                             g_0_zzzzz_0_yy_1,   \
+                             g_0_zzzzz_0_yyy_0,  \
+                             g_0_zzzzz_0_yyy_1,  \
+                             g_0_zzzzz_0_yyz_0,  \
+                             g_0_zzzzz_0_yyz_1,  \
+                             g_0_zzzzz_0_yz_1,   \
+                             g_0_zzzzz_0_yzz_0,  \
+                             g_0_zzzzz_0_yzz_1,  \
+                             g_0_zzzzz_0_zz_1,   \
+                             g_0_zzzzz_0_zzz_0,  \
+                             g_0_zzzzz_0_zzz_1,  \
+                             wp_x,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -2218,7 +3235,65 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_yyyyyy_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 219);
 
-    #pragma omp simd aligned(g_0_yyyy_0_xxx_0, g_0_yyyy_0_xxx_1, g_0_yyyy_0_xxy_0, g_0_yyyy_0_xxy_1, g_0_yyyy_0_xxz_0, g_0_yyyy_0_xxz_1, g_0_yyyy_0_xyy_0, g_0_yyyy_0_xyy_1, g_0_yyyy_0_xyz_0, g_0_yyyy_0_xyz_1, g_0_yyyy_0_xzz_0, g_0_yyyy_0_xzz_1, g_0_yyyy_0_yyy_0, g_0_yyyy_0_yyy_1, g_0_yyyy_0_yyz_0, g_0_yyyy_0_yyz_1, g_0_yyyy_0_yzz_0, g_0_yyyy_0_yzz_1, g_0_yyyy_0_zzz_0, g_0_yyyy_0_zzz_1, g_0_yyyyy_0_xx_1, g_0_yyyyy_0_xxx_0, g_0_yyyyy_0_xxx_1, g_0_yyyyy_0_xxy_0, g_0_yyyyy_0_xxy_1, g_0_yyyyy_0_xxz_0, g_0_yyyyy_0_xxz_1, g_0_yyyyy_0_xy_1, g_0_yyyyy_0_xyy_0, g_0_yyyyy_0_xyy_1, g_0_yyyyy_0_xyz_0, g_0_yyyyy_0_xyz_1, g_0_yyyyy_0_xz_1, g_0_yyyyy_0_xzz_0, g_0_yyyyy_0_xzz_1, g_0_yyyyy_0_yy_1, g_0_yyyyy_0_yyy_0, g_0_yyyyy_0_yyy_1, g_0_yyyyy_0_yyz_0, g_0_yyyyy_0_yyz_1, g_0_yyyyy_0_yz_1, g_0_yyyyy_0_yzz_0, g_0_yyyyy_0_yzz_1, g_0_yyyyy_0_zz_1, g_0_yyyyy_0_zzz_0, g_0_yyyyy_0_zzz_1, g_0_yyyyyy_0_xxx_0, g_0_yyyyyy_0_xxy_0, g_0_yyyyyy_0_xxz_0, g_0_yyyyyy_0_xyy_0, g_0_yyyyyy_0_xyz_0, g_0_yyyyyy_0_xzz_0, g_0_yyyyyy_0_yyy_0, g_0_yyyyyy_0_yyz_0, g_0_yyyyyy_0_yzz_0, g_0_yyyyyy_0_zzz_0, wp_y, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_yyyy_0_xxx_0,       \
+                             g_0_yyyy_0_xxx_1,   \
+                             g_0_yyyy_0_xxy_0,   \
+                             g_0_yyyy_0_xxy_1,   \
+                             g_0_yyyy_0_xxz_0,   \
+                             g_0_yyyy_0_xxz_1,   \
+                             g_0_yyyy_0_xyy_0,   \
+                             g_0_yyyy_0_xyy_1,   \
+                             g_0_yyyy_0_xyz_0,   \
+                             g_0_yyyy_0_xyz_1,   \
+                             g_0_yyyy_0_xzz_0,   \
+                             g_0_yyyy_0_xzz_1,   \
+                             g_0_yyyy_0_yyy_0,   \
+                             g_0_yyyy_0_yyy_1,   \
+                             g_0_yyyy_0_yyz_0,   \
+                             g_0_yyyy_0_yyz_1,   \
+                             g_0_yyyy_0_yzz_0,   \
+                             g_0_yyyy_0_yzz_1,   \
+                             g_0_yyyy_0_zzz_0,   \
+                             g_0_yyyy_0_zzz_1,   \
+                             g_0_yyyyy_0_xx_1,   \
+                             g_0_yyyyy_0_xxx_0,  \
+                             g_0_yyyyy_0_xxx_1,  \
+                             g_0_yyyyy_0_xxy_0,  \
+                             g_0_yyyyy_0_xxy_1,  \
+                             g_0_yyyyy_0_xxz_0,  \
+                             g_0_yyyyy_0_xxz_1,  \
+                             g_0_yyyyy_0_xy_1,   \
+                             g_0_yyyyy_0_xyy_0,  \
+                             g_0_yyyyy_0_xyy_1,  \
+                             g_0_yyyyy_0_xyz_0,  \
+                             g_0_yyyyy_0_xyz_1,  \
+                             g_0_yyyyy_0_xz_1,   \
+                             g_0_yyyyy_0_xzz_0,  \
+                             g_0_yyyyy_0_xzz_1,  \
+                             g_0_yyyyy_0_yy_1,   \
+                             g_0_yyyyy_0_yyy_0,  \
+                             g_0_yyyyy_0_yyy_1,  \
+                             g_0_yyyyy_0_yyz_0,  \
+                             g_0_yyyyy_0_yyz_1,  \
+                             g_0_yyyyy_0_yz_1,   \
+                             g_0_yyyyy_0_yzz_0,  \
+                             g_0_yyyyy_0_yzz_1,  \
+                             g_0_yyyyy_0_zz_1,   \
+                             g_0_yyyyy_0_zzz_0,  \
+                             g_0_yyyyy_0_zzz_1,  \
+                             g_0_yyyyyy_0_xxx_0, \
+                             g_0_yyyyyy_0_xxy_0, \
+                             g_0_yyyyyy_0_xxz_0, \
+                             g_0_yyyyyy_0_xyy_0, \
+                             g_0_yyyyyy_0_xyz_0, \
+                             g_0_yyyyyy_0_xzz_0, \
+                             g_0_yyyyyy_0_yyy_0, \
+                             g_0_yyyyyy_0_yyz_0, \
+                             g_0_yyyyyy_0_yzz_0, \
+                             g_0_yyyyyy_0_zzz_0, \
+                             wp_y,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -2227,25 +3302,35 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_yyyyyy_0_xxx_0[i] = 5.0 * g_0_yyyy_0_xxx_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_xxx_1[i] * fti_ab_0 + g_0_yyyyy_0_xxx_0[i] * pb_y + g_0_yyyyy_0_xxx_1[i] * wp_y[i];
+        g_0_yyyyyy_0_xxx_0[i] =
+            5.0 * g_0_yyyy_0_xxx_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_xxx_1[i] * fti_ab_0 + g_0_yyyyy_0_xxx_0[i] * pb_y + g_0_yyyyy_0_xxx_1[i] * wp_y[i];
 
-        g_0_yyyyyy_0_xxy_0[i] = 5.0 * g_0_yyyy_0_xxy_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_xxy_1[i] * fti_ab_0 + g_0_yyyyy_0_xx_1[i] * fi_abcd_0 + g_0_yyyyy_0_xxy_0[i] * pb_y + g_0_yyyyy_0_xxy_1[i] * wp_y[i];
+        g_0_yyyyyy_0_xxy_0[i] = 5.0 * g_0_yyyy_0_xxy_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_xxy_1[i] * fti_ab_0 + g_0_yyyyy_0_xx_1[i] * fi_abcd_0 +
+                                g_0_yyyyy_0_xxy_0[i] * pb_y + g_0_yyyyy_0_xxy_1[i] * wp_y[i];
 
-        g_0_yyyyyy_0_xxz_0[i] = 5.0 * g_0_yyyy_0_xxz_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_xxz_1[i] * fti_ab_0 + g_0_yyyyy_0_xxz_0[i] * pb_y + g_0_yyyyy_0_xxz_1[i] * wp_y[i];
+        g_0_yyyyyy_0_xxz_0[i] =
+            5.0 * g_0_yyyy_0_xxz_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_xxz_1[i] * fti_ab_0 + g_0_yyyyy_0_xxz_0[i] * pb_y + g_0_yyyyy_0_xxz_1[i] * wp_y[i];
 
-        g_0_yyyyyy_0_xyy_0[i] = 5.0 * g_0_yyyy_0_xyy_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_xyy_1[i] * fti_ab_0 + 2.0 * g_0_yyyyy_0_xy_1[i] * fi_abcd_0 + g_0_yyyyy_0_xyy_0[i] * pb_y + g_0_yyyyy_0_xyy_1[i] * wp_y[i];
+        g_0_yyyyyy_0_xyy_0[i] = 5.0 * g_0_yyyy_0_xyy_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_xyy_1[i] * fti_ab_0 + 2.0 * g_0_yyyyy_0_xy_1[i] * fi_abcd_0 +
+                                g_0_yyyyy_0_xyy_0[i] * pb_y + g_0_yyyyy_0_xyy_1[i] * wp_y[i];
 
-        g_0_yyyyyy_0_xyz_0[i] = 5.0 * g_0_yyyy_0_xyz_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_xyz_1[i] * fti_ab_0 + g_0_yyyyy_0_xz_1[i] * fi_abcd_0 + g_0_yyyyy_0_xyz_0[i] * pb_y + g_0_yyyyy_0_xyz_1[i] * wp_y[i];
+        g_0_yyyyyy_0_xyz_0[i] = 5.0 * g_0_yyyy_0_xyz_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_xyz_1[i] * fti_ab_0 + g_0_yyyyy_0_xz_1[i] * fi_abcd_0 +
+                                g_0_yyyyy_0_xyz_0[i] * pb_y + g_0_yyyyy_0_xyz_1[i] * wp_y[i];
 
-        g_0_yyyyyy_0_xzz_0[i] = 5.0 * g_0_yyyy_0_xzz_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_xzz_1[i] * fti_ab_0 + g_0_yyyyy_0_xzz_0[i] * pb_y + g_0_yyyyy_0_xzz_1[i] * wp_y[i];
+        g_0_yyyyyy_0_xzz_0[i] =
+            5.0 * g_0_yyyy_0_xzz_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_xzz_1[i] * fti_ab_0 + g_0_yyyyy_0_xzz_0[i] * pb_y + g_0_yyyyy_0_xzz_1[i] * wp_y[i];
 
-        g_0_yyyyyy_0_yyy_0[i] = 5.0 * g_0_yyyy_0_yyy_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_yyy_1[i] * fti_ab_0 + 3.0 * g_0_yyyyy_0_yy_1[i] * fi_abcd_0 + g_0_yyyyy_0_yyy_0[i] * pb_y + g_0_yyyyy_0_yyy_1[i] * wp_y[i];
+        g_0_yyyyyy_0_yyy_0[i] = 5.0 * g_0_yyyy_0_yyy_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_yyy_1[i] * fti_ab_0 + 3.0 * g_0_yyyyy_0_yy_1[i] * fi_abcd_0 +
+                                g_0_yyyyy_0_yyy_0[i] * pb_y + g_0_yyyyy_0_yyy_1[i] * wp_y[i];
 
-        g_0_yyyyyy_0_yyz_0[i] = 5.0 * g_0_yyyy_0_yyz_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_yyz_1[i] * fti_ab_0 + 2.0 * g_0_yyyyy_0_yz_1[i] * fi_abcd_0 + g_0_yyyyy_0_yyz_0[i] * pb_y + g_0_yyyyy_0_yyz_1[i] * wp_y[i];
+        g_0_yyyyyy_0_yyz_0[i] = 5.0 * g_0_yyyy_0_yyz_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_yyz_1[i] * fti_ab_0 + 2.0 * g_0_yyyyy_0_yz_1[i] * fi_abcd_0 +
+                                g_0_yyyyy_0_yyz_0[i] * pb_y + g_0_yyyyy_0_yyz_1[i] * wp_y[i];
 
-        g_0_yyyyyy_0_yzz_0[i] = 5.0 * g_0_yyyy_0_yzz_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_yzz_1[i] * fti_ab_0 + g_0_yyyyy_0_zz_1[i] * fi_abcd_0 + g_0_yyyyy_0_yzz_0[i] * pb_y + g_0_yyyyy_0_yzz_1[i] * wp_y[i];
+        g_0_yyyyyy_0_yzz_0[i] = 5.0 * g_0_yyyy_0_yzz_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_yzz_1[i] * fti_ab_0 + g_0_yyyyy_0_zz_1[i] * fi_abcd_0 +
+                                g_0_yyyyy_0_yzz_0[i] * pb_y + g_0_yyyyy_0_yzz_1[i] * wp_y[i];
 
-        g_0_yyyyyy_0_zzz_0[i] = 5.0 * g_0_yyyy_0_zzz_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_zzz_1[i] * fti_ab_0 + g_0_yyyyy_0_zzz_0[i] * pb_y + g_0_yyyyy_0_zzz_1[i] * wp_y[i];
+        g_0_yyyyyy_0_zzz_0[i] =
+            5.0 * g_0_yyyy_0_zzz_0[i] * fi_ab_0 - 5.0 * g_0_yyyy_0_zzz_1[i] * fti_ab_0 + g_0_yyyyy_0_zzz_0[i] * pb_y + g_0_yyyyy_0_zzz_1[i] * wp_y[i];
     }
 
     /// Set up 220-230 components of targeted buffer : SISF
@@ -2270,7 +3355,45 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_yyyyyz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 229);
 
-    #pragma omp simd aligned(g_0_yyyyy_0_xx_1, g_0_yyyyy_0_xxx_0, g_0_yyyyy_0_xxx_1, g_0_yyyyy_0_xxy_0, g_0_yyyyy_0_xxy_1, g_0_yyyyy_0_xxz_0, g_0_yyyyy_0_xxz_1, g_0_yyyyy_0_xy_1, g_0_yyyyy_0_xyy_0, g_0_yyyyy_0_xyy_1, g_0_yyyyy_0_xyz_0, g_0_yyyyy_0_xyz_1, g_0_yyyyy_0_xz_1, g_0_yyyyy_0_xzz_0, g_0_yyyyy_0_xzz_1, g_0_yyyyy_0_yy_1, g_0_yyyyy_0_yyy_0, g_0_yyyyy_0_yyy_1, g_0_yyyyy_0_yyz_0, g_0_yyyyy_0_yyz_1, g_0_yyyyy_0_yz_1, g_0_yyyyy_0_yzz_0, g_0_yyyyy_0_yzz_1, g_0_yyyyy_0_zz_1, g_0_yyyyy_0_zzz_0, g_0_yyyyy_0_zzz_1, g_0_yyyyyz_0_xxx_0, g_0_yyyyyz_0_xxy_0, g_0_yyyyyz_0_xxz_0, g_0_yyyyyz_0_xyy_0, g_0_yyyyyz_0_xyz_0, g_0_yyyyyz_0_xzz_0, g_0_yyyyyz_0_yyy_0, g_0_yyyyyz_0_yyz_0, g_0_yyyyyz_0_yzz_0, g_0_yyyyyz_0_zzz_0, wp_z, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_yyyyy_0_xx_1,       \
+                             g_0_yyyyy_0_xxx_0,  \
+                             g_0_yyyyy_0_xxx_1,  \
+                             g_0_yyyyy_0_xxy_0,  \
+                             g_0_yyyyy_0_xxy_1,  \
+                             g_0_yyyyy_0_xxz_0,  \
+                             g_0_yyyyy_0_xxz_1,  \
+                             g_0_yyyyy_0_xy_1,   \
+                             g_0_yyyyy_0_xyy_0,  \
+                             g_0_yyyyy_0_xyy_1,  \
+                             g_0_yyyyy_0_xyz_0,  \
+                             g_0_yyyyy_0_xyz_1,  \
+                             g_0_yyyyy_0_xz_1,   \
+                             g_0_yyyyy_0_xzz_0,  \
+                             g_0_yyyyy_0_xzz_1,  \
+                             g_0_yyyyy_0_yy_1,   \
+                             g_0_yyyyy_0_yyy_0,  \
+                             g_0_yyyyy_0_yyy_1,  \
+                             g_0_yyyyy_0_yyz_0,  \
+                             g_0_yyyyy_0_yyz_1,  \
+                             g_0_yyyyy_0_yz_1,   \
+                             g_0_yyyyy_0_yzz_0,  \
+                             g_0_yyyyy_0_yzz_1,  \
+                             g_0_yyyyy_0_zz_1,   \
+                             g_0_yyyyy_0_zzz_0,  \
+                             g_0_yyyyy_0_zzz_1,  \
+                             g_0_yyyyyz_0_xxx_0, \
+                             g_0_yyyyyz_0_xxy_0, \
+                             g_0_yyyyyz_0_xxz_0, \
+                             g_0_yyyyyz_0_xyy_0, \
+                             g_0_yyyyyz_0_xyz_0, \
+                             g_0_yyyyyz_0_xzz_0, \
+                             g_0_yyyyyz_0_yyy_0, \
+                             g_0_yyyyyz_0_yyz_0, \
+                             g_0_yyyyyz_0_yzz_0, \
+                             g_0_yyyyyz_0_zzz_0, \
+                             wp_z,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -2318,7 +3441,63 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_yyyyzz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 239);
 
-    #pragma omp simd aligned(g_0_yyyy_0_xxy_0, g_0_yyyy_0_xxy_1, g_0_yyyy_0_xyy_0, g_0_yyyy_0_xyy_1, g_0_yyyy_0_yyy_0, g_0_yyyy_0_yyy_1, g_0_yyyyz_0_xxy_0, g_0_yyyyz_0_xxy_1, g_0_yyyyz_0_xyy_0, g_0_yyyyz_0_xyy_1, g_0_yyyyz_0_yyy_0, g_0_yyyyz_0_yyy_1, g_0_yyyyzz_0_xxx_0, g_0_yyyyzz_0_xxy_0, g_0_yyyyzz_0_xxz_0, g_0_yyyyzz_0_xyy_0, g_0_yyyyzz_0_xyz_0, g_0_yyyyzz_0_xzz_0, g_0_yyyyzz_0_yyy_0, g_0_yyyyzz_0_yyz_0, g_0_yyyyzz_0_yzz_0, g_0_yyyyzz_0_zzz_0, g_0_yyyzz_0_xxx_0, g_0_yyyzz_0_xxx_1, g_0_yyyzz_0_xxz_0, g_0_yyyzz_0_xxz_1, g_0_yyyzz_0_xyz_0, g_0_yyyzz_0_xyz_1, g_0_yyyzz_0_xz_1, g_0_yyyzz_0_xzz_0, g_0_yyyzz_0_xzz_1, g_0_yyyzz_0_yyz_0, g_0_yyyzz_0_yyz_1, g_0_yyyzz_0_yz_1, g_0_yyyzz_0_yzz_0, g_0_yyyzz_0_yzz_1, g_0_yyyzz_0_zz_1, g_0_yyyzz_0_zzz_0, g_0_yyyzz_0_zzz_1, g_0_yyzz_0_xxx_0, g_0_yyzz_0_xxx_1, g_0_yyzz_0_xxz_0, g_0_yyzz_0_xxz_1, g_0_yyzz_0_xyz_0, g_0_yyzz_0_xyz_1, g_0_yyzz_0_xzz_0, g_0_yyzz_0_xzz_1, g_0_yyzz_0_yyz_0, g_0_yyzz_0_yyz_1, g_0_yyzz_0_yzz_0, g_0_yyzz_0_yzz_1, g_0_yyzz_0_zzz_0, g_0_yyzz_0_zzz_1, wp_y, wp_z, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_yyyy_0_xxy_0,       \
+                             g_0_yyyy_0_xxy_1,   \
+                             g_0_yyyy_0_xyy_0,   \
+                             g_0_yyyy_0_xyy_1,   \
+                             g_0_yyyy_0_yyy_0,   \
+                             g_0_yyyy_0_yyy_1,   \
+                             g_0_yyyyz_0_xxy_0,  \
+                             g_0_yyyyz_0_xxy_1,  \
+                             g_0_yyyyz_0_xyy_0,  \
+                             g_0_yyyyz_0_xyy_1,  \
+                             g_0_yyyyz_0_yyy_0,  \
+                             g_0_yyyyz_0_yyy_1,  \
+                             g_0_yyyyzz_0_xxx_0, \
+                             g_0_yyyyzz_0_xxy_0, \
+                             g_0_yyyyzz_0_xxz_0, \
+                             g_0_yyyyzz_0_xyy_0, \
+                             g_0_yyyyzz_0_xyz_0, \
+                             g_0_yyyyzz_0_xzz_0, \
+                             g_0_yyyyzz_0_yyy_0, \
+                             g_0_yyyyzz_0_yyz_0, \
+                             g_0_yyyyzz_0_yzz_0, \
+                             g_0_yyyyzz_0_zzz_0, \
+                             g_0_yyyzz_0_xxx_0,  \
+                             g_0_yyyzz_0_xxx_1,  \
+                             g_0_yyyzz_0_xxz_0,  \
+                             g_0_yyyzz_0_xxz_1,  \
+                             g_0_yyyzz_0_xyz_0,  \
+                             g_0_yyyzz_0_xyz_1,  \
+                             g_0_yyyzz_0_xz_1,   \
+                             g_0_yyyzz_0_xzz_0,  \
+                             g_0_yyyzz_0_xzz_1,  \
+                             g_0_yyyzz_0_yyz_0,  \
+                             g_0_yyyzz_0_yyz_1,  \
+                             g_0_yyyzz_0_yz_1,   \
+                             g_0_yyyzz_0_yzz_0,  \
+                             g_0_yyyzz_0_yzz_1,  \
+                             g_0_yyyzz_0_zz_1,   \
+                             g_0_yyyzz_0_zzz_0,  \
+                             g_0_yyyzz_0_zzz_1,  \
+                             g_0_yyzz_0_xxx_0,   \
+                             g_0_yyzz_0_xxx_1,   \
+                             g_0_yyzz_0_xxz_0,   \
+                             g_0_yyzz_0_xxz_1,   \
+                             g_0_yyzz_0_xyz_0,   \
+                             g_0_yyzz_0_xyz_1,   \
+                             g_0_yyzz_0_xzz_0,   \
+                             g_0_yyzz_0_xzz_1,   \
+                             g_0_yyzz_0_yyz_0,   \
+                             g_0_yyzz_0_yyz_1,   \
+                             g_0_yyzz_0_yzz_0,   \
+                             g_0_yyzz_0_yzz_1,   \
+                             g_0_yyzz_0_zzz_0,   \
+                             g_0_yyzz_0_zzz_1,   \
+                             wp_y,               \
+                             wp_z,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -2327,25 +3506,35 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_yyyyzz_0_xxx_0[i] = 3.0 * g_0_yyzz_0_xxx_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_xxx_1[i] * fti_ab_0 + g_0_yyyzz_0_xxx_0[i] * pb_y + g_0_yyyzz_0_xxx_1[i] * wp_y[i];
+        g_0_yyyyzz_0_xxx_0[i] =
+            3.0 * g_0_yyzz_0_xxx_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_xxx_1[i] * fti_ab_0 + g_0_yyyzz_0_xxx_0[i] * pb_y + g_0_yyyzz_0_xxx_1[i] * wp_y[i];
 
-        g_0_yyyyzz_0_xxy_0[i] = g_0_yyyy_0_xxy_0[i] * fi_ab_0 - g_0_yyyy_0_xxy_1[i] * fti_ab_0 + g_0_yyyyz_0_xxy_0[i] * pb_z + g_0_yyyyz_0_xxy_1[i] * wp_z[i];
+        g_0_yyyyzz_0_xxy_0[i] =
+            g_0_yyyy_0_xxy_0[i] * fi_ab_0 - g_0_yyyy_0_xxy_1[i] * fti_ab_0 + g_0_yyyyz_0_xxy_0[i] * pb_z + g_0_yyyyz_0_xxy_1[i] * wp_z[i];
 
-        g_0_yyyyzz_0_xxz_0[i] = 3.0 * g_0_yyzz_0_xxz_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_xxz_1[i] * fti_ab_0 + g_0_yyyzz_0_xxz_0[i] * pb_y + g_0_yyyzz_0_xxz_1[i] * wp_y[i];
+        g_0_yyyyzz_0_xxz_0[i] =
+            3.0 * g_0_yyzz_0_xxz_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_xxz_1[i] * fti_ab_0 + g_0_yyyzz_0_xxz_0[i] * pb_y + g_0_yyyzz_0_xxz_1[i] * wp_y[i];
 
-        g_0_yyyyzz_0_xyy_0[i] = g_0_yyyy_0_xyy_0[i] * fi_ab_0 - g_0_yyyy_0_xyy_1[i] * fti_ab_0 + g_0_yyyyz_0_xyy_0[i] * pb_z + g_0_yyyyz_0_xyy_1[i] * wp_z[i];
+        g_0_yyyyzz_0_xyy_0[i] =
+            g_0_yyyy_0_xyy_0[i] * fi_ab_0 - g_0_yyyy_0_xyy_1[i] * fti_ab_0 + g_0_yyyyz_0_xyy_0[i] * pb_z + g_0_yyyyz_0_xyy_1[i] * wp_z[i];
 
-        g_0_yyyyzz_0_xyz_0[i] = 3.0 * g_0_yyzz_0_xyz_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_xyz_1[i] * fti_ab_0 + g_0_yyyzz_0_xz_1[i] * fi_abcd_0 + g_0_yyyzz_0_xyz_0[i] * pb_y + g_0_yyyzz_0_xyz_1[i] * wp_y[i];
+        g_0_yyyyzz_0_xyz_0[i] = 3.0 * g_0_yyzz_0_xyz_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_xyz_1[i] * fti_ab_0 + g_0_yyyzz_0_xz_1[i] * fi_abcd_0 +
+                                g_0_yyyzz_0_xyz_0[i] * pb_y + g_0_yyyzz_0_xyz_1[i] * wp_y[i];
 
-        g_0_yyyyzz_0_xzz_0[i] = 3.0 * g_0_yyzz_0_xzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_xzz_1[i] * fti_ab_0 + g_0_yyyzz_0_xzz_0[i] * pb_y + g_0_yyyzz_0_xzz_1[i] * wp_y[i];
+        g_0_yyyyzz_0_xzz_0[i] =
+            3.0 * g_0_yyzz_0_xzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_xzz_1[i] * fti_ab_0 + g_0_yyyzz_0_xzz_0[i] * pb_y + g_0_yyyzz_0_xzz_1[i] * wp_y[i];
 
-        g_0_yyyyzz_0_yyy_0[i] = g_0_yyyy_0_yyy_0[i] * fi_ab_0 - g_0_yyyy_0_yyy_1[i] * fti_ab_0 + g_0_yyyyz_0_yyy_0[i] * pb_z + g_0_yyyyz_0_yyy_1[i] * wp_z[i];
+        g_0_yyyyzz_0_yyy_0[i] =
+            g_0_yyyy_0_yyy_0[i] * fi_ab_0 - g_0_yyyy_0_yyy_1[i] * fti_ab_0 + g_0_yyyyz_0_yyy_0[i] * pb_z + g_0_yyyyz_0_yyy_1[i] * wp_z[i];
 
-        g_0_yyyyzz_0_yyz_0[i] = 3.0 * g_0_yyzz_0_yyz_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_yyz_1[i] * fti_ab_0 + 2.0 * g_0_yyyzz_0_yz_1[i] * fi_abcd_0 + g_0_yyyzz_0_yyz_0[i] * pb_y + g_0_yyyzz_0_yyz_1[i] * wp_y[i];
+        g_0_yyyyzz_0_yyz_0[i] = 3.0 * g_0_yyzz_0_yyz_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_yyz_1[i] * fti_ab_0 + 2.0 * g_0_yyyzz_0_yz_1[i] * fi_abcd_0 +
+                                g_0_yyyzz_0_yyz_0[i] * pb_y + g_0_yyyzz_0_yyz_1[i] * wp_y[i];
 
-        g_0_yyyyzz_0_yzz_0[i] = 3.0 * g_0_yyzz_0_yzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_yzz_1[i] * fti_ab_0 + g_0_yyyzz_0_zz_1[i] * fi_abcd_0 + g_0_yyyzz_0_yzz_0[i] * pb_y + g_0_yyyzz_0_yzz_1[i] * wp_y[i];
+        g_0_yyyyzz_0_yzz_0[i] = 3.0 * g_0_yyzz_0_yzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_yzz_1[i] * fti_ab_0 + g_0_yyyzz_0_zz_1[i] * fi_abcd_0 +
+                                g_0_yyyzz_0_yzz_0[i] * pb_y + g_0_yyyzz_0_yzz_1[i] * wp_y[i];
 
-        g_0_yyyyzz_0_zzz_0[i] = 3.0 * g_0_yyzz_0_zzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_zzz_1[i] * fti_ab_0 + g_0_yyyzz_0_zzz_0[i] * pb_y + g_0_yyyzz_0_zzz_1[i] * wp_y[i];
+        g_0_yyyyzz_0_zzz_0[i] =
+            3.0 * g_0_yyzz_0_zzz_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_zzz_1[i] * fti_ab_0 + g_0_yyyzz_0_zzz_0[i] * pb_y + g_0_yyyzz_0_zzz_1[i] * wp_y[i];
     }
 
     /// Set up 240-250 components of targeted buffer : SISF
@@ -2370,7 +3559,63 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_yyyzzz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 249);
 
-    #pragma omp simd aligned(g_0_yyyz_0_xxy_0, g_0_yyyz_0_xxy_1, g_0_yyyz_0_xyy_0, g_0_yyyz_0_xyy_1, g_0_yyyz_0_yyy_0, g_0_yyyz_0_yyy_1, g_0_yyyzz_0_xxy_0, g_0_yyyzz_0_xxy_1, g_0_yyyzz_0_xyy_0, g_0_yyyzz_0_xyy_1, g_0_yyyzz_0_yyy_0, g_0_yyyzz_0_yyy_1, g_0_yyyzzz_0_xxx_0, g_0_yyyzzz_0_xxy_0, g_0_yyyzzz_0_xxz_0, g_0_yyyzzz_0_xyy_0, g_0_yyyzzz_0_xyz_0, g_0_yyyzzz_0_xzz_0, g_0_yyyzzz_0_yyy_0, g_0_yyyzzz_0_yyz_0, g_0_yyyzzz_0_yzz_0, g_0_yyyzzz_0_zzz_0, g_0_yyzzz_0_xxx_0, g_0_yyzzz_0_xxx_1, g_0_yyzzz_0_xxz_0, g_0_yyzzz_0_xxz_1, g_0_yyzzz_0_xyz_0, g_0_yyzzz_0_xyz_1, g_0_yyzzz_0_xz_1, g_0_yyzzz_0_xzz_0, g_0_yyzzz_0_xzz_1, g_0_yyzzz_0_yyz_0, g_0_yyzzz_0_yyz_1, g_0_yyzzz_0_yz_1, g_0_yyzzz_0_yzz_0, g_0_yyzzz_0_yzz_1, g_0_yyzzz_0_zz_1, g_0_yyzzz_0_zzz_0, g_0_yyzzz_0_zzz_1, g_0_yzzz_0_xxx_0, g_0_yzzz_0_xxx_1, g_0_yzzz_0_xxz_0, g_0_yzzz_0_xxz_1, g_0_yzzz_0_xyz_0, g_0_yzzz_0_xyz_1, g_0_yzzz_0_xzz_0, g_0_yzzz_0_xzz_1, g_0_yzzz_0_yyz_0, g_0_yzzz_0_yyz_1, g_0_yzzz_0_yzz_0, g_0_yzzz_0_yzz_1, g_0_yzzz_0_zzz_0, g_0_yzzz_0_zzz_1, wp_y, wp_z, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_yyyz_0_xxy_0,       \
+                             g_0_yyyz_0_xxy_1,   \
+                             g_0_yyyz_0_xyy_0,   \
+                             g_0_yyyz_0_xyy_1,   \
+                             g_0_yyyz_0_yyy_0,   \
+                             g_0_yyyz_0_yyy_1,   \
+                             g_0_yyyzz_0_xxy_0,  \
+                             g_0_yyyzz_0_xxy_1,  \
+                             g_0_yyyzz_0_xyy_0,  \
+                             g_0_yyyzz_0_xyy_1,  \
+                             g_0_yyyzz_0_yyy_0,  \
+                             g_0_yyyzz_0_yyy_1,  \
+                             g_0_yyyzzz_0_xxx_0, \
+                             g_0_yyyzzz_0_xxy_0, \
+                             g_0_yyyzzz_0_xxz_0, \
+                             g_0_yyyzzz_0_xyy_0, \
+                             g_0_yyyzzz_0_xyz_0, \
+                             g_0_yyyzzz_0_xzz_0, \
+                             g_0_yyyzzz_0_yyy_0, \
+                             g_0_yyyzzz_0_yyz_0, \
+                             g_0_yyyzzz_0_yzz_0, \
+                             g_0_yyyzzz_0_zzz_0, \
+                             g_0_yyzzz_0_xxx_0,  \
+                             g_0_yyzzz_0_xxx_1,  \
+                             g_0_yyzzz_0_xxz_0,  \
+                             g_0_yyzzz_0_xxz_1,  \
+                             g_0_yyzzz_0_xyz_0,  \
+                             g_0_yyzzz_0_xyz_1,  \
+                             g_0_yyzzz_0_xz_1,   \
+                             g_0_yyzzz_0_xzz_0,  \
+                             g_0_yyzzz_0_xzz_1,  \
+                             g_0_yyzzz_0_yyz_0,  \
+                             g_0_yyzzz_0_yyz_1,  \
+                             g_0_yyzzz_0_yz_1,   \
+                             g_0_yyzzz_0_yzz_0,  \
+                             g_0_yyzzz_0_yzz_1,  \
+                             g_0_yyzzz_0_zz_1,   \
+                             g_0_yyzzz_0_zzz_0,  \
+                             g_0_yyzzz_0_zzz_1,  \
+                             g_0_yzzz_0_xxx_0,   \
+                             g_0_yzzz_0_xxx_1,   \
+                             g_0_yzzz_0_xxz_0,   \
+                             g_0_yzzz_0_xxz_1,   \
+                             g_0_yzzz_0_xyz_0,   \
+                             g_0_yzzz_0_xyz_1,   \
+                             g_0_yzzz_0_xzz_0,   \
+                             g_0_yzzz_0_xzz_1,   \
+                             g_0_yzzz_0_yyz_0,   \
+                             g_0_yzzz_0_yyz_1,   \
+                             g_0_yzzz_0_yzz_0,   \
+                             g_0_yzzz_0_yzz_1,   \
+                             g_0_yzzz_0_zzz_0,   \
+                             g_0_yzzz_0_zzz_1,   \
+                             wp_y,               \
+                             wp_z,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -2379,25 +3624,35 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_yyyzzz_0_xxx_0[i] = 2.0 * g_0_yzzz_0_xxx_0[i] * fi_ab_0 - 2.0 * g_0_yzzz_0_xxx_1[i] * fti_ab_0 + g_0_yyzzz_0_xxx_0[i] * pb_y + g_0_yyzzz_0_xxx_1[i] * wp_y[i];
+        g_0_yyyzzz_0_xxx_0[i] =
+            2.0 * g_0_yzzz_0_xxx_0[i] * fi_ab_0 - 2.0 * g_0_yzzz_0_xxx_1[i] * fti_ab_0 + g_0_yyzzz_0_xxx_0[i] * pb_y + g_0_yyzzz_0_xxx_1[i] * wp_y[i];
 
-        g_0_yyyzzz_0_xxy_0[i] = 2.0 * g_0_yyyz_0_xxy_0[i] * fi_ab_0 - 2.0 * g_0_yyyz_0_xxy_1[i] * fti_ab_0 + g_0_yyyzz_0_xxy_0[i] * pb_z + g_0_yyyzz_0_xxy_1[i] * wp_z[i];
+        g_0_yyyzzz_0_xxy_0[i] =
+            2.0 * g_0_yyyz_0_xxy_0[i] * fi_ab_0 - 2.0 * g_0_yyyz_0_xxy_1[i] * fti_ab_0 + g_0_yyyzz_0_xxy_0[i] * pb_z + g_0_yyyzz_0_xxy_1[i] * wp_z[i];
 
-        g_0_yyyzzz_0_xxz_0[i] = 2.0 * g_0_yzzz_0_xxz_0[i] * fi_ab_0 - 2.0 * g_0_yzzz_0_xxz_1[i] * fti_ab_0 + g_0_yyzzz_0_xxz_0[i] * pb_y + g_0_yyzzz_0_xxz_1[i] * wp_y[i];
+        g_0_yyyzzz_0_xxz_0[i] =
+            2.0 * g_0_yzzz_0_xxz_0[i] * fi_ab_0 - 2.0 * g_0_yzzz_0_xxz_1[i] * fti_ab_0 + g_0_yyzzz_0_xxz_0[i] * pb_y + g_0_yyzzz_0_xxz_1[i] * wp_y[i];
 
-        g_0_yyyzzz_0_xyy_0[i] = 2.0 * g_0_yyyz_0_xyy_0[i] * fi_ab_0 - 2.0 * g_0_yyyz_0_xyy_1[i] * fti_ab_0 + g_0_yyyzz_0_xyy_0[i] * pb_z + g_0_yyyzz_0_xyy_1[i] * wp_z[i];
+        g_0_yyyzzz_0_xyy_0[i] =
+            2.0 * g_0_yyyz_0_xyy_0[i] * fi_ab_0 - 2.0 * g_0_yyyz_0_xyy_1[i] * fti_ab_0 + g_0_yyyzz_0_xyy_0[i] * pb_z + g_0_yyyzz_0_xyy_1[i] * wp_z[i];
 
-        g_0_yyyzzz_0_xyz_0[i] = 2.0 * g_0_yzzz_0_xyz_0[i] * fi_ab_0 - 2.0 * g_0_yzzz_0_xyz_1[i] * fti_ab_0 + g_0_yyzzz_0_xz_1[i] * fi_abcd_0 + g_0_yyzzz_0_xyz_0[i] * pb_y + g_0_yyzzz_0_xyz_1[i] * wp_y[i];
+        g_0_yyyzzz_0_xyz_0[i] = 2.0 * g_0_yzzz_0_xyz_0[i] * fi_ab_0 - 2.0 * g_0_yzzz_0_xyz_1[i] * fti_ab_0 + g_0_yyzzz_0_xz_1[i] * fi_abcd_0 +
+                                g_0_yyzzz_0_xyz_0[i] * pb_y + g_0_yyzzz_0_xyz_1[i] * wp_y[i];
 
-        g_0_yyyzzz_0_xzz_0[i] = 2.0 * g_0_yzzz_0_xzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzz_0_xzz_1[i] * fti_ab_0 + g_0_yyzzz_0_xzz_0[i] * pb_y + g_0_yyzzz_0_xzz_1[i] * wp_y[i];
+        g_0_yyyzzz_0_xzz_0[i] =
+            2.0 * g_0_yzzz_0_xzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzz_0_xzz_1[i] * fti_ab_0 + g_0_yyzzz_0_xzz_0[i] * pb_y + g_0_yyzzz_0_xzz_1[i] * wp_y[i];
 
-        g_0_yyyzzz_0_yyy_0[i] = 2.0 * g_0_yyyz_0_yyy_0[i] * fi_ab_0 - 2.0 * g_0_yyyz_0_yyy_1[i] * fti_ab_0 + g_0_yyyzz_0_yyy_0[i] * pb_z + g_0_yyyzz_0_yyy_1[i] * wp_z[i];
+        g_0_yyyzzz_0_yyy_0[i] =
+            2.0 * g_0_yyyz_0_yyy_0[i] * fi_ab_0 - 2.0 * g_0_yyyz_0_yyy_1[i] * fti_ab_0 + g_0_yyyzz_0_yyy_0[i] * pb_z + g_0_yyyzz_0_yyy_1[i] * wp_z[i];
 
-        g_0_yyyzzz_0_yyz_0[i] = 2.0 * g_0_yzzz_0_yyz_0[i] * fi_ab_0 - 2.0 * g_0_yzzz_0_yyz_1[i] * fti_ab_0 + 2.0 * g_0_yyzzz_0_yz_1[i] * fi_abcd_0 + g_0_yyzzz_0_yyz_0[i] * pb_y + g_0_yyzzz_0_yyz_1[i] * wp_y[i];
+        g_0_yyyzzz_0_yyz_0[i] = 2.0 * g_0_yzzz_0_yyz_0[i] * fi_ab_0 - 2.0 * g_0_yzzz_0_yyz_1[i] * fti_ab_0 + 2.0 * g_0_yyzzz_0_yz_1[i] * fi_abcd_0 +
+                                g_0_yyzzz_0_yyz_0[i] * pb_y + g_0_yyzzz_0_yyz_1[i] * wp_y[i];
 
-        g_0_yyyzzz_0_yzz_0[i] = 2.0 * g_0_yzzz_0_yzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzz_0_yzz_1[i] * fti_ab_0 + g_0_yyzzz_0_zz_1[i] * fi_abcd_0 + g_0_yyzzz_0_yzz_0[i] * pb_y + g_0_yyzzz_0_yzz_1[i] * wp_y[i];
+        g_0_yyyzzz_0_yzz_0[i] = 2.0 * g_0_yzzz_0_yzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzz_0_yzz_1[i] * fti_ab_0 + g_0_yyzzz_0_zz_1[i] * fi_abcd_0 +
+                                g_0_yyzzz_0_yzz_0[i] * pb_y + g_0_yyzzz_0_yzz_1[i] * wp_y[i];
 
-        g_0_yyyzzz_0_zzz_0[i] = 2.0 * g_0_yzzz_0_zzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzz_0_zzz_1[i] * fti_ab_0 + g_0_yyzzz_0_zzz_0[i] * pb_y + g_0_yyzzz_0_zzz_1[i] * wp_y[i];
+        g_0_yyyzzz_0_zzz_0[i] =
+            2.0 * g_0_yzzz_0_zzz_0[i] * fi_ab_0 - 2.0 * g_0_yzzz_0_zzz_1[i] * fti_ab_0 + g_0_yyzzz_0_zzz_0[i] * pb_y + g_0_yyzzz_0_zzz_1[i] * wp_y[i];
     }
 
     /// Set up 250-260 components of targeted buffer : SISF
@@ -2422,7 +3677,63 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_yyzzzz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 259);
 
-    #pragma omp simd aligned(g_0_yyzz_0_xxy_0, g_0_yyzz_0_xxy_1, g_0_yyzz_0_xyy_0, g_0_yyzz_0_xyy_1, g_0_yyzz_0_yyy_0, g_0_yyzz_0_yyy_1, g_0_yyzzz_0_xxy_0, g_0_yyzzz_0_xxy_1, g_0_yyzzz_0_xyy_0, g_0_yyzzz_0_xyy_1, g_0_yyzzz_0_yyy_0, g_0_yyzzz_0_yyy_1, g_0_yyzzzz_0_xxx_0, g_0_yyzzzz_0_xxy_0, g_0_yyzzzz_0_xxz_0, g_0_yyzzzz_0_xyy_0, g_0_yyzzzz_0_xyz_0, g_0_yyzzzz_0_xzz_0, g_0_yyzzzz_0_yyy_0, g_0_yyzzzz_0_yyz_0, g_0_yyzzzz_0_yzz_0, g_0_yyzzzz_0_zzz_0, g_0_yzzzz_0_xxx_0, g_0_yzzzz_0_xxx_1, g_0_yzzzz_0_xxz_0, g_0_yzzzz_0_xxz_1, g_0_yzzzz_0_xyz_0, g_0_yzzzz_0_xyz_1, g_0_yzzzz_0_xz_1, g_0_yzzzz_0_xzz_0, g_0_yzzzz_0_xzz_1, g_0_yzzzz_0_yyz_0, g_0_yzzzz_0_yyz_1, g_0_yzzzz_0_yz_1, g_0_yzzzz_0_yzz_0, g_0_yzzzz_0_yzz_1, g_0_yzzzz_0_zz_1, g_0_yzzzz_0_zzz_0, g_0_yzzzz_0_zzz_1, g_0_zzzz_0_xxx_0, g_0_zzzz_0_xxx_1, g_0_zzzz_0_xxz_0, g_0_zzzz_0_xxz_1, g_0_zzzz_0_xyz_0, g_0_zzzz_0_xyz_1, g_0_zzzz_0_xzz_0, g_0_zzzz_0_xzz_1, g_0_zzzz_0_yyz_0, g_0_zzzz_0_yyz_1, g_0_zzzz_0_yzz_0, g_0_zzzz_0_yzz_1, g_0_zzzz_0_zzz_0, g_0_zzzz_0_zzz_1, wp_y, wp_z, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_yyzz_0_xxy_0,       \
+                             g_0_yyzz_0_xxy_1,   \
+                             g_0_yyzz_0_xyy_0,   \
+                             g_0_yyzz_0_xyy_1,   \
+                             g_0_yyzz_0_yyy_0,   \
+                             g_0_yyzz_0_yyy_1,   \
+                             g_0_yyzzz_0_xxy_0,  \
+                             g_0_yyzzz_0_xxy_1,  \
+                             g_0_yyzzz_0_xyy_0,  \
+                             g_0_yyzzz_0_xyy_1,  \
+                             g_0_yyzzz_0_yyy_0,  \
+                             g_0_yyzzz_0_yyy_1,  \
+                             g_0_yyzzzz_0_xxx_0, \
+                             g_0_yyzzzz_0_xxy_0, \
+                             g_0_yyzzzz_0_xxz_0, \
+                             g_0_yyzzzz_0_xyy_0, \
+                             g_0_yyzzzz_0_xyz_0, \
+                             g_0_yyzzzz_0_xzz_0, \
+                             g_0_yyzzzz_0_yyy_0, \
+                             g_0_yyzzzz_0_yyz_0, \
+                             g_0_yyzzzz_0_yzz_0, \
+                             g_0_yyzzzz_0_zzz_0, \
+                             g_0_yzzzz_0_xxx_0,  \
+                             g_0_yzzzz_0_xxx_1,  \
+                             g_0_yzzzz_0_xxz_0,  \
+                             g_0_yzzzz_0_xxz_1,  \
+                             g_0_yzzzz_0_xyz_0,  \
+                             g_0_yzzzz_0_xyz_1,  \
+                             g_0_yzzzz_0_xz_1,   \
+                             g_0_yzzzz_0_xzz_0,  \
+                             g_0_yzzzz_0_xzz_1,  \
+                             g_0_yzzzz_0_yyz_0,  \
+                             g_0_yzzzz_0_yyz_1,  \
+                             g_0_yzzzz_0_yz_1,   \
+                             g_0_yzzzz_0_yzz_0,  \
+                             g_0_yzzzz_0_yzz_1,  \
+                             g_0_yzzzz_0_zz_1,   \
+                             g_0_yzzzz_0_zzz_0,  \
+                             g_0_yzzzz_0_zzz_1,  \
+                             g_0_zzzz_0_xxx_0,   \
+                             g_0_zzzz_0_xxx_1,   \
+                             g_0_zzzz_0_xxz_0,   \
+                             g_0_zzzz_0_xxz_1,   \
+                             g_0_zzzz_0_xyz_0,   \
+                             g_0_zzzz_0_xyz_1,   \
+                             g_0_zzzz_0_xzz_0,   \
+                             g_0_zzzz_0_xzz_1,   \
+                             g_0_zzzz_0_yyz_0,   \
+                             g_0_zzzz_0_yyz_1,   \
+                             g_0_zzzz_0_yzz_0,   \
+                             g_0_zzzz_0_yzz_1,   \
+                             g_0_zzzz_0_zzz_0,   \
+                             g_0_zzzz_0_zzz_1,   \
+                             wp_y,               \
+                             wp_z,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -2431,25 +3742,35 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_yyzzzz_0_xxx_0[i] = g_0_zzzz_0_xxx_0[i] * fi_ab_0 - g_0_zzzz_0_xxx_1[i] * fti_ab_0 + g_0_yzzzz_0_xxx_0[i] * pb_y + g_0_yzzzz_0_xxx_1[i] * wp_y[i];
+        g_0_yyzzzz_0_xxx_0[i] =
+            g_0_zzzz_0_xxx_0[i] * fi_ab_0 - g_0_zzzz_0_xxx_1[i] * fti_ab_0 + g_0_yzzzz_0_xxx_0[i] * pb_y + g_0_yzzzz_0_xxx_1[i] * wp_y[i];
 
-        g_0_yyzzzz_0_xxy_0[i] = 3.0 * g_0_yyzz_0_xxy_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_xxy_1[i] * fti_ab_0 + g_0_yyzzz_0_xxy_0[i] * pb_z + g_0_yyzzz_0_xxy_1[i] * wp_z[i];
+        g_0_yyzzzz_0_xxy_0[i] =
+            3.0 * g_0_yyzz_0_xxy_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_xxy_1[i] * fti_ab_0 + g_0_yyzzz_0_xxy_0[i] * pb_z + g_0_yyzzz_0_xxy_1[i] * wp_z[i];
 
-        g_0_yyzzzz_0_xxz_0[i] = g_0_zzzz_0_xxz_0[i] * fi_ab_0 - g_0_zzzz_0_xxz_1[i] * fti_ab_0 + g_0_yzzzz_0_xxz_0[i] * pb_y + g_0_yzzzz_0_xxz_1[i] * wp_y[i];
+        g_0_yyzzzz_0_xxz_0[i] =
+            g_0_zzzz_0_xxz_0[i] * fi_ab_0 - g_0_zzzz_0_xxz_1[i] * fti_ab_0 + g_0_yzzzz_0_xxz_0[i] * pb_y + g_0_yzzzz_0_xxz_1[i] * wp_y[i];
 
-        g_0_yyzzzz_0_xyy_0[i] = 3.0 * g_0_yyzz_0_xyy_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_xyy_1[i] * fti_ab_0 + g_0_yyzzz_0_xyy_0[i] * pb_z + g_0_yyzzz_0_xyy_1[i] * wp_z[i];
+        g_0_yyzzzz_0_xyy_0[i] =
+            3.0 * g_0_yyzz_0_xyy_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_xyy_1[i] * fti_ab_0 + g_0_yyzzz_0_xyy_0[i] * pb_z + g_0_yyzzz_0_xyy_1[i] * wp_z[i];
 
-        g_0_yyzzzz_0_xyz_0[i] = g_0_zzzz_0_xyz_0[i] * fi_ab_0 - g_0_zzzz_0_xyz_1[i] * fti_ab_0 + g_0_yzzzz_0_xz_1[i] * fi_abcd_0 + g_0_yzzzz_0_xyz_0[i] * pb_y + g_0_yzzzz_0_xyz_1[i] * wp_y[i];
+        g_0_yyzzzz_0_xyz_0[i] = g_0_zzzz_0_xyz_0[i] * fi_ab_0 - g_0_zzzz_0_xyz_1[i] * fti_ab_0 + g_0_yzzzz_0_xz_1[i] * fi_abcd_0 +
+                                g_0_yzzzz_0_xyz_0[i] * pb_y + g_0_yzzzz_0_xyz_1[i] * wp_y[i];
 
-        g_0_yyzzzz_0_xzz_0[i] = g_0_zzzz_0_xzz_0[i] * fi_ab_0 - g_0_zzzz_0_xzz_1[i] * fti_ab_0 + g_0_yzzzz_0_xzz_0[i] * pb_y + g_0_yzzzz_0_xzz_1[i] * wp_y[i];
+        g_0_yyzzzz_0_xzz_0[i] =
+            g_0_zzzz_0_xzz_0[i] * fi_ab_0 - g_0_zzzz_0_xzz_1[i] * fti_ab_0 + g_0_yzzzz_0_xzz_0[i] * pb_y + g_0_yzzzz_0_xzz_1[i] * wp_y[i];
 
-        g_0_yyzzzz_0_yyy_0[i] = 3.0 * g_0_yyzz_0_yyy_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_yyy_1[i] * fti_ab_0 + g_0_yyzzz_0_yyy_0[i] * pb_z + g_0_yyzzz_0_yyy_1[i] * wp_z[i];
+        g_0_yyzzzz_0_yyy_0[i] =
+            3.0 * g_0_yyzz_0_yyy_0[i] * fi_ab_0 - 3.0 * g_0_yyzz_0_yyy_1[i] * fti_ab_0 + g_0_yyzzz_0_yyy_0[i] * pb_z + g_0_yyzzz_0_yyy_1[i] * wp_z[i];
 
-        g_0_yyzzzz_0_yyz_0[i] = g_0_zzzz_0_yyz_0[i] * fi_ab_0 - g_0_zzzz_0_yyz_1[i] * fti_ab_0 + 2.0 * g_0_yzzzz_0_yz_1[i] * fi_abcd_0 + g_0_yzzzz_0_yyz_0[i] * pb_y + g_0_yzzzz_0_yyz_1[i] * wp_y[i];
+        g_0_yyzzzz_0_yyz_0[i] = g_0_zzzz_0_yyz_0[i] * fi_ab_0 - g_0_zzzz_0_yyz_1[i] * fti_ab_0 + 2.0 * g_0_yzzzz_0_yz_1[i] * fi_abcd_0 +
+                                g_0_yzzzz_0_yyz_0[i] * pb_y + g_0_yzzzz_0_yyz_1[i] * wp_y[i];
 
-        g_0_yyzzzz_0_yzz_0[i] = g_0_zzzz_0_yzz_0[i] * fi_ab_0 - g_0_zzzz_0_yzz_1[i] * fti_ab_0 + g_0_yzzzz_0_zz_1[i] * fi_abcd_0 + g_0_yzzzz_0_yzz_0[i] * pb_y + g_0_yzzzz_0_yzz_1[i] * wp_y[i];
+        g_0_yyzzzz_0_yzz_0[i] = g_0_zzzz_0_yzz_0[i] * fi_ab_0 - g_0_zzzz_0_yzz_1[i] * fti_ab_0 + g_0_yzzzz_0_zz_1[i] * fi_abcd_0 +
+                                g_0_yzzzz_0_yzz_0[i] * pb_y + g_0_yzzzz_0_yzz_1[i] * wp_y[i];
 
-        g_0_yyzzzz_0_zzz_0[i] = g_0_zzzz_0_zzz_0[i] * fi_ab_0 - g_0_zzzz_0_zzz_1[i] * fti_ab_0 + g_0_yzzzz_0_zzz_0[i] * pb_y + g_0_yzzzz_0_zzz_1[i] * wp_y[i];
+        g_0_yyzzzz_0_zzz_0[i] =
+            g_0_zzzz_0_zzz_0[i] * fi_ab_0 - g_0_zzzz_0_zzz_1[i] * fti_ab_0 + g_0_yzzzz_0_zzz_0[i] * pb_y + g_0_yzzzz_0_zzz_1[i] * wp_y[i];
     }
 
     /// Set up 260-270 components of targeted buffer : SISF
@@ -2474,7 +3795,45 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_yzzzzz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 269);
 
-    #pragma omp simd aligned(g_0_yzzzzz_0_xxx_0, g_0_yzzzzz_0_xxy_0, g_0_yzzzzz_0_xxz_0, g_0_yzzzzz_0_xyy_0, g_0_yzzzzz_0_xyz_0, g_0_yzzzzz_0_xzz_0, g_0_yzzzzz_0_yyy_0, g_0_yzzzzz_0_yyz_0, g_0_yzzzzz_0_yzz_0, g_0_yzzzzz_0_zzz_0, g_0_zzzzz_0_xx_1, g_0_zzzzz_0_xxx_0, g_0_zzzzz_0_xxx_1, g_0_zzzzz_0_xxy_0, g_0_zzzzz_0_xxy_1, g_0_zzzzz_0_xxz_0, g_0_zzzzz_0_xxz_1, g_0_zzzzz_0_xy_1, g_0_zzzzz_0_xyy_0, g_0_zzzzz_0_xyy_1, g_0_zzzzz_0_xyz_0, g_0_zzzzz_0_xyz_1, g_0_zzzzz_0_xz_1, g_0_zzzzz_0_xzz_0, g_0_zzzzz_0_xzz_1, g_0_zzzzz_0_yy_1, g_0_zzzzz_0_yyy_0, g_0_zzzzz_0_yyy_1, g_0_zzzzz_0_yyz_0, g_0_zzzzz_0_yyz_1, g_0_zzzzz_0_yz_1, g_0_zzzzz_0_yzz_0, g_0_zzzzz_0_yzz_1, g_0_zzzzz_0_zz_1, g_0_zzzzz_0_zzz_0, g_0_zzzzz_0_zzz_1, wp_y, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_yzzzzz_0_xxx_0,     \
+                             g_0_yzzzzz_0_xxy_0, \
+                             g_0_yzzzzz_0_xxz_0, \
+                             g_0_yzzzzz_0_xyy_0, \
+                             g_0_yzzzzz_0_xyz_0, \
+                             g_0_yzzzzz_0_xzz_0, \
+                             g_0_yzzzzz_0_yyy_0, \
+                             g_0_yzzzzz_0_yyz_0, \
+                             g_0_yzzzzz_0_yzz_0, \
+                             g_0_yzzzzz_0_zzz_0, \
+                             g_0_zzzzz_0_xx_1,   \
+                             g_0_zzzzz_0_xxx_0,  \
+                             g_0_zzzzz_0_xxx_1,  \
+                             g_0_zzzzz_0_xxy_0,  \
+                             g_0_zzzzz_0_xxy_1,  \
+                             g_0_zzzzz_0_xxz_0,  \
+                             g_0_zzzzz_0_xxz_1,  \
+                             g_0_zzzzz_0_xy_1,   \
+                             g_0_zzzzz_0_xyy_0,  \
+                             g_0_zzzzz_0_xyy_1,  \
+                             g_0_zzzzz_0_xyz_0,  \
+                             g_0_zzzzz_0_xyz_1,  \
+                             g_0_zzzzz_0_xz_1,   \
+                             g_0_zzzzz_0_xzz_0,  \
+                             g_0_zzzzz_0_xzz_1,  \
+                             g_0_zzzzz_0_yy_1,   \
+                             g_0_zzzzz_0_yyy_0,  \
+                             g_0_zzzzz_0_yyy_1,  \
+                             g_0_zzzzz_0_yyz_0,  \
+                             g_0_zzzzz_0_yyz_1,  \
+                             g_0_zzzzz_0_yz_1,   \
+                             g_0_zzzzz_0_yzz_0,  \
+                             g_0_zzzzz_0_yzz_1,  \
+                             g_0_zzzzz_0_zz_1,   \
+                             g_0_zzzzz_0_zzz_0,  \
+                             g_0_zzzzz_0_zzz_1,  \
+                             wp_y,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_abcd_0 = 0.5 / (a_exp + b_exp + c_exps[i] + d_exps[i]);
@@ -2522,7 +3881,65 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
     auto g_0_zzzzzz_0_zzz_0 = pbuffer.data(idx_eri_0_sisf + 279);
 
-    #pragma omp simd aligned(g_0_zzzz_0_xxx_0, g_0_zzzz_0_xxx_1, g_0_zzzz_0_xxy_0, g_0_zzzz_0_xxy_1, g_0_zzzz_0_xxz_0, g_0_zzzz_0_xxz_1, g_0_zzzz_0_xyy_0, g_0_zzzz_0_xyy_1, g_0_zzzz_0_xyz_0, g_0_zzzz_0_xyz_1, g_0_zzzz_0_xzz_0, g_0_zzzz_0_xzz_1, g_0_zzzz_0_yyy_0, g_0_zzzz_0_yyy_1, g_0_zzzz_0_yyz_0, g_0_zzzz_0_yyz_1, g_0_zzzz_0_yzz_0, g_0_zzzz_0_yzz_1, g_0_zzzz_0_zzz_0, g_0_zzzz_0_zzz_1, g_0_zzzzz_0_xx_1, g_0_zzzzz_0_xxx_0, g_0_zzzzz_0_xxx_1, g_0_zzzzz_0_xxy_0, g_0_zzzzz_0_xxy_1, g_0_zzzzz_0_xxz_0, g_0_zzzzz_0_xxz_1, g_0_zzzzz_0_xy_1, g_0_zzzzz_0_xyy_0, g_0_zzzzz_0_xyy_1, g_0_zzzzz_0_xyz_0, g_0_zzzzz_0_xyz_1, g_0_zzzzz_0_xz_1, g_0_zzzzz_0_xzz_0, g_0_zzzzz_0_xzz_1, g_0_zzzzz_0_yy_1, g_0_zzzzz_0_yyy_0, g_0_zzzzz_0_yyy_1, g_0_zzzzz_0_yyz_0, g_0_zzzzz_0_yyz_1, g_0_zzzzz_0_yz_1, g_0_zzzzz_0_yzz_0, g_0_zzzzz_0_yzz_1, g_0_zzzzz_0_zz_1, g_0_zzzzz_0_zzz_0, g_0_zzzzz_0_zzz_1, g_0_zzzzzz_0_xxx_0, g_0_zzzzzz_0_xxy_0, g_0_zzzzzz_0_xxz_0, g_0_zzzzzz_0_xyy_0, g_0_zzzzzz_0_xyz_0, g_0_zzzzzz_0_xzz_0, g_0_zzzzzz_0_yyy_0, g_0_zzzzzz_0_yyz_0, g_0_zzzzzz_0_yzz_0, g_0_zzzzzz_0_zzz_0, wp_z, c_exps, d_exps  : 64)
+#pragma omp simd aligned(g_0_zzzz_0_xxx_0,       \
+                             g_0_zzzz_0_xxx_1,   \
+                             g_0_zzzz_0_xxy_0,   \
+                             g_0_zzzz_0_xxy_1,   \
+                             g_0_zzzz_0_xxz_0,   \
+                             g_0_zzzz_0_xxz_1,   \
+                             g_0_zzzz_0_xyy_0,   \
+                             g_0_zzzz_0_xyy_1,   \
+                             g_0_zzzz_0_xyz_0,   \
+                             g_0_zzzz_0_xyz_1,   \
+                             g_0_zzzz_0_xzz_0,   \
+                             g_0_zzzz_0_xzz_1,   \
+                             g_0_zzzz_0_yyy_0,   \
+                             g_0_zzzz_0_yyy_1,   \
+                             g_0_zzzz_0_yyz_0,   \
+                             g_0_zzzz_0_yyz_1,   \
+                             g_0_zzzz_0_yzz_0,   \
+                             g_0_zzzz_0_yzz_1,   \
+                             g_0_zzzz_0_zzz_0,   \
+                             g_0_zzzz_0_zzz_1,   \
+                             g_0_zzzzz_0_xx_1,   \
+                             g_0_zzzzz_0_xxx_0,  \
+                             g_0_zzzzz_0_xxx_1,  \
+                             g_0_zzzzz_0_xxy_0,  \
+                             g_0_zzzzz_0_xxy_1,  \
+                             g_0_zzzzz_0_xxz_0,  \
+                             g_0_zzzzz_0_xxz_1,  \
+                             g_0_zzzzz_0_xy_1,   \
+                             g_0_zzzzz_0_xyy_0,  \
+                             g_0_zzzzz_0_xyy_1,  \
+                             g_0_zzzzz_0_xyz_0,  \
+                             g_0_zzzzz_0_xyz_1,  \
+                             g_0_zzzzz_0_xz_1,   \
+                             g_0_zzzzz_0_xzz_0,  \
+                             g_0_zzzzz_0_xzz_1,  \
+                             g_0_zzzzz_0_yy_1,   \
+                             g_0_zzzzz_0_yyy_0,  \
+                             g_0_zzzzz_0_yyy_1,  \
+                             g_0_zzzzz_0_yyz_0,  \
+                             g_0_zzzzz_0_yyz_1,  \
+                             g_0_zzzzz_0_yz_1,   \
+                             g_0_zzzzz_0_yzz_0,  \
+                             g_0_zzzzz_0_yzz_1,  \
+                             g_0_zzzzz_0_zz_1,   \
+                             g_0_zzzzz_0_zzz_0,  \
+                             g_0_zzzzz_0_zzz_1,  \
+                             g_0_zzzzzz_0_xxx_0, \
+                             g_0_zzzzzz_0_xxy_0, \
+                             g_0_zzzzzz_0_xxz_0, \
+                             g_0_zzzzzz_0_xyy_0, \
+                             g_0_zzzzzz_0_xyz_0, \
+                             g_0_zzzzzz_0_xzz_0, \
+                             g_0_zzzzzz_0_yyy_0, \
+                             g_0_zzzzzz_0_yyz_0, \
+                             g_0_zzzzzz_0_yzz_0, \
+                             g_0_zzzzzz_0_zzz_0, \
+                             wp_z,               \
+                             c_exps,             \
+                             d_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fi_ab_0 = 0.5 / (a_exp + b_exp);
@@ -2531,27 +3948,36 @@ comp_prim_electron_repulsion_sisf(CSimdArray<double>& pbuffer,
 
         const double fti_ab_0 = 2.0 * fi_abcd_0 * fi_ab_0 * (c_exps[i] + d_exps[i]);
 
-        g_0_zzzzzz_0_xxx_0[i] = 5.0 * g_0_zzzz_0_xxx_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_xxx_1[i] * fti_ab_0 + g_0_zzzzz_0_xxx_0[i] * pb_z + g_0_zzzzz_0_xxx_1[i] * wp_z[i];
+        g_0_zzzzzz_0_xxx_0[i] =
+            5.0 * g_0_zzzz_0_xxx_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_xxx_1[i] * fti_ab_0 + g_0_zzzzz_0_xxx_0[i] * pb_z + g_0_zzzzz_0_xxx_1[i] * wp_z[i];
 
-        g_0_zzzzzz_0_xxy_0[i] = 5.0 * g_0_zzzz_0_xxy_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_xxy_1[i] * fti_ab_0 + g_0_zzzzz_0_xxy_0[i] * pb_z + g_0_zzzzz_0_xxy_1[i] * wp_z[i];
+        g_0_zzzzzz_0_xxy_0[i] =
+            5.0 * g_0_zzzz_0_xxy_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_xxy_1[i] * fti_ab_0 + g_0_zzzzz_0_xxy_0[i] * pb_z + g_0_zzzzz_0_xxy_1[i] * wp_z[i];
 
-        g_0_zzzzzz_0_xxz_0[i] = 5.0 * g_0_zzzz_0_xxz_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_xxz_1[i] * fti_ab_0 + g_0_zzzzz_0_xx_1[i] * fi_abcd_0 + g_0_zzzzz_0_xxz_0[i] * pb_z + g_0_zzzzz_0_xxz_1[i] * wp_z[i];
+        g_0_zzzzzz_0_xxz_0[i] = 5.0 * g_0_zzzz_0_xxz_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_xxz_1[i] * fti_ab_0 + g_0_zzzzz_0_xx_1[i] * fi_abcd_0 +
+                                g_0_zzzzz_0_xxz_0[i] * pb_z + g_0_zzzzz_0_xxz_1[i] * wp_z[i];
 
-        g_0_zzzzzz_0_xyy_0[i] = 5.0 * g_0_zzzz_0_xyy_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_xyy_1[i] * fti_ab_0 + g_0_zzzzz_0_xyy_0[i] * pb_z + g_0_zzzzz_0_xyy_1[i] * wp_z[i];
+        g_0_zzzzzz_0_xyy_0[i] =
+            5.0 * g_0_zzzz_0_xyy_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_xyy_1[i] * fti_ab_0 + g_0_zzzzz_0_xyy_0[i] * pb_z + g_0_zzzzz_0_xyy_1[i] * wp_z[i];
 
-        g_0_zzzzzz_0_xyz_0[i] = 5.0 * g_0_zzzz_0_xyz_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_xyz_1[i] * fti_ab_0 + g_0_zzzzz_0_xy_1[i] * fi_abcd_0 + g_0_zzzzz_0_xyz_0[i] * pb_z + g_0_zzzzz_0_xyz_1[i] * wp_z[i];
+        g_0_zzzzzz_0_xyz_0[i] = 5.0 * g_0_zzzz_0_xyz_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_xyz_1[i] * fti_ab_0 + g_0_zzzzz_0_xy_1[i] * fi_abcd_0 +
+                                g_0_zzzzz_0_xyz_0[i] * pb_z + g_0_zzzzz_0_xyz_1[i] * wp_z[i];
 
-        g_0_zzzzzz_0_xzz_0[i] = 5.0 * g_0_zzzz_0_xzz_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_xzz_1[i] * fti_ab_0 + 2.0 * g_0_zzzzz_0_xz_1[i] * fi_abcd_0 + g_0_zzzzz_0_xzz_0[i] * pb_z + g_0_zzzzz_0_xzz_1[i] * wp_z[i];
+        g_0_zzzzzz_0_xzz_0[i] = 5.0 * g_0_zzzz_0_xzz_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_xzz_1[i] * fti_ab_0 + 2.0 * g_0_zzzzz_0_xz_1[i] * fi_abcd_0 +
+                                g_0_zzzzz_0_xzz_0[i] * pb_z + g_0_zzzzz_0_xzz_1[i] * wp_z[i];
 
-        g_0_zzzzzz_0_yyy_0[i] = 5.0 * g_0_zzzz_0_yyy_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_yyy_1[i] * fti_ab_0 + g_0_zzzzz_0_yyy_0[i] * pb_z + g_0_zzzzz_0_yyy_1[i] * wp_z[i];
+        g_0_zzzzzz_0_yyy_0[i] =
+            5.0 * g_0_zzzz_0_yyy_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_yyy_1[i] * fti_ab_0 + g_0_zzzzz_0_yyy_0[i] * pb_z + g_0_zzzzz_0_yyy_1[i] * wp_z[i];
 
-        g_0_zzzzzz_0_yyz_0[i] = 5.0 * g_0_zzzz_0_yyz_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_yyz_1[i] * fti_ab_0 + g_0_zzzzz_0_yy_1[i] * fi_abcd_0 + g_0_zzzzz_0_yyz_0[i] * pb_z + g_0_zzzzz_0_yyz_1[i] * wp_z[i];
+        g_0_zzzzzz_0_yyz_0[i] = 5.0 * g_0_zzzz_0_yyz_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_yyz_1[i] * fti_ab_0 + g_0_zzzzz_0_yy_1[i] * fi_abcd_0 +
+                                g_0_zzzzz_0_yyz_0[i] * pb_z + g_0_zzzzz_0_yyz_1[i] * wp_z[i];
 
-        g_0_zzzzzz_0_yzz_0[i] = 5.0 * g_0_zzzz_0_yzz_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_yzz_1[i] * fti_ab_0 + 2.0 * g_0_zzzzz_0_yz_1[i] * fi_abcd_0 + g_0_zzzzz_0_yzz_0[i] * pb_z + g_0_zzzzz_0_yzz_1[i] * wp_z[i];
+        g_0_zzzzzz_0_yzz_0[i] = 5.0 * g_0_zzzz_0_yzz_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_yzz_1[i] * fti_ab_0 + 2.0 * g_0_zzzzz_0_yz_1[i] * fi_abcd_0 +
+                                g_0_zzzzz_0_yzz_0[i] * pb_z + g_0_zzzzz_0_yzz_1[i] * wp_z[i];
 
-        g_0_zzzzzz_0_zzz_0[i] = 5.0 * g_0_zzzz_0_zzz_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_zzz_1[i] * fti_ab_0 + 3.0 * g_0_zzzzz_0_zz_1[i] * fi_abcd_0 + g_0_zzzzz_0_zzz_0[i] * pb_z + g_0_zzzzz_0_zzz_1[i] * wp_z[i];
+        g_0_zzzzzz_0_zzz_0[i] = 5.0 * g_0_zzzz_0_zzz_0[i] * fi_ab_0 - 5.0 * g_0_zzzz_0_zzz_1[i] * fti_ab_0 + 3.0 * g_0_zzzzz_0_zz_1[i] * fi_abcd_0 +
+                                g_0_zzzzz_0_zzz_0[i] * pb_z + g_0_zzzzz_0_zzz_1[i] * wp_z[i];
     }
 }
 
-} // erirec namespace
-
+}  // namespace erirec

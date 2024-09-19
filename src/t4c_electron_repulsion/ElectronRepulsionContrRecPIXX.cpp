@@ -2,22 +2,26 @@
 
 #include "TensorComponents.hpp"
 
-namespace erirec { // erirec namespace
+namespace erirec {  // erirec namespace
 
 auto
-comp_bra_hrr_electron_repulsion_pixx(CSimdArray<double>& cbuffer,
-                                     const size_t idx_pixx,
-                                     const size_t idx_sixx,
-                                     const size_t idx_skxx,
+comp_bra_hrr_electron_repulsion_pixx(CSimdArray<double>&   cbuffer,
+                                     const size_t          idx_pixx,
+                                     const size_t          idx_sixx,
+                                     const size_t          idx_skxx,
                                      const TPoint<double>& r_ab,
-                                     const int c_angmom,
-                                     const int d_angmom) -> void
+                                     const int             c_angmom,
+                                     const int             d_angmom) -> void
 {
     const auto nelems = cbuffer.number_of_active_elements();
 
-    const auto ccomps = tensor::number_of_spherical_components(std::array<int, 1>{c_angmom,});
+    const auto ccomps = tensor::number_of_spherical_components(std::array<int, 1>{
+        c_angmom,
+    });
 
-    const auto dcomps = tensor::number_of_spherical_components(std::array<int, 1>{d_angmom,});
+    const auto dcomps = tensor::number_of_spherical_components(std::array<int, 1>{
+        d_angmom,
+    });
 
     // set up R(AB) distances
 
@@ -231,7 +235,90 @@ comp_bra_hrr_electron_repulsion_pixx(CSimdArray<double>& cbuffer,
 
             auto g_x_zzzzzz = cbuffer.data(pi_off + 27 * ccomps * dcomps);
 
-            #pragma omp simd aligned(g_0_xxxxxx, g_0_xxxxxxx, g_0_xxxxxxy, g_0_xxxxxxz, g_0_xxxxxy, g_0_xxxxxyy, g_0_xxxxxyz, g_0_xxxxxz, g_0_xxxxxzz, g_0_xxxxyy, g_0_xxxxyyy, g_0_xxxxyyz, g_0_xxxxyz, g_0_xxxxyzz, g_0_xxxxzz, g_0_xxxxzzz, g_0_xxxyyy, g_0_xxxyyyy, g_0_xxxyyyz, g_0_xxxyyz, g_0_xxxyyzz, g_0_xxxyzz, g_0_xxxyzzz, g_0_xxxzzz, g_0_xxxzzzz, g_0_xxyyyy, g_0_xxyyyyy, g_0_xxyyyyz, g_0_xxyyyz, g_0_xxyyyzz, g_0_xxyyzz, g_0_xxyyzzz, g_0_xxyzzz, g_0_xxyzzzz, g_0_xxzzzz, g_0_xxzzzzz, g_0_xyyyyy, g_0_xyyyyyy, g_0_xyyyyyz, g_0_xyyyyz, g_0_xyyyyzz, g_0_xyyyzz, g_0_xyyyzzz, g_0_xyyzzz, g_0_xyyzzzz, g_0_xyzzzz, g_0_xyzzzzz, g_0_xzzzzz, g_0_xzzzzzz, g_0_yyyyyy, g_0_yyyyyz, g_0_yyyyzz, g_0_yyyzzz, g_0_yyzzzz, g_0_yzzzzz, g_0_zzzzzz, g_x_xxxxxx, g_x_xxxxxy, g_x_xxxxxz, g_x_xxxxyy, g_x_xxxxyz, g_x_xxxxzz, g_x_xxxyyy, g_x_xxxyyz, g_x_xxxyzz, g_x_xxxzzz, g_x_xxyyyy, g_x_xxyyyz, g_x_xxyyzz, g_x_xxyzzz, g_x_xxzzzz, g_x_xyyyyy, g_x_xyyyyz, g_x_xyyyzz, g_x_xyyzzz, g_x_xyzzzz, g_x_xzzzzz, g_x_yyyyyy, g_x_yyyyyz, g_x_yyyyzz, g_x_yyyzzz, g_x_yyzzzz, g_x_yzzzzz, g_x_zzzzzz  : 64)
+#pragma omp simd aligned(g_0_xxxxxx,      \
+                             g_0_xxxxxxx, \
+                             g_0_xxxxxxy, \
+                             g_0_xxxxxxz, \
+                             g_0_xxxxxy,  \
+                             g_0_xxxxxyy, \
+                             g_0_xxxxxyz, \
+                             g_0_xxxxxz,  \
+                             g_0_xxxxxzz, \
+                             g_0_xxxxyy,  \
+                             g_0_xxxxyyy, \
+                             g_0_xxxxyyz, \
+                             g_0_xxxxyz,  \
+                             g_0_xxxxyzz, \
+                             g_0_xxxxzz,  \
+                             g_0_xxxxzzz, \
+                             g_0_xxxyyy,  \
+                             g_0_xxxyyyy, \
+                             g_0_xxxyyyz, \
+                             g_0_xxxyyz,  \
+                             g_0_xxxyyzz, \
+                             g_0_xxxyzz,  \
+                             g_0_xxxyzzz, \
+                             g_0_xxxzzz,  \
+                             g_0_xxxzzzz, \
+                             g_0_xxyyyy,  \
+                             g_0_xxyyyyy, \
+                             g_0_xxyyyyz, \
+                             g_0_xxyyyz,  \
+                             g_0_xxyyyzz, \
+                             g_0_xxyyzz,  \
+                             g_0_xxyyzzz, \
+                             g_0_xxyzzz,  \
+                             g_0_xxyzzzz, \
+                             g_0_xxzzzz,  \
+                             g_0_xxzzzzz, \
+                             g_0_xyyyyy,  \
+                             g_0_xyyyyyy, \
+                             g_0_xyyyyyz, \
+                             g_0_xyyyyz,  \
+                             g_0_xyyyyzz, \
+                             g_0_xyyyzz,  \
+                             g_0_xyyyzzz, \
+                             g_0_xyyzzz,  \
+                             g_0_xyyzzzz, \
+                             g_0_xyzzzz,  \
+                             g_0_xyzzzzz, \
+                             g_0_xzzzzz,  \
+                             g_0_xzzzzzz, \
+                             g_0_yyyyyy,  \
+                             g_0_yyyyyz,  \
+                             g_0_yyyyzz,  \
+                             g_0_yyyzzz,  \
+                             g_0_yyzzzz,  \
+                             g_0_yzzzzz,  \
+                             g_0_zzzzzz,  \
+                             g_x_xxxxxx,  \
+                             g_x_xxxxxy,  \
+                             g_x_xxxxxz,  \
+                             g_x_xxxxyy,  \
+                             g_x_xxxxyz,  \
+                             g_x_xxxxzz,  \
+                             g_x_xxxyyy,  \
+                             g_x_xxxyyz,  \
+                             g_x_xxxyzz,  \
+                             g_x_xxxzzz,  \
+                             g_x_xxyyyy,  \
+                             g_x_xxyyyz,  \
+                             g_x_xxyyzz,  \
+                             g_x_xxyzzz,  \
+                             g_x_xxzzzz,  \
+                             g_x_xyyyyy,  \
+                             g_x_xyyyyz,  \
+                             g_x_xyyyzz,  \
+                             g_x_xyyzzz,  \
+                             g_x_xyzzzz,  \
+                             g_x_xzzzzz,  \
+                             g_x_yyyyyy,  \
+                             g_x_yyyyyz,  \
+                             g_x_yyyyzz,  \
+                             g_x_yyyzzz,  \
+                             g_x_yyzzzz,  \
+                             g_x_yzzzzz,  \
+                             g_x_zzzzzz : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_x_xxxxxx[k] = -g_0_xxxxxx[k] * ab_x + g_0_xxxxxxx[k];
@@ -349,7 +436,90 @@ comp_bra_hrr_electron_repulsion_pixx(CSimdArray<double>& cbuffer,
 
             auto g_y_zzzzzz = cbuffer.data(pi_off + 55 * ccomps * dcomps);
 
-            #pragma omp simd aligned(g_0_xxxxxx, g_0_xxxxxxy, g_0_xxxxxy, g_0_xxxxxyy, g_0_xxxxxyz, g_0_xxxxxz, g_0_xxxxyy, g_0_xxxxyyy, g_0_xxxxyyz, g_0_xxxxyz, g_0_xxxxyzz, g_0_xxxxzz, g_0_xxxyyy, g_0_xxxyyyy, g_0_xxxyyyz, g_0_xxxyyz, g_0_xxxyyzz, g_0_xxxyzz, g_0_xxxyzzz, g_0_xxxzzz, g_0_xxyyyy, g_0_xxyyyyy, g_0_xxyyyyz, g_0_xxyyyz, g_0_xxyyyzz, g_0_xxyyzz, g_0_xxyyzzz, g_0_xxyzzz, g_0_xxyzzzz, g_0_xxzzzz, g_0_xyyyyy, g_0_xyyyyyy, g_0_xyyyyyz, g_0_xyyyyz, g_0_xyyyyzz, g_0_xyyyzz, g_0_xyyyzzz, g_0_xyyzzz, g_0_xyyzzzz, g_0_xyzzzz, g_0_xyzzzzz, g_0_xzzzzz, g_0_yyyyyy, g_0_yyyyyyy, g_0_yyyyyyz, g_0_yyyyyz, g_0_yyyyyzz, g_0_yyyyzz, g_0_yyyyzzz, g_0_yyyzzz, g_0_yyyzzzz, g_0_yyzzzz, g_0_yyzzzzz, g_0_yzzzzz, g_0_yzzzzzz, g_0_zzzzzz, g_y_xxxxxx, g_y_xxxxxy, g_y_xxxxxz, g_y_xxxxyy, g_y_xxxxyz, g_y_xxxxzz, g_y_xxxyyy, g_y_xxxyyz, g_y_xxxyzz, g_y_xxxzzz, g_y_xxyyyy, g_y_xxyyyz, g_y_xxyyzz, g_y_xxyzzz, g_y_xxzzzz, g_y_xyyyyy, g_y_xyyyyz, g_y_xyyyzz, g_y_xyyzzz, g_y_xyzzzz, g_y_xzzzzz, g_y_yyyyyy, g_y_yyyyyz, g_y_yyyyzz, g_y_yyyzzz, g_y_yyzzzz, g_y_yzzzzz, g_y_zzzzzz  : 64)
+#pragma omp simd aligned(g_0_xxxxxx,      \
+                             g_0_xxxxxxy, \
+                             g_0_xxxxxy,  \
+                             g_0_xxxxxyy, \
+                             g_0_xxxxxyz, \
+                             g_0_xxxxxz,  \
+                             g_0_xxxxyy,  \
+                             g_0_xxxxyyy, \
+                             g_0_xxxxyyz, \
+                             g_0_xxxxyz,  \
+                             g_0_xxxxyzz, \
+                             g_0_xxxxzz,  \
+                             g_0_xxxyyy,  \
+                             g_0_xxxyyyy, \
+                             g_0_xxxyyyz, \
+                             g_0_xxxyyz,  \
+                             g_0_xxxyyzz, \
+                             g_0_xxxyzz,  \
+                             g_0_xxxyzzz, \
+                             g_0_xxxzzz,  \
+                             g_0_xxyyyy,  \
+                             g_0_xxyyyyy, \
+                             g_0_xxyyyyz, \
+                             g_0_xxyyyz,  \
+                             g_0_xxyyyzz, \
+                             g_0_xxyyzz,  \
+                             g_0_xxyyzzz, \
+                             g_0_xxyzzz,  \
+                             g_0_xxyzzzz, \
+                             g_0_xxzzzz,  \
+                             g_0_xyyyyy,  \
+                             g_0_xyyyyyy, \
+                             g_0_xyyyyyz, \
+                             g_0_xyyyyz,  \
+                             g_0_xyyyyzz, \
+                             g_0_xyyyzz,  \
+                             g_0_xyyyzzz, \
+                             g_0_xyyzzz,  \
+                             g_0_xyyzzzz, \
+                             g_0_xyzzzz,  \
+                             g_0_xyzzzzz, \
+                             g_0_xzzzzz,  \
+                             g_0_yyyyyy,  \
+                             g_0_yyyyyyy, \
+                             g_0_yyyyyyz, \
+                             g_0_yyyyyz,  \
+                             g_0_yyyyyzz, \
+                             g_0_yyyyzz,  \
+                             g_0_yyyyzzz, \
+                             g_0_yyyzzz,  \
+                             g_0_yyyzzzz, \
+                             g_0_yyzzzz,  \
+                             g_0_yyzzzzz, \
+                             g_0_yzzzzz,  \
+                             g_0_yzzzzzz, \
+                             g_0_zzzzzz,  \
+                             g_y_xxxxxx,  \
+                             g_y_xxxxxy,  \
+                             g_y_xxxxxz,  \
+                             g_y_xxxxyy,  \
+                             g_y_xxxxyz,  \
+                             g_y_xxxxzz,  \
+                             g_y_xxxyyy,  \
+                             g_y_xxxyyz,  \
+                             g_y_xxxyzz,  \
+                             g_y_xxxzzz,  \
+                             g_y_xxyyyy,  \
+                             g_y_xxyyyz,  \
+                             g_y_xxyyzz,  \
+                             g_y_xxyzzz,  \
+                             g_y_xxzzzz,  \
+                             g_y_xyyyyy,  \
+                             g_y_xyyyyz,  \
+                             g_y_xyyyzz,  \
+                             g_y_xyyzzz,  \
+                             g_y_xyzzzz,  \
+                             g_y_xzzzzz,  \
+                             g_y_yyyyyy,  \
+                             g_y_yyyyyz,  \
+                             g_y_yyyyzz,  \
+                             g_y_yyyzzz,  \
+                             g_y_yyzzzz,  \
+                             g_y_yzzzzz,  \
+                             g_y_zzzzzz : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_y_xxxxxx[k] = -g_0_xxxxxx[k] * ab_y + g_0_xxxxxxy[k];
@@ -467,7 +637,90 @@ comp_bra_hrr_electron_repulsion_pixx(CSimdArray<double>& cbuffer,
 
             auto g_z_zzzzzz = cbuffer.data(pi_off + 83 * ccomps * dcomps);
 
-            #pragma omp simd aligned(g_0_xxxxxx, g_0_xxxxxxz, g_0_xxxxxy, g_0_xxxxxyz, g_0_xxxxxz, g_0_xxxxxzz, g_0_xxxxyy, g_0_xxxxyyz, g_0_xxxxyz, g_0_xxxxyzz, g_0_xxxxzz, g_0_xxxxzzz, g_0_xxxyyy, g_0_xxxyyyz, g_0_xxxyyz, g_0_xxxyyzz, g_0_xxxyzz, g_0_xxxyzzz, g_0_xxxzzz, g_0_xxxzzzz, g_0_xxyyyy, g_0_xxyyyyz, g_0_xxyyyz, g_0_xxyyyzz, g_0_xxyyzz, g_0_xxyyzzz, g_0_xxyzzz, g_0_xxyzzzz, g_0_xxzzzz, g_0_xxzzzzz, g_0_xyyyyy, g_0_xyyyyyz, g_0_xyyyyz, g_0_xyyyyzz, g_0_xyyyzz, g_0_xyyyzzz, g_0_xyyzzz, g_0_xyyzzzz, g_0_xyzzzz, g_0_xyzzzzz, g_0_xzzzzz, g_0_xzzzzzz, g_0_yyyyyy, g_0_yyyyyyz, g_0_yyyyyz, g_0_yyyyyzz, g_0_yyyyzz, g_0_yyyyzzz, g_0_yyyzzz, g_0_yyyzzzz, g_0_yyzzzz, g_0_yyzzzzz, g_0_yzzzzz, g_0_yzzzzzz, g_0_zzzzzz, g_0_zzzzzzz, g_z_xxxxxx, g_z_xxxxxy, g_z_xxxxxz, g_z_xxxxyy, g_z_xxxxyz, g_z_xxxxzz, g_z_xxxyyy, g_z_xxxyyz, g_z_xxxyzz, g_z_xxxzzz, g_z_xxyyyy, g_z_xxyyyz, g_z_xxyyzz, g_z_xxyzzz, g_z_xxzzzz, g_z_xyyyyy, g_z_xyyyyz, g_z_xyyyzz, g_z_xyyzzz, g_z_xyzzzz, g_z_xzzzzz, g_z_yyyyyy, g_z_yyyyyz, g_z_yyyyzz, g_z_yyyzzz, g_z_yyzzzz, g_z_yzzzzz, g_z_zzzzzz  : 64)
+#pragma omp simd aligned(g_0_xxxxxx,      \
+                             g_0_xxxxxxz, \
+                             g_0_xxxxxy,  \
+                             g_0_xxxxxyz, \
+                             g_0_xxxxxz,  \
+                             g_0_xxxxxzz, \
+                             g_0_xxxxyy,  \
+                             g_0_xxxxyyz, \
+                             g_0_xxxxyz,  \
+                             g_0_xxxxyzz, \
+                             g_0_xxxxzz,  \
+                             g_0_xxxxzzz, \
+                             g_0_xxxyyy,  \
+                             g_0_xxxyyyz, \
+                             g_0_xxxyyz,  \
+                             g_0_xxxyyzz, \
+                             g_0_xxxyzz,  \
+                             g_0_xxxyzzz, \
+                             g_0_xxxzzz,  \
+                             g_0_xxxzzzz, \
+                             g_0_xxyyyy,  \
+                             g_0_xxyyyyz, \
+                             g_0_xxyyyz,  \
+                             g_0_xxyyyzz, \
+                             g_0_xxyyzz,  \
+                             g_0_xxyyzzz, \
+                             g_0_xxyzzz,  \
+                             g_0_xxyzzzz, \
+                             g_0_xxzzzz,  \
+                             g_0_xxzzzzz, \
+                             g_0_xyyyyy,  \
+                             g_0_xyyyyyz, \
+                             g_0_xyyyyz,  \
+                             g_0_xyyyyzz, \
+                             g_0_xyyyzz,  \
+                             g_0_xyyyzzz, \
+                             g_0_xyyzzz,  \
+                             g_0_xyyzzzz, \
+                             g_0_xyzzzz,  \
+                             g_0_xyzzzzz, \
+                             g_0_xzzzzz,  \
+                             g_0_xzzzzzz, \
+                             g_0_yyyyyy,  \
+                             g_0_yyyyyyz, \
+                             g_0_yyyyyz,  \
+                             g_0_yyyyyzz, \
+                             g_0_yyyyzz,  \
+                             g_0_yyyyzzz, \
+                             g_0_yyyzzz,  \
+                             g_0_yyyzzzz, \
+                             g_0_yyzzzz,  \
+                             g_0_yyzzzzz, \
+                             g_0_yzzzzz,  \
+                             g_0_yzzzzzz, \
+                             g_0_zzzzzz,  \
+                             g_0_zzzzzzz, \
+                             g_z_xxxxxx,  \
+                             g_z_xxxxxy,  \
+                             g_z_xxxxxz,  \
+                             g_z_xxxxyy,  \
+                             g_z_xxxxyz,  \
+                             g_z_xxxxzz,  \
+                             g_z_xxxyyy,  \
+                             g_z_xxxyyz,  \
+                             g_z_xxxyzz,  \
+                             g_z_xxxzzz,  \
+                             g_z_xxyyyy,  \
+                             g_z_xxyyyz,  \
+                             g_z_xxyyzz,  \
+                             g_z_xxyzzz,  \
+                             g_z_xxzzzz,  \
+                             g_z_xyyyyy,  \
+                             g_z_xyyyyz,  \
+                             g_z_xyyyzz,  \
+                             g_z_xyyzzz,  \
+                             g_z_xyzzzz,  \
+                             g_z_xzzzzz,  \
+                             g_z_yyyyyy,  \
+                             g_z_yyyyyz,  \
+                             g_z_yyyyzz,  \
+                             g_z_yyyzzz,  \
+                             g_z_yyzzzz,  \
+                             g_z_yzzzzz,  \
+                             g_z_zzzzzz : 64)
             for (size_t k = 0; k < nelems; k++)
             {
                 g_z_xxxxxx[k] = -g_0_xxxxxx[k] * ab_z + g_0_xxxxxxz[k];
@@ -530,5 +783,4 @@ comp_bra_hrr_electron_repulsion_pixx(CSimdArray<double>& cbuffer,
     }
 }
 
-} // erirec namespace
-
+}  // namespace erirec
