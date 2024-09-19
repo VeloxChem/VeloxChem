@@ -230,7 +230,7 @@ comp_electron_repulsion_spdf(T&                               distributor,
 
                 if (use_rs)
                 {
-                    t4cfunc::comp_boys_args(bf_data, 7, pfactors, 13, a_exp, b_exp);
+                    t4cfunc::comp_boys_args(bf_data, 7, pfactors, 13, a_exp, b_exp, omega);
 
                     bf_table.compute(bf_data, 0, 7, pfactors, a_exp, b_exp, omega);
                 }
