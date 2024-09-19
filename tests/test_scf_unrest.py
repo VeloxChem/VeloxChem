@@ -49,6 +49,11 @@ class TestScfUnrestrictedDriver:
         self.run_scf_unrest('b3lyp', 1, 2, -75.9017886760, 1.0e-6)
         self.run_scf_unrest('b3lyp', 0, 3, -76.0832193747, 1.0e-6)
 
+    def test_camb3lyp(self):
+
+        self.run_scf_unrest('cam-b3lyp', 1, 2, -75.8737059513, 1.0e-6)
+        self.run_scf_unrest('cam-b3lyp', 0, 3, -76.0523450131, 1.0e-6)
+
     def test_tpssh(self):
 
         self.run_scf_unrest('tpssh', 1, 2, -75.9044411187, 1.0e-6)

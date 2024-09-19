@@ -1564,26 +1564,63 @@ class ScfDriver:
             erf_k_coef = -self.xcfun.get_rs_beta()
             omega = self.xcfun.get_rs_omega()
 
-            # TODO: double check range-separated integrals
+            if self.scf_type == 'restricted':
+                # range-separated, closed-shell
+                fock_mat_full_k = fock_drv.compute(screener, self.rank,
+                                                   self.nodes, den_mat_for_fock,
+                                                   '2jkx', full_k_coef, 0.0,
+                                                   thresh_int)
 
-            # TODO: open-shell case for range-separated
+                fock_mat_erf_k = fock_drv.compute(screener, self.rank,
+                                                  self.nodes, den_mat_for_fock,
+                                                  'kx_rs', erf_k_coef, omega,
+                                                  thresh_int)
 
-            fock_mat_full_k = fock_drv.compute(screener, self.rank, self.nodes,
-                                               den_mat_for_fock, '2jkx',
-                                               full_k_coef, 0.0, thresh_int)
+                fock_mat_np = (fock_mat_full_k.full_matrix().to_numpy() -
+                               fock_mat_erf_k.full_matrix().to_numpy())
 
-            fock_mat_erf_k = fock_drv.compute(screener, self.rank, self.nodes,
-                                              den_mat_for_fock, 'kx_rs',
-                                              erf_k_coef, omega, thresh_int)
+                fock_mat_np = self.comm.reduce(fock_mat_np, root=mpi_master())
 
-            fock_mat_np = (fock_mat_full_k.full_matrix().to_numpy() -
-                           fock_mat_erf_k.full_matrix().to_numpy())
+                if self.rank == mpi_master():
+                    # Note: make fock_mat a list
+                    fock_mat = [fock_mat_np]
 
-            fock_mat_np = self.comm.reduce(fock_mat_np, root=mpi_master())
+            else:
+                # range-separated, open-shell
+                fock_mat = fock_drv.compute(screener, self.rank, self.nodes,
+                                            den_mat_for_fock, ["kx", "kx", "j"],
+                                            full_k_coef, 0.0, thresh_int)
 
-            if self.rank == mpi_master():
-                # Note: make fock_mat a list
-                fock_mat = [fock_mat_np]
+                K_a_np = fock_mat.matrix("0").full_matrix().to_numpy()
+                K_b_np = fock_mat.matrix("1").full_matrix().to_numpy()
+                J_ab_np = fock_mat.matrix("2").full_matrix().to_numpy()
+
+                fock_mat_erf_ka = fock_drv.compute(screener, self.rank,
+                                                   self.nodes,
+                                                   den_mat_for_fock.matrix("0"),
+                                                   'kx_rs', erf_k_coef, omega,
+                                                   thresh_int)
+                fock_mat_erf_kb = fock_drv.compute(screener, self.rank,
+                                                   self.nodes,
+                                                   den_mat_for_fock.matrix("1"),
+                                                   'kx_rs', erf_k_coef, omega,
+                                                   thresh_int)
+
+                fock_mat_a_np = (J_ab_np - K_a_np -
+                                 fock_mat_erf_ka.full_matrix().to_numpy())
+                fock_mat_b_np = (J_ab_np - K_b_np -
+                                 fock_mat_erf_kb.full_matrix().to_numpy())
+
+                fock_mat_a_np = self.comm.reduce(fock_mat_a_np,
+                                                 root=mpi_master())
+                fock_mat_b_np = self.comm.reduce(fock_mat_b_np,
+                                                 root=mpi_master())
+
+                if self.rank == mpi_master():
+                    # Note: make fock_mat a list
+                    fock_mat = [fock_mat_a_np, fock_mat_b_np]
+                else:
+                    fock_mat = None
 
         else:
             if self.scf_type == 'restricted':
