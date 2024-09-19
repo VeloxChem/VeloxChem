@@ -24965,7 +24965,7 @@ CBoysFunc<N>::compute(CSimdArray<double>&       buffer,
         {
             double ab_exp = a_exp + b_exp;
 
-            double cd_exp = c_exps[i] + d_exps[i];
+            double cd_exp = c_exps[j] + d_exps[j];
             
             double frho = ab_exp * cd_exp / (ab_exp + cd_exp);
 
