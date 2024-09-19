@@ -2,22 +2,22 @@
 #define ElectronRepulsionDiagRecSDSD_hpp
 
 #include <cstddef>
-#include <vector>
 #include <utility>
+#include <vector>
 
+#include "BoysFunc.hpp"
 #include "ElectronRepulsionPrimRecSDSD.hpp"
 #include "ElectronRepulsionPrimRecSPSD.hpp"
 #include "ElectronRepulsionPrimRecSPSP.hpp"
 #include "ElectronRepulsionPrimRecSSSD.hpp"
 #include "ElectronRepulsionPrimRecSSSP.hpp"
 #include "ElectronRepulsionPrimRecSSSS.hpp"
-#include "SimdArray.hpp"
-#include "BoysFunc.hpp"
-#include "T4CUtils.hpp"
-#include "T2CUtils.hpp"
 #include "GtoPairBlock.hpp"
+#include "SimdArray.hpp"
+#include "T2CUtils.hpp"
+#include "T4CUtils.hpp"
 
-namespace erirec { // erirec namespace
+namespace erirec {  // erirec namespace
 
 /// @brief Computes (SD|1/|r-r'||SD)  integrals for GTOs pair block.
 /// @param distributor The pointer to screening data distributor.
@@ -25,9 +25,7 @@ namespace erirec { // erirec namespace
 /// @param gto_indices The range [gto_first, gto_last) of GTOs on bra and ket sides.
 template <class T>
 auto
-comp_diag_electron_repulsion_sdsd(T& distributor,
-                                  const CGtoPairBlock& gto_pair_block,
-                                  const std::pair<size_t, size_t>& gto_indices) -> void
+comp_diag_electron_repulsion_sdsd(T& distributor, const CGtoPairBlock& gto_pair_block, const std::pair<size_t, size_t>& gto_indices) -> void
 {
     // intialize GTOs pair data
 
@@ -212,19 +210,18 @@ comp_diag_electron_repulsion_sdsd(T& distributor,
             erirec::comp_prim_electron_repulsion_sdsd(pbuffer, 80, 17, 23, 35, 44, 62, pfactors, 26, r_pb, a_exp, b_exp);
 
             t2cfunc::reduce(cbuffer, 0, pbuffer, 80, 36, ket_width, npgtos);
-
         }
 
         t4cfunc::ket_transform<0, 2>(skbuffer, 0, cbuffer, 0, 0, 2);
 
         t4cfunc::bra_transform<0, 2>(sbuffer, 0, skbuffer, 0, 0, 2);
 
-        t4cfunc::update_max_values(max_values, sbuffer, i - gto_indices.first); 
+        t4cfunc::update_max_values(max_values, sbuffer, i - gto_indices.first);
     }
 
     distributor.distribute(max_values, gto_indices);
 }
 
-} // erirec namespace
+}  // namespace erirec
 
 #endif /* ElectronRepulsionDiagRecSDSD_hpp */

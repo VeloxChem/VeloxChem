@@ -68,6 +68,23 @@ class CBoysFunc
                  const CSimdArray<double>& factors,
                  const double              a_exp,
                  const double              omega) const -> void;
+    
+    /// @brief Computes scaled Boys function values up to specified order (inclusively) for given vector of arguments.
+    /// @param buffer The Boys function data buffer (values, arguments).
+    /// @param index_vals The primary row index of values in Boys function data.
+    /// @param index_args The primary row index of arguments in Boys function data.
+    /// @param factors The primitive factors buffer.
+    /// @param a_exp The primitive basis function exponent on center A.
+    /// @param b_exp The primitive basis function exponent on center B.
+    /// @param omega THe range separation parameter.
+    /// @WARNING Boys function arguments are overwrited during computation.
+    auto compute(CSimdArray<double>&       buffer,
+                 const size_t              index_vals,
+                 const size_t              index_args,
+                 const CSimdArray<double>& factors,
+                 const double              a_exp,
+                 const double              b_exp,
+                 const double              omega) const -> void;
 
    private:
     /// @brief The order of Boys function.
@@ -24896,5 +24913,68 @@ CBoysFunc<N>::compute(CSimdArray<double>&       buffer,
         }
     }
 }
+
+template <int N>
+auto
+CBoysFunc<N>::compute(CSimdArray<double>&       buffer,
+                      const size_t              index_vals,
+                      const size_t              index_args,
+                      const CSimdArray<double>& factors,
+                      const double              a_exp,
+                      const double              b_exp,
+                      const double              omega) const -> void
+{
+    // compute Boys function values
+
+    compute(buffer, index_vals, index_args);
+
+    // Set up exponents
+
+    auto c_exps = buffer.data(0);
+
+    auto d_exps = buffer.data(1);
+
+    // rescale computed Boys function values
+
+    auto bvals = buffer.data(index_vals);
+
+    auto facts = buffer.data(index_args);
+
+    auto nelems = buffer.number_of_active_elements();
+
+#pragma omp simd aligned(bvals, facts, c_exps, d_exps : 64)
+    for (size_t i = 0; i < nelems; i++)
+    {
+        double ab_exp = a_exp + b_exp;
+
+        double cd_exp = c_exps[i] + d_exps[i];
+        
+        double frho = ab_exp * cd_exp / (ab_exp + cd_exp);
+
+        facts[i] = omega / std::sqrt(omega * omega + frho);
+
+        bvals[i] *= facts[i];
+    }
+
+    for (int i = 1; i <= N; i++)
+    {
+        auto bvals = buffer.data(index_vals + i);
+
+#pragma omp simd aligned(bvals, facts, c_exps, d_exps : 64)
+        for (size_t j = 0; j < nelems; j++)
+        {
+            double ab_exp = a_exp + b_exp;
+
+            double cd_exp = c_exps[i] + d_exps[i];
+            
+            double frho = ab_exp * cd_exp / (ab_exp + cd_exp);
+
+            facts[j] *= omega * omega / (omega * omega + frho);
+
+            bvals[j] *= facts[j];
+        }
+    }
+}
+
 
 #endif /* BoysFunc_hpp */

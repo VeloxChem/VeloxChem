@@ -51,6 +51,20 @@ CT4CMatricesDistributor::get_omega() const -> double
     return _omega;
 }
 
+auto 
+CT4CMatricesDistributor::need_omega() const -> bool
+{
+    for (const auto& label : _labels)
+    {
+        if ((label != "j_rs") || (label != "k_rs") || (label != "kx_rs"))
+        {
+            return false; 
+        }
+    }
+    
+    return true;
+}
+
 auto
 CT4CMatricesDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, const CGtoPairBlock& ket_gto_pair_block) -> void
 {
