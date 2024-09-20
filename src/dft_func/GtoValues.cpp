@@ -24,6 +24,7 @@
 
 #include "GtoValues.hpp"
 
+#include "ErrorHandler.hpp"
 #include "GtoValuesRecD.hpp"
 #include "GtoValuesRecP.hpp"
 #include "GtoValuesRecS.hpp"
@@ -53,6 +54,10 @@ get_gto_values_for_lda(const CGtoBlock&            gto_block,
         return gtoval::get_lda_values_rec_d(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
     }
 
+    std::string errangmom("get_gto_values_for_lda: Only implemented up to d-orbitals");
+
+    errors::assertMsgCritical(false, errangmom);
+
     return CMatrix();
 }
 
@@ -77,6 +82,10 @@ get_gto_values_for_gga(const CGtoBlock&            gto_block,
     {
         return gtoval::get_gga_values_rec_d(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
     }
+
+    std::string errangmom("get_gto_values_for_gga: Only implemented up to d-orbitals");
+
+    errors::assertMsgCritical(false, errangmom);
 
     return CMatrix();
 }
