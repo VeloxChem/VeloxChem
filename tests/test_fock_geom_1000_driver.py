@@ -38,7 +38,9 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockGeom1000Driver()
-        fock_mats = fock_drv.compute(bas_sto3g, mol_h2o, den_mat, 0, "j", 0.0, 0.0)
+        fock_mats = fock_drv.compute(bas_sto3g, mol_h2o, den_mat, 2, "j", 0.0, 0.0)
+        
+        assert False
 
         # dimension of molecular basis
         basdims = [0, 4, 7]

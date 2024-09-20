@@ -138,7 +138,7 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis &basis,
                     distributor.set_indices(bra_gpairs, ket_gpairs);
                     auto bra_range = std::pair<size_t, size_t>(0, bra_gpairs.number_of_contracted_pairs());
                     auto ket_range = std::pair<size_t, size_t>(0, ket_gpairs.number_of_contracted_pairs());
-//                    erifunc::compute<CT4CMatrixDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range, i == j);
+                    erifunc::compute_geom_1000<CT4CMatricesDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range);
 //                    distributor.accumulate(bra_gpairs, ket_gpairs);
                 }
             });

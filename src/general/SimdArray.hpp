@@ -277,7 +277,28 @@ class CSimdArray
             }
         }
     }
-
+    
+    /// @brief Scales selected rows in SIMD array by given factor.
+    /// @param factor The factor to scale SIMD array rows.
+    /// @param indices The indices [first, last] of rows to scale.
+    inline auto
+    scale(const double factor,
+          const std::pair<size_t, size_t> indices) -> void
+    {
+        const auto nelems = number_of_active_elements();
+        
+        for (auto i = indices.first; i < indices.second; i++)
+        {
+            auto ptr_data = data(i);
+            
+            #pragma omp simd aligned(ptr_data : 64)
+            for (size_t j = 0; j < nelems; j++)
+            {
+                ptr_data[j] *= factor;
+            }
+        }
+    }
+    
    private:
     /// @brief Memory block for data storage.
     T *_data;
