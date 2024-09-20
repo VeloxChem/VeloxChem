@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <ranges>
 
+#include "ErrorHandler.hpp"
 #include "MathFunc.hpp"
 
 CGtoBlock::CGtoBlock()
@@ -324,6 +325,212 @@ CGtoBlock::getAtomicOrbitalsIndexes() const -> std::vector<int>
     }
 
     return ao_inds;
+}
+
+auto
+CGtoBlock::getAtomicOrbitalsIndexesForCartesian(const int ncgtos_d) const -> std::vector<int>
+{
+    errors::assertMsgCritical(_angular_momentum <= 3, std::string("GtoBlock: getAtomicOrbitalsIndexesForCartesian only supports up to f-orbitals"));
+
+    if (_angular_momentum == 3)
+    {
+        errors::assertMsgCritical(ncgtos_d > 0, std::string("GtoBlock: getAtomicOrbitalsIndexesForCartesian needs to know ncgtos of d-orbitals"));
+    }
+
+    std::vector<int> ao_inds;
+
+    int orb_ind_shift = 0;
+
+    // take into account the shifting of cart_ind due to 6 d Cartesian components
+    if (_angular_momentum == 3) orb_ind_shift = ncgtos_d;
+
+    // go through Cartesian components
+
+    for (int comp = 0; comp < (_angular_momentum + 1) * (_angular_momentum + 2) / 2; comp++)
+    {
+        // go through CGTOs in this block
+        // note that ind starts from 1
+        // because _orb_indices[0] is the total number of CGTOs of _angular_momentum
+        // which could be larger than the number of CGTOs in this block
+
+        for (size_t ind = 1; ind < _orb_indices.size(); ind++)
+        {
+            ao_inds.push_back(comp * _orb_indices[0] + _orb_indices[ind] + orb_ind_shift);
+        }
+    }
+
+    return ao_inds;
+}
+
+auto
+CGtoBlock::getCartesianToSphericalMappingForP() const -> std::unordered_map<int, std::vector<std::pair<int, double>>>
+{
+    errors::assertMsgCritical(_angular_momentum == 1, std::string("GtoBlock: getCartesianToSphericalMappingForP only works for p-orbitals"));
+
+    std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_p;
+
+    // p-1 (0) <- py (1)
+    // p_0 (1) <- pz (2)
+    // p+1 (2) <- px (0)
+
+    std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_comp_map;
+
+    cart_sph_comp_map[0] = std::vector<std::pair<int, double>>({{2, 1.0}});
+    cart_sph_comp_map[1] = std::vector<std::pair<int, double>>({{0, 1.0}});
+    cart_sph_comp_map[2] = std::vector<std::pair<int, double>>({{1, 1.0}});
+
+    for (const auto& [cart_comp, sph_comp_coef_vec] : cart_sph_comp_map)
+    {
+        // go through CGTOs in this block
+        // note that ind starts from 1
+        // because _orb_indices[0] is the total number of CGTOs of _angular_momentum
+        // which could be larger than the number of CGTOs in this block
+
+        for (size_t ind = 1; ind < _orb_indices.size(); ind++)
+        {
+            auto cart_ind = cart_comp * _orb_indices[0] + _orb_indices[ind];
+
+            cart_sph_p[cart_ind] = std::vector<std::pair<int, double>>();
+
+            for (const auto& sph_comp_coef : sph_comp_coef_vec)
+            {
+                auto sph_comp = sph_comp_coef.first;
+                auto sph_coef = sph_comp_coef.second;
+
+                auto sph_ind = sph_comp * _orb_indices[0] + _orb_indices[ind];
+
+                cart_sph_p[cart_ind].push_back(std::pair<int, double>({sph_ind, sph_coef}));
+            }
+        }
+    }
+
+    return cart_sph_p;
+}
+
+auto
+CGtoBlock::getCartesianToSphericalMappingForD() const -> std::unordered_map<int, std::vector<std::pair<int, double>>>
+{
+    errors::assertMsgCritical(_angular_momentum == 2, std::string("GtoBlock: getCartesianToSphericalMappingForD only works for d-orbitals"));
+
+    std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_d;
+
+    const double f2_3 = 2.0 * std::sqrt(3.0);
+
+    // d-2 (0) <- dxy(1) * f2_3
+    // d-1 (1) <- dyz(4) * f2_3
+    // d_0 (2) <- dzz(5) * 2.0 - dxx(0) - dyy(3)
+    // d+1 (3) <- dxz(2) * f2_3
+    // d+2 (4) <- (dxx(0) - dyy(3)) * 0.5 * f2_3
+
+    std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_comp_map;
+
+    cart_sph_comp_map[0] = std::vector<std::pair<int, double>>({{2, -1.0}, {4, 0.5 * f2_3}});
+    cart_sph_comp_map[1] = std::vector<std::pair<int, double>>({{0, f2_3}});
+    cart_sph_comp_map[2] = std::vector<std::pair<int, double>>({{3, f2_3}});
+    cart_sph_comp_map[3] = std::vector<std::pair<int, double>>({{2, -1.0}, {4, -0.5 * f2_3}});
+    cart_sph_comp_map[4] = std::vector<std::pair<int, double>>({{1, f2_3}});
+    cart_sph_comp_map[5] = std::vector<std::pair<int, double>>({{2, 2.0}});
+
+    for (const auto& [cart_comp, sph_comp_coef_vec] : cart_sph_comp_map)
+    {
+        // go through CGTOs in this block
+        // note that ind starts from 1
+        // because _orb_indices[0] is the total number of CGTOs of _angular_momentum
+        // which could be larger than the number of CGTOs in this block
+
+        for (size_t ind = 1; ind < _orb_indices.size(); ind++)
+        {
+            auto cart_ind = cart_comp * _orb_indices[0] + _orb_indices[ind];
+
+            cart_sph_d[cart_ind] = std::vector<std::pair<int, double>>();
+
+            for (const auto& sph_comp_coef : sph_comp_coef_vec)
+            {
+                auto sph_comp = sph_comp_coef.first;
+                auto sph_coef = sph_comp_coef.second;
+
+                auto sph_ind = sph_comp * _orb_indices[0] + _orb_indices[ind];
+
+                cart_sph_d[cart_ind].push_back(std::pair<int, double>({sph_ind, sph_coef}));
+            }
+        }
+    }
+
+    return cart_sph_d;
+}
+
+auto
+CGtoBlock::getCartesianToSphericalMappingForF(const int ncgtos_d) const -> std::unordered_map<int, std::vector<std::pair<int, double>>>
+{
+    errors::assertMsgCritical(_angular_momentum == 3, std::string("GtoBlock: getCartesianToSphericalMappingForF only works for f-orbitals"));
+
+    std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_f;
+
+    const double f3_5 = std::sqrt(2.5);
+    const double f3_15 = 2.0 * std::sqrt(15.0);
+    const double f3_3 = std::sqrt(1.5);
+
+    // xxx : 0
+    // xxy : 1
+    // xxz : 2
+    // xyy : 3
+    // xyz : 4
+    // xzz : 5
+    // yyy : 6
+    // yyz : 7
+    // yzz : 8
+    // zzz : 9
+
+    // f-3 (0) <- fxxy(1) * 3.0 * f3_5  + fyyy(6) * (-f3_5)
+    // f-2 (1) <- fxyz(4) * f3_15
+    // f-1 (2) <- fxxy(1) * (-f3_3)     + fyyy(6) * (-f3_3)        + fyzz(8) * 4.0 * f3_3
+    // f_0 (3) <- fxxz(2) * (-3.0)      + fyyz(7) * (-3.0)         + fzzz(9) * 2.0
+    // f+1 (4) <- fxxx(0) * (-f3_3)     + fxyy(3) * (-f3_3)        + fxzz(5) * 4.0 * f3_3
+    // f+2 (5) <- fxxz(2) * 0.5 * f3_15 + fyyz(7) * (-0.5) * f3_15
+    // f+3 (6) <- fxxx(0) * f3_5        + fxyy(3) * (-3.0) * f3_5
+
+    std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_comp_map;
+
+    cart_sph_comp_map[0] = std::vector<std::pair<int, double>>({{4, -f3_3}, {6, f3_5}});
+    cart_sph_comp_map[1] = std::vector<std::pair<int, double>>({{0, 3.0 * f3_5}, {2, -f3_3}});
+    cart_sph_comp_map[2] = std::vector<std::pair<int, double>>({{3, -3.0}, {5, 0.5 * f3_15}});
+    cart_sph_comp_map[3] = std::vector<std::pair<int, double>>({{4, -f3_3}, {6, -3.0 * f3_5}});
+    cart_sph_comp_map[4] = std::vector<std::pair<int, double>>({{1, f3_15}});
+    cart_sph_comp_map[5] = std::vector<std::pair<int, double>>({{4, 4.0 * f3_3}});
+    cart_sph_comp_map[6] = std::vector<std::pair<int, double>>({{0, -f3_5}, {2, -f3_3}});
+    cart_sph_comp_map[7] = std::vector<std::pair<int, double>>({{3, -3.0}, {5, -0.5 * f3_15}});
+    cart_sph_comp_map[8] = std::vector<std::pair<int, double>>({{2, 4.0 * f3_3}});
+    cart_sph_comp_map[9] = std::vector<std::pair<int, double>>({{3, 2.0}});
+
+    for (const auto& [cart_comp, sph_comp_coef_vec] : cart_sph_comp_map)
+    {
+        // go through CGTOs in this block
+        // note that ind starts from 1
+        // because _orb_indices[0] is the total number of CGTOs of _angular_momentum
+        // which could be larger than the number of CGTOs in this block
+
+        for (size_t ind = 1; ind < _orb_indices.size(); ind++)
+        {
+            auto cart_ind = cart_comp * _orb_indices[0] + _orb_indices[ind];
+
+            // take into account the shifting of cart_ind due to 6 d Cartesian components
+            cart_ind += ncgtos_d;
+
+            cart_sph_f[cart_ind] = std::vector<std::pair<int, double>>();
+
+            for (const auto& sph_comp_coef : sph_comp_coef_vec)
+            {
+                auto sph_comp = sph_comp_coef.first;
+                auto sph_coef = sph_comp_coef.second;
+
+                auto sph_ind = sph_comp * _orb_indices[0] + _orb_indices[ind];
+
+                cart_sph_f[cart_ind].push_back(std::pair<int, double>({sph_ind, sph_coef}));
+            }
+        }
+    }
+
+    return cart_sph_f;
 }
 
 auto

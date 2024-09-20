@@ -106,6 +106,14 @@ class CGtoBlock
      */
     auto getAtomicOrbitalsIndexes() const -> std::vector<int>;
 
+    auto getAtomicOrbitalsIndexesForCartesian(const int ncgtos_d = 0) const -> std::vector<int>;
+
+    auto getCartesianToSphericalMappingForP() const -> std::unordered_map<int, std::vector<std::pair<int, double>>>;
+
+    auto getCartesianToSphericalMappingForD() const -> std::unordered_map<int, std::vector<std::pair<int, double>>>;
+
+    auto getCartesianToSphericalMappingForF(const int ncgtos_d) const -> std::unordered_map<int, std::vector<std::pair<int, double>>>;
+
     /// @brief Gets angular momentum of basis functions.
     /// @return The angular momentum of basis functionss.
     auto angular_momentum() const -> int;

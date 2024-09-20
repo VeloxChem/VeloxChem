@@ -4,6 +4,7 @@
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 #include "ExportMoldata.hpp"
+#include "ExportOneElecInts.hpp"
 #include "ExportOrbdata.hpp"
 #include "ExportT2CIntegrals.hpp"
 #include "ExportT4CIntegrals.hpp"
@@ -19,6 +20,8 @@ PYBIND11_MODULE(veloxchemlib, m)
     vlx_orbdata::export_orbdata(m);
 
     vlx_dft::export_dft(m);
+
+    vlx_oneeints::export_oneeints(m);
 
     vlx_t2cintegrals::export_t2cintegrals(m);
 
