@@ -1,9 +1,12 @@
-from veloxchem import Molecule
-from veloxchem import MolecularBasis
+import pytest
+
+from veloxchem import mpi_master
+from veloxchem import Molecule, MolecularBasis
 from veloxchem import ScfRestrictedDriver
 from veloxchem import C6Driver
 
 
+@pytest.mark.solvers
 class TestC6:
 
     def run_c6(self, xcfun_label, ref_c6, tol):
@@ -29,7 +32,8 @@ class TestC6:
         lr_drv.ostream.mute()
         lr_results = lr_drv.compute(mol, bas, scf_results)
 
-        assert abs(lr_results['c6'] - ref_c6) < tol
+        if lr_drv.rank == mpi_master():
+            assert abs(lr_results['c6'] - ref_c6) < tol
 
     def test_hf(self):
 

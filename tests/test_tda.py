@@ -1,11 +1,13 @@
 import numpy as np
+import pytest
 
-from veloxchem import Molecule
-from veloxchem import MolecularBasis
+from veloxchem import mpi_master
+from veloxchem import Molecule, MolecularBasis
 from veloxchem import ScfRestrictedDriver
 from veloxchem import TdaEigenSolver
 
 
+@pytest.mark.solvers
 class TestTDA:
 
     def run_tda(self, xcfun_label, ref_exc_enes, ref_osc_str, tol):
@@ -32,9 +34,12 @@ class TestTDA:
         lr_drv.nstates = 5
         lr_results = lr_drv.compute(mol, bas, scf_results)
 
-        assert np.max(np.abs(ref_exc_enes - lr_results['eigenvalues'])) < tol
-        assert np.max(np.abs(ref_osc_str -
-                             lr_results['oscillator_strengths'])) < 1.0e-4
+        if lr_drv.rank == mpi_master():
+            assert np.max(np.abs(ref_exc_enes -
+                                 lr_results['eigenvalues'])) < tol
+            assert np.max(
+                np.abs(ref_osc_str -
+                       lr_results['oscillator_strengths'])) < 1.0e-4
 
     def test_hf(self):
 

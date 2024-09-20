@@ -1,11 +1,13 @@
 import numpy as np
+import pytest
 
-from veloxchem import Molecule
-from veloxchem import MolecularBasis
+from veloxchem import mpi_master
+from veloxchem import Molecule, MolecularBasis
 from veloxchem import ScfRestrictedDriver
 from veloxchem import ComplexResponse
 
 
+@pytest.mark.solvers
 class TestCPP:
 
     def run_cpp(self, xcfun_label, cpp_flag, ref_x_data, ref_y_data, tol):
@@ -35,10 +37,12 @@ class TestCPP:
         lr_drv.set_cpp_flag(cpp_flag)
         lr_drv.frequencies = list(ref_x_data)
         lr_results = lr_drv.compute(mol, bas, scf_results)
-        lr_spec = lr_drv.get_spectrum(lr_results, 'au')
 
-        assert np.max(
-            np.abs(np.array(lr_spec['y_data']) - np.array(ref_y_data))) < tol
+        if lr_drv.rank == mpi_master():
+            lr_spec = lr_drv.get_spectrum(lr_results, 'au')
+            assert np.max(
+                np.abs(np.array(lr_spec['y_data']) -
+                       np.array(ref_y_data))) < tol
 
     def test_hf_absorption(self):
 
