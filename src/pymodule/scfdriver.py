@@ -1546,6 +1546,7 @@ class ScfDriver:
 
         fock_drv = FockDriver()
 
+        # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'
         exchange_scaling_factor = 1.0
         if self._dft and not self._first_step:
@@ -1556,114 +1557,104 @@ class ScfDriver:
                 fock_type = 'j'
                 exchange_scaling_factor = 0.0
 
-        fock_mat = None
-
-        if (self._dft and (not self._first_step) and
-                self.xcfun.is_range_separated()):
-            full_k_coef = self.xcfun.get_rs_alpha() + self.xcfun.get_rs_beta()
+        # further determine exchange_scaling_factor, erf_k_coef and omega
+        need_omega = (self._dft and (not self._first_step) and
+                      self.xcfun.is_range_separated())
+        if need_omega:
+            exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
+                                       self.xcfun.get_rs_beta())
             erf_k_coef = -self.xcfun.get_rs_beta()
             omega = self.xcfun.get_rs_omega()
+        else:
+            erf_k_coef, omega = None, None
 
-            if self.scf_type == 'restricted':
-                # range-separated, closed-shell
-                fock_mat_full_k = fock_drv.compute(screener, self.rank,
-                                                   self.nodes, den_mat_for_fock,
-                                                   '2jkx', full_k_coef, 0.0,
-                                                   thresh_int)
+        fock_mat = None
 
+        if self.scf_type == 'restricted':
+            # restricted SCF
+            fock_mat = fock_drv.compute(screener, self.rank, self.nodes,
+                                        den_mat_for_fock, fock_type,
+                                        exchange_scaling_factor, 0.0,
+                                        thresh_int)
+
+            fock_mat_np = fock_mat.full_matrix().to_numpy()
+
+            if fock_type == 'j':
+                # for pure functional
+                fock_mat_np *= 2.0
+
+            if need_omega:
+                # for range-separated functional
                 fock_mat_erf_k = fock_drv.compute(screener, self.rank,
                                                   self.nodes, den_mat_for_fock,
                                                   'kx_rs', erf_k_coef, omega,
                                                   thresh_int)
 
-                fock_mat_np = (fock_mat_full_k.full_matrix().to_numpy() -
-                               fock_mat_erf_k.full_matrix().to_numpy())
+                fock_mat_np -= fock_mat_erf_k.full_matrix().to_numpy()
 
-                fock_mat_np = self.comm.reduce(fock_mat_np, root=mpi_master())
+            fock_mat_np = self.comm.reduce(fock_mat_np, root=mpi_master())
 
-                if self.rank == mpi_master():
-                    # Note: make fock_mat a list
-                    fock_mat = [fock_mat_np]
-
+            if self.rank == mpi_master():
+                # Note: make fock_mat a list
+                fock_mat = [fock_mat_np]
             else:
-                # range-separated, open-shell
-                fock_mat = fock_drv.compute(screener, self.rank, self.nodes,
-                                            den_mat_for_fock, ["kx", "kx", "j"],
-                                            full_k_coef, 0.0, thresh_int)
-
-                K_a_np = fock_mat.matrix("0").full_matrix().to_numpy()
-                K_b_np = fock_mat.matrix("1").full_matrix().to_numpy()
-                J_ab_np = fock_mat.matrix("2").full_matrix().to_numpy()
-
-                fock_mat_erf_ka = fock_drv.compute(screener, self.rank,
-                                                   self.nodes,
-                                                   den_mat_for_fock.matrix("0"),
-                                                   'kx_rs', erf_k_coef, omega,
-                                                   thresh_int)
-                fock_mat_erf_kb = fock_drv.compute(screener, self.rank,
-                                                   self.nodes,
-                                                   den_mat_for_fock.matrix("1"),
-                                                   'kx_rs', erf_k_coef, omega,
-                                                   thresh_int)
-
-                fock_mat_a_np = (J_ab_np - K_a_np -
-                                 fock_mat_erf_ka.full_matrix().to_numpy())
-                fock_mat_b_np = (J_ab_np - K_b_np -
-                                 fock_mat_erf_kb.full_matrix().to_numpy())
-
-                fock_mat_a_np = self.comm.reduce(fock_mat_a_np,
-                                                 root=mpi_master())
-                fock_mat_b_np = self.comm.reduce(fock_mat_b_np,
-                                                 root=mpi_master())
-
-                if self.rank == mpi_master():
-                    # Note: make fock_mat a list
-                    fock_mat = [fock_mat_a_np, fock_mat_b_np]
-                else:
-                    fock_mat = None
+                fock_mat = None
 
         else:
-            if self.scf_type == 'restricted':
+            # unrestricted SCF or restricted open-shell SCF
+            if fock_type == 'j':
+                # for pure functional
+                # den_mat_for_fock.matrix('2') is D_total
                 fock_mat = fock_drv.compute(screener, self.rank, self.nodes,
-                                            den_mat_for_fock, fock_type,
-                                            exchange_scaling_factor, 0.0,
-                                            thresh_int)
+                                            den_mat_for_fock.matrix('2'), 'j',
+                                            0.0, 0.0, thresh_int)
 
-                fock_mat_np = fock_mat.full_matrix().to_numpy()
-                if fock_type == 'j':
-                    fock_mat_np *= 2.0
+                J_ab_np = fock_mat.full_matrix().to_numpy()
 
-                fock_mat_np = self.comm.reduce(fock_mat_np, root=mpi_master())
-
-                if self.rank == mpi_master():
-                    # Note: make fock_mat a list
-                    fock_mat = [fock_mat_np]
-                else:
-                    fock_mat = None
+                fock_mat_a_np = J_ab_np
+                fock_mat_b_np = J_ab_np.copy()
 
             else:
                 fock_mat = fock_drv.compute(screener, self.rank, self.nodes,
-                                            den_mat_for_fock, ["kx", "kx", "j"],
+                                            den_mat_for_fock, ['kx', 'kx', 'j'],
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
 
-                K_a_np = fock_mat.matrix("0").full_matrix().to_numpy()
-                K_b_np = fock_mat.matrix("1").full_matrix().to_numpy()
-                J_ab_np = fock_mat.matrix("2").full_matrix().to_numpy()
+                K_a_np = fock_mat.matrix('0').full_matrix().to_numpy()
+                K_b_np = fock_mat.matrix('1').full_matrix().to_numpy()
+                J_ab_np = fock_mat.matrix('2').full_matrix().to_numpy()
 
                 fock_mat_a_np = J_ab_np - K_a_np
                 fock_mat_b_np = J_ab_np - K_b_np
 
-                fock_mat_a_np = self.comm.reduce(fock_mat_a_np,
-                                                 root=mpi_master())
-                fock_mat_b_np = self.comm.reduce(fock_mat_b_np,
-                                                 root=mpi_master())
+            if need_omega:
+                # for range-separated functional
 
-                if self.rank == mpi_master():
-                    # Note: make fock_mat a list
-                    fock_mat = [fock_mat_a_np, fock_mat_b_np]
-                else:
-                    fock_mat = None
+                # TODO: use Matrices here
+                # TODO: double check range-separated Fock with Matrices
+
+                fock_mat_erf_ka = fock_drv.compute(screener, self.rank,
+                                                   self.nodes,
+                                                   den_mat_for_fock.matrix('0'),
+                                                   'kx_rs', erf_k_coef, omega,
+                                                   thresh_int)
+                fock_mat_erf_kb = fock_drv.compute(screener, self.rank,
+                                                   self.nodes,
+                                                   den_mat_for_fock.matrix('1'),
+                                                   'kx_rs', erf_k_coef, omega,
+                                                   thresh_int)
+
+                fock_mat_a_np -= fock_mat_erf_ka.full_matrix().to_numpy()
+                fock_mat_b_np -= fock_mat_erf_kb.full_matrix().to_numpy()
+
+            fock_mat_a_np = self.comm.reduce(fock_mat_a_np, root=mpi_master())
+            fock_mat_b_np = self.comm.reduce(fock_mat_b_np, root=mpi_master())
+
+            if self.rank == mpi_master():
+                # Note: make fock_mat a list
+                fock_mat = [fock_mat_a_np, fock_mat_b_np]
+            else:
+                fock_mat = None
 
         if self.timing:
             profiler.add_timing_info('FockERI', tm.time() - eri_t0)
