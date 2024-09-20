@@ -86,6 +86,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
+from .tdaeigensolver import TdaEigenSolver
 from .cppsolver import ComplexResponse
 from .c6driver import C6Driver
 

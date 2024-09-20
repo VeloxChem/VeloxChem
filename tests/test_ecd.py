@@ -4,8 +4,7 @@ import pytest
 from veloxchem import mpi_master
 from veloxchem import Molecule, MolecularBasis
 from veloxchem import ScfRestrictedDriver
-from veloxchem import LinearResponseEigenSolver
-#from veloxchem import LinearResponseEigenSolver, TdaEigenSolver
+from veloxchem import LinearResponseEigenSolver, TdaEigenSolver
 
 
 @pytest.mark.solvers
@@ -89,7 +88,6 @@ class TestECD:
         self.run_ecd('hf', 'rpa', ref_edip, ref_vdip, ref_mdip, ref_exc_ene,
                      ref_osc_str, ref_rot_str)
 
-    """
     def test_hf_tda(self):
 
         ref_edip = np.array([[-0.005942, -0.045678, -0.011238],
@@ -117,4 +115,3 @@ class TestECD:
 
         self.run_ecd('hf', 'tda', ref_edip, ref_vdip, ref_mdip, ref_exc_ene,
                      ref_osc_str, ref_rot_str)
-    """
