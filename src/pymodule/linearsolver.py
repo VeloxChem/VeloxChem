@@ -870,12 +870,10 @@ class LinearSolver:
 
         t0 = tm.time()
 
-        # TODO: add MPI communicator to FockDriver constructor
-
         fock_drv = FockDriver()
         fock_arrays = []
 
-        # TODO: double check fock_type for mat_t.general
+        # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'
         exchange_scaling_factor = 1.0
         if self._dft:
@@ -886,43 +884,40 @@ class LinearSolver:
                 fock_type = 'j'
                 exchange_scaling_factor = 0.0
 
-        if (self._dft and self.xcfun.is_range_separated()):
-            full_k_coef = self.xcfun.get_rs_alpha() + self.xcfun.get_rs_beta()
+        # further determine exchange_scaling_factor, erf_k_coef and omega
+        need_omega = (self._dft and self.xcfun.is_range_separated())
+        if need_omega:
+            exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
+                                       self.xcfun.get_rs_beta())
             erf_k_coef = -self.xcfun.get_rs_beta()
             omega = self.xcfun.get_rs_omega()
-
-            # TODO: double check range-separated case
-
-            # TODO: enable mpi for range-separated case
-
-            fock_mat_full_K = fock_drv.compute(
-                screening, self.rank, self.nodes, den_mat_for_fock,
-                ['2jkx' for x in range(len(dens))], full_k_coef, 0.0,
-                thresh_int)
-
-            fock_mat_erf_K = fock_drv.compute(screening, self.rank, self.nodes,
-                                              den_mat_for_fock,
-                                              ['kx' for x in range(len(dens))],
-                                              erf_k_coef, omega, thresh_int)
-
-            for idx in range(len(dens)):
-                fock_full_K = fock_mat_full_K.matrix(
-                    str(idx)).full_matrix().to_numpy()
-                fock_erf_K = fock_mat_erf_K.matrix(
-                    str(idx)).full_matrix().to_numpy()
-                fock_arrays.append(fock_full_K - fock_erf_K)
-
         else:
-            fock_mat = fock_drv.compute(
-                screening, self.rank, self.nodes, den_mat_for_fock,
-                [fock_type for x in range(num_densities)],
-                exchange_scaling_factor, 0.0, thresh_int)
+            erf_k_coef, omega = None, None
+
+        fock_mat = fock_drv.compute(screening, self.rank, self.nodes,
+                                    den_mat_for_fock,
+                                    [fock_type for x in range(len(dens))],
+                                    exchange_scaling_factor, 0.0, thresh_int)
+
+        for idx in range(num_densities):
+            fock_np = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
+            fock_arrays.append(fock_np)
+
+        if fock_type == 'j':
+            # for pure functional
+            for idx in range(num_densities):
+                fock_arrays[idx] *= 2.0
+
+        if need_omega:
+            # for range-separated functional
+            fock_mat = fock_drv.compute(screening, self.rank, self.nodes,
+                                        den_mat_for_fock,
+                                        ['kx_rs' for x in range(len(dens))],
+                                        erf_k_coef, omega, thresh_int)
 
             for idx in range(num_densities):
-                fock_np = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
-                if fock_type == 'j':
-                    fock_np *= 2.0
-                fock_arrays.append(fock_np)
+                fock_erf_k = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
+                fock_arrays[idx] -= fock_erf_k
 
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)
