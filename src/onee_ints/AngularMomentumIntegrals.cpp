@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <unordered_map>
 
+#include "ErrorHandler.hpp"
 #include "GtoFunc.hpp"
 #include "GtoInfo.hpp"
 #include "MathFunc.hpp"
@@ -134,6 +135,12 @@ computeAngularMomentumIntegrals(const CMolecule&           molecule,
             {
                 cart_sph_f[cart_ind] = sph_ind_coef;
             }
+        }
+        else if (gto_ang > 3)
+        {
+            std::string errangmom("computeAngularMomentumIntegrals: Only implemented up to f-orbitals");
+
+            errors::assertMsgCritical(false, errangmom);
         }
     }
 

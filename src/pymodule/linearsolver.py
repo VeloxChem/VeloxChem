@@ -29,9 +29,8 @@ import time as tm
 import math
 import sys
 
-#from .veloxchemlib import (compute_electric_dipole_integrals,
-#                           compute_linear_momentum_integrals,
-#                           compute_angular_momentum_integrals)
+from .veloxchemlib import (compute_linear_momentum_integrals,
+                           compute_angular_momentum_integrals)
 # TODO: rename to ElectricDipoleMomentDriver
 from .veloxchemlib import ElectricDipoleMomentumDriver
 from .veloxchemlib import FockDriver, T4CScreener
@@ -1573,13 +1572,14 @@ class LinearSolver:
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             if self.rank == mpi_master():
-                dipole_mats = compute_electric_dipole_integrals(
-                    molecule, basis, [0.0, 0.0, 0.0])
-                integrals = (
-                    dipole_mats[0] + 0j,
-                    dipole_mats[1] + 0j,
-                    dipole_mats[2] + 0j,
-                )
+                dip_drv = ElectricDipoleMomentumDriver()
+                dip_mats = dip_drv.compute(molecule, basis, [0.0, 0.0, 0.0])
+                # TODO: move factor -1.0 into ElectricDipoleMomentDriver
+                integrals = tuple([
+                    -1.0 * dip_mats.matrix('X').full_matrix().to_numpy() + 0j,
+                    -1.0 * dip_mats.matrix('Y').full_matrix().to_numpy() + 0j,
+                    -1.0 * dip_mats.matrix('Z').full_matrix().to_numpy() + 0j,
+                ])
             else:
                 integrals = tuple()
 
