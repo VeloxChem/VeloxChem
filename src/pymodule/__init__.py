@@ -86,6 +86,8 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
+from .cppsolver import ComplexResponse
+from .c6driver import C6Driver
 
 # Environment variable: basis set path
 from .environment import (set_vlxbasispath, get_basis_path)
