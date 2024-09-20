@@ -58,3 +58,13 @@ class TestTDA:
         ref_osc_str = np.array([0.0180, 0.0000, 0.0854, 0.0695, 0.3006])
 
         self.run_tda('b3lyp', ref_exc_enes, ref_osc_str, 1.0e-5)
+
+    def test_camb3lyp(self):
+
+        ref_exc_enes = np.array(
+            [0.28370223, 0.35557650, 0.36883370, 0.44496286, 0.51683587])
+
+        ref_osc_str = np.array(
+            [0.017966, 0.000000, 0.084011, 0.068027, 0.300331])
+
+        self.run_tda('cam-b3lyp', ref_exc_enes, ref_osc_str, 1.0e-5)

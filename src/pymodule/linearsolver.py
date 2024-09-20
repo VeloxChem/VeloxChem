@@ -728,6 +728,8 @@ class LinearSolver:
                     dks.append(dak)
                     kns.append(kn)
 
+            # TODO: merge gerade and ungerade dks into general matrices
+
             # form Fock matrices
 
             fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,

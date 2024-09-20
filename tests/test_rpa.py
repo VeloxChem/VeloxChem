@@ -71,6 +71,16 @@ class TestRPA:
 
         self.run_rpa('b3lyp', ref_exc_enes, ref_osc_str, 1.0e-5)
 
+    def test_camb3lyp(self):
+
+        ref_exc_enes = np.array(
+            [0.28249530, 0.35533592, 0.36664012, 0.44312170, 0.51548914])
+
+        ref_osc_str = np.array(
+            [0.018219, 0.000000, 0.077391, 0.059649, 0.273690])
+
+        self.run_rpa('cam-b3lyp', ref_exc_enes, ref_osc_str, 1.0e-5)
+
     def test_tpssh(self):
 
         ref_exc_enes = np.array(
