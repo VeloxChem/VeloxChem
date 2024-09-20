@@ -30,10 +30,9 @@ import time as tm
 import math
 import sys
 
+from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import (compute_linear_momentum_integrals,
                            compute_angular_momentum_integrals)
-# TODO: rename to ElectricDipoleMomentDriver
-from .veloxchemlib import ElectricDipoleMomentumDriver
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import AODensityMatrix, denmat
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
@@ -659,15 +658,8 @@ class TdaEigenSolver(LinearSolver):
             The one-electron integrals.
         """
 
-        dip_drv = ElectricDipoleMomentumDriver()
-        dip_mats = dip_drv.compute(molecule, basis, [0.0, 0.0, 0.0])
-        # TODO: move factor -1.0 into ElectricDipoleMomentDriver
-        dipole_mats = tuple([
-            -1.0 * dip_mats.matrix('X').full_matrix().to_numpy(),
-            -1.0 * dip_mats.matrix('Y').full_matrix().to_numpy(),
-            -1.0 * dip_mats.matrix('Z').full_matrix().to_numpy(),
-        ])
-
+        dipole_mats = compute_electric_dipole_integrals(molecule, basis,
+                                                        [0.0, 0.0, 0.0])
         linmom_mats = compute_linear_momentum_integrals(molecule, basis)
         angmom_mats = compute_angular_momentum_integrals(
             molecule, basis, [0.0, 0.0, 0.0])

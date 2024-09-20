@@ -30,7 +30,8 @@ import time as tm
 import math
 import sys
 
-#from .veloxchemlib import compute_nuclear_potential_integrals
+from .oneeints import compute_nuclear_potential_integrals
+#from .veloxchemlib import compute_electric_dipole_integrals
 from .veloxchemlib import (OverlapDriver, KineticEnergyDriver,
                            NuclearPotentialDriver)
 #from .veloxchemlib import ElectricDipoleMomentDriver
@@ -1327,37 +1328,37 @@ class ScfDriver:
             The one-electron integrals.
         """
 
-        t0 = tm.time()
+        if self.rank == mpi_master():
 
-        ovl_drv = OverlapDriver()
-        ovl_mat = ovl_drv.compute(molecule, basis)
-        ovl_mat = ovl_mat.full_matrix().to_numpy()
+            t0 = tm.time()
 
-        t1 = tm.time()
+            ovl_drv = OverlapDriver()
+            ovl_mat = ovl_drv.compute(molecule, basis)
+            ovl_mat = ovl_mat.full_matrix().to_numpy()
 
-        kin_drv = KineticEnergyDriver()
-        kin_mat = kin_drv.compute(molecule, basis)
-        kin_mat = kin_mat.full_matrix().to_numpy()
+            t1 = tm.time()
 
-        t2 = tm.time()
+            kin_drv = KineticEnergyDriver()
+            kin_mat = kin_drv.compute(molecule, basis)
+            kin_mat = kin_mat.full_matrix().to_numpy()
 
-        # TODO: parallelize npot_mat
-        """
-        if molecule.number_of_atoms() >= self.nodes and self.nodes > 1:
-            npot_mat = self._comp_npot_mat_split_comm(molecule, basis)
+            t2 = tm.time()
+
+            # TODO: parallelize npot_mat
+
+            npot_mat = compute_nuclear_potential_integrals(molecule, basis)
+
+            t3 = tm.time()
+
         else:
-            npot_drv = NuclearPotentialIntegralsDriver(self.comm)
-            npot_mat = npot_drv.compute(molecule, basis)
-        """
 
-        npot_drv = NuclearPotentialDriver()
-        npot_mat = npot_drv.compute(molecule, basis)
-        npot_mat = npot_mat.full_matrix().to_numpy()
-        npot_mat *= -1.0
+            ovl_mat = None
+            kin_mat = None
+            npot_mat = None
 
-        #npot_mat = compute_nuclear_potential_integrals(molecule, basis)
-
-        t3 = tm.time()
+        ovl_mat = self.comm.bcast(ovl_mat, root=mpi_master())
+        kin_mat = self.comm.bcast(kin_mat, root=mpi_master())
+        npot_mat = self.comm.bcast(npot_mat, root=mpi_master())
 
         if self.electric_field is not None:
             if molecule.get_charge() != 0:
