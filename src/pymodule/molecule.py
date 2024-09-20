@@ -90,7 +90,6 @@ def _Molecule_read_smiles(smiles_str):
     return Molecule.read_xyz_string(xyz)
 
 
-@staticmethod
 def _element_guesser(atom_name, residue_name):
     """
     Guesses the chemical element of an atom based on its name. Needed by GRO
