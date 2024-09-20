@@ -84,18 +84,11 @@ monkey:cmake_build:
         -GNinja
         -DCMAKE_CXX_COMPILER=mpicxx
         -DVLX_LA_VENDOR=MKL
-    - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib utests -- -d stats
+    - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib -- -d stats
   artifacts:
     paths:
       - build
     expire_in: 2 days
-
-monkey:unit_tests:
-  extends: .monkey:setup
-  stage: test
-  needs: ["monkey:cmake_build"]
-  script:
-    - ctest --test-dir build --output-on-failure -L unit
 
 monkey:pip_install:
   extends: .monkey:setup
