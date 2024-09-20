@@ -52,8 +52,10 @@ stages:
     - ulimit -s unlimited
     - lscpu | egrep 'Thread|Core|Socket|^CPU\('
     - python -V
-    - mpiicc -cc=icx --version
-    - mpiicpc -cxx=icpx --version
+    - mpicc --version
+    - mpicc -show
+    - mpicxx --version
+    - mpicxx -show
 
 .monkey:setup:
   extends:
@@ -75,14 +77,12 @@ monkey:cmake_build:
     - python -m pip install
         numpy
         pybind11[global]
-    - CC=icx MPICC="mpiicc -cc=icx" python -m pip install
-        mpi4py --no-binary=mpi4py
+    - CC=gcc MPICC=mpicc python -m pip install mpi4py --no-binary=mpi4py
     - cmake
         -S.
         -Bbuild
         -GNinja
-        -DCMAKE_CXX_COMPILER=mpiicpc
-        -DCMAKE_CXX_FLAGS="-cxx=icpx"
+        -DCMAKE_CXX_COMPILER=mpicxx
         -DVLX_LA_VENDOR=MKL
     - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib utests -- -d stats
   artifacts:
@@ -101,12 +101,11 @@ monkey:pip_install:
   extends: .monkey:setup
   stage: build
   script:
-    - CC=icx MPICC="mpiicc -cc=icx" python -m pip install
-        mpi4py --no-binary=mpi4py
+    - CC=gcc MPICC=mpicc python -m pip install mpi4py --no-binary=mpi4py
     - CC=gcc CXX=g++ python -m pip install
         cppe
         MDAnalysis
-    - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpiicpc -DCMAKE_CXX_FLAGS=\"-cxx=icpx\""
+    - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpicxx"
         python -m pip install -v .[test,qmmm]
   artifacts:
     paths:
