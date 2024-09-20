@@ -56,7 +56,7 @@ CT4CMatricesDistributor::need_omega() const -> bool
 {
     for (const auto& label : _labels)
     {
-        if ((label != "j_rs") || (label != "k_rs") || (label != "kx_rs"))
+        if ((label != "j_rs") && (label != "k_rs") && (label != "kx_rs"))
         {
             return false; 
         }

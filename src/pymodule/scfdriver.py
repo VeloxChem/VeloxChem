@@ -1527,15 +1527,23 @@ class ScfDriver:
 
                 den_mat_for_Jab = make_matrix(basis, mat_t.symmetric)
                 den_mat_for_Jab.set_values(den_mat[0] + den_mat[1])
-
-                den_mat_for_fock = Matrices()
-                den_mat_for_fock.add(den_mat_for_Ka, "0")
-                den_mat_for_fock.add(den_mat_for_Kb, "1")
-                den_mat_for_fock.add(den_mat_for_Jab, "2")
             else:
-                den_mat_for_fock = Matrices()
+                den_mat_for_Ka = None
+                den_mat_for_Kb = None
+                den_mat_for_Jab = None
 
-            den_mat_for_fock = den_mat_for_fock.bcast(self.comm, mpi_master())
+            den_mat_for_fock = Matrices()
+
+            dm_fock = self.comm.bcast(den_mat_for_Ka, root=mpi_master())
+            den_mat_for_fock.add(dm_fock, '0')
+
+            dm_fock = self.comm.bcast(den_mat_for_Kb, root=mpi_master())
+            den_mat_for_fock.add(dm_fock, '1')
+
+            dm_fock = self.comm.bcast(den_mat_for_Jab, root=mpi_master())
+            den_mat_for_fock.add(dm_fock, '2')
+
+            dm_fock = None
 
         if e_grad is None:
             thresh_int = int(-math.log10(self.eri_thresh))
@@ -1585,12 +1593,11 @@ class ScfDriver:
 
             if need_omega:
                 # for range-separated functional
-                fock_mat_erf_k = fock_drv.compute(screener, self.rank,
-                                                  self.nodes, den_mat_for_fock,
-                                                  'kx_rs', erf_k_coef, omega,
-                                                  thresh_int)
+                fock_mat = fock_drv.compute(screener, self.rank, self.nodes,
+                                            den_mat_for_fock, 'kx_rs',
+                                            erf_k_coef, omega, thresh_int)
 
-                fock_mat_np -= fock_mat_erf_k.full_matrix().to_numpy()
+                fock_mat_np -= fock_mat.full_matrix().to_numpy()
 
             fock_mat_np = self.comm.reduce(fock_mat_np, root=mpi_master())
 
@@ -1629,23 +1636,17 @@ class ScfDriver:
 
             if need_omega:
                 # for range-separated functional
+                den_mat_for_erf_k = Matrices()
+                den_mat_for_erf_k.add(den_mat_for_fock.matrix('0'), '0')
+                den_mat_for_erf_k.add(den_mat_for_fock.matrix('1'), '1')
 
-                # TODO: use Matrices here
-                # TODO: double check range-separated Fock with Matrices
+                fock_mat = fock_drv.compute(screener, self.rank, self.nodes,
+                                            den_mat_for_erf_k,
+                                            ['kx_rs', 'kx_rs'], erf_k_coef,
+                                            omega, thresh_int)
 
-                fock_mat_erf_ka = fock_drv.compute(screener, self.rank,
-                                                   self.nodes,
-                                                   den_mat_for_fock.matrix('0'),
-                                                   'kx_rs', erf_k_coef, omega,
-                                                   thresh_int)
-                fock_mat_erf_kb = fock_drv.compute(screener, self.rank,
-                                                   self.nodes,
-                                                   den_mat_for_fock.matrix('1'),
-                                                   'kx_rs', erf_k_coef, omega,
-                                                   thresh_int)
-
-                fock_mat_a_np -= fock_mat_erf_ka.full_matrix().to_numpy()
-                fock_mat_b_np -= fock_mat_erf_kb.full_matrix().to_numpy()
+                fock_mat_a_np -= fock_mat.matrix('0').full_matrix().to_numpy()
+                fock_mat_b_np -= fock_mat.matrix('1').full_matrix().to_numpy()
 
             fock_mat_a_np = self.comm.reduce(fock_mat_a_np, root=mpi_master())
             fock_mat_b_np = self.comm.reduce(fock_mat_b_np, root=mpi_master())
