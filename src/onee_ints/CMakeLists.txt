@@ -1,6 +1,9 @@
 target_sources(vlxobjs
   PRIVATE
     AngularMomentumIntegrals.cpp
+    BoysFuncTable.cpp
+    ElectricFieldIntegrals.cpp
+    ElectricFieldValues.cpp
     GtoInfo.cpp
     LinearMomentumIntegrals.cpp
   )
