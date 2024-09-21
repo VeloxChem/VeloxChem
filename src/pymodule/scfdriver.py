@@ -31,10 +31,8 @@ import math
 import sys
 
 from .oneeints import compute_nuclear_potential_integrals
-#from .veloxchemlib import compute_electric_dipole_integrals
-from .veloxchemlib import (OverlapDriver, KineticEnergyDriver,
-                           NuclearPotentialDriver)
-#from .veloxchemlib import ElectricDipoleMomentDriver
+from .oneeints import compute_electric_dipole_integrals
+from .veloxchemlib import OverlapDriver, KineticEnergyDriver
 from .veloxchemlib import FockDriver, T4CScreener
 from .veloxchemlib import GridDriver, XCIntegrator
 from .veloxchemlib import AODensityMatrix, Matrices
@@ -1104,7 +1102,7 @@ class ScfDriver:
 
             if self.rank == mpi_master() and self.electric_field is not None:
                 efpot = sum([
-                    ef * mat
+                    -1.0 * ef * mat
                     for ef, mat in zip(self.electric_field, dipole_ints)
                 ])
 
@@ -1369,13 +1367,8 @@ class ScfDriver:
             else:
                 self._dipole_origin = np.zeros(3)
 
-            dipole_drv = ElectricDipoleMomentDriver()
-            dipole_mats = dipole_drv.compute(molecule, basis,
-                                             *tuple(self._dipole_origin))
-            dipmat_x = dipole_mats.matrix('X').full_matrix().to_numpy()
-            dipmat_y = dipole_mats.matrix('Y').full_matrix().to_numpy()
-            dipmat_z = dipole_mats.matrix('Z').full_matrix().to_numpy()
-            dipole_mats = (dipmat_x, dipmat_y, dipmat_z)
+            dipole_mats = compute_electric_dipole_integrals(
+                molecule, basis, list(self._dipole_origin))
         else:
             dipole_mats = None
 

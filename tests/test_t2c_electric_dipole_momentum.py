@@ -1,7 +1,7 @@
 from pathlib import Path
 import numpy as np
 
-from veloxchem import ElectricDipoleMomentumDriver
+from veloxchem import ElectricDipoleMomentDriver
 from veloxchem import MolecularBasis
 from veloxchem import Molecule
 from veloxchem import SubMatrix
@@ -25,7 +25,7 @@ class TestElectricDipoleMomentDriver:
         mol, bas = self.get_data()
 
         # compute overlap matrix
-        dip_drv = ElectricDipoleMomentumDriver()
+        dip_drv = ElectricDipoleMomentDriver()
         dip_mats = dip_drv.compute(mol, bas, [0.0, 0.0, 0.0])
 
         # load reference overlap data

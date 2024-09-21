@@ -108,7 +108,8 @@ export_t2cintegrals(py::module& m)
             "charges.");
 
     // CElectricDipoleMomentumDriver class
-    PyClass<CElectricDipoleMomentumDriver>(m, "ElectricDipoleMomentumDriver")
+    // TODO: rename CElectricDipoleMomentumDriver to CElectricDipoleMomentDriver
+    PyClass<CElectricDipoleMomentumDriver>(m, "ElectricDipoleMomentDriver")
         .def(py::init<>())
         .def(
             "compute",
@@ -274,7 +275,8 @@ export_t2cintegrals(py::module& m)
             "Computes kinetic energy second derivatives matrices for given molecule, basis and selected atom.");
 
     // CElectricDipoleMomentumGeom100Driver class
-    PyClass<CElectricDipoleMomentumGeomX00Driver<1>>(m, "ElectricDipoleMomentumGeom100Driver")
+    // TODO: rename CElectricDipoleMomentumGeom100Driver to CElectricDipoleMomentGeom100Driver
+    PyClass<CElectricDipoleMomentumGeomX00Driver<1>>(m, "ElectricDipoleMomentGeom100Driver")
         .def(py::init<>())
         .def(
             "compute",

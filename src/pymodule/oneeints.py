@@ -1,6 +1,5 @@
 from .veloxchemlib import NuclearPotentialDriver
-# TODO: rename to ElectricDipoleMomentDriver
-from .veloxchemlib import ElectricDipoleMomentumDriver
+from .veloxchemlib import ElectricDipoleMomentDriver
 
 
 def compute_nuclear_potential_integrals(molecule, basis):
@@ -36,7 +35,7 @@ def compute_electric_dipole_integrals(molecule, basis, origin=(0.0, 0.0, 0.0)):
         A tuple containint the electric dipole integral matrices.
     """
 
-    dip_drv = ElectricDipoleMomentumDriver()
+    dip_drv = ElectricDipoleMomentDriver()
     dip_mats = dip_drv.compute(molecule, basis, list(origin))
 
     return tuple([

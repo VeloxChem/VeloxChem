@@ -1,7 +1,7 @@
 from pathlib import Path
 import numpy as np
 
-from veloxchem import ElectricDipoleMomentumGeom100Driver
+from veloxchem import ElectricDipoleMomentGeom100Driver
 from veloxchem import MolecularBasis
 from veloxchem import Molecule
 from veloxchem import SubMatrix
@@ -25,7 +25,7 @@ class TestElectricDipoleMomentDriver:
         mol, bas = self.get_data()
 
         # compute electric dipole derivatives matrix
-        dip_drv = ElectricDipoleMomentumGeom100Driver()
+        dip_drv = ElectricDipoleMomentGeom100Driver()
         dip_mats = dip_drv.compute(mol, bas, [0.0, 0.0, 0.0], 0)
 
         # load reference overlap data
@@ -71,7 +71,7 @@ class TestElectricDipoleMomentDriver:
         mol, bas = self.get_data()
 
         # compute electric dipole derivatives matrix
-        dip_drv = ElectricDipoleMomentumGeom100Driver()
+        dip_drv = ElectricDipoleMomentGeom100Driver()
         dip_mats = dip_drv.compute(mol, bas, [0.0, 0.0, 0.0], 1)
 
         # load reference overlap data
