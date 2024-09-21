@@ -11,6 +11,7 @@ target_sources(vlxobjs
     GridScreener.cpp
     GtoValues.cpp
     GtoValuesRecD.cpp
+    GtoValuesRecF.cpp
     GtoValuesRecP.cpp
     GtoValuesRecS.cpp
     LebedevLaikovQuadrature.cpp
