@@ -566,12 +566,12 @@ class ForceFieldGenerator:
         excess_charge = (sum(self.partial_charges) -
                          round(sum(self.partial_charges)))
 
-        if abs(excess_charge) > 0.0:
-            max_charge_index = np.argmax(np.abs(self.partial_charges))
-            self.partial_charges[max_charge_index] -= excess_charge
+        max_charge_index = np.argmax(np.abs(self.partial_charges))
+        self.partial_charges[max_charge_index] -= excess_charge
 
+        if abs(excess_charge) > 1.0e-8:
             msg = 'Sum of partial charges is not a whole number. Compensating '
-            msg += f'by removing {excess_charge} from the largest charge.'
+            msg += f'by removing {excess_charge:.3e} from the largest charge.'
             self.ostream.print_warning(msg)
             self.ostream.flush()
 
