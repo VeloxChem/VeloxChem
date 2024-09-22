@@ -90,9 +90,12 @@ from .tdaeigensolver import TdaEigenSolver
 from .cppsolver import ComplexResponse
 from .c6driver import C6Driver
 
-# Environment variable: basis set path
-from .environment import (set_vlxbasispath, get_basis_path)
+# Environment variable: basis set path, number of OpenMP threads, MKL linking
+from .environment import (set_vlxbasispath, set_omp_num_threads, get_basis_path,
+                          configure_mkl_rt)
 
 set_vlxbasispath()
+set_omp_num_threads()
+configure_mkl_rt()
 
 __version__ = "1.0rc3"
