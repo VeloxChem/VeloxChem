@@ -51,17 +51,17 @@ CT4CMatricesDistributor::get_omega() const -> double
     return _omega;
 }
 
-auto 
+auto
 CT4CMatricesDistributor::need_omega() const -> bool
 {
     for (const auto& label : _labels)
     {
         if ((label != "j_rs") || (label != "k_rs") || (label != "kx_rs"))
         {
-            return false; 
+            return false;
         }
     }
-    
+
     return true;
 }
 
@@ -194,7 +194,7 @@ CT4CMatricesDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, con
 
                 auto density = _densities->matrix(keys[i]);
 
-                if ((label == "2jk") || (label == "2jkx")  || (label == "j") || (label == "j_rs"))
+                if ((label == "2jk") || (label == "2jkx") || (label == "j") || (label == "j_rs"))
                 {
                     // acummulate contributions to Fock matrix
 

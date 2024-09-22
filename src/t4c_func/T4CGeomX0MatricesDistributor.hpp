@@ -1,5 +1,5 @@
-#ifndef T4CMatricesDistributor_hpp
-#define T4CMatricesDistributor_hpp
+#ifndef T4CGeomX0MatricesDistributor_hpp
+#define T4CGeomX0MatricesDistributor_hpp
 
 #include <array>
 #include <string>
@@ -10,56 +10,56 @@
 #include "Matrix.hpp"
 #include "SimdArray.hpp"
 
-/// @brief Class CT4CMatricesDistributor provides methods for distributing single Fock matrices associated
-/// with density matrices.
-class CT4CMatricesDistributor
+/// @brief Class CT4CGeomX0MatricesDistributor provides methods for distributing single Fock matrices associated
+/// with density matrix.
+class CT4CGeomX0MatricesDistributor
 {
    public:
     /// @brief The default destructor.
-    CT4CMatricesDistributor() = default;
+    CT4CGeomX0MatricesDistributor() = default;
 
     /// Creates a Fock matrices distributor.
     /// @param focks  The Fock matrices.
-    /// @param densities  The density matrices.
-    /// @param labels  The vector of standard  Fock matrix type labels.
+    /// @param density  The density matrix.
+    /// @param label  The standard  Fock matrix type labels.
     /// @param exchange_factor  The scaling factor of exchange contribution.
     /// @param omega The range separation factor.
-    CT4CMatricesDistributor(CMatrices*                      focks,
-                            const CMatrices*                densities,
-                            const std::vector<std::string>& labels,
-                            const double                    exchange_factor,
-                            const double                    omega);
+    CT4CGeomX0MatricesDistributor(CMatrices*         focks,
+                                  const CMatrix*     density,
+                                  const std::string& label,
+                                  const double       exchange_factor,
+                                  const double       omega);
 
     /// @brief The default copy constructor.
     /// @param other The distributor to be copied.
-    CT4CMatricesDistributor(const CT4CMatricesDistributor& other) = delete;
+    CT4CGeomX0MatricesDistributor(const CT4CGeomX0MatricesDistributor& other) = delete;
 
     /// @brief The default move constructor.
     /// @param other The distributor to be moved.
-    CT4CMatricesDistributor(CT4CMatricesDistributor&& other) noexcept = delete;
+    CT4CGeomX0MatricesDistributor(CT4CGeomX0MatricesDistributor&& other) noexcept = delete;
 
     /// @brief The default destructor.
-    ~CT4CMatricesDistributor() = default;
+    ~CT4CGeomX0MatricesDistributor() = default;
 
     /// @brief The default copy assignment operator.
     /// @param other The distributor to be copy assigned.
     /// @return The assigned distributor.
-    auto operator=(const CT4CMatricesDistributor& other) -> CT4CMatricesDistributor& = delete;
+    auto operator=(const CT4CGeomX0MatricesDistributor& other) -> CT4CGeomX0MatricesDistributor& = delete;
 
     /// @brief The default move assignment operator.
     /// @param other The distributor to be move assigned.
     /// @return The assigned distributor.
-    auto operator=(CT4CMatricesDistributor&& other) noexcept -> CT4CMatricesDistributor& = delete;
+    auto operator=(CT4CGeomX0MatricesDistributor&& other) noexcept -> CT4CGeomX0MatricesDistributor& = delete;
 
     /// @brief The equality operator.
     /// @param other The distributor to be compared.
     /// @return True if distributors are equal, False otherwise.
-    auto operator==(const CT4CMatricesDistributor& other) const -> bool = delete;
+    auto operator==(const CT4CGeomX0MatricesDistributor& other) const -> bool = delete;
 
     /// @brief The equality operator.
     /// @param other The distributor to be compared.
     /// @return True if distributors are not equal, False otherwise.
-    auto operator!=(const CT4CMatricesDistributor& other) const -> bool = delete;
+    auto operator!=(const CT4CGeomX0MatricesDistributor& other) const -> bool = delete;
 
     /// @brief The gets range separation factors.
     /// @return The range separation
@@ -86,7 +86,6 @@ class CT4CMatricesDistributor
     /// @param d_angmom Tthe angular momentum of integrals buffer on center D.
     /// @param ibra_gto The index of basis function on bra side.
     /// @param ket_range The index of the range [ket_first, ket_last) of basis functions on ket side.
-    /// @param diagonal The flag to indicate diagonal subblock of matrix.
     auto distribute(const CSimdArray<double>&        buffer,
                     const size_t                     offset,
                     const std::vector<size_t>&       a_indices,
@@ -98,8 +97,7 @@ class CT4CMatricesDistributor
                     const int                        c_angmom,
                     const int                        d_angmom,
                     const size_t                     ibra_gto,
-                    const std::pair<size_t, size_t>& ket_range,
-                    const bool                       diagonal) -> void;
+                    const std::pair<size_t, size_t>& ket_range) -> void;
 
     /// Accumulates local Fock matrices contributions to targeted Fock matrix.
     /// @param bra_gto_pair_block The basis function pairs block on bra side.
@@ -110,11 +108,11 @@ class CT4CMatricesDistributor
     /// @brief The Fock matrices associated with distributor.
     CMatrices* _focks;
 
-    /// @brief The density matrices associated with distributor.
-    const CMatrices* _densities;
+    /// @brief The density matrix associated with distributor.
+    const CMatrix* _density;
 
-    /// @brief The vector of standard Fock matrix type labels.
-    std::vector<std::string> _labels;
+    /// @brief The standard Fock matrix type label.
+    std::string _label;
 
     /// @brief The scalling factor for scaling exchange contribution.
     double _exchange_factor;
@@ -150,4 +148,4 @@ class CT4CMatricesDistributor
     std::vector<size_t> _d_glob_indices;
 };
 
-#endif /* T4CMatricesDistributor_hpp */
+#endif /* T4CGeomX0MatricesDistributor_hpp */

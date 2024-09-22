@@ -17,7 +17,7 @@
 
 namespace erirec {  // erirec namespace
 
-/// @brief Computes (SP|1/|r-r'||SP)  integrals for two basis function pairs blocks.
+/// @brief Computes (SS|1/|r-r'||SP)  integral derivatives for two basis function pairs blocks.
 /// @param distributor The pointer to Fock matrix/matrices distributor.
 /// @param bra_gto_pair_block The GTOs pair block on bra side.
 /// @param ket_gto_pair_block The GTOs pair block on ket side.
@@ -164,8 +164,6 @@ comp_electron_repulsion_geom_1000_sssp(T&                               distribu
             const auto b_xyz = r_b.coordinates();
 
             const auto r_ab = TPoint<double>({a_xyz[0] - b_xyz[0], a_xyz[1] - b_xyz[1], a_xyz[2] - b_xyz[2]});
-            
-            std::cout << " * R(AB)  = " << r_ab.coordinates()[0] << " " << r_ab.coordinates()[1] << " " << r_ab.coordinates()[2] << std::endl;
 
             for (int k = 0; k < bra_npgtos; k++)
             {
@@ -246,33 +244,8 @@ comp_electron_repulsion_geom_1000_sssp(T&                               distribu
             t4cfunc::ket_transform<0, 1>(skbuffer, 3, cbuffer, 3, 0, 1);
 
             erirec::comp_bra_hrr_electron_repulsion_psxx(sbuffer, 0, skbuffer, 3, 0, r_ab, 0, 1);
-            
-            for (auto k = ket_range.first; k < ket_range.second; k++)
-            {
-                std::cout << "(" << a_indices[j+1] << "," << b_indices[j+1] << "|" << c_indices[k+1] << "," << d_indices[k+1] << ") = ";
-                
-                std::cout << " x x " << sbuffer.data(0)[k - ket_range.first];
-                
-                std::cout << " x y " << sbuffer.data(1)[k - ket_range.first];
-                
-                std::cout << " x z " << sbuffer.data(2)[k - ket_range.first];
-                
-                std::cout << " y x " << sbuffer.data(3)[k - ket_range.first];
-                
-                std::cout << " y y " << sbuffer.data(4)[k - ket_range.first];
-                
-                std::cout << " y z " << sbuffer.data(5)[k - ket_range.first];
-                
-                std::cout << " z x " << sbuffer.data(6)[k - ket_range.first];
-                
-                std::cout << " z y " << sbuffer.data(7)[k - ket_range.first];
-                
-                std::cout << " z z " << sbuffer.data(8)[k - ket_range.first];
-                
-                std::cout  << std::endl;
-            }
 
-            //distributor.distribute(sbuffer, 0, a_indices, b_indices, c_indices, d_indices, 0, 1, 0, 1, j, ket_range, diagonal);
+            distributor.distribute(sbuffer, 0, a_indices, b_indices, c_indices, d_indices, 0, 0, 0, 1, j, ket_range);
         }
     }
 }
