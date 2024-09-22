@@ -36,9 +36,13 @@ CTimer::CTimer()
 void
 CTimer::reset()
 {
+#ifndef _MSC_VER
     auto t0 = std::chrono::steady_clock::now();
 
     _duration = t0 - t0;
+#else
+    _duration = 0.0;
+#endif
 
     _started = false;
 }
@@ -48,7 +52,11 @@ CTimer::start()
 {
     if (!_started)
     {
+#ifndef _MSC_VER
         _startTime = std::chrono::steady_clock::now();
+#else
+        _startTime = 0.0;
+#endif
 
         _started = true;
     }
@@ -59,7 +67,9 @@ CTimer::stop()
 {
     if (_started)
     {
+#ifndef _MSC_VER
         _duration += std::chrono::steady_clock::now() - _startTime;
+#endif
 
         _started = false;
     }
@@ -70,9 +80,13 @@ CTimer::getElapsedTime() const
 {
     std::stringstream ss;
 
+#ifndef _MSC_VER
     auto duration_double = std::chrono::duration_cast<std::chrono::duration<double>>(_duration);
 
     ss << std::fixed << std::setw(15) << std::setprecision(3) << duration_double.count() << " sec";
+#else
+    ss << "         N/A";
+#endif
 
     return ss.str();
 }
