@@ -1,7 +1,5 @@
 from pathlib import Path
 import numpy as np
-import math as mt
-import copy as cp
 
 from .veloxchemlib import Point
 from .veloxchemlib import Molecule
@@ -14,67 +12,41 @@ from .errorhandler import assert_msg_critical
 
 
 @staticmethod
-def _Molecule_smiles_to_xyz(smiles_str, optimize=True, no_hydrogen=False):
+def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
     """
     Converts SMILES string to xyz string.
 
     :param smiles_str:
         The SMILES string.
+    :param optimize:
+        Boolean indicating whether to perform geometry optimization.
+    :param hydrogen:
+        Boolean indicating whether to remove hydrogens.
 
     :return:
         An xyz string (including number of atoms).
     """
 
     try:
-        from rdkit import Chem
-        from rdkit.Chem import AllChem
+        from openbabel import pybel as pb
 
-        mol_bare = Chem.MolFromSmiles(smiles_str)
-        mol_full = Chem.AddHs(mol_bare)
-        AllChem.EmbedMolecule(mol_full)
+        mol = pb.readstring('smiles', smiles_str)
+        mol.make3D()
+
         if optimize:
-            AllChem.UFFOptimizeMolecule(mol_full)
+            # TODO: Double check if UFF is needed
+            mol.localopt(forcefield="mmff94", steps=300)
 
-        if no_hydrogen:
-            return Chem.RemoveHs(mol_full)
+        if not hydrogen:
+            # remove hydrogens
+            mol.removeh()
+            return mol.write(format="xyz")
+
         else:
-            return Chem.MolToXYZBlock(mol_full)
+            return mol.write(format="xyz")
 
     except ImportError:
-        raise ImportError('Unable to import rdkit.')
-
-
-@staticmethod
-def _Molecule_draw_2d_svg(smiles_str, width=300, height=300):
-    """
-    Draw 2D representation for SMILES string.
-
-    :param smiles_str:
-        The SMILES string.
-    :param width:
-        The width of the drawing area.
-    :param height:
-        The height of the drawing area.
-    """
-
-    try:
-        from rdkit import Chem
-        from IPython.display import SVG
-        from IPython.display import display
-
-        mol_no_hydrogen = Molecule.smiles_to_xyz(smiles_str,
-                                                 optimize=True,
-                                                 no_hydrogen=True)
-
-        drawer = Chem.Draw.rdMolDraw2D.MolDraw2DSVG(width, height)
-        drawer.DrawMolecule(mol_no_hydrogen)
-        drawer.FinishDrawing()
-
-        display(SVG(drawer.GetDrawingText()))
-
-    except ImportError:
-        raise ImportError(
-            'Unable to import rdkit.Chem and/or IPython.display.')
+        raise ImportError('Unable to import openbabel')
 
 
 @staticmethod
@@ -120,11 +92,11 @@ def _Molecule_read_molecule_string(mol_str, units='angstrom'):
     elements = []
 
     for label in labels:
-        id = chemical_element_identifier(label)
+        elem_id = chemical_element_identifier(label)
         assert_msg_critical(
-            id != -1,
+            elem_id != -1,
             f'Molecule: Unsupported chemical element {label} in XYZ string')
-        elements.append(id)
+        elements.append(elem_id)
 
     return Molecule(elements, coords, units)
 
@@ -189,9 +161,8 @@ def _Molecule_from_dict(mol_dict):
     assert_msg_critical('xyz' in mol_dict or 'xyzfile' in mol_dict,
                         'Molecule: Expecting either "xyz" or "xyzfile" input')
 
-    assert_msg_critical(
-        not ('xyz' in mol_dict and 'xyzfile' in mol_dict),
-        'Molecule: Cannot have both "xyz" and "xyzfile" input')
+    assert_msg_critical(not ('xyz' in mol_dict and 'xyzfile' in mol_dict),
+                        'Molecule: Cannot have both "xyz" and "xyzfile" input')
 
     if 'xyz' in mol_dict:
         mol_str = '\n'.join(mol_dict['xyz'])
@@ -268,8 +239,8 @@ def _Molecule_get_string(self):
     coords_in_angstrom = self.get_coordinates_in_angstrom()
 
     mol_str = 'Molecular Geometry (Angstroms)\n'
-    mol_str += f'================================\n\n'
-    mol_str += f'  Atom         Coordinate X          Coordinate Y          Coordinate Z  \n\n'
+    mol_str += '================================\n\n'
+    mol_str += '  Atom         Coordinate X          Coordinate Y          Coordinate Z  \n\n'
     for label, coords in zip(labels, coords_in_angstrom):
         mol_str += f'  {label:<4s}{coords[0]:>22.12f}{coords[1]:>22.12f}{coords[2]:>22.12f}\n'
     mol_str += '\n'
@@ -313,12 +284,13 @@ def _Molecule_get_coordinates_in_bohr(self):
     :return:
         A numpy array of atom coordinates (nx3) in Bohr.
     """
-   
+
     coords = []
-    for r in self.get_coordinates(): 
+    for r in self.get_coordinates():
         coords.append(r.coordinates())
 
     return np.array(coords)
+
 
 def _Molecule_get_coordinates_in_angstrom(self):
     """
@@ -327,9 +299,9 @@ def _Molecule_get_coordinates_in_angstrom(self):
     :return:
         A numpy array of atom coordinates (nx3) in Angstrom.
     """
-    
+
     coords = []
-    for r in self.get_coordinates('angstrom'): 
+    for r in self.get_coordinates('angstrom'):
         coords.append(r.coordinates())
 
     return np.array(coords)
@@ -365,6 +337,89 @@ def _Molecule_write_xyz_file(self, xyz_filename):
 
     with open(str(xyz_filename), 'w') as fh:
         fh.write(self.get_xyz_string())
+
+
+def _Molecule_show(self,
+                   width=400,
+                   height=300,
+                   atom_indices=False,
+                   atom_labels=False):
+    """
+    Creates a 3D view with py3dmol.
+
+    :param width:
+        The width.
+    :param height:
+        The height.
+    :param atom_indices:
+        The flag for showing atom indices (1-based).
+    :param atom_labels:
+        The flag for showing atom labels.
+    """
+
+    try:
+        import py3Dmol
+        viewer = py3Dmol.view(width=width, height=height)
+        viewer.addModel(self.get_xyz_string())
+        viewer.setViewStyle({"style": "outline", "width": 0.05})
+        viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
+        if atom_indices or atom_labels:
+            coords = self.get_coordinates_in_angstrom()
+            labels = self.get_labels()
+            for i in range(coords.shape[0]):
+                text = ''
+                if atom_labels:
+                    text += f'{labels[i]}'
+                if atom_indices:
+                    text += f'{i + 1}'
+                viewer.addLabel(
+                    text, {
+                        'position': {
+                            'x': coords[i, 0],
+                            'y': coords[i, 1],
+                            'z': coords[i, 2],
+                        },
+                        'alignment': 'center',
+                        'fontColor': 0x000000,
+                        'backgroundColor': 0xffffff,
+                        'backgroundOpacity': 0.0,
+                    })
+        viewer.zoomTo()
+        viewer.show()
+
+    except ImportError:
+        raise ImportError('Unable to import py3Dmol')
+
+
+def _Molecule_draw_2d(self, width=400, height=300):
+    """
+    Generates 2D representation of the molecule.
+
+    :param width:
+        The width.
+    :param height:
+        The height.
+    """
+
+    try:
+        from openbabel import pybel as pb
+        from IPython.display import SVG, display
+
+        molecule = self.get_xyz_string()
+
+        mol = pb.readstring('xyz', molecule)
+
+        mol.make2D()
+        mol.removeh()
+
+        # Convert to SVG using pybel's drawing method
+        svg_string = mol.write(format='svg', opt={'w': width, 'h': height})
+
+        # Display SVG
+        display(SVG(svg_string))
+
+    except ImportError:
+        raise ImportError('Unable to import openbabel and/or IPython.display.')
 
 
 def _Molecule_moments_of_inertia(self):
@@ -549,7 +604,8 @@ def _Molecule_number_of_beta_electrons(self):
 Molecule._get_input_keywords = _Molecule_get_input_keywords
 
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
-Molecule.draw_2d_svg = _Molecule_draw_2d_svg
+Molecule.show = _Molecule_show
+Molecule.draw_2d = _Molecule_draw_2d
 Molecule.read_smiles = _Molecule_read_smiles
 Molecule.read_molecule_string = _Molecule_read_molecule_string
 Molecule.read_xyz_file = _Molecule_read_xyz_file
