@@ -27,6 +27,7 @@ from pathlib import Path
 import sys
 import time as tm
 
+from .veloxchemlib import mpi_master
 from .errorhandler import assert_msg_critical
 
 
@@ -86,6 +87,27 @@ class OutputStream:
         """
 
         self.close()
+
+    @classmethod
+    def create_mpi_ostream(cls, comm, fname=None):
+        """
+        Creates an MPI output stream that remains active on master rank and
+        silent on other ranks.
+
+        :param comm:
+            The communicator.
+
+        :return:
+            The output stream.
+        """
+
+        if comm.Get_rank() == mpi_master():
+            if fname is not None and isinstance(fname, str):
+                return cls(fname)
+            else:
+                return cls(sys.stdout)
+        else:
+            return cls(None)
 
     def close(self):
         """
@@ -380,14 +402,14 @@ class OutputStream:
         self.print_separator()
         exec_str = 'VeloxChem execution started'
         if num_nodes > 1:
-            exec_str += ' on ' + str(num_nodes) + ' compute nodes'
+            exec_str += ' on ' + str(num_nodes) + ' MPI processes'
         exec_str += ' at ' + tm.asctime(tm.localtime(start_time)) + '.'
         self.print_title(exec_str)
         self.print_separator()
         self.print_blank()
 
         if 'OMP_NUM_THREADS' in environ:
-            self.print_info('Using {} OpenMP threads per compute node.'.format(
+            self.print_info('Using {} OpenMP threads per MPI process.'.format(
                 environ['OMP_NUM_THREADS']))
             self.print_blank()
 

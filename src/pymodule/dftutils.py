@@ -122,5 +122,6 @@ def print_libxc_reference(xcfun, ostream):
             if ref not in printed_refs:
                 ostream.print_reference(ref)
                 printed_refs.append(ref)
+        ostream.print_blank()
         ostream.print_reference(xcfun.get_libxc_reference())
         ostream.print_blank()
