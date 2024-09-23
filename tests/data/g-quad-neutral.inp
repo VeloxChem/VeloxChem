@@ -11,6 +11,7 @@ timing: yes
 # Note: This threshold is very loose and is only used for benchmark purposes.
 # It should not be used in production calculations.
 conv_thresh: 2.0e-4
+restart: no
 @end
 
 @molecule
