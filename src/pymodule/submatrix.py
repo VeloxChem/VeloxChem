@@ -2,6 +2,7 @@ from mpi4py import MPI
 
 from .veloxchemlib import SubMatrix
 
+
 def _SubMatrix_sum(sub_matrix_a, sub_matrix_b, datatype):
     """
     Helper function to enable submatrices addition.
@@ -24,7 +25,7 @@ def _SubMatrix_sum(sub_matrix_a, sub_matrix_b, datatype):
 def _SubMatrix_reduce(sub_matrix, comm, mpi_id):
     """
     Reduces submatrix over MPI communicator to specific root process.
-    
+
     :param sub_matrix:
         The submatrix to reduce.
     :param comm:

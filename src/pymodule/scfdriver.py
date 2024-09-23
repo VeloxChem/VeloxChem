@@ -496,7 +496,7 @@ class ScfDriver:
                                                 basis_path='.',
                                                 ostream=None)
             else:
-                min_basis = MolecularBasis()
+                min_basis = None
             min_basis = self.comm.bcast(min_basis, root=mpi_master())
 
         # check molecule

@@ -27,7 +27,7 @@ from copy import deepcopy
 import numpy as np
 import sys
 
-#from .veloxchemlib import XCFunctional, MolecularGrid
+from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import mpi_master
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
