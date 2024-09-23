@@ -15,6 +15,7 @@
 #include "ElectronRepulsionGeom1000RecPPSP.hpp"
 #include "ElectronRepulsionGeom1000RecPPPP.hpp"
 #include "ElectronRepulsionGeom1000RecPSSS.hpp"
+#include "ElectronRepulsionGeom1000RecPSSP.hpp"
 #include "GtoPairBlock.hpp"
 
 namespace erifunc {  // erifunc namespace
