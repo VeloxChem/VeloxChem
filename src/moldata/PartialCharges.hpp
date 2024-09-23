@@ -23,7 +23,7 @@
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 //
 //  This file contains derivative work of dftd4 (v2.4.0):
-//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+//  Copyright © 2017-2019 Stefan Grimme, Sebastian Ehlert, Eike Caldeweyher
 
 #ifndef PartialCharges_hpp
 #define PartialCharges_hpp
