@@ -129,10 +129,6 @@ CT4CGeomX0MatricesDistributor::distribute(const CSimdArray<double>&        buffe
         const auto ncomps = tensor::number_of_spherical_components(std::array<int, 4>{a_angmom, b_angmom, c_angmom, d_angmom});
 
         std::ranges::for_each(std::views::iota(size_t{0}, nkeys), [&](const auto i) {
-            std::cout << " *** Offset : " << keys[i] << " : " << offset + i * ncomps;
-
-            std::cout << " ang_mom : " << a_angmom << " " << b_angmom << " " << c_angmom << " " << d_angmom << std::endl;
-
             t4cfunc::local_distribute_geom_ket_symm(_matrices,
                                                     std::to_string(i),
                                                     _density,
