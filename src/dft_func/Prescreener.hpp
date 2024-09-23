@@ -21,9 +21,6 @@
 //
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
-//
-//  This file contains derivative work of dftd4 (v2.4.0):
-//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 
 #ifndef Prescreener_hpp
 #define Prescreener_hpp
