@@ -16,6 +16,7 @@
 #include "ElectronRepulsionGeom1000RecPPPP.hpp"
 #include "ElectronRepulsionGeom1000RecPSSS.hpp"
 #include "ElectronRepulsionGeom1000RecPSSP.hpp"
+#include "ElectronRepulsionGeom1000RecPSPP.hpp"
 #include "GtoPairBlock.hpp"
 
 namespace erifunc {  // erifunc namespace
@@ -149,6 +150,12 @@ compute_geom_1000(T&                               distributor,
     if ((bra_angmoms == std::pair<int, int>({1, 0})) && (ket_angmoms == std::pair<int, int>({0, 1})))
     {
         erirec::comp_electron_repulsion_geom_1000_pssp(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({1, 0})) && (ket_angmoms == std::pair<int, int>({1, 1})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_pspp(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
         return;
     }
     

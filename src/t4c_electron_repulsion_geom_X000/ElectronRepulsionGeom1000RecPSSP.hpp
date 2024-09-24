@@ -278,7 +278,7 @@ comp_electron_repulsion_geom_1000_pssp(T&                               distribu
             
             t4cfunc::bra_transform<1, 0>(sbuffer, 9, skbuffer, 78, 0, 1);
             
-            t4cfunc::bra_transform<1, 0>(sbuffer, 18, skbuffer, 87, 0, 0);
+            t4cfunc::bra_transform<1, 0>(sbuffer, 18, skbuffer, 87, 0, 1);
             
             distributor.distribute(sbuffer, 0, a_indices, b_indices, c_indices, d_indices, 1, 0, 0, 1, j, ket_range);
         }
