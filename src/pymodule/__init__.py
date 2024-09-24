@@ -78,6 +78,7 @@ from .matrices import Matrices
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .fockdriver import FockDriver
+from .moleculargradientdriver import MolecularGradientDriver
 
 # Environment variable: basis set path
 from .environment import (set_vlxbasispath, get_basis_path)

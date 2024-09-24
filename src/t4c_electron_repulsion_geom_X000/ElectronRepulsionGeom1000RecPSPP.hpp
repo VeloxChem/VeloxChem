@@ -24,6 +24,10 @@
 #include "T2CUtils.hpp"
 #include "T4CUtils.hpp"
 
+#include "TensorComponents.hpp"
+#include <iomanip>
+#include <iostream>
+
 namespace erirec {  // erirec namespace
 
 /// @brief Computes (PS|1/|r-r'||PP)  integral derivatives for two basis function pairs blocks.
@@ -326,11 +330,11 @@ comp_electron_repulsion_geom_1000_pspp(T&                               distribu
             
             t4cfunc::ket_transform<1, 1>(skbuffer, 45, ckbuffer, 45, 0, 2);
             
-            erirec::comp_bra_hrr_electron_repulsion_psxx(skbuffer, 99, cbuffer, 18, 9, r_ab, 1, 1);
+            erirec::comp_bra_hrr_electron_repulsion_psxx(skbuffer, 99, skbuffer, 18, 9, r_ab, 1, 1);
             
             erirec::comp_bra_hrr_electron_repulsion_ppxx(skbuffer, 126, 18, 45, r_ab, 1, 1);
             
-            erirec::comp_bra_geom_hrr_electron_repulsion_psxx(skbuffer, 207, 99, 126, 0, r_ab, 0, 1);
+            erirec::comp_bra_geom_hrr_electron_repulsion_psxx(skbuffer, 207, 99, 126, 0, r_ab, 1, 1);
         
             t4cfunc::bra_transform<1, 0>(sbuffer, 0, skbuffer, 207, 1, 1);
             
@@ -339,6 +343,69 @@ comp_electron_repulsion_geom_1000_pspp(T&                               distribu
             t4cfunc::bra_transform<1, 0>(sbuffer, 54, skbuffer, 261, 1, 1);
             
             distributor.distribute(sbuffer, 0, a_indices, b_indices, c_indices, d_indices, 1, 0, 1, 1, j, ket_range);
+            
+//            // *** START DEBUG BLOCK
+//            
+//            const auto [a_angmom, b_angmom]=  bra_gto_pair_block.angular_momentums();
+//            
+//            const auto [c_angmom, d_angmom]=  ket_gto_pair_block.angular_momentums();
+//            
+//            const auto adim = a_indices[0];
+//
+//            const auto bdim = b_indices[0];
+//
+//            const auto cdim = c_indices[0];
+//
+//            const auto ddim = d_indices[0];
+//
+//            // set up angular components
+//
+//            const auto acomps = tensor::number_of_spherical_components(std::array<int, 1>{a_angmom});
+//
+//            const auto bcomps = tensor::number_of_spherical_components(std::array<int, 1>{b_angmom});
+//
+//            const auto ccomps = tensor::number_of_spherical_components(std::array<int, 1>{c_angmom});
+//
+//            const auto dcomps = tensor::number_of_spherical_components(std::array<int, 1>{d_angmom});
+//            
+//            const auto tcomps = acomps * bcomps * ccomps * dcomps;
+//            
+//            std::cout << std::setprecision(15);
+//                
+//            for (size_t p = 0; p < sbuffer.number_of_active_elements(); p++)
+//            {
+//                std::cout << " *** integral shell *** " << std::endl;
+//                
+//                for (int k = 0; k < acomps; k++)
+//                {
+//                    for (int l = 0; l < bcomps; l++)
+//                    {
+//                        for (int m = 0; m < ccomps; m++)
+//                        {
+//                            for (int n = 0; n < dcomps; n++)
+//                            {
+//                                auto idx = k * bcomps * ccomps * dcomps + l * ccomps * dcomps  + m * dcomps + n;
+//                            
+//                                auto tint_x = sbuffer.data(idx);
+//                            
+//                                auto tint_y = sbuffer.data(idx + tcomps);
+//                            
+//                                auto tint_z = sbuffer.data(idx + 2 * tcomps);
+//                           
+//                                std::cout << "(" << k * adim + a_indices[j + 1] << "," << l * bdim + b_indices[j + 1];
+//                                
+//                                std::cout << "|" << m * cdim + c_indices[ket_indices.first + p + 1] << "," << n * ddim + d_indices[ket_indices.first + p + 1];
+//                               
+//                                std::cout << "):  x " << tint_x[p] << " y " << tint_y[p] << " z " << tint_z[p] << std::endl;
+//                            }
+//                        }
+//                    }
+//                }
+//                
+//                std::cout << " *** <------> *** " << std::endl;
+//            }
+//            
+//            // *** END DEBUG BLOCK
         }
     }
 }
