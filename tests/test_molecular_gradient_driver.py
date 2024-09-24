@@ -36,11 +36,20 @@ class TestMolecularGradientDriver:
         den_mat = make_matrix(bas_sto3g, mat_t.symmetric)
         den_mat.set_values(np.load(npyfile))
         
-        grad_drv = MolecularGradientDriver()
-        mol_grad = grad_drv.compute(mol_h2o, bas_sto3g, den_mat)
+        # load weighted density matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.sto3g.energy.weighted.density.npy')
+        wden_mat = np.load(npyfile)
         
-        print(mol_grad)
-        assert False
+        grad_drv = MolecularGradientDriver()
+        mol_grad = grad_drv.compute(mol_h2o, bas_sto3g, den_mat, wden_mat)
+        
+        # electronic gradient contribution
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.sto3g.electronic.gradient.npy')
+        ref_grad = np.load(npyfile)
+        
+        assert np.allclose(ref_grad, mol_grad, 1.0e-12, 1.0e-12, False)
 
         
         
