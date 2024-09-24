@@ -98,6 +98,7 @@ from .errorhandler import assert_msg_critical
 # Python classes
 from .inputparser import InputParser
 from .outputstream import OutputStream
+from .subcommunicators import SubCommunicators
 from .submatrix import SubMatrix
 from .matrix import Matrix
 from .matrices import Matrices
