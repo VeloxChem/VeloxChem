@@ -26,15 +26,14 @@ class TestMolecularGradientDriver:
 
         return mol, bas
 
-    def test_h2o_hf(self):
+    def test_h2o_comp_electronic_grad(self):
 
         mol_h2o, bas_sto3g = self.get_data_h2o()
 
         # load density matrix
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.sto3g.density.npy')
-        den_mat = make_matrix(bas_sto3g, mat_t.symmetric)
-        den_mat.set_values(np.load(npyfile))
+        den_mat = np.load(npyfile)
         
         # load weighted density matrix
         here = Path(__file__).parent
@@ -42,7 +41,7 @@ class TestMolecularGradientDriver:
         wden_mat = np.load(npyfile)
         
         grad_drv = MolecularGradientDriver()
-        mol_grad = grad_drv.compute(mol_h2o, bas_sto3g, den_mat, wden_mat)
+        mol_grad = grad_drv.comp_electronic_grad(mol_h2o, bas_sto3g, den_mat, wden_mat, 0.0, 0.0)
         
         # electronic gradient contribution
         here = Path(__file__).parent
