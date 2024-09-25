@@ -82,6 +82,7 @@ from .veloxchemlib import get_number_of_threads
 from .veloxchemlib import make_work_tasks
 from .veloxchemlib import make_diag_work_tasks
 from .veloxchemlib import make_work_group
+from .veloxchemlib import partition_atoms
 from .veloxchemlib import spherical_momentum_s_factors
 from .veloxchemlib import spherical_momentum_p_factors
 from .veloxchemlib import spherical_momentum_d_factors
@@ -113,6 +114,7 @@ from .lreigensolver import LinearResponseEigenSolver
 from .tdaeigensolver import TdaEigenSolver
 from .cppsolver import ComplexResponse
 from .c6driver import C6Driver
+from .moleculargradientdriver import MolecularGradientDriver
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
 from .environment import (set_vlxbasispath, set_omp_num_threads, get_basis_path,

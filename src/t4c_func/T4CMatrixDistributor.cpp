@@ -47,7 +47,7 @@ CT4CMatrixDistributor::get_omega() const -> double
     return _omega;
 }
 
-auto 
+auto
 CT4CMatrixDistributor::need_omega() const -> bool
 {
     return (_label == "j_rs") || (_label == "k_rs") || (_label == "kx_rs");
