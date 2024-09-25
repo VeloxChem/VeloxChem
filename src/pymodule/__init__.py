@@ -115,6 +115,7 @@ from .tdaeigensolver import TdaEigenSolver
 from .cppsolver import ComplexResponse
 from .c6driver import C6Driver
 from .moleculargradientdriver import MolecularGradientDriver
+from .scfgradientdriver import ScfGradientDriver
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
 from .environment import (set_vlxbasispath, set_omp_num_threads, get_basis_path,
