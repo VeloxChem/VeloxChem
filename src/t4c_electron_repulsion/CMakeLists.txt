@@ -16,6 +16,7 @@ target_sources(vlxobjs
     ElectronRepulsionContrRecPIXX.cpp
     ElectronRepulsionContrRecPKXX.cpp
     ElectronRepulsionContrRecPPXX.cpp
+    ElectronRepulsionContrRecPSXX.cpp
     ElectronRepulsionContrRecXXDD.cpp
     ElectronRepulsionContrRecXXDF.cpp
     ElectronRepulsionContrRecXXDG.cpp
