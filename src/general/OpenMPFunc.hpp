@@ -94,6 +94,13 @@ auto partition_tasks(const std::vector<T>& tasks, const int rank, const int node
     return rtasks;
 }
 
+/// @brief Gets angular momentum scaling factor for SIMD width.
+/// @param natoms The number of atoms.
+/// @param rank The rank of requested node.
+/// @param nodes The number of nodes used in partitioning.
+/// @return The reduced vector of atomic indices.
+auto partition_atoms(const int natoms, const int rank, const int nodes) -> std::vector<int>;
+
 }  // namespace omp
 
 #endif /* OpenMPFunc_hpp */

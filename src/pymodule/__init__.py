@@ -57,6 +57,7 @@ from .veloxchemlib import get_number_of_threads
 from .veloxchemlib import make_work_tasks
 from .veloxchemlib import make_diag_work_tasks
 from .veloxchemlib import make_work_group
+from .veloxchemlib import partition_atoms
 from .veloxchemlib import spherical_momentum_s_factors
 from .veloxchemlib import spherical_momentum_p_factors
 from .veloxchemlib import spherical_momentum_d_factors

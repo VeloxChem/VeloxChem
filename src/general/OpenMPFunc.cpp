@@ -252,4 +252,15 @@ angular_momentum_scale(const std::pair<int, int>& ang_pair) -> size_t
     return 128;
 }
 
+
+auto
+partition_atoms(const int natoms, const int rank, const int nodes) -> std::vector<int>
+{
+    std::vector<int> atoms(natoms);
+    
+    std::iota(atoms.begin(), atoms.end(), 0);
+    
+    return omp::partition_tasks(atoms, rank, nodes);
+}
+
 }  // namespace omp

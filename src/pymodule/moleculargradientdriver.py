@@ -7,6 +7,7 @@ from .veloxchemlib import NuclearPotentialGeom010Driver
 from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import make_matrix
 from .veloxchemlib import mat_t
+from .veloxchemlib import partition_atoms
 
 class MolecularGradientDriver:
     """
@@ -19,6 +20,40 @@ class MolecularGradientDriver:
         """
         
         self.comm = None
+        
+    def mpi_comp_electronic_grad(self, comm, molecule, basis, density, wdensity, xcfactor, omega):
+        """
+        Computes electronic part of molecular gradient.
+
+        :param comm:
+            The MPI communicator.
+        :param molecule:
+            The molecule to compute gradient.
+        :param basis:
+            The basis set to compute gradient.
+        :param density:
+            The density matrix to compute gradient.
+        :param wdensity:
+            The weighted density matrix to compute gradient.
+        :param xcfactor: 
+            The exchange matrix scaling factor.
+        :param omega:
+            The range separation factor.
+
+        :return:
+            The electronic part of molecular gradient.
+        """
+
+        natoms = molecule.number_of_atoms()
+        grad_mat = np.zeros((natoms, 3))
+        
+        for i in partition_atoms(natoms, comm.Get_rank(), comm.Get_size()):
+            self.comp_kin_grad(grad_mat, molecule, basis, density, i)
+            self.comp_npot_grad(grad_mat, molecule, basis, density, i)
+            self.comp_orb_grad(grad_mat, molecule, basis, wdensity, i)
+            self.comp_fock_grad(grad_mat, molecule, basis, density, xcfactor, omega, i)
+        
+        return grad_mat
 
     def comp_electronic_grad(self, molecule, basis, density, wdensity, xcfactor, omega):
         """
