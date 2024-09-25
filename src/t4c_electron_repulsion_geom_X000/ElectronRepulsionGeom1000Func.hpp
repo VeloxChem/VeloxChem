@@ -7,6 +7,9 @@
 
 #include "ElectronRepulsionGeom1000RecSSSS.hpp"
 #include "ElectronRepulsionGeom1000RecSSSP.hpp"
+#include "ElectronRepulsionGeom1000RecSSSD.hpp"
+#include "ElectronRepulsionGeom1000RecSSSF.hpp"
+#include "ElectronRepulsionGeom1000RecSSSG.hpp"
 #include "ElectronRepulsionGeom1000RecSSPP.hpp"
 #include "ElectronRepulsionGeom1000RecSPSS.hpp"
 #include "ElectronRepulsionGeom1000RecSPSP.hpp"
@@ -50,25 +53,25 @@ compute_geom_1000(T&                               distributor,
         erirec::comp_electron_repulsion_geom_1000_sssp(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
         return;
     }
-//
-//    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({0, 2})))
-//    {
-//        erirec::comp_electron_repulsion_sssd(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices, bra_eq_ket);
-//        return;
-//    }
-//
-//    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({0, 3})))
-//    {
-//        erirec::comp_electron_repulsion_sssf(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices, bra_eq_ket);
-//        return;
-//    }
-//
-//    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({0, 4})))
-//    {
-//        erirec::comp_electron_repulsion_sssg(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices, bra_eq_ket);
-//        return;
-//    }
-//
+
+    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({0, 2})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_sssd(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({0, 3})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_sssf(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({0, 4})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_sssg(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+
     if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({1, 1})))
     {
         erirec::comp_electron_repulsion_geom_1000_sspp(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);

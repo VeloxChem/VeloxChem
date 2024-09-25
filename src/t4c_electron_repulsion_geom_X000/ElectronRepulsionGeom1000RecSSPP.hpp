@@ -7,6 +7,7 @@
 
 #include "BatchFunc.hpp"
 #include "BoysFunc.hpp"
+#include "ElectronRepulsionContrRecPSXX.hpp"
 #include "ElectronRepulsionContrRecXXPP.hpp"
 #include "ElectronRepulsionPrimRecSPSD.hpp"
 #include "ElectronRepulsionPrimRecSPSP.hpp"

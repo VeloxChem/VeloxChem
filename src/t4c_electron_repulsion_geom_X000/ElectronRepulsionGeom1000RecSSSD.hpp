@@ -7,6 +7,7 @@
 
 #include "BatchFunc.hpp"
 #include "BoysFunc.hpp"
+#include "ElectronRepulsionContrRecPSXX.hpp"
 #include "ElectronRepulsionPrimRecSPSD.hpp"
 #include "ElectronRepulsionPrimRecSSSD.hpp"
 #include "ElectronRepulsionPrimRecSSSP.hpp"
@@ -163,6 +164,8 @@ comp_electron_repulsion_geom_1000_sssd(T&                               distribu
             const auto a_xyz = r_a.coordinates();
 
             const auto b_xyz = r_b.coordinates();
+            
+            const auto r_ab = TPoint<double>({a_xyz[0] - b_xyz[0], a_xyz[1] - b_xyz[1], a_xyz[2] - b_xyz[2]});
 
             for (int k = 0; k < bra_npgtos; k++)
             {
@@ -248,7 +251,7 @@ comp_electron_repulsion_geom_1000_sssd(T&                               distribu
 
             t4cfunc::ket_transform<0, 2>(skbuffer, 0, cbuffer, 0, 0, 0);
             
-            t4cfunc::ket_transform<0, 2>(skbuffer, 6, cbuffer, 6, 0, 1);
+            t4cfunc::ket_transform<0, 2>(skbuffer, 5, cbuffer, 6, 0, 1);
             
             erirec::comp_bra_hrr_electron_repulsion_psxx(sbuffer, 0, skbuffer, 5, 0, r_ab, 0, 2);
 
@@ -258,6 +261,5 @@ comp_electron_repulsion_geom_1000_sssd(T&                               distribu
 }
 
 }  // namespace erirec
-
 
 #endif /* ElectronRepulsionGeom1000RecSSSD_hpp */
