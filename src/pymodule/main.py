@@ -36,6 +36,8 @@ from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
 #from .rspcustomproperty import CustomProperty
+from .scfgradientdriver import ScfGradientDriver
+from .optimizationdriver import OptimizationDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
 
@@ -210,6 +212,8 @@ def main():
     method_dict['pe_options'] = (dict(task.input_dict['pe'])
                                  if 'pe' in task.input_dict else {})
 
+    use_xtb = ('xtb' in method_dict)
+
     # Self-consistent field
 
     run_scf = task_type in [
@@ -267,6 +271,124 @@ def main():
 
         if not rsp_prop.is_converged:
             return
+
+    # Gradient
+
+    if task_type == 'gradient':
+
+        run_excited_state_gradient = ('response' in task.input_dict)
+        run_ground_state_gradient = (not run_excited_state_gradient)
+
+        if run_ground_state_gradient:
+
+            if use_xtb:
+
+                # TODO: enable xtb gradient
+                assert False
+
+                grad_drv = XtbGradientDriver(xtb_drv)
+                grad_drv.compute(task.molecule)
+
+            elif scf_drv.scf_type == 'restricted':
+
+                # TODO: double check supported angular momentum (for now up to P)
+
+                grad_drv = ScfGradientDriver(scf_drv)
+                grad_drv.compute(task.molecule, task.ao_basis, scf_results)
+
+        elif run_excited_state_gradient:
+
+            # TODO: enable excited state gradient
+            assert False
+
+            grad_dict = (task.input_dict['gradient']
+                         if 'gradient' in task.input_dict else {})
+
+            rsp_dict = dict(task.input_dict['response'])
+            rsp_dict['program_end_time'] = program_end_time
+            rsp_dict['filename'] = task.input_dict['filename']
+            rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
+
+            assert_msg_critical(
+                rsp_dict['property'].lower() in ['absorption', 'uv-vis', 'ecd'],
+                'Invalid response property for gradient calculation')
+
+            rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
+                                           method_dict)
+            rsp_prop.init_driver(task.mpi_comm, task.ostream)
+
+            tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
+            tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
+            tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
+                                  rsp_prop.rsp_driver)
+
+    # Geometry optimization
+
+    if task_type == 'optimize':
+
+        if 'potfile' in method_dict:
+            errmsg = 'OptimizationDriver: The \'potfile\' keyword is not '
+            errmsg += 'supported in geometry optimization.'
+            if task.mpi_rank == mpi_master():
+                assert_msg_critical(False, errmsg)
+
+        opt_dict = (dict(task.input_dict['optimize'])
+                    if 'optimize' in task.input_dict else {})
+        opt_dict['filename'] = task.input_dict['filename']
+
+        run_excited_state_gradient = ('response' in task.input_dict)
+        run_ground_state_gradient = (not run_excited_state_gradient)
+
+        if run_ground_state_gradient:
+
+            if use_xtb:
+
+                # TODO: enable xtb optimization
+                assert False
+
+                grad_drv = XtbGradientDriver(xtb_drv)
+                opt_drv = OptimizationDriver(grad_drv)
+                opt_drv.keep_files = True
+                opt_drv.update_settings(opt_dict)
+                opt_results = opt_drv.compute(task.molecule)
+
+            elif scf_drv.scf_type == 'restricted':
+                grad_drv = ScfGradientDriver(scf_drv)
+                opt_drv = OptimizationDriver(grad_drv)
+                opt_drv.keep_files = True
+                opt_drv.update_settings(opt_dict)
+                opt_results = opt_drv.compute(task.molecule, task.ao_basis,
+                                              scf_results)
+
+        elif run_excited_state_gradient:
+
+            # TODO: enable excited state optimization
+            assert False
+
+            grad_dict = (task.input_dict['gradient']
+                         if 'gradient' in task.input_dict else {})
+
+            rsp_dict = dict(task.input_dict['response'])
+            rsp_dict['program_end_time'] = program_end_time
+            rsp_dict['filename'] = task.input_dict['filename']
+            rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
+
+            assert_msg_critical(
+                rsp_dict['property'].lower() in ['absorption', 'uv-vis', 'ecd'],
+                'Invalid response property for geometry optimization')
+
+            rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
+                                           method_dict)
+            rsp_prop.init_driver(task.mpi_comm, task.ostream)
+
+            tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
+            tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
+
+            opt_drv = OptimizationDriver(tddftgrad_drv)
+            opt_drv.keep_files = True
+            opt_drv.update_settings(opt_dict)
+            opt_results = opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
+                                          rsp_prop.rsp_driver)
 
     # All done
 

@@ -1,10 +1,12 @@
 import numpy as np
+import pytest
 
 from veloxchem import Molecule, MolecularBasis
 from veloxchem import ScfRestrictedDriver
 from veloxchem import ScfGradientDriver
 
 
+@pytest.mark.solvers
 class TestGrad:
 
     def run_grad(self, molecule, basis):
@@ -16,7 +18,7 @@ class TestGrad:
         grad_drv = ScfGradientDriver(scf_drv)
         grad_drv.delta_h = 0.0005
 
-        grad_drv.compute_numerical_gradient(molecule, basis)
+        grad_drv.compute_numerical_gradient(molecule, basis, scf_results)
         num_grad = grad_drv.get_gradient()
 
         grad_drv.compute(molecule, basis, scf_results)

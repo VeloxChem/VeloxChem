@@ -71,10 +71,10 @@ class ScfGradientDriver(GradientDriver):
             The AO basis set.
         :param scf_results:
             The dictionary containing converged SCF results.
-
-        :return:
-            The molecular gradient.
         """
+
+        start_time = tm.time()
+        self.print_header()
 
         if self.rank == mpi_master():
             nocc = molecule.number_of_alpha_electrons()
@@ -104,7 +104,17 @@ class ScfGradientDriver(GradientDriver):
 
         self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
 
-    def compute_numerical_gradient(self, molecule, ao_basis):
+        # print gradient
+        self.print_geometry(molecule)
+        self.print_gradient(molecule)
+
+        valstr = '*** Time spent in gradient calculation: '
+        valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def compute_numerical_gradient(self, molecule, ao_basis, scf_results):
         """
         Performs calculation of gradient.
 
@@ -112,6 +122,8 @@ class ScfGradientDriver(GradientDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
+        :param scf_results:
+            The dictionary containing converged SCF results.
         """
 
         start_time = tm.time()
@@ -119,7 +131,7 @@ class ScfGradientDriver(GradientDriver):
 
         self.ostream.mute()
         # Currently, only numerical gradients activated
-        self.compute_numerical(molecule, ao_basis)
+        self.compute_numerical(molecule, ao_basis, scf_results)
         self.ostream.unmute()
 
         # print gradient
@@ -132,7 +144,7 @@ class ScfGradientDriver(GradientDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def compute_energy(self, molecule, ao_basis):
+    def compute_energy(self, molecule, ao_basis, scf_results):
         """
         Computes the energy at current geometry.
 
@@ -140,6 +152,8 @@ class ScfGradientDriver(GradientDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
+        :param scf_results:
+            The dictionary containing converged SCF results.
 
         :return:
             The energy.
@@ -147,10 +161,13 @@ class ScfGradientDriver(GradientDriver):
 
         self.ostream.mute()
         self.scf_driver.restart = False
-        self.scf_driver.compute(molecule, ao_basis)
+        new_scf_results = self.scf_driver.compute(molecule, ao_basis)
         assert_msg_critical(self.scf_driver.is_converged,
                             'ScfGradientDriver: SCF did not converge')
         self.ostream.unmute()
+
+        if self.rank == mpi_master():
+            scf_results.update(new_scf_results)
 
         return self.scf_driver.get_scf_energy()
 
