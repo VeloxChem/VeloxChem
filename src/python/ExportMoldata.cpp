@@ -36,6 +36,8 @@
 
 namespace vlx_moldata {
 
+// TODO: add wrappers for Molecule constructor
+
 void
 export_moldata(py::module &m)
 {

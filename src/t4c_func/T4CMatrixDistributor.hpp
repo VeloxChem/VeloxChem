@@ -60,7 +60,7 @@ class CT4CMatrixDistributor
     /// @brief The gets range separation factors.
     /// @return The range separation
     auto get_omega() const -> double;
-    
+
     /// @brief Checks if range separation factor is needed.
     /// @return The range separation
     auto need_omega() const -> bool;

@@ -101,6 +101,8 @@ make_diag_work_group(const std::vector<CGtoPairBlock>& gto_pair_blocks) -> std::
             
             if (bsize < simd::width<double>()) bsize = simd::width<double>();
             
+            if (const auto mbsize = omp::max_block_size(); bsize > mbsize) bsize = mbsize; 
+            
             const auto bblocks = batch::number_of_batches(gp_size, bsize);
             
             for (size_t j = 0; j < bblocks; j++)
@@ -138,6 +140,8 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
                 
                 auto bra_bsize = omp::angular_momentum_scale(bra_angpair) * simd::width<double>();
                 
+                if (const auto mbsize = omp::max_block_size(); bra_bsize > mbsize) bra_bsize = mbsize;
+                
                 const auto bra_blocks = batch::number_of_batches(bra_size, bra_bsize);
                 
                 for (int ket_idx = bra_idx; ket_idx < 16; ket_idx++)
@@ -150,7 +154,9 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
 
                     const auto ket_size = ket_block.number_of_contracted_pairs();
                     
-                    auto ket_bsize = omp::angular_momentum_scale(ket_angpair)  * simd::width<double>();
+                    auto ket_bsize = omp::angular_momentum_scale(ket_angpair) * simd::width<double>();
+                    
+                    if (const auto mbsize = omp::max_block_size(); ket_bsize > mbsize) ket_bsize = mbsize; 
                     
                     const auto ket_blocks = batch::number_of_batches(ket_size, ket_bsize);
                     
@@ -250,6 +256,17 @@ angular_momentum_scale(const std::pair<int, int>& ang_pair) -> size_t
     if (angmom > 4) return 64;
     
     return 128;
+}
+
+
+auto
+partition_atoms(const int natoms, const int rank, const int nodes) -> std::vector<int>
+{
+    std::vector<int> atoms(natoms);
+    
+    std::iota(atoms.begin(), atoms.end(), 0);
+    
+    return omp::partition_tasks(atoms, rank, nodes);
 }
 
 }  // namespace omp

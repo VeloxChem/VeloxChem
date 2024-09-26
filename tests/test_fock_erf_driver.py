@@ -14,7 +14,7 @@ from veloxchem import make_matrix
 from veloxchem import mat_t
 
 
-class TestFockDriver:
+class TestFockErfDriver:
 
     def get_data_h2o_dimer(self):
 

@@ -37,6 +37,14 @@ set_static_scheduler() -> void
     omp_set_dynamic(0);
 }
 
+/// @brief Gets maximum size of task work units.
+/// @return The maximum size of task work units.
+inline auto
+max_block_size() -> size_t
+{
+    return 256;
+}
+
 /// @brief Generates work groups for OMP tasks manager.
 /// @param gto_blocks The vector of basis functions blocks.
 /// @return The vector of work tasks.
@@ -93,6 +101,13 @@ auto partition_tasks(const std::vector<T>& tasks, const int rank, const int node
     
     return rtasks;
 }
+
+/// @brief Gets angular momentum scaling factor for SIMD width.
+/// @param natoms The number of atoms.
+/// @param rank The rank of requested node.
+/// @param nodes The number of nodes used in partitioning.
+/// @return The reduced vector of atomic indices.
+auto partition_atoms(const int natoms, const int rank, const int nodes) -> std::vector<int>;
 
 }  // namespace omp
 

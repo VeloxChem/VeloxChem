@@ -211,8 +211,9 @@ export_general(py::module &m) -> void
     m.def("make_work_tasks",
           py::overload_cast<const std::vector<CGtoBlock> &, const std::vector<CGtoBlock> &>(&omp::make_work_tasks),
           "Gets work tasks for given two vectors of basis function blocks.");
-    m.def("make_diag_work_tasks", &omp::make_diag_work_group);
-    m.def("make_work_group", &omp::make_work_group);
+    m.def("make_diag_work_tasks", &omp::make_diag_work_group, "Gets work tasks for diagonal integrals.");
+    m.def("make_work_group", &omp::make_work_group, "Gets work group for ERIs.");
+    m.def("partition_atoms", &omp::partition_atoms, "Get atomic indices of partitioned atoms list.");
 
     // exposing functions from SphericalMomentum.hpp
     m.def("spherical_momentum_s_factors", spher_mom::transformation_factors<0>, "Gets transformation factors for S type spherical momentum.");
