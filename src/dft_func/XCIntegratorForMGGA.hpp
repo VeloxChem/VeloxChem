@@ -27,7 +27,6 @@
 
 #include <string>
 
-#include "AODensityMatrix.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
 #include "MolecularBasis.hpp"

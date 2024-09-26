@@ -1225,6 +1225,10 @@ class ScfDriver:
                     F_alpha = fock_mat[0]
                     F_beta = fock_mat[1]
 
+                den_type = (denmat.rest
+                            if self.scf_type == 'restricted' else denmat.unrest)
+                self._density = AODensityMatrix(self._density, den_type)
+
                 self._scf_tensors = {
                     # eri info
                     'eri_thresh': self.eri_thresh,
@@ -1259,32 +1263,6 @@ class ScfDriver:
             else:
                 self._scf_tensors = None
 
-            # broadcast density
-            # TODO: move AODensityMatrix into Python layer
-
-            aodens = []
-            if self.rank == mpi_master():
-                aodens.append(self._density[0])
-                if self.scf_type != 'restricted':
-                    aodens.append(self._density[1])
-            else:
-                aodens.append(None)
-                if self.scf_type != 'restricted':
-                    aodens.append(None)
-
-            aodens[0] = self.comm.bcast(aodens[0], root=mpi_master())
-            aoden_type = denmat.rest
-            if self.scf_type != 'restricted':
-                aodens[1] = self.comm.bcast(aodens[1], root=mpi_master())
-                aoden_type = denmat.unrest
-
-            self._density = AODensityMatrix(aodens, aoden_type)
-
-            # broadcast MO
-
-            self._molecular_orbitals = self.comm.bcast(self._molecular_orbitals,
-                                                       root=mpi_master())
-
             self._scf_prop.compute_scf_prop(molecule, ao_basis,
                                             self.scf_tensors)
 
@@ -1298,6 +1276,69 @@ class ScfDriver:
             self._print_scf_finish(diis_start_time)
 
         profiler.check_memory_usage('End of SCF')
+
+    def broadcast_mo_and_density(self, scf_results):
+        """
+        Broadcasts MO and density.
+
+        :param scf_results:
+            The dictionary containing converged SCF results.
+        """
+
+        ao_dens = []
+        mo_occs = []
+        mo_coefs = []
+        mo_enes = []
+
+        if self.rank == mpi_master():
+            ao_dens.append(scf_results['D_alpha'])
+            mo_occs.append(scf_results['occ_alpha'])
+            mo_coefs.append(scf_results['C_alpha'])
+            mo_enes.append(scf_results['E_alpha'])
+
+            if self.scf_type != 'restricted':
+                ao_dens.append(scf_results['D_beta'])
+                mo_occs.append(scf_results['occ_beta'])
+                if self.scf_type == 'unrestricted':
+                    mo_coefs.append(scf_results['C_beta'])
+                    mo_enes.append(scf_results['E_beta'])
+
+        else:
+            ao_dens.append(None)
+            mo_occs.append(None)
+            mo_coefs.append(None)
+            mo_enes.append(None)
+
+            if self.scf_type != 'restricted':
+                ao_dens.append(None)
+                mo_occs.append(None)
+                if self.scf_type == 'unrestricted':
+                    mo_coefs.append(None)
+                    mo_enes.append(None)
+
+        ao_dens[0] = self.comm.bcast(ao_dens[0], root=mpi_master())
+        ao_den_type = denmat.rest
+
+        mo_coefs[0] = self.comm.bcast(mo_coefs[0], root=mpi_master())
+        mo_enes[0] = self.comm.bcast(mo_enes[0], root=mpi_master())
+        mo_occs[0] = self.comm.bcast(mo_occs[0], root=mpi_master())
+        mo_type = molorb.rest
+
+        if self.scf_type != 'restricted':
+            ao_dens[1] = self.comm.bcast(ao_dens[1], root=mpi_master())
+            ao_den_type = denmat.unrest
+
+            mo_occs[1] = self.comm.bcast(mo_occs[1], root=mpi_master())
+            if self.scf_type == 'unrestricted':
+                mo_coefs[1] = self.comm.bcast(mo_coefs[1], root=mpi_master())
+                mo_enes[1] = self.comm.bcast(mo_enes[1], root=mpi_master())
+                mo_type = molorb.unrest
+            else:
+                mo_type = molorb.restopen
+
+        self._density = AODensityMatrix(ao_dens, ao_den_type)
+        self._molecular_orbitals = MolecularOrbitals(mo_coefs, mo_enes, mo_occs,
+                                                     mo_type)
 
     def _need_graceful_exit(self, iter_in_hours):
         """

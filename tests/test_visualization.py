@@ -26,25 +26,26 @@ class TestVisualization:
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
-        mol_orbs = scf_drv.mol_orbs
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
+        scf_drv.broadcast_mo_and_density(scf_results)
+        mol_orbs = scf_drv.molecular_orbitals
         density = scf_drv.density
 
         grid = CubicGrid([0.3, 0.6, 0.9], [1.0, 1.0, 1.0], [2, 3, 3])
         homo = task.molecule.number_of_alpha_electrons() - 1
 
         vis_drv = VisualizationDriver(task.mpi_comm)
-        mo_alpha_coefs = mol_orbs.alpha_to_numpy()
-        mo_beta_coefs = mol_orbs.beta_to_numpy()
-        vis_drv.compute(grid, task.molecule, task.ao_basis, mo_alpha_coefs,
-                        mo_beta_coefs, homo, 'alpha')
+        mo_coefs = mol_orbs.alpha_to_numpy()
+        vis_drv.compute(grid, task.molecule, task.ao_basis, mo_coefs, homo,
+                        'alpha')
 
         points = [[0.3 + 1.0 * ix, 0.6 + 1.0 * iy, 0.9 + 1.0 * iz]
                   for ix in range(2)
                   for iy in range(3)
                   for iz in range(3)]
-        mo_val = vis_drv.get_mo(points, task.molecule, task.ao_basis,
-                                mo_alpha_coefs, mo_beta_coefs, homo, 'alpha')
+        mo_val = vis_drv.get_mo(points, task.molecule, task.ao_basis, mo_coefs,
+                                homo, 'alpha')
 
         if is_mpi_master(task.mpi_comm):
             homo_values = grid.values_to_numpy()
@@ -142,8 +143,10 @@ class TestVisualization:
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
-        mol_orbs = scf_drv.mol_orbs
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
+        scf_drv.broadcast_mo_and_density(scf_results)
+        mol_orbs = scf_drv.molecular_orbitals
         density = scf_drv.density
 
         here = Path(__file__).parent
@@ -173,10 +176,8 @@ class TestVisualization:
             assert read_grid.compare(cubic_grid) < 1e-6
             dens_cube_fpath.unlink()
 
-        mo_alpha_coefs = mol_orbs.alpha_to_numpy()
-        mo_beta_coefs = mol_orbs.beta_to_numpy()
-        vis_drv.compute(cubic_grid, task.molecule, task.ao_basis,
-                        mo_alpha_coefs, mo_beta_coefs,
+        mo_coefs = mol_orbs.alpha_to_numpy()
+        vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, mo_coefs,
                         task.molecule.number_of_alpha_electrons() - 1, 'alpha')
         if is_mpi_master(task.mpi_comm):
             read_grid = CubicGrid.read_cube(homo_cube_fname)

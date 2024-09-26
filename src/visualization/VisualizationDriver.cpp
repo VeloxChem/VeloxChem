@@ -454,8 +454,7 @@ CVisualizationDriver::compute(CCubicGrid&               grid,
                               const CMolecularBasis&    basis,
                               const int                 nao,
                               const int                 nmo,
-                              const double*             mo_alpha,
-                              const double*             mo_beta,
+                              const double*             mocoefs,
                               const int                 moidx,
                               const std::string&        mospin) const
 {
@@ -481,7 +480,7 @@ CVisualizationDriver::compute(CCubicGrid&               grid,
 
     CCubicGrid localgrid(localorigin, stepsize, localnumpoints);
 
-    _computeLocalGrid(localgrid, molecule, basis, nao, nmo, mo_alpha, mo_beta, moidx, mospin);
+    _computeLocalGrid(localgrid, molecule, basis, nao, nmo, mocoefs, moidx, mospin);
 
     // gather local grids
 
@@ -551,8 +550,7 @@ CVisualizationDriver::_computeLocalGrid(CCubicGrid&               grid,
                                         const CMolecularBasis&    basis,
                                         const int                 nao,
                                         const int                 nmo,
-                                        const double*             mo_alpha,
-                                        const double*             mo_beta,
+                                        const double*             mocoefs,
                                         const int                 moidx,
                                         const std::string&        mospin) const
 {
@@ -589,10 +587,6 @@ CVisualizationDriver::_computeLocalGrid(CCubicGrid&               grid,
     errors::assertMsgCritical(morows == static_cast<int>(phi0.size()), errnao);
 
     // target MO
-
-    auto mocoefs = alphaspin ? mo_alpha : mo_beta;
-
-    // calculate psi on grid points
 
     #pragma omp parallel for schedule(dynamic)
     for (int ix = 0; ix < numpoints[0]; ix++)
@@ -751,8 +745,7 @@ CVisualizationDriver::getMO(const std::vector<std::vector<double>>& coords,
                             const CMolecularBasis&                  basis,
                             const int                               nao,
                             const int                               nmo,
-                            const double*                           mo_alpha,
-                            const double*                           mo_beta,
+                            const double*                           mocoefs,
                             const int                               moidx,
                             const std::string&                      mospin) const
 {
@@ -773,8 +766,6 @@ CVisualizationDriver::getMO(const std::vector<std::vector<double>>& coords,
         errors::assertMsgCritical(0 <= moidx && moidx < nmo, erridx);
 
         // compute MO
-
-        auto mocoefs = alphaspin ? mo_alpha : mo_beta;
 
         auto npoints = static_cast<int>(coords.size());
 

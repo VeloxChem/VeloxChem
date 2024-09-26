@@ -29,19 +29,6 @@
 namespace dftsubmat {  // dftsubmat namespace
 
 auto
-getSubDensityMatrix(const CAODensityMatrix& densityMatrix, const int densityIndex, const std::string& densitySpin, const std::vector<int>& aoIndices)
-    -> CDenseMatrix
-{
-    auto naos = densityMatrix.getNumberOfRows(densityIndex);
-
-    bool alphaspin = (format::upper_case(densitySpin) == std::string("ALPHA"));
-
-    auto dens = alphaspin ? densityMatrix.alphaDensity(densityIndex) : densityMatrix.betaDensity(densityIndex);
-
-    return getSubDensityMatrix(dens, aoIndices, naos);
-}
-
-auto
 getSubDensityMatrix(const double* densityPointer, const std::vector<int>& aoIndices, const int naos) -> CDenseMatrix
 {
     const auto aocount = static_cast<int>(aoIndices.size());

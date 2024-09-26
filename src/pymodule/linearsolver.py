@@ -37,7 +37,6 @@ from .veloxchemlib import Matrices, make_matrix, mat_t
 from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .veloxchemlib import rotatory_strength_in_cgs
-from .veloxchemlib import AODensityMatrix, denmat
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals, molorb

@@ -27,25 +27,10 @@
 
 #include <vector>
 
-#include "AODensityMatrix.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
 
 namespace dftsubmat {  // dftsubmat namespace
-
-/**
- Gets sub AO density matrices from AO density matrices.
-
- @param densityMatrix the AO density matrix.
- @param densityIndex the index of density matrix.
- @param densitySpin the spin of density matrix.
- @param aoIndices the index mapping from submatrix to full matrix.
- @return the sub AO density matrices.
- */
-auto getSubDensityMatrix(const CAODensityMatrix& densityMatrix,
-                         const int               densityIndex,
-                         const std::string&      densitySpin,
-                         const std::vector<int>& aoIndices) -> CDenseMatrix;
 
 /**
  Gets sub AO density matrices from AO density matrices.

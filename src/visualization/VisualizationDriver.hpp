@@ -88,7 +88,9 @@ class CVisualizationDriver
      @param grid the cubic grid.
      @param molecule the molecule.
      @param basis the basis set for the molecule.
-     @param molorb the molecular orbitals of the molecule.
+     @param nao the number of AOs.
+     @param nmo the number of MOs.
+     @param mocoefs the pointer to molecular orbitals coefficients.
      @param moidx the index of the molecular orbital (0-based).
      @param mospin the spin of the molecular orbital ('alpha' or 'beta').
      */
@@ -97,8 +99,7 @@ class CVisualizationDriver
                            const CMolecularBasis&    basis,
                            const int                 nao,
                            const int                 nmo,
-                           const double*             mo_alpha,
-                           const double*             mo_beta,
+                           const double*             mocoefs,
                            const int                 moidx,
                            const std::string&        mospin) const;
 
@@ -177,7 +178,9 @@ class CVisualizationDriver
      @param grid the cubic grid.
      @param molecule the molecule.
      @param basis the basis set for the molecule.
-     @param molorb the molecular orbitals of the molecule.
+     @param nao the number of AOs.
+     @param nmo the number of MOs.
+     @param mocoefs the pointer to molecular orbitals coefficients.
      @param moidx the index of the molecular orbital (0-based).
      @param mospin the spin of the molecular orbital ('alpha' or 'beta').
      */
@@ -186,8 +189,7 @@ class CVisualizationDriver
                  const CMolecularBasis&    basis,
                  const int                 nao,
                  const int                 nmo,
-                 const double*             mo_alpha,
-                 const double*             mo_beta,
+                 const double*             mocoefs,
                  const int                 moidx,
                  const std::string&        mospin) const;
 
@@ -214,7 +216,9 @@ class CVisualizationDriver
      @param coords the coordinates.
      @param molecule the molecule.
      @param basis the basis set for the molecule.
-     @param mo the molecular orbitals of the molecule.
+     @param nao the number of AOs.
+     @param nmo the number of MOs.
+     @param mocoefs the pointer to molecular orbitals coefficients.
      @param moidx the index of the molecular orbital (0-based).
      @param mospin the spin of the molecular orbital ('alpha' or 'beta').
      */
@@ -223,8 +227,7 @@ class CVisualizationDriver
                               const CMolecularBasis&                  basis,
                               const int                               nao,
                               const int                               nmo,
-                              const double*                           mo_alpha,
-                              const double*                           mo_beta,
+                              const double*                           mocoefs,
                               const int                               moidx,
                               const std::string&                      mospin) const;
 

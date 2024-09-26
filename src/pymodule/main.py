@@ -244,7 +244,6 @@ def main():
                                       task.min_basis)
 
         mol_orbs = scf_drv.molecular_orbitals
-        density = scf_drv.density
 
         if not scf_drv.is_converged:
             return
@@ -393,6 +392,10 @@ def main():
     if task_type == 'visualization':
         cube_dict = (task.input_dict['visualization']
                      if 'visualization' in task.input_dict else {})
+
+        scf_drv.broadcast_mo_and_density(scf_results)
+        mol_orbs = scf_drv.molecular_orbitals
+        density = scf_drv.density
 
         vis_drv = VisualizationDriver(task.mpi_comm)
         vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,

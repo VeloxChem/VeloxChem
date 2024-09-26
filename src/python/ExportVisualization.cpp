@@ -57,22 +57,14 @@ CVisualizationDriver_compute(CVisualizationDriver&      self,
                              CCubicGrid&                grid,
                              const CMolecule&           molecule,
                              const CMolecularBasis&     basis,
-                             const py::array_t<double>& mo_alpha_coefs,
-                             const py::array_t<double>& mo_beta_coefs,
+                             const py::array_t<double>& mocoefs,
                              const int                  moidx,
                              const std::string&         mospin) -> void
 {
-    auto nao = mo_alpha_coefs.shape(0);
-    auto nmo = mo_alpha_coefs.shape(1);
+    auto nao = mocoefs.shape(0);
+    auto nmo = mocoefs.shape(1);
 
-    std::string errnum("VisualizationDriver.compute: Inconsistent number of orbitals");
-    errors::assertMsgCritical(mo_beta_coefs.shape(0) == nao, errnum);
-    errors::assertMsgCritical(mo_beta_coefs.shape(1) == nmo, errnum);
-
-    auto mo_alpha = mo_alpha_coefs.data();
-    auto mo_beta = mo_beta_coefs.data();
-
-    self.compute(grid, molecule, basis, nao, nmo, mo_alpha, mo_beta, moidx, mospin);
+    self.compute(grid, molecule, basis, nao, nmo, mocoefs.data(), moidx, mospin);
 }
 
 static auto
@@ -80,22 +72,14 @@ CVisualizationDriver_get_mo(CVisualizationDriver&                   self,
                             const std::vector<std::vector<double>>& coords,
                             const CMolecule&                        molecule,
                             const CMolecularBasis&                  basis,
-                            const py::array_t<double>&              mo_alpha_coefs,
-                            const py::array_t<double>&              mo_beta_coefs,
+                            const py::array_t<double>&              mocoefs,
                             const int                               moidx,
                             const std::string&                      mospin) -> std::vector<double>
 {
-    auto nao = mo_alpha_coefs.shape(0);
-    auto nmo = mo_alpha_coefs.shape(1);
+    auto nao = mocoefs.shape(0);
+    auto nmo = mocoefs.shape(1);
 
-    std::string errnum("VisualizationDriver.get_mo: Inconsistent number of orbitals");
-    errors::assertMsgCritical(mo_beta_coefs.shape(0) == nao, errnum);
-    errors::assertMsgCritical(mo_beta_coefs.shape(1) == nmo, errnum);
-
-    auto mo_alpha = mo_alpha_coefs.data();
-    auto mo_beta = mo_beta_coefs.data();
-
-    return self.getMO(coords, molecule, basis, nao, nmo, mo_alpha, mo_beta, moidx, mospin);
+    return self.getMO(coords, molecule, basis, nao, nmo, mocoefs.data(), moidx, mospin);
 }
 
 // Exports classes/functions in src/visualization to python
@@ -143,8 +127,7 @@ export_visualization(py::module& m)
              "grid"_a,
              "molecule"_a,
              "basis"_a,
-             "mo_alpha_coefs"_a,
-             "mo_beta_coefs"_a,
+             "mocoefs"_a,
              "moidx"_a,
              "mospin"_a)
         .def("compute",
@@ -163,8 +146,7 @@ export_visualization(py::module& m)
              "coords"_a,
              "molecule"_a,
              "basis"_a,
-             "mo_alpha_coefs"_a,
-             "mo_beta_coefs"_a,
+             "mocoefs"_a,
              "moidx"_a,
              "mospin"_a)
         .def("get_density",

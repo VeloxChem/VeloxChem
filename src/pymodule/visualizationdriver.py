@@ -197,9 +197,11 @@ def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
             if cube_type in ['mo', 'amo']:
                 spin = 'alpha'
                 nelec = molecule.number_of_alpha_electrons()
+                mo_coefs = mol_orbs.alpha_to_numpy()
             else:
                 spin = 'beta'
                 nelec = molecule.number_of_beta_electrons()
+                mo_coefs = mol_orbs.beta_to_numpy()
 
             # Note: the input MO index should be 1-based
             cube_value = m.group(2).strip().lower()
@@ -207,11 +209,7 @@ def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
             cube_value = cube_value.replace('lumo', str(nelec + 1))
             orb_id = eval(cube_value) - 1
 
-            mo_alpha_coefs = mol_orbs.alpha_to_numpy()
-            mo_beta_coefs = mol_orbs.beta_to_numpy()
-
-            self.compute(cubic_grid, molecule, basis, mo_alpha_coefs,
-                         mo_beta_coefs, orb_id, spin)
+            self.compute(cubic_grid, molecule, basis, mo_coefs, orb_id, spin)
 
             if self.get_rank() == mpi_master():
                 self.write_data(fname, cubic_grid, molecule, 'mo', orb_id, spin)
