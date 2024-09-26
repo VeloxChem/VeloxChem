@@ -163,14 +163,14 @@ class GradientDriver:
         for i in range(molecule.number_of_atoms()):
             for d in range(3):
                 coords[i, d] += self.delta_h
-                points = [Point([float(x) for x in xyz]) for xyz in coords]
+                points = [Point(xyz) for xyz in coords]
                 new_mol = Molecule(elem_ids, points, 'au')
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
                 e_plus = self.compute_energy(new_mol, *args)
 
                 coords[i, d] -= 2.0 * self.delta_h
-                points = [Point([float(x) for x in xyz]) for xyz in coords]
+                points = [Point(xyz) for xyz in coords]
                 new_mol = Molecule(elem_ids, points, 'au')
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
@@ -178,14 +178,14 @@ class GradientDriver:
 
                 if self.do_four_point:
                     coords[i, d] -= self.delta_h
-                    points = [Point([float(x) for x in xyz]) for xyz in coords]
+                    points = [Point(xyz) for xyz in coords]
                     new_mol = Molecule(elem_ids, points, 'au')
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
                     e_minus2 = self.compute_energy(new_mol, *args)
 
                     coords[i, d] += 4.0 * self.delta_h
-                    points = [Point([float(x) for x in xyz]) for xyz in coords]
+                    points = [Point(xyz) for xyz in coords]
                     new_mol = Molecule(elem_ids, points, 'au')
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)

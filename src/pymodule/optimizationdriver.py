@@ -311,11 +311,7 @@ class OptimizationDriver:
             elem_ids = molecule.get_identifiers()
 
             if self.rank == mpi_master():
-                points = [
-                    Point([float(x)
-                           for x in xyz])
-                    for xyz in coords.reshape(-1, 3)
-                ]
+                points = [Point(xyz) for xyz in coords.reshape(-1, 3)]
                 final_mol = Molecule(elem_ids, points, 'au')
                 final_mol.set_charge(molecule.get_charge())
                 final_mol.set_multiplicity(molecule.get_multiplicity())
@@ -359,11 +355,7 @@ class OptimizationDriver:
                     labels = molecule.get_labels()
                     elem_ids = molecule.get_identifiers()
                     for opt_coords_au in all_coords_au:
-                        points = [
-                            Point([float(x)
-                                   for x in xs])
-                            for xs in opt_coords_au[-1]
-                        ]
+                        points = [Point(xs) for xs in opt_coords_au[-1]]
                         mol = Molecule(elem_ids, points, 'au')
                         opt_results['scan_geometries'].append(
                             mol.get_xyz_string())
@@ -378,9 +370,7 @@ class OptimizationDriver:
                     elem_ids = molecule.get_identifiers()
                     for xyz in m.xyzs:
                         points = [
-                            Point([float(x)
-                                   for x in xs])
-                            for xs in xyz / geometric.nifty.bohr2ang
+                            Point(xs) for xs in xyz / geometric.nifty.bohr2ang
                         ]
                         mol = Molecule(elem_ids, points, 'au')
                         opt_results['opt_geometries'].append(
