@@ -1225,10 +1225,6 @@ class ScfDriver:
                     F_alpha = fock_mat[0]
                     F_beta = fock_mat[1]
 
-                den_type = (denmat.rest
-                            if self.scf_type == 'restricted' else denmat.unrest)
-                self._density = AODensityMatrix(self._density, den_type)
-
                 self._scf_tensors = {
                     # eri info
                     'eri_thresh': self.eri_thresh,
@@ -1262,6 +1258,32 @@ class ScfDriver:
 
             else:
                 self._scf_tensors = None
+
+            # broadcast density
+            # TODO: move AODensityMatrix into Python layer
+
+            aodens = []
+            if self.rank == mpi_master():
+                aodens.append(self._density[0])
+                if self.scf_type != 'restricted':
+                    aodens.append(self._density[1])
+            else:
+                aodens.append(None)
+                if self.scf_type != 'restricted':
+                    aodens.append(None)
+
+            aodens[0] = self.comm.bcast(aodens[0], root=mpi_master())
+            aoden_type = denmat.rest
+            if self.scf_type != 'restricted':
+                aodens[1] = self.comm.bcast(aodens[1], root=mpi_master())
+                aoden_type = denmat.unrest
+
+            self._density = AODensityMatrix(aodens, aoden_type)
+
+            # broadcast MO
+
+            self._molecular_orbitals = self.comm.bcast(self._molecular_orbitals,
+                                                       root=mpi_master())
 
             self._scf_prop.compute_scf_prop(molecule, ao_basis,
                                             self.scf_tensors)

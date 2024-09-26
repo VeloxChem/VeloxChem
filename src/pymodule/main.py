@@ -394,10 +394,6 @@ def main():
         cube_dict = (task.input_dict['visualization']
                      if 'visualization' in task.input_dict else {})
 
-        # TODO: broadcast mol_orbs and density
-        #mol_orbs.broadcast(task.mpi_rank, task.mpi_comm)
-        #density.broadcast(task.mpi_rank, task.mpi_comm)
-
         vis_drv = VisualizationDriver(task.mpi_comm)
         vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
                           density)

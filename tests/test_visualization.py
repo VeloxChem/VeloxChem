@@ -1,5 +1,6 @@
 from pathlib import Path
 import numpy as np
+import pytest
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.cubicgrid import CubicGrid
@@ -14,6 +15,7 @@ def is_mpi_master(comm):
     return comm.Get_rank() == mpi_master()
 
 
+@pytest.mark.solvers
 class TestVisualization:
 
     def test_visualization_driver(self):
@@ -27,10 +29,6 @@ class TestVisualization:
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
         mol_orbs = scf_drv.mol_orbs
         density = scf_drv.density
-
-        # TODO: broadcast mol_orbs and density
-        #mol_orbs.broadcast(task.mpi_rank, task.mpi_comm)
-        #density.broadcast(task.mpi_rank, task.mpi_comm)
 
         grid = CubicGrid([0.3, 0.6, 0.9], [1.0, 1.0, 1.0], [2, 3, 3])
         homo = task.molecule.number_of_alpha_electrons() - 1
@@ -147,10 +145,6 @@ class TestVisualization:
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
         mol_orbs = scf_drv.mol_orbs
         density = scf_drv.density
-
-        # TODO: broadcast mol_orbs and density
-        #mol_orbs.broadcast(task.mpi_rank, task.mpi_comm)
-        #density.broadcast(task.mpi_rank, task.mpi_comm)
 
         here = Path(__file__).parent
         random_string = get_random_string_parallel()
