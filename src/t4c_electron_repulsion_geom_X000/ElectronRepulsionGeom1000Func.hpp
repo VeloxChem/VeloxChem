@@ -13,6 +13,8 @@
 #include "ElectronRepulsionGeom1000RecSSPP.hpp"
 #include "ElectronRepulsionGeom1000RecSSPD.hpp"
 #include "ElectronRepulsionGeom1000RecSSPF.hpp"
+#include "ElectronRepulsionGeom1000RecSSDD.hpp"
+#include "ElectronRepulsionGeom1000RecSSDF.hpp"
 #include "ElectronRepulsionGeom1000RecSPSS.hpp"
 #include "ElectronRepulsionGeom1000RecSPSP.hpp"
 #include "ElectronRepulsionGeom1000RecSPPP.hpp"
@@ -68,11 +70,11 @@ compute_geom_1000(T&                               distributor,
         return;
     }
     
-    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({0, 4})))
-    {
-        erirec::comp_electron_repulsion_geom_1000_sssg(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
-        return;
-    }
+//    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({0, 4})))
+//    {
+//        erirec::comp_electron_repulsion_geom_1000_sssg(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+//        return;
+//    }
 
     if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({1, 1})))
     {
@@ -111,11 +113,17 @@ compute_geom_1000(T&                               distributor,
 //        return;
 //    }
 //
-//    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({2, 2})))
-//    {
-//        erirec::comp_electron_repulsion_ssdd(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices, bra_eq_ket);
-//        return;
-//    }
+    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({2, 2})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_ssdd(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({2, 3})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_ssdf(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
 //
 //    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({2, 3})))
 //    {
@@ -1426,8 +1434,8 @@ compute_geom_1000(T&                               distributor,
 //        return;
 //    }
 
-    std::cout << " *** Integral not found in call tree :" << bra_angmoms.first << " , " << bra_angmoms.second << " , " << ket_angmoms.first << " , "
-              << ket_angmoms.second << std::endl;
+    //std::cout << " *** Integral not found in call tree :" << bra_angmoms.first << " , " << bra_angmoms.second << " , " << ket_angmoms.first << " , "
+    //          << ket_angmoms.second << std::endl;
 }
 
 }  // namespace erifunc
