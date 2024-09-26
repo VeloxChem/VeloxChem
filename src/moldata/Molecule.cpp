@@ -29,6 +29,7 @@
 #include <iterator>
 #include <ranges>
 
+#include "AtomicRadii.hpp"
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
 #include "CustomViews.hpp"
@@ -456,6 +457,82 @@ CMolecule::min_distances() const -> std::vector<double>
     });
 
     return mdists;
+}
+
+auto
+CMolecule::get_vdw_radii() const -> std::vector<double>
+{
+    std::vector<double> atomradii;
+
+    auto radii = atomicradii::buildVdwRadii();
+
+    for (int i = 0; i < number_of_atoms(); i++)
+    {
+        atomradii.push_back(radii[_identifiers[i]]);
+    }
+
+    return atomradii;
+}
+
+auto
+CMolecule::get_mk_radii() const -> std::vector<double>
+{
+    std::vector<double> atomradii;
+
+    auto mk_radii = atomicradii::buildMkRadii();
+
+    auto vdw_radii = atomicradii::buildVdwRadii();
+
+    for (int i = 0; i < number_of_atoms(); i++)
+    {
+        if (_identifiers[i] < static_cast<int>(mk_radii.size()))
+        {
+            atomradii.push_back(mk_radii[_identifiers[i]]);
+        }
+        else
+        {
+            atomradii.push_back(vdw_radii[_identifiers[i]]);
+        }
+    }
+
+    return atomradii;
+}
+
+auto
+CMolecule::get_chelpg_radii() const -> std::vector<double>
+{
+    std::vector<double> atomradii;
+
+    auto chelpg_radii = atomicradii::buildChelpgRadii();
+
+    for (int i = 0; i < number_of_atoms(); i++)
+    {
+        if (_identifiers[i] < static_cast<int>(chelpg_radii.size()))
+        {
+            atomradii.push_back(chelpg_radii[_identifiers[i]]);
+        }
+        else
+        {
+            atomradii.push_back(2.0 / units::bohr_in_angstrom());
+        }
+    }
+
+    return atomradii;
+}
+
+auto
+CMolecule::get_covalent_radii() const -> std::vector<double>
+{
+    std::vector<double> atomradii;
+
+    auto radii = atomicradii::buildCovalentRadii();
+
+    for (int i = 0; i < number_of_atoms(); i++)
+    {
+        atomradii.push_back(radii[_identifiers[i]]);
+    }
+
+    return atomradii;
 }
 
 auto

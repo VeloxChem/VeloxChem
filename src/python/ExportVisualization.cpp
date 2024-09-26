@@ -33,6 +33,7 @@
 #include <array>
 #include <vector>
 
+#include "AtomicRadii.hpp"
 #include "CubicGrid.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
@@ -106,7 +107,7 @@ export_visualization(py::module& m)
 
     PyClass<CCubicGrid>(m, "CubicGrid")
         .def(py::init<>())
-        .def(py::init<const std::array<double, 3>&, const std::array<double, 3>&, const std::array<int32_t, 3>>())
+        .def(py::init<const std::array<double, 3>&, const std::array<double, 3>&, const std::array<int, 3>>())
         .def("get_origin", &CCubicGrid::getOrigin, "Gets coordinate of the origin.")
         .def("get_step_size", &CCubicGrid::getStepSize, "Gets step size in X, Y and Z direction.")
         .def("get_num_points", &CCubicGrid::getNumPoints, "Gets number of points in X, Y and Z direction.")
@@ -147,7 +148,7 @@ export_visualization(py::module& m)
              "moidx"_a,
              "mospin"_a)
         .def("compute",
-             py::overload_cast<CCubicGrid&, const CMolecule&, const CMolecularBasis&, const CAODensityMatrix&, const int32_t, const std::string&>(
+             py::overload_cast<CCubicGrid&, const CMolecule&, const CMolecularBasis&, const CAODensityMatrix&, const int, const std::string&>(
                  &CVisualizationDriver::compute, py::const_),
              "Computes density values at cubic grid points.",
              "grid"_a,

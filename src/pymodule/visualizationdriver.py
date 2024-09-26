@@ -24,16 +24,11 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
-import h5py
 import re
 
 from .veloxchemlib import VisualizationDriver
 from .veloxchemlib import CubicGrid
-from .veloxchemlib import DenseMatrix
 from .veloxchemlib import mpi_master
-from .veloxchemlib import ao_matrix_to_veloxchem
-from .veloxchemlib import denmat
-from .aodensitymatrix import AODensityMatrix
 from .errorhandler import assert_msg_critical
 
 
@@ -53,9 +48,11 @@ def _VisualizationDriver_gen_cubic_grid(molecule, grid_points):
 
     n_x, n_y, n_z = grid_points[:3]
 
-    x = molecule.x_to_numpy()
-    y = molecule.y_to_numpy()
-    z = molecule.z_to_numpy()
+    coords = molecule.get_coordinates_in_bohr()
+
+    x = coords[:, 0]
+    y = coords[:, 1]
+    z = coords[:, 2]
 
     atom_radii = molecule.vdw_radii_to_numpy()
 
@@ -98,12 +95,14 @@ def _VisualizationDriver_write_data(cubefile, grid, molecule, flag, index,
 
     f_cube = open(str(cubefile), 'w')
 
-    x = molecule.x_to_numpy()
-    y = molecule.y_to_numpy()
-    z = molecule.z_to_numpy()
+    coords = molecule.get_coordinates_in_bohr()
+
+    x = coords[:, 0]
+    y = coords[:, 1]
+    z = coords[:, 2]
 
     natoms = molecule.number_of_atoms()
-    elem_ids = molecule.elem_ids_to_numpy()
+    elem_ids = molecule.get_identifiers()
 
     x0, y0, z0 = grid.get_origin()
     dx, dy, dz = grid.get_step_size()
@@ -208,7 +207,11 @@ def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
             cube_value = cube_value.replace('lumo', str(nelec + 1))
             orb_id = eval(cube_value) - 1
 
-            self.compute(cubic_grid, molecule, basis, mol_orbs, orb_id, spin)
+            mo_alpha_coefs = mol_orbs.alpha_to_numpy()
+            mo_beta_coefs = mol_orbs.beta_to_numpy()
+
+            self.compute(cubic_grid, molecule, basis, mo_alpha_coefs,
+                         mo_beta_coefs, orb_id, spin)
 
             if self.get_rank() == mpi_master():
                 self.write_data(fname, cubic_grid, molecule, 'mo', orb_id, spin)
@@ -219,23 +222,6 @@ def _VisualizationDriver_gen_cubes(self, cube_dict, molecule, basis, mol_orbs,
             spin = cube_value
 
             self.compute(cubic_grid, molecule, basis, density, 0, spin)
-
-            if self.get_rank() == mpi_master():
-                self.write_data(fname, cubic_grid, molecule, 'density', 0, spin)
-
-        elif cube_type == 'read_dalton':
-
-            cube_value = m.group(2).strip()
-
-            hf = h5py.File(cube_value, 'r')
-            dal_dens = DenseMatrix(np.array(hf.get('DALTON_AO_MATRIX')))
-            vlx_dens = ao_matrix_to_veloxchem(dal_dens, basis,
-                                              molecule).to_numpy()
-            read_density = AODensityMatrix([vlx_dens], denmat.rest)
-            hf.close()
-
-            spin = 'alpha'
-            self.compute(cubic_grid, molecule, basis, read_density, 0, spin)
 
             if self.get_rank() == mpi_master():
                 self.write_data(fname, cubic_grid, molecule, 'density', 0, spin)

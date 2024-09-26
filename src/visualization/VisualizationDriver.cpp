@@ -112,14 +112,19 @@ CVisualizationDriver::_compPhiAtomicOrbitals(const CMolecule&       molecule,
             {
                 case 0:
                     sphmom = spher_mom::transformation_factors<0>(isph);
+                    break;
                 case 1:
                     sphmom = spher_mom::transformation_factors<1>(isph);
+                    break;
                 case 2:
                     sphmom = spher_mom::transformation_factors<2>(isph);
+                    break;
                 case 3:
                     sphmom = spher_mom::transformation_factors<3>(isph);
+                    break;
                 case 4:
                     sphmom = spher_mom::transformation_factors<4>(isph);
+                    break;
                 default:
                     sphmom = std::vector<std::pair<int, double>>();
             }
@@ -303,14 +308,19 @@ CVisualizationDriver::computeAtomicOrbitalForGrid(CCubicGrid& grid, const CMolec
     {
         case 0:
             sphmom = spher_mom::transformation_factors<0>(isph);
+            break;
         case 1:
             sphmom = spher_mom::transformation_factors<1>(isph);
+            break;
         case 2:
             sphmom = spher_mom::transformation_factors<2>(isph);
+            break;
         case 3:
             sphmom = spher_mom::transformation_factors<3>(isph);
+            break;
         case 4:
             sphmom = spher_mom::transformation_factors<4>(isph);
+            break;
         default:
             sphmom = std::vector<std::pair<int, double>>();
     }
@@ -493,7 +503,7 @@ CVisualizationDriver::compute(CCubicGrid&             grid,
                               const CMolecule&        molecule,
                               const CMolecularBasis&  basis,
                               const CAODensityMatrix& density,
-                              const int           denidx,
+                              const int               denidx,
                               const std::string&      denspin) const
 {
     // grid information

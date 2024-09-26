@@ -191,6 +191,34 @@ class CMolecule
     /// @return The vector of distances between atoms.
     auto min_distances() const -> std::vector<double>;
 
+    /**
+     Gets VDW radii of the atoms.
+
+     @return the vector of VDW radii.
+     */
+    auto get_vdw_radii() const -> std::vector<double>;
+
+    /**
+     Gets MK radii of the atoms.
+
+     @return the vector of MK radii.
+     */
+    auto get_mk_radii() const -> std::vector<double>;
+
+    /**
+     Gets CHELPG radii of the atoms.
+
+     @return the vector of CHELPG radii.
+     */
+    auto get_chelpg_radii() const -> std::vector<double>;
+
+    /**
+     Gets covalent radii of the atoms.
+
+     @return the vector of covalent radii.
+     */
+    auto get_covalent_radii() const -> std::vector<double>;
+
    private:
     /// @brief The charge of molecule.
     double _charge{0.0};

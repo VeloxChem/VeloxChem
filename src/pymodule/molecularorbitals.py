@@ -101,36 +101,36 @@ class MolecularOrbitals:
 
     def alpha_to_numpy(self):
 
-        return self._orbitals[0]
+        return self._orbitals[0].copy()
 
     def beta_to_numpy(self):
 
         if self._orbitals_type in [molorb.rest, molorb.restopen]:
-            return self._orbitals[0]
+            return self._orbitals[0].copy()
         else:
-            return self._orbitals[1]
+            return self._orbitals[1].copy()
 
     def ea_to_numpy(self):
 
-        return self._energies[0]
+        return self._energies[0].copy()
 
     def eb_to_numpy(self):
 
         if self._orbitals_type in [molorb.rest, molorb.restopen]:
-            return self._energies[0]
+            return self._energies[0].copy()
         else:
-            return self._energies[1]
+            return self._energies[1].copy()
 
     def occa_to_numpy(self):
 
-        return self._occupations[0]
+        return self._occupations[0].copy()
 
     def occb_to_numpy(self):
 
         if self._orbitals_type == molorb.rest:
-            return self._occupations[0]
+            return self._occupations[0].copy()
         else:
-            return self._occupations[1]
+            return self._occupations[1].copy()
 
     def number_of_aos(self):
 

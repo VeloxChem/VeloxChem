@@ -30,6 +30,7 @@ from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
+from .visualizationdriver import VisualizationDriver
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .rsplinabscross import LinearAbsorptionCrossSection
@@ -222,9 +223,6 @@ def main():
         'optimize', 'response', 'pulses', 'visualization', 'loprop'
     ]
 
-    if task_type == 'visualization' and 'visualization' in task.input_dict:
-        run_scf = 'read_dalton' not in task.input_dict['visualization']['cubes']
-
     scf_type = 'restricted'
     if task_type in ['uhf', 'uscf', 'ump2']:
         scf_type = 'unrestricted'
@@ -246,7 +244,7 @@ def main():
                                       task.min_basis)
 
         mol_orbs = scf_drv.molecular_orbitals
-        #density = scf_drv.density
+        density = scf_drv.density
 
         if not scf_drv.is_converged:
             return
@@ -389,6 +387,20 @@ def main():
             opt_drv.update_settings(opt_dict)
             opt_results = opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
                                           rsp_prop.rsp_driver)
+
+    # Cube file
+
+    if task_type == 'visualization':
+        cube_dict = (task.input_dict['visualization']
+                     if 'visualization' in task.input_dict else {})
+
+        # TODO: broadcast mol_orbs and density
+        #mol_orbs.broadcast(task.mpi_rank, task.mpi_comm)
+        #density.broadcast(task.mpi_rank, task.mpi_comm)
+
+        vis_drv = VisualizationDriver(task.mpi_comm)
+        vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
+                          density)
 
     # All done
 

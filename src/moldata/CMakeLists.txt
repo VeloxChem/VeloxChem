@@ -1,5 +1,6 @@
 target_sources(vlxobjs
   PRIVATE
+    AtomicRadii.cpp
     ChemicalElement.cpp
     CoordinationNumber.cpp
     Molecule.cpp

@@ -103,6 +103,34 @@ export_moldata(py::module &m)
             "get_partial_charges",
             [](const CMolecule& self, const double net_charge) -> std::vector<double> { return parchg::getPartialCharges(self, net_charge); },
             "Gets partial charges for molecule.")
+        .def(
+            "vdw_radii_to_numpy",
+            [](const CMolecule& self) -> py::array_t<double> {
+                auto atomradii = self.get_vdw_radii();
+                return vlx_general::pointer_to_numpy(atomradii.data(), {static_cast<int>(atomradii.size())});
+            },
+            "Gets VDW radii for molecule.")
+        .def(
+            "mk_radii_to_numpy",
+            [](const CMolecule& self) -> py::array_t<double> {
+                auto atomradii = self.get_mk_radii();
+                return vlx_general::pointer_to_numpy(atomradii.data(), {static_cast<int>(atomradii.size())});
+            },
+            "Gets MK radii for molecule.")
+        .def(
+            "chelpg_radii_to_numpy",
+            [](const CMolecule& self) -> py::array_t<double> {
+                auto atomradii = self.get_chelpg_radii();
+                return vlx_general::pointer_to_numpy(atomradii.data(), {static_cast<int>(atomradii.size())});
+            },
+            "Gets CHELPG radii for molecule.")
+        .def(
+            "covalent_radii_to_numpy",
+            [](const CMolecule& self) -> py::array_t<double> {
+                auto atomradii = self.get_covalent_radii();
+                return vlx_general::pointer_to_numpy(atomradii.data(), {static_cast<int>(atomradii.size())});
+            },
+            "Gets covalent radii for molecule.")
         .def("get_masses", &CMolecule::masses, "Gets a vector of atomic masses in molecule.")
         .def("get_labels", &CMolecule::labels, "Gets a vector of atomic labels in molecule.")
         .def("get_label", &CMolecule::label, "Gets an atomic labels of specific atom in molecule.")
