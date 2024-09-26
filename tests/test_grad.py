@@ -39,3 +39,21 @@ class TestGrad:
         bas = MolecularBasis.read(mol, 'sto-3g')
 
         self.run_grad(mol, bas)
+
+    def test_c2h4_sto3g(self):
+
+        xyzstr = """
+        6
+
+        C      -0.667     -0.000     -0.000
+        C       0.667      0.000     -0.000
+        H      -1.227      0.930      0.000
+        H      -1.227     -0.930     -0.000
+        H       1.227      0.930     -0.000
+        H       1.227     -0.930      0.000
+        """
+        mol = Molecule.read_xyz_string(xyzstr)
+
+        bas = MolecularBasis.read(mol, 'sto-3g')
+
+        self.run_grad(mol, bas)
