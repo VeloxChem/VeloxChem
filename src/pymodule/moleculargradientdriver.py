@@ -80,9 +80,9 @@ class MolecularGradientDriver:
         grad_mat = np.zeros((natoms, 3))
                 
         for i in range(natoms):
-            self.comp_kin_grad(grad_mat, molecule, basis, density, i)
-            self.comp_npot_grad(grad_mat, molecule, basis, density, i)
-            self.comp_orb_grad(grad_mat, molecule, basis, wdensity, i)
+            #self.comp_kin_grad(grad_mat, molecule, basis, density, i)
+            #self.comp_npot_grad(grad_mat, molecule, basis, density, i)
+            #self.comp_orb_grad(grad_mat, molecule, basis, wdensity, i)
             self.comp_fock_grad(grad_mat, molecule, basis, density, xcfactor, omega, i)
                 
         return grad_mat

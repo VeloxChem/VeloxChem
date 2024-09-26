@@ -27,6 +27,22 @@ class TestMolecularGradientDriver:
         bas = MolecularBasis.read(mol, 'sto-3g')
 
         return mol, bas
+        
+    def get_data_c2h4(self):
+
+        c2h4str = """
+            C             -0.667        -0.000        -0.000
+            C              0.667         0.000        -0.000
+            H             -1.227         0.930         0.000
+            H             -1.227        -0.930        -0.000
+            H              1.227         0.930        -0.000
+            H              1.227        -0.930         0.000
+        """
+
+        mol = Molecule.read_str(c2h4str, 'angstrom')
+        bas = MolecularBasis.read(mol, 'sto-3g')
+
+        return mol, bas
 
     def test_h2o_mpi_comp_electronic_grad(self):
     
@@ -80,6 +96,29 @@ class TestMolecularGradientDriver:
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.sto3g.electronic.gradient.npy')
         ref_grad = np.load(npyfile)
+        
+        assert np.allclose(ref_grad, mol_grad, 1.0e-12, 1.0e-12, False)
+        
+    def test_c2h4_comp_electronic_grad(self):
+
+        mol_c2h4, bas_sto3g = self.get_data_c2h4()
+
+        # load density matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'c2h4.sto3g.density.npy')
+        den_mat = np.load(npyfile)
+        
+        # load weighted density matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'c2h4.sto3g.energy.weighted.density.npy')
+        wden_mat = np.load(npyfile)
+        
+        grad_drv = MolecularGradientDriver()
+        mol_grad = grad_drv.comp_electronic_grad(mol_c2h4, bas_sto3g, den_mat, wden_mat, 0.0, 0.0)
+        
+        print(mol_grad)
+        
+        assert False
         
         assert np.allclose(ref_grad, mol_grad, 1.0e-12, 1.0e-12, False)
 
