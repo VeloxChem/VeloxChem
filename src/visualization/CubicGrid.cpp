@@ -43,7 +43,7 @@ CCubicGrid::CCubicGrid()
 {
 }
 
-CCubicGrid::CCubicGrid(const std::array<double, 3>& origin, const std::array<double, 3>& stepSize, const std::array<int32_t, 3>& numPoints)
+CCubicGrid::CCubicGrid(const std::array<double, 3>& origin, const std::array<double, 3>& stepSize, const std::array<int, 3>& numPoints)
 
     : _origin(origin)
 
@@ -154,7 +154,7 @@ CCubicGrid::getStepSize() const
     return _stepSize;
 }
 
-std::array<int32_t, 3>
+std::array<int, 3>
 CCubicGrid::getNumPoints() const
 {
     return _numPoints;
@@ -179,7 +179,7 @@ CCubicGrid::setValues(const std::vector<double> vals)
 
     auto npoints = _numPoints[0] * _numPoints[1] * _numPoints[2];
 
-    errors::assertMsgCritical(npoints == static_cast<int32_t>(vals.size()), errmsg);
+    errors::assertMsgCritical(npoints == static_cast<int>(vals.size()), errmsg);
 
     std::memcpy(_values.data(), vals.data(), npoints * sizeof(double));
 }

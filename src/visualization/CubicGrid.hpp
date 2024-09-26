@@ -50,7 +50,7 @@ class CCubicGrid
     /**
      Number of points in three dimensions.
      */
-    std::array<int32_t, 3> _numPoints;
+    std::array<int, 3> _numPoints;
 
     /**
      Values at the grid points.
@@ -67,7 +67,7 @@ class CCubicGrid
      Creates a cubic grid object from origin, step size, and
      number of points.
      */
-    CCubicGrid(const std::array<double, 3>& origin, const std::array<double, 3>& stepSize, const std::array<int32_t, 3>& numPoints);
+    CCubicGrid(const std::array<double, 3>& origin, const std::array<double, 3>& stepSize, const std::array<int, 3>& numPoints);
 
     /**
      Creates a cubic grid object by copying other cubic grid object.
@@ -137,7 +137,7 @@ class CCubicGrid
 
      @return number of points in X, Y and Z direction.
      */
-    std::array<int32_t, 3> getNumPoints() const;
+    std::array<int, 3> getNumPoints() const;
 
     /**
      Gets constant pointer to first element of cubic grid values.
