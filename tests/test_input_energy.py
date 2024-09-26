@@ -1,6 +1,7 @@
 from mpi4py import MPI
 from pathlib import Path
 from unittest.mock import patch
+import pytest
 import sys
 
 from veloxchem.veloxchemlib import mpi_master
@@ -16,6 +17,7 @@ def mpi_barrier():
     MPI.COMM_WORLD.barrier()
 
 
+@pytest.mark.solvers
 class TestInputEnergy:
 
     def create_input_file(self, lines, fname):

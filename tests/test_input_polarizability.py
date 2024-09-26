@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 from random import choice
 import numpy as np
+import pytest
 import sys
 
 from veloxchem.veloxchemlib import mpi_master
@@ -18,6 +19,7 @@ def mpi_barrier():
     MPI.COMM_WORLD.barrier()
 
 
+@pytest.mark.solvers
 class TestInputPolarizability:
 
     def create_input_file(self, lines, fname):
