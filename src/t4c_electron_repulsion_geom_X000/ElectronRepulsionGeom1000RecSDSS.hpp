@@ -78,7 +78,25 @@ comp_electron_repulsion_geom_1000_sdss(T&                               distribu
     const auto d_indices = ket_gto_pair_block.ket_orbital_indices();
 
     const auto ket_npgtos = ket_gto_pair_block.number_of_primitive_pairs();
-
+    
+    std::cout << " ** BRA PAIRS **" << std::endl;
+    
+    for (size_t i = bra_indices.first; i < bra_indices.second; i++)
+    {
+        std::cout << "(" << a_indices[i+1] << "," << b_indices[i+1] << ") ";
+    }
+    
+    std::cout << std::endl;
+    
+    std::cout << " ** KET PAIRS **" << std::endl;
+    
+    for (size_t i = ket_indices.first; i < ket_indices.second; i++)
+    {
+        std::cout << "(" << c_indices[i+1] << "," << d_indices[i+1] << ") ";
+    }
+    
+    std::cout << std::endl;
+    
     // allocate aligned 2D arrays for ket side
 
     CSimdArray<double> pfactors(23, ket_npgtos);
@@ -120,6 +138,8 @@ comp_electron_repulsion_geom_1000_sdss(T&                               distribu
     for (size_t i = 0; i < ket_blocks; i++)
     {
         auto ket_range = batch::batch_range(i, ket_dim, simd::width<double>(), ket_indices.first);
+        
+       // std::cout << "*** BLOCK : " << i << " -> " << ket_range.first << " , " << ket_range.second << std::endl;
 
         pfactors.load(c_vec_exps, ket_range, 0, ket_npgtos);
 
@@ -309,11 +329,11 @@ comp_electron_repulsion_geom_1000_sdss(T&                               distribu
 
                                 auto tint_z = sbuffer.data(idx + 2 * tcomps);
 
-                                std::cout << k * adim + a_indices[j + 1] << " " << l * bdim + b_indices[j + 1];
+                                //std::cout << k * adim + a_indices[j + 1] << " " << l * bdim + b_indices[j + 1];
 
-                                std::cout << " " << m * cdim + c_indices[ket_indices.first + p + 1] << " " << n * ddim + d_indices[ket_indices.first + p + 1];
+                                //std::cout << " " << m * cdim + c_indices[ket_range.first + p + 1] << " " << n * ddim + d_indices[ket_range.first + p + 1];
 
-                                std::cout << " " << tint_x[p] << " " << tint_y[p] << " " << tint_z[p] << std::endl;
+                                //std::cout << " " << tint_x[p] << " " << tint_y[p] << " " << tint_z[p] << std::endl;
                             }
                         }
                     }
