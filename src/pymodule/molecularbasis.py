@@ -279,8 +279,6 @@ def _MolecularBasis_read(molecule,
 
     mol_basis = MolecularBasis()
 
-    all_basis_set_names = []
-
     for idx, elem_id in enumerate(molecule.get_identifiers()):
         if basis_name.upper() == 'AO-START-GUESS':
             atom_bas_label = basis_name.upper()
@@ -295,14 +293,6 @@ def _MolecularBasis_read(molecule,
                                       elem_id, atom_bas_label)
 
         mol_basis.add(atom_basis)
-
-        if atom_bas_label not in all_basis_set_names:
-            all_basis_set_names.append(atom_bas_label)
-
-    if len(all_basis_set_names) == 1:
-        mol_basis.set_label(all_basis_set_names[0])
-    else:
-        mol_basis.set_label('MIXED-BASIS-SETS')
 
     ostream.print_block(mol_basis.info_str('Atomic Basis'))
     ostream.flush()

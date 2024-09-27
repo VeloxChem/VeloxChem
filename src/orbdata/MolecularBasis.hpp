@@ -21,8 +21,7 @@ class CMolecularBasis
     /// atom bases indices.
     /// @param basis_sets The vector of unique atom bases.
     /// @param indices The vector of atom bases indices.
-    /// @param label The name of molecular basis.
-    CMolecularBasis(const std::vector<CAtomBasis> &basis_sets, const std::vector<int> &indices, const std::string &label);
+    CMolecularBasis(const std::vector<CAtomBasis> &basis_sets, const std::vector<int> &indices);
 
     /// @brief The default copy constructor.
     /// @param other The molecular basis to be copied.
@@ -232,18 +231,8 @@ class CMolecularBasis
     /// @return The number of primitive atomic orbitals.
     auto dimensions_of_primitive_basis() const -> size_t;
 
-    /**
-     Sets name of molecular basis.
-
-     @param label the name of molecular basis.
-     */
-    void set_label(const std::string& label);
-
-    /**
-     Gets name of molecular basis.
-
-     @return the name of molecular basis.
-     */
+    /// @brief Gets name of molecular basis.
+    /// @return the name of molecular basis.
     std::string get_label() const;
 
     /// @brief Creates map indices for basis functions with specific angular
@@ -276,9 +265,6 @@ class CMolecularBasis
 
     /// @brief The vector of atom basis sets indices.
     std::vector<int> _indices;
-
-    /// @breif The name of molecular basis.
-    std::string _label;
 
     /// @brief Gets atom basis labels frequency map.
     /// @return The labels frequency map.

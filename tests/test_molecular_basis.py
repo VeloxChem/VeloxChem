@@ -161,6 +161,7 @@ class TestMolecularBasis:
 
         h2o = self.get_h2o()
         a_basis = MolecularBasis.read(h2o, 'DEF2-SVP', ostream=None)
+        assert a_basis.get_label() == 'DEF2-SVP'
         b_basis = self.get_h2o_svp()
         assert a_basis == b_basis
 
@@ -172,6 +173,7 @@ class TestMolecularBasis:
                                            'DEF2-SVP',
                                            bdict,
                                            ostream=None)
+        assert a_basis.get_label() == 'MIXED-BASIS-SETS'
         b_basis = self.get_h2o_mixed()
         assert a_basis == b_basis
 
@@ -787,6 +789,7 @@ class TestMolecularBasis:
         a_basis = None
         if comm.Get_rank() == 0:
             a_basis = self.get_h2o_svp()
+            assert a_basis.get_label() == 'DEF2-SVP'
         a_basis = comm.bcast(a_basis)
         b_basis = self.get_h2o_svp()
         assert a_basis == b_basis
