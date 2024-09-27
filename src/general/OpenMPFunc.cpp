@@ -101,7 +101,7 @@ make_diag_work_group(const std::vector<CGtoPairBlock>& gto_pair_blocks) -> std::
             
             if (bsize < simd::width<double>()) bsize = simd::width<double>();
             
-            if (const auto mbsize = omp::max_block_size(); bsize > mbsize) bsize = mbsize; 
+            //if (const auto mbsize = omp::max_block_size(); bsize > mbsize) bsize = mbsize; 
             
             const auto bblocks = batch::number_of_batches(gp_size, bsize);
             
@@ -140,7 +140,7 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
                 
                 auto bra_bsize = omp::angular_momentum_scale(bra_angpair) * simd::width<double>();
                 
-                if (const auto mbsize = omp::max_block_size(); bra_bsize > mbsize) bra_bsize = mbsize;
+                //if (const auto mbsize = omp::max_block_size(); bra_bsize > mbsize) bra_bsize = mbsize;
                 
                 const auto bra_blocks = batch::number_of_batches(bra_size, bra_bsize);
                 
@@ -156,7 +156,7 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
                     
                     auto ket_bsize = omp::angular_momentum_scale(ket_angpair) * simd::width<double>();
                     
-                    if (const auto mbsize = omp::max_block_size(); ket_bsize > mbsize) ket_bsize = mbsize; 
+                    //if (const auto mbsize = omp::max_block_size(); ket_bsize > mbsize) ket_bsize = mbsize; 
                     
                     const auto ket_blocks = batch::number_of_batches(ket_size, ket_bsize);
                     
@@ -251,13 +251,16 @@ angular_momentum_scale(const std::pair<int, int>& ang_pair) -> size_t
 {
     const auto angmom = ang_pair.first + ang_pair.second;
     
-    if (angmom > 8) return 32;
-    
-    if (angmom > 4) return 64;
+    if (angmom > 8) return 8;
+
+    if (angmom > 6) return 16;
+
+    if (angmom > 4) return 32;
+
+    if (angmom > 2) return 64;
     
     return 128;
 }
-
 
 auto
 partition_atoms(const int natoms, const int rank, const int nodes) -> std::vector<int>
