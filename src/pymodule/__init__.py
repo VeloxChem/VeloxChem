@@ -48,7 +48,6 @@ from .veloxchemlib import NuclearPotentialGeom110Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
 from .veloxchemlib import T4CScreener
-from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import FockGeom1000Driver
 
 # C++ functions
@@ -106,6 +105,7 @@ from .matrices import Matrices
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
+from .aodensitymatrix import AODensityMatrix
 from .fockdriver import FockDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver

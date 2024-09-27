@@ -29,6 +29,7 @@ import math
 import sys
 
 from .veloxchemlib import tensor_order
+from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
@@ -371,6 +372,59 @@ class MolecularOrbitals:
             errmsg = "MolecularOrbitals.get_density: "
             errmsg += " Invalid molecular orbitals type"
             assert_msg_critical(False, errmsg)
+
+    def broadcast(self, comm, root=mpi_master()):
+        """
+        Broadcasts the molecular orbitals object.
+
+        :param comm:
+            The MPI communicator.
+        :param root:
+            The root rank to broadcast from.
+
+        :return:
+            The molecular orbitals object.
+        """
+
+        mo_occs = []
+        mo_coefs = []
+        mo_enes = []
+
+        mo_type = comm.bcast(self._orbitals_type, root=root)
+
+        if comm.Get_rank() == root:
+            mo_occs.append(self._occupations[0])
+            mo_coefs.append(self._orbitals[0])
+            mo_enes.append(self._energies[0])
+
+            if mo_type != molorb.rest:
+                mo_occs.append(self._occupations[1])
+                if mo_type == molorb.unrest:
+                    mo_coefs.append(self._orbitals[1])
+                    mo_enes.append(self._energies[1])
+
+        else:
+            mo_occs.append(None)
+            mo_coefs.append(None)
+            mo_enes.append(None)
+
+            if mo_type != molorb.rest:
+                mo_occs.append(None)
+                if mo_type == molorb.unrest:
+                    mo_coefs.append(None)
+                    mo_enes.append(None)
+
+        mo_coefs[0] = comm.bcast(mo_coefs[0], root=root)
+        mo_enes[0] = comm.bcast(mo_enes[0], root=root)
+        mo_occs[0] = comm.bcast(mo_occs[0], root=root)
+
+        if mo_type != molorb.rest:
+            mo_occs[1] = comm.bcast(mo_occs[1], root=root)
+            if mo_type == molorb.unrest:
+                mo_coefs[1] = comm.bcast(mo_coefs[1], root=root)
+                mo_enes[1] = comm.bcast(mo_enes[1], root=root)
+
+        return MolecularOrbitals(mo_coefs, mo_enes, mo_occs, mo_type)
 
     def write_hdf5(self, fname, nuclear_charges=None, basis_set=None):
         """

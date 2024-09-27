@@ -40,7 +40,7 @@ from .veloxchemlib import rotatory_strength_in_cgs
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals, molorb
-#from .visualizationdriver import VisualizationDriver
+from .visualizationdriver import VisualizationDriver
 from .sanitychecks import dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
@@ -2032,9 +2032,11 @@ class LinearSolver:
 
             self.ostream.print_info('  lambda: {:.4f}'.format(lam_diag[i_nto]))
 
+            nto_coefs = nto_mo.alpha_to_numpy()
+
             # hole
             ind_occ = nocc - i_nto - 1
-            vis_drv.compute(cubic_grid, molecule, basis, nto_mo, ind_occ,
+            vis_drv.compute(cubic_grid, molecule, basis, nto_coefs, ind_occ,
                             'alpha')
 
             if self.rank == mpi_master():
@@ -2050,7 +2052,7 @@ class LinearSolver:
 
             # electron
             ind_vir = nocc + i_nto
-            vis_drv.compute(cubic_grid, molecule, basis, nto_mo, ind_vir,
+            vis_drv.compute(cubic_grid, molecule, basis, nto_coefs, ind_vir,
                             'alpha')
 
             if self.rank == mpi_master():

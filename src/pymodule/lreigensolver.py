@@ -29,19 +29,20 @@ import numpy as np
 import time as tm
 import sys
 
+from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import XCFunctional, MolecularGrid
-from .veloxchemlib import AODensityMatrix, denmat
-from .veloxchemlib import mpi_master, hartree_in_ev
 from .veloxchemlib import (mpi_master, rotatory_strength_in_cgs, hartree_in_ev,
                            hartree_in_inverse_nm, fine_structure_constant,
                            extinction_coefficient_from_beta)
+from .veloxchemlib import denmat
+from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .molecularorbitals import MolecularOrbitals
-#from .visualizationdriver import VisualizationDriver
-#from .cubicgrid import CubicGrid
+from .visualizationdriver import VisualizationDriver
+from .cubicgrid import CubicGrid
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check)
 from .errorhandler import assert_msg_critical
@@ -95,7 +96,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         self.nto = False
         self.nto_pairs = None
-        self.nto_cubes = True
+        self.nto_cubes = False
         self.detach_attach = False
         self.cube_origin = None
         self.cube_stepsize = None
@@ -292,7 +293,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
             iter_start_time = tm.time()
 
-            profiler.set_timing_key(f'Iteration {iteration+1}')
+            profiler.set_timing_key(f'Iteration {iteration + 1}')
 
             profiler.start_timer('ReducedSpace')
 
@@ -515,7 +516,7 @@ class LinearResponseEigenSolver(LinearSolver):
             elec_trans_dipoles = np.zeros((self.nstates, 3))
             velo_trans_dipoles = np.zeros((self.nstates, 3))
             magn_trans_dipoles = np.zeros((self.nstates, 3))
-            """
+
             if self.rank == mpi_master():
                 # create h5 file for response solutions
                 if (self.save_solutions and self.checkpoint_file is not None):
@@ -529,7 +530,6 @@ class LinearResponseEigenSolver(LinearSolver):
             nto_h5_files = []
             nto_cube_files = []
             dens_cube_files = []
-            """
 
             excitation_details = []
 
@@ -550,7 +550,7 @@ class LinearResponseEigenSolver(LinearSolver):
                         mo_vir = scf_tensors['C_alpha'][:, nocc:]
                         z_mat = eigvec[:eigvec.size // 2].reshape(nocc, -1)
                         y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
-                """
+
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
                     if self.cube_origin is None or self.cube_stepsize is None:
@@ -581,12 +581,12 @@ class LinearResponseEigenSolver(LinearSolver):
                                                   mo_vir.shape[1])
                         nto_lambdas.append(nto_lam[lam_start:lam_end])
 
-                        nto_h5_fname = f'{base_fname}_S{s+1}_NTO.h5'
+                        nto_h5_fname = f'{base_fname}_S{s + 1}_NTO.h5'
                         nto_mo.write_hdf5(nto_h5_fname)
                         nto_h5_files.append(nto_h5_fname)
                     else:
                         nto_mo = MolecularOrbitals()
-                    nto_mo.broadcast(self.rank, self.comm)
+                    nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
 
                     if self.nto_cubes:
                         lam_diag, nto_cube_fnames = self.write_nto_cubes(
@@ -608,7 +608,7 @@ class LinearResponseEigenSolver(LinearSolver):
                         dens_DA = AODensityMatrix([dens_D, dens_A], denmat.rest)
                     else:
                         dens_DA = AODensityMatrix()
-                    dens_DA.broadcast(self.rank, self.comm)
+                    dens_DA = dens_DA.broadcast(self.comm, root=mpi_master())
 
                     dens_cube_fnames = self.write_detach_attach_cubes(
                         cubic_grid, molecule, basis, s, dens_DA)
@@ -617,16 +617,6 @@ class LinearResponseEigenSolver(LinearSolver):
                         dens_cube_files.append(dens_cube_fnames)
 
                 if self.esa:
-                    dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-                    dipole_matrices = dipole_drv.compute(molecule, basis)
-
-                    if self.rank == mpi_master():
-                        dipole_integrals = (dipole_matrices.x_to_numpy(),
-                                            dipole_matrices.y_to_numpy(),
-                                            dipole_matrices.z_to_numpy())
-                    else:
-                        dipole_integrals = None
-
                     if self.esa_from_state is None:
                         source_states = list(range(self.nstates))
                     else:
@@ -638,8 +628,8 @@ class LinearResponseEigenSolver(LinearSolver):
 
                     if self.rank == mpi_master():
                         esa_results = []
-                    else:
-                        esa_results = None
+                        dipole_integrals = compute_electric_dipole_integrals(
+                            molecule, basis, [0.0, 0.0, 0.0])
 
                     for s_1, s_2 in esa_pairs:
                         eigvec_1 = self.get_full_solution_vector(
@@ -669,7 +659,6 @@ class LinearResponseEigenSolver(LinearSolver):
                                     [mo_vir, y_mat_1.T, y_mat_2, mo_vir.T]))
 
                             esa_trans_dipole = np.array([
-                                -1.0 *
                                 np.sum(esa_trans_dens * dipole_integrals[i])
                                 for i in range(3)
                             ])
@@ -685,7 +674,6 @@ class LinearResponseEigenSolver(LinearSolver):
                                 'oscillator_strength': esa_osc_str,
                                 'transition_dipole': esa_trans_dipole,
                             })
-                """
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
@@ -695,13 +683,12 @@ class LinearResponseEigenSolver(LinearSolver):
                             lmom_grad[ind], eigvec) / (-eigvals[s])
                         magn_trans_dipoles[s, ind] = np.vdot(
                             mdip_grad[ind], eigvec)
-                    """
+
                     # write to h5 file for response solutions
                     if (self.save_solutions and
                             self.checkpoint_file is not None):
                         write_rsp_solution(final_h5_fname,
                                            'S{:d}'.format(s + 1), eigvec)
-                    """
 
                     # save excitation details
                     excitation_details.append(
@@ -730,7 +717,7 @@ class LinearResponseEigenSolver(LinearSolver):
                         'rotatory_strengths': rot_vel,
                         'excitation_details': excitation_details,
                     }
-                    """
+
                     if self.nto:
                         ret_dict['nto_lambdas'] = nto_lambdas
                         ret_dict['nto_h5_files'] = nto_h5_files
@@ -749,7 +736,6 @@ class LinearResponseEigenSolver(LinearSolver):
                         checkpoint_text += final_h5_fname
                         self.ostream.print_info(checkpoint_text)
                         self.ostream.print_blank()
-                    """
 
                     self._print_results(ret_dict)
 

@@ -34,15 +34,16 @@ from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import (compute_linear_momentum_integrals,
                            compute_angular_momentum_integrals)
 from .veloxchemlib import XCFunctional, MolecularGrid
-from .veloxchemlib import AODensityMatrix, denmat
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
+from .veloxchemlib import denmat
+from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .linearsolver import LinearSolver
 from .blockdavidson import BlockDavidsonSolver
 from .molecularorbitals import MolecularOrbitals
-#from .visualizationdriver import VisualizationDriver
-#from .cubicgrid import CubicGrid
+from .visualizationdriver import VisualizationDriver
+from .cubicgrid import CubicGrid
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check)
 from .errorhandler import assert_msg_critical
@@ -104,7 +105,7 @@ class TdaEigenSolver(LinearSolver):
         # NTO and detachment/attachment density
         self.nto = False
         self.nto_pairs = None
-        self.nto_cubes = True
+        self.nto_cubes = False
         self.detach_attach = False
         self.cube_origin = None
         self.cube_stepsize = None
@@ -420,7 +421,7 @@ class TdaEigenSolver(LinearSolver):
                     nto_h5_files.append(nto_h5_fname)
                 else:
                     nto_mo = MolecularOrbitals()
-                nto_mo.broadcast(self.rank, self.comm)
+                nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
 
                 if self.nto_cubes:
                     lam_diag, nto_cube_fnames = self.write_nto_cubes(
@@ -441,7 +442,7 @@ class TdaEigenSolver(LinearSolver):
                     dens_DA = AODensityMatrix([dens_D, dens_A], denmat.rest)
                 else:
                     dens_DA = AODensityMatrix()
-                dens_DA.broadcast(self.rank, self.comm)
+                dens_DA = dens_DA.broadcast(self.comm, root=mpi_master())
 
                 dens_cube_fnames = self.write_detach_attach_cubes(
                     cubic_grid, molecule, basis, s, dens_DA)

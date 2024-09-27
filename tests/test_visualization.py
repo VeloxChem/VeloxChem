@@ -28,9 +28,12 @@ class TestVisualization:
 
         scf_results = scf_drv.compute(task.molecule, task.ao_basis,
                                       task.min_basis)
-        scf_drv.broadcast_mo_and_density(scf_results)
+
         mol_orbs = scf_drv.molecular_orbitals
         density = scf_drv.density
+
+        mol_orbs = mol_orbs.broadcast(task.mpi_comm, root=mpi_master())
+        density = density.broadcast(task.mpi_comm, root=mpi_master())
 
         grid = CubicGrid([0.3, 0.6, 0.9], [1.0, 1.0, 1.0], [2, 3, 3])
         homo = task.molecule.number_of_alpha_electrons() - 1
@@ -145,9 +148,12 @@ class TestVisualization:
 
         scf_results = scf_drv.compute(task.molecule, task.ao_basis,
                                       task.min_basis)
-        scf_drv.broadcast_mo_and_density(scf_results)
+
         mol_orbs = scf_drv.molecular_orbitals
         density = scf_drv.density
+
+        mol_orbs = mol_orbs.broadcast(task.mpi_comm, root=mpi_master())
+        density = density.broadcast(task.mpi_comm, root=mpi_master())
 
         here = Path(__file__).parent
         random_string = get_random_string_parallel()

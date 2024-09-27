@@ -35,11 +35,12 @@ from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import OverlapDriver, KineticEnergyDriver
 from .veloxchemlib import FockDriver, T4CScreener
 from .veloxchemlib import GridDriver, XCIntegrator
-from .veloxchemlib import AODensityMatrix, Matrices
+from .veloxchemlib import Matrices
 from .veloxchemlib import make_matrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat, mat_t
 from .veloxchemlib import xcfun
+from .aodensitymatrix import AODensityMatrix
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -1265,6 +1266,7 @@ class ScfDriver:
 
             else:
                 self._scf_tensors = None
+                self._density = AODensityMatrix()
 
             self._scf_prop.compute_scf_prop(molecule, ao_basis,
                                             self.scf_tensors)
@@ -1279,69 +1281,6 @@ class ScfDriver:
             self._print_scf_finish(diis_start_time)
 
         profiler.check_memory_usage('End of SCF')
-
-    def broadcast_mo_and_density(self, scf_results):
-        """
-        Broadcasts MO and density.
-
-        :param scf_results:
-            The dictionary containing converged SCF results.
-        """
-
-        ao_dens = []
-        mo_occs = []
-        mo_coefs = []
-        mo_enes = []
-
-        if self.rank == mpi_master():
-            ao_dens.append(scf_results['D_alpha'])
-            mo_occs.append(scf_results['occ_alpha'])
-            mo_coefs.append(scf_results['C_alpha'])
-            mo_enes.append(scf_results['E_alpha'])
-
-            if self.scf_type != 'restricted':
-                ao_dens.append(scf_results['D_beta'])
-                mo_occs.append(scf_results['occ_beta'])
-                if self.scf_type == 'unrestricted':
-                    mo_coefs.append(scf_results['C_beta'])
-                    mo_enes.append(scf_results['E_beta'])
-
-        else:
-            ao_dens.append(None)
-            mo_occs.append(None)
-            mo_coefs.append(None)
-            mo_enes.append(None)
-
-            if self.scf_type != 'restricted':
-                ao_dens.append(None)
-                mo_occs.append(None)
-                if self.scf_type == 'unrestricted':
-                    mo_coefs.append(None)
-                    mo_enes.append(None)
-
-        ao_dens[0] = self.comm.bcast(ao_dens[0], root=mpi_master())
-        ao_den_type = denmat.rest
-
-        mo_coefs[0] = self.comm.bcast(mo_coefs[0], root=mpi_master())
-        mo_enes[0] = self.comm.bcast(mo_enes[0], root=mpi_master())
-        mo_occs[0] = self.comm.bcast(mo_occs[0], root=mpi_master())
-        mo_type = molorb.rest
-
-        if self.scf_type != 'restricted':
-            ao_dens[1] = self.comm.bcast(ao_dens[1], root=mpi_master())
-            ao_den_type = denmat.unrest
-
-            mo_occs[1] = self.comm.bcast(mo_occs[1], root=mpi_master())
-            if self.scf_type == 'unrestricted':
-                mo_coefs[1] = self.comm.bcast(mo_coefs[1], root=mpi_master())
-                mo_enes[1] = self.comm.bcast(mo_enes[1], root=mpi_master())
-                mo_type = molorb.unrest
-            else:
-                mo_type = molorb.restopen
-
-        self._density = AODensityMatrix(ao_dens, ao_den_type)
-        self._molecular_orbitals = MolecularOrbitals(mo_coefs, mo_enes, mo_occs,
-                                                     mo_type)
 
     def _need_graceful_exit(self, iter_in_hours):
         """
