@@ -13,9 +13,20 @@
 #include "ElectronRepulsionGeom1000RecSSPP.hpp"
 #include "ElectronRepulsionGeom1000RecSSPD.hpp"
 #include "ElectronRepulsionGeom1000RecSSPF.hpp"
+#include "ElectronRepulsionGeom1000RecSSDD.hpp"
+#include "ElectronRepulsionGeom1000RecSSDF.hpp"
+#include "ElectronRepulsionGeom1000RecSSFF.hpp"
 #include "ElectronRepulsionGeom1000RecSPSS.hpp"
 #include "ElectronRepulsionGeom1000RecSPSP.hpp"
+#include "ElectronRepulsionGeom1000RecSPSD.hpp"
+#include "ElectronRepulsionGeom1000RecSPSF.hpp"
 #include "ElectronRepulsionGeom1000RecSPPP.hpp"
+#include "ElectronRepulsionGeom1000RecSPPD.hpp"
+#include "ElectronRepulsionGeom1000RecSPPF.hpp"
+#include "ElectronRepulsionGeom1000RecSPDD.hpp"
+#include "ElectronRepulsionGeom1000RecSPDF.hpp"
+#include "ElectronRepulsionGeom1000RecSPFF.hpp"
+#include "ElectronRepulsionGeom1000RecSDSS.hpp"
 #include "ElectronRepulsionGeom1000RecPPSS.hpp"
 #include "ElectronRepulsionGeom1000RecPPSP.hpp"
 #include "ElectronRepulsionGeom1000RecPPPP.hpp"
@@ -68,11 +79,11 @@ compute_geom_1000(T&                               distributor,
         return;
     }
     
-    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({0, 4})))
-    {
-        erirec::comp_electron_repulsion_geom_1000_sssg(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
-        return;
-    }
+//    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({0, 4})))
+//    {
+//        erirec::comp_electron_repulsion_geom_1000_sssg(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+//        return;
+//    }
 
     if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({1, 1})))
     {
@@ -111,11 +122,24 @@ compute_geom_1000(T&                               distributor,
 //        return;
 //    }
 //
-//    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({2, 2})))
-//    {
-//        erirec::comp_electron_repulsion_ssdd(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices, bra_eq_ket);
-//        return;
-//    }
+    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({2, 2})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_ssdd(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({2, 3})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_ssdf(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({3, 3})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_ssff(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
 //
 //    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({2, 3})))
 //    {
@@ -159,6 +183,19 @@ compute_geom_1000(T&                               distributor,
         return;
     }
     
+    if ((bra_angmoms == std::pair<int, int>({0, 1})) && (ket_angmoms == std::pair<int, int>({0, 2})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_spsd(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({0, 1})) && (ket_angmoms == std::pair<int, int>({0, 3})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_spsf(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    
     if ((bra_angmoms == std::pair<int, int>({1, 0})) && (ket_angmoms == std::pair<int, int>({0, 0})))
     {
         erirec::comp_electron_repulsion_geom_1000_psss(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
@@ -199,6 +236,36 @@ compute_geom_1000(T&                               distributor,
     if ((bra_angmoms == std::pair<int, int>({0, 1})) && (ket_angmoms == std::pair<int, int>({1, 1})))
     {
         erirec::comp_electron_repulsion_geom_1000_sppp(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({0, 1})) && (ket_angmoms == std::pair<int, int>({1, 2})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_sppd(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({0, 1})) && (ket_angmoms == std::pair<int, int>({1, 3})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_sppf(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({0, 1})) && (ket_angmoms == std::pair<int, int>({2, 2})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_spdd(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({0, 1})) && (ket_angmoms == std::pair<int, int>({2, 3})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_spdf(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({0, 1})) && (ket_angmoms == std::pair<int, int>({3, 3})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_spff(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
         return;
     }
 //
@@ -256,11 +323,11 @@ compute_geom_1000(T&                               distributor,
 //        return;
 //    }
 //
-//    if ((bra_angmoms == std::pair<int, int>({0, 2})) && (ket_angmoms == std::pair<int, int>({0, 0})))
-//    {
-//        erirec::comp_electron_repulsion_sdss(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices, bra_eq_ket);
-//        return;
-//    }
+   if ((bra_angmoms == std::pair<int, int>({0, 2})) && (ket_angmoms == std::pair<int, int>({0, 0})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_sdss(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
 //
 //    if ((bra_angmoms == std::pair<int, int>({0, 2})) && (ket_angmoms == std::pair<int, int>({0, 1})))
 //    {
@@ -1426,8 +1493,8 @@ compute_geom_1000(T&                               distributor,
 //        return;
 //    }
 
-    std::cout << " *** Integral not found in call tree :" << bra_angmoms.first << " , " << bra_angmoms.second << " , " << ket_angmoms.first << " , "
-              << ket_angmoms.second << std::endl;
+    //std::cout << " *** Integral not found in call tree :" << bra_angmoms.first << " , " << bra_angmoms.second << " , " << ket_angmoms.first << " , "
+    //          << ket_angmoms.second << std::endl;
 }
 
 }  // namespace erifunc
