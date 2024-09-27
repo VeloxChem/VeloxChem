@@ -161,9 +161,9 @@ export_orbdata(py::module &m)
     PyClass<CMolecularBasis>(m, "MolecularBasis")
         .def(py::init<>())
         .def(py::init<const CMolecularBasis &>())
-        .def(py::init<const std::vector<CAtomBasis> &, const std::vector<int> &>())
-        .def(py::pickle([](const CMolecularBasis &mbas) { return py::make_tuple(mbas.basis_sets(), mbas.basis_sets_indices()); },
-                        [](py::tuple t) { return CMolecularBasis(t[0].cast<std::vector<CAtomBasis>>(), t[1].cast<std::vector<int>>()); }))
+        .def(py::init<const std::vector<CAtomBasis> &, const std::vector<int> &, const std::string &>())
+        .def(py::pickle([](const CMolecularBasis &mbas) { return py::make_tuple(mbas.basis_sets(), mbas.basis_sets_indices(), mbas.get_label()); },
+                        [](py::tuple t) { return CMolecularBasis(t[0].cast<std::vector<CAtomBasis>>(), t[1].cast<std::vector<int>>(), t[2].cast<std::string>()); }))
         .def("add", &CMolecularBasis::add, "Adds atomic basis to molecular basis.")
         .def("slice", &CMolecularBasis::slice, "Slices fraction of molecular basis for specific atoms.")
         .def("reduce_to_valence_basis", &CMolecularBasis::reduce_to_valence_basis, "Reduces molecular basis to it's valence only form.")

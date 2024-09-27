@@ -15,14 +15,18 @@ CMolecularBasis::CMolecularBasis()
     : _basis_sets{}
 
     , _indices{}
+
+    , _label(std::string(""))
 {
 }
 
-CMolecularBasis::CMolecularBasis(const std::vector<CAtomBasis> &basis_sets, const std::vector<int> &indices)
+CMolecularBasis::CMolecularBasis(const std::vector<CAtomBasis> &basis_sets, const std::vector<int> &indices, const std::string &label)
 
     : _basis_sets(basis_sets)
 
     , _indices(indices)
+
+    , _label(label)
 {
 }
 
@@ -31,6 +35,8 @@ CMolecularBasis::CMolecularBasis(const CMolecularBasis &other)
     : _basis_sets(other._basis_sets)
 
     , _indices(other._indices)
+
+    , _label(other._label)
 {
 }
 
@@ -39,10 +45,14 @@ CMolecularBasis::CMolecularBasis(CMolecularBasis &&other) noexcept
     : _basis_sets{}
 
     , _indices{}
+
+    , _label{}
 {
     std::swap(_basis_sets, other._basis_sets);
 
     std::swap(_indices, other._indices);
+
+    std::swap(_label, other._label);
 }
 
 auto
@@ -51,6 +61,8 @@ CMolecularBasis::operator=(const CMolecularBasis &other) -> CMolecularBasis &
     _basis_sets = other._basis_sets;
 
     _indices = other._indices;
+
+    _label = other._label;
 
     return *this;
 }
@@ -62,6 +74,8 @@ CMolecularBasis::operator=(CMolecularBasis &&other) noexcept -> CMolecularBasis 
 
     std::swap(_indices, other._indices);
 
+    std::swap(_label, other._label);
+
     return *this;
 }
 
@@ -69,6 +83,10 @@ auto
 CMolecularBasis::operator==(const CMolecularBasis &other) const -> bool
 {
     if (_indices != other._indices)
+    {
+        return false;
+    }
+    else if (_label != other._label)
     {
         return false;
     }
@@ -111,7 +129,7 @@ CMolecularBasis::reduce_to_valence_basis() const -> CMolecularBasis
 
     std::ranges::transform(_basis_sets, std::back_inserter(rbasis_sets), [](const auto &abas) { return abas.reduce_to_valence_basis(); });
 
-    return CMolecularBasis(rbasis_sets, _indices);
+    return CMolecularBasis(rbasis_sets, _indices, _label + std::string("_VALENCE"));
 }
 
 auto
