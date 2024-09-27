@@ -177,6 +177,8 @@ class LinearSolver:
         self._dist_fock_ger = None
         self._dist_fock_ung = None
 
+        self.block_size_factor = 1
+
         # input keywords
         self._input_keywords = {
             'response': {
@@ -184,6 +186,7 @@ class LinearSolver:
                 'qq_type': ('str_upper', 'ERI screening scheme'),
                 'batch_size': ('int', 'batch size for Fock build'),
                 'conv_thresh': ('float', 'convergence threshold'),
+                'block_size_factor': ('int', 'OpenMP block size factor'),
                 'max_iter': ('int', 'maximum number of iterations'),
                 'norm_thresh': ('float', 'norm threshold for adding vector'),
                 'lindep_thresh': ('float', 'threshold for linear dependence'),
@@ -870,6 +873,8 @@ class LinearSolver:
         t0 = tm.time()
 
         fock_drv = FockDriver()
+        fock_drv.set_block_size_factor(self.block_size_factor)
+
         fock_arrays = []
 
         # determine fock_type and exchange_scaling_factor

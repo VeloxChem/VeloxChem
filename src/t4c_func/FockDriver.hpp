@@ -126,6 +126,11 @@ class CFockDriver
                  const double                    exchange_factor,
                  const double                    omega,
                  const int                       ithreshold) const -> CMatrices;
+
+    auto set_block_size_factor(const int) -> void;
+
+   private:
+    int _block_size_factor = 1;
 };
 
 #endif /* FockDriver_hpp */

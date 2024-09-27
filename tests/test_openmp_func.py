@@ -95,7 +95,7 @@ class TestOpenMPFunc:
         t4c_drv = T4CScreener()
         t4c_drv.partition(bas_svp, mol_h2o, 'eri')
 
-        wtasks = make_work_group(t4c_drv.gto_pair_blocks(), 12)
+        wtasks = make_work_group(t4c_drv.gto_pair_blocks(), 12, 1)
         rtasks = [[0, 0, 0, 0, 0, 1, 0, 1], [0, 0, 0, 1, 0, 1, 0, 9],
                   [0, 0, 1, 1, 0, 9, 0, 9], [0, 1, 0, 1, 0, 1, 0, 8],
                   [0, 1, 1, 1, 0, 9, 0, 8], [0, 2, 0, 1, 0, 1, 0, 4],

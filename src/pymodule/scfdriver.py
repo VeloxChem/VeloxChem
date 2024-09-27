@@ -228,6 +228,8 @@ class ScfDriver:
         # filename
         self.filename = None
 
+        self.block_size_factor = 1
+
         # input keywords
         self._input_keywords = {
             'scf': {
@@ -236,6 +238,7 @@ class ScfDriver:
                 'max_iter': ('int', 'maximum number of SCF iterations'),
                 'conv_thresh': ('float', 'SCF convergence threshold'),
                 'eri_thresh': ('float', 'ERI screening threshold'),
+                'block_size_factor': ('int', 'OpenMP block size factor'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
@@ -1623,6 +1626,7 @@ class ScfDriver:
         eri_t0 = tm.time()
 
         fock_drv = FockDriver()
+        fock_drv.set_block_size_factor(self.block_size_factor)
 
         # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'

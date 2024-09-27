@@ -101,7 +101,7 @@ CFockDriver::compute(const CT4CScreener& screener,
         {
             auto gto_pair_blocks = ptr_screener->gto_pair_blocks();
 
-            const auto work_tasks = omp::make_work_group(gto_pair_blocks, ithreshold);
+            const auto work_tasks = omp::make_work_group(gto_pair_blocks, ithreshold, _block_size_factor);
 
             std::ranges::for_each(std::views::reverse(work_tasks), [&](const auto& task) {
                 const auto bra_gpairs = gto_pair_blocks[task[0]].gto_pair_block(static_cast<int>(task[2]));
@@ -157,7 +157,7 @@ CFockDriver::compute(const CT4CScreener&             screener,
         {
             auto gto_pair_blocks = ptr_screener->gto_pair_blocks();
 
-            const auto work_tasks = omp::make_work_group(gto_pair_blocks, ithreshold);
+            const auto work_tasks = omp::make_work_group(gto_pair_blocks, ithreshold, _block_size_factor);
 
             std::ranges::for_each(std::views::reverse(work_tasks), [&](const auto& task) {
                 const auto bra_gpairs = gto_pair_blocks[task[0]].gto_pair_block(static_cast<int>(task[2]));
@@ -213,7 +213,7 @@ CFockDriver::compute(const CT4CScreener& screener,
         {
             auto gto_pair_blocks = ptr_screener->gto_pair_blocks();
 
-            const auto work_tasks = omp::make_work_group(gto_pair_blocks, ithreshold);
+            const auto work_tasks = omp::make_work_group(gto_pair_blocks, ithreshold, _block_size_factor);
 
             const auto red_tasks = omp::partition_tasks(work_tasks, rank, nodes);
 
@@ -273,7 +273,7 @@ CFockDriver::compute(const CT4CScreener&             screener,
         {
             auto gto_pair_blocks = ptr_screener->gto_pair_blocks();
 
-            const auto work_tasks = omp::make_work_group(gto_pair_blocks, ithreshold);
+            const auto work_tasks = omp::make_work_group(gto_pair_blocks, ithreshold, _block_size_factor);
 
             const auto red_tasks = omp::partition_tasks(work_tasks, rank, nodes);
 
@@ -297,4 +297,10 @@ CFockDriver::compute(const CT4CScreener&             screener,
     fock_mats.symmetrize();
 
     return fock_mats;
+}
+
+auto
+CFockDriver::set_block_size_factor(const int factor) -> void
+{
+    _block_size_factor = factor;
 }
