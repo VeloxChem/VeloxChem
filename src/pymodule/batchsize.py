@@ -69,6 +69,15 @@ def get_batch_size(input_batch_size, n_total, n_ao, comm):
         max_batch_size = int(avail_mem / (mem_per_mat * nthreads))
         max_batch_size = max(1, max_batch_size)
 
+        if n_ao < 900:
+            max_batch_size = min(8, max_batch_size)
+        elif n_ao < 1800:
+            max_batch_size = min(4, max_batch_size)
+        elif n_ao < 3600:
+            max_batch_size = min(2, max_batch_size)
+        else:
+            max_batch_size = min(1, max_batch_size)
+
         # note: batch_size will be zero if n_total is zero
         if batch_size is None:
             batch_size = min(n_total, max_batch_size)

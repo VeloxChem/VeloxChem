@@ -679,15 +679,14 @@ class LinearSolver:
         # go through batches
 
         if self.rank == mpi_master():
-            batch_str = 'Processing Fock builds...'
-            batch_str += ' (batch size: {:d})'.format(batch_size)
+            batch_str = f'Processing {n_total} Fock build'
+            if n_total > 1:
+                batch_str += 's'
+            batch_str += '...'
             self.ostream.print_info(batch_str)
+            self.ostream.flush()
 
         for batch_ind in range(num_batches):
-
-            self.ostream.print_info('  batch {}/{}'.format(
-                batch_ind + 1, num_batches))
-            self.ostream.flush()
 
             # form density matrices
 
