@@ -1041,6 +1041,9 @@ class ScfDriver:
                                             root=mpi_master())
 
         if (linear_dependency and self.eri_thresh > self.eri_thresh_tight):
+
+            # TODO: double check if it is necessary to tighten threshold
+
             self.eri_thresh = self.eri_thresh_tight
 
             if self.rank == mpi_master():

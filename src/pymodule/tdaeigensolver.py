@@ -590,8 +590,6 @@ class TdaEigenSolver(LinearSolver):
         else:
             tdens = None
 
-        # TODO: broadcast tdens
-
         return tdens
 
     def _get_sigmas(self, fock, tensors, molecule, trial_mat):

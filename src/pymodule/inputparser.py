@@ -499,20 +499,6 @@ def get_keyword_type(keyword_type):
     }[keyword_type]
 
 
-def get_datetime_string():
-    """
-    Gets datetime string.
-
-    :return:
-        The datetime string (ISO format with ':' replaced by '.').
-    """
-
-    # TODO: deprecate get_datetime_string
-
-    return datetime.now().isoformat(sep='T',
-                                    timespec='seconds').replace(':', '.')
-
-
 def get_random_string_serial():
     """
     Gets a random string.

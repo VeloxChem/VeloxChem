@@ -784,7 +784,15 @@ class SadGuessDriver:
 
     def get_ao_indices_of_atoms(self, molecule, basis):
         """
-        TODO
+        Gets AO indices of atoms.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+
+        :return:
+            A list of list containing AO indices of atoms.
         """
 
         natoms = molecule.number_of_atoms()
@@ -805,7 +813,19 @@ class SadGuessDriver:
 
     def compute(self, molecule, basis_1, basis_2, scf_type):
         """
-        TODO
+        Computes initial density matrix using SAD guess.
+
+        :param molecule:
+            The molecule.
+        :param basis_1:
+            The minimal basis set.
+        :param basis_2:
+            The AO basis set.
+        :scf_type:
+            The SCF type.
+
+        :return:
+            A tuple containing density matricies as numpy arrays.
         """
 
         natoms = molecule.number_of_atoms()

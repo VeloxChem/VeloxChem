@@ -104,8 +104,6 @@ def get_number_of_batches(n_total, batch_size, comm):
 
     num_batches = None
 
-    # TODO: double check batch size
-
     # note: num_batches will be zero if batch_size is zero
     if comm.Get_rank() == mpi_master():
         if batch_size > 0:
