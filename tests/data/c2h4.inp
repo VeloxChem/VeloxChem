@@ -1,0 +1,25 @@
+@jobs
+task: response
+@end
+
+@method settings
+basis: def2-svp
+@end
+
+@response
+property: absorption
+nstates: 5
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+units: au
+xyz:  
+C        0.0000        0.0000       -1.2436
+C       -0.0000        0.0000        1.2436
+H        0.0000        1.7272       -2.3230
+H        0.0000       -1.7272       -2.3230
+H       -0.0000        1.7272        2.3230
+H       -0.0000       -1.7272        2.3230
+@end 
