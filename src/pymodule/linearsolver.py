@@ -635,7 +635,10 @@ class LinearSolver:
 
         n_ger = vecs_ger.shape(1)
         n_ung = vecs_ung.shape(1)
-        n_total = n_ger + n_ung
+
+        n_general = min(n_ger, n_ung)
+        n_extra_ger = n_ger - n_general
+        n_extra_ung = n_ung - n_general
 
         # prepare molecular orbitals
 
@@ -668,6 +671,8 @@ class LinearSolver:
 
         n_ao = mo.shape[0] if self.rank == mpi_master() else None
 
+        n_total = n_general + n_extra_ger + n_extra_ung
+
         batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
@@ -696,16 +701,39 @@ class LinearSolver:
                 dks = None
 
             for col in range(batch_start, batch_end):
-                if col < n_ger:
+
+                # determine vec_type
+
+                if col < n_general:
+                    vec_type = 'general'
+                elif n_extra_ger > 0:
+                    vec_type = 'gerade'
+                elif n_extra_ung > 0:
+                    vec_type = 'ungerade'
+
+                # form full-size vec
+
+                if vec_type == 'general':
+                    v_ger = vecs_ger.get_full_vector(col)
+                    v_ung = vecs_ung.get_full_vector(col)
+                    if self.rank == mpi_master():
+                        # full-size trial vector
+                        vec = np.hstack((v_ger, v_ger))
+                        vec += np.hstack((v_ung, -v_ung))
+
+                elif vec_type == 'gerade':
                     v_ger = vecs_ger.get_full_vector(col)
                     if self.rank == mpi_master():
                         # full-size gerade trial vector
                         vec = np.hstack((v_ger, v_ger))
-                else:
-                    v_ung = vecs_ung.get_full_vector(col - n_ger)
+
+                elif vec_type == 'ungerade':
+                    v_ung = vecs_ung.get_full_vector(col)
                     if self.rank == mpi_master():
                         # full-size ungerade trial vector
                         vec = np.hstack((v_ung, -v_ung))
+
+                # build density
 
                 if self.rank == mpi_master():
                     half_size = vec.shape[0] // 2
@@ -728,12 +756,40 @@ class LinearSolver:
                     dks.append(dak)
                     kns.append(kn)
 
-            # TODO: merge gerade and ungerade dks into general matrices
-
             # form Fock matrices
 
             fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,
                                       pe_dict, profiler)
+
+            if self.rank == mpi_master():
+                raw_fock_ger = []
+                raw_fock_ung = []
+
+                raw_kns_ger = []
+                raw_kns_ung = []
+
+                for col in range(batch_start, batch_end):
+                    ifock = col - batch_start
+
+                    if col < n_general:
+                        raw_fock_ger.append(0.5 * (fock[ifock] - fock[ifock].T))
+                        raw_fock_ung.append(0.5 * (fock[ifock] + fock[ifock].T))
+                        raw_kns_ger.append(0.5 * (kns[ifock] + kns[ifock].T))
+                        raw_kns_ung.append(0.5 * (kns[ifock] - kns[ifock].T))
+
+                    elif n_extra_ger > 0:
+                        raw_fock_ger.append(0.5 * (fock[ifock] - fock[ifock].T))
+                        raw_kns_ger.append(0.5 * (kns[ifock] + kns[ifock].T))
+
+                    elif n_extra_ung > 0:
+                        raw_fock_ung.append(0.5 * (fock[ifock] + fock[ifock].T))
+                        raw_kns_ung.append(0.5 * (kns[ifock] - kns[ifock].T))
+
+                fock = raw_fock_ger + raw_fock_ung
+                kns = raw_kns_ger + raw_kns_ung
+
+                batch_ger = len(raw_fock_ger)
+                batch_ung = len(raw_fock_ung)
 
             e2_ger = None
             e2_ung = None
@@ -742,13 +798,6 @@ class LinearSolver:
             fock_ung = None
 
             if self.rank == mpi_master():
-
-                batch_ger, batch_ung = 0, 0
-                for col in range(batch_start, batch_end):
-                    if col < n_ger:
-                        batch_ger += 1
-                    else:
-                        batch_ung += 1
 
                 e2_ger = np.zeros((half_size, batch_ger))
                 e2_ung = np.zeros((half_size, batch_ung))
