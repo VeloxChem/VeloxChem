@@ -138,7 +138,10 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
 
                 const auto bra_size = bra_block.number_of_contracted_pairs();
                 
-                auto bra_bsize = omp::angular_momentum_scale(bra_angpair) * simd::width<double>() / block_size_factor;
+                auto bra_bsize = std::max(
+                    simd::width<double>(),
+                    omp::angular_momentum_scale(bra_angpair) * simd::width<double>() / block_size_factor
+                );
                 
                 //if (const auto mbsize = omp::max_block_size(); bra_bsize > mbsize) bra_bsize = mbsize;
                 
@@ -154,8 +157,11 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
 
                     const auto ket_size = ket_block.number_of_contracted_pairs();
                     
-                    auto ket_bsize = omp::angular_momentum_scale(ket_angpair) * simd::width<double>() / block_size_factor;
-                    
+                    auto ket_bsize = std::max(
+                        simd::width<double>(),
+                        omp::angular_momentum_scale(ket_angpair) * simd::width<double>() / block_size_factor
+                    );
+
                     //if (const auto mbsize = omp::max_block_size(); ket_bsize > mbsize) ket_bsize = mbsize; 
                     
                     const auto ket_blocks = batch::number_of_batches(ket_size, ket_bsize);
@@ -199,7 +205,10 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
 
                     const auto bra_size = bra_block.number_of_contracted_pairs();
                 
-                    auto bra_bsize = omp::angular_momentum_scale(bra_angpair) * simd::width<double>() / block_size_factor;
+                    auto bra_bsize = std::max(
+                        simd::width<double>(),
+                        omp::angular_momentum_scale(bra_angpair) * simd::width<double>() / block_size_factor
+                    );
                     
                     const auto bra_blocks = batch::number_of_batches(bra_size, bra_bsize);
 
@@ -213,8 +222,11 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
 
                         const auto ket_size = ket_block.number_of_contracted_pairs();
                         
-                        auto ket_bsize = omp::angular_momentum_scale(ket_angpair) * simd::width<double>() / block_size_factor;
-                        
+                        auto ket_bsize = std::max(
+                            simd::width<double>(),
+                            omp::angular_momentum_scale(ket_angpair) * simd::width<double>() / block_size_factor
+                        );
+
                         const auto ket_blocks = batch::number_of_batches(ket_size, ket_bsize);
                     
                         // create task graph

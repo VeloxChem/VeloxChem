@@ -229,7 +229,7 @@ class ScfDriver:
         # filename
         self.filename = None
 
-        self.block_size_factor = 1
+        self._block_size_factor = 2
 
         # input keywords
         self._input_keywords = {
@@ -1565,7 +1565,19 @@ class ScfDriver:
         eri_t0 = tm.time()
 
         fock_drv = FockDriver()
-        fock_drv.set_block_size_factor(self.block_size_factor)
+        if self.rank == mpi_master():
+            nao = den_mat[0].shape[0]
+            if nao < 900:
+                self._block_size_factor = 16
+            elif nao < 1800:
+                self._block_size_factor = 8
+            elif nao < 3600:
+                self._block_size_factor = 4
+            else:
+                self._block_size_factor = 2
+        self._block_size_factor = self.comm.bcast(self._block_size_factor,
+                                                  root=mpi_master())
+        fock_drv.set_block_size_factor(self._block_size_factor)
 
         # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'
