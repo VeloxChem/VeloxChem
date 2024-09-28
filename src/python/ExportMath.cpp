@@ -348,6 +348,23 @@ export_math(py::module &m) -> void
         .def("__ne__", [](const CMatrices &self, const CMatrices &other) { return self != other; })
         .def("__copy__", [](const CMatrices &self) { return CMatrices(self); })
         .def("__deepcopy__", [](const CMatrices &self, py::dict) { return CMatrices(self); });
+
+    // CDenseMatrix class
+    PyClass<CDenseMatrix>(m, "DenseMatrix")
+        .def(py::init<>())
+        .def(py::init<const int, const int>())
+        .def(py::init<const CDenseMatrix&>())
+        .def(py::init(&CDenseMatrix_from_numpy))
+        .def("number_of_rows", &CDenseMatrix::getNumberOfRows, "Gets number of rows in dense matrix.")
+        .def("number_of_columns", &CDenseMatrix::getNumberOfColumns, "Gets number of columns in dense matrix.")
+        .def("symmetrize", &CDenseMatrix::symmetrize, "Symmetrizes elements of square matrix: a_ij = a_ji = (a_ij + a_ji).")
+        .def(
+            "to_numpy",
+            [](const CDenseMatrix& self) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.values(), {self.getNumberOfRows(), self.getNumberOfColumns()});
+            },
+            "Converts DenseMatrix to numpy array.")
+        .def(py::self == py::self);
 }
 
 }  // namespace vlx_math

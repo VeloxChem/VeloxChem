@@ -29,6 +29,7 @@
 #include <pybind11/stl.h>
 
 #include "ChemicalElement.hpp"
+#include "DispersionModel.hpp"
 #include "ExportGeneral.hpp"
 #include "Molecule.hpp"
 #include "PartialCharges.hpp"
@@ -148,7 +149,17 @@ export_moldata(py::module &m)
         .def("__copy__", [](const CMolecule &self) { return CMolecule(self); })
         .def("__deepcopy__", [](const CMolecule &self, py::dict) { return CMolecule(self); });
 
-    // ... add class bindings here ...
+    // CDispersionModel class
+
+    PyClass<CDispersionModel>(m, "DispersionModel")
+        .def(py::init<>())
+        .def("compute",
+             &CDispersionModel::compute,
+             "Computes dispersion energy and gradient for a given molecule and a given density functional.",
+             "molecule"_a,
+             "xcLabel"_a)
+        .def("get_energy", &CDispersionModel::getEnergy, "Gets dispersion energy.")
+        .def("get_gradient", &CDispersionModel::getGradient, "Gets dispersion gradient.");
 }
 
 }  // namespace vlx_moldata

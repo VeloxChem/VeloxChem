@@ -3,6 +3,9 @@ target_sources(vlxobjs
     AtomicRadii.cpp
     ChemicalElement.cpp
     CoordinationNumber.cpp
+    DispersionData.cpp
+    DispersionModel.cpp
+    DispersionParameters.cpp
     Molecule.cpp
     PartialCharges.cpp
   )

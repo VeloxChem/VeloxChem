@@ -35,6 +35,7 @@ from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import OverlapDriver, KineticEnergyDriver
 from .veloxchemlib import FockDriver, T4CScreener
 from .veloxchemlib import GridDriver, XCIntegrator
+from .veloxchemlib import DispersionModel
 from .veloxchemlib import Matrices
 from .veloxchemlib import make_matrix
 from .veloxchemlib import mpi_master
