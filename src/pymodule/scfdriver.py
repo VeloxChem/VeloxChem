@@ -1745,6 +1745,9 @@ class ScfDriver:
             The AO Kohn-Sham (Vxc) matrix.
         """
 
+        assert_msg_critical(
+            False, 'SCF driver: SCF with split communicator not implemented')
+
         return None
 
     def _comp_energy(self, fock_mat, vxc_mat, e_pe, kin_mat, npot_mat, den_mat):

@@ -38,7 +38,6 @@ from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .veloxchemlib import rotatory_strength_in_cgs
 from .distributedarray import DistributedArray
-from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals, molorb
 from .visualizationdriver import VisualizationDriver
 from .sanitychecks import dft_sanity_check
@@ -994,122 +993,10 @@ class LinearSolver:
             The profiler.
         """
 
-        molgrid = dft_dict['molgrid']
-        gs_density = dft_dict['gs_density']
-
-        V_es = pe_dict['V_es']
-        pe_drv = pe_dict['pe_drv']
-
-        if self._split_comm_ratio is None:
-            if self._dft and self._pe:
-                self._split_comm_ratio = [0.34, 0.33, 0.33]
-            elif self._dft:
-                self._split_comm_ratio = [0.5, 0.5, 0.0]
-            elif self._pe:
-                self._split_comm_ratio = [0.5, 0.0, 0.5]
-            else:
-                self._split_comm_ratio = [1.0, 0.0, 0.0]
-
-        if self._dft:
-            dft_nodes = int(float(self.nodes) * self._split_comm_ratio[1] + 0.5)
-            dft_nodes = max(1, dft_nodes)
-        else:
-            dft_nodes = 0
-
-        if self._pe:
-            pe_nodes = int(float(self.nodes) * self._split_comm_ratio[2] + 0.5)
-            pe_nodes = max(1, pe_nodes)
-        else:
-            pe_nodes = 0
-
-        eri_nodes = max(1, self.nodes - dft_nodes - pe_nodes)
-
-        if eri_nodes == max(eri_nodes, dft_nodes, pe_nodes):
-            eri_nodes = self.nodes - dft_nodes - pe_nodes
-        elif dft_nodes == max(eri_nodes, dft_nodes, pe_nodes):
-            dft_nodes = self.nodes - eri_nodes - pe_nodes
-        else:
-            pe_nodes = self.nodes - eri_nodes - dft_nodes
-
-        node_grps = [0] * eri_nodes + [1] * dft_nodes + [2] * pe_nodes
-        eri_comm = (node_grps[self.rank] == 0)
-        dft_comm = (node_grps[self.rank] == 1)
-        pe_comm = (node_grps[self.rank] == 2)
-
-        subcomms = SubCommunicators(self.comm, node_grps)
-        local_comm = subcomms.local_comm
-        cross_comm = subcomms.cross_comm
-
-        # reset molecular grid for DFT and V_es for PE
-        if self.rank != mpi_master():
-            molgrid = MolecularGrid()
-            V_es = np.zeros(0)
-        if self._dft:
-            if local_comm.Get_rank() == mpi_master():
-                molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
-        if self._pe:
-            if local_comm.Get_rank() == mpi_master():
-                V_es = cross_comm.bcast(V_es, root=mpi_master())
-
-        t0 = tm.time()
-
-        # calculate Fock on ERI nodes
-        if eri_comm:
-            eri_drv = ElectronRepulsionIntegralsDriver(local_comm)
-            local_screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                              self.eri_thresh, molecule, basis)
-            eri_drv.compute(fock, dens, molecule, basis, local_screening)
-            if self._dft and not self.xcfun.is_hybrid():
-                for ifock in range(fock.number_of_fock_matrices()):
-                    fock.scale(2.0, ifock)
-
-        # calculate Fxc on DFT nodes
-        if dft_comm:
-            xc_drv = XCIntegrator(local_comm)
-            molgrid.re_distribute_counts_and_displacements(
-                local_comm.Get_rank(), local_comm.Get_size(), local_comm)
-            xc_drv.integrate_fxc_fock(fock, molecule, basis, dens, gs_density,
-                                      molgrid, self.xcfun.get_func_label())
-
-        # calculate e_pe and V_pe on PE nodes
-        if pe_comm:
-            from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, self.pe_options, local_comm)
-            pe_drv.V_es = V_es.copy()
-            for ifock in range(fock.number_of_fock_matrices()):
-                dm = dens.alpha_to_numpy(ifock) + dens.beta_to_numpy(ifock)
-                e_pe, V_pe = pe_drv.get_pe_contribution(dm, elec_only=True)
-                if local_comm.Get_rank() == mpi_master():
-                    fock.add_matrix(DenseMatrix(V_pe), ifock)
-
-        dt = tm.time() - t0
-
-        if profiler is not None:
-            profiler.add_timing_info('FockBuild', dt)
-
-        # collect Fock on master node
-        fock.reduce_sum(self.rank, self.nodes, self.comm)
-
-        if local_comm.Get_rank() == mpi_master():
-            dt = cross_comm.gather(dt, root=mpi_master())
-
-        if self.rank == mpi_master():
-            time_eri = dt[0] * eri_nodes
-            time_dft = 0.0
-            if self._dft:
-                time_dft = dt[1] * dft_nodes
-            time_pe = 0.0
-            if self._pe:
-                pe_root = 2 if self._dft else 1
-                time_pe = dt[pe_root] * pe_nodes
-            time_sum = time_eri + time_dft + time_pe
-            self._split_comm_ratio = [
-                time_eri / time_sum,
-                time_dft / time_sum,
-                time_pe / time_sum,
-            ]
-        self._split_comm_ratio = self.comm.bcast(self._split_comm_ratio,
-                                                 root=mpi_master())
+        assert_msg_critical(
+            False,
+            'LinearSolver: Linear response with split communicator not implemented'
+        )
 
     def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """
@@ -1257,9 +1144,6 @@ class LinearSolver:
             self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        #cur_str = 'ERI Screening Scheme            : ' + get_qq_type(
-        #    self.qq_type)
-        #self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
             self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
