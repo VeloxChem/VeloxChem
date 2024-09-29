@@ -31,6 +31,7 @@ from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .xtbdriver import XtbDriver
+from .xtbgradientdriver import XtbGradientDriver
 from .visualizationdriver import VisualizationDriver
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
@@ -292,10 +293,6 @@ def main():
         if run_ground_state_gradient:
 
             if use_xtb:
-
-                # TODO: enable xtb gradient
-                assert False
-
                 grad_drv = XtbGradientDriver(xtb_drv)
                 grad_drv.compute(task.molecule)
 
@@ -352,10 +349,6 @@ def main():
         if run_ground_state_gradient:
 
             if use_xtb:
-
-                # TODO: enable xtb optimization
-                assert False
-
                 grad_drv = XtbGradientDriver(xtb_drv)
                 opt_drv = OptimizationDriver(grad_drv)
                 opt_drv.keep_files = True
