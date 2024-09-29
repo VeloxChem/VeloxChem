@@ -36,8 +36,6 @@
 /**
  Class CGridDriver generates grid points data for usage in numerical
  integration.
-
- @author Z. Rinkevicius
  */
 class CGridDriver
 {

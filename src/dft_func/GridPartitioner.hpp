@@ -34,8 +34,6 @@
 
 /**
  Class CGridPartitioner implemention DFT grid points partitioner.
-
- @author X. Li
  */
 class CGridPartitioner
 {

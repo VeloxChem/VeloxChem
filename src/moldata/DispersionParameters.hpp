@@ -33,8 +33,6 @@
 /**
  Class CDispersionParameters implements the density functional parameters for
  the D4 dispersion correction (reference: dftd4 v2.4.0).
-
- @author X. Li
  */
 class CDispersionParameters
 {

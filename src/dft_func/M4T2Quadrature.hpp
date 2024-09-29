@@ -32,8 +32,6 @@
 /**
  Class CM4T2Quadrature class generates M4T2 quadrature.
  Reference: O. Treutler and R. Ahlrichs, J. Chem. Phys. 102, 346 (1995).
-
- @author Z. Rinkevicius
  */
 class CM4T2Quadrature
 {

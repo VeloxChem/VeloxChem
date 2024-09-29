@@ -45,8 +45,6 @@
 
 /**
  Class CLebedevLaikovQuadrature class generates Lebedev-Laikov quadrature.
-
- @author Z. Rinkevicius
  */
 class CLebedevLaikovQuadrature
 {

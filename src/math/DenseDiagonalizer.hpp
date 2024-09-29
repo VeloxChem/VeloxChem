@@ -33,8 +33,6 @@
  Class CDenseDiagonalizer provides methods for diagonalization of dense real
  symmetric matrices and for manipulation with computed eigenvalues and
  eigenvectors.
-
- @author Z. Rinkevicius
  */
 class CDenseDiagonalizer
 {

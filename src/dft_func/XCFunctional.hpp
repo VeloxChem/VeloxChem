@@ -52,8 +52,6 @@ enum class xcfun
 
 /**
  * Class CXCFunctional is a wrapper to the C functions and structs provided by LibXC.
- *
- * @author R. Di Remigio Eikås, Z. Rinkevicius, X. Li
  */
 class CXCFunctional
 {

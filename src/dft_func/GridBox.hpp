@@ -31,8 +31,6 @@
 
 /**
  Class CGridBox contains DFT grid points.
-
- @author X. Li
  */
 class CGridBox
 {

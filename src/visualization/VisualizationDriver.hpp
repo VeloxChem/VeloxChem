@@ -37,8 +37,6 @@
 
 /**
  Class CVisualizationDriver computes wavefunction or density on grid points.
-
- @author X. Li
  */
 class CVisualizationDriver
 {

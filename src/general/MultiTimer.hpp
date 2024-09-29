@@ -33,8 +33,6 @@
 
 /**
  Class CMultiTimer implements timer with multiple timing.
-
- @author X. Li
  */
 class CMultiTimer
 {

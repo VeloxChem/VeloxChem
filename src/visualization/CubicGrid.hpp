@@ -31,8 +31,6 @@
 
 /**
  Class CCubicGrid contains cubic grid points.
-
- @author X. Li
  */
 class CCubicGrid
 {

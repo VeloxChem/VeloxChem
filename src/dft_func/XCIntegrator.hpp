@@ -42,8 +42,6 @@
 
 /**
  Class CXCIntegrator implements XC integrator.
-
- @author X. Li, K. Ahmadzadeh, M. Delcey
  */
 class CXCIntegrator
 {

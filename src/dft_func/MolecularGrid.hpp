@@ -36,8 +36,6 @@
 
 /**
  Class CMolecularGrid class generates molecular grid.
-
- @author Z. Rinkevicius
  */
 class CMolecularGrid
 {

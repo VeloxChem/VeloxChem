@@ -36,8 +36,6 @@
 
 /**
  Class CTimer implements timer.
-
- @author X. Li
  */
 class CTimer
 {
