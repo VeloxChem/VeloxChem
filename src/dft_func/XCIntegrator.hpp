@@ -25,8 +25,6 @@
 #ifndef XCIntegrator_hpp
 #define XCIntegrator_hpp
 
-#include <mpi.h>
-
 #include <array>
 #include <string>
 
@@ -45,23 +43,17 @@
  */
 class CXCIntegrator
 {
+   private:
     /**
      Screening threshold for GTO values on grid points.
      */
     double _screeningThresholdForGTOValues;
 
-    /**
-     The MPI communicator.
-     */
-    MPI_Comm _locComm;
-
    public:
     /**
      Creates an XC integrator object.
-
-     @param comm the MPI communicator.
      */
-    CXCIntegrator(MPI_Comm comm);
+    CXCIntegrator();
 
     /**
      Integrates first-order exchange-correlation functional contribution to AO

@@ -1017,7 +1017,7 @@ class LinearSolver:
 
         if self._dft:
             t0 = tm.time()
-            xc_drv = XCIntegrator(self.comm)
+            xc_drv = XCIntegrator()
             xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis, dens,
                                       gs_density, molgrid, self.xcfun)
 

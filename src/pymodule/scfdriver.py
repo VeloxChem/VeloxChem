@@ -1702,7 +1702,7 @@ class ScfDriver:
 
         if self._dft and not self._first_step:
             if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga, xcfun.mgga]:
-                xc_drv = XCIntegrator(self.comm)
+                xc_drv = XCIntegrator()
                 # Note: vxc_mat will remain distributed across MPI processes.
                 # XC energy and Vxc matrix will be reduced in _comp_energy
                 # and _comp_full_fock

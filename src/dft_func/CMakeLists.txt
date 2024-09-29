@@ -25,6 +25,7 @@ target_sources(vlxobjs
     XCIntegratorForGGA.cpp
     XCIntegratorForLDA.cpp
     XCIntegratorForMGGA.cpp
+    XCMolecularGradient.cpp
   )
 
 target_include_directories(vlxobjs

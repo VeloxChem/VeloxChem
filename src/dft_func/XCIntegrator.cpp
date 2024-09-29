@@ -49,11 +49,10 @@
 #include "XCIntegratorForLDA.hpp"
 #include "XCIntegratorForMGGA.hpp"
 
-CXCIntegrator::CXCIntegrator(MPI_Comm comm)
+CXCIntegrator::CXCIntegrator()
 
     : _screeningThresholdForGTOValues(1.0e-12)
 {
-    _locComm = comm;
 }
 
 auto
