@@ -24,8 +24,6 @@
 
 #include "XtbDriver.hpp"
 
-#include <mpi.h>
-
 #include <fstream>
 #include <iostream>
 
@@ -33,17 +31,11 @@
 #include "Molecule.hpp"
 #include "MpiFunc.hpp"
 
-CXtbDriver::CXtbDriver(MPI_Comm comm)
+CXtbDriver::CXtbDriver()
     : _outputFilename(std::string("STDOUT"))
 
     , _xtbMethod(std::string("gfn2"))
 {
-    _locRank = mpi::rank(comm);
-
-    _locNodes = mpi::nodes(comm);
-
-    _locComm = comm;
-
     _electronicTemp = 300.0;
 
     _maxIterations = 280;
@@ -100,7 +92,7 @@ void
 CXtbDriver::mute()
 {
 #ifdef ENABLE_XTB
-    if (isMasterNode()) xtb_setVerbosity(_environment, XTB_VERBOSITY_MUTED);
+    xtb_setVerbosity(_environment, XTB_VERBOSITY_MUTED);
 #endif
 }
 
@@ -108,7 +100,7 @@ void
 CXtbDriver::unmute()
 {
 #ifdef ENABLE_XTB
-    if (isMasterNode()) xtb_setVerbosity(_environment, XTB_VERBOSITY_FULL);
+    xtb_setVerbosity(_environment, XTB_VERBOSITY_FULL);
 #endif
 }
 
@@ -116,7 +108,6 @@ void
 CXtbDriver::compute(const CMolecule& molecule)
 {
 #ifdef ENABLE_XTB
-    if (isMasterNode())
     {
         // set up output stream
 
@@ -166,12 +157,6 @@ CXtbDriver::compute(const CMolecule& molecule)
         xtb_releaseOutput(_environment);
     }
 #endif
-}
-
-bool
-CXtbDriver::isMasterNode() const
-{
-    return _locRank == mpi::master();
 }
 
 bool
@@ -226,12 +211,9 @@ CXtbDriver::getEnergy() const
 {
     double energy = 0.0;
 
-    if (isMasterNode())
-    {
 #ifdef ENABLE_XTB
-        xtb_getEnergy(_environment, _results, &energy);
+    xtb_getEnergy(_environment, _results, &energy);
 #endif
-    }
 
     return energy;
 }
@@ -241,7 +223,7 @@ CXtbDriver::getGradient() const
 {
     std::vector<double> grad;
 
-    if ((_natoms > 0) && isMasterNode())
+    if (_natoms > 0)
     {
 #ifdef ENABLE_XTB
         grad = std::vector<double>(_natoms * 3, 0.0);
@@ -258,7 +240,7 @@ CXtbDriver::getDipole() const
 {
     std::vector<double> dipole;
 
-    if ((_natoms > 0) && isMasterNode())
+    if (_natoms > 0)
     {
 #ifdef ENABLE_XTB
         dipole = std::vector<double>(3, 0.0);
@@ -275,7 +257,7 @@ CXtbDriver::getPartialCharges() const
 {
     std::vector<double> partial_charges;
 
-    if ((_natoms > 0) && isMasterNode())
+    if (_natoms > 0)
     {
 #ifdef ENABLE_XTB
         partial_charges = std::vector<double>(_natoms, 0.0);
@@ -292,7 +274,7 @@ CXtbDriver::getBondOrders() const
 {
     std::vector<double> bond_orders;
 
-    if ((_natoms > 0) && isMasterNode())
+    if (_natoms > 0)
     {
 #ifdef ENABLE_XTB
         bond_orders = std::vector<double>(_natoms * _natoms, 0.0);
@@ -315,7 +297,7 @@ CXtbDriver::getNumberOfAOs() const
 {
     int nao = 0;
 
-    if ((_natoms > 0) && isMasterNode())
+    if (_natoms > 0)
     {
 #ifdef ENABLE_XTB
         xtb_getNao(_environment, _results, &nao);
@@ -330,7 +312,7 @@ CXtbDriver::getOrbitalEnergies() const
 {
     std::vector<double> orbital_energies;
 
-    if ((_natoms > 0) && isMasterNode())
+    if (_natoms > 0)
     {
 #ifdef ENABLE_XTB
         auto nao = getNumberOfAOs();
@@ -349,7 +331,7 @@ CXtbDriver::getOrbitalOccupations() const
 {
     std::vector<double> orbital_occupations;
 
-    if ((_natoms > 0) && isMasterNode())
+    if (_natoms > 0)
     {
 #ifdef ENABLE_XTB
         auto nao = getNumberOfAOs();

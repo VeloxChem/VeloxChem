@@ -22,38 +22,20 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+#ifndef ExportXtb_hpp
+#define ExportXtb_hpp
+
 #include <pybind11/pybind11.h>
 
-#include "ExportDft.hpp"
-#include "ExportGeneral.hpp"
-#include "ExportMath.hpp"
-#include "ExportMoldata.hpp"
-#include "ExportOneElecInts.hpp"
-#include "ExportOrbdata.hpp"
-#include "ExportVisualization.hpp"
-#include "ExportXtb.hpp"
-#include "ExportT2CIntegrals.hpp"
-#include "ExportT4CIntegrals.hpp"
+namespace py = pybind11;
 
-PYBIND11_MODULE(veloxchemlib, m)
-{
-    vlx_general::export_general(m);
+namespace vlx_xtb {  // vlx_xtb namespace
 
-    vlx_math::export_math(m);
+/**
+ Exports classes/functions in src/xtb to python.
+ */
+void export_xtb(py::module& m);
 
-    vlx_moldata::export_moldata(m);
+}  // namespace vlx_xtb
 
-    vlx_orbdata::export_orbdata(m);
-
-    vlx_dft::export_dft(m);
-
-    vlx_oneeints::export_oneeints(m);
-
-    vlx_visualization::export_visualization(m);
-
-    vlx_xtb::export_xtb(m);
-
-    vlx_t2cintegrals::export_t2cintegrals(m);
-
-    vlx_t4cintegrals::export_t4cintegrals(m);
-}
+#endif /* ExportXtb_hpp */

@@ -30,6 +30,7 @@ from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
+from .xtbdriver import XtbDriver
 from .visualizationdriver import VisualizationDriver
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
@@ -238,21 +239,32 @@ def main():
         scf_dict['program_end_time'] = program_end_time
         scf_dict['filename'] = task.input_dict['filename']
 
-        scf_drv = select_scf_driver(task, scf_type)
-        scf_drv.update_settings(scf_dict, method_dict)
-        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
-                                      task.min_basis)
+        if use_xtb:
+            if 'potfile' in method_dict:
+                errmsg = 'XtbDriver: The \'potfile\' keyword is not supported '
+                errmsg += 'in XTB calculation.'
+                if task.mpi_rank == mpi_master():
+                    assert_msg_critical(False, errmsg)
+            xtb_drv = XtbDriver(task.mpi_comm, task.ostream)
+            xtb_drv.set_method(method_dict['xtb'].lower())
+            xtb_drv.xtb_verbose = True
+            xtb_results = xtb_drv.compute(task.molecule)
+        else:
+            scf_drv = select_scf_driver(task, scf_type)
+            scf_drv.update_settings(scf_dict, method_dict)
+            scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                          task.min_basis)
 
-        mol_orbs = scf_drv.molecular_orbitals
-        density = scf_drv.density
+            mol_orbs = scf_drv.molecular_orbitals
+            density = scf_drv.density
 
-        if not scf_drv.is_converged:
-            return
+            if not scf_drv.is_converged:
+                return
 
-        if (scf_drv.electric_field is not None and
-                task.molecule.get_charge() != 0):
-            task.finish()
-            return
+            if (scf_drv.electric_field is not None and
+                    task.molecule.get_charge() != 0):
+                task.finish()
+                return
 
     # Response
 

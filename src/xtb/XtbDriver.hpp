@@ -25,8 +25,6 @@
 #ifndef XtbDriver_hpp
 #define XtbDriver_hpp
 
-#include <mpi.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -44,21 +42,6 @@ class CMolecule;
  */
 class CXtbDriver
 {
-    /**
-     The rank of associated local MPI process.
-     */
-    int32_t _locRank;
-
-    /**
-     The total number of local MPI processes.
-     */
-    int32_t _locNodes;
-
-    /**
-     The MPI communicator.
-     */
-    MPI_Comm _locComm;
-
     /**
      The name of the XTB output file.
      */
@@ -111,11 +94,9 @@ class CXtbDriver
 
    public:
     /**
-     Creates a XTB driver object using MPI info.
-
-     @param comm the MPI communicator.
+     Creates a XTB driver object.
      */
-    CXtbDriver(MPI_Comm comm);
+    CXtbDriver();
 
     /**
      Destroys a XTB driver object.
@@ -180,13 +161,6 @@ class CXtbDriver
 #endif
         return false;
     }
-
-    /**
-     Checks if XTB driver is running on master node.
-
-     @return true if XTB driver is running on master node, false otherwise.
-     */
-    bool isMasterNode() const;
 
     /**
      Gets state of XTB environment.
