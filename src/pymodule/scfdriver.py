@@ -46,7 +46,6 @@ from .profiler import Profiler
 from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
 from .sadguessdriver import SadGuessDriver
-from .subcommunicators import SubCommunicators
 from .firstorderprop import FirstOrderProperties
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
@@ -1352,36 +1351,39 @@ class ScfDriver:
         """
 
         if self.rank == mpi_master():
-
             t0 = tm.time()
 
             ovl_drv = OverlapDriver()
             ovl_mat = ovl_drv.compute(molecule, basis)
             ovl_mat = ovl_mat.full_matrix().to_numpy()
 
-            t1 = tm.time()
+            ovl_dt = tm.time() - t0
+            t0 = tm.time()
 
             kin_drv = KineticEnergyDriver()
             kin_mat = kin_drv.compute(molecule, basis)
             kin_mat = kin_mat.full_matrix().to_numpy()
 
-            t2 = tm.time()
-
-            # TODO: parallelize npot_mat
-
-            npot_mat = compute_nuclear_potential_integrals(molecule, basis)
-
-            t3 = tm.time()
-
+            kin_dt = tm.time() - t0
         else:
-
             ovl_mat = None
             kin_mat = None
-            npot_mat = None
 
         ovl_mat = self.comm.bcast(ovl_mat, root=mpi_master())
         kin_mat = self.comm.bcast(kin_mat, root=mpi_master())
+
+        t0 = tm.time()
+
+        if molecule.number_of_atoms() >= self.nodes and self.nodes > 1:
+            npot_mat = self._comp_npot_mat_parallel(molecule, basis)
+        else:
+            npot_mat = compute_nuclear_potential_integrals(molecule, basis)
+
+        npot_dt = tm.time() - t0
+
         npot_mat = self.comm.bcast(npot_mat, root=mpi_master())
+
+        t0 = tm.time()
 
         if self.electric_field is not None:
             if molecule.get_charge() != 0:
@@ -1397,35 +1399,34 @@ class ScfDriver:
         else:
             dipole_mats = None
 
-        t4 = tm.time()
+        dipole_dt = tm.time() - t0
 
         if self.rank == mpi_master() and self.print_level > 1:
 
             self.ostream.print_info('Overlap matrix computed in' +
-                                    ' {:.2f} sec.'.format(t1 - t0))
+                                    ' {:.2f} sec.'.format(ovl_dt))
             self.ostream.print_blank()
 
             self.ostream.print_info('Kinetic energy matrix computed in' +
-                                    ' {:.2f} sec.'.format(t2 - t1))
+                                    ' {:.2f} sec.'.format(kin_dt))
             self.ostream.print_blank()
 
             self.ostream.print_info('Nuclear potential matrix computed in' +
-                                    ' {:.2f} sec.'.format(t3 - t2))
+                                    ' {:.2f} sec.'.format(npot_dt))
             self.ostream.print_blank()
 
             if self.electric_field is not None:
                 self.ostream.print_info('Electric dipole matrices computed in' +
-                                        ' {:.2f} sec.'.format(t4 - t3))
+                                        ' {:.2f} sec.'.format(dipole_dt))
                 self.ostream.print_blank()
 
             self.ostream.flush()
 
         return ovl_mat, kin_mat, npot_mat, dipole_mats
 
-    def _comp_npot_mat_split_comm(self, molecule, basis):
+    def _comp_npot_mat_parallel(self, molecule, basis):
         """
-        Computes one-electron nuclear potential integral on split
-        communicators.
+        Computes one-electron nuclear potential integral in parallel.
 
         :param molecule:
             The molecule.
@@ -1436,28 +1437,19 @@ class ScfDriver:
             The one-electron nuclear potential matrix.
         """
 
-        node_grps = [p for p in range(self.nodes)]
-        subcomm = SubCommunicators(self.comm, node_grps)
-        local_comm = subcomm.local_comm
-        cross_comm = subcomm.cross_comm
-
         ave, res = divmod(molecule.number_of_atoms(), self.nodes)
         counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
 
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
-        charges = molecule.elem_ids_to_numpy()[start:end].astype(float)
-        coords = np.vstack(
-            (molecule.x_to_numpy()[start:end], molecule.y_to_numpy()[start:end],
-             molecule.z_to_numpy()[start:end])).T
+        charges = molecule.get_element_ids()[start:end]
+        coords = molecule.get_coordinates_in_bohr()[start:end, :]
 
-        npot_drv = NuclearPotentialIntegralsDriver(local_comm)
-        npot_mat = npot_drv.compute(molecule, basis, charges, coords)
+        npot_mat = compute_nuclear_potential_integrals(molecule, basis, charges,
+                                                       coords)
 
-        if local_comm.Get_rank() == mpi_master():
-            npot_mat.reduce_sum(cross_comm.Get_rank(), cross_comm.Get_size(),
-                                cross_comm)
+        npot_mat = self.comm.reduce(npot_mat, root=mpi_master())
 
         return npot_mat
 
