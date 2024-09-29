@@ -286,13 +286,13 @@ CXtbDriver::getBondOrders() const
     return bond_orders;
 }
 
-int32_t
+int
 CXtbDriver::getNumberOfAtoms() const
 {
     return _natoms;
 }
 
-int32_t
+int
 CXtbDriver::getNumberOfAOs() const
 {
     int nao = 0;
@@ -304,7 +304,7 @@ CXtbDriver::getNumberOfAOs() const
 #endif
     }
 
-    return static_cast<int32_t>(nao);
+    return static_cast<int>(nao);
 }
 
 std::vector<double>

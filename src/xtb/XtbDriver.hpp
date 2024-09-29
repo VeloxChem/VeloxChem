@@ -37,8 +37,6 @@ class CMolecule;
 
 /**
  Class CXtbDriver enables DFT-B computations using XTB package from Grimme group.
-
- @author Z. Rinkevicius
  */
 class CXtbDriver
 {
@@ -230,14 +228,14 @@ class CXtbDriver
 
      @return the number of Atoms.
     */
-    int32_t getNumberOfAtoms() const;
+    int getNumberOfAtoms() const;
 
     /**
      Gets number of AOs.
 
      @return the number of AOs.
     */
-    int32_t getNumberOfAOs() const;
+    int getNumberOfAOs() const;
 
     /**
      Gets orbital energies as vector (order: naos).
