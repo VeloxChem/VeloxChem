@@ -40,6 +40,7 @@ from .veloxchemlib import rotatory_strength_in_cgs
 from .distributedarray import DistributedArray
 from .molecularorbitals import MolecularOrbitals, molorb
 from .visualizationdriver import VisualizationDriver
+from .profiler import Profiler
 from .sanitychecks import dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
@@ -178,6 +179,8 @@ class LinearSolver:
 
         self._block_size_factor = 2
 
+        self.debug = False
+
         # input keywords
         self._input_keywords = {
             'response': {
@@ -200,6 +203,7 @@ class LinearSolver:
                 'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
                 'print_level': ('int', 'verbosity of output (1-3)'),
+                'debug': ('bool', 'print debug info'),
             },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
@@ -686,7 +690,18 @@ class LinearSolver:
             self.ostream.print_info(batch_str)
             self.ostream.flush()
 
+        if self.debug:
+            self.ostream.print_info(
+                '==DEBUG== batch_size: {}'.format(batch_size))
+            self.ostream.print_blank()
+            self.ostream.flush()
+
         for batch_ind in range(num_batches):
+
+            if self.debug:
+                self.ostream.print_info('==DEBUG== batch {}/{}'.format(
+                    batch_ind + 1, num_batches))
+                self.ostream.flush()
 
             # form density matrices
 
@@ -757,8 +772,23 @@ class LinearSolver:
 
             # form Fock matrices
 
+            if self.debug:
+                if profiler is None:
+                    profiler = Profiler()
+                self.ostream.print_info(
+                    '==DEBUG==   available memory before Fock build: ' +
+                    profiler.get_available_memory())
+                self.ostream.flush()
+
             fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,
                                       pe_dict, profiler)
+
+            if self.debug:
+                self.ostream.print_info(
+                    '==DEBUG==   available memory after  Fock build: ' +
+                    profiler.get_available_memory())
+                self.ostream.print_blank()
+                self.ostream.flush()
 
             if self.rank == mpi_master():
                 raw_fock_ger = []

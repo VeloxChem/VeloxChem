@@ -232,6 +232,8 @@ class ScfDriver:
 
         self._block_size_factor = 2
 
+        self.debug = False
+
         # input keywords
         self._input_keywords = {
             'scf': {
@@ -249,6 +251,7 @@ class ScfDriver:
                 'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
                 'print_level': ('int', 'verbosity of output (1-3)'),
+                'debug': ('bool', 'print debug info'),
                 'guess_unpaired_electrons':
                     ('str', 'unpaired electrons for initila guess'),
             },
@@ -1607,6 +1610,14 @@ class ScfDriver:
 
         fock_mat = None
 
+        if self.debug:
+            if profiler is None:
+                profiler = Profiler()
+            self.ostream.print_info(
+                '==DEBUG==   available memory before Fock build: ' +
+                profiler.get_available_memory())
+            self.ostream.flush()
+
         if self.scf_type == 'restricted':
             # restricted SCF
             fock_mat = fock_drv.compute(screener, self.rank, self.nodes,
@@ -1685,6 +1696,13 @@ class ScfDriver:
                 fock_mat = [fock_mat_a_np, fock_mat_b_np]
             else:
                 fock_mat = None
+
+        if self.debug:
+            self.ostream.print_info(
+                '==DEBUG==   available memory after  Fock build: ' +
+                profiler.get_available_memory())
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         if self.timing:
             profiler.add_timing_info('FockERI', tm.time() - eri_t0)
