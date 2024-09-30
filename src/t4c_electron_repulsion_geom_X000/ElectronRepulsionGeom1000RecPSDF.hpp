@@ -109,15 +109,15 @@ comp_electron_repulsion_geom_1000_psdf(T&                               distribu
 
     // allocate aligned contracted integrals
 
-    CSimdArray<double> ckbuffer(810, 1);
+    CSimdArray<double> ckbuffer(1485, 1);
 
     // allocate aligned half transformed integrals
 
-    CSimdArray<double> skbuffer(210, 1);
+    CSimdArray<double> skbuffer(1120, 1);
 
     // allocate aligned spherical integrals
 
-    CSimdArray<double> sbuffer(175, 1);
+    CSimdArray<double> sbuffer(315, 1);
 
     // setup Boys fuction data
 
@@ -382,77 +382,111 @@ comp_electron_repulsion_geom_1000_psdf(T&                               distribu
 
                 t2cfunc::reduce(cbuffer, 380, pbuffer, 682, 126, ket_width, ket_npgtos);
             }
+            
+            erirec::comp_ket_hrr_electron_repulsion_xxpf(ckbuffer, 0, cbuffer, 0, 10, cfactors, 6, 0, 0);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxpf(ckbuffer, 0, cbuffer, 0, 60, cfactors, 6, 0, 2);
+            erirec::comp_ket_hrr_electron_repulsion_xxpg(ckbuffer, 30, cbuffer, 10, 25, cfactors, 6, 0, 0);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxpg(ckbuffer, 180, cbuffer, 60, 150, cfactors, 6, 0, 2);
+            erirec::comp_ket_hrr_electron_repulsion_xxdf(ckbuffer, 75, 0, 30, cfactors, 6, 0, 0);
+            
+            erirec::comp_ket_hrr_electron_repulsion_xxpf(ckbuffer, 135, cbuffer, 46, 56, cfactors, 6, 0, 0);
 
-            erirec::comp_ket_hrr_electron_repulsion_xxdf(ckbuffer, 450, 0, 180, cfactors, 6, 0, 2);
+            erirec::comp_ket_hrr_electron_repulsion_xxpg(ckbuffer, 165, cbuffer, 56, 71, cfactors, 6, 0, 0);
 
-            t4cfunc::ket_transform<2, 3>(skbuffer, 0, ckbuffer, 450, 0, 2);
+            erirec::comp_ket_hrr_electron_repulsion_xxdf(ckbuffer, 210, 135, 165, cfactors, 6, 0, 0);
+            
+            erirec::comp_ket_hrr_electron_repulsion_xxpf(ckbuffer, 270, cbuffer, 92, 122, cfactors, 6, 0, 1);
 
-            t4cfunc::bra_transform<0, 2>(sbuffer, 0, skbuffer, 0, 2, 3);
+            erirec::comp_ket_hrr_electron_repulsion_xxpg(ckbuffer, 360, cbuffer, 122, 167, cfactors, 6, 0, 1);
 
+            erirec::comp_ket_hrr_electron_repulsion_xxdf(ckbuffer, 495, 270, 360, cfactors, 6, 0, 1);
+
+            erirec::comp_ket_hrr_electron_repulsion_xxpf(ckbuffer, 675, cbuffer, 230, 290, cfactors, 6, 0, 2);
+
+            erirec::comp_ket_hrr_electron_repulsion_xxpg(ckbuffer, 855, cbuffer, 290, 380, cfactors, 6, 0, 2);
+
+            erirec::comp_ket_hrr_electron_repulsion_xxdf(ckbuffer, 1125, 675, 855, cfactors, 6, 0, 2);
+
+            t4cfunc::ket_transform<2, 3>(skbuffer, 0, ckbuffer, 75, 0, 0);
+            
+            t4cfunc::ket_transform<2, 3>(skbuffer, 35, ckbuffer, 210, 0, 0);
+
+            t4cfunc::ket_transform<2, 3>(skbuffer, 70, ckbuffer, 495, 0, 1);
+            
+            t4cfunc::ket_transform<2, 3>(skbuffer, 175, ckbuffer, 1125, 0, 2);
+            
+            erirec::comp_bra_hrr_electron_repulsion_psxx(skbuffer, 385, skbuffer, 70, 35, r_ab, 2, 3);
+            
+            erirec::comp_bra_hrr_electron_repulsion_ppxx(skbuffer, 490, 70, 175, r_ab, 2, 3);
+            
+            erirec::comp_bra_geom_hrr_electron_repulsion_psxx(skbuffer, 805, 385, 490, 0, r_ab, 2, 3);
+            
+            t4cfunc::bra_transform<1, 0>(sbuffer, 0, skbuffer, 805, 2, 3);
+            
+            t4cfunc::bra_transform<1, 0>(sbuffer, 105, skbuffer, 910, 2, 3);
+            
+            t4cfunc::bra_transform<1, 0>(sbuffer, 210, skbuffer, 1015, 2, 3);
+            
             distributor.distribute(sbuffer, 0, a_indices, b_indices, c_indices, d_indices, 1, 0, 2, 3, j, ket_range);
             
-            // *** START DEBUG BLOCK
-            
-            const auto [a_angmom, b_angmom]=  bra_gto_pair_block.angular_momentums();
-            
-            const auto [c_angmom, d_angmom]=  ket_gto_pair_block.angular_momentums();
-            
-            const auto adim = a_indices[0];
-            
-            const auto bdim = b_indices[0];
-            
-            const auto cdim = c_indices[0];
-            
-            const auto ddim = d_indices[0];
-            
-            // set up angular components
-            
-            const auto acomps = tensor::number_of_spherical_components(std::array<int, 1>{a_angmom});
-            
-            const auto bcomps = tensor::number_of_spherical_components(std::array<int, 1>{b_angmom});
-            
-            const auto ccomps = tensor::number_of_spherical_components(std::array<int, 1>{c_angmom});
-            
-            const auto dcomps = tensor::number_of_spherical_components(std::array<int, 1>{d_angmom});
-            
-            const auto tcomps = acomps * bcomps * ccomps * dcomps;
-            
-            std::cout << std::setprecision(15);
-            
-            for (size_t p = 0; p < sbuffer.number_of_active_elements(); p++)
-            {
-                for (int k = 0; k < acomps; k++)
-                {
-                    for (int l = 0; l < bcomps; l++)
-                    {
-                        for (int m = 0; m < ccomps; m++)
-                        {
-                            for (int n = 0; n < dcomps; n++)
-                            {
-                                auto idx = k * bcomps * ccomps * dcomps + l * ccomps * dcomps  + m * dcomps + n;
-                                
-                                auto tint_x = sbuffer.data(idx);
-                                
-                                auto tint_y = sbuffer.data(idx + tcomps);
-                                
-                                auto tint_z = sbuffer.data(idx + 2 * tcomps);
-                                
-                                std::cout << k * adim + a_indices[j + 1] << " " << l * bdim + b_indices[j + 1];
-                                
-                                std::cout << " " << m * cdim + c_indices[ket_range.first + p + 1] << " " << n * ddim + d_indices[ket_range.first + p + 1];
-                                
-                                std::cout << " " << tint_x[p] << " " << tint_y[p] << " " << tint_z[p] << std::endl;
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // *** END DEBUG BLOCK
+//            // *** START DEBUG BLOCK
+//            
+//            const auto [a_angmom, b_angmom]=  bra_gto_pair_block.angular_momentums();
+//            
+//            const auto [c_angmom, d_angmom]=  ket_gto_pair_block.angular_momentums();
+//            
+//            const auto adim = a_indices[0];
+//            
+//            const auto bdim = b_indices[0];
+//            
+//            const auto cdim = c_indices[0];
+//            
+//            const auto ddim = d_indices[0];
+//            
+//            // set up angular components
+//            
+//            const auto acomps = tensor::number_of_spherical_components(std::array<int, 1>{a_angmom});
+//            
+//            const auto bcomps = tensor::number_of_spherical_components(std::array<int, 1>{b_angmom});
+//            
+//            const auto ccomps = tensor::number_of_spherical_components(std::array<int, 1>{c_angmom});
+//            
+//            const auto dcomps = tensor::number_of_spherical_components(std::array<int, 1>{d_angmom});
+//            
+//            const auto tcomps = acomps * bcomps * ccomps * dcomps;
+//            
+//            std::cout << std::setprecision(15);
+//            
+//            for (size_t p = 0; p < sbuffer.number_of_active_elements(); p++)
+//            {
+//                for (int k = 0; k < acomps; k++)
+//                {
+//                    for (int l = 0; l < bcomps; l++)
+//                    {
+//                        for (int m = 0; m < ccomps; m++)
+//                        {
+//                            for (int n = 0; n < dcomps; n++)
+//                            {
+//                                auto idx = k * bcomps * ccomps * dcomps + l * ccomps * dcomps  + m * dcomps + n;
+//                                
+//                                auto tint_x = sbuffer.data(idx);
+//                                
+//                                auto tint_y = sbuffer.data(idx + tcomps);
+//                                
+//                                auto tint_z = sbuffer.data(idx + 2 * tcomps);
+//                                
+//                                std::cout << k * adim + a_indices[j + 1] << " " << l * bdim + b_indices[j + 1];
+//                                
+//                                std::cout << " " << m * cdim + c_indices[ket_range.first + p + 1] << " " << n * ddim + d_indices[ket_range.first + p + 1];
+//                                
+//                                std::cout << " " << tint_x[p] << " " << tint_y[p] << " " << tint_z[p] << std::endl;
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//            
+//            // *** END DEBUG BLOCK
         }
     }
 }
