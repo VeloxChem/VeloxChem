@@ -57,7 +57,7 @@ class TestXCMolGrad:
 
         self.run_xc_mol_grad(molecule, basis, xcfun, ref_grad)
 
-    def disabled_test_xc_mol_grad_blyp(self):
+    def test_xc_mol_grad_blyp(self):
 
         mol_str = """
             O  0.0000000000   0.0000000000  -0.0254395383
