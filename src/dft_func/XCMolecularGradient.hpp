@@ -71,6 +71,25 @@ class CXCMolecularGradient
                                              const CXCFunctional&    xcFunctional) const;
 
     /**
+     Integrates first-order GGA exchnage-correlation functional contribution to
+     molecular gradient.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrix the perturbed AO density matrix.
+     @param gsDensityMatrix the ground state AO density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @return the molecular gradient.
+     */
+    CDenseMatrix _integrateVxcGradientForGGA(const CMolecule&        molecule,
+                                             const CMolecularBasis&  basis,
+                                             const double*           rwDensityPointer,
+                                             const double*           gsDensityPointer,
+                                             const CMolecularGrid&   molecularGrid,
+                                             const CXCFunctional&    xcFunctional) const;
+
+    /**
      Computes AO-to-atom mapping.
 
      @param ao_to_atom_ids the vector for storing the mapping.

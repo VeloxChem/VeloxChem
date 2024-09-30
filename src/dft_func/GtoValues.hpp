@@ -62,6 +62,12 @@ auto get_gto_values_for_gga(const CGtoBlock&            gto_block,
                         const std::vector<double>&  grid_coords_z,
                         const std::vector<int>& gtos_mask) -> CMatrix;
 
+auto get_gto_values_for_mgga(const CGtoBlock&            gto_block,
+                             const std::vector<double>&  grid_coords_x,
+                             const std::vector<double>&  grid_coords_y,
+                             const std::vector<double>&  grid_coords_z,
+                             const std::vector<int>& gtos_mask) -> CMatrix;
+
 }  // namespace gtoval
 
 #endif /* GtoValues_hpp */
