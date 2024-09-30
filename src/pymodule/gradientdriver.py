@@ -80,6 +80,8 @@ class GradientDriver:
         self.gradient = None
         self.flag = None
 
+        # TODO: double check self.numerical
+
         self.numerical = False
         self.do_four_point = False
 

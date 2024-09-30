@@ -57,3 +57,4 @@ class TestGrad:
 
         self.run_grad(mol, 'hf', 'sto-3g', 1.0e-5)
         self.run_grad(mol, 'slater', 'sto-3g', 1.0e-4)
+        self.run_grad(mol, 'b3lyp', 'sto-3g', 1.0e-4)

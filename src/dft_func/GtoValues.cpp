@@ -112,6 +112,10 @@ get_gto_values_for_mgga(const CGtoBlock&            gto_block,
     {
         return gtoval::get_mgga_values_rec_s(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
     }
+    else if (gto_ang == 1)
+    {
+        return gtoval::get_mgga_values_rec_p(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
+    }
 
     std::string errangmom("get_gto_values_for_gga: Only implemented up to f-orbitals");
 

@@ -63,7 +63,7 @@ class ScfGradientDriver(GradientDriver):
         self.scf_driver = scf_drv
         self.flag = 'SCF Gradient Driver'
 
-        self.numerical = True
+        self.numerical = False
         self.delta_h = 0.001
 
     def compute(self, molecule, basis, scf_results):
