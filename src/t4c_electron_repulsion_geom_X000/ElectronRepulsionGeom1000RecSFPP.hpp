@@ -1,5 +1,5 @@
-#ifndef ElectronRepulsionGeom1000RecSDSS_hpp
-#define ElectronRepulsionGeom1000RecSDSS_hpp
+#ifndef ElectronRepulsionGeom1000RecSFPP_hpp
+#define ElectronRepulsionGeom1000RecSFPP_hpp
 
 #include <array>
 #include <cstddef>
@@ -7,10 +7,21 @@
 
 #include "BatchFunc.hpp"
 #include "BoysFunc.hpp"
-#include "ElectronRepulsionContrRecPDXX.hpp"
+#include "ElectronRepulsionContrRecPFXX.hpp"
+#include "ElectronRepulsionContrRecXXPP.hpp"
+#include "ElectronRepulsionPrimRecSDSD.hpp"
+#include "ElectronRepulsionPrimRecSDSP.hpp"
 #include "ElectronRepulsionPrimRecSDSS.hpp"
+#include "ElectronRepulsionPrimRecSFSD.hpp"
+#include "ElectronRepulsionPrimRecSFSP.hpp"
 #include "ElectronRepulsionPrimRecSFSS.hpp"
+#include "ElectronRepulsionPrimRecSGSD.hpp"
+#include "ElectronRepulsionPrimRecSGSP.hpp"
+#include "ElectronRepulsionPrimRecSPSD.hpp"
+#include "ElectronRepulsionPrimRecSPSP.hpp"
 #include "ElectronRepulsionPrimRecSPSS.hpp"
+#include "ElectronRepulsionPrimRecSSSD.hpp"
+#include "ElectronRepulsionPrimRecSSSP.hpp"
 #include "ElectronRepulsionPrimRecSSSS.hpp"
 #include "GtoPairBlock.hpp"
 #include "SimdArray.hpp"
@@ -23,7 +34,7 @@
 
 namespace erirec {  // erirec namespace
 
-/// @brief Computes (SD|1/|r-r'||SS)  integral derivatives for two basis function pairs blocks.
+/// @brief Computes (SF|1/|r-r'||PP)  integral derivatives for two basis function pairs blocks.
 /// @param distributor The pointer to Fock matrix/matrices distributor.
 /// @param bra_gto_pair_block The GTOs pair block on bra side.
 /// @param ket_gto_pair_block The GTOs pair block on ket side.
@@ -31,7 +42,7 @@ namespace erirec {  // erirec namespace
 /// @param ket_indices The range [ket_first, ket_last) of basis function pairs on ket side.
 template <class T>
 inline auto
-comp_electron_repulsion_geom_1000_sdss(T&                               distributor,
+comp_electron_repulsion_geom_1000_sfpp(T&                               distributor,
                                        const CGtoPairBlock&             bra_gto_pair_block,
                                        const CGtoPairBlock&             ket_gto_pair_block,
                                        const std::pair<size_t, size_t>& bra_indices,
@@ -78,32 +89,38 @@ comp_electron_repulsion_geom_1000_sdss(T&                               distribu
     const auto d_indices = ket_gto_pair_block.ket_orbital_indices();
 
     const auto ket_npgtos = ket_gto_pair_block.number_of_primitive_pairs();
-    
+
     // allocate aligned 2D arrays for ket side
 
-    CSimdArray<double> pfactors(23, ket_npgtos);
+    CSimdArray<double> pfactors(29, ket_npgtos);
+
+    CSimdArray<double> cfactors(9, 1);
 
     // allocate aligned primitive integrals
 
-    CSimdArray<double> pbuffer(35, ket_npgtos);
+    CSimdArray<double> pbuffer(671, ket_npgtos);
 
     // allocate aligned Cartesian integrals
 
-    CSimdArray<double> cbuffer(16, 1);
+    CSimdArray<double> cbuffer(225, 1);
+
+    // allocate aligned contracted integrals
+
+    CSimdArray<double> ckbuffer(225, 1);
 
     // allocate aligned half transformed integrals
 
-    CSimdArray<double> skbuffer(34, 1);
+    CSimdArray<double> skbuffer(495, 1);
 
     // allocate aligned spherical integrals
 
-    CSimdArray<double> sbuffer(15, 1);
+    CSimdArray<double> sbuffer(189, 1);
 
     // setup Boys fuction data
 
-    const CBoysFunc<3> bf_table;
+    const CBoysFunc<6> bf_table;
 
-    CSimdArray<double> bf_data(5, ket_npgtos);
+    CSimdArray<double> bf_data(8, ket_npgtos);
 
     // set up range seperation factor
 
@@ -120,8 +137,6 @@ comp_electron_repulsion_geom_1000_sdss(T&                               distribu
     for (size_t i = 0; i < ket_blocks; i++)
     {
         auto ket_range = batch::batch_range(i, ket_dim, simd::width<double>(), ket_indices.first);
-        
-       // std::cout << "*** BLOCK : " << i << " -> " << ket_range.first << " , " << ket_range.second << std::endl;
 
         pfactors.load(c_vec_exps, ket_range, 0, ket_npgtos);
 
@@ -135,6 +150,12 @@ comp_electron_repulsion_geom_1000_sdss(T&                               distribu
 
         pfactors.replicate_points(d_coords, ket_range, 7, ket_npgtos);
 
+        cfactors.replicate_points(c_coords, ket_range, 0, 1);
+
+        cfactors.replicate_points(d_coords, ket_range, 3, 1);
+
+        t4cfunc::comp_distances_cd(cfactors, 6, 0, 3);
+
         // set up active SIMD width
 
         const auto ket_width = ket_range.second - ket_range.first;
@@ -142,6 +163,8 @@ comp_electron_repulsion_geom_1000_sdss(T&                               distribu
         pbuffer.set_active_width(ket_width);
 
         cbuffer.set_active_width(ket_width);
+
+        ckbuffer.set_active_width(ket_width);
 
         skbuffer.set_active_width(ket_width);
 
@@ -156,6 +179,8 @@ comp_electron_repulsion_geom_1000_sdss(T&                               distribu
             // zero integral buffers
 
             cbuffer.zero();
+
+            ckbuffer.zero();
 
             skbuffer.zero();
 
@@ -205,19 +230,23 @@ comp_electron_repulsion_geom_1000_sdss(T&                               distribu
 
                 t4cfunc::comp_coordinates_w(pfactors, 17, 10, r_p, a_exp, b_exp);
 
-                t4cfunc::comp_distances_wp(pfactors, 20, 17, r_p);
+                t4cfunc::comp_distances_qd(pfactors, 20, 10, 7);
+
+                t4cfunc::comp_distances_wq(pfactors, 23, 17, 10);
+
+                t4cfunc::comp_distances_wp(pfactors, 26, 17, r_p);
 
                 if (use_rs)
                 {
-                    t4cfunc::comp_boys_args(bf_data, 4, pfactors, 13, a_exp, b_exp, omega);
+                    t4cfunc::comp_boys_args(bf_data, 7, pfactors, 13, a_exp, b_exp, omega);
 
-                    bf_table.compute(bf_data, 0, 4, pfactors, a_exp, b_exp, omega);
+                    bf_table.compute(bf_data, 0, 7, pfactors, a_exp, b_exp, omega);
                 }
                 else
                 {
-                    t4cfunc::comp_boys_args(bf_data, 4, pfactors, 13, a_exp, b_exp);
+                    t4cfunc::comp_boys_args(bf_data, 7, pfactors, 13, a_exp, b_exp);
 
-                    bf_table.compute(bf_data, 0, 4);
+                    bf_table.compute(bf_data, 0, 7);
                 }
 
                 t4cfunc::comp_ovl_factors(pfactors, 16, 2, 3, ab_ovl, ab_norm, a_exp, b_exp);
@@ -230,69 +259,149 @@ comp_electron_repulsion_geom_1000_sdss(T&                               distribu
 
                 erirec::comp_prim_electron_repulsion_ssss(pbuffer, 3, pfactors, 16, bf_data, 3);
 
-                erirec::comp_prim_electron_repulsion_spss(pbuffer, 4, 0, 1, pfactors, 20, r_pb);
+                erirec::comp_prim_electron_repulsion_ssss(pbuffer, 4, pfactors, 16, bf_data, 4);
 
-                erirec::comp_prim_electron_repulsion_spss(pbuffer, 7, 1, 2, pfactors, 20, r_pb);
+                erirec::comp_prim_electron_repulsion_ssss(pbuffer, 5, pfactors, 16, bf_data, 5);
 
-                erirec::comp_prim_electron_repulsion_spss(pbuffer, 10, 2, 3, pfactors, 20, r_pb);
+                erirec::comp_prim_electron_repulsion_ssss(pbuffer, 6, pfactors, 16, bf_data, 6);
 
-                erirec::comp_prim_electron_repulsion_sdss(pbuffer, 13, 0, 1, 4, 7, pfactors, 20, r_pb, a_exp, b_exp);
+                erirec::comp_prim_electron_repulsion_sssp(pbuffer, 7, 0, 1, pfactors, 20, 23);
 
-                erirec::comp_prim_electron_repulsion_sdss(pbuffer, 19, 1, 2, 7, 10, pfactors, 20, r_pb, a_exp, b_exp);
+                erirec::comp_prim_electron_repulsion_sssp(pbuffer, 10, 1, 2, pfactors, 20, 23);
 
-                erirec::comp_prim_electron_repulsion_sfss(pbuffer, 25, 4, 7, 13, 19, pfactors, 20, r_pb, a_exp, b_exp);
+                erirec::comp_prim_electron_repulsion_sssp(pbuffer, 13, 2, 3, pfactors, 20, 23);
+
+                erirec::comp_prim_electron_repulsion_sssp(pbuffer, 16, 3, 4, pfactors, 20, 23);
+
+                erirec::comp_prim_electron_repulsion_sssp(pbuffer, 19, 4, 5, pfactors, 20, 23);
+
+                erirec::comp_prim_electron_repulsion_sssp(pbuffer, 22, 5, 6, pfactors, 20, 23);
+
+                erirec::comp_prim_electron_repulsion_sssd(pbuffer, 25, 0, 1, 7, 10, pfactors, 20, 23, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sssd(pbuffer, 31, 1, 2, 10, 13, pfactors, 20, 23, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sssd(pbuffer, 37, 2, 3, 13, 16, pfactors, 20, 23, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sssd(pbuffer, 43, 3, 4, 16, 19, pfactors, 20, 23, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sssd(pbuffer, 49, 4, 5, 19, 22, pfactors, 20, 23, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_spss(pbuffer, 55, 1, 2, pfactors, 26, r_pb);
+
+                erirec::comp_prim_electron_repulsion_spss(pbuffer, 58, 2, 3, pfactors, 26, r_pb);
+
+                erirec::comp_prim_electron_repulsion_spss(pbuffer, 61, 3, 4, pfactors, 26, r_pb);
+
+                erirec::comp_prim_electron_repulsion_spsp(pbuffer, 64, 1, 7, 10, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_spsp(pbuffer, 73, 2, 10, 13, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_spsp(pbuffer, 82, 3, 13, 16, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_spsp(pbuffer, 91, 4, 16, 19, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_spsd(pbuffer, 100, 10, 25, 31, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_spsd(pbuffer, 118, 13, 31, 37, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_spsd(pbuffer, 136, 16, 37, 43, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_spsd(pbuffer, 154, 19, 43, 49, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sdss(pbuffer, 172, 1, 2, 55, 58, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sdss(pbuffer, 178, 2, 3, 58, 61, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sdsp(pbuffer, 184, 7, 10, 55, 64, 73, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sdsp(pbuffer, 202, 10, 13, 58, 73, 82, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sdsp(pbuffer, 220, 13, 16, 61, 82, 91, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sdsd(pbuffer, 238, 25, 31, 73, 100, 118, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sdsd(pbuffer, 274, 31, 37, 82, 118, 136, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sdsd(pbuffer, 310, 37, 43, 91, 136, 154, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sfss(pbuffer, 346, 55, 58, 172, 178, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sfsp(pbuffer, 356, 64, 73, 172, 184, 202, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sfsp(pbuffer, 386, 73, 82, 178, 202, 220, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sfsd(pbuffer, 416, 100, 118, 202, 238, 274, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sfsd(pbuffer, 476, 118, 136, 220, 274, 310, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sgsp(pbuffer, 536, 184, 202, 346, 356, 386, pfactors, 26, r_pb, a_exp, b_exp);
+
+                erirec::comp_prim_electron_repulsion_sgsd(pbuffer, 581, 238, 274, 386, 416, 476, pfactors, 26, r_pb, a_exp, b_exp);
                 
-                pbuffer.scale(2.0 * a_exp, {13, 19});
+                pbuffer.scale(2.0 * a_exp, {356, 386});
                 
-                pbuffer.scale(2.0 * a_exp, {25, 35});
+                pbuffer.scale(2.0 * a_exp, {416, 476});
+                
+                pbuffer.scale(2.0 * a_exp, {536, 581});
+                
+                pbuffer.scale(2.0 * a_exp, {581, 671});
 
-                t2cfunc::reduce(cbuffer, 0, pbuffer, 13, 6, ket_width, ket_npgtos);
+                t2cfunc::reduce(cbuffer, 0, pbuffer, 356, 30, ket_width, ket_npgtos);
 
-                t2cfunc::reduce(cbuffer, 6, pbuffer, 25, 10, ket_width, ket_npgtos);
+                t2cfunc::reduce(cbuffer, 30, pbuffer, 416, 60, ket_width, ket_npgtos);
+
+                t2cfunc::reduce(cbuffer, 90, pbuffer, 536, 45, ket_width, ket_npgtos);
+
+                t2cfunc::reduce(cbuffer, 135, pbuffer, 581, 90, ket_width, ket_npgtos);
             }
 
-            t4cfunc::ket_transform<0, 0>(skbuffer, 0, cbuffer, 0, 0, 2);
+            erirec::comp_ket_hrr_electron_repulsion_xxpp(ckbuffer, 0, cbuffer, 0, 30, cfactors, 6, 0, 3);
 
-            t4cfunc::ket_transform<0, 0>(skbuffer, 6, cbuffer, 6, 0, 3);
+            erirec::comp_ket_hrr_electron_repulsion_xxpp(ckbuffer, 90, cbuffer, 90, 135, cfactors, 6, 0, 4);
 
-            erirec::comp_bra_hrr_electron_repulsion_pdxx(skbuffer, 16, 0, 6, r_ab, 0, 0);
+            t4cfunc::ket_transform<1, 1>(skbuffer, 0, ckbuffer, 0, 0, 3);
 
-            t4cfunc::bra_transform<0, 2>(sbuffer, 0, skbuffer, 16, 0, 0);
+            t4cfunc::ket_transform<1, 1>(skbuffer, 90, ckbuffer, 90, 0, 4);
+
+            erirec::comp_bra_hrr_electron_repulsion_pfxx(skbuffer, 225, 0, 90, r_ab, 1, 1);
+
+            t4cfunc::bra_transform<0, 3>(sbuffer, 0, skbuffer, 225, 1, 1);
             
-            t4cfunc::bra_transform<0, 2>(sbuffer, 5, skbuffer, 22, 0, 0);
+            t4cfunc::bra_transform<0, 3>(sbuffer, 63, skbuffer, 315, 1, 1);
             
-            t4cfunc::bra_transform<0, 2>(sbuffer, 10, skbuffer, 28, 0, 0);
+            t4cfunc::bra_transform<0, 3>(sbuffer, 126, skbuffer, 405, 1, 1);
 
-            distributor.distribute(sbuffer, 0, a_indices, b_indices, c_indices, d_indices, 0, 2, 0, 0, j, ket_range);
+            distributor.distribute(sbuffer, 0, a_indices, b_indices, c_indices, d_indices, 0, 3, 1, 1, j, ket_range);
             
 //            // *** START DEBUG BLOCK
-//
+//            
 //            const auto [a_angmom, b_angmom]=  bra_gto_pair_block.angular_momentums();
-//
+//            
 //            const auto [c_angmom, d_angmom]=  ket_gto_pair_block.angular_momentums();
-//
+//            
 //            const auto adim = a_indices[0];
-//
+//            
 //            const auto bdim = b_indices[0];
-//
+//            
 //            const auto cdim = c_indices[0];
-//
+//            
 //            const auto ddim = d_indices[0];
-//
+//            
 //            // set up angular components
-//
+//            
 //            const auto acomps = tensor::number_of_spherical_components(std::array<int, 1>{a_angmom});
-//
+//            
 //            const auto bcomps = tensor::number_of_spherical_components(std::array<int, 1>{b_angmom});
-//
+//            
 //            const auto ccomps = tensor::number_of_spherical_components(std::array<int, 1>{c_angmom});
-//
+//            
 //            const auto dcomps = tensor::number_of_spherical_components(std::array<int, 1>{d_angmom});
-//
+//            
 //            const auto tcomps = acomps * bcomps * ccomps * dcomps;
-//
+//            
 //            std::cout << std::setprecision(15);
-//
+//            
 //            for (size_t p = 0; p < sbuffer.number_of_active_elements(); p++)
 //            {
 //                for (int k = 0; k < acomps; k++)
@@ -304,29 +413,29 @@ comp_electron_repulsion_geom_1000_sdss(T&                               distribu
 //                            for (int n = 0; n < dcomps; n++)
 //                            {
 //                                auto idx = k * bcomps * ccomps * dcomps + l * ccomps * dcomps  + m * dcomps + n;
-//
+//                                
 //                                auto tint_x = sbuffer.data(idx);
-//
+//                                
 //                                auto tint_y = sbuffer.data(idx + tcomps);
-//
+//                                
 //                                auto tint_z = sbuffer.data(idx + 2 * tcomps);
-//
+//                                
 //                                std::cout << k * adim + a_indices[j + 1] << " " << l * bdim + b_indices[j + 1];
-//
+//                                
 //                                std::cout << " " << m * cdim + c_indices[ket_range.first + p + 1] << " " << n * ddim + d_indices[ket_range.first + p + 1];
-//
+//                                
 //                                std::cout << " " << tint_x[p] << " " << tint_y[p] << " " << tint_z[p] << std::endl;
 //                            }
 //                        }
 //                    }
 //                }
 //            }
-//
+//            
 //            // *** END DEBUG BLOCK
         }
     }
 }
 
-}  // namespace erirec
+} // namespace erirec
 
-#endif /* ElectronRepulsionGeom1000RecSDSS_hpp */
+#endif /* ElectronRepulsionGeom1000RecSFPP_hpp */
