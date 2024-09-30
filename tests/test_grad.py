@@ -9,10 +9,13 @@ from veloxchem import ScfGradientDriver
 @pytest.mark.solvers
 class TestGrad:
 
-    def run_grad(self, molecule, basis):
+    def run_grad(self, molecule, xcfun_label, basis_label, tol):
+
+        basis = MolecularBasis.read(molecule, basis_label)
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
+        scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(molecule, basis)
 
         grad_drv = ScfGradientDriver(scf_drv)
@@ -24,7 +27,7 @@ class TestGrad:
         grad_drv.compute(molecule, basis, scf_results)
         ana_grad = grad_drv.get_gradient()
 
-        assert np.max(np.abs(num_grad - ana_grad)) < 1.0e-5
+        assert np.max(np.abs(num_grad - ana_grad)) < tol
 
     def test_nh3_sto3g(self):
 
@@ -36,9 +39,7 @@ class TestGrad:
         """
         mol = Molecule.read_molecule_string(molstr, units='bohr')
 
-        bas = MolecularBasis.read(mol, 'sto-3g')
-
-        self.run_grad(mol, bas)
+        self.run_grad(mol, 'hf', 'sto-3g', 1.0e-5)
 
     def test_c2h4_sto3g(self):
 
@@ -54,6 +55,5 @@ class TestGrad:
         """
         mol = Molecule.read_xyz_string(xyzstr)
 
-        bas = MolecularBasis.read(mol, 'sto-3g')
-
-        self.run_grad(mol, bas)
+        self.run_grad(mol, 'hf', 'sto-3g', 1.0e-5)
+        self.run_grad(mol, 'slater', 'sto-3g', 1.0e-4)
