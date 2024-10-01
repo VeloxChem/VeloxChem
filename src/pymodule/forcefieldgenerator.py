@@ -29,6 +29,8 @@ import numpy as np
 import tempfile
 import sys
 import re
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
 
 from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
 from .atomtypeidentifier import AtomTypeIdentifier
@@ -45,6 +47,7 @@ from .seminario import Seminario
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
+from .uffparameters import get_uff_parameters
 
 
 class ForceFieldGenerator:
@@ -141,6 +144,9 @@ class ForceFieldGenerator:
         self.resp_dict = None
 
         self.keep_files = True
+
+        # UFF parameters
+        self.uff_parameters = get_uff_parameters()
 
     def update_settings(self, ffg_dict, resp_dict=None):
         """
@@ -443,15 +449,20 @@ class ForceFieldGenerator:
 
         return content.splitlines()
 
-    def create_topology(self, molecule, basis=None):
+    def create_topology(self, molecule, basis=None, scf_result=None, resp=True):
         """
-        Analizes the topology of the molecule and create dictionaries
+        Analyzes the topology of the molecule and create dictionaries
         for the atoms, bonds, angles, dihedrals, impropers and pairs.
 
         :param molecule:
             The molecule.
         :param basis:
             The AO basis set.
+        :param scf_result:
+            A converged SCF result.
+        :param resp:
+            If RESP charges should be computed.
+            If False partial charges will be set to zero.
         """
 
         # Read the force field data lines.
@@ -492,30 +503,77 @@ class ForceFieldGenerator:
         self.connectivity_matrix = np.copy(
             atomtypeidentifier.connectivity_matrix)
 
+        if not resp:
+            # skip RESP charges calculation
+            self.partial_charges = np.zeros(self.molecule.number_of_atoms())
+            msg = 'RESP calculation disabled: All partial charges are set to zero.'
+            self.ostream.print_info(msg)
+            self.ostream.flush()
+
         if self.partial_charges is None:
-            if basis is None:
-                if self.rank == mpi_master():
-                    basis = MolecularBasis.read(self.molecule,
-                                                '6-31G*',
-                                                ostream=None)
-                else:
-                    basis = MolecularBasis()
-                basis.broadcast(self.rank, self.comm)
-                msg = 'Using 6-31G* basis set for RESP charges...'
+            if scf_result is None:
+                # compute RESP charges from scratch
+                if basis is None:
+                    if self.rank == mpi_master():
+                        basis = MolecularBasis.read(self.molecule,
+                                                    '6-31G*',
+                                                    ostream=None)
+                    else:
+                        basis = MolecularBasis()
+                    basis.broadcast(self.rank, self.comm)
+                    msg = 'Using 6-31G* basis set for RESP charges...'
+                    self.ostream.print_info(msg)
+                    self.ostream.flush()
+
+                resp_drv = RespChargesDriver(self.comm, self.ostream)
+                resp_drv.filename = self.molecule_name
+                if self.resp_dict is not None:
+                    resp_drv.update_settings(self.resp_dict)
+                if resp_drv.equal_charges is None:
+                    resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
+
+                self.partial_charges = resp_drv.compute(self.molecule, basis,
+                                                        'resp')
+                self.partial_charges = self.comm.bcast(self.partial_charges,
+                                                       root=mpi_master())
+
+            else:
+                # compute RESP charges using the provided SCF result
+                if basis is None:
+                    error_msg = 'Basis is required for RESP charges.'
+                    assert_msg_critical(False, error_msg)
+
+                resp_drv = RespChargesDriver(self.comm, self.ostream)
+                resp_drv.filename = self.molecule_name
+                msg = 'Using provided SCF result for RESP charges'
                 self.ostream.print_info(msg)
                 self.ostream.flush()
+                if self.resp_dict is not None:
+                    resp_drv.update_settings(self.resp_dict)
+                if resp_drv.equal_charges is None:
+                    resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
 
-            resp_drv = RespChargesDriver(self.comm, self.ostream)
-            resp_drv.filename = self.molecule_name
-            if self.resp_dict is not None:
-                resp_drv.update_settings(self.resp_dict)
-            if resp_drv.equal_charges is None:
-                resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
+                self.partial_charges = resp_drv.compute(self.molecule, basis,
+                                                        scf_result, 'resp')
+                self.partial_charges = self.comm.bcast(self.partial_charges,
+                                                       root=mpi_master())
 
-            self.partial_charges = resp_drv.compute(self.molecule, basis,
-                                                    'resp')
-            self.partial_charges = self.comm.bcast(self.partial_charges,
-                                                   root=mpi_master())
+        # self.partial charges should be summing to a whole number
+        # Round to the itp writting precision (6 decimal places)
+        self.partial_charges = np.round(self.partial_charges, 6)
+
+        # Removing the tail of the partial charges to ensure the sum is a whole number
+        excess_charge = (sum(self.partial_charges) -
+                         round(sum(self.partial_charges)))
+
+        max_charge_index = np.argmax(np.abs(self.partial_charges))
+        self.partial_charges[max_charge_index] -= excess_charge
+
+        if abs(excess_charge) > 1.0e-8:
+            msg = 'Sum of partial charges is not a whole number. Compensating '
+            msg += f'by removing {excess_charge:.3e} from the largest charge.'
+            self.ostream.print_warning(msg)
+            self.ostream.flush()
 
         # preparing atomtypes and atoms
 
@@ -595,6 +653,14 @@ class ForceFieldGenerator:
         for at in self.unique_atom_types:
             atom_type_found = False
 
+            # Auxilary variable for finding parameters in UFF
+            element = ''
+            for c in at:
+                if not c.isdigit():
+                    element += c
+                else:
+                    break
+
             for line in ff_data_lines:
                 if line.startswith(f'  {at}     '):
                     atom_ff = line[5:].strip().split()
@@ -609,11 +675,19 @@ class ForceFieldGenerator:
                     sigma, epsilon, comment = 3.15061e-01, 6.36386e-01, 'OW'
                 elif at == 'hw':
                     sigma, epsilon, comment = 0.0, 0.0, 'HW'
-                else:
+                # Case for atoms in UFF but not in GAFF
+                elif element in self.uff_parameters:
                     warnmsg = f'ForceFieldGenerator: atom type {at} is not in GAFF.'
+                    warnmsg += ' Taking sigma and epsilon from UFF.'
                     self.ostream.print_warning(warnmsg)
-                    # Default value for atomtypes
-                    sigma, epsilon, comment = 0.0, 0.0, 'Unknown'
+                    sigma = self.uff_parameters[element]['sigma']
+                    epsilon = self.uff_parameters[element]['epsilon']
+                    comment = 'UFF'
+                else:
+                    assert_msg_critical(
+                        False,
+                        f'ForceFieldGenerator: atom type {at} not found in GAFF or UFF.'
+                    )
 
             atom_type_params[at] = {
                 'sigma': sigma,
@@ -676,7 +750,7 @@ class ForceFieldGenerator:
 
             if self.eq_param:
                 if abs(r - r_eq) > self.r_thresh:
-                    msg = f'Updated bond length {i+1}-{j+1} '
+                    msg = f'Updated bond length {i + 1}-{j + 1} '
                     msg += f'({at_1}-{at_2}) to {r_eq:.3f} nm'
                     self.ostream.print_info(msg)
                     self.ostream.flush()
@@ -737,7 +811,7 @@ class ForceFieldGenerator:
 
             if self.eq_param:
                 if abs(theta - theta_eq) > self.theta_thresh:
-                    msg = f'Updated bond angle {i+1}-{j+1}-{k+1} '
+                    msg = f'Updated bond angle {i + 1}-{j + 1}-{k + 1} '
                     msg += f'({at_1}-{at_2}-{at_3}) to {theta_eq:.3f} deg'
                     self.ostream.print_info(msg)
                     self.ostream.flush()
@@ -1178,6 +1252,69 @@ class ForceFieldGenerator:
 
         return []
 
+    def add_bond(self, bond, force_constant=250000.00, equilibrium=None):
+        """
+        Adds a bond to the topology.
+
+        :param bond:
+            The bond to be added. As a tuple of 1-based atom indices.
+        :param force_constant:
+            The force constant of the bond. Default is 250000.00 kJ/mol/nm^2.
+        :param equilibrium:
+            The equilibrium distance of the bond. If none it will be calculated.
+        """
+
+        i, j = bond
+
+        # Convert to zero-based indices
+        i = i - 1
+        j = j - 1
+
+        if equilibrium is None:
+            coords = self.molecule.get_coordinates_in_angstrom()
+            equilibrium = np.linalg.norm(coords[i] - coords[j]) * 0.1
+
+        self.bonds[(i, j)] = {
+            'type': 'harmonic',
+            'force_constant': force_constant,
+            'equilibrium': equilibrium,
+            'comment': 'User-defined'
+        }
+
+    def add_angle(self, angle, force_constant=1000.00, equilibrium=None):
+        """
+        Adds an angle to the topology.
+
+        :param angle:
+            The angle to be added. As a tuple of 1-based atom indices.
+        :param force_constant:
+            The force constant of the angle. Default is 1000.00 kJ/mol/rad^2.
+        :param equilibrium:
+            The equilibrium angle of the angle. If none it will be calculated.
+        """
+
+        i, j, k = angle
+
+        # Convert to zero-based indices
+        i = i - 1
+        j = j - 1
+        k = k - 1
+
+        if equilibrium is None:
+            coords = self.molecule.get_coordinates_in_angstrom()
+            a = coords[i] - coords[j]
+            b = coords[k] - coords[j]
+            equilibrium = safe_arccos(
+                np.dot(a, b) / np.linalg.norm(a) /
+                np.linalg.norm(b)) * 180 / np.pi
+
+        self.angles[(i, j, k)] = {
+            'type': 'harmonic',
+            'force_constant': force_constant,
+            'equilibrium': equilibrium,
+            'comment': 'User-defined'
+        }
+
     def reparameterize(self,
                        hessian=None,
                        reparameterize_all=False,
@@ -1498,9 +1635,9 @@ class ForceFieldGenerator:
             total_charge = 0.0
             for i, atom in self.atoms.items():
                 total_charge += atom['charge']
-                line_str = '{:6}{:>5}{:6}{:>6}{:>6}'.format(
+                line_str = '{:6} {:>5} {:6} {:>6} {:>6}'.format(
                     i + 1, atom['type'], 1, res_name, atom['name'])
-                line_str += '{:5}{:13.6f}{:13.5f}'.format(
+                line_str += ' {:5} {:13.6f} {:13.5f}'.format(
                     i + 1, atom['charge'], atom['mass'])
                 line_str += ' ; qtot{:7.3f}  equiv. {}\n'.format(
                     total_charge, atom['equivalent_atom'])
@@ -1609,6 +1746,157 @@ class ForceFieldGenerator:
                     dih['comment'])
                 f_itp.write(line_str)
 
+    def generate_residue_xml(self, xml_file, mol_name='MOL'):
+        """
+        Generates an XML force field file for a single residue.
+
+        :param mol_name:
+            The name of the molecule.
+        :param filename:
+            The name of the XML file.
+        """
+
+        filename = str(xml_file)
+
+        # Create the root element of the XML file
+        ForceField = ET.Element("ForceField")
+
+        # AtomTypes section
+        AtomTypes = ET.SubElement(ForceField, "AtomTypes")
+
+        for i, atom in self.atoms.items():
+
+            # Get the element of the atom
+            element = ''
+            for c in atom['name']:
+                if not c.isdigit():
+                    element += c
+                else:
+                    break
+
+            attributes = {
+                # Name is the atom type_molname
+                "name": atom['name'] + '_' + mol_name,
+                "class": str(i + 1),
+                "element": element,
+                "mass": str(atom['mass'])
+            }
+            ET.SubElement(AtomTypes, "Type", **attributes)
+
+        # Residues section
+        Residues = ET.SubElement(ForceField, "Residues")
+        Residue = ET.SubElement(Residues, "Residue", name=mol_name)
+        for atom_id, atom_data in self.atoms.items():
+            ET.SubElement(Residue,
+                          "Atom",
+                          name=atom_data['name'],
+                          type=atom_data['name'] + '_' + mol_name,
+                          charge=str(atom_data['charge']))
+        for bond_id, bond_data in self.bonds.items():
+            ET.SubElement(Residue,
+                          "Bond",
+                          atomName1=self.atoms[bond_id[0]]['name'],
+                          atomName2=self.atoms[bond_id[1]]['name'])
+
+        # Bonds section
+        Bonds = ET.SubElement(ForceField, "HarmonicBondForce")
+        for bond_id, bond_data in self.bonds.items():
+            attributes = {
+                "class1": str(bond_id[0] + 1),
+                "class2": str(bond_id[1] + 1),
+                "length": str(bond_data['equilibrium']),
+                "k": str(bond_data['force_constant'])
+            }
+            ET.SubElement(Bonds, "Bond", **attributes)
+
+        # Angles section
+        Angles = ET.SubElement(ForceField, "HarmonicAngleForce")
+        for angle_id, angle_data in self.angles.items():
+            attributes = {
+                "class1": str(angle_id[0] + 1),
+                "class2": str(angle_id[1] + 1),
+                "class3": str(angle_id[2] + 1),
+                "angle": str(angle_data['equilibrium'] * np.pi / 180),
+                "k": str(angle_data['force_constant'])
+            }
+            ET.SubElement(Angles, "Angle", **attributes)
+
+        # Periodic Dihedrals section
+        Dihedrals = ET.SubElement(ForceField, "PeriodicTorsionForce")
+        for dihedral_id, dihedral_data in self.dihedrals.items():
+            if dihedral_data['type'] == 'RB':
+                continue
+            attributes = {
+                "class1": str(dihedral_id[0] + 1),
+                "class2": str(dihedral_id[1] + 1),
+                "class3": str(dihedral_id[2] + 1),
+                "class4": str(dihedral_id[3] + 1),
+                "periodicity1": str(dihedral_data['periodicity']),
+                "phase1": str(dihedral_data['phase'] * np.pi / 180),
+                "k1": str(dihedral_data['barrier'])
+            }
+            ET.SubElement(Dihedrals, "Proper", **attributes)
+
+        # RB Dihedrals section
+        RB_Dihedrals = ET.SubElement(ForceField, "RBTorsionForce")
+        for dihedral_id, dihedral_data in self.dihedrals.items():
+            if dihedral_data['type'] == 'Fourier':
+                continue
+            attributes = {
+                "class1": str(dihedral_id[0] + 1),
+                "class2": str(dihedral_id[1] + 1),
+                "class3": str(dihedral_id[2] + 1),
+                "class4": str(dihedral_id[3] + 1),
+                "c0": str(dihedral_data['RB_coefficients'][0]),
+                "c1": str(dihedral_data['RB_coefficients'][1]),
+                "c2": str(dihedral_data['RB_coefficients'][2]),
+                "c3": str(dihedral_data['RB_coefficients'][3]),
+                "c4": str(dihedral_data['RB_coefficients'][4]),
+                "c5": str(dihedral_data['RB_coefficients'][5])
+            }
+            ET.SubElement(RB_Dihedrals, "Proper", **attributes)
+
+        # Improper Dihedrals section
+        Impropers = ET.SubElement(ForceField, "PeriodicTorsionForce")
+        for improper_id, improper_data in self.impropers.items():
+
+            # The order of the atoms is defined in the OpenMM documentation
+            # http://docs.openmm.org/latest/userguide/application/06_creating_ffs.html
+
+            attributes = {
+                "class1": str(improper_id[1] + 1),
+                "class2": str(improper_id[0] + 1),
+                "class3": str(improper_id[2] + 1),
+                "class4": str(improper_id[3] + 1),
+                "periodicity1": str(improper_data['periodicity']),
+                "phase1": str(improper_data['phase'] * np.pi / 180),
+                "k1": str(improper_data['barrier'])
+            }
+            ET.SubElement(Impropers, "Improper", **attributes)
+
+        # NonbondedForce section
+        NonbondedForce = ET.SubElement(ForceField,
+                                       "NonbondedForce",
+                                       coulomb14scale=str(self.fudgeQQ),
+                                       lj14scale=str(self.fudgeLJ))
+        for atom_id, atom_data in self.atoms.items():
+            attributes = {
+                "type": atom_data['name'] + '_' + mol_name,
+                "charge": str(atom_data['charge']),
+                "sigma": str(atom_data['sigma']),
+                "epsilon": str(atom_data['epsilon'])
+            }
+            ET.SubElement(NonbondedForce, "Atom", **attributes)
+
+        # Generate the tree and write to file
+        # tree = ET.ElementTree(ForceField)
+        rough_string = ET.tostring(ForceField, 'utf-8')
+        reparsed = minidom.parseString(rough_string)
+        indented_string = reparsed.toprettyxml(indent="    ")
+
+        with open(filename, 'w') as output_file:
+            output_file.write(indented_string)
+
     def write_gro(self, gro_file, mol_name=None, gro_precision=3):
         """
         Writes a GRO file with the original coordinates.
@@ -1640,7 +1928,7 @@ class ForceFieldGenerator:
                 atom_name = atom['name']
                 line_str = f'{1:>5d}{res_name:<5s}{atom_name:<5s}{i + 1:>5d}'
                 for d in range(3):
-                    line_str += f'{coords_in_nm[i][d]:{ndec+5}.{ndec}f}'
+                    line_str += f'{coords_in_nm[i][d]:{ndec + 5}.{ndec}f}'
                 line_str += '\n'
                 f_gro.write(line_str)
 
@@ -1648,6 +1936,81 @@ class ForceFieldGenerator:
             box_dimension = 10.0
             line_str = f'{box_dimension:10.5f}' * 3 + '\n'
             f_gro.write(line_str)
+
+    def write_pdb(self, pdb_file, mol_name=None):
+        """
+        Writes a PDB file with the original coordinates.
+
+        :param pdb_file:
+            The PDB file path.
+        :param mol_name:
+            The name of the molecule.
+        """
+
+        # PDB format from http://deposit.rcsb.org/adit/docs/pdb_atom_format.html
+
+        # COLUMNS        DATA TYPE       CONTENTS
+        # --------------------------------------------------------------------------------
+        #  1 -  6        Record name     "HETATM" or "ATOM  "
+        #  7 - 11        Integer         Atom serial number.
+        # 13 - 16        Atom            Atom name.
+        # 17             Character       Alternate location indicator.
+        # 18 - 20        Residue name    Residue name.
+        # 22             Character       Chain identifier.
+        # 23 - 26        Integer         Residue sequence number.
+        # 27             AChar           Code for insertion of residues.
+        # 31 - 38        Real(8.3)       Orthogonal coordinates for X in Angstroms.
+        # 39 - 46        Real(8.3)       Orthogonal coordinates for Y in Angstroms.
+        # 47 - 54        Real(8.3)       Orthogonal coordinates for Z in Angstroms.
+        # 55 - 60        Real(6.2)       Occupancy (Default = 1.0).
+        # 61 - 66        Real(6.2)       Temperature factor (Default = 0.0).
+        # 73 - 76        LString(4)      Segment identifier, left-justified.
+        # 77 - 78        LString(2)      Element symbol, right-justified.
+        # 79 - 80        LString(2)      Charge on the atom.
+
+        pdb_filename = str(pdb_file)
+        if mol_name is None:
+            mol_name = Path(self.molecule_name).stem
+
+        coords_in_angstrom = self.molecule.get_coordinates_in_angstrom()
+        molecule_elements = self.molecule.get_labels()
+
+        with open(pdb_filename, 'w') as f_pdb:
+            # Header
+            f_pdb.write(
+                f'TITLE     PDB file of {mol_name}, generated by VeloxChem\n')
+            f_pdb.write('MODEL        1\n')
+
+            # Atoms
+            for i, (atom, element) in enumerate(
+                    zip(self.atoms.values(), molecule_elements), 1):
+                atom_name = atom['name']
+                occupancy = 1.00
+                temp_factor = 0.00
+                element_symbol = element[:2].rjust(2)
+
+                # Format string from https://cupnet.net/pdb-format/
+
+                line_str = "{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   ".format(
+                    'HETATM', i, atom_name[:4], '', mol_name[:3], 'A', 1, '')
+
+                line_str += "{:8.3f}{:8.3f}{:8.3f}".format(
+                    coords_in_angstrom[i - 1][0], coords_in_angstrom[i - 1][1],
+                    coords_in_angstrom[i - 1][2])
+
+                line_str += "{:6.2f}{:6.2f}          {:>2s}".format(
+                    occupancy, temp_factor, element_symbol)
+
+                f_pdb.write(line_str + '\n')
+
+            # CONECT section in the PDB file stating the connectivity.
+            # Required by OpenMM to correctly assign topology.bonds
+            for (i, j) in self.bonds:
+                f_pdb.write(f'CONECT{i + 1:>5}{j + 1:>5}\n')
+
+            f_pdb.write('TER\n')
+            f_pdb.write('ENDMDL\n')
+            f_pdb.write('END\n')
 
     def write_gromacs_files(self,
                             filename,
@@ -1680,6 +2043,25 @@ class ForceFieldGenerator:
         self.write_itp(itp_file, mol_name)
         self.write_top(top_file, itp_file, mol_name, amber_ff, water_model)
         self.write_gro(gro_file, mol_name, gro_precision)
+
+    def write_openmm_files(self, filename, mol_name=None):
+        """
+        Writes all the needed files for a MD simulation with OpenMM.
+
+        :param filename:
+            The name of the molecule.
+        :param mol_name:
+            The name of the molecule.
+        """
+
+        if mol_name is None:
+            mol_name = Path(self.molecule_name).stem
+
+        xml_file = Path(filename).with_suffix('.xml')
+        pdb_file = Path(filename).with_suffix('.pdb')
+
+        self.generate_residue_xml(xml_file, mol_name)
+        self.write_pdb(pdb_file, mol_name)
 
     @staticmethod
     def copy_file(src, dest):
@@ -1728,7 +2110,7 @@ class ForceFieldGenerator:
         qm_scan = self.scan_energies[i]
         angles = self.scan_dih_angles[i]
 
-        dih_str = f'{dih[0]+1}-{dih[1]+1}-{dih[2]+1}-{dih[3]+1}'
+        dih_str = f'{dih[0] + 1}-{dih[1] + 1}-{dih[2] + 1}-{dih[3] + 1}'
         self.ostream.print_info(f'Fitting dihedral angle {dih_str}...')
         self.ostream.flush()
 
@@ -1809,7 +2191,7 @@ class ForceFieldGenerator:
 
         dih = self.target_dihedrals[i]
 
-        dih_str = f'{dih[0]+1}-{dih[1]+1}-{dih[2]+1}-{dih[3]+1}'
+        dih_str = f'{dih[0] + 1}-{dih[1] + 1}-{dih[2] + 1}-{dih[3] + 1}'
         self.ostream.print_info(f'  Target dihedral angle: {dih_str}')
         self.ostream.print_blank()
 

@@ -65,3 +65,25 @@ def safe_arccos(val):
         cos_phi = val
 
     return math.acos(cos_phi)
+
+
+def safe_arcsin(val):
+    """
+    Safely uses math.asin and avoids the math domain error.
+
+    :param val:
+        The sine value.
+
+    :return:
+        The angle in radian.
+    """
+
+    if abs(val) > 1.0:
+        # avoid math domain error
+        assert_msg_critical(
+            abs(abs(val) - 1.0) < 1.0e-12, 'arcsin: Invalid sine value')
+        sin_phi = 1.0 if val > 1.0 else -1.0
+    else:
+        sin_phi = val
+
+    return math.asin(sin_phi)

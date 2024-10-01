@@ -26,7 +26,12 @@
 #ifndef Timer_hpp
 #define Timer_hpp
 
+// to avoid MSVC error
+// "error: capturing a structured binding is not yet supported in OpenMP"
+#ifndef _MSC_VER
 #include <chrono>
+#endif
+
 #include <string>
 
 /**
@@ -39,7 +44,11 @@ class CTimer
     /**
      The time duration (accumulated).
      */
+#ifndef _MSC_VER
     std::chrono::steady_clock::duration _duration;
+#else
+    double _duration;
+#endif
 
     /**
      Whether the timer has started.
@@ -49,7 +58,11 @@ class CTimer
     /**
      The time point when the timer started.
      */
+#ifndef _MSC_VER
     std::chrono::steady_clock::time_point _startTime;
+#else
+    double _startTime;
+#endif
 
    public:
     /**

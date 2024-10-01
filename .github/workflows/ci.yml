@@ -1,0 +1,77 @@
+name: build
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  vlx_ci:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    container:
+      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_intel:sha-c8613aa
+
+    env:
+      VLX_NUM_BUILD_JOBS: 4
+      TARBALL: veloxchem.tar.bz2
+
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v3
+
+      - name: build and test
+        run: |
+          echo "=== System Info ==="
+          uname -a
+          free -m
+          df -h
+          ulimit -a
+          ulimit -s unlimited
+          lscpu | egrep 'Thread|Core|Socket|^CPU\('
+          echo "=== Intel OneAPI ==="
+          source /opt/intel/oneapi/setvars.sh
+          mpiicc -cc=icx --version
+          mpiicpc -cxx=icpx --version
+          echo "=== Python ==="
+          which python
+          python -V
+          echo "=== Python venv ==="
+          python -m venv --clear venv
+          source venv/bin/activate
+          which python
+          python -V
+          echo "=== Python dependencies ==="
+          python -m pip install --upgrade pip setuptools wheel
+          CC=icx MPICC="mpiicc -cc=icx" python -m pip install mpi4py --no-binary=mpi4py
+          CC=gcc CXX=g++ python -m pip install cppe MDAnalysis
+          echo "=== VeloxChem build ==="
+          SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpiicpc -DCMAKE_CXX_FLAGS=\"-cxx=icpx\"" \
+            python -m pip install -v .[test,qmmm]
+          echo "=== VeloxChem test ==="
+          python -c "import veloxchem; print(veloxchem.__version__)"
+          OMP_NUM_THREADS=2 mpiexec -n 2 python -m pytest --capture=no --log-cli-level=INFO --pyargs veloxchem -m "solvers"
+          OMP_NUM_THREADS=4 python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO --pyargs veloxchem
+          echo "=== VeloxChem archive ==="
+          git config --global --add safe.directory $PWD
+          git archive --format=tar --prefix="veloxchem/" $GITHUB_SHA | bzip2 > $TARBALL
+          tar tf $TARBALL
+          echo "TARBALL            " $TARBALL
+          echo "GITHUB_REPOSITORY  " $GITHUB_REPOSITORY
+          echo "GITHUB_RUN_ID      " $GITHUB_RUN_ID
+          echo "GITHUB_RUN_NUMBER  " $GITHUB_RUN_NUMBER
+          echo "GITHUB_SHA         " $GITHUB_SHA
+
+      # - name: upload artifact
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: veloxchem-artifact
+      #     path: ${{ env.TARBALL }}
+      #     retention-days: 1

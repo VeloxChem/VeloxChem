@@ -137,6 +137,7 @@ from .orbitalviewer import OrbitalViewer
 from .numerovdriver import NumerovDriver
 from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
+from .symmetryanalyzer import SymmetryAnalyzer
 
 # for backward compatibility
 from .veloxchemlib import XCIntegrator as XCNewIntegrator
