@@ -419,9 +419,6 @@ def main():
             hessian_drv.update_settings(method_dict, hessian_dict)
             hessian_drv.compute(task.molecule, task.ao_basis)
 
-        #if task.mpi_rank == mpi_master():
-        #    hessian_drv.vibrational_analysis(task.molecule)
-
     # Geometry optimization
 
     if task_type == 'optimize':
@@ -499,7 +496,17 @@ def main():
         rsp_dict['filename'] = task.input_dict['filename']
         vib_dict['filename'] = task.input_dict['filename']
 
-        hessian_drv = ScfHessianDriver(scf_drv)
+        #hessian_drv = ScfHessianDriver(scf_drv)
+
+        if use_xtb:
+            hessian_drv = XtbHessianDriver(xtb_drv)
+            hessian_drv.update_settings(method_dict, hess_dict)
+            hessian_drv.compute(task.molecule)
+
+        elif scf_drv.scf_type == 'restricted':
+            hessian_drv = ScfHessianDriver(scf_drv)
+            hessian_drv.update_settings(method_dict, hess_dict)
+            hessian_drv.compute(task.molecule, task.ao_basis)
 
         vibrational_drv = VibrationalAnalysis(hessian_drv)
         vibrational_drv.update_settings(method_dict, vib_dict, hess_dict=hess_dict,
