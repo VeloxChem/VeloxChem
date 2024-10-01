@@ -48,7 +48,15 @@
 #include "ElectronRepulsionGeom1000RecSFFF.hpp"
 #include "ElectronRepulsionGeom1000RecPPSS.hpp"
 #include "ElectronRepulsionGeom1000RecPPSP.hpp"
+#include "ElectronRepulsionGeom1000RecPPSD.hpp"
+#include "ElectronRepulsionGeom1000RecPPSF.hpp"
 #include "ElectronRepulsionGeom1000RecPPPP.hpp"
+#include "ElectronRepulsionGeom1000RecPPPD.hpp"
+#include "ElectronRepulsionGeom1000RecPPPF.hpp"
+#include "ElectronRepulsionGeom1000RecPPDD.hpp"
+#include "ElectronRepulsionGeom1000RecPPDF.hpp"
+#include "ElectronRepulsionGeom1000RecPPFF.hpp"
+
 #include "ElectronRepulsionGeom1000RecPSSS.hpp"
 #include "ElectronRepulsionGeom1000RecPSSP.hpp"
 #include "ElectronRepulsionGeom1000RecPSSD.hpp"
@@ -405,9 +413,51 @@ compute_geom_1000(T&                               distributor,
         return;
     }
     
+    if ((bra_angmoms == std::pair<int, int>({1, 1})) && (ket_angmoms == std::pair<int, int>({0, 2})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_ppsd(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({1, 1})) && (ket_angmoms == std::pair<int, int>({0, 3})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_ppsf(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
     if ((bra_angmoms == std::pair<int, int>({1, 1})) && (ket_angmoms == std::pair<int, int>({1, 1})))
     {
         erirec::comp_electron_repulsion_geom_1000_pppp(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({1, 1})) && (ket_angmoms == std::pair<int, int>({1, 2})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_pppd(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({1, 1})) && (ket_angmoms == std::pair<int, int>({1, 3})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_pppf(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({1, 1})) && (ket_angmoms == std::pair<int, int>({2, 2})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_ppdd(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({1, 1})) && (ket_angmoms == std::pair<int, int>({2, 3})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_ppdf(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({1, 1})) && (ket_angmoms == std::pair<int, int>({3, 3})))
+    {
+        erirec::comp_electron_repulsion_geom_1000_ppff(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
         return;
     }
 
