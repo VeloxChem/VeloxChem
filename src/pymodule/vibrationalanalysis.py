@@ -288,7 +288,7 @@ class VibrationalAnalysis:
             self.print_vibrational_analysis(molecule)
 
             # create binary file and save vibrational analysis results
-            self._write_final_hdf5()
+            self._write_final_hdf5(molecule)
 
         return
    
@@ -642,7 +642,7 @@ class VibrationalAnalysis:
 
         self.ostream.flush()
 
-    def _write_final_hdf5(self):
+    def _write_final_hdf5(self, molecule):
         """
         Writes final HDF5 file that contains results
         from vibrational analysis
@@ -656,12 +656,14 @@ class VibrationalAnalysis:
 
         final_h5_fname = self.checkpoint_file
 
-        self.write_vib_results_to_hdf5(final_h5_fname)
+        self.write_vib_results_to_hdf5(molecule, final_h5_fname)
 
-    def write_vib_results_to_hdf5(self, fname):
+    def write_vib_results_to_hdf5(self, molecule, fname):
         """
         Writes vibrational analysis results to HDF5 file.
 
+        :param molecule:
+            The molecule.
         :param fname:
             Name of the HDF5 file.
         """
@@ -671,16 +673,19 @@ class VibrationalAnalysis:
         if not valid_checkpoint:
             return False
 
-        # for some reason, the mpirun cannot truncate existing file
-        # so we check if it exists and deletes if True
+        # check if h5 file exists and deletes if True
         file_path = Path(fname)
         if file_path.is_file():
             file_path.unlink()
 
         hf = h5py.File(fname, 'w')
 
-        hf.create_dataset('normal_modes',
-                          data = np.array([self.normed_normal_modes]))
+        nuc_rep = molecule.nuclear_repulsion_energy()
+        hf.create_dataset('nuc_rep', data = nuc_rep)
+
+        normal_mode_grp = hf.create_group('normal_modes')
+        for n, Q in enumerate(self.normed_normal_modes, 1):
+            normal_mode_grp.create_dataset(str(n), data = np.array([Q]))
         hf.create_dataset('vib_frequencies',
                           data = np.array([self.vib_frequencies]))
         hf.create_dataset('force_constants',
@@ -695,13 +700,13 @@ class VibrationalAnalysis:
             raman_grp = hf.create_group('raman_activity')
             for i in range(len(freqs)):
                 raman_grp.create_dataset(str(freqs[i]),
-                                         data= self.raman_intensities[freqs[i]])
+                                         data = self.raman_intensities[freqs[i]])
         if self.do_resonance_raman:
             freqs = self.frequencies
             raman_grp = hf.create_group('resonance_raman_activity')
             for i in range(len(freqs)):
                 raman_grp.create_dataset(str(freqs[i]),
-                                         data= self.raman_intensities[freqs[i]])
+                                         data = self.raman_intensities[freqs[i]])
         hf.close()
 
         return True
