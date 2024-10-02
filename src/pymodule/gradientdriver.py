@@ -26,11 +26,11 @@ from mpi4py import MPI
 import numpy as np
 import sys
 
-#from .veloxchemlib import GridDriver, XCMolecularGradient
-from .veloxchemlib import GridDriver
+#from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import Point
+from .griddriver import GridDriver
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .dftutils import get_default_grid_level
@@ -241,11 +241,11 @@ class GradientDriver:
             The vxc exchange-correlation contribution to the gradient.
         """
 
-        grid_drv = GridDriver(self.comm)
+        grid_drv = GridDriver()
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
+        mol_grid = grid_drv.generate(molecule, self.comm)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
         vxc_contrib = xc_molgrad_drv.integrate_vxc_gradient(
@@ -276,11 +276,11 @@ class GradientDriver:
             The 2nd-order exchange-correlation contribution to the gradient.
         """
 
-        grid_drv = GridDriver(self.comm)
+        grid_drv = GridDriver()
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
+        mol_grid = grid_drv.generate(molecule, self.comm)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
         vxc2_contrib = xc_molgrad_drv.integrate_fxc_gradient(
@@ -314,11 +314,11 @@ class GradientDriver:
             The 3rd-order exchange-correlation contribution to the gradient.
         """
 
-        grid_drv = GridDriver(self.comm)
+        grid_drv = GridDriver()
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
+        mol_grid = grid_drv.generate(molecule, self.comm)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
         vxc3_contrib = xc_molgrad_drv.integrate_kxc_gradient(
@@ -350,11 +350,11 @@ class GradientDriver:
             The exchange-correlation contribution to tddft gradient.
         """
 
-        grid_drv = GridDriver(self.comm)
+        grid_drv = GridDriver()
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
+        mol_grid = grid_drv.generate(molecule, self.comm)
 
         xcgrad_drv = XCMolecularGradient(self.comm)
         tddft_xcgrad = xcgrad_drv.integrate_vxc_gradient(

@@ -147,7 +147,7 @@ export_dft(py::module& m)
             },
             "Gets weights of grid as numpy array.")
         .def(
-            "points_to_numpy",
+            "grid_to_numpy",
             [](const CMolecularGrid& self) -> py::array_t<double> {
                 auto points = self.getGridPoints();
                 return vlx_general::pointer_to_numpy(points.values(), {4, self.getNumberOfGridPoints()});
@@ -159,7 +159,13 @@ export_dft(py::module& m)
 
     PyClass<CGridDriver>(m, "GridDriver")
         .def(py::init<>())
-        .def("generate", &CGridDriver::generate, "Generates molecular grid for molecule.", "molecule"_a, "rank"_a, "nnodes"_a)
+        .def(
+            "generate_local_grid",
+            &CGridDriver::generate_local_grid,
+            "Generates MPI-local molecular grid for molecule.",
+            "molecule"_a,
+            "rank"_a,
+            "nnodes"_a)
         .def("set_level", &CGridDriver::setLevel, "Sets accuracy level for grid generation.", "grid_level"_a);
 
     // CXCIntegrator class

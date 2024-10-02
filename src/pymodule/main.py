@@ -25,7 +25,7 @@
 from mpi4py import MPI
 from datetime import datetime, timedelta
 
-from .veloxchemlib import mpi_initialized, mpi_master
+from .veloxchemlib import mpi_master
 from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -186,8 +186,6 @@ def main():
     """
 
     program_start_time = datetime.now()
-
-    assert_msg_critical(mpi_initialized(), "MPI not initialized")
 
     # Parse command line
 

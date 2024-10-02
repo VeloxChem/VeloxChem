@@ -34,10 +34,11 @@ from .veloxchemlib import (compute_linear_momentum_integrals,
                            compute_angular_momentum_integrals)
 from .veloxchemlib import FockDriver, T4CScreener
 from .veloxchemlib import Matrices, make_matrix, mat_t
-from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
+from .veloxchemlib import MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .veloxchemlib import rotatory_strength_in_cgs
 from .distributedarray import DistributedArray
+from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
 from .visualizationdriver import VisualizationDriver
 from .profiler import Profiler
@@ -408,13 +409,13 @@ class LinearSolver:
         if self._dft:
             print_libxc_reference(self.xcfun, self.ostream)
 
-            grid_drv = GridDriver(self.comm)
+            grid_drv = GridDriver()
             grid_level = (get_default_grid_level(self.xcfun)
                           if self.grid_level is None else self.grid_level)
             grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
-            molgrid = grid_drv.generate(molecule)
+            molgrid = grid_drv.generate(molecule, self.comm)
             n_grid_points = molgrid.number_of_points()
             self.ostream.print_info(
                 'Molecular grid with {0:d} points generated in {1:.2f} sec.'.

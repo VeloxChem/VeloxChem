@@ -1,7 +1,8 @@
 import numpy as np
 
 from veloxchem.veloxchemlib import mpi_master
-from veloxchem.veloxchemlib import GridDriver, XCMolecularGradient
+from veloxchem.veloxchemlib import XCMolecularGradient
+from veloxchem.griddriver import GridDriver
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -22,11 +23,11 @@ class TestXCMolGrad:
         density = scf_drv.density
         density = density.broadcast(scf_drv.comm, root=mpi_master())
 
-        grid_drv = GridDriver(scf_drv.comm)
+        grid_drv = GridDriver()
         grid_level = (get_default_grid_level(scf_drv.xcfun)
                       if scf_drv.grid_level is None else scf_drv.grid_level)
         grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
+        mol_grid = grid_drv.generate(molecule, scf_drv.comm)
 
         grad_drv = XCMolecularGradient()
         mol_grad = grad_drv.integrate_vxc_gradient(molecule, basis,

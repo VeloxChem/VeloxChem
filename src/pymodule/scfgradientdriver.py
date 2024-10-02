@@ -30,11 +30,11 @@ import time as tm
 from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
                            NuclearPotentialGeom100Driver,
                            NuclearPotentialGeom010Driver, FockGeom1000Driver)
-from .veloxchemlib import (XCFunctional, MolecularGrid, GridDriver,
-                           XCMolecularGradient)
+from .veloxchemlib import XCFunctional, MolecularGrid, XCMolecularGradient
 from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import partition_atoms, make_matrix
 from .veloxchemlib import parse_xc_func
+from .griddriver import GridDriver
 from .outputstream import OutputStream
 from .gradientdriver import GradientDriver
 from .dftutils import get_default_grid_level
@@ -206,9 +206,9 @@ class ScfGradientDriver(GradientDriver):
                           if grid_level is None else grid_level)
 
             # TODO: take molecular grid from scf
-            grid_drv = GridDriver(self.comm)
+            grid_drv = GridDriver()
             grid_drv.set_level(grid_level)
-            mol_grid = grid_drv.generate(molecule)
+            mol_grid = grid_drv.generate(molecule, self.comm)
 
             grad_drv = XCMolecularGradient()
             self.gradient += grad_drv.integrate_vxc_gradient(

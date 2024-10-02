@@ -123,7 +123,7 @@ class CGridDriver
      @param nnodes the number of MPI processes.
      @return the molecular grid object.
      */
-    auto generate(const CMolecule& molecule, const int rank, const int nnodes) const -> CMolecularGrid;
+    auto generate_local_grid(const CMolecule& molecule, const int rank, const int nnodes) const -> CMolecularGrid;
 };
 
 #endif /* GridDriver_hpp */

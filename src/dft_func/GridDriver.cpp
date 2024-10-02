@@ -141,7 +141,7 @@ CGridDriver::_getNumberOfAngularPoints(const int idElemental) const -> int
 }
 
 auto
-CGridDriver::generate(const CMolecule& molecule, const int rank, const int nnodes) const -> CMolecularGrid
+CGridDriver::generate_local_grid(const CMolecule& molecule, const int rank, const int nnodes) const -> CMolecularGrid
 {
     // molecular data
 

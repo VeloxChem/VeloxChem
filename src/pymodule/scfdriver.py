@@ -34,8 +34,7 @@ from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import OverlapDriver, KineticEnergyDriver
 from .veloxchemlib import FockDriver, T4CScreener
-from .veloxchemlib import GridDriver, XCIntegrator
-from .veloxchemlib import DenseMatrix, MolecularGrid
+from .veloxchemlib import XCIntegrator
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import Matrices
 from .veloxchemlib import make_matrix
@@ -44,6 +43,7 @@ from .veloxchemlib import denmat, mat_t
 from .veloxchemlib import xcfun
 from .aodensitymatrix import AODensityMatrix
 from .profiler import Profiler
+from .griddriver import GridDriver
 from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
 from .sadguessdriver import SadGuessDriver
@@ -554,22 +554,8 @@ class ScfDriver:
             grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
-
-            # TODO: hide the details in GridDriver in Python layer
-            self._mol_grid = grid_drv.generate(molecule, self.rank, self.nodes)
-
-            points_np_arrays = self.comm.allgather(
-                self._mol_grid.points_to_numpy())
-            points_np_arrays = [arr for arr in points_np_arrays if arr.size > 0]
-            self._mol_grid = MolecularGrid(
-                DenseMatrix(np.hstack(points_np_arrays)))
-
-            self._mol_grid.partition_grid_points()
-            self._mol_grid.distribute_counts_and_displacements(
-                self.rank, self.nodes)
-
+            self._mol_grid = grid_drv.generate(molecule, self.comm)
             n_grid_points = self._mol_grid.number_of_points()
-
             self.ostream.print_info(
                 'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
                 format(n_grid_points,
