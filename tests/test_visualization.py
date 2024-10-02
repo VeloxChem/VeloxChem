@@ -58,6 +58,7 @@ class TestVisualization:
                                 homo, 'alpha')
 
         if is_mpi_master(task.mpi_comm):
+            grid_np_arrays = [arr for arr in grid_np_arrays if arr.size > 0]
             homo_values = np.vstack(grid_np_arrays)
 
             homo_ref = np.array([
@@ -201,6 +202,7 @@ class TestVisualization:
             local_cubic_grid.values_to_numpy(), root=mpi_master())
 
         if is_mpi_master(task.mpi_comm):
+            grid_np_arrays = [arr for arr in grid_np_arrays if arr.size > 0]
             cubic_grid.set_values(np.vstack(grid_np_arrays).reshape(-1))
             read_grid = CubicGrid.read_cube(homo_cube_fname)
             assert read_grid.compare(cubic_grid) < 1e-6

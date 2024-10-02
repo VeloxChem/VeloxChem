@@ -522,50 +522,14 @@ CVisualizationDriver::compute(CCubicGrid&               localgrid,
 }
 
 void
-CVisualizationDriver::compute(CCubicGrid&             grid,
+CVisualizationDriver::compute(CCubicGrid&             localgrid,
                               const CMolecule&        molecule,
                               const CMolecularBasis&  basis,
                               const CAODensityMatrix& density,
                               const int               denidx,
                               const std::string&      denspin) const
 {
-    // grid information
-
-    auto origin = grid.getOrigin();
-
-    auto stepsize = grid.getStepSize();
-
-    auto numpoints = grid.getNumPoints();
-
-    // compute local grid on this MPI process
-
-    auto xcntdsp = getCountsAndDisplacements(numpoints[0]);
-
-    auto xcounts = xcntdsp[0];
-
-    auto xdispls = xcntdsp[1];
-
-    std::array localorigin{origin[0] + stepsize[0] * xdispls[_locRank], origin[1], origin[2]};
-
-    std::array localnumpoints{xcounts[_locRank], numpoints[1], numpoints[2]};
-
-    CCubicGrid localgrid(localorigin, stepsize, localnumpoints);
-
     _computeLocalGrid(localgrid, molecule, basis, density, denidx, denspin);
-
-    // gather local grids
-
-    std::vector<int> yzcounts, yzdispls;
-
-    for (int i = 0; i < static_cast<int>(xcounts.size()); i++)
-    {
-        yzcounts.push_back(xcounts[i] * numpoints[1] * numpoints[2]);
-
-        yzdispls.push_back(xdispls[i] * numpoints[1] * numpoints[2]);
-    }
-
-    MPI_Gatherv(
-        localgrid.values(), yzcounts[_locRank], MPI_DOUBLE, grid.values(), yzcounts.data(), yzdispls.data(), MPI_DOUBLE, mpi::master(), _locComm);
 }
 
 void

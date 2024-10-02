@@ -195,16 +195,16 @@ class CVisualizationDriver
                  const std::string&        mospin) const;
 
     /**
-     Computes density values at cubic grid points (MPI).
+     Computes density values at local cubic grid point.
 
-     @param grid the cubic grid.
+     @param localgrid the local cubic grid.
      @param molecule the molecule.
      @param basis the basis set for the molecule.
      @param density the AO density matrix.
      @param denidx the index of the density matrix (0-based).
      @param denspin the spin of the density matrix ('alpha' or 'beta').
      */
-    void compute(CCubicGrid&             grid,
+    void compute(CCubicGrid&             localgrid,
                  const CMolecule&        molecule,
                  const CMolecularBasis&  basis,
                  const CAODensityMatrix& density,
