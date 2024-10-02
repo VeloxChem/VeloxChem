@@ -25,8 +25,6 @@
 #ifndef MolecularGrid_hpp
 #define MolecularGrid_hpp
 
-#include <mpi.h>
-
 #include <array>
 #include <cstdint>
 #include <string>
@@ -39,6 +37,7 @@
  */
 class CMolecularGrid
 {
+   private:
     /**
      The distribution status of molecular grid object.
      */
@@ -198,17 +197,19 @@ class CMolecularGrid
      Distributes grid point counts and displacements within domain of MPI
      communacator and sets distribution flag to true.
 
-     @param comm the MPI communicator.
+     @param rank the MPI rank.
+     @param nnodes the number of MPI processes.
      */
-    auto distributeCountsAndDisplacements(MPI_Comm comm) -> void;
+    auto distributeCountsAndDisplacements(const int rank, const int nnodes) -> void;
 
     /**
      Redo distributing grid point counts and displacements within domain of MPI
      communacator and sets distribution flag to true.
 
-     @param comm the MPI communicator.
+     @param rank the MPI rank.
+     @param nnodes the number of MPI processes.
      */
-    auto reDistributeCountsAndDisplacements(MPI_Comm comm) -> void;
+    auto reDistributeCountsAndDisplacements(const int rank, const int nnodes) -> void;
 
     /**
      Checks whether the molecular grid has been partitioned.

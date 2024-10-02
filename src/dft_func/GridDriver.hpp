@@ -71,16 +71,6 @@ class CGridDriver
     auto _getNumberOfAngularPoints(const int idElemental) const -> int;
 
     /**
-     Creates molecular grid on master node by generating fraction of grid
-     points on each MPI process within domain of MPI communicator. Grid points
-     are generated using only CPUs.
-
-     @param molecule the molecule.
-     @return the molecular grid object.
-     */
-    auto _genGridPoints(const CMolecule& molecule) const -> CMolecularGrid;
-
-    /**
      Gets size of grid points batch.
 
      @param idsElemental the vector of chemical elements identifiers.
@@ -139,9 +129,11 @@ class CGridDriver
      Grid generation is distributed within domain of MPI communicator.
 
      @param molecule the molecule.
+     @param rank the MPI rank.
+     @param nnodes the number of MPI processes.
      @return the molecular grid object.
      */
-    auto generate(const CMolecule& molecule) const -> CMolecularGrid;
+    auto generate(const CMolecule& molecule, const int rank, const int nnodes) const -> CMolecularGrid;
 };
 
 #endif /* GridDriver_hpp */

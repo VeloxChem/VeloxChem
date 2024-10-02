@@ -295,7 +295,7 @@ CMolecularGrid::partitionGridPoints() -> std::string
 }
 
 auto
-CMolecularGrid::distributeCountsAndDisplacements(MPI_Comm comm) -> void
+CMolecularGrid::distributeCountsAndDisplacements(const int rank, const int nnodes) -> void
 {
     std::string errnotpartitioned("MolecularGrid.distributeCountsAndDisplacements: Cannot distribute unpartitioned molecular grid");
 
@@ -322,38 +322,39 @@ CMolecularGrid::distributeCountsAndDisplacements(MPI_Comm comm) -> void
 
         // re-arrange sorted indices for parallelization
 
-        std::vector<int> newcounts;
+        std::vector<std::vector<int>> newcounts, newdispls;
 
-        std::vector<int> newdispls;
-
-        auto nodes = mpi::nodes(comm);
-
-        for (int p = 0; p < nodes; p++)
+        for (int p = 0; p < nnodes; p++)
         {
-            for (int box_id = numboxes - 1 - p; box_id >= 0; box_id -= nodes)
+            std::vector<int> counts_p, displs_p;
+
+            for (int box_id = numboxes - 1 - p; box_id >= 0; box_id -= nnodes)
             {
                 auto index = count_index_pairs[box_id].second;
 
-                newcounts.push_back(_gridPointCounts.data()[index]);
-
-                newdispls.push_back(_gridPointDisplacements.data()[index]);
+                counts_p.push_back(_gridPointCounts.data()[index]);
+                displs_p.push_back(_gridPointDisplacements.data()[index]);
             }
+
+            newcounts.push_back(counts_p);
+            newdispls.push_back(displs_p);
         }
 
         // distribute counts and displacements
 
-        _gridPointCounts = mpi::scatterStdVector(newcounts, comm);
+        _gridPointCounts = newcounts[rank];
 
-        _gridPointDisplacements = mpi::scatterStdVector(newdispls, comm);
+        _gridPointDisplacements = newdispls[rank];
 
         // broadcast all grid points, since counts and displacements are already distributed
 
-        _gridPoints = mpi::bcastDenseMatrix(_gridPoints, comm);
+        // TODO: broadcast all grid points
+        //_gridPoints = mpi::bcastDenseMatrix(_gridPoints, comm);
     }
 }
 
 auto
-CMolecularGrid::reDistributeCountsAndDisplacements(MPI_Comm comm) -> void
+CMolecularGrid::reDistributeCountsAndDisplacements(const int rank, const int nnodes) -> void
 {
     _isPartitioned = false;
 
@@ -361,7 +362,7 @@ CMolecularGrid::reDistributeCountsAndDisplacements(MPI_Comm comm) -> void
 
     _isDistributed = false;
 
-    distributeCountsAndDisplacements(comm);
+    distributeCountsAndDisplacements(rank, nnodes);
 }
 
 auto

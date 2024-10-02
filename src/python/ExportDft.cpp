@@ -127,7 +127,10 @@ export_dft(py::module& m)
 
     PyClass<CMolecularGrid>(m, "MolecularGrid")
         .def(py::init<>())
+        .def(py::init<const CDenseMatrix&>())
         .def(py::init<const CMolecularGrid&>())
+        .def("partition_grid_points", &CMolecularGrid::partitionGridPoints)
+        .def("distribute_counts_and_displacements", &CMolecularGrid::distributeCountsAndDisplacements)
         .def("number_of_points", &CMolecularGrid::getNumberOfGridPoints)
         .def(
             "x_to_numpy",
@@ -153,13 +156,20 @@ export_dft(py::module& m)
                 return vlx_general::pointer_to_numpy(self.getWeights(), std::vector<int>{self.getNumberOfGridPoints()});
             },
             "Gets weights of grid as numpy array.")
+        .def(
+            "points_to_numpy",
+            [](const CMolecularGrid& self) -> py::array_t<double> {
+                auto points = self.getGridPoints();
+                return vlx_general::pointer_to_numpy(points.values(), {4, self.getNumberOfGridPoints()});
+            },
+            "Gets grid points as numpy array of shape (4,N).")
         .def(py::self == py::self);
 
     // CGridDriver class
 
     PyClass<CGridDriver>(m, "GridDriver")
         .def(py::init(&CGridDriver_create), "comm"_a = py::none())
-        .def("generate", &CGridDriver::generate, "Generates molecular grid for molecule.", "molecule"_a)
+        .def("generate", &CGridDriver::generate, "Generates molecular grid for molecule.", "molecule"_a, "rank"_a, "nnodes"_a)
         .def("set_level", &CGridDriver::setLevel, "Sets accuracy level for grid generation.", "grid_level"_a);
 
     // CXCIntegrator class

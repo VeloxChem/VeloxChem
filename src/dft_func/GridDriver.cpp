@@ -51,26 +51,7 @@ CGridDriver::CGridDriver(MPI_Comm comm)
 auto
 CGridDriver::setLevel(const int gridLevel) -> void
 {
-    if (mpi::rank(_locComm) == mpi::master())
-    {
-        if ((gridLevel > 0) && (gridLevel < 9)) _gridLevel = gridLevel;
-    }
-
-    _gridLevel = mpi::bcastScalar(_gridLevel, _locComm);
-}
-
-auto
-CGridDriver::generate(const CMolecule& molecule) const -> CMolecularGrid
-{
-    CMolecularGrid molgrid;
-
-    molgrid = _genGridPoints(molecule);
-
-    molgrid.partitionGridPoints();
-
-    molgrid.distributeCountsAndDisplacements(_locComm);
-
-    return molgrid;
+    if ((gridLevel > 0) && (gridLevel < 9)) _gridLevel = gridLevel;
 }
 
 auto
@@ -162,7 +143,7 @@ CGridDriver::_getNumberOfAngularPoints(const int idElemental) const -> int
 }
 
 auto
-CGridDriver::_genGridPoints(const CMolecule& molecule) const -> CMolecularGrid
+CGridDriver::generate(const CMolecule& molecule, const int rank, const int nnodes) const -> CMolecularGrid
 {
     // molecular data
 
@@ -182,13 +163,9 @@ CGridDriver::_genGridPoints(const CMolecule& molecule) const -> CMolecularGrid
 
     // determine dimensions of atoms batch for each MPI process
 
-    auto rank = mpi::rank(_locComm);
+    auto nodatm = mathfunc::batch_size(natoms, rank, nnodes);
 
-    auto nodes = mpi::nodes(_locComm);
-
-    auto nodatm = mathfunc::batch_size(natoms, rank, nodes);
-
-    auto nodoff = mathfunc::batch_offset(natoms, rank, nodes);
+    auto nodoff = mathfunc::batch_offset(natoms, rank, nnodes);
 
     // allocate raw grid
 
@@ -230,9 +207,7 @@ CGridDriver::_genGridPoints(const CMolecule& molecule) const -> CMolecularGrid
 
     delete rawgrid;
 
-    auto gathered_prngrid = mpi::gatherDenseMatricesByColumns(prngrid, _locComm);
-
-    return CMolecularGrid(gathered_prngrid);
+    return CMolecularGrid(prngrid);
 }
 
 auto
