@@ -39,9 +39,16 @@ class TestVisualization:
         homo = task.molecule.number_of_alpha_electrons() - 1
 
         vis_drv = VisualizationDriver(task.mpi_comm)
+
+        local_grid = vis_drv.create_local_cubic_grid(grid, task.mpi_rank,
+                                                     task.mpi_size)
+
         mo_coefs = mol_orbs.alpha_to_numpy()
-        vis_drv.compute(grid, task.molecule, task.ao_basis, mo_coefs, homo,
-                        'alpha')
+        vis_drv.compute(local_grid, task.molecule, task.ao_basis, mo_coefs,
+                        homo, 'alpha')
+
+        grid_np_arrays = task.mpi_comm.gather(local_grid.values_to_numpy(),
+                                              root=mpi_master())
 
         points = [[0.3 + 1.0 * ix, 0.6 + 1.0 * iy, 0.9 + 1.0 * iz]
                   for ix in range(2)
@@ -51,7 +58,7 @@ class TestVisualization:
                                 homo, 'alpha')
 
         if is_mpi_master(task.mpi_comm):
-            homo_values = grid.values_to_numpy()
+            homo_values = np.vstack(grid_np_arrays)
 
             homo_ref = np.array([
                 5.09744e-02, 2.82845e-02, 1.20927e-02, 3.22233e-02, 1.53738e-02,
@@ -175,6 +182,9 @@ class TestVisualization:
 
         cubic_grid = vis_drv.gen_cubic_grid(task.molecule, [2, 3, 5])
 
+        local_cubic_grid = vis_drv.create_local_cubic_grid(
+            cubic_grid, task.mpi_rank, task.mpi_size)
+
         vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, density, 0,
                         'alpha')
         if is_mpi_master(task.mpi_comm):
@@ -183,9 +193,15 @@ class TestVisualization:
             dens_cube_fpath.unlink()
 
         mo_coefs = mol_orbs.alpha_to_numpy()
-        vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, mo_coefs,
+        vis_drv.compute(local_cubic_grid, task.molecule, task.ao_basis,
+                        mo_coefs,
                         task.molecule.number_of_alpha_electrons() - 1, 'alpha')
+
+        grid_np_arrays = task.mpi_comm.gather(
+            local_cubic_grid.values_to_numpy(), root=mpi_master())
+
         if is_mpi_master(task.mpi_comm):
+            cubic_grid.set_values(np.vstack(grid_np_arrays).reshape(-1))
             read_grid = CubicGrid.read_cube(homo_cube_fname)
             assert read_grid.compare(cubic_grid) < 1e-6
             homo_cube_fpath.unlink()

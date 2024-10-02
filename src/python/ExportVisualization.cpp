@@ -108,6 +108,7 @@ export_visualization(py::module& m)
     PyClass<CVisualizationDriver>(m, "VisualizationDriver")
         .def(py::init(&CVisualizationDriver_create), "comm"_a = py::none())
         .def("get_rank", &CVisualizationDriver::getRank, "Gets rank of the MPI process.")
+        .def("create_local_cubic_grid", &CVisualizationDriver::create_local_cubic_grid, "Creates MPI-local cubic grid.")
         .def("get_atomic_orbital_info",
              &CVisualizationDriver::getAtomicOrbitalInformation,
              "Gets atomic orbital information.",

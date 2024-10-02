@@ -161,6 +161,8 @@ class CVisualizationDriver
      */
     int getRank() const;
 
+    std::vector<std::vector<int>> getCountsAndDisplacements(int nx, int nnodes) const;
+
     /**
      Computes counts and displacements for distributing workloads to MPI processes.
 
@@ -169,10 +171,12 @@ class CVisualizationDriver
      */
     std::vector<std::vector<int>> getCountsAndDisplacements(const int nx) const;
 
-    /**
-     Computes molecular orbital values at cubic grid points (MPI).
+    CCubicGrid create_local_cubic_grid(const CCubicGrid& grid, const int rank, const int nnodes) const;
 
-     @param grid the cubic grid.
+    /**
+     Computes molecular orbital values at local cubic grid points.
+
+     @param localgrid the local cubic grid.
      @param molecule the molecule.
      @param basis the basis set for the molecule.
      @param nao the number of AOs.
@@ -181,7 +185,7 @@ class CVisualizationDriver
      @param moidx the index of the molecular orbital (0-based).
      @param mospin the spin of the molecular orbital ('alpha' or 'beta').
      */
-    void compute(CCubicGrid&               grid,
+    void compute(CCubicGrid&               localgrid,
                  const CMolecule&          molecule,
                  const CMolecularBasis&    basis,
                  const int                 nao,

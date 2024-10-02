@@ -415,6 +415,39 @@ CVisualizationDriver::getRank() const
 }
 
 std::vector<std::vector<int>>
+CVisualizationDriver::getCountsAndDisplacements(int nx, int nnodes) const
+{
+    int ave = nx / nnodes;
+
+    int res = nx % nnodes;
+
+    std::vector<int> counts;
+
+    for (int i = 0; i < nnodes; i++)
+    {
+        if (i < res)
+        {
+            counts.push_back(ave + 1);
+        }
+        else
+        {
+            counts.push_back(ave);
+        }
+    }
+
+    std::vector<int> displs;
+
+    for (int i = 0, disp = 0; i < nnodes; i++)
+    {
+        displs.push_back(disp);
+
+        disp += counts[i];
+    }
+
+    return std::vector<std::vector<int>>({counts, displs});
+}
+
+std::vector<std::vector<int>>
 CVisualizationDriver::getCountsAndDisplacements(int nx) const
 {
     int ave = nx / _locNodes;
@@ -447,15 +480,10 @@ CVisualizationDriver::getCountsAndDisplacements(int nx) const
     return std::vector<std::vector<int>>({counts, displs});
 }
 
-void
-CVisualizationDriver::compute(CCubicGrid&               grid,
-                              const CMolecule&          molecule,
-                              const CMolecularBasis&    basis,
-                              const int                 nao,
-                              const int                 nmo,
-                              const double*             mocoefs,
-                              const int                 moidx,
-                              const std::string&        mospin) const
+CCubicGrid
+CVisualizationDriver::create_local_cubic_grid(const CCubicGrid& grid,
+                                              const int         rank,
+                                              const int         nnodes) const
 {
     // grid information
 
@@ -467,33 +495,30 @@ CVisualizationDriver::compute(CCubicGrid&               grid,
 
     // compute local grid on this MPI process
 
-    auto xcntdsp = getCountsAndDisplacements(numpoints[0]);
+    auto xcntdsp = getCountsAndDisplacements(numpoints[0], nnodes);
 
     auto xcounts = xcntdsp[0];
 
     auto xdispls = xcntdsp[1];
 
-    std::array localorigin{origin[0] + stepsize[0] * xdispls[_locRank], origin[1], origin[2]};
+    std::array localorigin{origin[0] + stepsize[0] * xdispls[rank], origin[1], origin[2]};
 
-    std::array localnumpoints{xcounts[_locRank], numpoints[1], numpoints[2]};
+    std::array localnumpoints{xcounts[rank], numpoints[1], numpoints[2]};
 
-    CCubicGrid localgrid(localorigin, stepsize, localnumpoints);
+    return CCubicGrid(localorigin, stepsize, localnumpoints);
+}
 
+void
+CVisualizationDriver::compute(CCubicGrid&               localgrid,
+                              const CMolecule&          molecule,
+                              const CMolecularBasis&    basis,
+                              const int                 nao,
+                              const int                 nmo,
+                              const double*             mocoefs,
+                              const int                 moidx,
+                              const std::string&        mospin) const
+{
     _computeLocalGrid(localgrid, molecule, basis, nao, nmo, mocoefs, moidx, mospin);
-
-    // gather local grids
-
-    std::vector<int> yzcounts, yzdispls;
-
-    for (int i = 0; i < static_cast<int>(xcounts.size()); i++)
-    {
-        yzcounts.push_back(xcounts[i] * numpoints[1] * numpoints[2]);
-
-        yzdispls.push_back(xdispls[i] * numpoints[1] * numpoints[2]);
-    }
-
-    MPI_Gatherv(
-        localgrid.values(), yzcounts[_locRank], MPI_DOUBLE, grid.values(), yzcounts.data(), yzdispls.data(), MPI_DOUBLE, mpi::master(), _locComm);
 }
 
 void
