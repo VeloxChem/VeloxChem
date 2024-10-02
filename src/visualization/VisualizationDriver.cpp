@@ -32,7 +32,6 @@
 #include "CubicGrid.hpp"
 #include "ErrorHandler.hpp"
 #include "MolecularBasis.hpp"
-#include "MpiFunc.hpp"
 #include "SphericalMomentum.hpp"
 #include "StringFormat.hpp"
 

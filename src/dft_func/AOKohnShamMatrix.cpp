@@ -28,7 +28,6 @@
 #include <string>
 
 #include "ErrorHandler.hpp"
-#include "MpiFunc.hpp"
 #include "StringFormat.hpp"
 
 CAOKohnShamMatrix::CAOKohnShamMatrix()

@@ -41,7 +41,6 @@
 #include "GtoFunc.hpp"
 #include "GtoValues.hpp"
 #include "MathFunc.hpp"
-#include "MpiFunc.hpp"
 #include "MultiTimer.hpp"
 #include "Prescreener.hpp"
 #include "StringFormat.hpp"

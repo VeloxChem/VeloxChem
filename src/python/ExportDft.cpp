@@ -78,16 +78,6 @@ arrays_to_const_pointers(const std::vector<py::array_t<double>>& arrays) -> std:
     return pointers;
 }
 
-// constructors for CGridDriver, CXCIntegrator
-
-static auto
-CGridDriver_create(py::object py_comm) -> std::shared_ptr<CGridDriver>
-{
-    if (py_comm.is_none()) return std::make_shared<CGridDriver>(MPI_COMM_WORLD);
-
-    return std::make_shared<CGridDriver>(*vlx_general::get_mpi_comm(py_comm));
-}
-
 // Exports classes/functions in src/dft to python
 
 void
@@ -168,7 +158,7 @@ export_dft(py::module& m)
     // CGridDriver class
 
     PyClass<CGridDriver>(m, "GridDriver")
-        .def(py::init(&CGridDriver_create), "comm"_a = py::none())
+        .def(py::init<>())
         .def("generate", &CGridDriver::generate, "Generates molecular grid for molecule.", "molecule"_a, "rank"_a, "nnodes"_a)
         .def("set_level", &CGridDriver::setLevel, "Sets accuracy level for grid generation.", "grid_level"_a);
 

@@ -2,7 +2,6 @@ target_sources(vlxobjs
   PRIVATE
     Codata.cpp
     ErrorHandler.cpp
-    MpiFunc.cpp
     MultiTimer.cpp
     OpenMPFunc.cpp
     StringFormat.cpp

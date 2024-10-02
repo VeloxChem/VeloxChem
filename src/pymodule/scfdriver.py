@@ -548,7 +548,7 @@ class ScfDriver:
         if self._dft:
             print_libxc_reference(self.xcfun, self.ostream)
 
-            grid_drv = GridDriver(self.comm)
+            grid_drv = GridDriver()
             grid_level = (get_default_grid_level(self.xcfun)
                           if self.grid_level is None else self.grid_level)
             grid_drv.set_level(grid_level)

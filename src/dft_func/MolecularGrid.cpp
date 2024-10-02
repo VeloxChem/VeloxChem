@@ -33,7 +33,6 @@
 
 #include "ErrorHandler.hpp"
 #include "GridPartitioner.hpp"
-#include "MpiFunc.hpp"
 
 CMolecularGrid::CMolecularGrid()
 

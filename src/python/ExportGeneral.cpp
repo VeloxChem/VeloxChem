@@ -24,12 +24,6 @@
 
 #include "ExportGeneral.hpp"
 
-#include <mpi.h>
-// see here: https://github.com/mpi4py/mpi4py/issues/19#issuecomment-768143143
-#ifdef MSMPI_VER
-#define PyMPI_HAVE_MPI_Message 1
-#endif
-#include <mpi4py/mpi4py.h>
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
@@ -37,7 +31,6 @@
 
 #include "BatchFunc.hpp"
 #include "Codata.hpp"
-#include "MpiFunc.hpp"
 #include "OpenMPFunc.hpp"
 #include "Point.hpp"
 #include "SphericalMomentum.hpp"
@@ -49,19 +42,6 @@ namespace py = pybind11;
 using namespace py::literals;
 
 namespace vlx_general {
-
-// Gets MPI_Comm pointer from a mpi4py communicator object
-// Not a static function; used in other files
-
-auto
-get_mpi_comm(py::object py_comm) -> MPI_Comm*
-{
-    auto comm_ptr = PyMPIComm_Get(py_comm.ptr());
-
-    if (!comm_ptr) throw py::error_already_set();
-
-    return comm_ptr;
-}
 
 // Gets shape and strides from dimension
 
@@ -108,26 +88,22 @@ pointer_to_numpy(const double* ptr, const std::vector<int>& dimension) -> py::ar
 auto
 export_general(py::module &m) -> void
 {
-    // initialize mpi4py's C-API
+    /// mpi master
+    m.def(
+        "mpi_master",
+        []() -> int { return 0; },
+        "Gets the rank of MPI master process.");
 
-    if (import_mpi4py() < 0)
-    {
-        // mpi4py calls the Python C API
-        // we let pybind11 give us the detailed traceback
-        throw py::error_already_set();
-    }
-
-    /// exposing functions from StringFormat.hpp
-    m.def("upper_case", &format::upper_case, "Creates upper cased copy of given string.");
-    m.def("lower_case", &format::lower_case, "Creates lower cased copy of given string.");
-
-    // exposing functions from MpiFunc.hpp
-    m.def("mpi_master", &mpi::master, "Returns rank of MPI master process.");
-    m.def("mpi_initialized", &mpi::initialized, "Check if MPI has been initialized.");
+    /// mpi size limit
+    /// here we choose a number that is smaller than the actual limit
     m.def(
         "mpi_size_limit",
         []() -> int { return static_cast<int>(1 << 30) / 5 * 9; },
         "Gets the size limit in MPI communication (below 2^31-1).");
+
+    /// exposing functions from StringFormat.hpp
+    m.def("upper_case", &format::upper_case, "Creates upper cased copy of given string.");
+    m.def("lower_case", &format::lower_case, "Creates lower cased copy of given string.");
 
     // exposing functions from Codata.hpp
     m.def("bohr_in_angstrom", &units::bohr_in_angstrom, "Gets Bohr value in Angstroms.");

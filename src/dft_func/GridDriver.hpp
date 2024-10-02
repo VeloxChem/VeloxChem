@@ -25,8 +25,6 @@
 #ifndef GridDriver_hpp
 #define GridDriver_hpp
 
-#include <mpi.h>
-
 #include <cstdint>
 
 #include "MolecularGrid.hpp"
@@ -48,11 +46,6 @@ class CGridDriver
      The threshold of weights screening.
      */
     double _thresholdOfWeight;
-
-    /**
-     The MPI communicator.
-     */
-    MPI_Comm _locComm;
 
     /**
      Determines number of radial grid points for specific chemical element.
@@ -111,10 +104,8 @@ class CGridDriver
    public:
     /**
      Creates a grid driver object.
-
-     @param comm the MPI communicator.
      */
-    CGridDriver(MPI_Comm comm);
+    CGridDriver();
 
     /**
      Sets accuracy level for grid generation. Level: 1-8, where 1 is coarse
@@ -125,8 +116,7 @@ class CGridDriver
     auto setLevel(const int gridLevel) -> void;
 
     /**
-     Generates molecular grid for molecule. Errors are printed to output stream.
-     Grid generation is distributed within domain of MPI communicator.
+     Generates molecular grid for molecule.
 
      @param molecule the molecule.
      @param rank the MPI rank.

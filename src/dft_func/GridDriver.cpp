@@ -35,17 +35,15 @@
 #include "MathFunc.hpp"
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
-#include "MpiFunc.hpp"
 #include "PartitionFunc.hpp"
 #include "StringFormat.hpp"
 
-CGridDriver::CGridDriver(MPI_Comm comm)
+CGridDriver::CGridDriver()
 
     : _gridLevel(5)
 
     , _thresholdOfWeight(1.0e-15)
 {
-    _locComm = comm;
 }
 
 auto
@@ -161,7 +159,7 @@ CGridDriver::generate(const CMolecule& molecule, const int rank, const int nnode
 
     auto molrm = mdist.data();
 
-    // determine dimensions of atoms batch for each MPI process
+    // determine dimensions of atoms batch for this MPI process
 
     auto nodatm = mathfunc::batch_size(natoms, rank, nnodes);
 
