@@ -24,8 +24,6 @@
 
 #include "VisualizationDriver.hpp"
 
-#include <mpi.h>
-
 #include <array>
 #include <cmath>
 #include <cstring>
@@ -38,13 +36,7 @@
 #include "SphericalMomentum.hpp"
 #include "StringFormat.hpp"
 
-CVisualizationDriver::CVisualizationDriver(MPI_Comm comm)
-
-    : _locRank(mpi::rank(comm))
-
-    , _locNodes(mpi::nodes(comm))
-
-    , _locComm(comm)
+CVisualizationDriver::CVisualizationDriver()
 {
 }
 
@@ -408,12 +400,6 @@ CVisualizationDriver::computeAtomicOrbitalForGrid(CCubicGrid& grid, const CMolec
     }
 }
 
-int
-CVisualizationDriver::getRank() const
-{
-    return _locRank;
-}
-
 std::vector<std::vector<int>>
 CVisualizationDriver::getCountsAndDisplacements(int nx, int nnodes) const
 {
@@ -438,39 +424,6 @@ CVisualizationDriver::getCountsAndDisplacements(int nx, int nnodes) const
     std::vector<int> displs;
 
     for (int i = 0, disp = 0; i < nnodes; i++)
-    {
-        displs.push_back(disp);
-
-        disp += counts[i];
-    }
-
-    return std::vector<std::vector<int>>({counts, displs});
-}
-
-std::vector<std::vector<int>>
-CVisualizationDriver::getCountsAndDisplacements(int nx) const
-{
-    int ave = nx / _locNodes;
-
-    int res = nx % _locNodes;
-
-    std::vector<int> counts;
-
-    for (int i = 0; i < _locNodes; i++)
-    {
-        if (i < res)
-        {
-            counts.push_back(ave + 1);
-        }
-        else
-        {
-            counts.push_back(ave);
-        }
-    }
-
-    std::vector<int> displs;
-
-    for (int i = 0, disp = 0; i < _locNodes; i++)
     {
         displs.push_back(disp);
 
@@ -509,7 +462,7 @@ CVisualizationDriver::create_local_cubic_grid(const CCubicGrid& grid,
 }
 
 void
-CVisualizationDriver::compute(CCubicGrid&               localgrid,
+CVisualizationDriver::compute(CCubicGrid&               grid,
                               const CMolecule&          molecule,
                               const CMolecularBasis&    basis,
                               const int                 nao,
@@ -517,30 +470,6 @@ CVisualizationDriver::compute(CCubicGrid&               localgrid,
                               const double*             mocoefs,
                               const int                 moidx,
                               const std::string&        mospin) const
-{
-    _computeLocalGrid(localgrid, molecule, basis, nao, nmo, mocoefs, moidx, mospin);
-}
-
-void
-CVisualizationDriver::compute(CCubicGrid&             localgrid,
-                              const CMolecule&        molecule,
-                              const CMolecularBasis&  basis,
-                              const CAODensityMatrix& density,
-                              const int               denidx,
-                              const std::string&      denspin) const
-{
-    _computeLocalGrid(localgrid, molecule, basis, density, denidx, denspin);
-}
-
-void
-CVisualizationDriver::_computeLocalGrid(CCubicGrid&               grid,
-                                        const CMolecule&          molecule,
-                                        const CMolecularBasis&    basis,
-                                        const int                 nao,
-                                        const int                 nmo,
-                                        const double*             mocoefs,
-                                        const int                 moidx,
-                                        const std::string&        mospin) const
 {
     // grid information
 
@@ -615,12 +544,12 @@ CVisualizationDriver::_computeLocalGrid(CCubicGrid&               grid,
 }
 
 void
-CVisualizationDriver::_computeLocalGrid(CCubicGrid&             grid,
-                                        const CMolecule&        molecule,
-                                        const CMolecularBasis&  basis,
-                                        const CAODensityMatrix& density,
-                                        const int           denidx,
-                                        const std::string&      denspin) const
+CVisualizationDriver::compute(CCubicGrid&             grid,
+                              const CMolecule&        molecule,
+                              const CMolecularBasis&  basis,
+                              const CAODensityMatrix& density,
+                              const int               denidx,
+                              const std::string&      denspin) const
 {
     // grid information
 
@@ -737,42 +666,37 @@ CVisualizationDriver::getMO(const std::vector<std::vector<double>>& coords,
                             const int                               moidx,
                             const std::string&                      mospin) const
 {
-    if (_locRank == mpi::master())
+    // sanity check
+
+    std::string errspin("VisualizationDriver.get_mo: invalid spin");
+
+    bool alphaspin = (format::upper_case(mospin) == std::string("ALPHA"));
+
+    bool betaspin = (format::upper_case(mospin) == std::string("BETA"));
+
+    errors::assertMsgCritical(alphaspin || betaspin, errspin);
+
+    std::string erridx("VisualizationDriver.get_mo: invalid MO index");
+
+    errors::assertMsgCritical(0 <= moidx && moidx < nmo, erridx);
+
+    // compute MO
+
+    auto npoints = static_cast<int>(coords.size());
+
+    std::vector<double> psi(npoints, 0.0);
+
+    for (int p = 0; p < npoints; p++)
     {
-        // sanity check
+        auto phi = _compPhiAtomicOrbitals(molecule, basis, coords[p][0], coords[p][1], coords[p][2]);
 
-        std::string errspin("VisualizationDriver.get_mo: invalid spin");
-
-        bool alphaspin = (format::upper_case(mospin) == std::string("ALPHA"));
-
-        bool betaspin = (format::upper_case(mospin) == std::string("BETA"));
-
-        errors::assertMsgCritical(alphaspin || betaspin, errspin);
-
-        std::string erridx("VisualizationDriver.get_mo: invalid MO index");
-
-        errors::assertMsgCritical(0 <= moidx && moidx < nmo, erridx);
-
-        // compute MO
-
-        auto npoints = static_cast<int>(coords.size());
-
-        std::vector<double> psi(npoints, 0.0);
-
-        for (int p = 0; p < npoints; p++)
+        for (int aoidx = 0; aoidx < nao; aoidx++)
         {
-            auto phi = _compPhiAtomicOrbitals(molecule, basis, coords[p][0], coords[p][1], coords[p][2]);
-
-            for (int aoidx = 0; aoidx < nao; aoidx++)
-            {
-                psi[p] += mocoefs[aoidx * nmo + moidx] * phi[aoidx];
-            }
+            psi[p] += mocoefs[aoidx * nmo + moidx] * phi[aoidx];
         }
-
-        return psi;
     }
 
-    return std::vector<double>();
+    return psi;
 }
 
 std::vector<double>
@@ -782,53 +706,48 @@ CVisualizationDriver::getDensity(const std::vector<std::vector<double>>& coords,
                                  const CAODensityMatrix&                 density,
                                  const std::string&                      denspin) const
 {
-    if (_locRank == mpi::master())
+    // sanity check
+
+    std::string errspin("VisualizationDriver.get_density: invalid spin");
+
+    bool alphaspin = (format::upper_case(denspin) == std::string("ALPHA"));
+
+    bool betaspin = (format::upper_case(denspin) == std::string("BETA"));
+
+    errors::assertMsgCritical(alphaspin || betaspin, errspin);
+
+    std::string erridx("VisualizationDriver.get_density: multiple density matrices not supported");
+
+    auto numdens = density.getNumberOfDensityMatrices();
+
+    errors::assertMsgCritical(numdens == 1, erridx);
+
+    const int denidx = 0;
+
+    // compute density
+
+    auto nao = density.getNumberOfRows(denidx);
+
+    auto dens = alphaspin ? density.alphaDensity(denidx) : density.betaDensity(denidx);
+
+    auto npoints = static_cast<int>(coords.size());
+
+    std::vector<double> psi(npoints, 0.0);
+
+    for (int p = 0; p < npoints; p++)
     {
-        // sanity check
+        auto phi = _compPhiAtomicOrbitals(molecule, basis, coords[p][0], coords[p][1], coords[p][2]);
 
-        std::string errspin("VisualizationDriver.get_density: invalid spin");
-
-        bool alphaspin = (format::upper_case(denspin) == std::string("ALPHA"));
-
-        bool betaspin = (format::upper_case(denspin) == std::string("BETA"));
-
-        errors::assertMsgCritical(alphaspin || betaspin, errspin);
-
-        std::string erridx("VisualizationDriver.get_density: multiple density matrices not supported");
-
-        auto numdens = density.getNumberOfDensityMatrices();
-
-        errors::assertMsgCritical(numdens == 1, erridx);
-
-        const int denidx = 0;
-
-        // compute density
-
-        auto nao = density.getNumberOfRows(denidx);
-
-        auto dens = alphaspin ? density.alphaDensity(denidx) : density.betaDensity(denidx);
-
-        auto npoints = static_cast<int>(coords.size());
-
-        std::vector<double> psi(npoints, 0.0);
-
-        for (int p = 0; p < npoints; p++)
+        for (int iao = 0; iao < nao; iao++)
         {
-            auto phi = _compPhiAtomicOrbitals(molecule, basis, coords[p][0], coords[p][1], coords[p][2]);
-
-            for (int iao = 0; iao < nao; iao++)
+            for (int jao = 0; jao < nao; jao++)
             {
-                for (int jao = 0; jao < nao; jao++)
-                {
-                    psi[p] += phi[iao] * dens[iao * nao + jao] * phi[jao];
-                }
+                psi[p] += phi[iao] * dens[iao * nao + jao] * phi[jao];
             }
         }
-
-        return psi;
     }
 
-    return std::vector<double>();
+    return psi;
 }
 
 std::vector<double>
@@ -840,50 +759,45 @@ CVisualizationDriver::getOneParticleDensity(const std::vector<std::vector<double
                                             const std::string&                      spin_1,
                                             const std::string&                      spin_2) const
 {
-    if (_locRank == mpi::master())
+    if (format::upper_case(spin_1) != format::upper_case(spin_2))
     {
-        if (format::upper_case(spin_1) != format::upper_case(spin_2))
-        {
-            return std::vector<double>(coords_1.size(), 0.0);
-        }
-
-        bool alphaspin = (format::upper_case(spin_1) == std::string("ALPHA"));
-
-        // Note: getOneParticleDensity is only called by getTwoParticleDensity
-        // which guarantees that density.getNumberOfDensityMatrices() == 1 and
-        // we therefore use denidx == 0
-
-        const int denidx = 0;
-
-        // compute density
-
-        auto nao = density.getNumberOfRows(denidx);
-
-        auto dens = alphaspin ? density.alphaDensity(denidx) : density.betaDensity(denidx);
-
-        auto npoints = static_cast<int>(coords_1.size());
-
-        std::vector<double> psi(npoints, 0.0);
-
-        for (int p = 0; p < npoints; p++)
-        {
-            auto phi_1 = _compPhiAtomicOrbitals(molecule, basis, coords_1[p][0], coords_1[p][1], coords_1[p][2]);
-
-            auto phi_2 = _compPhiAtomicOrbitals(molecule, basis, coords_2[p][0], coords_2[p][1], coords_2[p][2]);
-
-            for (int iao = 0; iao < nao; iao++)
-            {
-                for (int jao = 0; jao < nao; jao++)
-                {
-                    psi[p] += phi_1[iao] * dens[iao * nao + jao] * phi_2[jao];
-                }
-            }
-        }
-
-        return psi;
+        return std::vector<double>(coords_1.size(), 0.0);
     }
 
-    return std::vector<double>();
+    bool alphaspin = (format::upper_case(spin_1) == std::string("ALPHA"));
+
+    // Note: getOneParticleDensity is only called by getTwoParticleDensity
+    // which guarantees that density.getNumberOfDensityMatrices() == 1 and
+    // we therefore use denidx == 0
+
+    const int denidx = 0;
+
+    // compute density
+
+    auto nao = density.getNumberOfRows(denidx);
+
+    auto dens = alphaspin ? density.alphaDensity(denidx) : density.betaDensity(denidx);
+
+    auto npoints = static_cast<int>(coords_1.size());
+
+    std::vector<double> psi(npoints, 0.0);
+
+    for (int p = 0; p < npoints; p++)
+    {
+        auto phi_1 = _compPhiAtomicOrbitals(molecule, basis, coords_1[p][0], coords_1[p][1], coords_1[p][2]);
+
+        auto phi_2 = _compPhiAtomicOrbitals(molecule, basis, coords_2[p][0], coords_2[p][1], coords_2[p][2]);
+
+        for (int iao = 0; iao < nao; iao++)
+        {
+            for (int jao = 0; jao < nao; jao++)
+            {
+                psi[p] += phi_1[iao] * dens[iao * nao + jao] * phi_2[jao];
+            }
+        }
+    }
+
+    return psi;
 }
 
 std::vector<double>
@@ -895,51 +809,46 @@ CVisualizationDriver::getTwoParticleDensity(const std::vector<std::vector<double
                                             const std::string&                      spin_1,
                                             const std::string&                      spin_2) const
 {
-    if (_locRank == mpi::master())
+    // sanity check
+
+    std::string errspin("VisualizationDriver.get_two_particle_density: invalid spin");
+
+    bool alphaspin_1 = (format::upper_case(spin_1) == std::string("ALPHA"));
+
+    bool betaspin_1 = (format::upper_case(spin_1) == std::string("BETA"));
+
+    bool alphaspin_2 = (format::upper_case(spin_2) == std::string("ALPHA"));
+
+    bool betaspin_2 = (format::upper_case(spin_2) == std::string("BETA"));
+
+    errors::assertMsgCritical(alphaspin_1 || betaspin_1, errspin);
+
+    errors::assertMsgCritical(alphaspin_2 || betaspin_2, errspin);
+
+    std::string erridx("VisualizationDriver.get_two_particle_density: multiple density matrices not supported");
+
+    auto numdens = density.getNumberOfDensityMatrices();
+
+    errors::assertMsgCritical(numdens == 1, erridx);
+
+    // compute density
+
+    auto g_11 = getOneParticleDensity(coords_1, coords_1, molecule, basis, density, spin_1, spin_1);
+
+    auto g_22 = getOneParticleDensity(coords_2, coords_2, molecule, basis, density, spin_2, spin_2);
+
+    auto g_12 = getOneParticleDensity(coords_1, coords_2, molecule, basis, density, spin_1, spin_2);
+
+    auto g_21 = getOneParticleDensity(coords_2, coords_1, molecule, basis, density, spin_2, spin_1);
+
+    auto npoints = static_cast<int>(coords_1.size());
+
+    std::vector<double> psi(npoints, 0.0);
+
+    for (int p = 0; p < npoints; p++)
     {
-        // sanity check
-
-        std::string errspin("VisualizationDriver.get_two_particle_density: invalid spin");
-
-        bool alphaspin_1 = (format::upper_case(spin_1) == std::string("ALPHA"));
-
-        bool betaspin_1 = (format::upper_case(spin_1) == std::string("BETA"));
-
-        bool alphaspin_2 = (format::upper_case(spin_2) == std::string("ALPHA"));
-
-        bool betaspin_2 = (format::upper_case(spin_2) == std::string("BETA"));
-
-        errors::assertMsgCritical(alphaspin_1 || betaspin_1, errspin);
-
-        errors::assertMsgCritical(alphaspin_2 || betaspin_2, errspin);
-
-        std::string erridx("VisualizationDriver.get_two_particle_density: multiple density matrices not supported");
-
-        auto numdens = density.getNumberOfDensityMatrices();
-
-        errors::assertMsgCritical(numdens == 1, erridx);
-
-        // compute density
-
-        auto g_11 = getOneParticleDensity(coords_1, coords_1, molecule, basis, density, spin_1, spin_1);
-
-        auto g_22 = getOneParticleDensity(coords_2, coords_2, molecule, basis, density, spin_2, spin_2);
-
-        auto g_12 = getOneParticleDensity(coords_1, coords_2, molecule, basis, density, spin_1, spin_2);
-
-        auto g_21 = getOneParticleDensity(coords_2, coords_1, molecule, basis, density, spin_2, spin_1);
-
-        auto npoints = static_cast<int>(coords_1.size());
-
-        std::vector<double> psi(npoints, 0.0);
-
-        for (int p = 0; p < npoints; p++)
-        {
-            psi[p] = g_11[p] * g_22[p] - g_12[p] * g_21[p];
-        }
-
-        return psi;
+        psi[p] = g_11[p] * g_22[p] - g_12[p] * g_21[p];
     }
 
-    return std::vector<double>();
+    return psi;
 }

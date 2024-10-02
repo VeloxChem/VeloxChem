@@ -25,8 +25,6 @@
 #ifndef VisualizationDriver_hpp
 #define VisualizationDriver_hpp
 
-#include <mpi.h>
-
 #include <array>
 #include <vector>
 
@@ -40,21 +38,7 @@
  */
 class CVisualizationDriver
 {
-    /**
-     The rank of associated local MPI process.
-     */
-    int _locRank;
-
-    /**
-     The total number of local MPI processes.
-     */
-    int _locNodes;
-
-    /**
-     The MPI communicator.
-     */
-    MPI_Comm _locComm;
-
+   private:
     /**
      Builds the components of Cartesian angular momentum for a shell.
 
@@ -79,51 +63,11 @@ class CVisualizationDriver
                                                const double           yp,
                                                const double           zp) const;
 
-    /**
-     Computes molecular orbital values at rank-local cubic grid points (OpenMP).
-
-     @param grid the cubic grid.
-     @param molecule the molecule.
-     @param basis the basis set for the molecule.
-     @param nao the number of AOs.
-     @param nmo the number of MOs.
-     @param mocoefs the pointer to molecular orbitals coefficients.
-     @param moidx the index of the molecular orbital (0-based).
-     @param mospin the spin of the molecular orbital ('alpha' or 'beta').
-     */
-    void _computeLocalGrid(CCubicGrid&               grid,
-                           const CMolecule&          molecule,
-                           const CMolecularBasis&    basis,
-                           const int                 nao,
-                           const int                 nmo,
-                           const double*             mocoefs,
-                           const int                 moidx,
-                           const std::string&        mospin) const;
-
-    /**
-     Computes electronic densities at rank-local cubic grid points (OpenMP).
-
-     @param grid the cubic grid.
-     @param molecule the molecule.
-     @param basis the basis set for the molecule.
-     @param density the density matrix of the molecule.
-     @param densityIndex the index of the density matrix (0-based).
-     @param densitySpin the spin of the density matrix ('alpha' or 'beta').
-     */
-    void _computeLocalGrid(CCubicGrid&             grid,
-                           const CMolecule&        molecule,
-                           const CMolecularBasis&  basis,
-                           const CAODensityMatrix& density,
-                           const int           densityIndex,
-                           const std::string&      densitySpin) const;
-
    public:
     /**
      Creates a visualization driver object.
-
-     @param comm the MPI communicator.
      */
-    CVisualizationDriver(MPI_Comm comm);
+    CVisualizationDriver();
 
     /**
      Gets atomic orbital information.
@@ -155,21 +99,13 @@ class CVisualizationDriver
     void computeAtomicOrbitalForGrid(CCubicGrid& grid, const CMolecularBasis& basis, const std::vector<int>& aoinfo) const;
 
     /**
-     Gets rank of the MPI process.
-
-     @return rank of the MPI process.
-     */
-    int getRank() const;
-
-    std::vector<std::vector<int>> getCountsAndDisplacements(int nx, int nnodes) const;
-
-    /**
      Computes counts and displacements for distributing workloads to MPI processes.
 
-     @param nx number of tasks.
+     @param nx number of points in x-axis.
+     @param nnodes number of MPI processes.
      @return a vector of vector containing counts and displacements.
      */
-    std::vector<std::vector<int>> getCountsAndDisplacements(const int nx) const;
+    std::vector<std::vector<int>> getCountsAndDisplacements(int nx, int nnodes) const;
 
     CCubicGrid create_local_cubic_grid(const CCubicGrid& grid, const int rank, const int nnodes) const;
 
@@ -208,7 +144,7 @@ class CVisualizationDriver
                  const CMolecule&        molecule,
                  const CMolecularBasis&  basis,
                  const CAODensityMatrix& density,
-                 const int           denidx,
+                 const int               denidx,
                  const std::string&      denspin) const;
 
     /**

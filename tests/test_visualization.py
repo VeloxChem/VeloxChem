@@ -38,7 +38,7 @@ class TestVisualization:
         grid = CubicGrid([0.3, 0.6, 0.9], [1.0, 1.0, 1.0], [2, 3, 3])
         homo = task.molecule.number_of_alpha_electrons() - 1
 
-        vis_drv = VisualizationDriver(task.mpi_comm)
+        vis_drv = VisualizationDriver()
 
         local_grid = vis_drv.create_local_cubic_grid(grid, task.mpi_rank,
                                                      task.mpi_size)
@@ -179,7 +179,7 @@ class TestVisualization:
 
         vis_drv = VisualizationDriver()
         vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
-                          density)
+                          density, task.mpi_comm)
 
         cubic_grid = vis_drv.gen_cubic_grid(task.molecule, [2, 3, 5])
 

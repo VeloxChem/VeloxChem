@@ -44,14 +44,6 @@ using namespace py::literals;
 namespace vlx_visualization {  // vlx_visualization namespace
 
 static auto
-CVisualizationDriver_create(py::object py_comm) -> std::shared_ptr<CVisualizationDriver>
-{
-    if (py_comm.is_none()) return std::make_shared<CVisualizationDriver>(MPI_COMM_WORLD);
-
-    return std::make_shared<CVisualizationDriver>(*vlx_general::get_mpi_comm(py_comm));
-}
-
-static auto
 CVisualizationDriver_compute(CVisualizationDriver&      self,
                              CCubicGrid&                grid,
                              const CMolecule&           molecule,
@@ -106,8 +98,7 @@ export_visualization(py::module& m)
     // CVisualizationDriver class
 
     PyClass<CVisualizationDriver>(m, "VisualizationDriver")
-        .def(py::init(&CVisualizationDriver_create), "comm"_a = py::none())
-        .def("get_rank", &CVisualizationDriver::getRank, "Gets rank of the MPI process.")
+        .def(py::init<>())
         .def("create_local_cubic_grid", &CVisualizationDriver::create_local_cubic_grid, "Creates MPI-local cubic grid.")
         .def("get_atomic_orbital_info",
              &CVisualizationDriver::getAtomicOrbitalInformation,

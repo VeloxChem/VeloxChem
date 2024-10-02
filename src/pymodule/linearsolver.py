@@ -1988,7 +1988,7 @@ class LinearSolver:
             name_string = get_random_string_parallel(self.comm)
             base_fname = 'vlx_' + name_string
 
-        vis_drv = VisualizationDriver(self.comm)
+        vis_drv = VisualizationDriver()
 
         local_cubic_grid = vis_drv.create_local_cubic_grid(
             cubic_grid, self.rank, self.nodes)
@@ -2114,7 +2114,7 @@ class LinearSolver:
             name_string = get_random_string_parallel(self.comm)
             base_fname = 'vlx_' + name_string
 
-        vis_drv = VisualizationDriver(self.comm)
+        vis_drv = VisualizationDriver()
 
         local_cubic_grid = vis_drv.create_local_cubic_grid(
             cubic_grid, self.rank, self.nodes)
