@@ -35,6 +35,7 @@
 #include "ExportGeneral.hpp"
 #include "ErrorHandler.hpp"
 #include "LinearMomentumIntegrals.hpp"
+#include "NuclearPotentialValues.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -110,6 +111,23 @@ export_oneeints(py::module& m)
                 return vlx_general::pointer_to_numpy(ef_vals.values(), {ef_vals.getNumberOfRows(), ef_vals.getNumberOfColumns()});
             },
             "Computes electric field values.");
+
+    m.def("compute_nuclear_potential_values",
+            [](const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const py::array_t<double>& point_coords,
+               const py::array_t<double>& D) -> py::array_t<double> {
+                std::string errstyle("compute_nuclear_potential_values: Expecting contiguous numpy arrays");
+                auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                errors::assertMsgCritical(c_style, errstyle);
+                std::string errshape("compute_electric_point_values: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto npoints = static_cast<int>(point_coords.shape(0));
+                auto naos = static_cast<int>(D.shape(0));
+                auto npot_vals = onee::computeNuclearPotentialValues(molecule, basis, point_coords.data(), npoints, D.data(), naos);
+                return vlx_general::pointer_to_numpy(npot_vals.data(), {static_cast<int>(npot_vals.size())});
+            },
+            "Computes nuclear potential values.");
 }
 
 }  // namespace vlx_oneeints

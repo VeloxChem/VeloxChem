@@ -6,6 +6,7 @@ target_sources(vlxobjs
     ElectricFieldValues.cpp
     GtoInfo.cpp
     LinearMomentumIntegrals.cpp
+    NuclearPotentialValues.cpp
   )
 
 target_include_directories(vlxobjs
