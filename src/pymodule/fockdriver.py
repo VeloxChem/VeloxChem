@@ -89,9 +89,9 @@ class FockDriver:
 
     def compute(self, screener, *args):
 
-        return self._fock_drv.compute_local_fock(screener, self.rank,
-                                                 self.nodes, *args)
+        return self._fock_drv._compute_local_fock(screener, self.rank,
+                                                  self.nodes, *args)
 
-    def compute_full_fock_serial(self, *args):
+    def _compute_fock_omp(self, *args):
 
-        return self._fock_drv.compute_full_fock_serial(*args)
+        return self._fock_drv._compute_fock_omp(*args)

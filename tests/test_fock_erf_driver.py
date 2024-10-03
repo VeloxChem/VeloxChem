@@ -43,8 +43,8 @@ class TestFockErfDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "k_rs",
-                                                     0.0, 0.63, 15)
+        fock_mat = fock_drv._compute_fock_omp(t4c_drv, den_mat, "k_rs", 0.0,
+                                              0.63, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -94,8 +94,8 @@ class TestFockErfDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "kx_rs",
-                                                     0.21, 0.63, 15)
+        fock_mat = fock_drv._compute_fock_omp(t4c_drv, den_mat, "kx_rs", 0.21,
+                                              0.63, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
