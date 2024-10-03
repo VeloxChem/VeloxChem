@@ -51,10 +51,8 @@ stages:
     - ulimit -s unlimited
     - lscpu | egrep 'Thread|Core|Socket|^CPU\('
     - python -V
-    - mpicc --version
-    - mpicc -show
-    - mpicxx --version
-    - mpicxx -show
+    - gcc --version
+    - g++ --version
 
 .monkey:setup:
   extends:
@@ -81,7 +79,7 @@ monkey:cmake_build:
         -S.
         -Bbuild
         -GNinja
-        -DCMAKE_CXX_COMPILER=mpicxx
+        -DCMAKE_CXX_COMPILER=g++
         -DVLX_LA_VENDOR=MKL
     - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib -- -d stats
   artifacts:
@@ -97,7 +95,7 @@ monkey:pip_install:
     - CC=gcc CXX=g++ python -m pip install
         cppe
         MDAnalysis
-    - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpicxx"
+    - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=g++"
         python -m pip install -v .[test,qmmm]
   artifacts:
     paths:
