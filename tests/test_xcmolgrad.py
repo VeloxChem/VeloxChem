@@ -23,11 +23,11 @@ class TestXCMolGrad:
         density = scf_drv.density
         density = density.broadcast(scf_drv.comm, root=mpi_master())
 
-        grid_drv = GridDriver()
+        grid_drv = GridDriver(scf_drv.comm)
         grid_level = (get_default_grid_level(scf_drv.xcfun)
                       if scf_drv.grid_level is None else scf_drv.grid_level)
         grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule, scf_drv.comm)
+        mol_grid = grid_drv.generate(molecule)
 
         grad_drv = XCMolecularGradient()
         mol_grad = grad_drv.integrate_vxc_gradient(molecule, basis,

@@ -206,9 +206,9 @@ class ScfGradientDriver(GradientDriver):
                           if grid_level is None else grid_level)
 
             # TODO: take molecular grid from scf
-            grid_drv = GridDriver()
+            grid_drv = GridDriver(self.comm)
             grid_drv.set_level(grid_level)
-            mol_grid = grid_drv.generate(molecule, self.comm)
+            mol_grid = grid_drv.generate(molecule)
 
             grad_drv = XCMolecularGradient()
             self.gradient += grad_drv.integrate_vxc_gradient(

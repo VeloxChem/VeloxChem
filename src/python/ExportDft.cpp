@@ -156,11 +156,12 @@ export_dft(py::module& m)
         .def(py::self == py::self);
 
     // CGridDriver class
+    // Note: GridDriver is prefixed by an underscore and will be used in griddriver.py
 
-    PyClass<CGridDriver>(m, "GridDriver")
+    PyClass<CGridDriver>(m, "_GridDriver")
         .def(py::init<>())
         .def(
-            "generate_local_grid",
+            "_generate_local_grid",
             &CGridDriver::generate_local_grid,
             "Generates MPI-local molecular grid for molecule.",
             "molecule"_a,

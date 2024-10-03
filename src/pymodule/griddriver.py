@@ -24,41 +24,79 @@
 
 from mpi4py import MPI
 import numpy as np
+import sys
 
-from .veloxchemlib import GridDriver
+from .veloxchemlib import mpi_master
+from .veloxchemlib import _GridDriver
 from .veloxchemlib import MolecularGrid, DenseMatrix
+from .outputstream import OutputStream
 
 
-def _GridDriver_generate(self, molecule, comm=None):
+class GridDriver:
     """
-    Generates molecular grid for molecule.
+    Implements grid driver.
 
-    :param molecule:
-        The molecule.
     :param comm:
         The MPI communicator.
-
-    :return:
-        The molecular grid.
+    :param ostream:
+        The output stream.
     """
 
-    if comm is None:
-        comm = MPI.COMM_WORLD
+    def __init__(self, comm=None, ostream=None):
+        """
+        Initializes grid driver.
+        """
 
-    local_grid = self.generate_local_grid(molecule, comm.Get_rank(),
-                                          comm.Get_size())
+        if comm is None:
+            comm = MPI.COMM_WORLD
 
-    grid_np_arrays = comm.allgather(local_grid.grid_to_numpy())
-    grid_np_arrays = [arr for arr in grid_np_arrays if arr.size > 0]
+        if ostream is None:
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
 
-    # Note: use hstack since local_grid is of shape (4,N)
-    mol_grid = MolecularGrid(DenseMatrix(np.hstack(grid_np_arrays)))
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
 
-    mol_grid.partition_grid_points()
-    mol_grid.distribute_counts_and_displacements(comm.Get_rank(),
-                                                 comm.Get_size())
+        self.ostream = ostream
 
-    return mol_grid
+        self._grid_drv = _GridDriver()
 
+    def set_level(self, grid_level):
+        """
+        Sets grid level for grid driver.
 
-GridDriver.generate = _GridDriver_generate
+        :param grid_level:
+            The grid level.
+        """
+
+        grid_level = self.comm.bcast(grid_level, root=mpi_master())
+
+        self._grid_drv.set_level(grid_level)
+
+    def generate(self, molecule):
+        """
+        Generates molecular grid for molecule.
+
+        :param molecule:
+            The molecule.
+
+        :return:
+            The molecular grid.
+        """
+
+        local_grid = self._grid_drv._generate_local_grid(
+            molecule, self.rank, self.nodes)
+
+        grid_np_arrays = self.comm.allgather(local_grid.grid_to_numpy())
+        grid_np_arrays = [arr for arr in grid_np_arrays if arr.size > 0]
+
+        # Note: use hstack since local_grid is of shape (4,N)
+        mol_grid = MolecularGrid(DenseMatrix(np.hstack(grid_np_arrays)))
+
+        mol_grid.partition_grid_points()
+        mol_grid.distribute_counts_and_displacements(self.rank, self.nodes)
+
+        return mol_grid
