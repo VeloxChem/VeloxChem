@@ -80,7 +80,7 @@ class PolarizabilityGradient():
                 'do_four_point': ('bool', 'do four-point numerical integration'),
                 'delta_h': ('float', 'the displacement for finite difference'),
                 'is_complex': ('bool', 'whether the polarizability is complex'),
-                'damping': ('float', 'damping parameter for complex numerical'),
+                'damping': ('float', 'damping parameter for complex numerical (a.u.)'),
                 'do_print_polgrad': ('bool', 'whether to print the pol. gradient'),
             },
             'method_settings': {
@@ -317,12 +317,7 @@ class PolarizabilityGradient():
         # dictionary for results
         polgrad_results = {}
 
-        if self.rank == mpi_master():
-            info_msg = 'do_four_point: ' + str(self.do_four_point)
-            self.ostream.print_blank()
-            self.ostream.print_info(info_msg)
-            self.ostream.flush()
-
+        # construct polarizability gradient
         num_polgradient = self.construct_numerical_gradient(molecule, ao_basis, scf_drv, lr_drv)
 
         if self.rank == mpi_master():
@@ -1098,7 +1093,7 @@ class PolarizabilityGradient():
         if self.is_complex:
             cur_str += 'Complex '
             cur_str2 = 'Damping value                   : '
-            cur_str2 += str(self.damping) + ' a.u.'
+            cur_str2 += '{:.4f} a.u.'.format(self.damping)
         else:
             cur_str += 'Real '
         if self.numerical:
@@ -1109,7 +1104,7 @@ class PolarizabilityGradient():
             else:
                 cur_str3 += 'Symmetric Difference Quotient'
             cur_str4 = 'Finite Difference Step Size     : '
-            cur_str4 += str(self.delta_h) + ' a.u.'
+            cur_str4 += '{:.4f} a.u.'.format(self.delta_h)
         else:
             cur_str += 'Analytical'
 
@@ -1128,7 +1123,7 @@ class PolarizabilityGradient():
             self.ostream.print_header(cur_str.ljust(str_width))
             grid_level = (get_default_grid_level(self.xcfun)
                           if self.grid_level is None else self.grid_level)
-            cur_str = 'Molecular Grid Level            : ' + str(grid_level)
+            cur_str = 'Molecular Grid Level            : {}'.format(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()

@@ -155,7 +155,7 @@ class VibrationalAnalysis:
 
         # flag for two-point or four-point approximation
         self.do_four_point_hessian = False
-        self.do_four_point_polgrad = False
+        self.do_four_point_raman = False
 
         self.do_ir = True
         self.do_raman = False
@@ -178,11 +178,11 @@ class VibrationalAnalysis:
                 'numerical_hessian': ('bool', 'do numerical hessian'),
                 'numerical_raman': ('bool', 'do numerical polarizability gradient'),
                 'do_four_point_hessian': ('bool', 'do four-point numerical integration'),
-                'do_four_point_polgrad': ('bool', 'do four-point numerical integration'),
+                'do_four_point_raman': ('bool', 'do four-point numerical integration'),
                 'do_ir': ('bool', 'whether to calculate IR intensities'),
                 'do_raman': ('bool', 'whether to calculate Raman activity'),
                 'do_resonance_raman': ('bool', 'whether to calculate resonance Raman activity'),
-                'rr_damping': ('float', 'the damping factor in CPP for resonance Raman'),
+                'rr_damping': ('float', 'the damping factor in CPP for resonance Raman (a.u.)'),
                 'do_print_hessian': ('bool', 'whether to print the Hessian'),
                 'do_print_polgrad': ('bool', 'whether to print the pol. gradient'),
                 'print_depolarization_ratio': ('bool', 'whether to print Raman depolarization ratio'),
@@ -511,7 +511,7 @@ class VibrationalAnalysis:
 
         # transfer settings for vibrational task to polgrad driver
         polgrad_drv.numerical = self.numerical_raman
-        polgrad_drv.do_four_point = self.do_four_point_polgrad
+        polgrad_drv.do_four_point = self.do_four_point_raman
         polgrad_drv.do_print_polgrad = self.do_print_polgrad
 
         # perform a linear response calculation
