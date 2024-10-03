@@ -30,6 +30,7 @@ from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
+from .respchargesdriver import RespChargesDriver
 #from .xtbdriver import XtbDriver
 #from .xtbgradientdriver import XtbGradientDriver
 from .visualizationdriver import VisualizationDriver
@@ -403,6 +404,26 @@ def main():
         vis_drv = VisualizationDriver(task.mpi_comm)
         vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
                           density)
+
+    # RESP and ESP charges
+
+    if task_type in ['resp charges', 'esp charges']:
+        if (task_type == 'resp charges' and 'resp_charges' in task.input_dict):
+            charges_dict = task.input_dict['resp_charges']
+        elif (task_type == 'esp charges' and 'esp_charges' in task.input_dict):
+            charges_dict = task.input_dict['esp_charges']
+        else:
+            charges_dict = {}
+
+        charges_dict['filename'] = task.input_dict['filename']
+
+        chg_drv = RespChargesDriver(task.mpi_comm, task.ostream)
+        chg_drv.update_settings(charges_dict, method_dict)
+
+        if task_type == 'resp charges':
+            chg_drv.compute(task.molecule, task.ao_basis, 'resp')
+        elif task_type == 'esp charges':
+            chg_drv.compute(task.molecule, task.ao_basis, 'esp')
 
     # All done
 
