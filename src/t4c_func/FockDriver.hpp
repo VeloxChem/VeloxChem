@@ -127,10 +127,16 @@ class CFockDriver
                  const double                    omega,
                  const int                       ithreshold) const -> CMatrices;
 
-    auto set_block_size_factor(const int) -> void;
+    auto set_block_size_factor(const int factor) -> void;
 
    private:
-    int _block_size_factor = 2;
+    int _block_size_factor = 1;
+
+    auto _determine_block_size_factor(const int nao) const -> int;
+
+    auto _get_nao(const CMatrix& mat) const -> int;
+
+    auto _get_nao(const CMatrices& mats) const -> int;
 };
 
 #endif /* FockDriver_hpp */

@@ -44,7 +44,7 @@ export_t4cintegrals(py::module& m)
 
     PyClass<CFockDriver>(m, "_FockDriver")
         .def(py::init<>())
-        .def("set_block_size_factor", &CFockDriver::set_block_size_factor, "Sets block size factor.")
+        .def("_set_block_size_factor", &CFockDriver::set_block_size_factor, "Sets block size factor.")
         .def(
             "_compute_fock_omp",
             [](const CFockDriver&     fock_drv,

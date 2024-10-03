@@ -179,8 +179,6 @@ class LinearSolver:
         self._dist_fock_ger = None
         self._dist_fock_ung = None
 
-        self._block_size_factor = 2
-
         self.debug = False
 
         # input keywords
@@ -952,12 +950,6 @@ class LinearSolver:
         t0 = tm.time()
 
         fock_drv = FockDriver(self.comm)
-
-        if self.rank == mpi_master():
-            nao = dens[0].shape[0]
-        else:
-            nao = None
-        fock_drv.update_block_size_factor(nao)
 
         fock_arrays = []
 

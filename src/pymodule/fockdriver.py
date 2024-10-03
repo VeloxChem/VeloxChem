@@ -62,31 +62,6 @@ class FockDriver:
 
         self._fock_drv = _FockDriver()
 
-    def update_block_size_factor(self, nao):
-        """
-        Updates block size factor for Fock driver.
-
-        :param nao:
-            The number of AOs.
-        """
-
-        if self.rank == mpi_master():
-            if nao < 900:
-                block_size_factor = 16
-            elif nao < 1800:
-                block_size_factor = 8
-            elif nao < 3600:
-                block_size_factor = 4
-            else:
-                block_size_factor = 2
-        else:
-            block_size_factor = None
-
-        block_size_factor = self.comm.bcast(block_size_factor,
-                                            root=mpi_master())
-
-        self._fock_drv.set_block_size_factor(block_size_factor)
-
     def compute(self, screener, *args):
 
         return self._fock_drv._compute_local_fock(screener, self.rank,
@@ -95,3 +70,7 @@ class FockDriver:
     def _compute_fock_omp(self, *args):
 
         return self._fock_drv._compute_fock_omp(*args)
+
+    def _set_block_size_factor(self, factor):
+
+        self._fock_drv._set_block_size_factor(factor)

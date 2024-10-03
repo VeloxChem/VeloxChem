@@ -231,8 +231,6 @@ class ScfDriver:
         # filename
         self.filename = None
 
-        self._block_size_factor = 2
-
         self.debug = False
 
         # input keywords
@@ -1566,12 +1564,6 @@ class ScfDriver:
         eri_t0 = tm.time()
 
         fock_drv = FockDriver(self.comm)
-
-        if self.rank == mpi_master():
-            nao = den_mat[0].shape[0]
-        else:
-            nao = None
-        fock_drv.update_block_size_factor(nao)
 
         # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'
