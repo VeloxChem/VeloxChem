@@ -552,7 +552,7 @@ class LinearResponseEigenSolver(LinearSolver):
                         y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
 
                 if self.nto or self.detach_attach:
-                    vis_drv = VisualizationDriver()
+                    vis_drv = VisualizationDriver(self.comm)
                     if self.cube_origin is None or self.cube_stepsize is None:
                         cubic_grid = vis_drv.gen_cubic_grid(
                             molecule, self.cube_points)

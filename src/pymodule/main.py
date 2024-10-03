@@ -400,9 +400,9 @@ def main():
         mol_orbs = mol_orbs.broadcast(task.mpi_comm, root=mpi_master())
         density = density.broadcast(task.mpi_comm, root=mpi_master())
 
-        vis_drv = VisualizationDriver()
+        vis_drv = VisualizationDriver(task.mpi_comm)
         vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
-                          density, task.mpi_comm)
+                          density)
 
     # All done
 

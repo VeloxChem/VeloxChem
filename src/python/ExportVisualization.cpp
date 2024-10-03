@@ -95,10 +95,11 @@ export_visualization(py::module& m)
             "Convertis cubic grid values to 3D numpy array.");
 
     // CVisualizationDriver class
+    // Note: CVisualizationDriver is prefixed by an underscore and will be used in visualizationdriver.py
 
-    PyClass<CVisualizationDriver>(m, "VisualizationDriver")
+    PyClass<CVisualizationDriver>(m, "_VisualizationDriver")
         .def(py::init<>())
-        .def("create_local_cubic_grid", &CVisualizationDriver::create_local_cubic_grid, "Creates MPI-local cubic grid.")
+        .def("_create_local_cubic_grid", &CVisualizationDriver::create_local_cubic_grid, "Creates MPI-local cubic grid.")
         .def("get_atomic_orbital_info",
              &CVisualizationDriver::getAtomicOrbitalInformation,
              "Gets atomic orbital information.",
@@ -111,19 +112,19 @@ export_visualization(py::module& m)
              "grid"_a,
              "basis"_a,
              "aoinfo"_a)
-        .def("compute_local_grid",
+        .def("_compute_local_grid",
              &CVisualizationDriver_compute_local_grid,
-             "Computes molecular orbital values at cubic grid points.",
+             "Computes molecular orbital values at MPI-local cubic grid points.",
              "grid"_a,
              "molecule"_a,
              "basis"_a,
              "mocoefs"_a,
              "moidx"_a,
              "mospin"_a)
-        .def("compute_local_grid",
+        .def("_compute_local_grid",
              py::overload_cast<CCubicGrid&, const CMolecule&, const CMolecularBasis&, const CAODensityMatrix&, const int, const std::string&>(
                  &CVisualizationDriver::compute_local_grid, py::const_),
-             "Computes density values at cubic grid points.",
+             "Computes density values at MPI-local cubic grid points.",
              "grid"_a,
              "molecule"_a,
              "basis"_a,

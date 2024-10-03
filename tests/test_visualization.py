@@ -38,16 +38,11 @@ class TestVisualization:
         grid = CubicGrid([0.3, 0.6, 0.9], [1.0, 1.0, 1.0], [2, 3, 3])
         homo = task.molecule.number_of_alpha_electrons() - 1
 
-        vis_drv = VisualizationDriver()
+        vis_drv = VisualizationDriver(task.mpi_comm)
 
         mo_coefs = mol_orbs.alpha_to_numpy()
-        vis_drv.compute(grid,
-                        task.molecule,
-                        task.ao_basis,
-                        mo_coefs,
-                        homo,
-                        'alpha',
-                        comm=task.mpi_comm)
+        vis_drv.compute(grid, task.molecule, task.ao_basis, mo_coefs, homo,
+                        'alpha')
 
         points = [[0.3 + 1.0 * ix, 0.6 + 1.0 * iy, 0.9 + 1.0 * iz]
                   for ix in range(2)
@@ -73,13 +68,7 @@ class TestVisualization:
             mo_val = np.array(mo_val).reshape(2, 3, 3)
             assert np.max(np.abs(np.abs(homo_values) - np.abs(mo_val))) < 1.0e-8
 
-        vis_drv.compute(grid,
-                        task.molecule,
-                        task.ao_basis,
-                        density,
-                        0,
-                        'alpha',
-                        comm=task.mpi_comm)
+        vis_drv.compute(grid, task.molecule, task.ao_basis, density, 0, 'alpha')
 
         den_val = vis_drv.get_density(points, task.molecule, task.ao_basis,
                                       density, 'alpha')
@@ -181,19 +170,14 @@ class TestVisualization:
             'files': f'{dens_cube_fname}, {homo_cube_fname}',
         }
 
-        vis_drv = VisualizationDriver()
+        vis_drv = VisualizationDriver(task.mpi_comm)
         vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
-                          density, task.mpi_comm)
+                          density)
 
         cubic_grid = vis_drv.gen_cubic_grid(task.molecule, [2, 3, 5])
 
-        vis_drv.compute(cubic_grid,
-                        task.molecule,
-                        task.ao_basis,
-                        density,
-                        0,
-                        'alpha',
-                        comm=task.mpi_comm)
+        vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, density, 0,
+                        'alpha')
 
         if is_mpi_master(task.mpi_comm):
             read_grid = CubicGrid.read_cube(dens_cube_fname)
@@ -201,13 +185,8 @@ class TestVisualization:
             dens_cube_fpath.unlink()
 
         mo_coefs = mol_orbs.alpha_to_numpy()
-        vis_drv.compute(cubic_grid,
-                        task.molecule,
-                        task.ao_basis,
-                        mo_coefs,
-                        task.molecule.number_of_alpha_electrons() - 1,
-                        'alpha',
-                        comm=task.mpi_comm)
+        vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, mo_coefs,
+                        task.molecule.number_of_alpha_electrons() - 1, 'alpha')
 
         if is_mpi_master(task.mpi_comm):
             read_grid = CubicGrid.read_cube(homo_cube_fname)

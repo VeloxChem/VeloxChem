@@ -1989,7 +1989,7 @@ class LinearSolver:
             name_string = get_random_string_parallel(self.comm)
             base_fname = 'vlx_' + name_string
 
-        vis_drv = VisualizationDriver()
+        vis_drv = VisualizationDriver(self.comm)
 
         if getattr(self, 'core_excitation', False):
             nocc = self.num_core_orbitals
@@ -2011,13 +2011,8 @@ class LinearSolver:
 
             # hole
             ind_occ = nocc - i_nto - 1
-            vis_drv.compute(cubic_grid,
-                            molecule,
-                            basis,
-                            nto_coefs,
-                            ind_occ,
-                            'alpha',
-                            comm=self.comm)
+            vis_drv.compute(cubic_grid, molecule, basis, nto_coefs, ind_occ,
+                            'alpha')
 
             if self.rank == mpi_master():
                 occ_cube_name = '{:s}_S{:d}_NTO_H{:d}.cube'.format(
@@ -2032,13 +2027,8 @@ class LinearSolver:
 
             # electron
             ind_vir = nocc + i_nto
-            vis_drv.compute(cubic_grid,
-                            molecule,
-                            basis,
-                            nto_coefs,
-                            ind_vir,
-                            'alpha',
-                            comm=self.comm)
+            vis_drv.compute(cubic_grid, molecule, basis, nto_coefs, ind_vir,
+                            'alpha')
 
             if self.rank == mpi_master():
                 vir_cube_name = '{:s}_S{:d}_NTO_P{:d}.cube'.format(
@@ -2110,15 +2100,9 @@ class LinearSolver:
             name_string = get_random_string_parallel(self.comm)
             base_fname = 'vlx_' + name_string
 
-        vis_drv = VisualizationDriver()
+        vis_drv = VisualizationDriver(self.comm)
 
-        vis_drv.compute(cubic_grid,
-                        molecule,
-                        basis,
-                        dens_DA,
-                        0,
-                        'alpha',
-                        comm=self.comm)
+        vis_drv.compute(cubic_grid, molecule, basis, dens_DA, 0, 'alpha')
 
         if self.rank == mpi_master():
             detach_cube_name = '{:s}_S{:d}_detach.cube'.format(
@@ -2131,13 +2115,7 @@ class LinearSolver:
                 '  Cube file (detachment) : {:s}'.format(detach_cube_name))
             self.ostream.flush()
 
-        vis_drv.compute(cubic_grid,
-                        molecule,
-                        basis,
-                        dens_DA,
-                        1,
-                        'alpha',
-                        comm=self.comm)
+        vis_drv.compute(cubic_grid, molecule, basis, dens_DA, 1, 'alpha')
 
         if self.rank == mpi_master():
             attach_cube_name = '{:s}_S{:d}_attach.cube'.format(
