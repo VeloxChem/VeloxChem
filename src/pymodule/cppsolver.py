@@ -1103,6 +1103,7 @@ class ComplexResponse(LinearSolver):
                         ops_label, rsp_func_val.real, rsp_func_val.imag)
                     ostream.print_header(output.ljust(width))
             ostream.print_blank()
+        ostream.flush()
 
     def _print_absorption_results(self, rsp_results, ostream=None):
         """
