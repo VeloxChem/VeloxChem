@@ -2,10 +2,8 @@
 # the unit test executable
 add_library(vlxobjs OBJECT)
 
-# TODO: remove MPI
 target_compile_definitions(vlxobjs
   PUBLIC
-    $<BUILD_INTERFACE:ENABLE_MPI=$<BOOL:$<TARGET_EXISTS:MPI::MPI_CXX>>>
     $<BUILD_INTERFACE:VLX_ALIGN=${VLX_ALIGN}>
   )
 
@@ -45,7 +43,6 @@ target_include_directories(vlxobjs
 target_link_libraries(vlxobjs
   PUBLIC
     OpenMP::OpenMP_CXX
-    MPI::MPI_CXX
     Math::LA
     Libxc::xc
   )

@@ -2,9 +2,6 @@
 # This is useful for static analysis tools and linters
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# TODO: remove MPI
-find_package(MPI REQUIRED COMPONENTS CXX)
-
 find_package(OpenMP 4.5 REQUIRED COMPONENTS CXX)
 
 message(STATUS "Configuring a ${CMAKE_BUILD_TYPE} build")

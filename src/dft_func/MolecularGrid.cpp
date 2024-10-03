@@ -339,16 +339,10 @@ CMolecularGrid::distributeCountsAndDisplacements(const int rank, const int nnode
             newdispls.push_back(displs_p);
         }
 
-        // distribute counts and displacements
+        // update counts and displacements
 
         _gridPointCounts = newcounts[rank];
-
         _gridPointDisplacements = newdispls[rank];
-
-        // broadcast all grid points, since counts and displacements are already distributed
-
-        // TODO: broadcast all grid points
-        //_gridPoints = mpi::bcastDenseMatrix(_gridPoints, comm);
     }
 }
 
