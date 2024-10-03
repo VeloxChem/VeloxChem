@@ -95,7 +95,7 @@ export_visualization(py::module& m)
             "Convertis cubic grid values to 3D numpy array.");
 
     // CVisualizationDriver class
-    // Note: CVisualizationDriver is prefixed by an underscore and will be used in visualizationdriver.py
+    // Note: VisualizationDriver is prefixed by an underscore and will be used in visualizationdriver.py
 
     PyClass<CVisualizationDriver>(m, "_VisualizationDriver")
         .def(py::init<>())

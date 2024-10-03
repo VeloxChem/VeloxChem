@@ -130,7 +130,7 @@ class CFockDriver
     auto set_block_size_factor(const int) -> void;
 
    private:
-    int _block_size_factor = 1;
+    int _block_size_factor = 2;
 };
 
 #endif /* FockDriver_hpp */

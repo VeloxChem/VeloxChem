@@ -22,40 +22,76 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
+import sys
+
 from .veloxchemlib import mpi_master
-from .veloxchemlib import FockDriver
+from .veloxchemlib import _FockDriver
+from .outputstream import OutputStream
 
 
-def _FockDriver_mpi_compute(self, comm, screener, density, label,
-                            exchange_factor, omega, ithreshold):
+class FockDriver:
     """
-    Computes Fock matrix/matrices for given density matrix/matrices.
+    Implements Fock driver.
 
     :param comm:
         The MPI communicator.
-    :param screener:
-        The sreener with ERIs data.
-    :param density:
-        The density matrix/matrices to compute Fock matrix.
-    :param label:
-        The standard label/labels of Fock matrix type.
-    :param exchange_factor:
-        The exchange scaling factor.
-    :param omega:
-        The range separation factor.
-    :param ithreshold:
-        The threshold of integrals.
-
-    :return:
-        Fock matrix/matrices.
+    :param ostream:
+        The output stream.
     """
 
-    # compute local Fock matrix
-    loc_mat = self.compute(screener, comm.Get_rank(), comm.Get_size(), density,
-                           label, exchange_factor, omega, ithreshold)
+    def __init__(self, comm=None, ostream=None):
+        """
+        Initializes Fock driver.
+        """
 
-    # reduce Fock matrix
-    return loc_mat.reduce(comm, mpi_master())
+        if comm is None:
+            comm = MPI.COMM_WORLD
 
+        if ostream is None:
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
 
-FockDriver.mpi_compute = _FockDriver_mpi_compute
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+
+        self.ostream = ostream
+
+        self._fock_drv = _FockDriver()
+
+    def update_block_size_factor(self, nao):
+        """
+        Updates block size factor for Fock driver.
+
+        :param nao:
+            The number of AOs.
+        """
+
+        if self.rank == mpi_master():
+            if nao < 900:
+                block_size_factor = 16
+            elif nao < 1800:
+                block_size_factor = 8
+            elif nao < 3600:
+                block_size_factor = 4
+            else:
+                block_size_factor = 2
+        else:
+            block_size_factor = None
+
+        block_size_factor = self.comm.bcast(block_size_factor,
+                                            root=mpi_master())
+
+        self._fock_drv.set_block_size_factor(block_size_factor)
+
+    def compute(self, screener, *args):
+
+        return self._fock_drv.compute_local_fock(screener, self.rank,
+                                                 self.nodes, *args)
+
+    def compute_full_fock_serial(self, *args):
+
+        return self._fock_drv.compute_full_fock_serial(*args)

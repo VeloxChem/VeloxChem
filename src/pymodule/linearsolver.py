@@ -32,12 +32,13 @@ import sys
 from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import (compute_linear_momentum_integrals,
                            compute_angular_momentum_integrals)
-from .veloxchemlib import FockDriver, T4CScreener
+from .veloxchemlib import T4CScreener
 from .veloxchemlib import Matrices, make_matrix, mat_t
 from .veloxchemlib import MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .veloxchemlib import rotatory_strength_in_cgs
 from .distributedarray import DistributedArray
+from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
 from .visualizationdriver import VisualizationDriver
@@ -950,20 +951,13 @@ class LinearSolver:
 
         t0 = tm.time()
 
-        fock_drv = FockDriver()
+        fock_drv = FockDriver(self.comm)
+
         if self.rank == mpi_master():
             nao = dens[0].shape[0]
-            if nao < 900:
-                self._block_size_factor = 16
-            elif nao < 1800:
-                self._block_size_factor = 8
-            elif nao < 3600:
-                self._block_size_factor = 4
-            else:
-                self._block_size_factor = 2
-        self._block_size_factor = self.comm.bcast(self._block_size_factor,
-                                                  root=mpi_master())
-        fock_drv.set_block_size_factor(self._block_size_factor)
+        else:
+            nao = None
+        fock_drv.update_block_size_factor(nao)
 
         fock_arrays = []
 
@@ -988,8 +982,7 @@ class LinearSolver:
         else:
             erf_k_coef, omega = None, None
 
-        fock_mat = fock_drv.compute(screening, self.rank, self.nodes,
-                                    den_mat_for_fock,
+        fock_mat = fock_drv.compute(screening, den_mat_for_fock,
                                     [fock_type for x in range(len(dens))],
                                     exchange_scaling_factor, 0.0, thresh_int)
 
@@ -1004,8 +997,7 @@ class LinearSolver:
 
         if need_omega:
             # for range-separated functional
-            fock_mat = fock_drv.compute(screening, self.rank, self.nodes,
-                                        den_mat_for_fock,
+            fock_mat = fock_drv.compute(screening, den_mat_for_fock,
                                         ['kx_rs' for x in range(len(dens))],
                                         erf_k_coef, omega, thresh_int)
 

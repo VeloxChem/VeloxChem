@@ -1,15 +1,11 @@
 from pathlib import Path
 import numpy as np
 
-from mpi4py import MPI
-
 from veloxchem import MolecularBasis
 from veloxchem import Molecule
 from veloxchem import FockDriver
 from veloxchem import T4CScreener
 from veloxchem import SubMatrix
-from veloxchem import Matrix
-from veloxchem import Matrices
 from veloxchem import make_matrix
 from veloxchem import mat_t
 
@@ -30,7 +26,7 @@ class TestFockErfDriver:
         bas = MolecularBasis.read(mol, 'def2-tzvp')
 
         return mol, bas
-        
+
     def test_h2o_dimer_fock_k_tzvp_with_screener(self):
 
         mol_h2o_dimer, bas_tzvp = self.get_data_h2o_dimer()
@@ -40,14 +36,15 @@ class TestFockErfDriver:
         npyfile = str(here / 'data' / 'h2o.dimer.tzvp.density.npy')
         den_mat = make_matrix(bas_tzvp, mat_t.symmetric)
         den_mat.set_values(np.load(npyfile))
-        
+
         # screen basis function pairs
         t4c_drv = T4CScreener()
         t4c_drv.partition(bas_tzvp, mol_h2o_dimer, "eri")
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "k_rs", 0.0, 0.63, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "k_rs",
+                                                     0.0, 0.63, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -70,8 +67,7 @@ class TestFockErfDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
@@ -81,7 +77,7 @@ class TestFockErfDriver:
         fref.set_values(np.ascontiguousarray(ref_mat))
 
         assert fmat == fref
-        
+
     def test_h2o_dimer_fock_kx_tzvp_with_screener(self):
 
         mol_h2o_dimer, bas_tzvp = self.get_data_h2o_dimer()
@@ -91,14 +87,15 @@ class TestFockErfDriver:
         npyfile = str(here / 'data' / 'h2o.dimer.tzvp.density.npy')
         den_mat = make_matrix(bas_tzvp, mat_t.symmetric)
         den_mat.set_values(np.load(npyfile))
-        
+
         # screen basis function pairs
         t4c_drv = T4CScreener()
         t4c_drv.partition(bas_tzvp, mol_h2o_dimer, "eri")
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "kx_rs", 0.21, 0.63, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "kx_rs",
+                                                     0.21, 0.63, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -121,8 +118,7 @@ class TestFockErfDriver:
             cmat = fock_mat.submatrix((i, j))
             # load reference submatrix
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
+            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             assert cmat == rmat
 
@@ -132,4 +128,3 @@ class TestFockErfDriver:
         fref.set_values(np.ascontiguousarray(ref_mat))
 
         assert fmat == fref
-        

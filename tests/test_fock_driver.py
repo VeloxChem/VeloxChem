@@ -3,6 +3,7 @@ import numpy as np
 
 from mpi4py import MPI
 
+from veloxchem import mpi_master
 from veloxchem import MolecularBasis
 from veloxchem import Molecule
 from veloxchem import FockDriver
@@ -86,9 +87,10 @@ class TestFockDriver:
         den_mats = Matrices.bcast(den_mats, comm, 0)
 
         # compute Fock matrix
-        fock_drv = FockDriver()
-        fock_mats = fock_drv.mpi_compute(comm, t4c_drv, den_mats, ["j", "k"],
-                                         0.0, 0.0, 15)
+        fock_drv = FockDriver(comm)
+        fock_mats = fock_drv.compute(t4c_drv, den_mats, ["j", "k"], 0.0, 0.0,
+                                     15)
+        fock_mats = fock_mats.reduce(comm, mpi_master())
 
         if comm.Get_rank() == 0:
             # dimension of molecular basis
@@ -181,9 +183,9 @@ class TestFockDriver:
         den_mat = comm.bcast(den_mat, 0)
 
         # compute Fock matrix
-        fock_drv = FockDriver()
-        fock_mat = fock_drv.mpi_compute(comm, t4c_drv, den_mat, "2jk", 0.0, 0.0,
-                                        15)
+        fock_drv = FockDriver(comm)
+        fock_mat = fock_drv.compute(t4c_drv, den_mat, "2jk", 0.0, 0.0, 15)
+        fock_mat = fock_mat.reduce(comm, mpi_master())
 
         if comm.Get_rank() == 0:
             # load reference Fock matrix
@@ -244,8 +246,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mats = fock_drv.compute(t4c_drv, den_mats, ["j", "k"], 0.0, 0.0,
-                                     15)
+        fock_mats = fock_drv.compute_full_fock_serial(t4c_drv, den_mats,
+                                                      ["j", "k"], 0.0, 0.0, 15)
 
         # dimension of molecular basis
         basdims = [0, 16, 58, 78]
@@ -331,7 +333,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "2jk", 0.0, 0.0, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "2jk",
+                                                     0.0, 0.0, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -388,7 +391,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "2jkx", 0.28, 0.0, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "2jkx",
+                                                     0.28, 0.0, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -445,7 +449,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "j", 0.0, 0.0, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "j", 0.0,
+                                                     0.0, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -496,7 +501,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "k", 0.0, 0.0, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "k", 0.0,
+                                                     0.0, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -548,7 +554,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "kx", 0.73, 0.0, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "kx",
+                                                     0.73, 0.0, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -600,7 +607,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "2jk", 0.0, 0.0, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "2jk",
+                                                     0.0, 0.0, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -655,7 +663,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "2jkx", 0.43, 0.0, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "2jkx",
+                                                     0.43, 0.0, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -710,7 +719,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "j", 0.0, 0.0, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "j", 0.0,
+                                                     0.0, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -760,7 +770,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "k", 0.0, 0.0, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "k", 0.0,
+                                                     0.0, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -810,7 +821,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "kx", 0.21, 0.0, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "kx",
+                                                     0.21, 0.0, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -860,7 +872,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "2jk", 0.0, 0.0, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "2jk",
+                                                     0.0, 0.0, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -915,7 +928,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "2jkx", 0.38, 0.0, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "2jkx",
+                                                     0.38, 0.0, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -970,7 +984,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "j", 0.0, 0.0, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "j", 0.0,
+                                                     0.0, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -1020,7 +1035,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "k", 0.0, 0.0, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "k", 0.0,
+                                                     0.0, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -1070,7 +1086,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(t4c_drv, den_mat, "kx", 0.23, 0.0, 15)
+        fock_mat = fock_drv.compute_full_fock_serial(t4c_drv, den_mat, "kx",
+                                                     0.23, 0.0, 15)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -1116,8 +1133,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(bas_svpd, mol_h2o_dimer, den_mat, "2jk",
-                                    0.0, 0.0)
+        fock_mat = fock_drv.compute_full_fock_serial(bas_svpd, mol_h2o_dimer,
+                                                     den_mat, "2jk", 0.0, 0.0)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -1168,8 +1185,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(bas_svpd, mol_h2o_dimer, den_mat, "2jkx",
-                                    0.38, 0.0)
+        fock_mat = fock_drv.compute_full_fock_serial(bas_svpd, mol_h2o_dimer,
+                                                     den_mat, "2jkx", 0.38, 0.0)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -1220,8 +1237,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(bas_svpd, mol_h2o_dimer, den_mat, "j", 0.0,
-                                    0.0)
+        fock_mat = fock_drv.compute_full_fock_serial(bas_svpd, mol_h2o_dimer,
+                                                     den_mat, "j", 0.0, 0.0)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -1267,8 +1284,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(bas_svpd, mol_h2o_dimer, den_mat, "k", 0.0,
-                                    0.0)
+        fock_mat = fock_drv.compute_full_fock_serial(bas_svpd, mol_h2o_dimer,
+                                                     den_mat, "k", 0.0, 0.0)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -1314,8 +1331,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(bas_svpd, mol_h2o_dimer, den_mat, "kx",
-                                    0.22, 0.0)
+        fock_mat = fock_drv.compute_full_fock_serial(bas_svpd, mol_h2o_dimer,
+                                                     den_mat, "kx", 0.22, 0.0)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -1361,8 +1378,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(bas_sto3g, mol_h2o, den_mat, "2jk", 0.0,
-                                    0.0)
+        fock_mat = fock_drv.compute_full_fock_serial(bas_sto3g, mol_h2o,
+                                                     den_mat, "2jk", 0.0, 0.0)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -1413,8 +1430,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(bas_sto3g, mol_h2o, den_mat, "2jkx", 0.68,
-                                    0.0)
+        fock_mat = fock_drv.compute_full_fock_serial(bas_sto3g, mol_h2o,
+                                                     den_mat, "2jkx", 0.68, 0.0)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -1465,7 +1482,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(bas_sto3g, mol_h2o, den_mat, "j", 0.0, 0.0)
+        fock_mat = fock_drv.compute_full_fock_serial(bas_sto3g, mol_h2o,
+                                                     den_mat, "j", 0.0, 0.0)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -1511,7 +1529,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(bas_sto3g, mol_h2o, den_mat, "k", 0.0, 0.0)
+        fock_mat = fock_drv.compute_full_fock_serial(bas_sto3g, mol_h2o,
+                                                     den_mat, "k", 0.0, 0.0)
 
         # load reference Fock matrix
         here = Path(__file__).parent
@@ -1557,8 +1576,8 @@ class TestFockDriver:
 
         # compute Fock matrix
         fock_drv = FockDriver()
-        fock_mat = fock_drv.compute(bas_sto3g, mol_h2o, den_mat, "kx", 0.68,
-                                    0.0)
+        fock_mat = fock_drv.compute_full_fock_serial(bas_sto3g, mol_h2o,
+                                                     den_mat, "kx", 0.68, 0.0)
 
         # load reference Fock matrix
         here = Path(__file__).parent

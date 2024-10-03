@@ -40,11 +40,13 @@ void
 export_t4cintegrals(py::module& m)
 {
     // FockDriver class
-    PyClass<CFockDriver>(m, "FockDriver")
+    // Note: FockDriver is prefixed by an underscore and will be used in fockdriver.py
+
+    PyClass<CFockDriver>(m, "_FockDriver")
         .def(py::init<>())
         .def("set_block_size_factor", &CFockDriver::set_block_size_factor, "Sets block size factor.")
         .def(
-            "compute",
+            "compute_full_fock_serial",
             [](const CFockDriver&     fock_drv,
                const CMolecularBasis& basis,
                const CMolecule&       molecule,
@@ -56,7 +58,7 @@ export_t4cintegrals(py::module& m)
             },
             "Computes single Fock matrix of requested type for given molecule and basis.")
         .def(
-            "compute",
+            "compute_full_fock_serial",
             [](const CFockDriver&  fock_drv,
                const CT4CScreener& screener,
                const CMatrix&      density,
@@ -68,7 +70,7 @@ export_t4cintegrals(py::module& m)
             },
             "Computes single Fock matrix of requested type for two-electron integrals screener.")
         .def(
-            "compute",
+            "compute_full_fock_serial",
             [](const CFockDriver&              fock_drv,
                const CT4CScreener&             screener,
                const CMatrices&                densities,
@@ -80,7 +82,7 @@ export_t4cintegrals(py::module& m)
             },
             "Computes Fock matrices of requested type for two-electron integrals screener.")
         .def(
-            "compute",
+            "compute_local_fock",
             [](const CFockDriver&  fock_drv,
                const CT4CScreener& screener,
                const int           rank,
@@ -94,7 +96,7 @@ export_t4cintegrals(py::module& m)
             },
             "Computes single Fock matrix of requested type for two-electron integrals screener.")
         .def(
-            "compute",
+            "compute_local_fock",
             [](const CFockDriver&              fock_drv,
                const CT4CScreener&             screener,
                const int                       rank,

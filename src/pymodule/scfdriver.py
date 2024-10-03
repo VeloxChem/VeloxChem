@@ -33,7 +33,7 @@ import sys
 from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import OverlapDriver, KineticEnergyDriver
-from .veloxchemlib import FockDriver, T4CScreener
+from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import Matrices
@@ -42,6 +42,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat, mat_t
 from .veloxchemlib import xcfun
 from .aodensitymatrix import AODensityMatrix
+from .fockdriver import FockDriver
 from .profiler import Profiler
 from .griddriver import GridDriver
 from .molecularbasis import MolecularBasis
@@ -1564,20 +1565,13 @@ class ScfDriver:
 
         eri_t0 = tm.time()
 
-        fock_drv = FockDriver()
+        fock_drv = FockDriver(self.comm)
+
         if self.rank == mpi_master():
             nao = den_mat[0].shape[0]
-            if nao < 900:
-                self._block_size_factor = 16
-            elif nao < 1800:
-                self._block_size_factor = 8
-            elif nao < 3600:
-                self._block_size_factor = 4
-            else:
-                self._block_size_factor = 2
-        self._block_size_factor = self.comm.bcast(self._block_size_factor,
-                                                  root=mpi_master())
-        fock_drv.set_block_size_factor(self._block_size_factor)
+        else:
+            nao = None
+        fock_drv.update_block_size_factor(nao)
 
         # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'
@@ -1613,8 +1607,7 @@ class ScfDriver:
 
         if self.scf_type == 'restricted':
             # restricted SCF
-            fock_mat = fock_drv.compute(screener, self.rank, self.nodes,
-                                        den_mat_for_fock, fock_type,
+            fock_mat = fock_drv.compute(screener, den_mat_for_fock, fock_type,
                                         exchange_scaling_factor, 0.0,
                                         thresh_int)
 
@@ -1626,8 +1619,7 @@ class ScfDriver:
 
             if need_omega:
                 # for range-separated functional
-                fock_mat = fock_drv.compute(screener, self.rank, self.nodes,
-                                            den_mat_for_fock, 'kx_rs',
+                fock_mat = fock_drv.compute(screener, den_mat_for_fock, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
 
                 fock_mat_np -= fock_mat.full_matrix().to_numpy()
@@ -1645,7 +1637,7 @@ class ScfDriver:
             if fock_type == 'j':
                 # for pure functional
                 # den_mat_for_fock.matrix('2') is D_total
-                fock_mat = fock_drv.compute(screener, self.rank, self.nodes,
+                fock_mat = fock_drv.compute(screener,
                                             den_mat_for_fock.matrix('2'), 'j',
                                             0.0, 0.0, thresh_int)
 
@@ -1655,8 +1647,8 @@ class ScfDriver:
                 fock_mat_b_np = J_ab_np.copy()
 
             else:
-                fock_mat = fock_drv.compute(screener, self.rank, self.nodes,
-                                            den_mat_for_fock, ['kx', 'kx', 'j'],
+                fock_mat = fock_drv.compute(screener, den_mat_for_fock,
+                                            ['kx', 'kx', 'j'],
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
 
@@ -1673,8 +1665,7 @@ class ScfDriver:
                 den_mat_for_erf_k.add(den_mat_for_fock.matrix('0'), '0')
                 den_mat_for_erf_k.add(den_mat_for_fock.matrix('1'), '1')
 
-                fock_mat = fock_drv.compute(screener, self.rank, self.nodes,
-                                            den_mat_for_erf_k,
+                fock_mat = fock_drv.compute(screener, den_mat_for_erf_k,
                                             ['kx_rs', 'kx_rs'], erf_k_coef,
                                             omega, thresh_int)
 
