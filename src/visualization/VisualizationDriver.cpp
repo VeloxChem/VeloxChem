@@ -461,14 +461,14 @@ CVisualizationDriver::create_local_cubic_grid(const CCubicGrid& grid,
 }
 
 void
-CVisualizationDriver::compute(CCubicGrid&               grid,
-                              const CMolecule&          molecule,
-                              const CMolecularBasis&    basis,
-                              const int                 nao,
-                              const int                 nmo,
-                              const double*             mocoefs,
-                              const int                 moidx,
-                              const std::string&        mospin) const
+CVisualizationDriver::compute_local_grid(CCubicGrid&               grid,
+                                         const CMolecule&          molecule,
+                                         const CMolecularBasis&    basis,
+                                         const int                 nao,
+                                         const int                 nmo,
+                                         const double*             mocoefs,
+                                         const int                 moidx,
+                                         const std::string&        mospin) const
 {
     // grid information
 
@@ -543,12 +543,12 @@ CVisualizationDriver::compute(CCubicGrid&               grid,
 }
 
 void
-CVisualizationDriver::compute(CCubicGrid&             grid,
-                              const CMolecule&        molecule,
-                              const CMolecularBasis&  basis,
-                              const CAODensityMatrix& density,
-                              const int               denidx,
-                              const std::string&      denspin) const
+CVisualizationDriver::compute_local_grid(CCubicGrid&             grid,
+                                         const CMolecule&        molecule,
+                                         const CMolecularBasis&  basis,
+                                         const CAODensityMatrix& density,
+                                         const int               denidx,
+                                         const std::string&      denspin) const
 {
     // grid information
 

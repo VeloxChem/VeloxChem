@@ -148,6 +148,27 @@ def _VisualizationDriver_write_data(cubefile, grid, molecule, flag, index,
     f_cube.close()
 
 
+def _VisualizationDriver_compute(self, cubic_grid, *args, comm=None):
+    """
+    TODO
+    """
+
+    if comm is None:
+        comm = MPI.COMM_WORLD
+
+    local_cubic_grid = self.create_local_cubic_grid(cubic_grid, comm.Get_rank(),
+                                                    comm.Get_size())
+
+    self.compute_local_grid(local_cubic_grid, *args)
+
+    grid_np_arrays = comm.gather(local_cubic_grid.values_to_numpy(),
+                                 root=mpi_master())
+
+    if comm.Get_rank() == mpi_master():
+        grid_np_arrays = [arr for arr in grid_np_arrays if arr.size > 0]
+        cubic_grid.set_values(np.vstack(grid_np_arrays).reshape(-1))
+
+
 def _VisualizationDriver_gen_cubes(self,
                                    cube_dict,
                                    molecule,
@@ -182,9 +203,6 @@ def _VisualizationDriver_gen_cubes(self,
     else:
         grid_points = [80, 80, 80]
     cubic_grid = self.gen_cubic_grid(molecule, grid_points)
-
-    local_cubic_grid = self.create_local_cubic_grid(cubic_grid, comm.Get_rank(),
-                                                    comm.Get_size())
 
     cubes = [x.strip() for x in cube_dict['cubes'].split(',')]
     if 'files' in cube_dict:
@@ -222,16 +240,15 @@ def _VisualizationDriver_gen_cubes(self,
             cube_value = cube_value.replace('lumo', str(nelec + 1))
             orb_id = eval(cube_value) - 1
 
-            self.compute(local_cubic_grid, molecule, basis, mo_coefs, orb_id,
-                         spin)
-
-            grid_np_arrays = comm.gather(local_cubic_grid.values_to_numpy(),
-                                         root=mpi_master())
+            self.compute(cubic_grid,
+                         molecule,
+                         basis,
+                         mo_coefs,
+                         orb_id,
+                         spin,
+                         comm=comm)
 
             if comm.Get_rank() == mpi_master():
-                grid_np_arrays = [arr for arr in grid_np_arrays if arr.size > 0]
-                cubic_grid.set_values(np.vstack(grid_np_arrays).reshape(-1))
-
                 self.write_data(fname, cubic_grid, molecule, 'mo', orb_id, spin)
 
         elif cube_type == 'density':
@@ -239,18 +256,19 @@ def _VisualizationDriver_gen_cubes(self,
             cube_value = m.group(2).strip().lower()
             spin = cube_value
 
-            self.compute(local_cubic_grid, molecule, basis, density, 0, spin)
-
-            grid_np_arrays = comm.gather(local_cubic_grid.values_to_numpy(),
-                                         root=mpi_master())
+            self.compute(cubic_grid,
+                         molecule,
+                         basis,
+                         density,
+                         0,
+                         spin,
+                         comm=comm)
 
             if comm.Get_rank() == mpi_master():
-                grid_np_arrays = [arr for arr in grid_np_arrays if arr.size > 0]
-                cubic_grid.set_values(np.vstack(grid_np_arrays).reshape(-1))
-
                 self.write_data(fname, cubic_grid, molecule, 'density', 0, spin)
 
 
 VisualizationDriver.gen_cubic_grid = _VisualizationDriver_gen_cubic_grid
 VisualizationDriver.write_data = _VisualizationDriver_write_data
+VisualizationDriver.compute = _VisualizationDriver_compute
 VisualizationDriver.gen_cubes = _VisualizationDriver_gen_cubes

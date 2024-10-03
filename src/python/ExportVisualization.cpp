@@ -43,7 +43,7 @@ using namespace py::literals;
 namespace vlx_visualization {  // vlx_visualization namespace
 
 static auto
-CVisualizationDriver_compute(CVisualizationDriver&      self,
+CVisualizationDriver_compute_local_grid(CVisualizationDriver&      self,
                              CCubicGrid&                grid,
                              const CMolecule&           molecule,
                              const CMolecularBasis&     basis,
@@ -54,7 +54,7 @@ CVisualizationDriver_compute(CVisualizationDriver&      self,
     auto nao = mocoefs.shape(0);
     auto nmo = mocoefs.shape(1);
 
-    self.compute(grid, molecule, basis, nao, nmo, mocoefs.data(), moidx, mospin);
+    self.compute_local_grid(grid, molecule, basis, nao, nmo, mocoefs.data(), moidx, mospin);
 }
 
 static auto
@@ -111,8 +111,8 @@ export_visualization(py::module& m)
              "grid"_a,
              "basis"_a,
              "aoinfo"_a)
-        .def("compute",
-             &CVisualizationDriver_compute,
+        .def("compute_local_grid",
+             &CVisualizationDriver_compute_local_grid,
              "Computes molecular orbital values at cubic grid points.",
              "grid"_a,
              "molecule"_a,
@@ -120,9 +120,9 @@ export_visualization(py::module& m)
              "mocoefs"_a,
              "moidx"_a,
              "mospin"_a)
-        .def("compute",
+        .def("compute_local_grid",
              py::overload_cast<CCubicGrid&, const CMolecule&, const CMolecularBasis&, const CAODensityMatrix&, const int, const std::string&>(
-                 &CVisualizationDriver::compute, py::const_),
+                 &CVisualizationDriver::compute_local_grid, py::const_),
              "Computes density values at cubic grid points.",
              "grid"_a,
              "molecule"_a,

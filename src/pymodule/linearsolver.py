@@ -1991,9 +1991,6 @@ class LinearSolver:
 
         vis_drv = VisualizationDriver()
 
-        local_cubic_grid = vis_drv.create_local_cubic_grid(
-            cubic_grid, self.rank, self.nodes)
-
         if getattr(self, 'core_excitation', False):
             nocc = self.num_core_orbitals
         else:
@@ -2014,16 +2011,15 @@ class LinearSolver:
 
             # hole
             ind_occ = nocc - i_nto - 1
-            vis_drv.compute(local_cubic_grid, molecule, basis, nto_coefs,
-                            ind_occ, 'alpha')
-
-            grid_np_arrays = self.comm.gather(
-                local_cubic_grid.values_to_numpy(), root=mpi_master())
+            vis_drv.compute(cubic_grid,
+                            molecule,
+                            basis,
+                            nto_coefs,
+                            ind_occ,
+                            'alpha',
+                            comm=self.comm)
 
             if self.rank == mpi_master():
-                grid_np_arrays = [arr for arr in grid_np_arrays if arr.size > 0]
-                cubic_grid.set_values(np.vstack(grid_np_arrays).reshape(-1))
-
                 occ_cube_name = '{:s}_S{:d}_NTO_H{:d}.cube'.format(
                     base_fname, root + 1, i_nto + 1)
                 vis_drv.write_data(occ_cube_name, cubic_grid, molecule, 'nto',
@@ -2036,16 +2032,15 @@ class LinearSolver:
 
             # electron
             ind_vir = nocc + i_nto
-            vis_drv.compute(local_cubic_grid, molecule, basis, nto_coefs,
-                            ind_vir, 'alpha')
-
-            grid_np_arrays = self.comm.gather(
-                local_cubic_grid.values_to_numpy(), root=mpi_master())
+            vis_drv.compute(cubic_grid,
+                            molecule,
+                            basis,
+                            nto_coefs,
+                            ind_vir,
+                            'alpha',
+                            comm=self.comm)
 
             if self.rank == mpi_master():
-                grid_np_arrays = [arr for arr in grid_np_arrays if arr.size > 0]
-                cubic_grid.set_values(np.vstack(grid_np_arrays).reshape(-1))
-
                 vir_cube_name = '{:s}_S{:d}_NTO_P{:d}.cube'.format(
                     base_fname, root + 1, i_nto + 1)
                 vis_drv.write_data(vir_cube_name, cubic_grid, molecule, 'nto',
@@ -2117,18 +2112,15 @@ class LinearSolver:
 
         vis_drv = VisualizationDriver()
 
-        local_cubic_grid = vis_drv.create_local_cubic_grid(
-            cubic_grid, self.rank, self.nodes)
-
-        vis_drv.compute(local_cubic_grid, molecule, basis, dens_DA, 0, 'alpha')
-
-        grid_np_arrays = self.comm.gather(local_cubic_grid.values_to_numpy(),
-                                          root=mpi_master())
+        vis_drv.compute(cubic_grid,
+                        molecule,
+                        basis,
+                        dens_DA,
+                        0,
+                        'alpha',
+                        comm=self.comm)
 
         if self.rank == mpi_master():
-            grid_np_arrays = [arr for arr in grid_np_arrays if arr.size > 0]
-            cubic_grid.set_values(np.vstack(grid_np_arrays).reshape(-1))
-
             detach_cube_name = '{:s}_S{:d}_detach.cube'.format(
                 base_fname, root + 1)
             vis_drv.write_data(detach_cube_name, cubic_grid, molecule,
@@ -2139,15 +2131,15 @@ class LinearSolver:
                 '  Cube file (detachment) : {:s}'.format(detach_cube_name))
             self.ostream.flush()
 
-        vis_drv.compute(local_cubic_grid, molecule, basis, dens_DA, 1, 'alpha')
-
-        grid_np_arrays = self.comm.gather(local_cubic_grid.values_to_numpy(),
-                                          root=mpi_master())
+        vis_drv.compute(cubic_grid,
+                        molecule,
+                        basis,
+                        dens_DA,
+                        1,
+                        'alpha',
+                        comm=self.comm)
 
         if self.rank == mpi_master():
-            grid_np_arrays = [arr for arr in grid_np_arrays if arr.size > 0]
-            cubic_grid.set_values(np.vstack(grid_np_arrays).reshape(-1))
-
             attach_cube_name = '{:s}_S{:d}_attach.cube'.format(
                 base_fname, root + 1)
             vis_drv.write_data(attach_cube_name, cubic_grid, molecule,

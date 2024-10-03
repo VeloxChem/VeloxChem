@@ -121,14 +121,14 @@ class CVisualizationDriver
      @param moidx the index of the molecular orbital (0-based).
      @param mospin the spin of the molecular orbital ('alpha' or 'beta').
      */
-    void compute(CCubicGrid&               localgrid,
-                 const CMolecule&          molecule,
-                 const CMolecularBasis&    basis,
-                 const int                 nao,
-                 const int                 nmo,
-                 const double*             mocoefs,
-                 const int                 moidx,
-                 const std::string&        mospin) const;
+    void compute_local_grid(CCubicGrid&               localgrid,
+                            const CMolecule&          molecule,
+                            const CMolecularBasis&    basis,
+                            const int                 nao,
+                            const int                 nmo,
+                            const double*             mocoefs,
+                            const int                 moidx,
+                            const std::string&        mospin) const;
 
     /**
      Computes density values at local cubic grid point.
@@ -140,12 +140,12 @@ class CVisualizationDriver
      @param denidx the index of the density matrix (0-based).
      @param denspin the spin of the density matrix ('alpha' or 'beta').
      */
-    void compute(CCubicGrid&             localgrid,
-                 const CMolecule&        molecule,
-                 const CMolecularBasis&  basis,
-                 const CAODensityMatrix& density,
-                 const int               denidx,
-                 const std::string&      denspin) const;
+    void compute_local_grid(CCubicGrid&             localgrid,
+                            const CMolecule&        molecule,
+                            const CMolecularBasis&  basis,
+                            const CAODensityMatrix& density,
+                            const int               denidx,
+                            const std::string&      denspin) const;
 
     /**
      Computes molecular orbital at given coordinates.
