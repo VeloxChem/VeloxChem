@@ -28,6 +28,7 @@ import sys
 from .veloxchemlib import mpi_master
 from .veloxchemlib import _FockDriver
 from .outputstream import OutputStream
+from .errorhandler import assert_msg_critical
 
 
 class FockDriver:
@@ -66,6 +67,32 @@ class FockDriver:
 
         return self._fock_drv._compute_local_fock(screener, self.rank,
                                                   self.nodes, *args)
+
+    def compute_on_subcomm(self, subcomm, screener, *args):
+
+        assert_msg_critical(
+            self._check_subcomm(subcomm),
+            'FockDriver.compute_on_subcomm: subcomm must be a ' +
+            'sub-communicator of self.comm')
+
+        return self._fock_drv._compute_local_fock(screener, subcomm.Get_rank(),
+                                                  subcomm.Get_size(), *args)
+
+    def _check_subcomm(self, subcomm):
+        """
+        Checks that subcomm is a sub-communicator of self.comm.
+        """
+
+        ranks = list(range(self.nodes))
+        group = self.comm.Get_group()
+
+        subranks = list(range(subcomm.Get_size()))
+        subgroup = subcomm.Get_group()
+
+        translated_ranks = subgroup.Translate_ranks(subranks, group)
+
+        return all((rank != MPI.UNDEFINED and rank in ranks)
+                   for rank in translated_ranks)
 
     def _compute_fock_omp(self, *args):
 
