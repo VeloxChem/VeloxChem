@@ -64,4 +64,4 @@ jobs:
           echo "=== VeloxChem test ==="
           python -c "import veloxchem; print(veloxchem.__version__)"
           OMP_NUM_THREADS=2 mpiexec -n 2 python -m pytest --capture=no --log-cli-level=INFO --pyargs veloxchem -m "solvers"
-          OMP_NUM_THREADS=4 python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO --pyargs veloxchem -k "not test_h2o_dimer_tzvp_comp_electronic_grad"
+          OMP_NUM_THREADS=4 python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO --pyargs veloxchem
