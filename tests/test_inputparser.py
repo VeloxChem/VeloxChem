@@ -10,14 +10,6 @@ from veloxchem.inputparser import (InputParser, parse_seq_range,
                                    parse_seq_fixed, parse_bool, parse_str)
 
 
-def is_mpi_master():
-    return MPI.COMM_WORLD.Get_rank() == mpi_master()
-
-
-def is_single_node():
-    return MPI.COMM_WORLD.Get_size() == 1
-
-
 @patch.object(InputParser, 'parse')
 def test_input_dict(mock_parse):
 
@@ -60,7 +52,7 @@ def test_full_input(tmpdir):
 
 def test_error_in_input(tmpdir):
 
-    if is_single_node():
+    if MPI.COMM_WORLD.Get_size() == 1:
         here = Path(__file__).parent
         inpfile = here / 'data' / 'water_error.inp'
 
@@ -87,7 +79,7 @@ def test_error_in_input(tmpdir):
 )
 def test_parse_seq_range(input_seq, expected):
 
-    if is_mpi_master():
+    if MPI.COMM_WORLD.Get_rank() == mpi_master():
         npt.assert_allclose(parse_seq_range(input_seq), expected)
 
 
@@ -104,7 +96,7 @@ def test_parse_seq_range(input_seq, expected):
 )
 def test_parse_seq_fixed(input_seq, flag, expected):
 
-    if is_mpi_master():
+    if MPI.COMM_WORLD.Get_rank() == mpi_master():
         npt.assert_allclose(parse_seq_fixed(input_seq, flag), expected)
 
 
@@ -119,7 +111,7 @@ def test_parse_seq_fixed(input_seq, flag, expected):
 )
 def test_parse_bool(input_bool, expected):
 
-    if is_mpi_master():
+    if MPI.COMM_WORLD.Get_rank() == mpi_master():
         assert parse_bool(input_bool) == expected
 
 
@@ -133,5 +125,5 @@ def test_parse_bool(input_bool, expected):
 )
 def test_parse_str(input_str, flag, expected):
 
-    if is_mpi_master():
+    if MPI.COMM_WORLD.Get_rank() == mpi_master():
         assert parse_str(input_str, flag) == expected

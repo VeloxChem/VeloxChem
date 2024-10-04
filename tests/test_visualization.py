@@ -11,10 +11,6 @@ from veloxchem.molecule import Molecule
 from veloxchem.inputparser import get_random_string_parallel
 
 
-def is_mpi_master(comm):
-    return comm.Get_rank() == mpi_master()
-
-
 @pytest.mark.solvers
 class TestVisualization:
 
@@ -51,7 +47,7 @@ class TestVisualization:
         mo_val = vis_drv.get_mo(points, task.molecule, task.ao_basis, mo_coefs,
                                 homo, 'alpha')
 
-        if is_mpi_master(task.mpi_comm):
+        if task.mpi_rank == mpi_master():
             homo_values = grid.values_to_numpy()
 
             homo_ref = np.array([
@@ -73,7 +69,7 @@ class TestVisualization:
         den_val = vis_drv.get_density(points, task.molecule, task.ao_basis,
                                       density, 'alpha')
 
-        if is_mpi_master(task.mpi_comm):
+        if task.mpi_rank == mpi_master():
             dens_alpha = grid.values_to_numpy()
             dens_total = dens_alpha * 2.0
 
@@ -101,7 +97,7 @@ class TestVisualization:
                                                        task.ao_basis, density,
                                                        'alpha', 'beta')
 
-        if is_mpi_master(task.mpi_comm):
+        if task.mpi_rank == mpi_master():
             twoe_val_aa = np.array(twoe_val_aa).reshape(2, 3, 3)
             twoe_val_ab = np.array(twoe_val_ab).reshape(2, 3, 3)
 
@@ -179,7 +175,7 @@ class TestVisualization:
         vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, density, 0,
                         'alpha')
 
-        if is_mpi_master(task.mpi_comm):
+        if task.mpi_rank == mpi_master():
             read_grid = CubicGrid.read_cube(dens_cube_fname)
             assert read_grid.compare(cubic_grid) < 1e-6
             dens_cube_fpath.unlink()
@@ -188,7 +184,7 @@ class TestVisualization:
         vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, mo_coefs,
                         task.molecule.number_of_alpha_electrons() - 1, 'alpha')
 
-        if is_mpi_master(task.mpi_comm):
+        if task.mpi_rank == mpi_master():
             read_grid = CubicGrid.read_cube(homo_cube_fname)
             assert read_grid.compare(cubic_grid) < 1e-6
             homo_cube_fpath.unlink()

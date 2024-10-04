@@ -1,4 +1,3 @@
-from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import pytest
@@ -10,14 +9,6 @@ from veloxchem.molecularorbitals import MolecularOrbitals
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
-
-
-def is_mpi_master(comm):
-    return comm.Get_rank() == mpi_master()
-
-
-def mpi_barrier():
-    MPI.COMM_WORLD.barrier()
 
 
 @pytest.mark.solvers
@@ -60,7 +51,7 @@ class TestNTO:
         rsp_drv.update_settings(rsp_dict, task.input_dict['method_settings'])
         rsp_results = rsp_drv.compute(task.molecule, task.ao_basis, scf_results)
 
-        if is_mpi_master(task.mpi_comm):
+        if task.mpi_rank == mpi_master():
             eig_vals = rsp_results['eigenvalues']
 
             nto_lambdas = []
@@ -92,7 +83,7 @@ class TestNTO:
 
         # compare with reference
 
-        if is_mpi_master(task.mpi_comm):
+        if task.mpi_rank == mpi_master():
             nto_lambdas = np.array(nto_lambdas)
             nto_cube_vals = np.array(nto_cube_vals)
             dens_cube_vals = np.array(dens_cube_vals)
@@ -143,7 +134,7 @@ class TestNTO:
                     if fpath.is_file():
                         fpath.unlink()
 
-        mpi_barrier()
+        task.mpi_comm.barrier()
 
     def test_nto_tda(self):
 

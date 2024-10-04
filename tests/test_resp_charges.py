@@ -7,10 +7,6 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.respchargesdriver import RespChargesDriver
 
 
-def is_mpi_master(comm):
-    return comm.Get_rank() == mpi_master()
-
-
 class TestRespCharges:
 
     def run_resp(self, inpfile, ref_charges, inp_chg_dict, chg_type):
@@ -33,7 +29,7 @@ class TestRespCharges:
         q_fit = chg_drv.compute(task.molecule, task.ao_basis, scf_results,
                                 chg_type.lower())
 
-        if is_mpi_master(task.mpi_comm):
+        if task.mpi_rank == mpi_master():
             assert np.max(np.abs(q_fit - ref_charges)) < 1.0e-5
 
             pdb_file = Path(chg_drv.filename).with_suffix('.pdb')

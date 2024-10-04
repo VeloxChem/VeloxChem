@@ -10,10 +10,6 @@ from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 
 
-def is_mpi_master():
-    return MPI.COMM_WORLD.Get_rank() == mpi_master()
-
-
 @pytest.mark.solvers
 class TestCoreExcitation:
 
@@ -58,7 +54,7 @@ class TestCoreExcitation:
             0.0044, 0.0017
         ])
 
-        if is_mpi_master():
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
             exc_ene = rpa_result['eigenvalues']
             osc_str = rpa_result['oscillator_strengths']
             assert np.max(np.abs(exc_ene - ref_exc_ene)) < 1.0e-4
@@ -86,7 +82,7 @@ class TestCoreExcitation:
             0.0044, 0.0017
         ])
 
-        if is_mpi_master():
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
             exc_ene = tda_result['eigenvalues']
             osc_str = tda_result['oscillator_strengths']
             assert np.max(np.abs(exc_ene - ref_exc_ene)) < 1.0e-4

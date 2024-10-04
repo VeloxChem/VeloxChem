@@ -9,29 +9,22 @@ from veloxchem.inputparser import get_random_string_parallel
 from veloxchem.main import main
 
 
-def is_mpi_master():
-    return MPI.COMM_WORLD.Get_rank() == mpi_master()
-
-
-def mpi_barrier():
-    MPI.COMM_WORLD.barrier()
-
-
 @pytest.mark.solvers
 class TestInputEnergy:
 
     def create_input_file(self, lines, fname):
 
-        if is_mpi_master():
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
             with open(fname, 'w') as f_inp:
                 for line in lines.splitlines():
                     if line:
                         f_inp.write(f'{line}\n')
-        mpi_barrier()
+
+        MPI.COMM_WORLD.barrier()
 
     def remove_input_and_h5_files(self, input_file):
 
-        if is_mpi_master():
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
             if input_file.is_file():
                 input_file.unlink()
 
@@ -51,7 +44,7 @@ class TestInputEnergy:
             if rsp_solutions_h5.is_file():
                 rsp_solutions_h5.unlink()
 
-        mpi_barrier()
+        MPI.COMM_WORLD.barrier()
 
     def get_input_lines(self, xcfun, scf_type):
 
@@ -107,7 +100,7 @@ class TestInputEnergy:
             main()
             captured = capsys.readouterr()
 
-            if is_mpi_master():
+            if MPI.COMM_WORLD.Get_rank() == mpi_master():
                 for line in captured.out.splitlines():
                     if 'Wave Function Model' in line:
                         wf_model = line.split(':')[1].strip()

@@ -6,10 +6,6 @@ from veloxchem.cubicgrid import CubicGrid
 from veloxchem.inputparser import get_random_string_serial
 
 
-def is_mpi_master():
-    return MPI.COMM_WORLD.Get_rank() == mpi_master()
-
-
 class TestCheckpoint:
 
     def write_cube(self, fname):
@@ -41,7 +37,7 @@ class TestCheckpoint:
 
     def test_cube(self):
 
-        if is_mpi_master():
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
             here = Path(__file__).parent
             random_string = get_random_string_serial()
             fpath = here / 'data' / f'vlx_cube_test_{random_string}.cube'
