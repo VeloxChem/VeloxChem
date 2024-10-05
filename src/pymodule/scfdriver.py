@@ -231,7 +231,8 @@ class ScfDriver:
         # filename
         self.filename = None
 
-        self.debug = False
+        self._debug = False
+        self._block_size_factor = 1
 
         # input keywords
         self._input_keywords = {
@@ -250,9 +251,10 @@ class ScfDriver:
                 'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
                 'print_level': ('int', 'verbosity of output (1-3)'),
-                'debug': ('bool', 'print debug info'),
                 'guess_unpaired_electrons':
                     ('str', 'unpaired electrons for initila guess'),
+                '_debug': ('bool', 'print debug info'),
+                '_block_size_factor': ('int', 'block size factor for ERI'),
             },
             'method_settings': {
                 'dispersion': ('bool', 'use D4 dispersion correction'),
@@ -1565,6 +1567,8 @@ class ScfDriver:
 
         fock_drv = FockDriver(self.comm)
 
+        fock_drv._set_block_size_factor(self._block_size_factor)
+
         # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'
         exchange_scaling_factor = 1.0
@@ -1589,7 +1593,7 @@ class ScfDriver:
 
         fock_mat = None
 
-        if self.debug:
+        if self._debug:
             if profiler is None:
                 profiler = Profiler()
             self.ostream.print_info(
@@ -1673,7 +1677,7 @@ class ScfDriver:
             else:
                 fock_mat = None
 
-        if self.debug:
+        if self._debug:
             self.ostream.print_info(
                 '==DEBUG==   available memory after  Fock build: ' +
                 profiler.get_available_memory())

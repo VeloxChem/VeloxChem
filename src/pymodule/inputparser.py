@@ -444,6 +444,8 @@ def print_keywords(input_keywords, ostream):
         ostream.print_header(f'  @{group_print}'.ljust(width))
         ostream.print_header('-' * width)
         for key, val in input_keywords[group].items():
+            if key.startswith('_'):
+                continue
             text = f'  {key}'.ljust(30)
             text += f'  {get_keyword_type(val[0])}'.ljust(15)
             text += f'  {val[1]}'.ljust(width - 45)
@@ -461,6 +463,8 @@ def print_attributes(input_keywords, ostream):
     ostream.print_header('=' * width)
     for group in input_keywords:
         for key, val in input_keywords[group].items():
+            if key.startswith('_'):
+                continue
             text = f'  {key}'.ljust(30)
             text += f'  {get_keyword_type(val[0])}'.ljust(15)
             text += f'  {val[1]}'.ljust(width - 45)

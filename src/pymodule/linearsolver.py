@@ -179,7 +179,8 @@ class LinearSolver:
         self._dist_fock_ger = None
         self._dist_fock_ung = None
 
-        self.debug = False
+        self._debug = False
+        self._block_size_factor = 1
 
         # input keywords
         self._input_keywords = {
@@ -203,7 +204,8 @@ class LinearSolver:
                 'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
                 'print_level': ('int', 'verbosity of output (1-3)'),
-                'debug': ('bool', 'print debug info'),
+                '_debug': ('bool', 'print debug info'),
+                '_block_size_factor': ('int', 'block size factor for ERI'),
             },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
@@ -690,7 +692,7 @@ class LinearSolver:
             self.ostream.print_info(batch_str)
             self.ostream.flush()
 
-        if self.debug:
+        if self._debug:
             self.ostream.print_info(
                 '==DEBUG== batch_size: {}'.format(batch_size))
             self.ostream.print_blank()
@@ -698,7 +700,7 @@ class LinearSolver:
 
         for batch_ind in range(num_batches):
 
-            if self.debug:
+            if self._debug:
                 self.ostream.print_info('==DEBUG== batch {}/{}'.format(
                     batch_ind + 1, num_batches))
                 self.ostream.flush()
@@ -772,7 +774,7 @@ class LinearSolver:
 
             # form Fock matrices
 
-            if self.debug:
+            if self._debug:
                 if profiler is None:
                     profiler = Profiler()
                 self.ostream.print_info(
@@ -783,7 +785,7 @@ class LinearSolver:
             fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,
                                       pe_dict, profiler)
 
-            if self.debug:
+            if self._debug:
                 self.ostream.print_info(
                     '==DEBUG==   available memory after  Fock build: ' +
                     profiler.get_available_memory())
@@ -950,6 +952,8 @@ class LinearSolver:
         t0 = tm.time()
 
         fock_drv = FockDriver(self.comm)
+
+        fock_drv._set_block_size_factor(self._block_size_factor)
 
         fock_arrays = []
 

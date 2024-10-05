@@ -100,4 +100,8 @@ class FockDriver:
 
     def _set_block_size_factor(self, factor):
 
+        assert_msg_critical(
+            factor in [1, 2, 4, 8, 16, 32, 64, 128],
+            'FockDriver._set_block_size_factor: Invalid factor')
+
         self._fock_drv._set_block_size_factor(factor)
