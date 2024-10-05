@@ -381,14 +381,14 @@ class OutputStream:
         self.print_separator()
         exec_str = 'VeloxChem execution started'
         if num_nodes > 1:
-            exec_str += ' on ' + str(num_nodes) + ' compute nodes'
+            exec_str += ' on ' + str(num_nodes) + ' MPI processes'
         exec_str += ' at ' + tm.asctime(tm.localtime(start_time)) + '.'
         self.print_title(exec_str)
         self.print_separator()
         self.print_blank()
 
         if 'OMP_NUM_THREADS' in environ:
-            self.print_info('Using {} OpenMP threads per compute node.'.format(
+            self.print_info('Using {} OpenMP threads per MPI process.'.format(
                 environ['OMP_NUM_THREADS']))
             self.print_blank()
 
