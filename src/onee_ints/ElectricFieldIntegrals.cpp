@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "BoysFuncTable.hpp"
+#include "ErrorHandler.hpp"
 #include "GtoFunc.hpp"
 #include "GtoInfo.hpp"
 #include "MathFunc.hpp"
@@ -107,6 +108,12 @@ computeElectricFieldIntegrals(const CMolecule& molecule, const CMolecularBasis& 
         else if (gto_ang == 3)
         {
             f_prim_count += npgtos * ncgtos;
+        }
+        else
+        {
+            std::string errangmom("computeElectricFieldIntegrals: Only implemented up to f-orbitals");
+
+            errors::assertMsgCritical(false, errangmom);
         }
     }
 

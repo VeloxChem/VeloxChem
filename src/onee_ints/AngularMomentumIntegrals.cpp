@@ -97,6 +97,12 @@ computeAngularMomentumIntegrals(const CMolecule&           molecule,
         {
             f_prim_count += npgtos * ncgtos;
         }
+        else
+        {
+            std::string errangmom("computeAngularMomentumIntegrals: Only implemented up to f-orbitals");
+
+            errors::assertMsgCritical(false, errangmom);
+        }
     }
 
     // Cartesian to spherical index mapping for P and D

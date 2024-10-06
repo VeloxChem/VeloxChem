@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <unordered_map>
 
+#include "ErrorHandler.hpp"
 #include "GtoFunc.hpp"
 #include "GtoInfo.hpp"
 #include "MathFunc.hpp"
@@ -104,6 +105,12 @@ computeQuadrupoleIntegrals(const CMolecule&           molecule,
         else if (gto_ang == 3)
         {
             f_prim_count += npgtos * ncgtos;
+        }
+        else
+        {
+            std::string errangmom("computeQuadrupoleIntegrals: Only implemented up to f-orbitals");
+
+            errors::assertMsgCritical(false, errangmom);
         }
     }
 

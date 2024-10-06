@@ -115,6 +115,12 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
         {
             f_prim_count += npgtos * ncgtos;
         }
+        else
+        {
+            std::string errangmom("computeElectricFieldValues: Only implemented up to f-orbitals");
+
+            errors::assertMsgCritical(false, errangmom);
+        }
     }
 
     // Cartesian to spherical index mapping for P and D
