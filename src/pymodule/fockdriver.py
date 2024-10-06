@@ -23,6 +23,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+from os import environ
 import sys
 
 from .veloxchemlib import mpi_master
@@ -104,4 +105,17 @@ class FockDriver:
             factor in [1, 2, 4, 8, 16, 32, 64, 128],
             'FockDriver._set_block_size_factor: Invalid factor')
 
-        self._fock_drv._set_block_size_factor(factor)
+        total_cores = self.nodes * int(environ['OMP_NUM_THREADS'])
+
+        # TODO: double check extra_factor for total_cores >= 4096
+
+        if total_cores >= 4096:
+            extra_factor = 8
+        elif total_cores >= 2048:
+            extra_factor = 4
+        elif total_cores >= 1024:
+            extra_factor = 2
+        else:
+            extra_factor = 1
+
+        self._fock_drv._set_block_size_factor(factor * extra_factor)
