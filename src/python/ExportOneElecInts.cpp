@@ -36,6 +36,7 @@
 #include "ErrorHandler.hpp"
 #include "LinearMomentumIntegrals.hpp"
 #include "NuclearPotentialValues.hpp"
+#include "QuadrupoleIntegrals.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -128,6 +129,22 @@ export_oneeints(py::module& m)
                 return vlx_general::pointer_to_numpy(npot_vals.data(), {static_cast<int>(npot_vals.size())});
             },
             "Computes nuclear potential values.");
+
+    m.def("compute_quadrupole_integrals",
+            [](const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const std::vector<double>& origin) -> py::list {
+                auto mu = onee::computeQuadrupoleIntegrals(molecule, basis, origin);
+                py::list ret;
+                ret.append(vlx_general::pointer_to_numpy(mu[0].values(), {mu[0].getNumberOfRows(), mu[0].getNumberOfColumns()}));
+                ret.append(vlx_general::pointer_to_numpy(mu[1].values(), {mu[1].getNumberOfRows(), mu[1].getNumberOfColumns()}));
+                ret.append(vlx_general::pointer_to_numpy(mu[2].values(), {mu[2].getNumberOfRows(), mu[2].getNumberOfColumns()}));
+                ret.append(vlx_general::pointer_to_numpy(mu[3].values(), {mu[3].getNumberOfRows(), mu[3].getNumberOfColumns()}));
+                ret.append(vlx_general::pointer_to_numpy(mu[4].values(), {mu[4].getNumberOfRows(), mu[4].getNumberOfColumns()}));
+                ret.append(vlx_general::pointer_to_numpy(mu[5].values(), {mu[5].getNumberOfRows(), mu[5].getNumberOfColumns()}));
+                return ret;
+            },
+            "Computes quadrupole integrals.");
 }
 
 }  // namespace vlx_oneeints

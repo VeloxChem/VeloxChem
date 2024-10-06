@@ -7,6 +7,7 @@ target_sources(vlxobjs
     GtoInfo.cpp
     LinearMomentumIntegrals.cpp
     NuclearPotentialValues.cpp
+    QuadrupoleIntegrals.cpp
   )
 
 target_include_directories(vlxobjs
