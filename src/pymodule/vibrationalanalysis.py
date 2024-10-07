@@ -31,8 +31,10 @@ import sys
 import h5py
 from pathlib import Path
 
-from .scfgradientdriver import ScfGradientDriver
+from .scfrestdriver import ScfRestrictedDriver
 from .scfhessiandriver import ScfHessianDriver
+from .xtbdriver import XtbDriver
+from .xtbhessiandriver import XtbHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
 from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
@@ -59,8 +61,8 @@ class VibrationalAnalysis:
         The MPI communicator.
     :param ostream:
         The output stream.
-    :param hess_drv:
-        The Hessian driver.
+    :param drv:
+        The SCF or XTB driver.
 
     Instance variables
         - hessian: The Hessian in Hartree per Bohr**2.
@@ -97,7 +99,8 @@ class VibrationalAnalysis:
         - checkpoint_file: The name of checkpoint file.
     """
 
-    def __init__(self, hess_drv, comm=None, ostream=None):
+    #def __init__(self, hess_drv, comm=None, ostream=None):
+    def __init__(self, drv, comm=None, ostream=None):
         """
         Initializes vibrational analysis driver.
         """
@@ -123,16 +126,26 @@ class VibrationalAnalysis:
         self.checkpoint_file = None
 
         # Hessian driver etc
-        self.hessian_driver = hess_drv
         self.is_scf = False
         self.is_xtb = False
-        hess_drv_class_name = self.hessian_driver.__class__.__name__
-        if 'Scf' in hess_drv_class_name:
-            self.scf_driver = hess_drv.scf_driver
+        if isinstance(drv, ScfRestrictedDriver):
             self.is_scf = True
-        else:
-            self.scf_driver = None
+            self.scf_driver = drv
+            self.hessian_driver = ScfHessianDriver(drv)
+        elif isinstance(drv, XtbDriver):
             self.is_xtb = True
+            self.scf_driver = None
+            self.hessian_driver = XtbHessianDriver(drv)
+
+        #self.scf_driver = None
+        #self.hessian_driver = None #hess_drv
+        #hess_drv_class_name = self.hessian_driver.__class__.__name__
+        #if 'Scf' in hess_drv_class_name:
+        #    self.scf_driver = hess_drv.scf_driver
+        #    self.is_scf = True
+        #else:
+        #    self.scf_driver = None
+        #    self.is_xtb = True
 
         self.hessian = None
         self.mass_weighted_hessian = None # FIXME unused variable
@@ -193,14 +206,14 @@ class VibrationalAnalysis:
                 },
             }
 
-    def update_settings(self, method_dict=None, vib_dict=None, hess_dict=None, cphf_dict=None,
+    def update_settings(self, method_dict=None, vib_dict=None, hessian_dict=None, cphf_dict=None,
                         rsp_dict=None, polgrad_dict=None):
         """
         Updates settings in HessianDriver.
 
         :param method_dict:
             The input dictionary of method settings group.
-        :param hess_dict:
+        :param hessian_dict:
             The input dictionary of Hessian settings group.
         :param cphf_dict:
             The input dictionary of CPHF (orbital response) settings.
@@ -229,8 +242,8 @@ class VibrationalAnalysis:
             self.checkpoint_file = f'{self.filename}.vib.results.h5'
 
         # settings for property modules
-        if hess_dict is None:
-            hess_dict = {}
+        if hessian_dict is None:
+            hessian_dict = {}
         if cphf_dict is None:
             cphf_dict = {}
         if rsp_dict is None:
@@ -240,7 +253,7 @@ class VibrationalAnalysis:
 
         self.method_dict = dict(method_dict)
         self.vib_dict = dict(vib_dict)
-        self.hess_dict = dict(hess_dict)
+        self.hessian_dict = dict(hessian_dict)
         self.cphf_dict = dict(cphf_dict)
         self.rsp_dict = dict(rsp_dict)
         self.polgrad_dict = dict(polgrad_dict)
@@ -263,7 +276,7 @@ class VibrationalAnalysis:
         self.compute_hessian(molecule, ao_basis)
 
         # compute the polarizability gradient for Raman intensities
-        if self.do_raman or self.do_resonance_raman:
+        if (self.do_raman or self.do_resonance_raman) and not self.is_xtb:
             self.compute_polarizability_gradient(molecule, ao_basis)
 
         if self.rank == mpi_master():
@@ -464,7 +477,8 @@ class VibrationalAnalysis:
         """
 
         hessian_drv = self.hessian_driver
-        hessian_drv.update_settings(self.method_dict, self.hess_dict, cphf_dict=self.cphf_dict)
+
+        hessian_drv.update_settings(self.method_dict, self.hessian_dict, cphf_dict=self.cphf_dict)
 
         # Transfer settings for vibrational task to Hessian driver
         hessian_drv.numerical = self.numerical_hessian
@@ -477,6 +491,7 @@ class VibrationalAnalysis:
         # save gradients
         self.hessian = hessian_drv.hessian
         self.dipole_gradient = hessian_drv.dipole_gradient
+
         # save the electronic energy
         self.elec_energy = hessian_drv.elec_energy
 
