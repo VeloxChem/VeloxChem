@@ -496,22 +496,17 @@ def main():
         rsp_dict['filename'] = task.input_dict['filename']
         vib_dict['filename'] = task.input_dict['filename']
 
-        #hessian_drv = ScfHessianDriver(scf_drv)
         if use_xtb:
-            hessian_drv = XtbHessianDriver(xtb_drv)
-            hessian_drv.update_settings(method_dict, hessian_dict)
-            hessian_drv.compute(task.molecule)
+            vibrational_drv = VibrationalAnalysis(xtb_drv)
+            vibrational_drv.update_settings(method_dict, vib_dict, hessian_dict=hessian_dict,
+                                        cphf_dict = orbrsp_dict, rsp_dict = rsp_dict,
+                                        polgrad_dict = polgrad_dict)
         elif scf_drv.scf_type == 'restricted':
-            hessian_drv = ScfHessianDriver(scf_drv)
-            hessian_drv.update_settings(method_dict, hessian_dict)
-            hessian_drv.compute(task.molecule, task.ao_basis)
-
-        vibrational_drv = VibrationalAnalysis(hessian_drv)
-        vibrational_drv.update_settings(method_dict, vib_dict, hessian_dict=hessian_dict,
+            vibrational_drv = VibrationalAnalysis(scf_drv)
+            vibrational_drv.update_settings(method_dict, vib_dict, hessian_dict=hessian_dict,
                                         cphf_dict = orbrsp_dict, rsp_dict = rsp_dict,
                                         polgrad_dict = polgrad_dict)
 
-        # TODO: add output file name for geomeTRIC vibrational analysis
         vibrational_drv.compute(task.molecule, task.ao_basis)
 
     # Polarizability gradient
