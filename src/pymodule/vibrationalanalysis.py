@@ -137,16 +137,6 @@ class VibrationalAnalysis:
             self.scf_driver = None
             self.hessian_driver = XtbHessianDriver(drv)
 
-        #self.scf_driver = None
-        #self.hessian_driver = None #hess_drv
-        #hess_drv_class_name = self.hessian_driver.__class__.__name__
-        #if 'Scf' in hess_drv_class_name:
-        #    self.scf_driver = hess_drv.scf_driver
-        #    self.is_scf = True
-        #else:
-        #    self.scf_driver = None
-        #    self.is_xtb = True
-
         self.hessian = None
         self.mass_weighted_hessian = None # FIXME unused variable
         self.reduced_masses = None
@@ -276,7 +266,7 @@ class VibrationalAnalysis:
         self.compute_hessian(molecule, ao_basis)
 
         # compute the polarizability gradient for Raman intensities
-        if (self.do_raman or self.do_resonance_raman) and not self.is_xtb:
+        if (self.do_raman or self.do_resonance_raman) and self.is_scf:
             self.compute_polarizability_gradient(molecule, ao_basis)
 
         if self.rank == mpi_master():

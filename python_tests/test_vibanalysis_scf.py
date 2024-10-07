@@ -15,7 +15,6 @@ class TestScfVibrationalAnalysisDriver:
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water_hessian_scf.inp')
-        #h5file = str(here / 'inputs' / 'water_hessian_scf.h5')
         h5file = str(here / 'inputs' / 'water_vib_scf.h5')
 
         task = MpiTask([inpfile, None])
@@ -26,8 +25,6 @@ class TestScfVibrationalAnalysisDriver:
         vib_settings = {'do_ir': 'yes', 'do_raman': 'yes', 'numerical_hessian':'yes',
                         'numerical_raman': 'yes'}
         method_settings = {}
-#        scf_hessian_drv = ScfHessianDriver(scf_drv)
-#        vibanalysis_drv = VibrationalAnalysis(scf_hessian_drv)
         vibanalysis_drv = VibrationalAnalysis(scf_drv)
         vibanalysis_drv.update_settings(method_settings, vib_settings)
         vibanalysis_drv.ostream.mute()
@@ -63,7 +60,6 @@ class TestScfVibrationalAnalysisDriver:
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water_hessian_scf.inp')
-        #h5file = str(here / 'inputs' / 'water_hessian_scf.h5')
         h5file = str(here / 'inputs' / 'water_vib_scf.h5')
 
         task = MpiTask([inpfile, None])
@@ -74,8 +70,6 @@ class TestScfVibrationalAnalysisDriver:
         vib_settings = {'do_ir': 'no', 'do_resonance_raman': 'yes', 'numerical_hessian':'yes',
                         'numerical_raman': 'yes', 'frequencies': (0.0, 0.4), 'rr_damping': 0.05}
         method_settings = {}
-        #scf_hessian_drv = ScfHessianDriver(scf_drv)
-        #vibanalysis_drv = VibrationalAnalysis(scf_hessian_drv)
         vibanalysis_drv = VibrationalAnalysis(scf_drv)
         vibanalysis_drv.update_settings(method_settings, vib_settings)
         vibanalysis_drv.ostream.mute()

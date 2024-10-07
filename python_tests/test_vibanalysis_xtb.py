@@ -30,10 +30,7 @@ class TestXtbVibrationalAnalysisDriver:
         xtb_drv.set_method(xtb_method.lower())
         xtb_drv.compute(task.molecule)
 
-        #xtb_hessian_drv = XtbHessianDriver(xtb_drv)
-
         vib_settings = {'do_ir': 'yes', 'numerical_hessian':'yes'}
-        #vibanalysis_drv = VibrationalAnalysis(xtb_hessian_drv)
         vibanalysis_drv = VibrationalAnalysis(xtb_drv)
         vibanalysis_drv.update_settings(vib_dict = vib_settings)
         vibanalysis_drv.ostream.mute()
