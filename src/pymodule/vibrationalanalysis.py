@@ -66,7 +66,6 @@ class VibrationalAnalysis:
 
     Instance variables
         - hessian: The Hessian in Hartree per Bohr**2.
-        - mass_weighted_hessian: The mass-weighted Hessian
           in Hartree / (amu * Bohr**2).
         - reduced_masses: The reduced masses of the normal modes in amu.
         - force_constants: The force constants in mdyn/Angstrom.
@@ -99,7 +98,6 @@ class VibrationalAnalysis:
         - checkpoint_file: The name of checkpoint file.
     """
 
-    #def __init__(self, hess_drv, comm=None, ostream=None):
     def __init__(self, drv, comm=None, ostream=None):
         """
         Initializes vibrational analysis driver.
@@ -138,7 +136,6 @@ class VibrationalAnalysis:
             self.hessian_driver = XtbHessianDriver(drv)
 
         self.hessian = None
-        self.mass_weighted_hessian = None # FIXME unused variable
         self.reduced_masses = None
         self.force_constants = None
         self.vib_frequencies = None
@@ -274,7 +271,7 @@ class VibrationalAnalysis:
             self.frequency_analysis(molecule, filename=None)
 
             # calculate force constants
-            self.force_constants = self.calculate_force_constant()
+            self.reduced_masses, self.force_constants = self.calculate_force_constant()
 
             # calculate the gradient of the dipole moment for IR intensities
             if self.do_ir:
@@ -284,6 +281,7 @@ class VibrationalAnalysis:
             if (self.do_raman or self.do_resonance_raman) and self.is_scf:
                 self.raman_intensities, depol_ratio = self.calculate_raman_activity(
                         self.normal_modes)
+
             elif (self.do_raman or self.do_resonance_raman) and self.is_xtb:
                 self.ostream.print_info('Raman not available for XTB.')
 
@@ -423,13 +421,13 @@ class VibrationalAnalysis:
 
         # diagonalizes Hessian and calculates the reduced masses
         # einsum 'ki->i'
-        self.reduced_masses = 1.0 / np.sum(self.normal_modes.T**2, axis=0)
+        reduced_masses = 1.0 / np.sum(self.normal_modes.T**2, axis=0)
 
         force_constants = (4.0 * np.pi**2 *
                                 (c * (self.vib_frequencies / cm_to_m))**2 *
-                                self.reduced_masses *
+                                reduced_masses *
                                 amu_in_kg()) * (N_to_mdyne / m_to_A)
-        return force_constants
+        return reduced_masses, force_constants
 
     def get_conversion_factor(self, prop):
         """
