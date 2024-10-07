@@ -401,6 +401,15 @@ CMolecule::atom_coordinates(const int iatom, const std::string &unit) const -> T
 }
 
 auto
+CMolecule::set_atom_coordinates(const int iatom, const std::vector<double>& xyz) -> void
+{
+    if (iatom < number_of_atoms())
+    {
+        _coordinates[iatom] = TPoint<double>({xyz[0], xyz[1], xyz[2]});
+    }
+}
+
+auto
 CMolecule::atom_indices(const std::string &label) const -> std::vector<int>
 {
     std::vector<int> indices;

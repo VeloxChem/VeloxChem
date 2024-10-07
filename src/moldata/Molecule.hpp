@@ -45,6 +45,11 @@ class CMolecule
     /// @param unit The unit used to define coordinates of atoms.
     CMolecule(const std::vector<int> &identifiers, const std::vector<TPoint<double>> &coordinates, const std::string &unit);
 
+    /// @brief The constructor with vector of chemical elements, atoms coordinates and atom basis labels.
+    /// @param identifiers The vector of chemical element identifiers.
+    /// @param coordinates The vector of Cartesian coordinates of atoms.
+    /// @param unit The unit used to define coordinates of atoms.
+    /// @param atom_basis_labels The atom basis labels.
     CMolecule(const std::vector<int> &identifiers, const std::vector<TPoint<double>> &coordinates, const std::string &unit, const std::vector<std::string>& atom_basis_labels);
 
     /// @brief The constructor with two molecular fragments.
@@ -86,6 +91,11 @@ class CMolecule
     /// @param unit The unit used to define coordinates of atoms.
     auto add_atom(const int identifier, const TPoint<double> &coordinates, const std::string &unit) -> void;
 
+    /// @brief Adds atom to molecule.
+    /// @param identifier The chemical element identifier.
+    /// @param coordinates The coordinates of atom.
+    /// @param unit The unit used to define coordinates of atoms.
+    /// @param atom_basis_label The atom basis label.
     auto add_atom(const int identifier, const TPoint<double> &coordinates, const std::string &unit, const std::string& atom_basis_label) -> void;
 
     /// @brief Slices given set of atoms into new molecule.
@@ -170,6 +180,11 @@ class CMolecule
     /// @return The coordinates of atom.
     auto atom_coordinates(const int iatom, const std::string &unit = std::string("au")) const -> TPoint<double>;
 
+    /// @brief Sets coordinates of specific atom.
+    /// @param iatom The index of atom.
+    /// @param xyz The new coordinates.
+    auto set_atom_coordinates(const int iatom, const std::vector<double>& xyz) -> void;
+
     /// @brief Gets indices of atoms with given atomic label.
     /// @param label The label of requested atom type.
     /// @return The vector of atom indices.
@@ -191,32 +206,20 @@ class CMolecule
     /// @return The vector of distances between atoms.
     auto min_distances() const -> std::vector<double>;
 
-    /**
-     Gets VDW radii of the atoms.
-
-     @return the vector of VDW radii.
-     */
+    /// @brief Gets VDW radii of the atoms.
+    /// @return the vector of VDW radii.
     auto get_vdw_radii() const -> std::vector<double>;
 
-    /**
-     Gets MK radii of the atoms.
-
-     @return the vector of MK radii.
-     */
+    /// @brief Gets MK radii of the atoms.
+    /// @return the vector of MK radii.
     auto get_mk_radii() const -> std::vector<double>;
 
-    /**
-     Gets CHELPG radii of the atoms.
-
-     @return the vector of CHELPG radii.
-     */
+    /// @brief Gets CHELPG radii of the atoms.
+    /// @return the vector of CHELPG radii.
     auto get_chelpg_radii() const -> std::vector<double>;
 
-    /**
-     Gets covalent radii of the atoms.
-
-     @return the vector of covalent radii.
-     */
+    /// @brief Gets covalent radii of the atoms.
+    /// @return the vector of covalent radii.
     auto get_covalent_radii() const -> std::vector<double>;
 
    private:
@@ -232,9 +235,7 @@ class CMolecule
     /// @brief The vector of chemical element identifiers of atoms.
     std::vector<int> _identifiers;
 
-    /**
-     The vector of basis set names of atoms.
-     */
+    /// @brief The vector of atom basis set labels.
     std::vector<std::string> _atom_basis_labels;
 
     /// @brief Checks if coordinates of atoms are given in Angstrom.
