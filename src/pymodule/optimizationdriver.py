@@ -30,7 +30,6 @@ import time as tm
 import tempfile
 
 from .veloxchemlib import mpi_master, hartree_in_kcalpermol, bohr_in_angstrom
-from .veloxchemlib import Point
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
 from .scfrestdriver import ScfRestrictedDriver
@@ -307,11 +306,9 @@ class OptimizationDriver:
         else:
             coords = m.xyzs[-1] / geometric.nifty.bohr2ang
             labels = molecule.get_labels()
-            elem_ids = molecule.get_identifiers()
 
             if self.rank == mpi_master():
-                points = [Point(xyz) for xyz in coords.reshape(-1, 3)]
-                final_mol = Molecule(elem_ids, points, 'au')
+                final_mol = Molecule(labels, coords.reshape(-1, 3), 'au')
                 final_mol.set_charge(molecule.get_charge())
                 final_mol.set_multiplicity(molecule.get_multiplicity())
             else:
@@ -352,10 +349,8 @@ class OptimizationDriver:
 
                     opt_results['scan_geometries'] = []
                     labels = molecule.get_labels()
-                    elem_ids = molecule.get_identifiers()
                     for opt_coords_au in all_coords_au:
-                        points = [Point(xs) for xs in opt_coords_au[-1]]
-                        mol = Molecule(elem_ids, points, 'au')
+                        mol = Molecule(labels, opt_coords_au[-1], 'au')
                         opt_results['scan_geometries'].append(
                             mol.get_xyz_string())
 
@@ -366,12 +361,9 @@ class OptimizationDriver:
 
                     opt_results['opt_geometries'] = []
                     labels = molecule.get_labels()
-                    elem_ids = molecule.get_identifiers()
                     for xyz in m.xyzs:
-                        points = [
-                            Point(xs) for xs in xyz / geometric.nifty.bohr2ang
-                        ]
-                        mol = Molecule(elem_ids, points, 'au')
+                        mol = Molecule(labels, xyz / geometric.nifty.bohr2ang,
+                                       'au')
                         opt_results['opt_geometries'].append(
                             mol.get_xyz_string())
 

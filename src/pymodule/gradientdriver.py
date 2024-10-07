@@ -29,7 +29,6 @@ import sys
 #from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
-from .veloxchemlib import Point
 from .griddriver import GridDriver
 from .outputstream import OutputStream
 from .molecule import Molecule
@@ -149,7 +148,7 @@ class GradientDriver:
         """
 
         # atom ids
-        elem_ids = molecule.get_identifiers()
+        labels = molecule.get_labels()
 
         # atom coordinates (nx3)
         coords = molecule.get_coordinates_in_bohr()
@@ -164,30 +163,26 @@ class GradientDriver:
         for i in range(molecule.number_of_atoms()):
             for d in range(3):
                 coords[i, d] += self.delta_h
-                points = [Point(xyz) for xyz in coords]
-                new_mol = Molecule(elem_ids, points, 'au')
+                new_mol = Molecule(labels, coords, 'au')
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
                 e_plus = self.compute_energy(new_mol, *args)
 
                 coords[i, d] -= 2.0 * self.delta_h
-                points = [Point(xyz) for xyz in coords]
-                new_mol = Molecule(elem_ids, points, 'au')
+                new_mol = Molecule(labels, coords, 'au')
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
                 e_minus = self.compute_energy(new_mol, *args)
 
                 if self.do_four_point:
                     coords[i, d] -= self.delta_h
-                    points = [Point(xyz) for xyz in coords]
-                    new_mol = Molecule(elem_ids, points, 'au')
+                    new_mol = Molecule(labels, coords, 'au')
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
                     e_minus2 = self.compute_energy(new_mol, *args)
 
                     coords[i, d] += 4.0 * self.delta_h
-                    points = [Point(xyz) for xyz in coords]
-                    new_mol = Molecule(elem_ids, points, 'au')
+                    new_mol = Molecule(labels, coords, 'au')
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
                     e_plus2 = self.compute_energy(new_mol, *args)

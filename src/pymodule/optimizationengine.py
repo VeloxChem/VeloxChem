@@ -30,7 +30,6 @@ import numpy as np
 import time as tm
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import Point
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .outputstream import OutputStream
 from .molecule import Molecule
@@ -93,11 +92,9 @@ class OptimizationEngine(geometric.engine.Engine):
         start_time = tm.time()
 
         labels = self.molecule.get_labels()
-        elem_ids = self.molecule.get_identifiers()
 
         if self.rank == mpi_master():
-            points = [Point([float(x) for x in xyz]) for xyz in coords.reshape(-1, 3)]
-            new_mol = Molecule(elem_ids, points, 'au')
+            new_mol = Molecule(labels, coords.reshape(-1, 3), 'au')
             new_mol.set_charge(self.molecule.get_charge())
             new_mol.set_multiplicity(self.molecule.get_multiplicity())
         else:
