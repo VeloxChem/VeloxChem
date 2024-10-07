@@ -1,23 +1,25 @@
-import tempfile
-import numpy as np
-import math as mt
-import copy as cp
-import pickle
-
 from mpi4py import MPI
 from pathlib import Path
+import numpy as np
+import pickle
+import math
 
-from veloxchem.veloxchemlib import DispersionModel
-from veloxchem.veloxchemlib import Point
-from veloxchem.veloxchemlib import bohr_in_angstrom
+from veloxchem.veloxchemlib import DispersionModel, Point
+from veloxchem.veloxchemlib import bohr_in_angstrom, mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
+from veloxchem.optimizationdriver import OptimizationDriver
+from veloxchem.inputparser import get_random_string_serial
 
 
 class TestMolecule:
 
     def nh3_elements(self):
         return [7, 1, 1, 1]
+
+    def nh3_labels(self):
+
+        return ['N', 'H', 'H', 'H']
 
     def nh3_coords(self):
 
@@ -27,6 +29,15 @@ class TestMolecule:
             Point([-4.704, 2.415, 1.497]),
             Point([-4.780, 2.569, -1.573]),
         ]
+
+    def nh3_coords_np(self):
+
+        return np.array([
+            [-3.710, 3.019, -0.037],
+            [-3.702, 4.942, 0.059],
+            [-4.704, 2.415, 1.497],
+            [-4.780, 2.569, -1.573],
+        ])
 
     def nh3_xyzstr(self):
 
@@ -74,18 +85,21 @@ class TestMolecule:
         tol = 1.0e-12
 
         elements = self.nh3_elements()
+        labels = self.nh3_labels()
         coords = self.nh3_coords()
+        coords_np = self.nh3_coords_np()
         xyzstr = self.nh3_xyzstr()
 
         # test static read_str method
         mol_a = Molecule(elements, coords, 'au')
-        mol_b = Molecule.read_str(xyzstr, 'au')
+        mol_b = Molecule(labels, coords_np, units='au')
+        mol_c = Molecule.read_str(xyzstr, 'au')
         assert mol_a == mol_b
+        assert mol_a == mol_c
 
         # test unit changes in constructors
-        f = bohr_in_angstrom()
         for r in coords:
-            r.scale(f)
+            r.scale(bohr_in_angstrom())
         mol_b = Molecule(elements, coords, 'angstrom')
         assert mol_a == mol_b
 
@@ -96,7 +110,7 @@ class TestMolecule:
         # test empty constructor
         mol_b = Molecule()
         assert mol_b.get_multiplicity() == 1
-        assert mt.isclose(mol_b.get_charge(), 0.0, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(mol_b.get_charge(), 0.0, rel_tol=tol, abs_tol=tol)
         assert mol_b.number_of_atoms() == 0
 
         # test composition constructor
@@ -156,10 +170,10 @@ class TestMolecule:
 
         mol = self.nh3_molecule()
         q = mol.get_charge()
-        assert mt.isclose(q, 0.0, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(q, 0.0, rel_tol=tol, abs_tol=tol)
         mol.set_charge(1.0)
         q = mol.get_charge()
-        assert mt.isclose(q, 1.0, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(q, 1.0, rel_tol=tol, abs_tol=tol)
 
     def test_multiplicity(self):
 
@@ -188,7 +202,7 @@ class TestMolecule:
 
         mol = self.nh3_molecule()
         n_e = mol.number_of_electrons()
-        assert mt.isclose(n_e, 10.0, rel_tol=tol, abs_tol=tol)
+        assert math.isclose(n_e, 10.0, rel_tol=tol, abs_tol=tol)
 
     def test_identifiers(self):
 
@@ -250,8 +264,6 @@ class TestMolecule:
 
     def test_atom_coordinates(self):
 
-        tol = 1.0e-12
-
         mol = self.nh3_molecule()
 
         # check nitrogen atom coordinates in au
@@ -289,10 +301,10 @@ class TestMolecule:
         tol = 1.0e-12
 
         mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
-        assert mt.isclose(mol.nuclear_repulsion_energy(),
-                          9.34363815797054450919,
-                          rel_tol=tol,
-                          abs_tol=tol)
+        assert math.isclose(mol.nuclear_repulsion_energy(),
+                            9.34363815797054450919,
+                            rel_tol=tol,
+                            abs_tol=tol)
 
     def test_check_proximity(self):
 
@@ -305,31 +317,18 @@ class TestMolecule:
         mol = self.nh3_molecule()
         molstr = mol.get_string()
         lines = molstr.splitlines()
+        # yapf: disable
         assert lines[0] == 'Molecular Geometry (Angstroms)'
         assert lines[1] == '================================'
         assert lines[2] == ''
-        assert lines[
-            3] == '  Atom         Coordinate X          Coordinate Y          Coordinate Z  '
+        assert lines[3] == '  Atom         Coordinate X          Coordinate Y          Coordinate Z  '
         assert lines[4] == ''
-        assert lines[
-            5] == '  N          -1.963247452450        1.597585999716       -0.019579556803'
-        assert lines[
-            6] == '  H          -1.959014034763        2.615193776283        0.031221455443'
-        assert lines[
-            7] == '  H          -2.489249600088        1.277962964331        0.792178284722'
-        assert lines[
-            8] == '  H          -2.529467068116        1.359456254810       -0.832395752750'
+        assert lines[5] == '  N          -1.963247452450        1.597585999716       -0.019579556803'
+        assert lines[6] == '  H          -1.959014034763        2.615193776283        0.031221455443'
+        assert lines[7] == '  H          -2.489249600088        1.277962964331        0.792178284722'
+        assert lines[8] == '  H          -2.529467068116        1.359456254810       -0.832395752750'
         assert lines[9] == ''
-
-    def test_write_xyz(self):
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            if MPI.COMM_WORLD.Get_rank() == 0:
-                fname = str(Path(temp_dir, 'mol.xyz'))
-                mol_a = self.nh3_molecule()
-                mol_a.write_xyz(fname)
-                mol_b = Molecule.read_xyz(fname)
-                assert mol_a == mol_b
+        # yapf: enable
 
     def test_read_dict(self):
 
@@ -605,3 +604,139 @@ class TestMolecule:
             max_rel_diff = np.max(np.abs(g_disp - g_ref) / np.abs(g_ref))
             assert max_diff < 1.0e-13
             assert max_rel_diff < 1.0e-10
+
+    def test_distance_matrix(self):
+
+        xyz_string = """
+            3
+            water
+            O       0.944703950608    0.070615471110   -0.056477643546
+            H       1.903732770975    0.056427544902   -0.044142825330
+            H       0.642753278417   -0.616673016012    0.540640468876
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        distance_matrix = mol.get_distance_matrix_in_angstrom()
+
+        ref_distrance_matrix = np.array([[0., 0.95921308, 0.95921307],
+                                         [0.95921308, 0., 1.54437856],
+                                         [0.95921307, 1.54437856, 0.]])
+
+        assert np.max(np.abs(distance_matrix - ref_distrance_matrix)) < 1.0e-8
+
+    def test_get_ic_rmsd(self):
+
+        init_xyz_str = """
+            C          -2.723479309037        0.388400197499       -0.032041680121
+            C          -1.198591674506        0.292402159666       -0.001957955680
+            H          -3.161468702971        0.002148459476        0.916810101463
+            H          -3.113340035638       -0.249559972670       -0.853012496915
+            O          -3.131199766507        1.709538730510       -0.265228909885
+            H          -0.880032285304       -0.767190536848        0.124520689502
+            O          -0.670239980035        1.084030100114        1.027238801838
+            H          -0.785679988597        0.645580322006       -0.970638007358
+            H          -0.821288323120        0.587492539563        1.873631291844
+            H          -3.112122928053        2.174373284354        0.611781773545
+        """
+
+        final_xyz_str = """
+            C          -2.760169377434        0.322719976286       -0.001925407564
+            C          -1.228941816065        0.304680448557       -0.002845411826
+            H          -3.128135202340       -0.132424338111        0.933568102246
+            H          -3.149271541311       -0.251138690089       -0.845341019529
+            O          -3.252173881237        1.631288380215       -0.127670008266
+            H          -0.863067365090       -0.729220194991        0.037102867132
+            O          -0.717621604087        1.071775860470        1.064783463761
+            H          -0.854080755853        0.782453035355       -0.910452256526
+            H          -0.974559560638        0.659440589631        1.897920584004
+            H          -2.669421889714        2.207640216349        0.385962694800
+        """
+
+        init_mol = Molecule.read_molecule_string(init_xyz_str, units='angstrom')
+        final_mol = Molecule.read_molecule_string(final_xyz_str,
+                                                  units='angstrom')
+
+        ic_rmsd = OptimizationDriver.get_ic_rmsd(final_mol, init_mol)
+        ref_ic_rmsd = {
+            'bonds': {
+                'rms': 0.017,
+                'max': 0.028,
+                'unit': 'Angstrom'
+            },
+            'angles': {
+                'rms': 1.463,
+                'max': 3.234,
+                'unit': 'degree'
+            },
+            'dihedrals': {
+                'rms': 20.573,
+                'max': 45.089,
+                'unit': 'degree'
+            }
+        }
+
+        for ic in ['bonds', 'angles', 'dihedrals']:
+            for val in ['rms', 'max']:
+                assert abs(ic_rmsd[ic][val] - ref_ic_rmsd[ic][val]) < 1.0e-3
+
+    def test_write_xyz(self):
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            here = Path(__file__).parent
+            random_string = get_random_string_serial()
+            fpath = here / 'data' / f'vlx_molecule_{random_string}.xyz'
+            fname = str(fpath)
+
+            mol = self.nh3_molecule()
+            mol.write_xyz(fname)
+
+            ref_labels = mol.get_labels()
+            ref_coords_au = mol.get_coordinates_in_bohr()
+            ref_coords_ang = mol.get_coordinates_in_angstrom()
+
+            mol_2 = Molecule.read_xyz_file(fname)
+            assert ref_labels == mol_2.get_labels()
+            assert np.max(
+                np.abs(ref_coords_au -
+                       mol_2.get_coordinates_in_bohr())) < 1.0e-10
+            assert np.max(
+                np.abs(ref_coords_ang -
+                       mol_2.get_coordinates_in_angstrom())) < 1.0e-10
+
+            with open(fname, 'r') as f_xyz:
+                lines = f_xyz.readlines()
+                mol_3 = Molecule.read_xyz_string(''.join(lines))
+                assert ref_labels == mol_3.get_labels()
+                assert np.max(
+                    np.abs(ref_coords_au -
+                           mol_3.get_coordinates_in_bohr())) < 1.0e-10
+                assert np.max(
+                    np.abs(ref_coords_ang -
+                           mol_3.get_coordinates_in_angstrom())) < 1.0e-10
+
+            if fpath.is_file():
+                fpath.unlink()
+
+    def test_dihedral(self):
+
+        xyz_string = """
+            9
+            xyz
+            O    1.086900000000    0.113880000000   -0.060730000000
+            C    2.455250000000    0.132120000000   -0.071390000000
+            C    3.171673900000   -0.838788100000    0.496389800000
+            C    2.491492369403   -1.966504408464    1.155862765438
+            O    1.664691816845   -2.650313648401    0.565927537003
+            H    0.786520000000   -0.686240000000    0.407170000000
+            H    2.871553600000    0.995167700000   -0.576074500000
+            H    4.254316047964   -0.842628605717    0.498660431748
+            H    2.767678583706   -2.159148582998    2.205812810612
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        assert abs(mol.get_dihedral_in_degrees((2, 3, 4, 5)) - 55.0) < 1e-4
+
+        mol.set_dihedral_in_degrees((2, 3, 4, 5), 270.0)
+        assert abs(mol.get_dihedral((2, 3, 4, 5), 'radian') +
+                   math.pi / 2.0) < 1e-4
+
+        mol.set_dihedral((2, 3, 4, 5), math.pi / 2.0, 'radian')
+        assert abs(mol.get_dihedral_in_degrees((2, 3, 4, 5)) - 90.0) < 1e-4

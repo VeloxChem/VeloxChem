@@ -235,11 +235,12 @@ CMolecule::add_atom(const int identifier, const TPoint<double> &coordinates, con
 auto
 CMolecule::slice(const std::vector<int> &atoms) const -> CMolecule
 {
+    // Note: the sliced molecule fragment will have default charge and multiplicity,
+    //       which could be wrong, but we will not make any guess here
+
     CMolecule molfrag;
 
     std::ranges::for_each(atoms, [&](const int i) { molfrag.add_atom(_identifiers.at(i), _coordinates.at(i), "au", _atom_basis_labels.at(i)); });
-
-    if ((molfrag.number_of_electrons() % 2) == 1) molfrag.set_multiplicity(2);
 
     return molfrag;
 }
