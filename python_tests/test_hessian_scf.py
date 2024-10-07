@@ -31,8 +31,7 @@ class TestScfHessianDriver:
         vib_settings = {'do_ir': 'yes', 'do_raman': 'yes', 'numerical_hessian':'yes',
                         'numerical_raman': 'yes'}
         method_settings = {}
-        scf_hessian_drv = ScfHessianDriver(scf_drv)
-        vibanalysis_drv = VibrationalAnalysis(scf_hessian_drv)
+        vibanalysis_drv = VibrationalAnalysis(scf_drv)
         vibanalysis_drv.update_settings(method_settings, vib_settings)
         vibanalysis_drv.ostream.mute()
         vibanalysis_drv.compute(task.molecule, task.ao_basis)
