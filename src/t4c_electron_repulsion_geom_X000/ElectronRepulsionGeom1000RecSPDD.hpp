@@ -5,8 +5,6 @@
 #include <cstddef>
 #include <utility>
 
-#include "BatchFunc.hpp"
-#include "BoysFunc.hpp"
 #include "ElectronRepulsionContrRecPPXX.hpp"
 #include "ElectronRepulsionContrRecXXDD.hpp"
 #include "ElectronRepulsionContrRecXXPD.hpp"
@@ -23,18 +21,16 @@
 #include "ElectronRepulsionPrimRecSSSG.hpp"
 #include "ElectronRepulsionPrimRecSSSP.hpp"
 #include "ElectronRepulsionPrimRecSSSS.hpp"
-#include "GtoPairBlock.hpp"
 #include "SimdArray.hpp"
-#include "T2CUtils.hpp"
+#include "BoysFunc.hpp"
 #include "T4CUtils.hpp"
+#include "T2CUtils.hpp"
+#include "BatchFunc.hpp"
+#include "GtoPairBlock.hpp"
 
-#include "TensorComponents.hpp"
-#include <iomanip>
-#include <iostream>
+namespace erirec { // erirec namespace
 
-namespace erirec {  // erirec namespace
-
-/// @brief Computes (SP|1/|r-r'||DD)  integral derivatives for two basis function pairs blocks.
+/// @brief Computes d^(1)/dA^(1)(SP|1/|r-r'||DD)  integral derivatives.
 /// @param distributor The pointer to Fock matrix/matrices distributor.
 /// @param bra_gto_pair_block The GTOs pair block on bra side.
 /// @param ket_gto_pair_block The GTOs pair block on ket side.
@@ -42,11 +38,11 @@ namespace erirec {  // erirec namespace
 /// @param ket_indices The range [ket_first, ket_last) of basis function pairs on ket side.
 template <class T>
 inline auto
-comp_electron_repulsion_geom_1000_spdd(T&                               distributor,
-                                       const CGtoPairBlock&             bra_gto_pair_block,
-                                       const CGtoPairBlock&             ket_gto_pair_block,
-                                       const std::pair<size_t, size_t>& bra_indices,
-                                       const std::pair<size_t, size_t>& ket_indices) -> void
+comp_electron_repulsion_geom1000_spdd(T& distributor,
+                                      const CGtoPairBlock& bra_gto_pair_block,
+                                      const CGtoPairBlock& ket_gto_pair_block,
+                                      const std::pair<size_t, size_t>& bra_indices,
+                                      const std::pair<size_t, size_t>& ket_indices) -> void
 {
     // intialize GTOs pair data on bra side
 
@@ -121,12 +117,6 @@ comp_electron_repulsion_geom_1000_spdd(T&                               distribu
     const CBoysFunc<6> bf_table;
 
     CSimdArray<double> bf_data(8, ket_npgtos);
-
-    // set up range seperation factor
-
-    const auto use_rs = distributor.need_omega();
-
-    const auto omega = distributor.get_omega();
 
     // set up ket partitioning
 
@@ -236,18 +226,9 @@ comp_electron_repulsion_geom_1000_spdd(T&                               distribu
 
                 t4cfunc::comp_distances_wp(pfactors, 26, 17, r_p);
 
-                if (use_rs)
-                {
-                    t4cfunc::comp_boys_args(bf_data, 7, pfactors, 13, a_exp, b_exp, omega);
+                t4cfunc::comp_boys_args(bf_data, 7, pfactors, 13, a_exp, b_exp);
 
-                    bf_table.compute(bf_data, 0, 7, pfactors, a_exp, b_exp, omega);
-                }
-                else
-                {
-                    t4cfunc::comp_boys_args(bf_data, 7, pfactors, 13, a_exp, b_exp);
-
-                    bf_table.compute(bf_data, 0, 7);
-                }
+                bf_table.compute(bf_data, 0, 7);
 
                 t4cfunc::comp_ovl_factors(pfactors, 16, 2, 3, ab_ovl, ab_norm, a_exp, b_exp);
 
@@ -320,17 +301,17 @@ comp_electron_repulsion_geom_1000_spdd(T&                               distribu
                 erirec::comp_prim_electron_repulsion_sdsf(pbuffer, 371, 55, 65, 167, 185, 215, pfactors, 26, r_pb, a_exp, b_exp);
 
                 erirec::comp_prim_electron_repulsion_sdsg(pbuffer, 431, 95, 110, 215, 245, 290, pfactors, 26, r_pb, a_exp, b_exp);
-                
+
                 pbuffer.scale(2.0 * a_exp, {149, 167});
-                
+
                 pbuffer.scale(2.0 * a_exp, {185, 215});
-                
+
                 pbuffer.scale(2.0 * a_exp, {245, 290});
-                
+
                 pbuffer.scale(2.0 * a_exp, {335, 371});
-                
+
                 pbuffer.scale(2.0 * a_exp, {371, 431});
-                
+
                 pbuffer.scale(2.0 * a_exp, {431, 521});
 
                 t2cfunc::reduce(cbuffer, 0, pbuffer, 149, 18, ket_width, ket_npgtos);
@@ -344,6 +325,7 @@ comp_electron_repulsion_geom_1000_spdd(T&                               distribu
                 t2cfunc::reduce(cbuffer, 129, pbuffer, 371, 60, ket_width, ket_npgtos);
 
                 t2cfunc::reduce(cbuffer, 189, pbuffer, 431, 90, ket_width, ket_npgtos);
+
             }
 
             erirec::comp_ket_hrr_electron_repulsion_xxpd(ckbuffer, 0, cbuffer, 0, 18, cfactors, 6, 0, 1);
@@ -365,75 +347,17 @@ comp_electron_repulsion_geom_1000_spdd(T&                               distribu
             erirec::comp_bra_hrr_electron_repulsion_ppxx(skbuffer, 225, 0, 75, r_ab, 2, 2);
 
             t4cfunc::bra_transform<0, 1>(sbuffer, 0, skbuffer, 225, 2, 2);
-            
+
             t4cfunc::bra_transform<0, 1>(sbuffer, 75, skbuffer, 300, 2, 2);
-            
+
             t4cfunc::bra_transform<0, 1>(sbuffer, 150, skbuffer, 375, 2, 2);
 
             distributor.distribute(sbuffer, 0, a_indices, b_indices, c_indices, d_indices, 0, 1, 2, 2, j, ket_range);
-            
-//            // *** START DEBUG BLOCK
-//
-//            const auto [a_angmom, b_angmom]=  bra_gto_pair_block.angular_momentums();
-//
-//            const auto [c_angmom, d_angmom]=  ket_gto_pair_block.angular_momentums();
-//
-//            const auto adim = a_indices[0];
-//
-//            const auto bdim = b_indices[0];
-//
-//            const auto cdim = c_indices[0];
-//
-//            const auto ddim = d_indices[0];
-//
-//            // set up angular components
-//
-//            const auto acomps = tensor::number_of_spherical_components(std::array<int, 1>{a_angmom});
-//
-//            const auto bcomps = tensor::number_of_spherical_components(std::array<int, 1>{b_angmom});
-//
-//            const auto ccomps = tensor::number_of_spherical_components(std::array<int, 1>{c_angmom});
-//
-//            const auto dcomps = tensor::number_of_spherical_components(std::array<int, 1>{d_angmom});
-//
-//            const auto tcomps = acomps * bcomps * ccomps * dcomps;
-//
-//            std::cout << std::setprecision(15);
-//
-//            for (size_t p = 0; p < sbuffer.number_of_active_elements(); p++)
-//            {
-//                for (int k = 0; k < acomps; k++)
-//                {
-//                    for (int l = 0; l < bcomps; l++)
-//                    {
-//                        for (int m = 0; m < ccomps; m++)
-//                        {
-//                            for (int n = 0; n < dcomps; n++)
-//                            {
-//                                auto idx = k * bcomps * ccomps * dcomps + l * ccomps * dcomps  + m * dcomps + n;
-//
-//                                auto tint_x = sbuffer.data(idx);
-//
-//                                auto tint_y = sbuffer.data(idx + tcomps);
-//
-//                                auto tint_z = sbuffer.data(idx + 2 * tcomps);
-//
-//                                std::cout << k * adim + a_indices[j + 1] << " " << l * bdim + b_indices[j + 1];
-//
-//                                std::cout << " " << m * cdim + c_indices[ket_indices.first + p + 1] << " " << n * ddim + d_indices[ket_indices.first + p + 1];
-//
-//                                std::cout << " " << tint_x[p] << " " << tint_y[p] << " " << tint_z[p] << std::endl;
-//                            }
-//                        }
-//                    }
-//                }
-//            }
-//
-//            // *** END DEBUG BLOCK
         }
     }
+
 }
 
-}  // namespace erirec
+} // erirec namespace
 
 #endif /* ElectronRepulsionGeom1000RecSPDD_hpp */
