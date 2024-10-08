@@ -295,22 +295,6 @@ def main():
                 task.finish()
                 return
 
-    # Response
-
-    if task_type == 'response' and scf_drv.scf_type == 'restricted':
-        rsp_dict = (dict(task.input_dict['response'])
-                    if 'response' in task.input_dict else {})
-        rsp_dict['program_end_time'] = program_end_time
-        rsp_dict['filename'] = task.input_dict['filename']
-        rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
-
-        rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
-        rsp_prop.init_driver(task.mpi_comm, task.ostream)
-        rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
-
-        if not rsp_prop.is_converged:
-            return
-
     # Gradient
 
     if task_type == 'gradient':
@@ -325,9 +309,6 @@ def main():
                 grad_drv.compute(task.molecule)
 
             elif scf_drv.scf_type == 'restricted':
-
-                # TODO: double check supported angular momentum (for now up to P)
-
                 grad_drv = ScfGradientDriver(scf_drv)
                 grad_drv.compute(task.molecule, task.ao_basis, scf_results)
 
@@ -420,6 +401,22 @@ def main():
             opt_drv.update_settings(opt_dict)
             opt_results = opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
                                           rsp_prop.rsp_driver)
+
+    # Response
+
+    if task_type == 'response' and scf_drv.scf_type == 'restricted':
+        rsp_dict = (dict(task.input_dict['response'])
+                    if 'response' in task.input_dict else {})
+        rsp_dict['program_end_time'] = program_end_time
+        rsp_dict['filename'] = task.input_dict['filename']
+        rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
+
+        rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
+        rsp_prop.init_driver(task.mpi_comm, task.ostream)
+        rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
+
+        if not rsp_prop.is_converged:
+            return
 
     # Cube file
 
