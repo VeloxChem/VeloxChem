@@ -437,4 +437,5 @@ def _MolecularBasis_get_string(self, title):
 MolecularBasis.read = _MolecularBasis_read
 MolecularBasis.read_dict = _MolecularBasis_read_dict
 MolecularBasis.get_avail_basis = _MolecularBasis_get_avail_basis
+MolecularBasis.get_string = _MolecularBasis_get_string
 MolecularBasis.info_str = _MolecularBasis_get_string

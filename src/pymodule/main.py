@@ -31,6 +31,7 @@ from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .respchargesdriver import RespChargesDriver
+from .excitondriver import ExcitonModelDriver
 #from .xtbdriver import XtbDriver
 #from .xtbgradientdriver import XtbGradientDriver
 from .visualizationdriver import VisualizationDriver
@@ -215,6 +216,18 @@ def main():
                                  if 'pe' in task.input_dict else {})
 
     use_xtb = ('xtb' in method_dict)
+
+    # Exciton model
+
+    if task_type == 'exciton':
+        exciton_dict = (dict(task.input_dict['exciton'])
+                        if 'exciton' in task.input_dict else {})
+        exciton_dict['program_end_time'] = program_end_time
+        exciton_dict['filename'] = task.input_dict['filename']
+
+        exciton_drv = ExcitonModelDriver(task.mpi_comm, task.ostream)
+        exciton_drv.update_settings(exciton_dict, method_dict)
+        exciton_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Self-consistent field
 

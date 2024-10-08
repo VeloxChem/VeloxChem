@@ -62,7 +62,12 @@ export_t2cintegrals(py::module& m)
             "compute",
             [](const COverlapDriver& ovl_drv, const CMolecule& molecule, const CMolecularBasis& bra_basis, const CMolecularBasis& ket_basis)
                 -> std::shared_ptr<CMatrix> { return std::make_shared<CMatrix>(ovl_drv.compute(bra_basis, ket_basis, molecule)); },
-            "Computes overlap matrix for given molecule and pair of bases.");
+            "Computes overlap matrix for given molecule and pair of bases.")
+        .def(
+            "compute",
+            [](const COverlapDriver& ovl_drv, const CMolecule& bra_molecule,  const CMolecule& ket_molecule, const CMolecularBasis& bra_basis, const CMolecularBasis& ket_basis)
+                -> std::shared_ptr<CMatrix> { return std::make_shared<CMatrix>(ovl_drv.compute(bra_basis, ket_basis, bra_molecule, ket_molecule)); },
+            "Computes overlap matrix for given pair of molecules and pair of bases.");
 
     // CKineticEnergyDriver class
     PyClass<CKineticEnergyDriver>(m, "KineticEnergyDriver")

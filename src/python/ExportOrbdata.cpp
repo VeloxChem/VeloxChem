@@ -34,6 +34,7 @@
 
 #include "AtomBasis.hpp"
 #include "AODensityMatrix.hpp"
+#include "AOIndices.hpp"
 #include "BasisFunction.hpp"
 #include "BlockedGtoPairBlock.hpp"
 #include "ExportGeneral.hpp"
@@ -420,6 +421,16 @@ export_orbdata(py::module &m)
         .def("number_of_density_matrices", &CAODensityMatrix::getNumberOfDensityMatrices, "Gets number of density matrices.")
         .def("get_density_type", &CAODensityMatrix::getDensityType, "Gets type of density matrix.")
         .def(py::self == py::self);
+
+    // exposing functions
+
+    m.def("get_dimer_ao_indices",
+          &aoindices::getDimerAOIndices,
+          "Gets AO indices of the two molecules in a molecular dimer.",
+          "mol_1"_a,
+          "mol_2"_a,
+          "basis_1"_a,
+          "basis_2"_a);
 }
 
 }  // namespace vlx_orbdata

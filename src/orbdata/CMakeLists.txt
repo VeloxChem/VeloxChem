@@ -1,6 +1,7 @@
 target_sources(vlxobjs
   PRIVATE
     AODensityMatrix.cpp
+    AOIndices.cpp
     AtomBasis.cpp
     BasisFunction.cpp
     BlockedGtoPairBlock.cpp
