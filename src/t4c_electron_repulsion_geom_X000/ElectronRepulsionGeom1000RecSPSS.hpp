@@ -5,20 +5,20 @@
 #include <cstddef>
 #include <utility>
 
-#include "BatchFunc.hpp"
-#include "BoysFunc.hpp"
 #include "ElectronRepulsionContrRecPPXX.hpp"
 #include "ElectronRepulsionPrimRecSDSS.hpp"
 #include "ElectronRepulsionPrimRecSPSS.hpp"
 #include "ElectronRepulsionPrimRecSSSS.hpp"
-#include "GtoPairBlock.hpp"
 #include "SimdArray.hpp"
-#include "T2CUtils.hpp"
+#include "BoysFunc.hpp"
 #include "T4CUtils.hpp"
+#include "T2CUtils.hpp"
+#include "BatchFunc.hpp"
+#include "GtoPairBlock.hpp"
 
-namespace erirec {  // erirec namespace
+namespace erirec { // erirec namespace
 
-/// @brief Computes (SP|1/|r-r'||SS)  integral derivatives for two basis function pairs blocks.
+/// @brief Computes d^(1)/dA^(1)(SP|1/|r-r'||SS)  integral derivatives.
 /// @param distributor The pointer to Fock matrix/matrices distributor.
 /// @param bra_gto_pair_block The GTOs pair block on bra side.
 /// @param ket_gto_pair_block The GTOs pair block on ket side.
@@ -26,11 +26,11 @@ namespace erirec {  // erirec namespace
 /// @param ket_indices The range [ket_first, ket_last) of basis function pairs on ket side.
 template <class T>
 inline auto
-comp_electron_repulsion_geom_1000_spss(T&                               distributor,
-                                       const CGtoPairBlock&             bra_gto_pair_block,
-                                       const CGtoPairBlock&             ket_gto_pair_block,
-                                       const std::pair<size_t, size_t>& bra_indices,
-                                       const std::pair<size_t, size_t>& ket_indices) -> void
+comp_electron_repulsion_geom1000_spss(T& distributor,
+                                      const CGtoPairBlock& bra_gto_pair_block,
+                                      const CGtoPairBlock& ket_gto_pair_block,
+                                      const std::pair<size_t, size_t>& bra_indices,
+                                      const std::pair<size_t, size_t>& ket_indices) -> void
 {
     // intialize GTOs pair data on bra side
 
@@ -99,12 +99,6 @@ comp_electron_repulsion_geom_1000_spss(T&                               distribu
     const CBoysFunc<2> bf_table;
 
     CSimdArray<double> bf_data(4, ket_npgtos);
-
-    // set up range seperation factor
-
-    const auto use_rs = distributor.need_omega();
-
-    const auto omega = distributor.get_omega();
 
     // set up ket partitioning
 
@@ -200,18 +194,9 @@ comp_electron_repulsion_geom_1000_spss(T&                               distribu
 
                 t4cfunc::comp_distances_wp(pfactors, 20, 17, r_p);
 
-                if (use_rs)
-                {
-                    t4cfunc::comp_boys_args(bf_data, 3, pfactors, 13, a_exp, b_exp, omega);
+                t4cfunc::comp_boys_args(bf_data, 3, pfactors, 13, a_exp, b_exp);
 
-                    bf_table.compute(bf_data, 0, 3, pfactors, a_exp, b_exp, omega);
-                }
-                else
-                {
-                    t4cfunc::comp_boys_args(bf_data, 3, pfactors, 13, a_exp, b_exp);
-
-                    bf_table.compute(bf_data, 0, 3);
-                }
+                bf_table.compute(bf_data, 0, 3);
 
                 t4cfunc::comp_ovl_factors(pfactors, 16, 2, 3, ab_ovl, ab_norm, a_exp, b_exp);
 
@@ -226,14 +211,15 @@ comp_electron_repulsion_geom_1000_spss(T&                               distribu
                 erirec::comp_prim_electron_repulsion_spss(pbuffer, 6, 1, 2, pfactors, 20, r_pb);
 
                 erirec::comp_prim_electron_repulsion_sdss(pbuffer, 9, 0, 1, 3, 6, pfactors, 20, r_pb, a_exp, b_exp);
-                
+
                 pbuffer.scale(2.0 * a_exp, {3, 6});
-                
+
                 pbuffer.scale(2.0 * a_exp, {9, 15});
 
                 t2cfunc::reduce(cbuffer, 0, pbuffer, 3, 3, ket_width, ket_npgtos);
 
                 t2cfunc::reduce(cbuffer, 3, pbuffer, 9, 6, ket_width, ket_npgtos);
+
             }
 
             t4cfunc::ket_transform<0, 0>(skbuffer, 0, cbuffer, 0, 0, 1);
@@ -243,16 +229,17 @@ comp_electron_repulsion_geom_1000_spss(T&                               distribu
             erirec::comp_bra_hrr_electron_repulsion_ppxx(skbuffer, 9, 0, 3, r_ab, 0, 0);
 
             t4cfunc::bra_transform<0, 1>(sbuffer, 0, skbuffer, 9, 0, 0);
-            
+
             t4cfunc::bra_transform<0, 1>(sbuffer, 3, skbuffer, 12, 0, 0);
-            
+
             t4cfunc::bra_transform<0, 1>(sbuffer, 6, skbuffer, 15, 0, 0);
 
             distributor.distribute(sbuffer, 0, a_indices, b_indices, c_indices, d_indices, 0, 1, 0, 0, j, ket_range);
         }
     }
+
 }
 
-}  // namespace erirec
+} // erirec namespace
 
 #endif /* ElectronRepulsionGeom1000RecSPSS_hpp */
