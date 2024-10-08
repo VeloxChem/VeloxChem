@@ -936,14 +936,15 @@ class ExcitonModelDriver:
 
         # SCF calculation
         scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
-        scf_drv.update_settings(
-            {
-                'eri_thresh': self.eri_thresh,
-                'conv_thresh': self.scf_conv_thresh,
-                'max_iter': self.scf_max_iter,
-                'restart': 'yes' if self.restart else 'no',
-                'checkpoint_file': str(monomer_scf_h5),
-            }, method_dict)
+        scf_dict = {
+            'eri_thresh': self.eri_thresh,
+            'conv_thresh': self.scf_conv_thresh,
+            'max_iter': self.scf_max_iter,
+            'restart': 'yes' if self.restart else 'no',
+        }
+        if self.checkpoint_file is not None:
+            scf_dict['checkpoint_file'] = str(monomer_scf_h5)
+        scf_drv.update_settings(scf_dict, method_dict)
         scf_results = scf_drv.compute(monomer, basis)
 
         # update ERI screening threshold
@@ -978,16 +979,17 @@ class ExcitonModelDriver:
                 self.checkpoint_file).with_suffix(f'.{monomer_rsp_h5}')
 
         # TDA calculation
-        abs_spec = Absorption(
-            {
-                'tamm_dancoff': 'yes',
-                'nstates': self.nstates,
-                'eri_thresh': self.eri_thresh,
-                'conv_thresh': self.tda_conv_thresh,
-                'max_iter': self.tda_max_iter,
-                'restart': 'yes' if self.restart else 'no',
-                'checkpoint_file': str(monomer_rsp_h5),
-            }, method_dict)
+        rsp_dict = {
+            'tamm_dancoff': 'yes',
+            'nstates': self.nstates,
+            'eri_thresh': self.eri_thresh,
+            'conv_thresh': self.tda_conv_thresh,
+            'max_iter': self.tda_max_iter,
+            'restart': 'yes' if self.restart else 'no',
+        }
+        if self.checkpoint_file is not None:
+            rsp_dict['checkpoint_file'] = str(monomer_rsp_h5)
+        abs_spec = Absorption(rsp_dict, method_dict)
         abs_spec.init_driver(self.comm, self.ostream)
         abs_spec.compute(monomer, basis, scf_results)
 
