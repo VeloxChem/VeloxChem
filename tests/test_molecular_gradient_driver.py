@@ -39,7 +39,7 @@ class TestMolecularGradientDriver:
             H  0.451  0.163 -0.083
         """
         mol = Molecule.read_str(h2o_dimer_str, 'angstrom')
-        bas = MolecularBasis.read(mol, 'def2-tzvp')
+        bas = MolecularBasis.read(mol, 'def2-svpd')
 
         return mol, bas
 
@@ -96,4 +96,28 @@ class TestMolecularGradientDriver:
         npyfile = str(here / 'data' / 'h2o.sto3g.electronic.gradient.npy')
         ref_grad = np.load(npyfile)
         
+        assert np.allclose(ref_grad, mol_grad, 1.0e-12, 1.0e-12, False)
+        
+    def test_h2o_dimer_svpd_comp_electronic_grad(self):
+
+        mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
+
+        # load density matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.npy')
+        den_mat = np.load(npyfile)
+        
+        # load weighted density matrix (need replacement)
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.energy.weighted.density.npy')
+        wden_mat = np.load(npyfile)
+        
+        grad_drv = MolecularGradientDriver()
+        mol_grad = grad_drv.comp_electronic_grad(mol_h2o_dimer, bas_svpd, den_mat, wden_mat, 0.0, 0.0)
+        
+        # electronic gradient contribution
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.electronic.gradient.npy')
+        ref_grad = np.load(npyfile)
+    
         assert np.allclose(ref_grad, mol_grad, 1.0e-12, 1.0e-12, False)
