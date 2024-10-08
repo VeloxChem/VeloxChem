@@ -33,6 +33,7 @@ from .scfrestopendriver import ScfRestrictedOpenDriver
 from .forcefieldgenerator import ForceFieldGenerator
 from .respchargesdriver import RespChargesDriver
 from .excitondriver import ExcitonModelDriver
+from .mp2driver import Mp2Driver
 #from .xtbdriver import XtbDriver
 #from .xtbgradientdriver import XtbGradientDriver
 from .visualizationdriver import VisualizationDriver
@@ -417,6 +418,16 @@ def main():
 
         if not rsp_prop.is_converged:
             return
+
+    # MP2 perturbation theory
+
+    if task_type in ['mp2', 'ump2', 'romp2']:
+        mp2_dict = task.input_dict['mp2'] if 'mp2' in task.input_dict else {}
+        mp2_dict = updated_dict_with_eri_settings(mp2_dict, scf_drv)
+
+        mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
+        mp2_drv.update_settings(mp2_dict, method_dict)
+        mp2_drv.compute(task.molecule, task.ao_basis, scf_results)
 
     # Cube file
 
