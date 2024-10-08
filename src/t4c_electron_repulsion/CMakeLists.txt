@@ -5,10 +5,19 @@ target_sources(vlxobjs
     ElectronRepulsionContrRecDGXX.cpp
     ElectronRepulsionContrRecDHXX.cpp
     ElectronRepulsionContrRecDIXX.cpp
+    ElectronRepulsionContrRecDPXX.cpp
+    ElectronRepulsionContrRecDSXX.cpp
+    ElectronRepulsionContrRecFDXX.cpp
     ElectronRepulsionContrRecFFXX.cpp
     ElectronRepulsionContrRecFGXX.cpp
     ElectronRepulsionContrRecFHXX.cpp
+    ElectronRepulsionContrRecFPXX.cpp
+    ElectronRepulsionContrRecFSXX.cpp
+    ElectronRepulsionContrRecGDXX.cpp
+    ElectronRepulsionContrRecGFXX.cpp
     ElectronRepulsionContrRecGGXX.cpp
+    ElectronRepulsionContrRecGPXX.cpp
+    ElectronRepulsionContrRecGSXX.cpp
     ElectronRepulsionContrRecPDXX.cpp
     ElectronRepulsionContrRecPFXX.cpp
     ElectronRepulsionContrRecPGXX.cpp
