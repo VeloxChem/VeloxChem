@@ -676,9 +676,9 @@ class ForceFieldGenerator:
                     sigma, epsilon, comment = 0.0, 0.0, 'HW'
                 # Case for atoms in UFF but not in GAFF
                 elif element in self.uff_parameters:
-                    warnmsg = f'ForceFieldGenerator: atom type {at} is not in GAFF.'
-                    warnmsg += ' Taking sigma and epsilon from UFF.'
-                    self.ostream.print_warning(warnmsg)
+                    uffmsg = f'ForceFieldGenerator: atom type {at} is not in GAFF.'
+                    uffmsg += ' Taking sigma and epsilon from UFF.'
+                    self.ostream.print_info(uffmsg)
                     sigma = self.uff_parameters[element]['sigma']
                     epsilon = self.uff_parameters[element]['epsilon']
                     comment = 'UFF'
