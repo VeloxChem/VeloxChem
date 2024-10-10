@@ -43,6 +43,8 @@ class TestRPA:
 
     def test_hf_svp(self):
 
+        # vlxtag: RHF, Absorption, TDHF
+
         ref_exc_enes = np.array(
             [0.33973039, 0.40464346, 0.43325535, 0.49805052, 0.55325390])
 
@@ -52,6 +54,8 @@ class TestRPA:
         self.run_rpa('hf', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-6)
 
     def test_slda_svp(self):
+
+        # vlxtag: RKS, Absorption, TDDFT
 
         ref_exc_enes = np.array(
             [0.27459103, 0.34805152, 0.35179468, 0.43068396, 0.51123472])
@@ -63,6 +67,8 @@ class TestRPA:
 
     def test_b3lyp_svp(self):
 
+        # vlxtag: RKS, Absorption, TDDFT
+
         ref_exc_enes = np.array(
             [0.27940792, 0.35031697, 0.36276301, 0.43718376, 0.51430795])
 
@@ -72,6 +78,8 @@ class TestRPA:
         self.run_rpa('b3lyp', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5)
 
     def test_camb3lyp_svp(self):
+
+        # vlxtag: RKS, Absorption, TDDFT
 
         ref_exc_enes = np.array(
             [0.28249530, 0.35533592, 0.36664012, 0.44312170, 0.51548914])
@@ -83,6 +91,8 @@ class TestRPA:
 
     def test_camb3lyp_tzvp(self):
 
+        # vlxtag: RKS, Absorption, TDDFT
+
         ref_exc_enes = np.array(
             [0.27984870, 0.35148791, 0.36310452, 0.43770042, 0.50331834])
 
@@ -93,6 +103,8 @@ class TestRPA:
                      1.0e-5)
 
     def test_tpssh_svp(self):
+
+        # vlxtag: RKS, Absorption, TDDFT
 
         ref_exc_enes = np.array(
             [0.28898749, 0.36043436, 0.37287451, 0.44801126, 0.52385373])

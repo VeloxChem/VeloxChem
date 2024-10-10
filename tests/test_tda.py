@@ -43,6 +43,8 @@ class TestTDA:
 
     def test_hf_svp(self):
 
+        # vlxtag: RHF, Absorption, CIS
+
         ref_exc_enes = np.array(
             [0.34189725, 0.40717708, 0.43577895, 0.50150019, 0.55485041])
 
@@ -51,6 +53,8 @@ class TestTDA:
         self.run_tda('hf', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-6)
 
     def test_b3lyp_svp(self):
+
+        # vlxtag: RKS, Absorption, TDA
 
         ref_exc_enes = np.array(
             [0.28045483, 0.35053288, 0.36504833, 0.43904962, 0.51570229])
@@ -61,6 +65,8 @@ class TestTDA:
 
     def test_camb3lyp_svp(self):
 
+        # vlxtag: RKS, Absorption, TDA
+
         ref_exc_enes = np.array(
             [0.28370223, 0.35557650, 0.36883370, 0.44496286, 0.51683587])
 
@@ -70,6 +76,8 @@ class TestTDA:
         self.run_tda('cam-b3lyp', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5)
 
     def test_camb3lyp_tzvp(self):
+
+        # vlxtag: RKS, Absorption, TDA
 
         ref_exc_enes = np.array(
             [0.28085567, 0.35172399, 0.36474654, 0.43912355, 0.50442105])

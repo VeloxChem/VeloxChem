@@ -103,6 +103,7 @@ from .symmetryanalyzer import SymmetryAnalyzer
 
 # Python functions
 from .errorhandler import assert_msg_critical
+from .features import print_features
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
 from .environment import (set_vlxbasispath, set_omp_num_threads, get_basis_path,

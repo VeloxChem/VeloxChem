@@ -64,6 +64,8 @@ class TestECD:
 
     def test_hf_rpa(self):
 
+        # vlxtag: RHF, Absorption, ECD, CIS
+
         ref_edip = np.array([[0.006676, 0.036815, -0.003599],
                              [0.008225, 0.053100, 0.086421],
                              [0.046176, -0.299265, -0.636825],
@@ -91,6 +93,8 @@ class TestECD:
                      ref_osc_str, ref_rot_str)
 
     def test_hf_tda(self):
+
+        # vlxtag: RHF, Absorption, ECD, TDHF
 
         ref_edip = np.array([[-0.005942, -0.045678, -0.011238],
                              [-0.011930, -0.063188, -0.084152],

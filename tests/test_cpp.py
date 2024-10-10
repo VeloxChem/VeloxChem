@@ -47,6 +47,8 @@ class TestCPP:
 
     def test_hf_absorption(self):
 
+        # vlxtag: RHF, Absorption, CPP
+
         xcfun_label = 'hf'
         cpp_flag = 'absorption'
         ref_x_data = [0.39, 0.40, 0.41]
@@ -55,6 +57,8 @@ class TestCPP:
         self.run_cpp(xcfun_label, cpp_flag, ref_x_data, ref_y_data, 1.0e-6)
 
     def test_hf_ecd(self):
+
+        # vlxtag: RHF, ECD, CPP
 
         xcfun_label = 'hf'
         cpp_flag = 'ecd'
@@ -65,6 +69,8 @@ class TestCPP:
 
     def test_b3lyp_absorption(self):
 
+        # vlxtag: RKS, Absorption, CPP
+
         xcfun_label = 'b3lyp'
         cpp_flag = 'absorption'
         ref_x_data = [0.39, 0.40, 0.41]
@@ -73,6 +79,8 @@ class TestCPP:
         self.run_cpp(xcfun_label, cpp_flag, ref_x_data, ref_y_data, 1.0e-4)
 
     def test_b3lyp_ecd(self):
+
+        # vlxtag: RKS, ECD, CPP
 
         xcfun_label = 'b3lyp'
         cpp_flag = 'ecd'

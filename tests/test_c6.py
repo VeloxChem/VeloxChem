@@ -38,12 +38,16 @@ class TestC6:
 
     def test_hf(self):
 
+        # vlxtag: RHF, C6, LR
+
         xcfun_label = 'hf'
         ref_c6 = 16.852249
 
         self.run_c6(xcfun_label, ref_c6, 1.0e-6)
 
     def test_b3lyp(self):
+
+        # vlxtag: RKS, C6, LR
 
         xcfun_label = 'b3lyp'
         ref_c6 = 17.421351
