@@ -804,7 +804,7 @@ class NumerovDriver:
             The molecule.
         """
 
-        m1, m2 = molecule.masses_to_numpy()
+        m1, m2 = molecule.get_masses()
         mu = (m1 * m2) / (m1 + m2)
 
         self.set_reduced_mass(mu)
