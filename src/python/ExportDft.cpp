@@ -78,6 +78,21 @@ arrays_to_const_pointers(const std::vector<py::array_t<double>>& arrays) -> std:
     return pointers;
 }
 
+static auto
+check_arrays(const std::string& func_name, const std::vector<py::array_t<double>>& arrays, const int nao) -> void
+{
+    std::string errstyle(func_name + std::string(": Expecting contiguous numpy arrays"));
+    std::string errshape(func_name + std::string(": Invalide shape of numpy array"));
+
+    for (size_t i = 0; i < arrays.size(); i++) {
+        auto c_style = py::detail::check_flags(arrays[i].ptr(), py::array::c_style);
+        errors::assertMsgCritical(c_style, errstyle);
+
+        errors::assertMsgCritical(static_cast<int>(arrays[i].shape(0)) == nao, errshape);
+        errors::assertMsgCritical(static_cast<int>(arrays[i].shape(1)) == nao, errshape);
+    }
+}
+
 // Exports classes/functions in src/dft to python
 
 void
@@ -181,6 +196,11 @@ export_dft(py::module& m)
                const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&                   molecularGrid,
                const std::string&                      xcFuncLabel) -> CAOKohnShamMatrix {
+                auto numdensities = static_cast<int>(gsDensityArrays.size());
+                std::string errsize("integrate_vxc_fock: Expecting a list of 1 or 2 numpy arrays");
+                errors::assertMsgCritical((numdensities == 1) || (numdensities == 2), errsize);
+                auto nao = basis.dimensions_of_basis();
+                check_arrays("integrate_vxc_fock", gsDensityArrays, nao);
                 auto gs_dens_pointers = arrays_to_const_pointers(gsDensityArrays);
                 return self.integrateVxcFock(molecule, basis, gs_dens_pointers, molecularGrid, xcFuncLabel);
             },
@@ -193,6 +213,11 @@ export_dft(py::module& m)
                const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&                   molecularGrid,
                const CXCFunctional&                    fvxc) -> CAOKohnShamMatrix {
+                auto numdensities = static_cast<int>(gsDensityArrays.size());
+                std::string errsize("integrate_vxc_fock: Expecting a list of 1 or 2 numpy arrays");
+                errors::assertMsgCritical((numdensities == 1) || (numdensities == 2), errsize);
+                auto nao = basis.dimensions_of_basis();
+                check_arrays("integrate_vxc_fock", gsDensityArrays, nao);
                 auto gs_dens_pointers = arrays_to_const_pointers(gsDensityArrays);
                 return self.integrateVxcFock(molecule, basis, gs_dens_pointers, molecularGrid, fvxc);
             },
@@ -207,6 +232,16 @@ export_dft(py::module& m)
                const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&                   molecularGrid,
                const std::string&                      xcFuncLabel) -> void {
+                auto num_focks = static_cast<int>(aoFockArrays.size());
+                auto num_rw_dens = static_cast<int>(rwDensityArrays.size());
+                auto num_gs_dens = static_cast<int>(gsDensityArrays.size());
+                std::string errnum("integrate_fxc_fock: Inconsistent number of numpy arrays");
+                errors::assertMsgCritical(num_rw_dens == num_focks, errnum);
+                errors::assertMsgCritical(num_gs_dens == 1, errnum);
+                auto nao = basis.dimensions_of_basis();
+                check_arrays("integrate_fxc_fock", aoFockArrays, nao);
+                check_arrays("integrate_fxc_fock", rwDensityArrays, nao);
+                check_arrays("integrate_fxc_fock", gsDensityArrays, nao);
                 auto fock_pointers    = arrays_to_mutable_pointers(aoFockArrays);
                 auto rw_dens_pointers = arrays_to_const_pointers(rwDensityArrays);
                 auto gs_dens_pointers = arrays_to_const_pointers(gsDensityArrays);
@@ -223,6 +258,16 @@ export_dft(py::module& m)
                const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&                   molecularGrid,
                const CXCFunctional&                    fvxc) -> void {
+                auto num_focks = static_cast<int>(aoFockArrays.size());
+                auto num_rw_dens = static_cast<int>(rwDensityArrays.size());
+                auto num_gs_dens = static_cast<int>(gsDensityArrays.size());
+                std::string errnum("integrate_fxc_fock: Inconsistent number of numpy arrays");
+                errors::assertMsgCritical(num_rw_dens == num_focks, errnum);
+                errors::assertMsgCritical(num_gs_dens == 1, errnum);
+                auto nao = basis.dimensions_of_basis();
+                check_arrays("integrate_fxc_fock", aoFockArrays, nao);
+                check_arrays("integrate_fxc_fock", rwDensityArrays, nao);
+                check_arrays("integrate_fxc_fock", gsDensityArrays, nao);
                 auto fock_pointers    = arrays_to_mutable_pointers(aoFockArrays);
                 auto rw_dens_pointers = arrays_to_const_pointers(rwDensityArrays);
                 auto gs_dens_pointers = arrays_to_const_pointers(gsDensityArrays);
