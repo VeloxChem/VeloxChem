@@ -133,9 +133,19 @@ class MolecularOrbitals:
         else:
             return self._occupations[1].copy()
 
+    def number_aos(self):
+
+        # for backward compatibility
+        return self._orbitals[0].shape[0]
+
     def number_of_aos(self):
 
         return self._orbitals[0].shape[0]
+
+    def number_mos(self):
+
+        # for backward compatibility
+        return self._orbitals[0].shape[1]
 
     def number_of_mos(self):
 
