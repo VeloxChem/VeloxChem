@@ -30,14 +30,17 @@ import sys
 
 #from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import NuclearPotentialDriver
+from .oneeints import compute_nuclear_potential_integrals
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .veloxchemlib import gen_lebedev_grid
 from .subcommunicators import SubCommunicators
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 # For PySCF integral derivatives
-from .import_from_pyscf import import_cosmo_derivatives_wrt_grid_points
-from .import_from_pyscf import import_cosmo_integral_derivatives
+#from .import_from_pyscf import import_cosmo_derivatives_wrt_grid_points
+#from .import_from_pyscf import import_cosmo_integral_derivatives
+from .veloxchemlib import NuclearPotentialGeom010Driver
+from .veloxchemlib import NuclearPotentialGeom100Driver
 
 class CosmoDriver:
     """
@@ -245,14 +248,13 @@ class CosmoDriver:
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
-        epi_drv = NuclearPotentialDriver(local_comm)
         local_esp = np.zeros(end - start)
 
         for i in range(start, end):
-            epi_matrix = epi_drv.compute(molecule, basis, np.array([1.0]),
-                                         np.array([grid[i]]))
+            epi_matrix = -1.0 * compute_nuclear_potential_integrals(molecule, basis, [1.0],
+                                         [grid[i,:3].tolist()])
             if local_comm.Get_rank() == mpi_master():
-                local_esp[i - start] -= np.sum(epi_matrix.to_numpy() * D)
+                local_esp[i - start] -= np.sum(np.array(epi_matrix) * D)
 
         if local_comm.Get_rank() == mpi_master():
             local_esp = cross_comm.gather(local_esp, root=mpi_master())
@@ -266,15 +268,15 @@ class CosmoDriver:
         else:
             return None
 
-    def get_contribution_to_Fock(self, grid, q, molecule, basis):
+    def get_contribution_to_Fock(self, molecule, basis,  grid, q):
 
         grid_coords = grid[:, :3].copy()
 
-        npot_drv = NuclearPotentialDriver(self.comm)
+        #npot_drv = NuclearPotentialDriver(self.comm)
 
         if self.rank == mpi_master():
-            V_es = -1.0 * npot_drv.compute(molecule, basis, q,
-                                           grid_coords).to_numpy()
+            V_es = compute_nuclear_potential_integrals(molecule, basis, q,
+                                           grid_coords)
         else:
             V_es = None
 
@@ -324,6 +326,10 @@ class CosmoDriver:
 
     def cosmo_grad_contribution(self, molecule, basis, grid, sw_f, q, D, eps, x):
         transl_inv = True
+        geom100_drv = NuclearPotentialGeom100Driver()
+        geom010_drv = NuclearPotentialGeom010Driver()
+        
+
         # Help functions
         def dr_rij(ri, rj):
             r_ij = np.array([(ri[0] - rj[0]), (ri[1] - rj[1]), (ri[2] - rj[2])])
@@ -384,13 +390,17 @@ class CosmoDriver:
                 natoms -= 1
             for a in range(natoms):
                 indices = (atom_indices == a)
-                kpts_deriv_mat = import_cosmo_derivatives_wrt_grid_points(molecule, basis,
-                                                                                grid[indices, :3], q[indices])
-                pyscf_deriv_mat = import_cosmo_integral_derivatives(molecule, basis,
-                                                                                        grid[:, :3], q, atom=a)
+                #kpts_deriv_mat = import_cosmo_derivatives_wrt_grid_points(molecule, basis,
+                #                                                                grid[indices, :3], q[indices])
+                geom010_mats = geom010_drv.compute(molecule, basis, q[indices], grid[indices, :3])
+                #pyscf_deriv_mat = import_cosmo_integral_derivatives(molecule, basis,
+                #                                                                        grid[:, :3], q, atom=a)
+                geom100_mats = geom100_drv.compute(molecule, basis, a, q, grid[:, :3])
                 
-                grad_C_cav[a] = np.einsum("mn,kxmn -> x", DM, kpts_deriv_mat)
-                grad_C_nuc[a] = np.einsum('xij,ij -> x', pyscf_deriv_mat, DM)
+                #grad_C_cav[a] = np.einsum("mn,kxmn -> x", DM, kpts_deriv_mat)
+                #grad_C_nuc[a] = np.einsum('xij,ij -> x', pyscf_deriv_mat, DM)
+                grad_C_cav[a] = np.einsum("mn,kxmn -> x", DM, geom010_mats)
+                grad_C_nuc[a] = np.einsum('xij,ij -> x', geom100_mats, DM)
             if transl_inv:
                 grad_C_cav[-1] = -np.sum(grad_C_cav[:-1], axis=0)
                 grad_C_nuc[-1] = -np.sum(grad_C_nuc[:-1], axis=0)
