@@ -274,6 +274,18 @@ class ScfGradientDriver(GradientDriver):
                 disp = DispersionModel()
                 disp.compute(molecule, xcfun_label)
                 self.gradient += disp.get_gradient().to_numpy()
+            
+            if self.scf_driver._cpcm: # maybe add condition for COSMO, specifically
+                self.gradient += self.scf_driver._cpcm_drv.cosmo_grad_contribution(
+                                                molecule, 
+                                                basis,
+                                                self.scf_driver._cpcm_grid,
+                                                self.scf_driver._cpcm_sw_func,
+                                                self.scf_driver._cpcm_q, 
+                                                self.scf_driver.scf_tensors['D_alpha'] + 
+                                                self.scf_driver.scf_tensors['D_beta'],
+                                                self.scf_driver.cpcm_epsilon,
+                                                self.scf_driver.cpcm_x)
 
         # collect gradient
 

@@ -59,7 +59,6 @@ from .veloxchemlib import fine_structure_constant
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import make_matrix
 from .veloxchemlib import make_matrices
-
 # C++ enums
 from .veloxchemlib import mat_t
 from .veloxchemlib import denmat
@@ -88,6 +87,7 @@ from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .mp2driver import Mp2Driver
+from .cosmodriver import CosmoDriver
 from .cubicgrid import CubicGrid
 from .visualizationdriver import VisualizationDriver
 from .excitondriver import ExcitonModelDriver
@@ -110,6 +110,7 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .rspc6 import C6
+
 from .rspshg import SHG
 from .rsptpa import TPA
 #from .rspcustomproperty import CustomProperty
@@ -128,6 +129,7 @@ from .symmetryanalyzer import SymmetryAnalyzer
 # Python functions
 from .errorhandler import assert_msg_critical
 from .features import print_features
+
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
 from .environment import (set_vlxbasispath, set_omp_num_threads, get_basis_path,

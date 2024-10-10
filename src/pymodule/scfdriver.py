@@ -55,7 +55,7 @@ from .dftutils import get_default_grid_level, print_libxc_reference
 from .sanitychecks import molecule_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
-
+from .cosmodriver import CosmoDriver
 
 class ScfDriver:
     """
@@ -201,6 +201,13 @@ class ScfDriver:
         self._V_es = None
         self._pe_summary = ''
 
+        # solvation model
+        self._cpcm = False
+        self.solvation_model = None
+        self.cpcm_epsilon = 78.39 # standard setting is for that
+                                  # of water as the solvent
+        self.cpcm_x = 0 # x in scaling function f
+
         # split communicators
         self.use_split_comm = False
         self._split_comm_ratio = None
@@ -260,6 +267,7 @@ class ScfDriver:
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
+                'solvation_model': ('str', 'solvation model'),
                 'electric_field': ('seq_fixed', 'static electric field'),
                 # 'use_split_comm': ('bool', 'use split communicators'),
             },
@@ -441,6 +449,12 @@ class ScfDriver:
             # field
             self.restart = False
 
+        if self.solvation_model is not None:
+            assert_msg_critical(
+                self.solvation_model in ['c_pcm', 'C_PCM'],
+                'SCF driver: Only the C-PCM solvation model is implemented.')
+            self._cpcm = True
+
     def _pe_sanity_check(self, method_dict=None):
         """
         Checks PE settings and updates relevant attributes.
@@ -502,6 +516,9 @@ class ScfDriver:
 
         # check pe setup
         self._pe_sanity_check()
+
+        if self._cpcm:
+            self._cpcm_drv = CosmoDriver(self.comm, self.ostream)
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -569,6 +586,16 @@ class ScfDriver:
                 self.pe_options['potfile'])
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
+
+        if self._cpcm:
+            self._cpcm_grid, self._cpcm_sw_func = self._cpcm_drv.generate_cosmo_grid(
+                molecule)
+            self._cpcm_Amat = self._cpcm_drv.form_matrix_A(
+                self._cpcm_grid, self._cpcm_sw_func)
+            self._cpcm_Bmat = self._cpcm_drv.form_matrix_B(
+                self._cpcm_grid, molecule)
+            self._cpcm_Bzvec = np.dot(self._cpcm_Bmat,
+                                     molecule.get_element_ids())
 
         # C2-DIIS method
         if self.acc_type.upper() == 'DIIS':
@@ -1109,6 +1136,27 @@ class ScfDriver:
                                      den_mat)
 
             self._comp_full_fock(fock_mat, vxc_mat, V_pe, kin_mat, npot_mat)
+
+            if self._cpcm:
+                Cvec = self._cpcm_drv.form_vector_C(
+                    self._cpcm_grid, molecule, ao_basis,
+                    den_mat[0] + den_mat[0])
+                    #den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0))
+
+                scale_f = -(self.cpcm_epsilon - 1) / (self.cpcm_epsilon + self.cpcm_x)
+                rhs = scale_f * (self._cpcm_Bzvec + Cvec)
+                q = np.linalg.solve(self._cpcm_Amat, rhs)
+                self._cpcm_q = q
+
+                e_sol = 0.5 * np.vdot(q, self._cpcm_Bzvec + Cvec)
+                e_el += e_sol
+                self._cpcm_epol = e_sol
+
+                Fock_sol = self._cpcm_drv.get_contribution_to_Fock(
+                    self._cpcm_grid, q, molecule, ao_basis)
+
+                fock_mat.add_matrix(DenseMatrix(Fock_sol), 0)
+                #fock_mat.add_matrix(Fock_sol, 0)
 
             if self.rank == mpi_master() and self.electric_field is not None:
                 efpot = sum([
