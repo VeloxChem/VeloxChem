@@ -1,14 +1,14 @@
 from pathlib import Path
 import numpy as np
 
-from veloxchem import MolecularBasis
-from veloxchem import Molecule
-from veloxchem import FockGeom1000Driver
-from veloxchem import SubMatrix
-from veloxchem import Matrix
-from veloxchem import Matrices
-from veloxchem import make_matrix
-from veloxchem import mat_t
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.molecule import Molecule
+from veloxchem.veloxchemlib import FockGeom1000Driver
+from veloxchem.submatrix import SubMatrix
+from veloxchem.matrix import Matrix
+from veloxchem.matrices import Matrices
+from veloxchem.veloxchemlib import make_matrix
+from veloxchem.veloxchemlib import mat_t
 
 
 class TestFockGeom1000Driver:

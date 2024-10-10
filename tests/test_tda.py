@@ -1,10 +1,11 @@
 import numpy as np
 import pytest
 
-from veloxchem import mpi_master
-from veloxchem import Molecule, MolecularBasis
-from veloxchem import ScfRestrictedDriver
-from veloxchem import TdaEigenSolver
+from veloxchem.veloxchemlib import mpi_master
+from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.tdaeigensolver import TdaEigenSolver
 
 
 @pytest.mark.solvers

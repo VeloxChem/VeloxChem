@@ -1,5 +1,5 @@
-from veloxchem import upper_case
-from veloxchem import lower_case
+from veloxchem.veloxchemlib import upper_case
+from veloxchem.veloxchemlib import lower_case
 
 
 class TestStringFormat:

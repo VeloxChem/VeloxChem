@@ -1,8 +1,8 @@
-from veloxchem import tensor_cartesian_labels
-from veloxchem import tensor_spherical_labels
-from veloxchem import tensor_cartesian_index
-from veloxchem import tensor_label
-from veloxchem import tensor_order
+from veloxchem.veloxchemlib import tensor_cartesian_labels
+from veloxchem.veloxchemlib import tensor_spherical_labels
+from veloxchem.veloxchemlib import tensor_cartesian_index
+from veloxchem.veloxchemlib import tensor_label
+from veloxchem.veloxchemlib import tensor_order
 
 
 class TestTensorLabels:

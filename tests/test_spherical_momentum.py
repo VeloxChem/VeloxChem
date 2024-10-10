@@ -1,10 +1,10 @@
 import math as mt
 
-from veloxchem import spherical_momentum_s_factors
-from veloxchem import spherical_momentum_p_factors
-from veloxchem import spherical_momentum_d_factors
-from veloxchem import spherical_momentum_f_factors
-from veloxchem import spherical_momentum_g_factors
+from veloxchem.veloxchemlib import spherical_momentum_s_factors
+from veloxchem.veloxchemlib import spherical_momentum_p_factors
+from veloxchem.veloxchemlib import spherical_momentum_d_factors
+from veloxchem.veloxchemlib import spherical_momentum_f_factors
+from veloxchem.veloxchemlib import spherical_momentum_g_factors
 
 
 class TestSphericalMomentum:

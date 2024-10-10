@@ -1,12 +1,12 @@
 import math as mt
 
-from veloxchem import is_chemical_element
-from veloxchem import chemical_element_name
-from veloxchem import chemical_element_label
-from veloxchem import chemical_element_identifier
-from veloxchem import chemical_element_mass
-from veloxchem import chemical_element_max_angular_momentum
-from veloxchem import chemical_element_max_identifier
+from veloxchem.veloxchemlib import is_chemical_element
+from veloxchem.veloxchemlib import chemical_element_name
+from veloxchem.veloxchemlib import chemical_element_label
+from veloxchem.veloxchemlib import chemical_element_identifier
+from veloxchem.veloxchemlib import chemical_element_mass
+from veloxchem.veloxchemlib import chemical_element_max_angular_momentum
+from veloxchem.veloxchemlib import chemical_element_max_identifier
 
 
 class TestChemicalElement:

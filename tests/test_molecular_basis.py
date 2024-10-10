@@ -2,10 +2,10 @@ import pickle
 
 from mpi4py import MPI
 
-from veloxchem import BasisFunction
-from veloxchem import AtomBasis
-from veloxchem import MolecularBasis
-from veloxchem import Molecule
+from veloxchem.veloxchemlib import BasisFunction
+from veloxchem.veloxchemlib import AtomBasis
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.molecule import Molecule
 
 
 class TestMolecularBasis:

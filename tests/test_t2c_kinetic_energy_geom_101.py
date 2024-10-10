@@ -1,10 +1,10 @@
 from pathlib import Path
 import numpy as np
 
-from veloxchem import KineticEnergyGeom101Driver
-from veloxchem import MolecularBasis
-from veloxchem import Molecule
-from veloxchem import SubMatrix
+from veloxchem.veloxchemlib import KineticEnergyGeom101Driver
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.molecule import Molecule
+from veloxchem.submatrix import SubMatrix
 
 
 class TestKineticEnergyGeom101Driver:

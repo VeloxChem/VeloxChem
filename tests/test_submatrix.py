@@ -4,7 +4,7 @@ import math as mt
 
 from mpi4py import MPI
 
-from veloxchem import SubMatrix
+from veloxchem.submatrix import SubMatrix
 
 
 class TestSubMatrix:

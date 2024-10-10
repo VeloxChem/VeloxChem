@@ -1,9 +1,10 @@
 import numpy as np
 import pytest
 
-from veloxchem import Molecule, MolecularBasis
-from veloxchem import ScfRestrictedDriver
-from veloxchem import ScfGradientDriver
+from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfgradientdriver import ScfGradientDriver
 
 
 @pytest.mark.solvers

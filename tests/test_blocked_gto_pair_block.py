@@ -1,14 +1,13 @@
-import pickle
-import numpy as np
-
 from mpi4py import MPI
+import numpy as np
+import pickle
 
-from veloxchem import MolecularBasis
-from veloxchem import Molecule
-from veloxchem import GtoBlock
-from veloxchem import GtoPairBlock
-from veloxchem import BlockedGtoPairBlock
-from veloxchem import Point
+from veloxchem.veloxchemlib import GtoBlock
+from veloxchem.veloxchemlib import GtoPairBlock
+from veloxchem.veloxchemlib import BlockedGtoPairBlock
+from veloxchem.veloxchemlib import Point
+from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
 
 
 class TestBlockedGtoPairBlock:

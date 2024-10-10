@@ -1,8 +1,9 @@
 import pytest
 
-from veloxchem import mpi_master
-from veloxchem import Molecule, MolecularBasis
-from veloxchem import ScfRestrictedOpenDriver
+from veloxchem.veloxchemlib import mpi_master
+from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
 
 
 @pytest.mark.solvers

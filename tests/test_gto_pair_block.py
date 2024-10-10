@@ -3,10 +3,10 @@ import numpy as np
 
 from mpi4py import MPI
 
-from veloxchem import MolecularBasis
-from veloxchem import Molecule
-from veloxchem import GtoBlock
-from veloxchem import GtoPairBlock
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.molecule import Molecule
+from veloxchem.veloxchemlib import GtoBlock
+from veloxchem.veloxchemlib import GtoPairBlock
 
 
 class TestGtoPairBlock:

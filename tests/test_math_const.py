@@ -1,6 +1,6 @@
 import math as mt
 
-from veloxchem import pi_value
+from veloxchem.veloxchemlib import pi_value
 
 
 class TestMathConst:

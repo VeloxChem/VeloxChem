@@ -1,5 +1,5 @@
-from veloxchem import number_of_cartesian_components
-from veloxchem import number_of_spherical_components
+from veloxchem.veloxchemlib import number_of_cartesian_components
+from veloxchem.veloxchemlib import number_of_spherical_components
 
 
 class TestTensorComponents:

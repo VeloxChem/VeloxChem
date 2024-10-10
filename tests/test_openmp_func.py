@@ -1,13 +1,13 @@
-from veloxchem import MolecularBasis
-from veloxchem import Molecule
-from veloxchem import set_number_of_threads
-from veloxchem import get_number_of_threads
-from veloxchem import make_gto_blocks
-from veloxchem import make_gto_pair_blocks
-from veloxchem import make_work_tasks
-from veloxchem import make_diag_work_tasks
-from veloxchem import make_work_group
-from veloxchem import T4CScreener
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.molecule import Molecule
+from veloxchem.veloxchemlib import set_number_of_threads
+from veloxchem.veloxchemlib import get_number_of_threads
+from veloxchem.veloxchemlib import make_gto_blocks
+from veloxchem.veloxchemlib import make_gto_pair_blocks
+from veloxchem.veloxchemlib import make_work_tasks
+from veloxchem.veloxchemlib import make_diag_work_tasks
+from veloxchem.veloxchemlib import make_work_group
+from veloxchem.veloxchemlib import T4CScreener
 
 
 class TestOpenMPFunc:

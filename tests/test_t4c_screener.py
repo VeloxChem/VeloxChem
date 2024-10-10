@@ -2,12 +2,12 @@ import pickle
 
 from mpi4py import MPI
 
-from veloxchem import MolecularBasis
-from veloxchem import Molecule
-from veloxchem import BlockedGtoPairBlock
-from veloxchem import T4CScreener
-from veloxchem import make_gto_blocks
-from veloxchem import make_gto_pair_blocks
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.molecule import Molecule
+from veloxchem.veloxchemlib import BlockedGtoPairBlock
+from veloxchem.veloxchemlib import T4CScreener
+from veloxchem.veloxchemlib import make_gto_blocks
+from veloxchem.veloxchemlib import make_gto_pair_blocks
 
 
 class TestT4CScreener:

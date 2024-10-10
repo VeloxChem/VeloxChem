@@ -1,6 +1,7 @@
 import numpy as np
 
-from veloxchem import Molecule, MolecularBasis
+from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.veloxchemlib import compute_electric_field_integrals
 from veloxchem.veloxchemlib import compute_electric_field_values
 

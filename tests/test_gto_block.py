@@ -1,10 +1,10 @@
 import numpy as np
 
-from veloxchem import BasisFunction
-from veloxchem import MolecularBasis
-from veloxchem import Molecule
-from veloxchem import GtoBlock
-from veloxchem import Point
+from veloxchem.veloxchemlib import BasisFunction
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.molecule import Molecule
+from veloxchem.veloxchemlib import GtoBlock
+from veloxchem.veloxchemlib import Point
 
 
 class TestGtoBlock:

@@ -1,7 +1,7 @@
 import math as mt
 
-from veloxchem import bohr_in_angstrom
-from veloxchem import hartree_in_ev
+from veloxchem.veloxchemlib import bohr_in_angstrom
+from veloxchem.veloxchemlib import hartree_in_ev
 
 
 class TestCodata:

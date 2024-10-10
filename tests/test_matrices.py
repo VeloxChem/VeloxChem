@@ -1,9 +1,9 @@
 from mpi4py import MPI
 
-from veloxchem import mat_t
-from veloxchem import SubMatrix
-from veloxchem import Matrix
-from veloxchem import Matrices
+from veloxchem.veloxchemlib import mat_t
+from veloxchem.submatrix import SubMatrix
+from veloxchem.matrix import Matrix
+from veloxchem.matrices import Matrices
 
 
 class TestMatrices:

@@ -1,7 +1,8 @@
 from pathlib import Path
 import numpy as np
 
-from veloxchem import Molecule, MolecularBasis
+from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.veloxchemlib import compute_linear_momentum_integrals
 
 

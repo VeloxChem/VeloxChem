@@ -1,5 +1,5 @@
-from veloxchem import number_of_batches
-from veloxchem import batch_range
+from veloxchem.veloxchemlib import number_of_batches
+from veloxchem.veloxchemlib import batch_range
 
 
 class TestBatchFunc:

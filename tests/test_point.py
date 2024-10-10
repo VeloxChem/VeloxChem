@@ -1,6 +1,6 @@
 import math as mt
 
-from veloxchem import Point
+from veloxchem.veloxchemlib import Point
 
 
 class TestPoint:

@@ -3,7 +3,7 @@ import pickle
 
 from mpi4py import MPI
 
-from veloxchem import BasisFunction
+from veloxchem.veloxchemlib import BasisFunction
 
 
 class TestBasisFunction:

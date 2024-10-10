@@ -23,100 +23,86 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 # C++ classes
-from .veloxchemlib import Point
-from .veloxchemlib import BasisFunction
 from .veloxchemlib import AtomBasis
-from .veloxchemlib import GtoBlock
-from .veloxchemlib import GtoPairBlock
-from .veloxchemlib import BlockedGtoPairBlock
+from .veloxchemlib import BasisFunction
 from .veloxchemlib import OverlapDriver
 from .veloxchemlib import KineticEnergyDriver
 from .veloxchemlib import NuclearPotentialDriver
-from .veloxchemlib import NuclearPotentialErfDriver
 from .veloxchemlib import ElectricDipoleMomentDriver
 from .veloxchemlib import OverlapGeom100Driver
-from .veloxchemlib import OverlapGeom200Driver
-from .veloxchemlib import OverlapGeom101Driver
 from .veloxchemlib import KineticEnergyGeom100Driver
-from .veloxchemlib import KineticEnergyGeom200Driver
-from .veloxchemlib import KineticEnergyGeom101Driver
 from .veloxchemlib import NuclearPotentialGeom010Driver
-from .veloxchemlib import NuclearPotentialGeom020Driver
 from .veloxchemlib import NuclearPotentialGeom100Driver
-from .veloxchemlib import NuclearPotentialGeom200Driver
-from .veloxchemlib import NuclearPotentialGeom110Driver
-from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
+from .veloxchemlib import XCIntegrator
+from .veloxchemlib import XCFunctional
 
 # C++ functions
-from .veloxchemlib import upper_case
-from .veloxchemlib import lower_case
-from .veloxchemlib import pi_value
-from .veloxchemlib import bohr_in_angstrom
-from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import is_chemical_element
 from .veloxchemlib import chemical_element_name
 from .veloxchemlib import chemical_element_label
 from .veloxchemlib import chemical_element_identifier
 from .veloxchemlib import chemical_element_mass
 from .veloxchemlib import chemical_element_max_angular_momentum
-from .veloxchemlib import chemical_element_max_identifier
-from .veloxchemlib import tensor_cartesian_labels
-from .veloxchemlib import tensor_spherical_labels
-from .veloxchemlib import tensor_cartesian_index
-from .veloxchemlib import tensor_label
-from .veloxchemlib import tensor_order
-from .veloxchemlib import number_of_cartesian_components
-from .veloxchemlib import number_of_spherical_components
-from .veloxchemlib import make_gto_blocks
-from .veloxchemlib import make_gto_pair_blocks
-from .veloxchemlib import make_matrix
-from .veloxchemlib import make_matrices
-from .veloxchemlib import number_of_batches
-from .veloxchemlib import batch_range
-from .veloxchemlib import set_number_of_threads
-from .veloxchemlib import get_number_of_threads
-from .veloxchemlib import make_work_tasks
-from .veloxchemlib import make_diag_work_tasks
-from .veloxchemlib import make_work_group
-from .veloxchemlib import partition_atoms
-from .veloxchemlib import spherical_momentum_s_factors
-from .veloxchemlib import spherical_momentum_p_factors
-from .veloxchemlib import spherical_momentum_d_factors
-from .veloxchemlib import spherical_momentum_f_factors
-from .veloxchemlib import spherical_momentum_g_factors
 from .veloxchemlib import mpi_master
+from .veloxchemlib import bohr_in_angstrom
+from .veloxchemlib import hartree_in_ev
+from .veloxchemlib import hartree_in_kcalpermol
+from .veloxchemlib import hartree_in_wavenumber, hartree_in_wavenumbers
+from .veloxchemlib import dipole_in_debye
+from .veloxchemlib import rotatory_strength_in_cgs
+from .veloxchemlib import extinction_coefficient_from_beta
+from .veloxchemlib import fine_structure_constant
+from .veloxchemlib import parse_xc_func
 
 # C++ enums
 from .veloxchemlib import mat_t
 
-# Python functions
-from .errorhandler import assert_msg_critical
-
 # Python classes
+from .atomtypeidentifier import AtomTypeIdentifier
+from .seminario import Seminario
 from .inputparser import InputParser
 from .outputstream import OutputStream
-from .subcommunicators import SubCommunicators
-from .submatrix import SubMatrix
-from .matrix import Matrix
-from .matrices import Matrices
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
-from .molecularorbitals import MolecularOrbitals, molorb
 from .aodensitymatrix import AODensityMatrix
+from .molecularorbitals import MolecularOrbitals, molorb
 from .fockdriver import FockDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
-from .lrsolver import LinearResponseSolver
-from .lreigensolver import LinearResponseEigenSolver
+from .gradientdriver import GradientDriver
+from .scfgradientdriver import ScfGradientDriver
+from .optimizationdriver import OptimizationDriver
+from .mp2driver import Mp2Driver
+from .cubicgrid import CubicGrid
+from .visualizationdriver import VisualizationDriver
+from .excitondriver import ExcitonModelDriver
 from .tdaeigensolver import TdaEigenSolver
+from .blockdavidson import BlockDavidsonSolver
+from .lreigensolver import LinearResponseEigenSolver
+from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
 from .c6driver import C6Driver
-from .moleculargradientdriver import MolecularGradientDriver
-from .scfgradientdriver import ScfGradientDriver
+from .respchargesdriver import RespChargesDriver
+from .rspproperty import ResponseProperty
+from .rsplinabscross import LinearAbsorptionCrossSection
+from .rspcdspec import CircularDichroismSpectrum
+from .rsppolarizability import Polarizability
+from .rspabsorption import Absorption
+from .rspc6 import C6
+from .mpitask import MpiTask
+from .subcommunicators import SubCommunicators
+from .firstorderprop import FirstOrderProperties
+from .forcefieldgenerator import ForceFieldGenerator
+from .mmdriver import MMDriver
+from .mmgradientdriver import MMGradientDriver
+from .symmetryanalyzer import SymmetryAnalyzer
+
+# Python functions
+from .errorhandler import assert_msg_critical
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
 from .environment import (set_vlxbasispath, set_omp_num_threads, get_basis_path,

@@ -1,10 +1,10 @@
-from veloxchem import Matrix
-from veloxchem import Matrices
-from veloxchem import MolecularBasis
-from veloxchem import Molecule
-from veloxchem import make_matrix
-from veloxchem import make_matrices
-from veloxchem import mat_t
+from veloxchem.matrix import Matrix
+from veloxchem.matrices import Matrices
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.molecule import Molecule
+from veloxchem.veloxchemlib import make_matrix
+from veloxchem.veloxchemlib import make_matrices
+from veloxchem.veloxchemlib import mat_t
 
 
 class TestMatricesFunc:

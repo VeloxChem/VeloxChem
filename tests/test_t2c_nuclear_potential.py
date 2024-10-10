@@ -1,10 +1,10 @@
 from pathlib import Path
 import numpy as np
 
-from veloxchem import NuclearPotentialDriver
-from veloxchem import MolecularBasis
-from veloxchem import Molecule
-from veloxchem import SubMatrix
+from veloxchem.veloxchemlib import NuclearPotentialDriver
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.molecule import Molecule
+from veloxchem.submatrix import SubMatrix
 
 
 class TestNuclearPotentialDriver:

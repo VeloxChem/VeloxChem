@@ -3,9 +3,9 @@ import numpy as np
 
 from mpi4py import MPI
 
-from veloxchem import mat_t
-from veloxchem import SubMatrix
-from veloxchem import Matrix
+from veloxchem.veloxchemlib import mat_t
+from veloxchem.submatrix import SubMatrix
+from veloxchem.matrix import Matrix
 
 
 class TestMatrix:

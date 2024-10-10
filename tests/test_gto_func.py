@@ -1,9 +1,9 @@
-from veloxchem import MolecularBasis
-from veloxchem import Molecule
-from veloxchem import GtoBlock
-from veloxchem import GtoPairBlock
-from veloxchem import make_gto_blocks
-from veloxchem import make_gto_pair_blocks
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.molecule import Molecule
+from veloxchem.veloxchemlib import GtoBlock
+from veloxchem.veloxchemlib import GtoPairBlock
+from veloxchem.veloxchemlib import make_gto_blocks
+from veloxchem.veloxchemlib import make_gto_pair_blocks
 
 
 class TestGtoFunc:

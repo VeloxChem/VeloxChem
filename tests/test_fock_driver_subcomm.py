@@ -4,15 +4,15 @@ import pytest
 
 from mpi4py import MPI
 
-from veloxchem import mpi_master
-from veloxchem import MolecularBasis
-from veloxchem import Molecule
-from veloxchem import FockDriver
-from veloxchem import T4CScreener
-from veloxchem import Matrices
-from veloxchem import SubCommunicators
-from veloxchem import make_matrix
-from veloxchem import mat_t
+from veloxchem.veloxchemlib import mpi_master
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.molecule import Molecule
+from veloxchem.fockdriver import FockDriver
+from veloxchem.veloxchemlib import T4CScreener
+from veloxchem.matrices import Matrices
+from veloxchem.subcommunicators import SubCommunicators
+from veloxchem.veloxchemlib import make_matrix
+from veloxchem.veloxchemlib import mat_t
 
 
 @pytest.mark.solvers
