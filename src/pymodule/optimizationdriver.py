@@ -38,8 +38,8 @@ from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfgradientdriver import ScfGradientDriver
 #from .xtbdriver import XtbDriver
 #from .xtbgradientdriver import XtbGradientDriver
-#from .openmmdriver import OpenMMDriver
-#from .openmmgradientdriver import OpenMMGradientDriver
+from .openmmdriver import OpenMMDriver
+from .openmmgradientdriver import OpenMMGradientDriver
 from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
 from .inputparser import parse_input, print_keywords, get_random_string_parallel
@@ -85,8 +85,8 @@ class OptimizationDriver:
         #elif isinstance(drv, XtbDriver):
         #    grad_drv = XtbGradientDriver(drv)
 
-        #elif isinstance(drv, OpenMMDriver):
-        #    grad_drv = OpenMMGradientDriver(drv)
+        elif isinstance(drv, OpenMMDriver):
+            grad_drv = OpenMMGradientDriver(drv)
 
         elif isinstance(drv, MMDriver):
             grad_drv = MMGradientDriver(drv)

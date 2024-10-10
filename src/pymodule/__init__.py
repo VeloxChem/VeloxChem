@@ -57,9 +57,6 @@ from .veloxchemlib import extinction_coefficient_from_beta
 from .veloxchemlib import fine_structure_constant
 from .veloxchemlib import parse_xc_func
 
-# C++ enums
-from .veloxchemlib import mat_t
-
 # Python classes
 from .atomtypeidentifier import AtomTypeIdentifier
 from .seminario import Seminario
@@ -97,6 +94,8 @@ from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .firstorderprop import FirstOrderProperties
 from .forcefieldgenerator import ForceFieldGenerator
+from .openmmdriver import OpenMMDriver
+from .openmmgradientdriver import OpenMMGradientDriver
 from .numerovdriver import NumerovDriver
 from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
