@@ -424,8 +424,8 @@ def _MolecularBasis_get_string(self, title):
             id_elem = abasis.get_identifier()
             bas_str += f'  {chemical_element_name(id_elem):<6s}{abasis.contraction_str():<26s}'
             bas_str += f'{abasis.primitives_str():<30s}\n'
+            bas_str += '\n'
 
-    bas_str += '\n'
     label = 'Contracted Basis Functions : ' + f'{self.get_dimensions_of_basis()}'
     bas_str += f'{label:<60s}\n'
     label = 'Primitive Basis Functions  : ' + f'{self.get_dimensions_of_primitive_basis()}'

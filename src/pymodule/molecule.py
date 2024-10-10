@@ -280,16 +280,21 @@ def _Molecule_read_molecule_string(mol_str, units='angstrom'):
 
     labels = []
     coords = []
+    basis_set_labels = []
 
     for line in mol_str.strip().splitlines():
         if line:
             content = line.split()
             labels.append(content[0].upper())
             coords.append([float(x) for x in content[1:4]])
+            if len(content) > 4:
+                basis_set_labels.append(content[4].upper())
+            else:
+                basis_set_labels.append('')
 
     coords = np.array(coords)
 
-    return Molecule(labels, coords, units)
+    return Molecule(labels, coords, units, basis_set_labels)
 
 
 @staticmethod

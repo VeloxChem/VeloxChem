@@ -41,19 +41,26 @@
 namespace vlx_moldata {
 
 static std::shared_ptr<CMolecule>
-CMolecule_from_coords(const std::vector<std::string>& labels, const std::vector<double>& coords_raw, const std::string& units)
+CMolecule_from_labels_and_array(const std::vector<std::string>& labels,
+                                const py::array_t<double>&      py_coords,
+                                const std::string&              units,
+                                const std::vector<std::string>& atom_basis_labels)
 {
-    // NOTE:
-    // The C++ Molecule constructor expects the coordinates to be arranged as 3 x natoms,
-    // namely {x1, x2, x3, x4, ..., y1, y2, y3, y4, ..., z1, z2, z3, z4, ...}
-
     // sanity check
 
-    std::string errmol("Molecule: Inconsistent lengths of lists");
+    std::string errmol("Molecule: Inconsistent sizes");
 
-    errors::assertMsgCritical(coords_raw.size() == labels.size() * 3, errmol);
+    errors::assertMsgCritical(py_coords.shape(0) == static_cast<py::ssize_t>(labels.size()), errmol);
 
-    const auto natoms = static_cast<int>(labels.size());
+    errors::assertMsgCritical(py_coords.shape(0) == static_cast<py::ssize_t>(atom_basis_labels.size()), errmol);
+
+    errors::assertMsgCritical(py_coords.shape(1) == 3, errmol);
+
+    std::string errstyle("Molecule: Expecting C-style contiguous array");
+
+    auto c_style = py::detail::check_flags(py_coords.ptr(), py::array::c_style);
+
+    errors::assertMsgCritical(c_style, errstyle);
 
     // scaling factor
 
@@ -78,12 +85,12 @@ CMolecule_from_coords(const std::vector<std::string>& labels, const std::vector<
 
     std::vector<TPoint<double>> coords_au;
 
-    for (int i = 0; i < natoms; i++)
+    for (size_t i = 0; i < labels.size(); i++)
     {
         TPoint<double> pxyz({
-            coords_raw[i * 3 + 0] * scale,
-            coords_raw[i * 3 + 1] * scale,
-            coords_raw[i * 3 + 2] * scale
+            py_coords.data()[i * 3 + 0] * scale,
+            py_coords.data()[i * 3 + 1] * scale,
+            py_coords.data()[i * 3 + 2] * scale
         });
 
         coords_au.push_back(pxyz);
@@ -104,43 +111,26 @@ CMolecule_from_coords(const std::vector<std::string>& labels, const std::vector<
 
     // molecule
 
-    return std::make_shared<CMolecule>(elem_ids, coords_au, std::string("BOHR"));
+    return std::make_shared<CMolecule>(elem_ids, coords_au, std::string("BOHR"), atom_basis_labels);
 }
 
 static std::shared_ptr<CMolecule>
-CMolecule_from_array(const std::vector<std::string>& labels,
-                     const py::array_t<double>&      py_coords,
-                     const std::string&              units = std::string("angstrom"))
+CMolecule_from_labels_and_array_2(const std::vector<std::string>& labels,
+                                  const py::array_t<double>&      py_coords,
+                                  const std::string&              units = std::string("angstrom"))
 {
-    // NOTE:
-    // The Python Molecule constructor expects the coordinates as a 2d numpy array,
-    // namely np.array([[x1, y1, z1], [x2, y2, z2], [x3, y3, z3], [x4, y4, z4], ...])
+    const auto natoms = static_cast<int>(labels.size());
 
-    // sanity check
+    std::vector<std::string> atom_basis_labels(natoms, std::string(""));
 
-    std::string errmol("Molecule: Inconsistent size");
-
-    errors::assertMsgCritical(py_coords.shape(0) == static_cast<py::ssize_t>(labels.size()), errmol);
-
-    errors::assertMsgCritical(py_coords.shape(1) == 3, errmol);
-
-    std::string errstyle("Molecule: Expecting C-style contiguous array");
-
-    auto c_style = py::detail::check_flags(py_coords.ptr(), py::array::c_style);
-
-    errors::assertMsgCritical(c_style, errstyle);
-
-    // form coordinate vector
-
-    std::vector<double> coords(py_coords.size());
-
-    std::memcpy(coords.data(), py_coords.data(), py_coords.size() * sizeof(double));
-
-    return CMolecule_from_coords(labels, coords, units);
+    return CMolecule_from_labels_and_array(labels, py_coords, units, atom_basis_labels);
 }
 
 static std::shared_ptr<CMolecule>
-CMolecule_from_array_2(const std::vector<int>& elem_ids, const py::array_t<double>& py_coords, const std::string& units = std::string("angstrom"))
+CMolecule_from_elemids_and_array(const std::vector<int>& elem_ids,
+                                 const py::array_t<double>& py_coords,
+                                 const std::string& units,
+                                 const std::vector<std::string>& atom_basis_labels)
 {
     std::vector<std::string> labels;
 
@@ -151,7 +141,17 @@ CMolecule_from_array_2(const std::vector<int>& elem_ids, const py::array_t<doubl
         labels.push_back(label);
     }
 
-    return CMolecule_from_array(labels, py_coords, units);
+    return CMolecule_from_labels_and_array(labels, py_coords, units, atom_basis_labels);
+}
+
+static std::shared_ptr<CMolecule>
+CMolecule_from_elemids_and_array_2(const std::vector<int>& elem_ids, const py::array_t<double>& py_coords, const std::string& units = std::string("angstrom"))
+{
+    const auto natoms = static_cast<int>(elem_ids.size());
+
+    std::vector<std::string> atom_basis_labels(natoms, std::string(""));
+
+    return CMolecule_from_elemids_and_array(elem_ids, py_coords, units, atom_basis_labels);
 }
 
 void
@@ -175,8 +175,10 @@ export_moldata(py::module &m)
         .def(py::init<const std::vector<int>&, const std::vector<TPoint<double>>&, const std::string&, const std::vector<std::string>&>())
         .def(py::init<const CMolecule &>())
         .def(py::init<const CMolecule &, const CMolecule &>())
-        .def(py::init(&CMolecule_from_array), "symbols"_a, "coordinates"_a, "units"_a = std::string("angstrom"))
-        .def(py::init(&CMolecule_from_array_2), "Zs"_a, "coordinates"_a, "units"_a = std::string("angstrom"))
+        .def(py::init(&CMolecule_from_labels_and_array), "symbols"_a, "coordinates"_a, "units"_a, "atom_basis_labels"_a)
+        .def(py::init(&CMolecule_from_labels_and_array_2), "symbols"_a, "coordinates"_a, "units"_a = std::string("angstrom"))
+        .def(py::init(&CMolecule_from_elemids_and_array), "Zs"_a, "coordinates"_a, "units"_a, "atom_basis_labels"_a)
+        .def(py::init(&CMolecule_from_elemids_and_array_2), "Zs"_a, "coordinates"_a, "units"_a = std::string("angstrom"))
         .def(py::pickle(
             [](const CMolecule &mol) { return py::make_tuple(mol.identifiers(), mol.coordinates("au"), mol.atom_basis_labels(), mol.get_charge(), mol.get_multiplicity()); },
             [](py::tuple t) {
