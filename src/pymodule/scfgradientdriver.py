@@ -219,6 +219,19 @@ class ScfGradientDriver(GradientDriver):
         if self.rank == mpi_master():
             self.gradient += self.grad_nuc_contrib(molecule)
 
+        # Add the COSMO contribution
+            if self.scf_driver._cpcm: # maybe add condition for COSMO, specifically
+                self.gradient += self.scf_driver._cpcm_drv.cosmo_grad_contribution(
+                                                molecule, 
+                                                basis,
+                                                self.scf_driver._cpcm_grid,
+                                                self.scf_driver._cpcm_sw_func,
+                                                self.scf_driver._cpcm_q, 
+                                                self.scf_driver.scf_tensors['D_alpha'] + 
+                                                self.scf_driver.scf_tensors['D_beta'],
+                                                self.scf_driver.cpcm_epsilon,
+                                                self.scf_driver.cpcm_x)
+
         # collect gradient
 
         self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
