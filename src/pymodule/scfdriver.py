@@ -1152,10 +1152,12 @@ class ScfDriver:
                 e_el += e_sol
                 self._cpcm_epol = e_sol
 
-                Fock_sol = self._cpcm_drv.get_contribution_to_Fock(
-                    self._cpcm_grid, q, molecule, ao_basis)
-
-                fock_mat.add_matrix(DenseMatrix(Fock_sol), 0)
+                Fock_sol = self._cpcm_drv.get_contribution_to_Fock(molecule, ao_basis,
+                    self._cpcm_grid, q)
+                print(np.array(fock_mat).shape, np.array(fock_mat[0]).shape, Fock_sol.shape)
+                fock_mat[0] += Fock_sol
+                #fock_mat[0] += DenseMatrix(Fock_sol)
+                #fock_mat.add_matrix(DenseMatrix(Fock_sol), 0)
                 #fock_mat.add_matrix(Fock_sol, 0)
 
             if self.rank == mpi_master() and self.electric_field is not None:
