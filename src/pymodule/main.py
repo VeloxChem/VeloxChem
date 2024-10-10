@@ -246,6 +246,19 @@ def main():
         force_field_drv.update_settings(force_field_dict, resp_dict)
         force_field_drv.compute(task.molecule, task.ao_basis)
 
+    # Diatomic vibronic spectrum using Numerov
+
+    if task_type == 'numerov':
+        numerov_dict = (dict(task.input_dict['numerov'])
+                        if 'numerov' in task.input_dict else {})
+
+        scf_dict = (dict(task.input_dict['scf'])
+                    if 'scf' in task.input_dict else {})
+
+        numerov_drv = NumerovDriver(task.mpi_comm, task.ostream)
+        numerov_drv.update_settings(numerov_dict, scf_dict, method_dict)
+        numerov_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
     # Self-consistent field
 
     run_scf = task_type in [
