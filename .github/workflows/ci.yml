@@ -3,7 +3,7 @@ name: build
 on:
   push:
     branches:
-      - simd_master_test
+      - new_master
 
 jobs:
   vlx_ci:
