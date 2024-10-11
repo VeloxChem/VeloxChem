@@ -42,6 +42,7 @@
 #include "XCFunctional.hpp"
 #include "XCIntegrator.hpp"
 #include "XCMolecularGradient.hpp"
+#include "XCPairDensityFunctional.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -361,6 +362,17 @@ export_dft(py::module& m)
         .def("get_rs_omega", &CXCFunctional::getRangeSeparationParameterOmega, "Gets range-separation parameter omega.")
         .def("get_dimension_of_derivatives", &CXCFunctional::getDimensionOfDerivatives, "Gets dimension of derivatives.")
         .def("set_rs_omega", &CXCFunctional::setRangeSeparatedParameterOmega, "Sets range-separation parameter omega.");
+
+    // XCPairDensityFunctional class
+    PyClass<CXCPairDensityFunctional>(m, "XCPairDensityFunctional")
+        .def(py::init<const std::string&, const std::vector<std::string>&, const std::vector<double>&>(),
+             "name_of_functional"_a,
+             "labels"_a,
+             "coeffs"_a)
+        .def(py::init<const CXCPairDensityFunctional&>())
+        .def(py::self == py::self)
+        .def("get_func_label", &CXCPairDensityFunctional::getFunctionalLabel, "Gets functional name.")
+        .def("get_func_type", &CXCPairDensityFunctional::getFunctionalType, "Gets functional type.");
 
     // exposing functions
 
