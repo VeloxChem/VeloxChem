@@ -151,7 +151,7 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
 
     errors::assertMsgCritical(c_style, errsrc);
 
-    auto naos = activeMOs.shape(1);
+    auto naos = static_cast<int>(activeMOs.shape(1));
 
     CDenseMatrix denseActiveMO(n_active, naos);
 

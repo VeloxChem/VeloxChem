@@ -466,7 +466,7 @@ class MolecularOrbitals:
             hf.create_dataset('nuclear_charges', data=nuclear_charges)
 
         if basis_set is not None:
-            hf.create_dataset('basis_set', data=np.string_([basis_set]))
+            hf.create_dataset('basis_set', data=np.bytes_([basis_set]))
 
         hf.close()
 

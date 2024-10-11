@@ -730,7 +730,7 @@ class ExcitonModelDriver:
                     self.elec_trans_dipoles,
                     self.velo_trans_dipoles,
                     self.magn_trans_dipoles,
-                    np.string_(state_info_list),
+                    np.bytes_(state_info_list),
                 ]
 
                 if self.rank == mpi_master():

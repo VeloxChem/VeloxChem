@@ -75,11 +75,11 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
         hf.create_dataset('spin_multiplicity',
                           data=np.array([molecule.get_multiplicity()]))
 
-        hf.create_dataset('basis_set', data=np.string_([basis.get_label()]))
+        hf.create_dataset('basis_set', data=np.bytes_([basis.get_label()]))
 
-        hf.create_dataset('dft_func_label', data=np.string_([dft_func_label]))
+        hf.create_dataset('dft_func_label', data=np.bytes_([dft_func_label]))
 
-        hf.create_dataset('potfile_text', data=np.string_([potfile_text]))
+        hf.create_dataset('potfile_text', data=np.bytes_([potfile_text]))
 
         hf.close()
 
@@ -115,7 +115,7 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
 
         # write SCF energy
         hf.create_dataset('scf_type',
-                          data=np.string_([scf_results['scf_type']]))
+                          data=np.bytes_([scf_results['scf_type']]))
         hf.create_dataset('scf_energy',
                           data=np.array([scf_results['scf_energy']]))
 
@@ -381,7 +381,7 @@ def write_distributed_focks(fname, dist_focks, key_freq_pairs, comm, ostream):
     if comm.Get_rank() == mpi_master():
         hf = h5py.File(fname, 'w')
         str_key_freq_pairs = [str((key, w)) for key, w in key_freq_pairs]
-        hf.create_dataset('key_freq_pairs', data=np.string_(str_key_freq_pairs))
+        hf.create_dataset('key_freq_pairs', data=np.bytes_(str_key_freq_pairs))
         hf.close()
     comm.barrier()
 
