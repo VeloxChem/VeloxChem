@@ -121,6 +121,9 @@ class GradientDriver:
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Gradient driver: Undefined XC functional')
+        if 'dispersion' in method_dict:
+            key = method_dict['dispersion'].lower()
+            self.dispersion = (key in ['yes', 'y'])
 
         if 'delta_h' in grad_dict:
             self.delta_h = float(grad_dict['delta_h'])

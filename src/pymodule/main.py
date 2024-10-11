@@ -315,6 +315,11 @@ def main():
 
     if task_type == 'gradient':
 
+        grad_dict = (dict(task.input_dict['gradient'])
+                     if 'gradient' in task.input_dict else {})
+        grad_dict['program_end_time'] = program_end_time
+        grad_dict['filename'] = task.input_dict['filename']
+
         run_excited_state_gradient = ('response' in task.input_dict)
         run_ground_state_gradient = (not run_excited_state_gradient)
 
@@ -322,19 +327,18 @@ def main():
 
             if use_xtb:
                 grad_drv = XtbGradientDriver(xtb_drv)
+                grad_drv.update_settings(grad_dict, method_dict)
                 grad_drv.compute(task.molecule)
 
             elif scf_drv.scf_type == 'restricted':
                 grad_drv = ScfGradientDriver(scf_drv)
+                grad_drv.update_settings(grad_dict, method_dict)
                 grad_drv.compute(task.molecule, task.ao_basis, scf_results)
 
         elif run_excited_state_gradient:
 
             # TODO: enable excited state gradient
             assert False
-
-            grad_dict = (task.input_dict['gradient']
-                         if 'gradient' in task.input_dict else {})
 
             rsp_dict = dict(task.input_dict['response'])
             rsp_dict['program_end_time'] = program_end_time

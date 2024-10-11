@@ -31,6 +31,7 @@ from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
                            NuclearPotentialGeom100Driver,
                            NuclearPotentialGeom010Driver, FockGeom1000Driver)
 from .veloxchemlib import XCFunctional, MolecularGrid, XCMolecularGradient
+from .veloxchemlib import DispersionModel
 from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import partition_atoms, make_matrix
 from .veloxchemlib import parse_xc_func
@@ -51,6 +52,7 @@ class ScfGradientDriver(GradientDriver):
     Instance variables
         - flag: The driver flag.
         - delta_h: The displacement for finite difference.
+        - dispersion: The flag for calculating D4 dispersion correction.
     """
 
     def __init__(self, scf_drv):
@@ -65,6 +67,9 @@ class ScfGradientDriver(GradientDriver):
 
         self.numerical = False
         self.delta_h = 0.001
+
+        # D4 dispersion correction
+        self.dispersion = scf_drv.dispersion
 
     def compute(self, molecule, basis, scf_results):
         """
@@ -191,18 +196,17 @@ class ScfGradientDriver(GradientDriver):
         # XC contribution to gradient
 
         if use_dft:
-
             if self.rank == mpi_master():
-                xcfun = scf_results['xcfun']
+                xcfun_label = scf_results['xcfun']
                 grid_level = scf_results.get('grid_level', None)
             else:
-                xcfun = None
+                xcfun_label = None
                 grid_level = None
 
-            xcfun, grid_level = self.comm.bcast((xcfun, grid_level),
-                                                root=mpi_master())
+            xcfun_label, grid_level = self.comm.bcast((xcfun_label, grid_level),
+                                                      root=mpi_master())
 
-            grid_level = (get_default_grid_level(xcfun)
+            grid_level = (get_default_grid_level(xcfun_label)
                           if grid_level is None else grid_level)
 
             # TODO: take molecular grid from scf
@@ -212,12 +216,22 @@ class ScfGradientDriver(GradientDriver):
 
             grad_drv = XCMolecularGradient()
             self.gradient += grad_drv.integrate_vxc_gradient(
-                molecule, basis, D, mol_grid, xcfun)
+                molecule, basis, D, mol_grid, xcfun_label)
 
-        # nuclear contribution to gradient (only added on master rank)
+        else:
+            xcfun_label = 'hf'
+
+        # nuclear contribution to gradient
+        # and D4 dispersion correction if requested
+        # (only added on master rank)
 
         if self.rank == mpi_master():
             self.gradient += self.grad_nuc_contrib(molecule)
+
+            if self.dispersion:
+                disp = DispersionModel()
+                disp.compute(molecule, xcfun_label)
+                self.gradient += disp.get_gradient().to_numpy()
 
         # collect gradient
 

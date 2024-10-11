@@ -10,13 +10,20 @@ from veloxchem.scfgradientdriver import ScfGradientDriver
 @pytest.mark.solvers
 class TestGrad:
 
-    def run_grad(self, molecule, xcfun_label, basis_label, ref_grad, tol):
+    def run_grad(self,
+                 molecule,
+                 xcfun_label,
+                 basis_label,
+                 ref_grad,
+                 tol,
+                 d4_flag='none'):
 
         basis = MolecularBasis.read(molecule, basis_label)
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
+        scf_drv.dispersion = (d4_flag.lower() == 'd4')
         scf_results = scf_drv.compute(molecule, basis)
 
         grad_drv = ScfGradientDriver(scf_drv)
@@ -239,6 +246,45 @@ class TestGrad:
         ])
 
         self.run_grad(mol, 'b3lyp', 'def2-svp', ref_grad, 1.0e-4)
+
+    def test_dimer_def2svp_d4(self):
+
+        molstr_au = """
+        N   -3.710    3.019   -0.037
+        H   -3.702    4.942    0.059
+        H   -4.704    2.415    1.497
+        H   -4.780    2.569   -1.573
+        C   -1.621   -5.080    0.444
+        H   -0.819   -6.698   -0.465
+        H   -3.412   -4.654   -0.393
+        H   -0.381   -3.498    0.222
+        H   -1.872   -5.468    2.413
+        """
+        mol = Molecule.read_molecule_string(molstr_au, units='bohr')
+
+        ref_grad = np.array([[[0.012820479, -0.005133886, -0.000532292],
+                              [-0.000517402, 0.011062643, 0.000555069],
+                              [-0.006051101, -0.003114417, 0.008595834],
+                              [-0.006512872, -0.002283463, -0.008630396],
+                              [-0.000656504, -0.000520428, -0.000092718],
+                              [-0.005821206, 0.012370339, 0.006757606],
+                              [0.013085469, -0.003310971, 0.006201275],
+                              [-0.008234083, -0.012028037, 0.001623879],
+                              [0.001887219, 0.002958227, -0.01447825]]])
+
+        self.run_grad(mol, 'hf', 'def2-svp', ref_grad, 1.0e-6, 'd4')
+
+        ref_grad = np.array([[[-0.004508326, 0.002351554, 0.000253069],
+                              [0.000525179, -0.002348746, -0.000141812],
+                              [0.001813106, 0.000424742, -0.001746064],
+                              [0.001856943, 0.000235163, 0.001619904],
+                              [-0.000587803, -0.000293513, -0.000114604],
+                              [-0.008214226, 0.017107836, 0.009459502],
+                              [0.018343682, -0.004617303, 0.008658392],
+                              [-0.011840469, -0.016924871, 0.002292746],
+                              [0.002611911, 0.004065144, -0.020281126]]])
+
+        self.run_grad(mol, 'b3lyp', 'def2-svp', ref_grad, 1.0e-4, 'd4')
 
     def test_dimer_def2tzvp(self):
 
