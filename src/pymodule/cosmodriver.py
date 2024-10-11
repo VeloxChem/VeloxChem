@@ -28,19 +28,15 @@ import numpy as np
 import math
 import sys
 
-#from .veloxchemlib import NuclearPotentialIntegralsDriver
-from .veloxchemlib import NuclearPotentialDriver
-from .oneeints import compute_nuclear_potential_integrals
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .veloxchemlib import gen_lebedev_grid
 from .subcommunicators import SubCommunicators
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
-# For PySCF integral derivatives
-#from .import_from_pyscf import import_cosmo_derivatives_wrt_grid_points
-#from .import_from_pyscf import import_cosmo_integral_derivatives
+from .oneeints import compute_nuclear_potential_integrals
 from .veloxchemlib import NuclearPotentialGeom010Driver
 from .veloxchemlib import NuclearPotentialGeom100Driver
+
 
 class CosmoDriver:
     """
@@ -325,12 +321,10 @@ class CosmoDriver:
         v.show()
 
     def cosmo_grad_contribution(self, molecule, basis, grid, sw_f, q, D, eps, x):
+        # get the C-PCM gradient contribution
         transl_inv = True
-        geom100_drv = NuclearPotentialGeom100Driver()
-        geom010_drv = NuclearPotentialGeom010Driver()
-        
 
-        # Help functions
+        # Helper functions
         def dr_rij(ri, rj):
             r_ij = np.array([(ri[0] - rj[0]), (ri[1] - rj[1]), (ri[2] - rj[2])])
             return r_ij / np.linalg.norm(r_ij)
@@ -385,25 +379,39 @@ class CosmoDriver:
             grad_C_nuc = np.zeros((natoms, 3))
             grad_C_cav = np.zeros((natoms, 3))
             atom_indices = grid[:, -1]
+            labels = ['X', 'Y', 'Z']
+            geom100_drv = NuclearPotentialGeom100Driver()
+            geom010_drv = NuclearPotentialGeom010Driver()
 
-            if transl_inv:
-                natoms -= 1
+            natoms -= 1 # translational invariance
             for a in range(natoms):
                 indices = (atom_indices == a)
-                #kpts_deriv_mat = import_cosmo_derivatives_wrt_grid_points(molecule, basis,
-                #                                                                grid[indices, :3], q[indices])
-                geom010_mats = geom010_drv.compute(molecule, basis, q[indices], grid[indices, :3])
-                #pyscf_deriv_mat = import_cosmo_integral_derivatives(molecule, basis,
-                #                                                                        grid[:, :3], q, atom=a)
-                geom100_mats = geom100_drv.compute(molecule, basis, a, q, grid[:, :3])
+                geom100_mats, geom010_mats, geom001_mats = [], [], []
+                gra = grid[indices, :3]
                 
-                #grad_C_cav[a] = np.einsum("mn,kxmn -> x", DM, kpts_deriv_mat)
-                #grad_C_nuc[a] = np.einsum('xij,ij -> x', pyscf_deriv_mat, DM)
-                grad_C_cav[a] = np.einsum("mn,kxmn -> x", DM, geom010_mats)
-                grad_C_nuc[a] = np.einsum('xij,ij -> x', geom100_mats, DM)
-            if transl_inv:
-                grad_C_cav[-1] = -np.sum(grad_C_cav[:-1], axis=0)
-                grad_C_nuc[-1] = -np.sum(grad_C_nuc[:-1], axis=0)
+                for i, charge in enumerate(q[indices]):
+                    grad_010 = geom010_drv.compute(molecule, basis, [charge], [gra[i].tolist()])
+                    temp_ = []
+                    for label in labels:
+                        temp_.append(-1*grad_010.matrix(label).full_matrix().to_numpy())
+                    geom010_mats.append(np.array(temp_))
+
+                grad_100 = geom100_drv.compute(basis, molecule, a, q, grid[:, :3])
+
+                for label in labels:
+                    geom100_mats.append(-1*grad_100.matrix(label).full_matrix().to_numpy())
+                    geom001_mats.append(-1*grad_100.matrix(label).full_matrix().to_numpy().T)
+                
+                geom010_mats = np.array(geom010_mats)
+                geom100_mats = np.array(geom100_mats)
+                geom001_mats = np.array(geom001_mats)
+                geom100_mats += geom001_mats
+
+                grad_C_nuc[a] = np.einsum('kxij,ij -> x', geom010_mats, DM)
+                grad_C_cav[a] = np.einsum("mn,xmn -> x", DM, geom100_mats)
+
+            grad_C_cav[-1] = -np.sum(grad_C_cav[:-1], axis=0)
+            grad_C_nuc[-1] = -np.sum(grad_C_nuc[:-1], axis=0)
             return grad_C_nuc + grad_C_cav
 
         def grad_Aij(molecule, grid, q, eps, x):
