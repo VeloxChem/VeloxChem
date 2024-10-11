@@ -25,7 +25,7 @@
 default:
   tags:
     - vlx-docker
-  image: ghcr.io/veloxchem/meta-vlx/vlx-ci_intel:sha-c8613aa
+  image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-066f322
   interruptible: true
 
 workflow:
@@ -80,7 +80,7 @@ monkey:cmake_build:
         -Bbuild
         -GNinja
         -DCMAKE_CXX_COMPILER=g++
-        -DVLX_LA_VENDOR=MKL
+        -DVLX_LA_VENDOR=OpenBLAS
     - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib -- -d stats
   artifacts:
     paths:
@@ -95,7 +95,7 @@ monkey:pip_install:
     - CC=gcc CXX=g++ python -m pip install
         cppe
         MDAnalysis
-    - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=g++"
+    - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=OpenBLAS -DCMAKE_CXX_COMPILER=g++"
         python -m pip install -v .[test,qmmm]
   artifacts:
     paths:
