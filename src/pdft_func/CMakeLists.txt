@@ -1,11 +1,13 @@
 target_sources(vlxobjs
   PRIVATE
     PairDensityBecke88.cpp
+    PairDensityGridGenerator.cpp
     PairDensityLYP.cpp
     PairDensityPBE_C.cpp
     PairDensityPBE_X.cpp
     PairDensitySlater.cpp
     PairDensityVWN.cpp
+    XCIntegratorForPDFT.cpp
     XCPairDensityFunctional.cpp
   )
 

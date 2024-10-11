@@ -94,6 +94,90 @@ check_arrays(const std::string& func_name, const std::vector<py::array_t<double>
     }
 }
 
+static auto
+integrate_vxc_pdft(const CXCIntegrator&       self,
+                   const CAODensityMatrix&    aoDensityMatrix,
+                   const py::array_t<double>& active2DM,
+                   const py::array_t<double>& activeMOs,
+                   const CMolecule&           molecule,
+                   const CMolecularBasis&     basis,
+                   const CMolecularGrid&      molecularGrid,
+                   const std::string&         xcFuncLabel) -> py::list
+{
+    // active2DM
+
+    // check dimension
+
+    std::string errdim("integrate_vxc_pdft, active2DM: Expecting a 4D numpy array");
+
+    errors::assertMsgCritical(active2DM.ndim() == 4, errdim);
+
+    // check that the numpy array is c-style contiguous
+
+    std::string errsrc("integrate_vxc_pdft, active2DM: Expecting a C-style contiguous numpy array");
+
+    auto c_style = py::detail::check_flags(active2DM.ptr(), py::array::c_style);
+
+    errors::assertMsgCritical(c_style, errsrc);
+
+    // Form 4D tensor
+
+    auto n_active = static_cast<int32_t>(active2DM.shape(0));
+
+    bool same_size =
+        ((active2DM.shape(0) == active2DM.shape(1)) && (active2DM.shape(0) == active2DM.shape(2)) && (active2DM.shape(0) == active2DM.shape(3)));
+
+    std::string errsizes("integrate_vxc_pdft, active2DM: Expecting 4 identical dimensions");
+
+    errors::assertMsgCritical(same_size, errsizes);
+
+    CDenseMatrix tensor2DM(n_active * n_active, n_active * n_active);
+
+    std::memcpy(tensor2DM.values(), active2DM.data(), active2DM.size() * sizeof(double));
+
+    // activeMOs
+
+    // Check dimensions
+
+    errdim = "integrate_vxc_pdft, activeMOs: Expecting a 2D numpy array";
+
+    errors::assertMsgCritical(activeMOs.ndim() == 2, errdim);
+
+    // check that the numpy array is c-style contiguous
+
+    errsrc = "integrate_vxc_pdft, activeMOs: Expecting a C-style contiguous numpy array";
+
+    c_style = py::detail::check_flags(activeMOs.ptr(), py::array::c_style);
+
+    errors::assertMsgCritical(c_style, errsrc);
+
+    auto naos = activeMOs.shape(1);
+
+    CDenseMatrix denseActiveMO(n_active, naos);
+
+    std::memcpy(denseActiveMO.values(), activeMOs.data(), activeMOs.size() * sizeof(double));
+
+    // Create output tensors
+
+    CAOKohnShamMatrix matrixVxc(naos, naos, true);
+
+    matrixVxc.zero();
+
+    CDense4DTensor tensorWxc(naos, n_active, n_active, n_active);
+
+    tensorWxc.zero();
+
+    self.integrateVxcPDFT(matrixVxc, tensorWxc, molecule, basis, aoDensityMatrix, tensor2DM, denseActiveMO, molecularGrid, xcFuncLabel);
+
+    py::list returnList;
+
+    returnList.append(matrixVxc);
+
+    returnList.append(vlx_general::pointer_to_numpy(tensorWxc.values(), {naos, n_active * n_active * n_active}));
+
+    return returnList;
+}
+
 // Exports classes/functions in src/dft to python
 
 void
@@ -275,6 +359,7 @@ export_dft(py::module& m)
                 self.integrateFxcFock(fock_pointers, molecule, basis, rw_dens_pointers, gs_dens_pointers, molecularGrid, fvxc);
             },
             "Integrates 2nd-order exchange-correlation contribution.")
+        .def("integrate_vxc_pdft", &integrate_vxc_pdft)
         .def(
             "compute_gto_values",
             [](CXCIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid)

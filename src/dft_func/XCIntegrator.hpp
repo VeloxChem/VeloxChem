@@ -28,8 +28,10 @@
 #include <array>
 #include <string>
 
+#include "AODensityMatrix.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
+#include "Dense4DTensor.hpp"
 #include "GridBox.hpp"
 #include "GtoBlock.hpp"
 #include "MolecularBasis.hpp"
@@ -128,6 +130,30 @@ class CXCIntegrator
                           const std::vector<const double*>& gsDensityPointers,
                           const CMolecularGrid&             molecularGrid,
                           const CXCFunctional&              fvxc) const -> void;
+
+    /**
+     Integrates first-order pair-density functional contribution to AO
+     Fock matrix and MO "Q-matrix".
+
+     @param aoFockMatrix the AO Fock matrix.
+     @param tensorWxc the MO Two-body energy gradient term.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param densityMatrix the AO density matrix object.
+     @param twoBodyDensityMatrix the MO two-body active density matrix.
+     @param activeMOs the active molecular orbitals.
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     */
+    auto integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
+                          CDense4DTensor&         tensorWxc,
+                          const CMolecule&        molecule,
+                          const CMolecularBasis&  basis,
+                          const CAODensityMatrix& densityMatrix,
+                          const CDenseMatrix&     twoBodyDensityMatrix,
+                          const CDenseMatrix&     activeMOs,
+                          const CMolecularGrid&   molecularGrid,
+                          const std::string&      xcFuncLabel) const -> void;
 
     /**
      Computes GTOs values on grid points.

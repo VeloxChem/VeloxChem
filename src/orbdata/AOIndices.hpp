@@ -38,8 +38,6 @@ namespace aoindices {  // aoindices namespace
  @param basis_1 the basis set for the first molecule.
  @param basis_2 the basis set for the first molecule.
  @return a vector of vector containing the AO indices of the two molecules.
-
- @author X. Li
  */
 std::vector<std::vector<int>> getDimerAOIndices(const CMolecule&       mol_1,
                                                     const CMolecule&       mol_2,

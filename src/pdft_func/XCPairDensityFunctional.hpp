@@ -33,9 +33,7 @@
 #include <vector>
 
 /**
- * Class CXCPairDensityFunctional is a wrapper to the C functions and structs provided by LibXC.
- *
- * @author X. Li
+ * Class CXCPairDensityFunctional implements pair density functionals.
  */
 class CXCPairDensityFunctional
 {
@@ -49,7 +47,7 @@ class CXCPairDensityFunctional
     /** Leading dimension for initial allocation of staging buffer. */
     int _ldStaging{1024};
 
-    /** Buffer to stage output results from LibXC invocations. */
+    /** Buffer to stage output results. */
     double* _stagingBuffer{nullptr};
 
     /** The functional components and their coefficients. */

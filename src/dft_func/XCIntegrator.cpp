@@ -47,6 +47,7 @@
 #include "XCIntegratorForGGA.hpp"
 #include "XCIntegratorForLDA.hpp"
 #include "XCIntegratorForMGGA.hpp"
+#include "XCIntegratorForPDFT.hpp"
 
 CXCIntegrator::CXCIntegrator()
 
@@ -155,6 +156,37 @@ CXCIntegrator::integrateFxcFock(const std::vector<double*>&       aoFockPointers
         std::string erropenshell("XCIntegrator.integrateFxcFock: Not implemented for open-shell");
 
         errors::assertMsgCritical(false, erropenshell);
+    }
+}
+
+auto
+CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
+                                CDense4DTensor&         tensorWxc,
+                                const CMolecule&        molecule,
+                                const CMolecularBasis&  basis,
+                                const CAODensityMatrix& densityMatrix,
+                                const CDenseMatrix&     twoBodyDensityMatrix,
+                                const CDenseMatrix&     activeMOs,
+                                const CMolecularGrid&   molecularGrid,
+                                const std::string&      xcFuncLabel) const -> void
+{
+    auto fvxc = vxcfuncs::getPairDensityExchangeCorrelationFunctional(xcFuncLabel);
+
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    if (xcfuntype == "PLDA")
+    {
+        xcintpdft::integrateVxcPDFTForLDA(aoFockMatrix, tensorWxc, molecule, basis, densityMatrix, twoBodyDensityMatrix, activeMOs, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+    }
+    else if (xcfuntype == "PGGA")
+    {
+        xcintpdft::integrateVxcPDFTForGGA(aoFockMatrix, tensorWxc, molecule, basis, densityMatrix, twoBodyDensityMatrix, activeMOs, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+    }
+    else
+    {
+        std::string errxcfuntype("XCIntegrator.integrateVxcPDFT: Only implemented for PLDA/PGGA");
+
+        errors::assertMsgCritical(false, errxcfuntype);
     }
 }
 

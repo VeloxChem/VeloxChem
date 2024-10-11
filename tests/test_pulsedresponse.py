@@ -112,7 +112,7 @@ class TestComplexResponse:
         h5_file = Path('{}.h5'.format(cls.h5fname))
         txt_file = Path('{}.txt'.format(cls.h5fname))
 
-        if MPI.COMM_WORLD.Get_size() == mpi_master():
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
             if h5_file.is_file():
                 h5_file.unlink()
             if txt_file.is_file():
@@ -130,7 +130,7 @@ class TestComplexResponse:
 
             return best_val
 
-        if MPI.COMM_WORLD.Get_size() == mpi_master():
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
             hf = h5py.File('{}.h5'.format(self.h5fname), 'r')
             calc_amplitudes = hf.get('amplitudes')[()]
@@ -153,7 +153,7 @@ class TestComplexResponse:
 
         # Test the contents of the file
 
-        if MPI.COMM_WORLD.Get_size() == mpi_master():
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
             hf = h5py.File('{}.h5'.format(self.h5fname), 'r')
             for key in expected_keys:
@@ -192,7 +192,7 @@ class TestComplexResponse:
 
         expected_keys = ['properties', 'pulse_settings', 'properties_zeropad']
 
-        if MPI.COMM_WORLD.Get_size() == mpi_master():
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
             for key in expected_keys:
                 if key not in self.results:

@@ -56,6 +56,37 @@ getSubDensityMatrix(const double* densityPointer, const std::vector<int>& aoIndi
 }
 
 auto
+getSubMatrixByColumnSlicing(const CDenseMatrix& denseMatrix, const std::vector<int>& aoIndices, const int naos) -> CDenseMatrix
+{
+    const auto aocount = static_cast<int>(aoIndices.size());
+
+    const auto nrows = denseMatrix.getNumberOfRows();
+
+    if ((aocount <= naos) && (nrows > 0))
+    {
+        CDenseMatrix sub_matrix(nrows, aocount);
+
+        auto dense = denseMatrix.values();
+
+        for (int i = 0; i < nrows; i++)
+        {
+            auto sub_matrix_row = sub_matrix.row(i);
+
+            auto dense_row = dense + i * naos;
+
+            for (int j = 0; j < aocount; j++)
+            {
+                sub_matrix_row[j] = dense_row[aoIndices[j]];
+            }
+        }
+
+        return sub_matrix;
+    }
+
+    return CDenseMatrix();
+}
+
+auto
 distributeSubMatrixToKohnSham(CAOKohnShamMatrix& aoKohnShamMatrix, const CDenseMatrix& subMatrix, const std::vector<int>& aoIndices) -> void
 {
     const auto naos = aoKohnShamMatrix.getNumberOfRows();
@@ -146,6 +177,30 @@ distributeSubMatrixToFock(const std::vector<double*>& aoFockPointers,
 
                 fock_row_orig[col_orig] += submat_row[col];
             }
+        }
+    }
+}
+
+auto
+distributeSubmatrixTo4DTensor(CDense4DTensor& fullTensor, const CDenseMatrix& subMatrix, const std::vector<int32_t>& aoIndices) -> void
+{
+    const auto aocount = static_cast<int>(aoIndices.size());
+
+    auto w_full = fullTensor.values();
+
+    auto w_small = subMatrix.values();
+
+    auto nAct3 = subMatrix.getNumberOfColumns();
+
+    for (int32_t i = 0; i < aocount; i++)
+    {
+        auto irow = nAct3 * i;
+
+        auto irow_full = nAct3 * aoIndices[i];
+
+        for (int32_t jkl = 0; jkl < nAct3; jkl++)
+        {
+            w_full[irow_full + jkl] += w_small[irow + jkl];
         }
     }
 }

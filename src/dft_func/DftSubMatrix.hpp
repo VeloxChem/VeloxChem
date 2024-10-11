@@ -28,6 +28,7 @@
 #include <vector>
 
 #include "AOKohnShamMatrix.hpp"
+#include "Dense4DTensor.hpp"
 #include "DenseMatrix.hpp"
 
 namespace dftsubmat {  // dftsubmat namespace
@@ -41,6 +42,18 @@ namespace dftsubmat {  // dftsubmat namespace
  @return the sub AO density matrices.
  */
 auto getSubDensityMatrix(const double* densityPointer, const std::vector<int>& aoIndices, const int naos) -> CDenseMatrix;
+
+/**
+ Gets sub matrix from an arbitrary matrix by slicing the columns.
+
+ @param denseMatrix the matrix to slice.
+ @param aoIndices the index mapping from submatrix to full matrix.
+ @param naos the number of indices in full matrix.
+ @return the sub matrix.
+ */
+auto getSubMatrixByColumnSlicing(const CDenseMatrix&         denseMatrix,
+                                 const std::vector<int32_t>& aoIndices,
+                                 const int32_t               naos) -> CDenseMatrix;
 
 /**
  Distributes partial matrix to AO Kohn-Sham matrix.
@@ -76,6 +89,18 @@ auto distributeSubMatrixToFock(const std::vector<double*>& aoFockPointers,
                                const CDenseMatrix&         subMatrix,
                                const std::vector<int>&     aoIndices,
                                const int                   naos) -> void;
+
+/**
+ Distributes partial Wxc tensor (pair functional) to full Wxc tensor.
+
+ @param fullTensor the full Wxc tensor.
+ @param subMatrix the partial Wxc matrix.
+ @param aoIndices the index mapping from partial to full.
+ @param aoCount the number of indices in partial matrix.
+ */
+auto distributeSubmatrixTo4DTensor(CDense4DTensor&             fullTensor,
+                                   const CDenseMatrix&         subMatrix,
+                                   const std::vector<int32_t>& aoIndices) -> void;
 
 }  // namespace dftsubmat
 

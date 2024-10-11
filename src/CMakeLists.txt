@@ -48,12 +48,12 @@ target_link_libraries(vlxobjs
   )
 
 add_subdirectory(dft_func)
-add_subdirectory(pdft_func)
 add_subdirectory(general)
 add_subdirectory(math)
 add_subdirectory(moldata)
 add_subdirectory(onee_ints)
 add_subdirectory(orbdata)
+add_subdirectory(pdft_func)
 add_subdirectory(pymodule)
 add_subdirectory(python)
 add_subdirectory(t2c_electric_dipole_momentum)
