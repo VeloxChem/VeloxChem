@@ -323,7 +323,6 @@ class CosmoDriver:
     def cosmo_grad_contribution(self, molecule, basis, grid, sw_f, q, D, eps, x):
         # get the C-PCM gradient contribution
         transl_inv = True
-
         # Helper functions
         def dr_rij(ri, rj):
             r_ij = np.array([(ri[0] - rj[0]), (ri[1] - rj[1]), (ri[2] - rj[2])])
@@ -338,7 +337,6 @@ class CosmoDriver:
 
             return delta_iM - delta_jM
         
-        ###
         def grad_B(molecule, grid, q):
             # Nuclear-cavity contribution
             atom_coords = molecule.get_coordinates_in_bohr()
