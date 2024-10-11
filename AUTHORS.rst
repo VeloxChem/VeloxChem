@@ -21,19 +21,21 @@ Contributors
 * Mickael Delcey
 * Olav Vahtras
 * Manuel Brand
-* Iulia E. Brumboiu
 * Juan de Gracia
+* Iulia E. Brumboiu
 * Nanna H. List
-* Magnus Ringholm
 * Xiaoyu Chen
 * Lukas Lampe
 * Manuel Hodecker
+* Noah Deveaux
+* Magnus Ringholm
 * Thomas Fransson
 * Bastiaan van Hoorn
 * Gabriel L. S. Rodrigues
 * Mikael T. Scott
 * Maximilian Scheurer
+* Vanda Le
 * Michael F. Herbst
 * Joe Jordan
 
-The list of contributors was obtained 2024-05-29 by ``git shortlog -sn``
+The list of contributors was obtained 2024-10-11 by ``git shortlog -sn``
