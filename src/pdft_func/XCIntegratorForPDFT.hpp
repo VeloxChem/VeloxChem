@@ -28,7 +28,6 @@
 #include <array>
 #include <string>
 
-#include "AODensityMatrix.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "Dense4DTensor.hpp"
 #include "DenseMatrix.hpp"
@@ -48,7 +47,7 @@ namespace xcintpdft {  // xcintpdft namespace
  @param tensorWxc the MO Two-body energy gradient term.
  @param molecule the molecule.
  @param basis the molecular basis.
- @param densityMatrix the AO density matrix object.
+ @param densityMatrixPointer the pointer to AO density matrix.
  @param twoBodyDensityMatrix the MO two-body active density matrix.
  @param activeMOs the active molecular orbitals.
  @param molecularGrid the molecular grid.
@@ -58,7 +57,7 @@ void integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
                             CDense4DTensor&                 tensorWxc,
                             const CMolecule&                molecule,
                             const CMolecularBasis&          basis,
-                            const CAODensityMatrix&         densityMatrix,
+                            const double*                   densityMatrixPointer,
                             const CDenseMatrix&             twoBodyDensityMatrix,
                             const CDenseMatrix&             activeMOs,
                             const CMolecularGrid&           molecularGrid,
@@ -73,7 +72,7 @@ void integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
  @param tensorWxc the MO Two-body energy gradient term.
  @param molecule the molecule.
  @param basis the molecular basis.
- @param densityMatrix the AO density matrix object.
+ @param densityMatrixPointer the pointer to AO density matrix.
  @param twoBodyDensityMatrix the MO two-body active density matrix.
  @param activeMOs the active molecular orbitals.
  @param molecularGrid the molecular grid.
@@ -83,7 +82,7 @@ void integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMatrix,
                             CDense4DTensor&                 tensorWxc,
                             const CMolecule&                molecule,
                             const CMolecularBasis&          basis,
-                            const CAODensityMatrix&         densityMatrix,
+                            const double*                   densityMatrixPointer,
                             const CDenseMatrix&             twoBodyDensityMatrix,
                             const CDenseMatrix&             activeMOs,
                             const CMolecularGrid&           molecularGrid,

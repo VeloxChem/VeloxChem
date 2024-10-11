@@ -160,15 +160,15 @@ CXCIntegrator::integrateFxcFock(const std::vector<double*>&       aoFockPointers
 }
 
 auto
-CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
-                                CDense4DTensor&         tensorWxc,
-                                const CMolecule&        molecule,
-                                const CMolecularBasis&  basis,
-                                const CAODensityMatrix& densityMatrix,
-                                const CDenseMatrix&     twoBodyDensityMatrix,
-                                const CDenseMatrix&     activeMOs,
-                                const CMolecularGrid&   molecularGrid,
-                                const std::string&      xcFuncLabel) const -> void
+CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&     aoFockMatrix,
+                                CDense4DTensor&        tensorWxc,
+                                const CMolecule&       molecule,
+                                const CMolecularBasis& basis,
+                                const double*          densityMatrixPointer,
+                                const CDenseMatrix&    twoBodyDensityMatrix,
+                                const CDenseMatrix&    activeMOs,
+                                const CMolecularGrid&  molecularGrid,
+                                const std::string&     xcFuncLabel) const -> void
 {
     auto fvxc = vxcfuncs::getPairDensityExchangeCorrelationFunctional(xcFuncLabel);
 
@@ -176,11 +176,29 @@ CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
 
     if (xcfuntype == "PLDA")
     {
-        xcintpdft::integrateVxcPDFTForLDA(aoFockMatrix, tensorWxc, molecule, basis, densityMatrix, twoBodyDensityMatrix, activeMOs, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        xcintpdft::integrateVxcPDFTForLDA(aoFockMatrix,
+                                          tensorWxc,
+                                          molecule,
+                                          basis,
+                                          densityMatrixPointer,
+                                          twoBodyDensityMatrix,
+                                          activeMOs,
+                                          molecularGrid,
+                                          _screeningThresholdForGTOValues,
+                                          fvxc);
     }
     else if (xcfuntype == "PGGA")
     {
-        xcintpdft::integrateVxcPDFTForGGA(aoFockMatrix, tensorWxc, molecule, basis, densityMatrix, twoBodyDensityMatrix, activeMOs, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        xcintpdft::integrateVxcPDFTForGGA(aoFockMatrix,
+                                          tensorWxc,
+                                          molecule,
+                                          basis,
+                                          densityMatrixPointer,
+                                          twoBodyDensityMatrix,
+                                          activeMOs,
+                                          molecularGrid,
+                                          _screeningThresholdForGTOValues,
+                                          fvxc);
     }
     else
     {

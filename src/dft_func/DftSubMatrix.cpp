@@ -182,7 +182,7 @@ distributeSubMatrixToFock(const std::vector<double*>& aoFockPointers,
 }
 
 auto
-distributeSubmatrixTo4DTensor(CDense4DTensor& fullTensor, const CDenseMatrix& subMatrix, const std::vector<int32_t>& aoIndices) -> void
+distributeSubmatrixTo4DTensor(CDense4DTensor& fullTensor, const CDenseMatrix& subMatrix, const std::vector<int>& aoIndices) -> void
 {
     const auto aocount = static_cast<int>(aoIndices.size());
 
@@ -192,13 +192,13 @@ distributeSubmatrixTo4DTensor(CDense4DTensor& fullTensor, const CDenseMatrix& su
 
     auto nAct3 = subMatrix.getNumberOfColumns();
 
-    for (int32_t i = 0; i < aocount; i++)
+    for (int i = 0; i < aocount; i++)
     {
         auto irow = nAct3 * i;
 
         auto irow_full = nAct3 * aoIndices[i];
 
-        for (int32_t jkl = 0; jkl < nAct3; jkl++)
+        for (int jkl = 0; jkl < nAct3; jkl++)
         {
             w_full[irow_full + jkl] += w_small[irow + jkl];
         }

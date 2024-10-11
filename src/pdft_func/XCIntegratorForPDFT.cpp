@@ -55,7 +55,7 @@ integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
                        CDense4DTensor&                 tensorWxc,
                        const CMolecule&                molecule,
                        const CMolecularBasis&          basis,
-                       const CAODensityMatrix&         densityMatrix,
+                       const double*                   densityMatrixPointer,
                        const CDenseMatrix&             twoBodyDensityMatrix,
                        const CDenseMatrix&             activeMOs,
                        const CMolecularGrid&           molecularGrid,
@@ -220,7 +220,7 @@ integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat_a = dftsubmat::getSubDensityMatrix(densityMatrix.alphaDensity(0), aoinds, naos);
+        auto sub_dens_mat_a = dftsubmat::getSubDensityMatrix(densityMatrixPointer, aoinds, naos);
 
         auto sub_active_mos = dftsubmat::getSubMatrixByColumnSlicing(activeMOs, aoinds, naos);
 
@@ -297,7 +297,7 @@ integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMatrix,
                        CDense4DTensor&                 tensorWxc,
                        const CMolecule&                molecule,
                        const CMolecularBasis&          basis,
-                       const CAODensityMatrix&         densityMatrix,
+                       const double*                   densityMatrixPointer,
                        const CDenseMatrix&             twoBodyDensityMatrix,
                        const CDenseMatrix&             activeMOs,
                        const CMolecularGrid&           molecularGrid,
@@ -480,7 +480,7 @@ integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat_a = dftsubmat::getSubDensityMatrix(densityMatrix.alphaDensity(0), aoinds, naos);
+        auto sub_dens_mat_a = dftsubmat::getSubDensityMatrix(densityMatrixPointer, aoinds, naos);
 
         auto sub_active_mos = dftsubmat::getSubMatrixByColumnSlicing(activeMOs, aoinds, naos);
 

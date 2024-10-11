@@ -3,12 +3,11 @@ import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import XCIntegrator, XCPairDensityFunctional
-from veloxchem.veloxchemlib import mpi_master, denmat
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.griddriver import GridDriver
 from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
-from veloxchem.aodensitymatrix import AODensityMatrix
 
 
 @pytest.mark.solvers
@@ -82,10 +81,9 @@ class TestPDFT:
         # Compute total and on-top pair densities
         if scfdrv.rank == mpi_master():
             total_density = scf_results['D_alpha'] + scf_results['D_beta']
-            den_mat = AODensityMatrix([total_density], denmat.rest)
         else:
-            den_mat = AODensityMatrix()
-        den_mat = den_mat.broadcast(scfdrv.comm, root=mpi_master())
+            total_density = None
+        total_density = scfdrv.comm.bcast(total_density, root=mpi_master())
 
         # Only in the 2 singly occupied orbitals
         Dact = np.identity(2)
@@ -98,7 +96,7 @@ class TestPDFT:
             mo_act = None
         mo_act = scfdrv.comm.bcast(mo_act, root=mpi_master())
 
-        pdft_vxc, pdft_wxc = xc_drv.integrate_vxc_pdft(den_mat, D2act,
+        pdft_vxc, pdft_wxc = xc_drv.integrate_vxc_pdft(total_density, D2act,
                                                        mo_act.T.copy(),
                                                        molecule, basis, molgrid,
                                                        pfunc)

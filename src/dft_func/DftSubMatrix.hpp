@@ -51,9 +51,7 @@ auto getSubDensityMatrix(const double* densityPointer, const std::vector<int>& a
  @param naos the number of indices in full matrix.
  @return the sub matrix.
  */
-auto getSubMatrixByColumnSlicing(const CDenseMatrix&         denseMatrix,
-                                 const std::vector<int32_t>& aoIndices,
-                                 const int32_t               naos) -> CDenseMatrix;
+auto getSubMatrixByColumnSlicing(const CDenseMatrix& denseMatrix, const std::vector<int>& aoIndices, const int naos) -> CDenseMatrix;
 
 /**
  Distributes partial matrix to AO Kohn-Sham matrix.
@@ -98,9 +96,7 @@ auto distributeSubMatrixToFock(const std::vector<double*>& aoFockPointers,
  @param aoIndices the index mapping from partial to full.
  @param aoCount the number of indices in partial matrix.
  */
-auto distributeSubmatrixTo4DTensor(CDense4DTensor&             fullTensor,
-                                   const CDenseMatrix&         subMatrix,
-                                   const std::vector<int32_t>& aoIndices) -> void;
+auto distributeSubmatrixTo4DTensor(CDense4DTensor& fullTensor, const CDenseMatrix& subMatrix, const std::vector<int>& aoIndices) -> void;
 
 }  // namespace dftsubmat
 
