@@ -707,9 +707,11 @@ def _Molecule_get_string(self):
 
     mol_str = 'Molecular Geometry (Angstroms)\n'
     mol_str += '================================\n\n'
-    mol_str += '  Atom         Coordinate X          Coordinate Y          Coordinate Z  \n\n'
+    mol_str += '  Atom         Coordinate X'
+    mol_str += '          Coordinate Y          Coordinate Z  \n\n'
     for label, coords in zip(labels, coords_in_angstrom):
-        mol_str += f'  {label:<4s}{coords[0]:>22.12f}{coords[1]:>22.12f}{coords[2]:>22.12f}\n'
+        mol_str += f'  {label:<4s}{coords[0]:>22.12f}'
+        mol_str += f'{coords[1]:>22.12f}{coords[2]:>22.12f}\n'
     mol_str += '\n'
 
     return mol_str

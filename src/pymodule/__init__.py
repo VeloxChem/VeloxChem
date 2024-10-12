@@ -57,6 +57,12 @@ from .veloxchemlib import extinction_coefficient_from_beta
 from .veloxchemlib import fine_structure_constant
 from .veloxchemlib import parse_xc_func
 
+# C++ enums
+from .veloxchemlib import denmat
+
+# Python enums
+from .molecularorbitals import molorb
+
 # Python classes
 from .atomtypeidentifier import AtomTypeIdentifier
 from .seminario import Seminario
@@ -65,7 +71,7 @@ from .outputstream import OutputStream
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix
-from .molecularorbitals import MolecularOrbitals, molorb
+from .molecularorbitals import MolecularOrbitals
 from .fockdriver import FockDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver

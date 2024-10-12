@@ -409,7 +409,8 @@ def _MolecularBasis_get_string(self, title):
     for abasis in self.basis_sets():
         if abasis.get_name() == mlabel:
             id_elem = abasis.get_identifier()
-            bas_str += f'  {chemical_element_name(id_elem):<6s}{abasis.contraction_str():<26s}'
+            bas_str += f'  {chemical_element_name(id_elem):<6s}'
+            bas_str += f'{abasis.contraction_str():<26s}'
             bas_str += f'{abasis.primitives_str():<30s}\n'
     bas_str += '\n'
 
@@ -422,13 +423,16 @@ def _MolecularBasis_get_string(self, title):
             label = 'Primitive GTOs'
             bas_str += f'{label:<30}\n\n'
             id_elem = abasis.get_identifier()
-            bas_str += f'  {chemical_element_name(id_elem):<6s}{abasis.contraction_str():<26s}'
+            bas_str += f'  {chemical_element_name(id_elem):<6s}'
+            bas_str += f'{abasis.contraction_str():<26s}'
             bas_str += f'{abasis.primitives_str():<30s}\n'
             bas_str += '\n'
 
-    label = 'Contracted Basis Functions : ' + f'{self.get_dimensions_of_basis()}'
+    label = 'Contracted Basis Functions : '
+    label += f'{self.get_dimensions_of_basis()}'
     bas_str += f'{label:<60s}\n'
-    label = 'Primitive Basis Functions  : ' + f'{self.get_dimensions_of_primitive_basis()}'
+    label = 'Primitive Basis Functions  : '
+    label += f'{self.get_dimensions_of_primitive_basis()}'
     bas_str += f'{label:<60s}\n\n'
 
     return bas_str

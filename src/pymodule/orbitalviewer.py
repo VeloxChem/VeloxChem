@@ -404,7 +404,7 @@ class OrbitalViewer:
                 orb_occ += orb_occ_beta
         orblist = []
         for i in range(len(orb_ene)):
-            orb_label = f'{i+1:3d} occ={orb_occ[i]:.3f} '
+            orb_label = f'{i + 1:3d} occ={orb_occ[i]:.3f} '
             orb_label += f'ene={orb_ene[i]:.3f}'
             orblist.append((orb_label, i))
 
@@ -413,7 +413,7 @@ class OrbitalViewer:
             orb_ene_beta = mo_object.eb_to_numpy()
             orblist_beta = [('', -1)]
             for i in range(len(orb_ene_beta)):
-                orb_label = f'{i+1:3d} occ={orb_occ_beta[i]:.3f} '
+                orb_label = f'{i + 1:3d} occ={orb_occ_beta[i]:.3f} '
                 orb_label += f'ene={orb_ene_beta[i]:.3f}'
                 orblist_beta.append((orb_label, i))
 

@@ -43,8 +43,8 @@ from .optimizationdriver import OptimizationDriver
 from .inputparser import parse_input, get_random_string_parallel
 from .errorhandler import assert_msg_critical, safe_arccos
 from .seminario import Seminario
-#from .xtbdriver import XtbDriver
-#from .xtbgradientdriver import XtbGradientDriver
+from .xtbdriver import XtbDriver
+from .xtbgradientdriver import XtbGradientDriver
 #from .xtbhessiandriver import XtbHessianDriver
 from .uffparameters import get_uff_parameters
 
@@ -571,7 +571,8 @@ class ForceFieldGenerator:
         if abs(excess_charge) > 1.0e-8:
             msg = 'Sum of partial charges is not a whole number.'
             self.ostream.print_info(msg)
-            msg = f'Compensating by removing {excess_charge:.3e} from the largest charge.'
+            msg = f'Compensating by removing {excess_charge:.3e}'
+            msg += ' from the largest charge.'
             self.ostream.print_info(msg)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -703,16 +704,16 @@ class ForceFieldGenerator:
 
         if use_gaff:
             self.ostream.print_info('Using GAFF parameters.')
-            gaff_ref = 'J. Wang, R. M. Wolf, J. W. Caldwell, P. A. Kollman, D. A. Case, '
-            gaff_ref += 'J. Comput. Chem. 2004, 25, 1157-1174.'
+            gaff_ref = 'J. Wang, R. M. Wolf, J. W. Caldwell, P. A. Kollman,'
+            gaff_ref += ' D. A. Case, J. Comput. Chem. 2004, 25, 1157-1174.'
             self.ostream.print_reference('Reference: ' + gaff_ref)
             self.ostream.print_blank()
             self.ostream.flush()
 
         if use_uff:
             self.ostream.print_info('Using UFF parameters.')
-            uff_ref = 'A. K. Rappé, C. J. Casewit, K. S.  Colwell, W. A. Goddard III, '
-            uff_ref += 'W. M. Skiff, J. Am. Chem. Soc. 1992, 114, 10024-10035.'
+            uff_ref = 'A. K. Rappé, C. J. Casewit, K. S.  Colwell, W. A. Goddard III,'
+            uff_ref += ' W. M. Skiff, J. Am. Chem. Soc. 1992, 114, 10024-10035.'
             self.ostream.print_reference('Reference: ' + uff_ref)
             self.ostream.print_blank()
             self.ostream.flush()

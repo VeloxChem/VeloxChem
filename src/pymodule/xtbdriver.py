@@ -25,7 +25,6 @@
 
 from mpi4py import MPI
 import numpy as np
-import time as tm
 import sys
 
 from .veloxchemlib import _XtbDriver
@@ -170,9 +169,6 @@ class XtbDriver:
 
             # run XTB calculation
 
-            start_time = tm.time()
-
-            # TODO: disable this when doing optimization
             self.print_title()
 
             self._xtb_driver.compute(molecule)
@@ -190,10 +186,6 @@ class XtbDriver:
             grad2 = np.sum(gradient**2, axis=1)
             rms_grad = np.sqrt(np.mean(grad2))
             max_grad = np.max(np.sqrt(grad2))
-
-            # TODO: enable this when doing optimization
-            # self.print_energy_and_gradient_info(energy, rms_grad, max_grad,
-            #                                     start_time)
 
             xtb_results = {
                 'energy': energy,
@@ -224,25 +216,6 @@ class XtbDriver:
 
         self.ostream.print_reference('Reference:')
         self.ostream.print_reference(self.get_reference())
-        self.ostream.flush()
-
-    def print_energy_and_gradient_info(self, energy, rms_grad, max_grad,
-                                       start_time):
-        """
-        Prints energy and gradient info for XTB calculation.
-        """
-
-        valstr = '  Energy   : {:.10f} a.u.'.format(energy)
-        self.ostream.print_info(valstr)
-
-        valstr = '  Gradient : {:.6e} a.u. (RMS)'.format(rms_grad)
-        self.ostream.print_info(valstr)
-        valstr = '             {:.6e} a.u. (Max)'.format(max_grad)
-        self.ostream.print_info(valstr)
-
-        valstr = '  Time     : {:.2f} sec'.format(tm.time() - start_time)
-        self.ostream.print_info(valstr)
-        self.ostream.print_blank()
         self.ostream.flush()
 
     def get_reference(self):
