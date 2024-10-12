@@ -97,7 +97,7 @@ check_arrays(const std::string& func_name, const std::vector<py::array_t<double>
 
 static auto
 integrate_vxc_pdft(const CXCIntegrator&       self,
-                   const py::array_t<double>& aoDensityMatrix,
+                   const py::array_t<double>& densityMatrix,
                    const py::array_t<double>& active2DM,
                    const py::array_t<double>& activeMOs,
                    const CMolecule&           molecule,
@@ -107,75 +107,61 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
 {
     // active2DM
 
-    // check dimension
-
-    std::string errdim("integrate_vxc_pdft, active2DM: Expecting a 4D numpy array");
-
-    errors::assertMsgCritical(active2DM.ndim() == 4, errdim);
-
-    // check that the numpy array is c-style contiguous
-
+    // sanity checks
     std::string errsrc("integrate_vxc_pdft, active2DM: Expecting a C-style contiguous numpy array");
-
-    auto c_style = py::detail::check_flags(active2DM.ptr(), py::array::c_style);
-
+    auto        c_style = py::detail::check_flags(active2DM.ptr(), py::array::c_style);
     errors::assertMsgCritical(c_style, errsrc);
 
-    // Form 4D tensor
+    std::string errsizes("integrate_vxc_pdft, active2DM: Expecting 4 identical dimensions");
+    bool        same_size = ((active2DM.ndim() == 4) && (active2DM.shape(0) == active2DM.shape(1)) && (active2DM.shape(0) == active2DM.shape(2)) &&
+                      (active2DM.shape(0) == active2DM.shape(3)));
+    errors::assertMsgCritical(same_size, errsizes);
 
     auto n_active = static_cast<int>(active2DM.shape(0));
 
-    bool same_size =
-        ((active2DM.shape(0) == active2DM.shape(1)) && (active2DM.shape(0) == active2DM.shape(2)) && (active2DM.shape(0) == active2DM.shape(3)));
-
-    std::string errsizes("integrate_vxc_pdft, active2DM: Expecting 4 identical dimensions");
-
-    errors::assertMsgCritical(same_size, errsizes);
-
+    // Form 4D tensor
     CDenseMatrix tensor2DM(n_active * n_active, n_active * n_active);
-
     std::memcpy(tensor2DM.values(), active2DM.data(), active2DM.size() * sizeof(double));
 
     // activeMOs
 
-    // Check dimensions
-
-    errdim = "integrate_vxc_pdft, activeMOs: Expecting a 2D numpy array";
-
-    errors::assertMsgCritical(activeMOs.ndim() == 2, errdim);
-
-    // check that the numpy array is c-style contiguous
-
-    errsrc = "integrate_vxc_pdft, activeMOs: Expecting a C-style contiguous numpy array";
-
+    // sanity checks
+    errsrc  = "integrate_vxc_pdft, activeMOs: Expecting a C-style contiguous numpy array";
     c_style = py::detail::check_flags(activeMOs.ptr(), py::array::c_style);
-
     errors::assertMsgCritical(c_style, errsrc);
+
+    errsizes = "integrate_vxc_pdft, activeMOs: Expecting a 2D numpy array";
+    errors::assertMsgCritical(activeMOs.ndim() == 2, errsizes);
 
     auto naos = static_cast<int>(activeMOs.shape(1));
 
     CDenseMatrix denseActiveMO(n_active, naos);
-
     std::memcpy(denseActiveMO.values(), activeMOs.data(), activeMOs.size() * sizeof(double));
+
+    // densityMatrix
+
+    // sanity checks
+    errsrc  = "integrate_vxc_pdft, densityMatrix: Expecting a C-style contiguous numpy array";
+    c_style = py::detail::check_flags(densityMatrix.ptr(), py::array::c_style);
+    errors::assertMsgCritical(c_style, errsrc);
+
+    errsizes  = "integrate_vxc_pdft, densityMatrix: Expecting 2 identical dimensions";
+    same_size = ((densityMatrix.ndim() == 2) && (densityMatrix.shape(0) == naos) && (densityMatrix.shape(1) == naos));
+    errors::assertMsgCritical(same_size, errsizes);
 
     // Create output tensors
 
     CAOKohnShamMatrix matrixVxc(naos, naos, true);
-
     matrixVxc.zero();
 
     CDense4DTensor tensorWxc(naos, n_active, n_active, n_active);
-
     tensorWxc.zero();
 
-    self.integrateVxcPDFT(matrixVxc, tensorWxc, molecule, basis, aoDensityMatrix.data(), tensor2DM, denseActiveMO, molecularGrid, xcFuncLabel);
+    self.integrateVxcPDFT(matrixVxc, tensorWxc, molecule, basis, densityMatrix.data(), tensor2DM, denseActiveMO, molecularGrid, xcFuncLabel);
 
     py::list returnList;
-
     returnList.append(matrixVxc);
-
     returnList.append(vlx_general::pointer_to_numpy(tensorWxc.values(), {naos, n_active * n_active * n_active}));
-
     return returnList;
 }
 

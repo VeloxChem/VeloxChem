@@ -36,8 +36,8 @@ from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfgradientdriver import ScfGradientDriver
-#from .xtbdriver import XtbDriver
-#from .xtbgradientdriver import XtbGradientDriver
+from .xtbdriver import XtbDriver
+from .xtbgradientdriver import XtbGradientDriver
 from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .mmdriver import MMDriver
@@ -82,8 +82,8 @@ class OptimizationDriver:
                             ScfRestrictedOpenDriver)):
             grad_drv = ScfGradientDriver(drv)
 
-        #elif isinstance(drv, XtbDriver):
-        #    grad_drv = XtbGradientDriver(drv)
+        elif isinstance(drv, XtbDriver):
+            grad_drv = XtbGradientDriver(drv)
 
         elif isinstance(drv, OpenMMDriver):
             grad_drv = OpenMMGradientDriver(drv)
@@ -92,9 +92,9 @@ class OptimizationDriver:
             grad_drv = MMGradientDriver(drv)
 
         elif (isinstance(drv, ScfGradientDriver) or
-              isinstance(drv, MMGradientDriver) or
+              isinstance(drv, XtbGradientDriver) or
               isinstance(drv, OpenMMGradientDriver) or
-              isinstance(drv, XtbGradientDriver)):
+              isinstance(drv, MMGradientDriver)):
             grad_drv = drv
 
         else:

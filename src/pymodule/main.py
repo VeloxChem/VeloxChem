@@ -45,8 +45,8 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
 #from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
-#from .xtbdriver import XtbDriver
-#from .xtbgradientdriver import XtbGradientDriver
+from .xtbdriver import XtbDriver
+from .xtbgradientdriver import XtbGradientDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
 
