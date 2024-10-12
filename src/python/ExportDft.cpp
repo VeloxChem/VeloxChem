@@ -173,7 +173,7 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
 
     returnList.append(matrixVxc);
 
-    returnList.append(vlx_general::pointer_to_numpy(tensorWxc.values(), {naos, n_active * n_active * n_active}));
+    returnList.append(vlx_general::pointer_to_numpy(tensorWxc.values(), {static_cast<int>(naos), n_active * n_active * n_active}));
 
     return returnList;
 }
