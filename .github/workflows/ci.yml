@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - simd_master_test
 
 jobs:
   vlx_ci:
