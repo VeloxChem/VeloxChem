@@ -155,6 +155,78 @@ generateDensityForLDA(double*             rho,
     timer.stop("Density grid rho");
 }
 
+auto
+generateDensityGridForLDA(const CDenseMatrix&     gtoValues,
+                          const CAODensityMatrix& densityMatrix,
+                          const xcfun             xcFunType,
+                          CMultiTimer&            timer) -> CDensityGrid
+{
+    auto npoints = gtoValues.getNumberOfColumns();
+
+    auto numdens = densityMatrix.getNumberOfDensityMatrices();
+
+    CDensityGrid dengrid(npoints, numdens, xcFunType, dengrid::ab);
+
+    for (int idens = 0; idens < numdens; idens++)
+    {
+        auto rhoa = dengrid.alphaDensity(idens);
+
+        auto rhob = dengrid.betaDensity(idens);
+
+        // eq.(26), JCTC 2021, 17, 1512-1521
+
+        timer.start("Density grid matmul");
+
+        auto mat_F = denblas::multAB(densityMatrix.getReferenceToDensity(idens), gtoValues);
+
+        timer.stop("Density grid matmul");
+
+        // eq.(27), JCTC 2021, 17, 1512-1521
+
+        timer.start("Density grid rho");
+
+        auto naos = gtoValues.getNumberOfRows();
+
+        auto nthreads = omp_get_max_threads();
+
+        auto F_val = mat_F.values();
+
+        auto chi_val = gtoValues.values();
+
+        #pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+
+            for (int nu = 0; nu < naos; nu++)
+            {
+                auto nu_offset = nu * npoints;
+
+                #pragma omp simd 
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                {
+                    rhoa[g] += F_val[nu_offset + g] * chi_val[nu_offset + g];
+                }
+            }
+
+            #pragma omp simd 
+            for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                rhob[g] = rhoa[g];
+
+                //std::cout << "===rhob===" <<rhob[g]<<std::endl;
+            }
+        }
+
+        timer.stop("Density grid rho");
+    }
+
+    return dengrid;
+}
+
 void
 generateDensityForGGA(double*             rho,
                       double*             rhograd,

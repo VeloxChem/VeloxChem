@@ -898,9 +898,9 @@ integrateKxcFockForLDA(const std::vector<double*>& aoFockPointers,
 
         auto xcfuntype = xcFunctional.getFunctionalType();
 
-        auto rwdengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, rw_sub_dens_mat, xcfuntype, timer);
+        auto rwdengrid = dengridgen::generateDensityGridForLDA(mat_chi, rw_sub_dens_mat, xcfuntype, timer);
 
-        auto rw2dengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, rw2_sub_dens_mat, xcfuntype, timer);
+        auto rw2dengrid = dengridgen::generateDensityGridForLDA(mat_chi, rw2_sub_dens_mat, xcfuntype, timer);
 
         // compute perturbed density
 
