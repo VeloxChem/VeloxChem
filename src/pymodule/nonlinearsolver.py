@@ -828,14 +828,16 @@ class NonlinearSolver:
             if self._dft:
                 t0 = tm.time()
 
-                xc_drv = XCIntegrator(self.comm)
+                xc_drv = XCIntegrator()
                 molgrid = dft_dict['molgrid']
                 gs_density = dft_dict['gs_density']
 
+                gs_den_mat = AODensityMatrix(gs_density, denmat.rest)
+
                 if mode_is_quadratic:
                     # Compute XC contribution to two-time transformed Fock matrics
-                    xc_drv.integrate_kxc_fock(fock, molecule, ao_basis, dens1,
-                                              dens2, gs_density, molgrid,
+                    xc_drv.integrate_kxc_fock(fock_arrays, molecule, ao_basis, dens1,
+                                              dens2, gs_den_mat, molgrid,
                                               self.xcfun.get_func_label(), mode)
                 elif mode_is_cubic:
                     # Compute XC contribution to three-time transformed Fock matrics

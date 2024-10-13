@@ -165,10 +165,13 @@ class TestQrfFD:
 
         self.run_qrf_fd('hf', 'def2-tzvp', 'yyz', [0.3, -0.11])
 
-    # TODO: enable qrf with lda
-    def disabled_test_lda_qrf_fd(self):
+    def test_lda_svp_qrf_fd(self):
 
         self.run_qrf_fd('slda', 'def2-svp', 'yyz', [0.3, -0.11])
+
+    def test_lda_tzvp_qrf_fd(self):
+
+        self.run_qrf_fd('slda', 'def2-tzvp', 'yyz', [0.3, -0.11])
 
     # TODO: enable qrf with gga
     def disabled_test_gga_qrf_fd(self):

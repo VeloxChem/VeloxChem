@@ -28,6 +28,7 @@
 #include <array>
 #include <string>
 
+#include "AODensityMatrix.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "Dense4DTensor.hpp"
 #include "DenseMatrix.hpp"
@@ -129,6 +130,16 @@ class CXCIntegrator
                           const std::vector<const double*>& gsDensityPointers,
                           const CMolecularGrid&             molecularGrid,
                           const CXCFunctional&              fvxc) const -> void;
+
+    auto integrateKxcFock(const std::vector<double*>& aoFockPointers,
+                                const CMolecule&        molecule,
+                                const CMolecularBasis&  basis,
+                                const CAODensityMatrix& rwDensityMatrix,
+                                const CAODensityMatrix& rw2DensityMatrix,
+                                const CAODensityMatrix& gsDensityMatrix,
+                                const CMolecularGrid&   molecularGrid,
+                                const std::string&      xcFuncLabel,
+                                const std::string&      quadMode) const -> void;
 
     /**
      Integrates first-order pair-density functional contribution to AO
