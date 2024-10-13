@@ -225,3 +225,9 @@ CAODensityMatrix::betaDensity(const int iDensityMatrix) const
 
     return nullptr;
 }
+
+const CDenseMatrix&
+CAODensityMatrix::getReferenceToDensity(const int iDensityMatrix) const
+{
+    return _denMatrices[iDensityMatrix];
+}

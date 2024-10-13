@@ -27,6 +27,7 @@
 
 #include <vector>
 
+#include "AODensityMatrix.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "Dense4DTensor.hpp"
 #include "DenseMatrix.hpp"
@@ -42,6 +43,9 @@ namespace dftsubmat {  // dftsubmat namespace
  @return the sub AO density matrices.
  */
 auto getSubDensityMatrix(const double* densityPointer, const std::vector<int>& aoIndices, const int naos) -> CDenseMatrix;
+
+auto
+getSubAODensityMatrix(const CAODensityMatrix& densityMatrix, const std::vector<int32_t>& aoIndices) -> CAODensityMatrix;
 
 /**
  Gets sub matrix from an arbitrary matrix by slicing the columns.

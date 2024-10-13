@@ -888,9 +888,9 @@ integrateKxcFockForLDA(const std::vector<double*>& aoFockPointers,
 
         timer.start("Density matrix slicing");
 
-        auto rw_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rwDensityMatrix, aoinds, aocount);
+        auto rw_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rwDensityMatrix, aoinds);
 
-        auto rw2_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rw2DensityMatrix, aoinds, aocount);
+        auto rw2_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rw2DensityMatrix, aoinds);
 
         timer.stop("Density matrix slicing");
 
