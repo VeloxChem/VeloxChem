@@ -387,8 +387,12 @@ class LinearSolver:
                 'Using sub-communicators for {}.'.format(valstr))
             self.ostream.print_blank()
         else:
-            screening = T4CScreener()
-            screening.partition(basis, molecule, 'eri')
+            if self.rank == mpi_master():
+                screening = T4CScreener()
+                screening.partition(basis, molecule, 'eri')
+            else:
+                screening = None
+            screening = self.comm.bcast(screening, root=mpi_master())
 
         return {
             'screening': screening,
@@ -955,8 +959,6 @@ class LinearSolver:
 
         fock_drv._set_block_size_factor(self._block_size_factor)
 
-        fock_arrays = []
-
         # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'
         exchange_scaling_factor = 1.0
@@ -982,6 +984,7 @@ class LinearSolver:
                                     [fock_type for x in range(len(dens))],
                                     exchange_scaling_factor, 0.0, thresh_int)
 
+        fock_arrays = []
         for idx in range(num_densities):
             fock_np = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
             fock_arrays.append(fock_np)

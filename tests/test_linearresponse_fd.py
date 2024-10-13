@@ -81,6 +81,10 @@ class TestLrfFD:
             rel_diff = abs(alpha_zz - alpha_zz_fd) / abs(alpha_zz_fd)
             assert rel_diff < 1.0e-6
 
+    def test_hf_lrf_fd(self):
+
+        self.run_lrf_fd('hf')
+
     def test_lda_lrf_fd(self):
 
         self.run_lrf_fd('slater')
