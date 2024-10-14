@@ -56,7 +56,7 @@ getSubDensityMatrix(const double* densityPointer, const std::vector<int>& aoIndi
 }
 
 auto
-getSubAODensityMatrix(const CAODensityMatrix& densityMatrix, const std::vector<int32_t>& aoIndices) -> CAODensityMatrix
+getSubAODensityMatrix(const CAODensityMatrix& densityMatrix, const std::vector<int>& aoIndices) -> CAODensityMatrix
 {
     const auto aocount = static_cast<int>(aoIndices.size());
 
@@ -68,19 +68,19 @@ getSubAODensityMatrix(const CAODensityMatrix& densityMatrix, const std::vector<i
 
     auto numdens = densityMatrix.getNumberOfDensityMatrices();
 
-    for (int32_t idens = 0; idens < numdens; idens++)
+    for (int idens = 0; idens < numdens; idens++)
     {
         CDenseMatrix sub_dens(aocount, aocount);
 
         auto dens = densityMatrix.getReferenceToDensity(idens);
 
-        for (int32_t i = 0; i < aocount; i++)
+        for (int i = 0; i < aocount; i++)
         {
             auto sub_dens_row = sub_dens.row(i);
 
             auto dens_row = dens.row(aoIndices[i]);
 
-            for (int32_t j = 0; j < aocount; j++)
+            for (int j = 0; j < aocount; j++)
             {
                 sub_dens_row[j] = dens_row[aoIndices[j]];
             }

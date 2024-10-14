@@ -145,7 +145,7 @@ integratePartialKxcFockForLDA(const CXCFunctional&    xcFunctional,
                               const double*           v3rho3,
                               const CDensityGridQuad& rwDensityGridQuad,
                               const CDensityGrid&     rw2DensityGrid,
-                              const int32_t           iFock,
+                              const int           iFock,
                               CMultiTimer&            timer) -> CDenseMatrix;
 
 }  // namespace xcintlda

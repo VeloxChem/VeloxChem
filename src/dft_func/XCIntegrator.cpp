@@ -184,17 +184,13 @@ CXCIntegrator::integrateKxcFock(const std::vector<double*>& aoFockPointers,
         {
             xcintgga::integrateKxcFockForGGA(aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
         }
-        /*
         else if (xcfuntype == xcfun::mgga)
         {
-            _integrateKxcFockForMGGA(
-                aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, fvxc, quadMode);
+            xcintmgga::integrateKxcFockForMGGA(aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
         }
-        */
         else
         {
-            //std::string errxcfuntype("XCIntegrator.integrateKxcFock: Only implemented for LDA/GGA/meta-GGA");
-            std::string errxcfuntype("XCIntegrator.integrateKxcFock: Only implemented for LDA/GGA");
+            std::string errxcfuntype("XCIntegrator.integrateKxcFock: Only implemented for LDA/GGA/meta-GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }

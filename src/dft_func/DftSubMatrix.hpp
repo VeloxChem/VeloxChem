@@ -45,7 +45,7 @@ namespace dftsubmat {  // dftsubmat namespace
 auto getSubDensityMatrix(const double* densityPointer, const std::vector<int>& aoIndices, const int naos) -> CDenseMatrix;
 
 auto
-getSubAODensityMatrix(const CAODensityMatrix& densityMatrix, const std::vector<int32_t>& aoIndices) -> CAODensityMatrix;
+getSubAODensityMatrix(const CAODensityMatrix& densityMatrix, const std::vector<int>& aoIndices) -> CAODensityMatrix;
 
 /**
  Gets sub matrix from an arbitrary matrix by slicing the columns.

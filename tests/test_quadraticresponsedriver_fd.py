@@ -177,9 +177,8 @@ class TestQrfFD:
 
         self.run_qrf_fd('cam-b3lyp', 'def2-tzvp', 'yyz', [0.3, -0.11])
 
-    # TODO: enable qrf with mgga
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() == 1,
                         reason="multi-node only")
-    def disabled_test_mgga_qrf_fd(self):
+    def test_mgga_qrf_fd(self):
 
         self.run_qrf_fd('tpssh', 'def2-svp', 'yyz', [0.3, -0.11])

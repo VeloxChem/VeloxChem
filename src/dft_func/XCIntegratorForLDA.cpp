@@ -777,7 +777,7 @@ integrateKxcFockForLDA(const std::vector<double*>& aoFockPointers,
 
     timer.stop("Preparation");
 
-    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    for (int box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
@@ -927,7 +927,7 @@ integrateKxcFockForLDA(const std::vector<double*>& aoFockPointers,
 
         // go through density matrices
 
-        for (int32_t idensity = 0; idensity < numdens_rw2; idensity++)
+        for (int idensity = 0; idensity < numdens_rw2; idensity++)
         {
             // compute partial contribution to Kxc matrix
 
@@ -950,7 +950,7 @@ integrateKxcFockForLDA(const std::vector<double*>& aoFockPointers,
     // std::cout << "------------------------" << std::endl;
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
-    // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
     // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
@@ -965,7 +965,7 @@ integratePartialKxcFockForLDA(const CXCFunctional&    xcFunctional,
                               const double*           v3rho3,
                               const CDensityGridQuad& rwDensityGridQuad,
                               const CDensityGrid&     rw2DensityGrid,
-                              const int32_t           iFock,
+                              const int           iFock,
                               CMultiTimer&            timer) -> CDenseMatrix
 {
     const auto npoints = gtoValues.getNumberOfColumns();
@@ -1009,12 +1009,12 @@ integratePartialKxcFockForLDA(const CXCFunctional&    xcFunctional,
 
         auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
 
-        for (int32_t nu = 0; nu < naos; nu++)
+        for (int nu = 0; nu < naos; nu++)
         {
             auto nu_offset = nu * npoints;
 
             #pragma omp simd 
-            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 // functional derivatives
 
