@@ -33,6 +33,7 @@ from .lreigensolver import LinearResponseEigenSolver
 from .c6driver import C6Driver
 from .tdaeigensolver import TdaEigenSolver
 from .shgdriver import ShgDriver
+from .tpatransitiondriver import TpaTransitionDriver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
@@ -187,6 +188,13 @@ class ResponseProperty:
               self._rsp_dict['complex'] == 'yes'):
 
             self._rsp_driver = ShgDriver(self.comm, self.ostream)
+
+        # TPA transition (quadratic response) driver
+        elif (self._rsp_dict['order'] == 'quadratic' and
+              self._rsp_dict['residue'] == 'single' and
+              self._rsp_dict['complex'] == 'yes'):
+
+            self._rsp_driver = TpaTransitionDriver(self.comm, self.ostream)
 
         # Update driver settings
         self._rsp_driver.update_settings(self._rsp_dict, self._method_dict)
