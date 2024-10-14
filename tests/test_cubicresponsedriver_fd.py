@@ -181,6 +181,8 @@ class TestCrfFD:
 
         self.run_crf_fd('b3lyp', 'def2-tzvp', 'zyyz', [0.11, -0.3, 0.05])
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() == 1,
+                        reason="multi-node only")
     def test_gga_rsh_crf_fd(self):
 
         self.run_crf_fd('cam-b3lyp', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05])

@@ -173,6 +173,8 @@ class TestQrfFD:
 
         self.run_qrf_fd('b3lyp', 'def2-svp', 'yyz', [0.3, -0.11])
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() == 1,
+                        reason="multi-node only")
     def test_gga_rsh_qrf_fd(self):
 
         self.run_qrf_fd('cam-b3lyp', 'def2-tzvp', 'yyz', [0.3, -0.11])
