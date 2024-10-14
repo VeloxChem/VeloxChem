@@ -131,15 +131,53 @@ class CXCIntegrator
                           const CMolecularGrid&             molecularGrid,
                           const CXCFunctional&              fvxc) const -> void;
 
+    /**
+     Integrates third-order exchange-correlation functional contribution to AO
+     Fock matrix in quadratic response.
+
+     @param aoFockPointers the pointers to AO Fock matrices.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrix the one-time transformed densities.
+     @param rw2DensityMatrix the two-time transformed densities.
+     @param gsDensityMatrix the ground state density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @param quadMode a string that specifies which densities should be combined.
+     */
     auto integrateKxcFock(const std::vector<double*>& aoFockPointers,
-                                const CMolecule&        molecule,
-                                const CMolecularBasis&  basis,
-                                const CAODensityMatrix& rwDensityMatrix,
-                                const CAODensityMatrix& rw2DensityMatrix,
-                                const CAODensityMatrix& gsDensityMatrix,
-                                const CMolecularGrid&   molecularGrid,
-                                const std::string&      xcFuncLabel,
-                                const std::string&      quadMode) const -> void;
+                          const CMolecule&        molecule,
+                          const CMolecularBasis&  basis,
+                          const CAODensityMatrix& rwDensityMatrix,
+                          const CAODensityMatrix& rw2DensityMatrix,
+                          const CAODensityMatrix& gsDensityMatrix,
+                          const CMolecularGrid&   molecularGrid,
+                          const std::string&      xcFuncLabel,
+                          const std::string&      quadMode) const -> void;
+
+    /**
+     Integrates third-order exchange-correlation functional contribution to AO
+     Fock matrix in quadratic response.
+
+     @param aoFockPointers the pointers to AO Fock matrices.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrix the one-time transformed densities.
+     @param rw2DensityMatrix the two-time transformed densities.
+     @param gsDensityMatrix the ground state density matrix.
+     @param molecularGrid the molecular grid.
+     @param fvxc the exchange-correlation functional.
+     @param quadMode a string that specifies which densities should be combined.
+     */
+    auto integrateKxcFock(const std::vector<double*>& aoFockPointers,
+                          const CMolecule&        molecule,
+                          const CMolecularBasis&  basis,
+                          const CAODensityMatrix& rwDensityMatrix,
+                          const CAODensityMatrix& rw2DensityMatrix,
+                          const CAODensityMatrix& gsDensityMatrix,
+                          const CMolecularGrid&   molecularGrid,
+                          const CXCFunctional&    fvxc,
+                          const std::string&      quadMode) const -> void;
 
     /**
      Integrates first-order pair-density functional contribution to AO

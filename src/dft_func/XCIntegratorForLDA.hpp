@@ -125,28 +125,55 @@ auto integratePartialFxcFockForLDA(const CXCFunctional& xcFunctional,
                                    const double*        v2rho2,
                                    CMultiTimer&         timer) -> CDenseMatrix;
 
-auto
-integrateKxcFockForLDA(const std::vector<double*>& aoFockPointers,
-                       const CMolecule&        molecule,
-                       const CMolecularBasis&  basis,
-                       const CAODensityMatrix& rwDensityMatrix,
-                       const CAODensityMatrix& rw2DensityMatrix,
-                       const CAODensityMatrix& gsDensityMatrix,
-                       const CMolecularGrid&   molecularGrid,
-                       const double            screeningThresholdForGTOValues,
-                       const CXCFunctional&    xcFunctional,
-                       const std::string&      quadMode) -> void;
+/**
+ Integrates third-order LDA exchange-correlation functional contribution
+ to AO Fock matrix.
 
-auto
-integratePartialKxcFockForLDA(const CXCFunctional&    xcFunctional,
-                              const double*           weights,
-                              const CDenseMatrix&     gtoValues,
-                              const double*           v2rho2,
-                              const double*           v3rho3,
-                              const CDensityGridQuad& rwDensityGridQuad,
-                              const CDensityGrid&     rw2DensityGrid,
-                              const int           iFock,
-                              CMultiTimer&            timer) -> CDenseMatrix;
+ @param aoFockMatrix the AO Fock matrix.
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ @param rwDensityMatrix the perturbed one-time transformed densities.
+ @param rw2DensityMatrix the two-time transformed densities.
+ @param gsDensityMatrix the ground state density matrix.
+ @param molecularGrid the molecular grid.
+ @param screeningThresholdForGTOValues the screening threshold for GTO values.
+ @param xcFunctional the exchange-correlation functional.
+ @param quadMode a string that specifies which densities should be combined.
+ */
+auto integrateKxcFockForLDA(const std::vector<double*>& aoFockPointers,
+                            const CMolecule&        molecule,
+                            const CMolecularBasis&  basis,
+                            const CAODensityMatrix& rwDensityMatrix,
+                            const CAODensityMatrix& rw2DensityMatrix,
+                            const CAODensityMatrix& gsDensityMatrix,
+                            const CMolecularGrid&   molecularGrid,
+                            const double            screeningThresholdForGTOValues,
+                            const CXCFunctional&    xcFunctional,
+                            const std::string&      quadMode) -> void;
+
+/**
+ Integrates LDA contribution to (third-order) Kxc matrix.
+
+ @param xcFunctional the exchange-correlation functional.
+ @param weights the weights of grid points.
+ @param gtoValues the GTO values on grid points.
+ @param v2rho2 the 2nd-order functional derivative wrt density.
+ @param v3rho3 the 3rd-order functional derivative wrt density.
+ @param rwDensityGridQuad the products of one-time transformed densities on grid points.
+ @param rw2DensityMatrix the two-time transformed densities on grid points.
+ @param iFock the index of the AO Fock matrix.
+ @param timer the timer.
+ @return the contribution as a CDenseMatrix object.
+ */
+auto integratePartialKxcFockForLDA(const CXCFunctional&    xcFunctional,
+                                   const double*           weights,
+                                   const CDenseMatrix&     gtoValues,
+                                   const double*           v2rho2,
+                                   const double*           v3rho3,
+                                   const CDensityGridQuad& rwDensityGridQuad,
+                                   const CDensityGrid&     rw2DensityGrid,
+                                   const int               iFock,
+                                   CMultiTimer&            timer) -> CDenseMatrix;
 
 }  // namespace xcintlda
 

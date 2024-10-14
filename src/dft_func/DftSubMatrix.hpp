@@ -44,6 +44,13 @@ namespace dftsubmat {  // dftsubmat namespace
  */
 auto getSubDensityMatrix(const double* densityPointer, const std::vector<int>& aoIndices, const int naos) -> CDenseMatrix;
 
+/**
+ Gets sub AO density matrices from AO density matrices.
+
+ @param densityMatrix the AO density matrix.
+ @param aoIndices the index mapping from submatrix to full matrix.
+ @return the sub AO density matrices.
+ */
 auto
 getSubAODensityMatrix(const CAODensityMatrix& densityMatrix, const std::vector<int>& aoIndices) -> CAODensityMatrix;
 

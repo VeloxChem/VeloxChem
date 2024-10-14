@@ -172,6 +172,20 @@ CXCIntegrator::integrateKxcFock(const std::vector<double*>& aoFockPointers,
 {
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
+    return integrateKxcFock(aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, fvxc, quadMode);
+}
+
+auto
+CXCIntegrator::integrateKxcFock(const std::vector<double*>& aoFockPointers,
+                                const CMolecule&        molecule,
+                                const CMolecularBasis&  basis,
+                                const CAODensityMatrix& rwDensityMatrix,
+                                const CAODensityMatrix& rw2DensityMatrix,
+                                const CAODensityMatrix& gsDensityMatrix,
+                                const CMolecularGrid&   molecularGrid,
+                                const CXCFunctional&    fvxc,
+                                const std::string&      quadMode) const -> void
+{
     auto xcfuntype = fvxc.getFunctionalType();
 
     if (rwDensityMatrix.isClosedShell() && rw2DensityMatrix.isClosedShell() && gsDensityMatrix.isClosedShell())
