@@ -168,7 +168,6 @@ class TestCrfFD:
 
             gamma_0_fd = (beta_plus.real - beta_minus.real) / (2.0 * delta_ef)
             assert abs(gamma_0 - gamma_0_fd) / abs(gamma_0_fd) < 1.0e-5
-            print(abs(gamma_0 - gamma_0_fd) / abs(gamma_0_fd))
 
     def test_hf_crf_fd(self):
 
