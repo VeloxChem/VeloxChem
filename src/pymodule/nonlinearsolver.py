@@ -795,12 +795,17 @@ class NonlinearSolver:
             if self._dft:
                 if self.xcfun.is_hybrid():
                     fock_type = '2jkx'
-                    fact_k_factor = self.xcfun.get_frac_exact_exchange()
+                    fock_k_factor = self.xcfun.get_frac_exact_exchange()
                 else:
                     fock_type = 'j'
-                    fact_k_factor = 0.0
+                    fock_k_factor = 0.0
 
             # TODO: range-separated
+            need_omega = (self._dft and self.xcfun.is_range_separated())
+            if need_omega:
+                assert_msg_critical(
+                    False, 'NLR: range-separated functional not yet supported' +
+                    ' in nonlinear response')
 
             t0 = tm.time()
 
@@ -835,8 +840,8 @@ class NonlinearSolver:
 
                 if mode_is_quadratic:
                     # Compute XC contribution to two-time transformed Fock matrics
-                    xc_drv.integrate_kxc_fock(fock_arrays, molecule, ao_basis, dens1,
-                                              dens2, gs_den_mat, molgrid,
+                    xc_drv.integrate_kxc_fock(fock_arrays, molecule, ao_basis,
+                                              dens1, dens2, gs_den_mat, molgrid,
                                               self.xcfun.get_func_label(), mode)
                 elif mode_is_cubic:
                     # Compute XC contribution to three-time transformed Fock matrics

@@ -173,10 +173,21 @@ class TestQrfFD:
 
         self.run_qrf_fd('slda', 'def2-tzvp', 'yyz', [0.3, -0.11])
 
-    # TODO: enable qrf with gga
-    def disabled_test_gga_qrf_fd(self):
+    def test_gga_svp_qrf_fd(self):
 
         self.run_qrf_fd('bp86', 'def2-svp', 'yyz', [0.3, -0.11])
+
+    def test_gga_tzvp_qrf_fd(self):
+
+        self.run_qrf_fd('bp86', 'def2-tzvp', 'yyz', [0.3, -0.11])
+
+    def test_gga_hyb_svp_qrf_fd(self):
+
+        self.run_qrf_fd('b3lyp', 'def2-svp', 'yyz', [0.3, -0.11])
+
+    def test_gga_hyb_tzvp_qrf_fd(self):
+
+        self.run_qrf_fd('b3lyp', 'def2-tzvp', 'yyz', [0.3, -0.11])
 
     # TODO: enable qrf with mgga
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() == 1,

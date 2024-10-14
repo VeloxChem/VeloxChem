@@ -112,6 +112,15 @@ auto generateDensityForGGA(double*             rho,
                            const CDenseMatrix& densityMatrixBeta,
                            CMultiTimer&        timer) -> void;
 
+auto
+generateDensityGridForGGA(const CDenseMatrix&     gtoValues,
+                          const CDenseMatrix&     gtoValuesX,
+                          const CDenseMatrix&     gtoValuesY,
+                          const CDenseMatrix&     gtoValuesZ,
+                          const CAODensityMatrix& densityMatrix,
+                          const xcfun             xcFunType,
+                          CMultiTimer&            timer) -> CDensityGrid;
+
 /**
  Generates density for meta-GGA.
 
