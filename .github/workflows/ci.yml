@@ -15,7 +15,7 @@ jobs:
         shell: bash -l {0}
 
     container:
-      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_intel:sha-c8613aa
+      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-1aa36de
 
     env:
       VLX_NUM_BUILD_JOBS: 4
@@ -33,10 +33,6 @@ jobs:
           ulimit -a
           ulimit -s unlimited
           lscpu | egrep 'Thread|Core|Socket|^CPU\('
-          echo "=== Intel OneAPI ==="
-          source /opt/intel/oneapi/setvars.sh
-          #mpiicc -cc=icx --version
-          #mpiicpc -cxx=icpx --version
           echo "=== GNU Compiler ==="
           #mpicc --version
           #mpicc -show
@@ -54,13 +50,12 @@ jobs:
           python -V
           echo "=== Python dependencies ==="
           python -m pip install --upgrade pip setuptools wheel
-          #CC=icx MPICC="mpiicc -cc=icx" python -m pip install mpi4py --no-binary=mpi4py
           CC=gcc MPICC=mpicc python -m pip install mpi4py --no-binary=mpi4py
           CC=gcc CXX=g++ python -m pip install cppe MDAnalysis
           echo "=== VeloxChem build ==="
-          #SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpiicpc -DCMAKE_CXX_FLAGS=\"-cxx=icpx\"" \
-          #  python -m pip install -v .[test,qmmm]
-          SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=g++" \
+          export XTBHOME=/usr/local
+          export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/local
+          SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=OpenBLAS -DCMAKE_CXX_COMPILER=g++" \
             python -m pip install -v .[test,qmmm]
           echo "=== VeloxChem test ==="
           python -c "import veloxchem; print(veloxchem.__version__)"
