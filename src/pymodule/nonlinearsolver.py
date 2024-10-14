@@ -800,12 +800,15 @@ class NonlinearSolver:
                     fock_type = 'j'
                     fock_k_factor = 0.0
 
-            # TODO: range-separated
+            # further determine fock_k_factor, erf_k_coef and omega
             need_omega = (self._dft and self.xcfun.is_range_separated())
             if need_omega:
-                assert_msg_critical(
-                    False, 'NLR: range-separated functional not yet supported' +
-                    ' in nonlinear response')
+                fock_k_factor = (self.xcfun.get_rs_alpha() +
+                                 self.xcfun.get_rs_beta())
+                erf_k_coef = -self.xcfun.get_rs_beta()
+                omega = self.xcfun.get_rs_omega()
+            else:
+                erf_k_coef, omega = None, None
 
             t0 = tm.time()
 
@@ -825,6 +828,18 @@ class NonlinearSolver:
                 # for pure functional
                 for idx in range(num_densities):
                     fock_arrays[idx] *= 2.0
+
+            if need_omega:
+                # for range-separated functional
+                fock_mat = fock_drv.compute(
+                    screening, den_mat_for_fock,
+                    ['kx_rs' for x in range(num_densities)], erf_k_coef, omega,
+                    thresh_int)
+
+                for idx in range(num_densities):
+                    fock_erf_k = fock_mat.matrix(
+                        str(idx)).full_matrix().to_numpy()
+                    fock_arrays[idx] -= fock_erf_k
 
             if profiler is not None:
                 profiler.add_timing_info('FockERI', tm.time() - t0)

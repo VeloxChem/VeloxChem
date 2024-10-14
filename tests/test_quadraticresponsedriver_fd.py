@@ -157,37 +157,30 @@ class TestQrfFD:
             beta_0_fd = (alpha_plus.real - alpha_minus.real) / (2.0 * delta_ef)
             assert abs(beta_0 - beta_0_fd) / abs(beta_0_fd) < 1.0e-5
 
-    def test_hf_svp_qrf_fd(self):
+    def test_hf_qrf_fd(self):
 
         self.run_qrf_fd('hf', 'def2-svp', 'yyz', [0.3, -0.11])
-
-    def test_hf_tzvp_qrf_fd(self):
-
         self.run_qrf_fd('hf', 'def2-tzvp', 'yyz', [0.3, -0.11])
 
-    def test_lda_svp_qrf_fd(self):
+    def test_lda_qrf_fd(self):
 
         self.run_qrf_fd('slda', 'def2-svp', 'yyz', [0.3, -0.11])
-
-    def test_lda_tzvp_qrf_fd(self):
-
         self.run_qrf_fd('slda', 'def2-tzvp', 'yyz', [0.3, -0.11])
 
-    def test_gga_svp_qrf_fd(self):
+    def test_gga_qrf_fd(self):
 
         self.run_qrf_fd('bp86', 'def2-svp', 'yyz', [0.3, -0.11])
-
-    def test_gga_tzvp_qrf_fd(self):
-
         self.run_qrf_fd('bp86', 'def2-tzvp', 'yyz', [0.3, -0.11])
 
-    def test_gga_hyb_svp_qrf_fd(self):
+    def test_gga_hyb_qrf_fd(self):
 
         self.run_qrf_fd('b3lyp', 'def2-svp', 'yyz', [0.3, -0.11])
-
-    def test_gga_hyb_tzvp_qrf_fd(self):
-
         self.run_qrf_fd('b3lyp', 'def2-tzvp', 'yyz', [0.3, -0.11])
+
+    def test_gga_rsh_qrf_fd(self):
+
+        self.run_qrf_fd('cam-b3lyp', 'def2-svp', 'yyz', [0.3, -0.11])
+        self.run_qrf_fd('cam-b3lyp', 'def2-tzvp', 'yyz', [0.3, -0.11])
 
     # TODO: enable qrf with mgga
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() == 1,
