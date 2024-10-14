@@ -288,6 +288,10 @@ class VibrationalAnalysis:
             # print the vibrational properties
             self.print_vibrational_analysis(molecule)
 
+            # print resonance Raman grid at the end
+            if self.do_resonance_raman:
+                self.print_resonance_raman()
+
             # create binary file and save vibrational analysis results
             self._write_final_hdf5(molecule)
 
@@ -639,6 +643,48 @@ class VibrationalAnalysis:
                 valstr += '{:12.4f}'.format(
                     self.normed_normal_modes[k][atom_index * 3 + 2])
                 self.ostream.print_header(valstr.ljust(width))
+
+            self.ostream.print_blank()
+            self.ostream.print_blank()
+
+        self.ostream.flush()
+
+    def print_resonance_raman(self):
+        """
+        Prints the results for resonance Raman.
+
+        :param molecule:
+            The molecule.
+        """
+
+        if self.do_raman:
+            pass
+
+        number_of_modes = len(self.vib_frequencies)
+        freqs = list(self.raman_intensities.keys())
+
+        title = 'Resonance Raman'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
+        width = 52
+        for k in range(number_of_modes):
+            # print normal mode indices
+            index_string = '{:22s}{:d}'.format('Vibrational Mode', k + 1)
+            self.ostream.print_header(index_string.ljust(width))
+            self.ostream.print_header('-' * width)
+
+            column_string = '{:>16s}  {:>24s}'.format('Frequency', 'Raman activity')
+            self.ostream.print_header(column_string.ljust(width))
+            self.ostream.print_header('-' * width)
+
+            # loop through the external frequencies
+            for freq in freqs:
+                #this_freq = str(round(freq,6))
+                raman_intens_string = '{:16.6f}  {:4s}  {:18.4f}  {:8s}'.format(
+                    freq, 'a.u.', self.raman_intensities[freq][k], 'A**4/amu')
+                self.ostream.print_header(raman_intens_string.ljust(width))
 
             self.ostream.print_blank()
             self.ostream.print_blank()
