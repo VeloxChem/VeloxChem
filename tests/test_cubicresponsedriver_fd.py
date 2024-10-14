@@ -187,9 +187,8 @@ class TestCrfFD:
 
         self.run_crf_fd('cam-b3lyp', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05])
 
-    # TODO: enable crf with mgga
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() == 1,
                         reason="multi-node only")
-    def disabled_test_mgga_crf_fd(self):
+    def test_mgga_crf_fd(self):
 
         self.run_crf_fd('tpssh', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05])

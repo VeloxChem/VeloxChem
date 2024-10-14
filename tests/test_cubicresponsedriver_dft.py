@@ -74,6 +74,12 @@ class TestCrf:
 
     def test_gga_hyb_crf(self):
 
-        ref_result = {'crf': -652.4805189222037+60.48380758714163j}
+        ref_result = {'crf': -652.4805189222037 + 60.48380758714163j}
 
         self.run_crf('b3lyp', 'def2-svpd', ref_result)
+
+    def test_mgga_hyb_crf(self):
+
+        ref_result = {'crf': -654.3981600270447 + 59.90488055447197j}
+
+        self.run_crf('tpssh', 'def2-svpd', ref_result)
