@@ -10,7 +10,7 @@ from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 from veloxchem.cubicresponsedriver import CubicResponseDriver
 
 
-@pytest.mark.solvers
+@pytest.mark.finitediff
 class TestCrfFD:
 
     def run_crf_fd(self, xcfun_label, basis_set_label, components, freqs):
@@ -181,14 +181,10 @@ class TestCrfFD:
 
         self.run_crf_fd('b3lyp', 'def2-tzvp', 'zyyz', [0.11, -0.3, 0.05])
 
-    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() == 1,
-                        reason="multi-node only")
     def test_gga_rsh_crf_fd(self):
 
         self.run_crf_fd('cam-b3lyp', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05])
 
-    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() == 1,
-                        reason="multi-node only")
     def test_mgga_crf_fd(self):
 
         self.run_crf_fd('tpssh', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05])

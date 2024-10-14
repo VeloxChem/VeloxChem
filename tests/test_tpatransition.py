@@ -77,8 +77,6 @@ class TestTpaTransition:
         }
         self.run_tpatransition('bp86', ref_result)
 
-    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() == 1,
-                        reason="multi-node only")
     def test_tpatransition_mgga(self):
 
         ref_result = {

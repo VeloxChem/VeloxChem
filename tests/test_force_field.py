@@ -15,7 +15,6 @@ from veloxchem.forcefieldgenerator import ForceFieldGenerator
 
 @pytest.mark.filterwarnings(
     'ignore:.*tostring.*tobytes:DeprecationWarning:geometric')
-@pytest.mark.solvers
 class TestForceField:
 
     @pytest.mark.skipif('scipy' not in sys.modules,

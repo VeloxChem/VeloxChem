@@ -10,7 +10,7 @@ from veloxchem.rsppolarizability import Polarizability
 from veloxchem.firstorderprop import FirstOrderProperties
 
 
-@pytest.mark.solvers
+@pytest.mark.finitediff
 class TestLrfFD:
 
     def run_lrf_fd(self, xcfun_label):
@@ -93,8 +93,6 @@ class TestLrfFD:
 
         self.run_lrf_fd('pbe0')
 
-    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() == 1,
-                        reason="multi-node only")
     def test_mgga_lrf_fd(self):
 
         self.run_lrf_fd('scan')

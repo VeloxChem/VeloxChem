@@ -95,7 +95,7 @@ class TestQrfDFT:
             assert abs(qrf_result_zzz[('qrf', -0.1, 0.3)].imag -
                        ref_result['zzz'].imag) < thresh
 
-    def test_slda_svp_qrf(self):
+    def test_lda_svp_qrf(self):
 
         ref_result = {
             'xxz': 0.998188471061107 + 2.5315931718063815j,
@@ -105,7 +105,7 @@ class TestQrfDFT:
 
         self.run_qrf('slda', 'def2-svp', ref_result)
 
-    def test_b3lyp_svp_qrf(self):
+    def test_gga_hyb_svp_qrf(self):
 
         ref_result = {
             'xxz': 1.0566216689359318 + 2.075487685485075j,
@@ -114,3 +114,13 @@ class TestQrfDFT:
         }
 
         self.run_qrf('b3lyp', 'def2-svp', ref_result)
+
+    def test_mgga_hyb_svp_qrf(self):
+
+        ref_result = {
+            'xxz': 1.3205225563995615 + 2.0352301782331748j,
+            'yzy': 26.641495799507723 + 11.843200356445866j,
+            'zzz': 15.41500249265054 + 19.8822927914182j,
+        }
+
+        self.run_qrf('tpssh', 'def2-svp', ref_result)

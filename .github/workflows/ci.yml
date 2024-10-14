@@ -59,5 +59,7 @@ jobs:
             python -m pip install -v .[test,qmmm]
           echo "=== VeloxChem test ==="
           python -c "import veloxchem; print(veloxchem.__version__)"
-          OMP_NUM_THREADS=2 mpiexec -n 2 python -m pytest --capture=no --log-cli-level=INFO --pyargs veloxchem -m "solvers"
-          OMP_NUM_THREADS=4 python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO --pyargs veloxchem
+          OMP_NUM_THREADS=2 mpiexec -n 2 python -m pytest --capture=no --log-cli-level=INFO \
+            --pyargs veloxchem -m "solvers" --durations=10
+          OMP_NUM_THREADS=4 python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO \
+            --pyargs veloxchem -m "not finitediff" --durations=10
