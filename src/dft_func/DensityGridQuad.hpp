@@ -61,14 +61,6 @@ class CDensityGridQuad
     /**
      Creates a density grid object.
 
-     @param densityValues the 2D memory block object with density values data.
-     @param gridType the type of density grid.
-     */
-    CDensityGridQuad(const CMemBlock2D<double>& densityValues, const dengrid gridType);
-
-    /**
-     Creates a density grid object.
-
      @param nGridPoints the number of grid points with density values.
      @param nDensityMatrices the number of AO density matrices.
      @param xcFuncType the type of exchange-correlation functional.

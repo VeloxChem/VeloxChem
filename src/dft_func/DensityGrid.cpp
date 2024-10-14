@@ -36,16 +36,6 @@ CDensityGrid::CDensityGrid()
 {
 }
 
-CDensityGrid::CDensityGrid(const CMemBlock2D<double>& densityValues, const dengrid gridType)
-
-    : _gridType(gridType)
-
-    , _nDensityMatrices(1)
-
-    , _densityValues(densityValues)
-{
-}
-
 CDensityGrid::CDensityGrid(const int nGridPoints, const int nDensityMatrices, const xcfun xcFuncType, const dengrid gridType)
 {
     _gridType = gridType;
@@ -64,15 +54,6 @@ CDensityGrid::CDensityGrid(const int nGridPoints, const int nDensityMatrices, co
     }
 
     _densityValues = CMemBlock2D<double>(nGridPoints, _nDensityMatrices * ncomp);
-}
-
-CDensityGrid::CDensityGrid(const int nGridPoints, const int nDensityMatrices, const int nComponents, const dengrid gridType)
-{
-    _gridType = gridType;
-
-    _nDensityMatrices = nDensityMatrices;
-
-    _densityValues = CMemBlock2D<double>(nGridPoints, _nDensityMatrices * nComponents);
 }
 
 CDensityGrid::CDensityGrid(const CDensityGrid& source)
@@ -149,15 +130,6 @@ void
 CDensityGrid::zero()
 {
     _densityValues.zero();
-}
-
-void
-CDensityGrid::slice(const int nGridPoints)
-{
-    if (nGridPoints < getNumberOfGridPoints())
-    {
-        _densityValues = _densityValues.slice(0, nGridPoints);
-    }
 }
 
 int

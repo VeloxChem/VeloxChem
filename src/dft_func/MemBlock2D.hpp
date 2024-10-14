@@ -143,16 +143,6 @@ class CMemBlock2D
     bool operator!=(const CMemBlock2D<T>& other) const;
 
     /**
-     Creates 2D memory block object by slicing part of this 2D memory block
-     object.
-
-     @param iPosition the position of first element in data chunks.
-     @param nElements the number of elements in data chunks.
-     @return the 2D memory block object.
-     */
-    CMemBlock2D<T> slice(const int iPosition, const int nElements) const;
-
-    /**
      Sets all elements of contiguous memory block to zero.
      */
     void zero();
@@ -339,29 +329,6 @@ bool
 CMemBlock2D<T>::operator!=(const CMemBlock2D<T>& other) const
 {
     return !(*this == other);
-}
-
-template <class T>
-CMemBlock2D<T>
-CMemBlock2D<T>::slice(const int iPosition, const int nElements) const
-{
-    CMemBlock2D<T> mblock(nElements, blocks());
-
-    for (int i = 0; i < blocks(); i++)
-    {
-        // set up pointers to data chunks
-
-        auto idata = data(i, iPosition);
-
-        auto odata = mblock.data(i);
-
-        // copy elements of data chunks
-
-        for (int j = 0; j < nElements; j++)
-            odata[j] = idata[j];
-    }
-
-    return mblock;
 }
 
 template <class T>

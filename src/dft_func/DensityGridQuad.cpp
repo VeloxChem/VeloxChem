@@ -40,16 +40,6 @@ CDensityGridQuad::CDensityGridQuad()
 {
 }
 
-CDensityGridQuad::CDensityGridQuad(const CMemBlock2D<double>& densityValues, const dengrid gridType)
-
-    : _gridType(gridType)
-
-    , _nDensityMatrices(1)
-
-    , _densityValues(densityValues)
-{
-}
-
 CDensityGridQuad::CDensityGridQuad(const int nGridPoints, const int nDensityMatrices, const xcfun xcFuncType, const dengrid gridType)
 {
     _gridType = gridType;

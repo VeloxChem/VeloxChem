@@ -66,14 +66,6 @@ class CDensityGrid
     /**
      Creates a density grid object.
 
-     @param densityValues the 2D memory block object with density values data.
-     @param gridType the type of density grid.
-     */
-    CDensityGrid(const CMemBlock2D<double>& densityValues, const dengrid gridType);
-
-    /**
-     Creates a density grid object.
-
      @param nGridPoints the number of grid points with density values.
      @param nDensityMatrices the number of AO density matrices.
      @param xcFuncType the type of exchange-correlation functional.
@@ -81,19 +73,6 @@ class CDensityGrid
      */
     CDensityGrid(const int nGridPoints, const int nDensityMatrices, const xcfun xcFuncType, const dengrid gridType);
 
-    /**
-     Creates a density grid object.
-     
-     @param nGridPoints the number of grid points with density values.
-     @param nDensityMatrices the number of AO density matrices.
-     @param nComponents the number of components per single AO density matrix.
-     @param gridType the type of density grid.
-     */
-    CDensityGrid(const int nGridPoints,
-                 const int nDensityMatrices,
-                 const int nComponents,
-                 const dengrid gridType);
-    
     /**
      Creates a density grid object by copying other density grid object.
 
@@ -147,13 +126,6 @@ class CDensityGrid
      Initialize density values at grid point to zero.
      */
     void zero();
-
-    /**
-     Reduces number of grid points by slicing off all grid points beoynd specific number of grid points.
-
-     @param nGridPoints the number of grid points.
-     */
-    void slice(const int nGridPoints);
 
     /**
      Gets number of grid points in density grid object.
