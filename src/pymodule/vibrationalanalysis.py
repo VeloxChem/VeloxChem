@@ -284,6 +284,8 @@ class VibrationalAnalysis:
 
             elif (self.do_raman or self.do_resonance_raman) and self.is_xtb:
                 self.ostream.print_info('Raman not available for XTB.')
+                self.do_raman = False
+                self.do_resonance_raman = False
 
             # print the vibrational properties
             self.print_vibrational_analysis(molecule)
@@ -596,7 +598,7 @@ class VibrationalAnalysis:
                     'IR intensity:', self.ir_intensities[k], 'km/mol')
                 self.ostream.print_header(ir_intens_string.ljust(width))
 
-            if self.raman_intensities is not None:
+            if self.do_raman and (self.raman_intensities is not None):
                 freq_unit = ' a.u.'
                 freqs = list(self.raman_intensities.keys())
                 for freq in freqs:
@@ -681,7 +683,6 @@ class VibrationalAnalysis:
 
             # loop through the external frequencies
             for freq in freqs:
-                #this_freq = str(round(freq,6))
                 raman_intens_string = '{:16.6f}  {:4s}  {:18.4f}  {:8s}'.format(
                     freq, 'a.u.', self.raman_intensities[freq][k], 'A**4/amu')
                 self.ostream.print_header(raman_intens_string.ljust(width))
@@ -730,11 +731,14 @@ class VibrationalAnalysis:
         hf = h5py.File(fname, 'w')
 
         nuc_rep = molecule.nuclear_repulsion_energy()
-        hf.create_dataset('nuc_rep', data = nuc_rep)
+        hf.create_dataset('nuclear_repulsion', data = nuc_rep)
+
+        natm = molecule.number_of_atoms()
 
         normal_mode_grp = hf.create_group('normal_modes')
         for n, Q in enumerate(self.normed_normal_modes, 1):
-            normal_mode_grp.create_dataset(str(n), data = np.array([Q]))
+            normal_mode_grp.create_dataset(str(n), 
+                          data = np.array([Q]).reshape(natm, 3))
         hf.create_dataset('vib_frequencies',
                           data = np.array([self.vib_frequencies]))
         hf.create_dataset('force_constants',
@@ -749,13 +753,13 @@ class VibrationalAnalysis:
             raman_grp = hf.create_group('raman_activity')
             for i in range(len(freqs)):
                 raman_grp.create_dataset(str(freqs[i]),
-                                         data = self.raman_intensities[freqs[i]])
+                          data = np.array([self.raman_intensities[freqs[i]]]))
         if self.do_resonance_raman:
             freqs = self.frequencies
             raman_grp = hf.create_group('resonance_raman_activity')
             for i in range(len(freqs)):
                 raman_grp.create_dataset(str(freqs[i]),
-                                         data = self.raman_intensities[freqs[i]])
+                          data = np.array([self.raman_intensities[freqs[i]]]))
         hf.close()
 
         return True
