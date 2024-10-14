@@ -132,6 +132,9 @@ class NonlinearSolver:
         # filename
         self.filename = None
 
+        self._debug = False
+        self._block_size_factor = 1
+
         # input keywords
         self._input_keywords = {
             'response': {
@@ -148,6 +151,8 @@ class NonlinearSolver:
                 'profiling': ('bool', 'print profiling information'),
                 'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
+                '_debug': ('bool', 'print debug info'),
+                '_block_size_factor': ('int', 'block size factor for ERI'),
             },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
@@ -440,6 +445,8 @@ class NonlinearSolver:
 
         fock_drv = FockDriver(self.comm)
 
+        fock_drv._set_block_size_factor(self._block_size_factor)
+
         # TODO: take screening from eri_dict
         if self.rank == mpi_master():
             screening = T4CScreener()
@@ -600,15 +607,25 @@ class NonlinearSolver:
         dist_fabs_2 = None
         dist_fabs_3 = None
 
-        batch_str = 'Processing Fock builds...'
-        batch_str += ' (batch size: {:d})'.format(batch_size)
+        batch_str = f'Processing {n_total} Fock build'
+        if n_total > 1:
+            batch_str += 's'
+        batch_str += '...'
         self.ostream.print_info(batch_str)
+        self.ostream.flush()
+
+        if self._debug:
+            self.ostream.print_info(
+                '==DEBUG== batch_size: {}'.format(batch_size))
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         for batch_ind in range(num_batches):
 
-            self.ostream.print_info('  batch {}/{}'.format(
-                batch_ind + 1, num_batches))
-            self.ostream.flush()
+            if self._debug:
+                self.ostream.print_info('==DEBUG== batch {}/{}'.format(
+                    batch_ind + 1, num_batches))
+                self.ostream.flush()
 
             dts1 = []
             dts2 = []
