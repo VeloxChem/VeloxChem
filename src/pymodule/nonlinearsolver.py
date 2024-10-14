@@ -29,7 +29,7 @@ import math
 
 from .veloxchemlib import XCIntegrator, MolecularGrid
 from .veloxchemlib import T4CScreener
-from .veloxchemlib import Matrices, make_matrix, mat_t
+from .veloxchemlib import make_matrix, mat_t
 from .veloxchemlib import mpi_master, denmat
 from .aodensitymatrix import AODensityMatrix
 from .griddriver import GridDriver
@@ -768,7 +768,6 @@ class NonlinearSolver:
 
             # broadcast densities
 
-            # TODO: use numpy array instead of AODensityMatrix
             dens_for_fock = dens_for_fock.broadcast(self.comm,
                                                     root=mpi_master())
 
@@ -777,14 +776,6 @@ class NonlinearSolver:
                 dens2 = dens2.broadcast(self.comm, root=mpi_master())
                 if mode_is_cubic:
                     dens3 = dens3.broadcast(self.comm, root=mpi_master())
-
-            den_mat_for_fock = Matrices()
-
-            num_densities = dens_for_fock.number_of_density_matrices()
-            for idx in range(num_densities):
-                den_mat = make_matrix(ao_basis, mat_t.general)
-                den_mat.set_values(dens_for_fock.alpha_to_numpy(idx))
-                den_mat_for_fock.add(den_mat, str(idx))
 
             thresh_int = int(-math.log10(self.eri_thresh))
 
@@ -814,32 +805,26 @@ class NonlinearSolver:
 
             # compute HF contribution to perturbed Fock matrices
 
-            fock_mat = fock_drv.compute(
-                screening, den_mat_for_fock,
-                [fock_type for x in range(num_densities)], fock_k_factor, 0.0,
-                thresh_int)
-
             fock_arrays = []
-            for idx in range(num_densities):
-                fock_np = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
+
+            for idx in range(dens_for_fock.number_of_density_matrices()):
+                den_mat = make_matrix(ao_basis, mat_t.general)
+                den_mat.set_values(dens_for_fock.alpha_to_numpy(idx))
+                fock_mat = fock_drv.compute(screening, den_mat, fock_type,
+                                            fock_k_factor, 0.0, thresh_int)
+                fock_np = fock_mat.full_matrix().to_numpy()
+
+                if fock_type == 'j':
+                    # for pure functional
+                    fock_np *= 2.0
+
+                if need_omega:
+                    # for range-separated functional
+                    erf_k_mat = fock_drv.compute(screening, den_mat, 'kx_rs',
+                                                 erf_k_coef, omega, thresh_int)
+                    fock_np -= erf_k_mat.full_matrix().to_numpy()
+
                 fock_arrays.append(fock_np)
-
-            if fock_type == 'j':
-                # for pure functional
-                for idx in range(num_densities):
-                    fock_arrays[idx] *= 2.0
-
-            if need_omega:
-                # for range-separated functional
-                fock_mat = fock_drv.compute(
-                    screening, den_mat_for_fock,
-                    ['kx_rs' for x in range(num_densities)], erf_k_coef, omega,
-                    thresh_int)
-
-                for idx in range(num_densities):
-                    fock_erf_k = fock_mat.matrix(
-                        str(idx)).full_matrix().to_numpy()
-                    fock_arrays[idx] -= fock_erf_k
 
             if profiler is not None:
                 profiler.add_timing_info('FockERI', tm.time() - t0)
@@ -860,9 +845,9 @@ class NonlinearSolver:
                                               self.xcfun.get_func_label(), mode)
                 elif mode_is_cubic:
                     # Compute XC contribution to three-time transformed Fock matrics
-                    xc_drv.integrate_kxclxc_fock(fock, molecule, ao_basis,
-                                                 dens1, dens2, dens3,
-                                                 gs_density, molgrid,
+                    xc_drv.integrate_kxclxc_fock(fock_arrays, molecule,
+                                                 ao_basis, dens1, dens2, dens3,
+                                                 gs_den_mat, molgrid,
                                                  self.xcfun.get_func_label(),
                                                  mode)
 

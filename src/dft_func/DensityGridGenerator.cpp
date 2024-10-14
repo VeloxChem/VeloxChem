@@ -942,10 +942,7 @@ generateDensityGridForMGGA(const CDenseMatrix&     gtoValues,
             {
                 auto nu_offset = nu * npoints;
 
-                #pragma omp simd aligned(rhoa, gradax, graday, gradaz, F_val, \
-                                         chi_val, chi_x_val, chi_y_val, chi_z_val, \
-                                         F_x_val, F_y_val, F_z_val, \
-                                         lapla, taua: VLX_ALIGN)
+                #pragma omp simd 
                 for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     rhoa[g] += F_val[nu_offset + g] * chi_val[nu_offset + g];
@@ -963,8 +960,7 @@ generateDensityGridForMGGA(const CDenseMatrix&     gtoValues,
                 }
             }
 
-            #pragma omp simd aligned(lapla,laplb,taua,taub,rhoa, rhob, gradax, graday, gradaz, gradbx, gradby, gradbz, \
-                                     grada, gradb, gradab : VLX_ALIGN)
+            #pragma omp simd 
             for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 rhob[g] = rhoa[g];

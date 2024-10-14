@@ -31,6 +31,7 @@
 #include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
 #include "DensityGrid.hpp"
+#include "DensityGridCubic.hpp"
 #include "DensityGridQuad.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularGrid.hpp"
@@ -174,6 +175,39 @@ auto integratePartialKxcFockForLDA(const CXCFunctional&    xcFunctional,
                                    const CDensityGrid&     rw2DensityGrid,
                                    const int               iFock,
                                    CMultiTimer&            timer) -> CDenseMatrix;
+
+auto integrateKxcLxcFockForLDA(const std::vector<double*>& aoFockPointers,
+                               const CMolecule&            molecule,
+                               const CMolecularBasis&      basis,
+                               const CAODensityMatrix&     rwDensityMatrix,
+                               const CAODensityMatrix&     rw2DensityMatrix,
+                               const CAODensityMatrix&     rw3DensityMatrix,
+                               const CAODensityMatrix&     gsDensityMatrix,
+                               const CMolecularGrid&       molecularGrid,
+                               const double                screeningThresholdForGTOValues,
+                               const CXCFunctional&        xcFunctional,
+                               const std::string&          cubeMode) -> void;
+
+auto integratePartialKxcFockForLDA2(const CXCFunctional&     xcFunctional,
+                                    const double*            weights,
+                                    const CDenseMatrix&      gtoValues,
+                                    const double*            v2rho2,
+                                    const double*            v3rho3,
+                                    const CDensityGridCubic& rwDensityGridCubic,
+                                    const CDensityGrid&      rw2DensityGrid,
+                                    const int            iFock,
+                                    CMultiTimer&             timer) -> CDenseMatrix;
+
+auto integratePartialLxcFockForLDA(const CXCFunctional&     xcFunctional,
+                                   const double*            weights,
+                                   const CDenseMatrix&      gtoValues,
+                                   const double*            v2rho2,
+                                   const double*            v3rho3,
+                                   const double*            v4rho4,
+                                   const CDensityGridCubic& rwDensityGridCubic,
+                                   const CDensityGrid&      rw3DensityGrid,
+                                   const int            iFock,
+                                   CMultiTimer&             timer) -> CDenseMatrix;
 
 }  // namespace xcintlda
 

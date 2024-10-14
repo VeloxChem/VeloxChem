@@ -179,6 +179,28 @@ class CXCIntegrator
                           const CXCFunctional&    fvxc,
                           const std::string&      quadMode) const -> void;
 
+    auto integrateKxcLxcFock(const std::vector<double*>& aoFockPointers,
+                             const CMolecule&        molecule,
+                             const CMolecularBasis&  basis,
+                             const CAODensityMatrix& rwDensityMatrix,
+                             const CAODensityMatrix& rw2DensityMatrix,
+                             const CAODensityMatrix& rw3DensityMatrix,
+                             const CAODensityMatrix& gsDensityMatrix,
+                             const CMolecularGrid&   molecularGrid,
+                             const std::string&      xcFuncLabel,
+                             const std::string&      cubeMode) const -> void;
+
+    auto integrateKxcLxcFock(const std::vector<double*>& aoFockPointers,
+                             const CMolecule&        molecule,
+                             const CMolecularBasis&  basis,
+                             const CAODensityMatrix& rwDensityMatrix,
+                             const CAODensityMatrix& rw2DensityMatrix,
+                             const CAODensityMatrix& rw3DensityMatrix,
+                             const CAODensityMatrix& gsDensityMatrix,
+                             const CMolecularGrid&   molecularGrid,
+                             const CXCFunctional&    fvxc,
+                             const std::string&      cubeMode) const -> void;
+
     /**
      Integrates first-order pair-density functional contribution to AO
      Fock matrix and MO "Q-matrix".

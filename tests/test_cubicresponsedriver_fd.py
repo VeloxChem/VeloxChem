@@ -173,8 +173,7 @@ class TestCrfFD:
 
         self.run_crf_fd('hf', 'def2-tzvp', 'zyyz', [0.11, -0.3, 0.05])
 
-    # TODO: enable crf with lda
-    def disabled_test_lda_crf_fd(self):
+    def test_lda_crf_fd(self):
 
         self.run_crf_fd('slda', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05])
 
