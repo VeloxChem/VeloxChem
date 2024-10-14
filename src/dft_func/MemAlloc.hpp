@@ -43,37 +43,9 @@
 #include "ErrorHandler.hpp"
 
 namespace mem {
-/**
- * Tag struct for host backend.
- */
-struct Host
-{
-    inline const static std::string name{"Host"};
-};
-
-template <typename B>
-inline constexpr bool is_on_host_v = std::is_same_v<B, Host>;
-
-/** Compute pitch for aligned allocation.
- *
- * @tparam T type of elements.
- * @param[in] alignment requested alignment, in bytes.
- * @param[in] count number of elements.
- * @return pitch of the allocation: _i.e._ the `count` plus the padding, if any.
- */
-template <typename T>
-constexpr auto
-get_pitch(size_t alignment, size_t count) -> size_t
-{
-    auto tile        = alignment / sizeof(T);
-    auto [quot, rem] = std::ldiv(count, tile);
-
-    if (rem) quot += 1;
-
-    return (quot * tile);
-}
 
 namespace detail {
+
 /** Aligned malloc to be used.
  *
  * - When linking against MKL, use `mkl_malloc`. Otherwise:
@@ -83,20 +55,19 @@ namespace detail {
  */
 inline auto __vlx_malloc =
 #ifdef ENABLE_MKL
-    [](size_t count_bytes, size_t alignment) -> void * { return mkl_malloc(count_bytes, static_cast<int>(alignment)); };
+    [](size_t count_bytes, size_t alignment) -> void * {
+        return mkl_malloc(count_bytes, static_cast<int>(alignment));
+    };
 #else  // ENABLE_MKL
 #ifdef _MSC_VER
     _aligned_malloc;
 #else  // _MSC_VER
     [](size_t count_bytes, size_t alignment) -> void * {
-    void *ptr = nullptr;
-
-    auto ierr = ::posix_memalign(&ptr, alignment, count_bytes);
-
-    errors::assertMsgCritical(ierr == 0, "posix_memalign failed");
-
-    return ptr;
-};
+        void *ptr = nullptr;
+        auto ierr = ::posix_memalign(&ptr, alignment, count_bytes);
+        errors::assertMsgCritical(ierr == 0, "posix_memalign failed");
+        return ptr;
+    };
 #endif
 #endif
 
@@ -129,7 +100,7 @@ inline auto __vlx_free =
  */
 template <typename T>
 auto
-host_allocate(size_t alignment, size_t count) -> T *
+allocate(size_t alignment, size_t count) -> T *
 {
     if (count == 0)
     {
@@ -171,7 +142,7 @@ host_allocate(size_t alignment, size_t count) -> T *
  */
 template <typename T>
 auto
-host_deallocate(T *p) noexcept -> void
+deallocate(T *p) noexcept -> void
 {
     if (p)
     {
@@ -179,74 +150,23 @@ host_deallocate(T *p) noexcept -> void
         p = nullptr;
     }
 }
+
 }  // namespace detail
 
-template <typename T, typename B = Host>
+template <typename T>
 auto
-malloc_1d(size_t alignment, size_t count) -> T *
+malloc(size_t count) -> T *
 {
-    if constexpr (is_on_host_v<B>)
-    {
-        return detail::host_allocate<T>(alignment, count);
-    }
-
-    return nullptr;
+    return detail::allocate<T>(VLX_ALIGN, static_cast<size_t>(count));
 }
 
-template <typename T, typename B = Host, typename U = size_t>
-auto
-malloc(U count) -> T *
-{
-    return malloc_1d<T, B>(VLX_ALIGN, static_cast<size_t>(count));
-}
-
-template <typename T, typename B = Host>
-auto
-malloc_2d(size_t alignment, size_t height, size_t width) -> std::tuple<size_t, T *>
-{
-    if constexpr (is_on_host_v<B>)
-    {
-        auto pitch = get_pitch<T>(alignment, width);
-        return {pitch, detail::host_allocate<T>(alignment, pitch * height)};
-    }
-
-    return nullptr;
-}
-
-template <typename T, typename B = Host, typename U = size_t>
-auto
-malloc(U height, U width) -> std::tuple<size_t, T *>
-{
-    return malloc_2d<T, B>(VLX_ALIGN, static_cast<size_t>(height), static_cast<size_t>(width));
-}
-
-/** Deallocate memory chunk pointed to by pointer.
- *
- * @tparam T type of memory chunk.
- * @tparam B memory allocation backend.
- * @param pointer the pointer to memory chunk.
- */
-template <typename T, typename B>
-auto
-free(T *pointer) -> void
-{
-    if constexpr (is_on_host_v<B>)
-    {
-        detail::host_deallocate(pointer);
-    }
-}
-
-/** Deallocate memory chunk pointed to by host pointer.
- *
- * @tparam T type of memory chunk.
- * @param pointer the pointer to memory chunk.
- */
 template <typename T>
 auto
 free(T *pointer) -> void
 {
-    detail::host_deallocate(pointer);
+    detail::deallocate(pointer);
 }
+
 }  // namespace mem
 
 #endif /* MemAlloc_hpp */

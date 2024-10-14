@@ -36,12 +36,6 @@
 #include "MathFunc.hpp"
 #include "MemAlloc.hpp"
 
-enum class numa : int
-{
-    serial = 0,
-    parallel = 1
-};
-
 /**
  Templated class CMemBlock manages contiguous memory block allocation,
  manipulation, and deallocation.
@@ -60,11 +54,6 @@ class CMemBlock
     int _nElements{0};
 
     /**
-     The NUMA policy for memory block handling.
-     */
-    numa _numaPolicy{numa::serial};
-
-    /**
      Allocates memory block.
      */
     void _allocate();
@@ -75,13 +64,6 @@ class CMemBlock
      @param source the pointer to data source.
      */
     void _copy_aligned(const T* source);
-
-    /**
-     Copies unaligned data to memory block from data source.
-
-     @param source the pointer to data source.
-     */
-    void _copy_unaligned(const T* source);
 
    public:
     /**
@@ -95,30 +77,6 @@ class CMemBlock
      @param nElements - the number of elements.
      */
     explicit CMemBlock(const int nElements);
-
-    /**
-     Creates a memory block object with specific NUMA policy.
-
-     @param nElements - the number of elements.
-     @param numaPolicy - the numa policy for data initialization.
-     */
-    CMemBlock(const int nElements, const numa numaPolicy);
-
-    /**
-     Creates a memory block object.
-
-     @param dataVector - the vector with data elements.
-     */
-    CMemBlock(const std::vector<T>& dataVector);
-
-    /**
-     Create a memory block object.
-
-     @param source - a raw pointer
-     @param size - size of data
-     @param numaPolicy - the numa policy for data initialization.
-     */
-    CMemBlock(const T* source, int size, numa numaPolicy);
 
     /**
      Creates a memory block object by copying other memory block object.
@@ -275,8 +233,6 @@ CMemBlock<T>::CMemBlock()
     : _data(nullptr)
 
     , _nElements(0)
-
-    , _numaPolicy(numa::serial)
 {
 }
 
@@ -286,54 +242,10 @@ CMemBlock<T>::CMemBlock(const int nElements)
     : _data(nullptr)
 
     , _nElements(nElements)
-
-    , _numaPolicy(numa::serial)
 {
     _allocate();
 
     zero();
-}
-
-template <class T>
-CMemBlock<T>::CMemBlock(const int nElements, const numa numaPolicy)
-
-    : _data(nullptr)
-
-    , _nElements(nElements)
-
-    , _numaPolicy(numaPolicy)
-{
-    _allocate();
-
-    zero();
-}
-
-template <class T>
-CMemBlock<T>::CMemBlock(const std::vector<T>& dataVector)
-
-    : _data(nullptr)
-
-    , _nElements(static_cast<int>(dataVector.size()))
-
-    , _numaPolicy(numa::serial)
-{
-    _allocate();
-
-    _copy_unaligned(dataVector.data());
-}
-
-template <typename T>
-CMemBlock<T>::CMemBlock(const T* source, int nElements, numa numaPolicy)
-
-    : _data(nullptr)
-
-    , _nElements(nElements)
-
-    , _numaPolicy(numaPolicy)
-{
-    _allocate();
-
-    _copy_unaligned(source);
 }
 
 template <class T>
@@ -342,8 +254,6 @@ CMemBlock<T>::CMemBlock(const CMemBlock<T>& source)
     : _data(nullptr)
 
     , _nElements(source._nElements)
-
-    , _numaPolicy(source._numaPolicy)
 {
     _allocate();
 
@@ -356,8 +266,6 @@ CMemBlock<T>::CMemBlock(CMemBlock<T>&& source) noexcept
     : _data(nullptr)
 
     , _nElements(std::move(source._nElements))
-
-    , _numaPolicy(std::move(source._numaPolicy))
 {
     _data = source._data;
 
@@ -378,8 +286,6 @@ CMemBlock<T>::operator=(const CMemBlock<T>& source)
 
     _nElements = source._nElements;
 
-    _numaPolicy = source._numaPolicy;
-
     _allocate();
 
     _copy_aligned(source.data());
@@ -395,8 +301,6 @@ CMemBlock<T>::operator=(CMemBlock<T>&& source) noexcept
 
     _nElements = std::move(source._nElements);
 
-    _numaPolicy = std::move(source._numaPolicy);
-
     mem::free(_data);
 
     _data = source._data;
@@ -411,8 +315,6 @@ bool
 CMemBlock<T>::operator==(const CMemBlock<T>& other) const
 {
     if (_nElements != other._nElements) return false;
-
-    if (_numaPolicy != other._numaPolicy) return false;
 
     for (int i = 0; i < _nElements; i++)
     {
@@ -472,17 +374,10 @@ CMemBlock<T>::zero()
 
     auto pdata = _data;
 
-    if (_numaPolicy == numa::parallel)
-    {
-#pragma omp      parallel for schedule(static)
-        for (int i = 0; i < _nElements; i++)
-            pdata[i] = t0value;
-    }
-    else
-    {
 #pragma omp simd aligned(pdata : VLX_ALIGN)
-        for (int i = 0; i < _nElements; i++)
-            pdata[i] = t0value;
+    for (int i = 0; i < _nElements; i++)
+    {
+        pdata[i] = t0value;
     }
 }
 
@@ -606,41 +501,14 @@ CMemBlock<T>::_allocate()
 
 template <class T>
 void
-CMemBlock<T>::_copy_unaligned(const T* source)
-{
-    auto pdata = _data;
-
-    if (_numaPolicy == numa::parallel)
-    {
-#pragma omp      parallel for schedule(static)
-        for (int i = 0; i < _nElements; i++)
-            pdata[i] = source[i];
-    }
-    else
-    {
-#pragma omp simd aligned(pdata : VLX_ALIGN)
-        for (int i = 0; i < _nElements; i++)
-            pdata[i] = source[i];
-    }
-}
-
-template <class T>
-void
 CMemBlock<T>::_copy_aligned(const T* source)
 {
     auto pdata = _data;
 
-    if (_numaPolicy == numa::parallel)
-    {
-#pragma omp      parallel for schedule(static)
-        for (int i = 0; i < _nElements; i++)
-            pdata[i] = source[i];
-    }
-    else
-    {
 #pragma omp simd aligned(pdata, source : VLX_ALIGN)
-        for (int i = 0; i < _nElements; i++)
-            pdata[i] = source[i];
+    for (int i = 0; i < _nElements; i++)
+    {
+        pdata[i] = source[i];
     }
 }
 

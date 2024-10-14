@@ -32,14 +32,7 @@
 #include <sstream>
 #include <string>
 
-#include "MemAlloc.hpp"
 #include "MemBlock.hpp"
-
-enum class matorder : int
-{
-    col_major,
-    row_major
-};
 
 /**
  Templated class CMemBlock2D manages 2D memory block allocation, manipulation,
@@ -86,22 +79,6 @@ class CMemBlock2D
      */
     void _setDimensions();
 
-    /**
-     Copies data elements from vector to memory block.
-
-     @param dataVector the vector with data elements.
-     @param dataOrder the order for copying data elements from vector to memory.
-     */
-    void _copy(const std::vector<T>& dataVector, const matorder dataOrder);
-
-    /**
-     Copies data elements from pointer to memory block.
-
-     @param source the raw pointer with data elements.
-     @param dataOrder the order for copying data elements from vector to memory.
-     */
-    void _copy(const T* source, const matorder dataOrder);
-
    public:
     /**
      Creates an empty 2D memory block object.
@@ -115,75 +92,6 @@ class CMemBlock2D
      @param nBlocks the number of data chunks.
      */
     CMemBlock2D(const int nElements, const int nBlocks);
-
-    /**
-     Creates an 2D memory block object.
-
-     @param dimVector the vector of data chunk sizes.
-     */
-    CMemBlock2D(const std::vector<int>& dimVector);
-
-    /**
-     Creates an 2D memory block object.
-
-     @param originalSizes the memory block object with data chunk sizes.
-     */
-    CMemBlock2D(const CMemBlock<int> originalSizes);
-
-    /**
-     Creates an 2D memory block object.
-
-     @param dataVector the vector with data elements.
-     @param nElements the number of elements in data chunk.
-     @param nBlocks the number of data chunks.
-     */
-    CMemBlock2D(const std::vector<T>& dataVector, const int nElements, const int nBlocks);
-
-    /**
-     Creates an 2D memory block object.
-
-     @param dataVector the vector with data elements.
-     @param dataOrder the order for copying data elements from vector to memory.
-     @param nElements the number of elements in data chunk.
-     @param nBlocks the number of data chunks.
-     */
-    CMemBlock2D(const std::vector<T>& dataVector, const matorder dataOrder, const int nElements, const int nBlocks);
-
-    /**
-     Creates an 2D memory block object.
-
-     @param source a raw pointer with data elements.
-     @param nElements the number of elements in data chunk.
-     @param nBlocks the number of data chunks.
-     */
-    CMemBlock2D(const T* source, const int nElements, const int nBlocks);
-
-    /**
-     Creates an 2D memory block object.
-
-     @param source a raw pointer with data elements.
-     @param dataOrder the order for copying data elements from vector to memory.
-     @param nElements the number of elements in data chunk.
-     @param nBlocks the number of data chunks.
-     */
-    CMemBlock2D(const T* source, const matorder dataOrder, const int nElements, const int nBlocks);
-
-    /**
-     Creates an 2D memory block object.
-
-     @param dataVector the vector with data elements.
-     @param dimVector the vector of data chunk sizes.
-     */
-    CMemBlock2D(const std::vector<T>& dataVector, const std::vector<int>& dimVector);
-
-    /**
-     Creates an 2D memory block object.
-
-     @param dataVector the vector with data elements.
-     @param dataOrder the order for copying data elements from vector to memory.
-     @param dimVector the vector of data chunk sizes.
-     */
-    CMemBlock2D(const std::vector<T>& dataVector, const matorder dataOrder, const std::vector<int>& dimVector);
 
     /**
      Creates a 2D memory block object by copying other 2D memory block object.
@@ -334,93 +242,6 @@ CMemBlock2D<T>::CMemBlock2D(const int nElements, const int nBlocks)
     _data = CMemBlock<T>(_nElements);
 
     _data.zero();
-}
-
-template <class T>
-CMemBlock2D<T>::CMemBlock2D(const std::vector<int>& dimVector) : _originalSizes(dimVector)
-{
-    _setDimensions();
-
-    _data = CMemBlock<T>(_nElements);
-
-    _data.zero();
-}
-
-template <class T>
-CMemBlock2D<T>::CMemBlock2D(const CMemBlock<int> originalSizes) : _originalSizes(originalSizes)
-{
-    _setDimensions();
-
-    _data = CMemBlock<T>(_nElements);
-
-    _data.zero();
-}
-
-template <class T>
-CMemBlock2D<T>::CMemBlock2D(const std::vector<T>& dataVector, const int nElements, const int nBlocks)
-
-    : CMemBlock2D<T>(dataVector, matorder::row_major, nElements, nBlocks)
-{
-}
-
-template <class T>
-CMemBlock2D<T>::CMemBlock2D(const std::vector<T>& dataVector, const matorder dataOrder, const int nElements, const int nBlocks)
-
-    : _nElements(0)
-{
-    _setOriginalSizes(nElements, nBlocks);
-
-    _setDimensions();
-
-    _data = CMemBlock<T>(_nElements);
-
-    _data.zero();
-
-    _copy(dataVector, dataOrder);
-}
-
-template <class T>
-CMemBlock2D<T>::CMemBlock2D(const T* raw, const int nElements, const int nBlocks)
-
-    : CMemBlock2D<T>(raw, matorder::row_major, nElements, nBlocks)
-{
-}
-
-template <class T>
-CMemBlock2D<T>::CMemBlock2D(const T* raw, const matorder dataOrder, const int nElements, const int nBlocks)
-
-    : _nElements(nElements)
-{
-    _setOriginalSizes(nElements, nBlocks);
-
-    _setDimensions();
-
-    _data = CMemBlock<T>(_nElements);
-
-    _data.zero();
-
-    _copy(raw, dataOrder);
-}
-
-template <class T>
-CMemBlock2D<T>::CMemBlock2D(const std::vector<T>& dataVector, const std::vector<int>& dimVector)
-
-    : CMemBlock2D<T>(dataVector, matorder::row_major, dimVector)
-{
-}
-
-template <class T>
-CMemBlock2D<T>::CMemBlock2D(const std::vector<T>& dataVector, const matorder dataOrder, const std::vector<int>& dimVector)
-{
-    _originalSizes = CMemBlock<int>(dimVector);
-
-    _setDimensions();
-
-    _data = CMemBlock<T>(_nElements);
-
-    _data.zero();
-
-    _copy(dataVector, dataOrder);
 }
 
 template <class T>
@@ -695,106 +516,6 @@ CMemBlock2D<T>::_setDimensions()
         _positions.at(i) = _nElements;
 
         _nElements += _paddedSizes.at(i);
-    }
-}
-
-template <class T>
-void
-CMemBlock2D<T>::_copy(const std::vector<T>& dataVector, const matorder dataOrder)
-{
-    // row major ordering of data in vector
-
-    if (dataOrder == matorder::row_major)
-    {
-        int pindex = 0;
-
-        for (int i = 0; i < _originalSizes.size(); i++)
-        {
-            auto currpos = _positions.at(i);
-
-            for (int j = 0; j < _originalSizes.at(i); j++)
-            {
-                _data.at(currpos + j) = dataVector[pindex];
-
-                pindex++;
-            }
-        }
-
-        return;
-    }
-
-    // column major ordering of data in vector
-
-    if (dataOrder == matorder::col_major)
-    {
-        int pindex = 0;
-
-        auto ndim = *(std::max_element(_originalSizes.data(), _originalSizes.data() + _originalSizes.size()));
-
-        for (int i = 0; i < ndim; i++)
-        {
-            for (int j = 0; j < _originalSizes.size(); j++)
-            {
-                if (i < _originalSizes.at(j))
-                {
-                    auto currpos = _positions.at(j);
-
-                    _data.at(currpos + i) = dataVector[pindex];
-
-                    pindex++;
-                }
-            }
-        }
-    }
-}
-
-template <class T>
-void
-CMemBlock2D<T>::_copy(const T* source, const matorder dataOrder)
-{
-    // row major ordering of data in vector
-
-    if (dataOrder == matorder::row_major)
-    {
-        int pindex = 0;
-
-        for (int i = 0; i < _originalSizes.size(); i++)
-        {
-            auto currpos = _positions.at(i);
-
-            for (int j = 0; j < _originalSizes.at(i); j++)
-            {
-                _data.at(currpos + j) = source[pindex];
-
-                pindex++;
-            }
-        }
-
-        return;
-    }
-
-    // column major ordering of data in vector
-
-    if (dataOrder == matorder::col_major)
-    {
-        int pindex = 0;
-
-        auto ndim = *(std::max_element(_originalSizes.data(), _originalSizes.data() + _originalSizes.size()));
-
-        for (int i = 0; i < ndim; i++)
-        {
-            for (int j = 0; j < _originalSizes.size(); j++)
-            {
-                if (i < _originalSizes.at(j))
-                {
-                    auto currpos = _positions.at(j);
-
-                    _data.at(currpos + i) = source[pindex];
-
-                    pindex++;
-                }
-            }
-        }
     }
 }
 
