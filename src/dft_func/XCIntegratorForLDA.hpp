@@ -27,8 +27,11 @@
 
 #include <string>
 
+#include "AODensityMatrix.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
+#include "DensityGrid.hpp"
+#include "DensityGridQuad.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
@@ -121,6 +124,29 @@ auto integratePartialFxcFockForLDA(const CXCFunctional& xcFunctional,
                                    const double*        rhow,
                                    const double*        v2rho2,
                                    CMultiTimer&         timer) -> CDenseMatrix;
+
+auto
+integrateKxcFockForLDA(const std::vector<double*>& aoFockPointers,
+                       const CMolecule&        molecule,
+                       const CMolecularBasis&  basis,
+                       const CAODensityMatrix& rwDensityMatrix,
+                       const CAODensityMatrix& rw2DensityMatrix,
+                       const CAODensityMatrix& gsDensityMatrix,
+                       const CMolecularGrid&   molecularGrid,
+                       const double            screeningThresholdForGTOValues,
+                       const CXCFunctional&    xcFunctional,
+                       const std::string&      quadMode) -> void;
+
+auto
+integratePartialKxcFockForLDA(const CXCFunctional&    xcFunctional,
+                              const double*           weights,
+                              const CDenseMatrix&     gtoValues,
+                              const double*           v2rho2,
+                              const double*           v3rho3,
+                              const CDensityGridQuad& rwDensityGridQuad,
+                              const CDensityGrid&     rw2DensityGrid,
+                              const int           iFock,
+                              CMultiTimer&            timer) -> CDenseMatrix;
 
 }  // namespace xcintlda
 

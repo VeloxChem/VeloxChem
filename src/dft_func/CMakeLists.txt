@@ -1,7 +1,9 @@
 target_sources(vlxobjs
   PRIVATE
     AOKohnShamMatrix.cpp
+    DensityGrid.cpp
     DensityGridGenerator.cpp
+    DensityGridQuad.cpp
     DftFunc.cpp
     DftSubMatrix.cpp
     FunctionalParser.cpp

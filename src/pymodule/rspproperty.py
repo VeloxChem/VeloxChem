@@ -32,6 +32,8 @@ from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .c6driver import C6Driver
 from .tdaeigensolver import TdaEigenSolver
+from .shgdriver import ShgDriver
+from .quadraticresponsedriver import QuadraticResponseDriver
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 
@@ -170,6 +172,21 @@ class ResponseProperty:
             self._rsp_driver._input_keywords['response'].update({
                 'tamm_dancoff': ('bool', 'use Tamm-Dancoff approximation'),
             })
+
+        # Quadratic response driver
+        elif (self.prop_type == 'custom' and
+              self._rsp_dict['order'] == 'quadratic' and
+              self._rsp_dict['residue'] == 'none' and
+              self._rsp_dict['complex'] == 'yes'):
+
+            self._rsp_driver = QuadraticResponseDriver(self.comm, self.ostream)
+
+        # SHG (quadratic response) driver
+        elif (self._rsp_dict['order'] == 'quadratic' and
+              self._rsp_dict['residue'] == 'none' and
+              self._rsp_dict['complex'] == 'yes'):
+
+            self._rsp_driver = ShgDriver(self.comm, self.ostream)
 
         # Update driver settings
         self._rsp_driver.update_settings(self._rsp_dict, self._method_dict)

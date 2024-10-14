@@ -345,6 +345,36 @@ export_dft(py::module& m)
                 self.integrateFxcFock(fock_pointers, molecule, basis, rw_dens_pointers, gs_dens_pointers, molecularGrid, fvxc);
             },
             "Integrates 2nd-order exchange-correlation contribution.")
+        .def(
+            "integrate_kxc_fock",
+            [](const CXCIntegrator&                    self,
+               std::vector<py::array_t<double>>&       aoFockArrays,
+               const CMolecule&                        molecule,
+               const CMolecularBasis&                  basis,
+               const CAODensityMatrix&                 rwDensityMatrix,
+               const CAODensityMatrix&                 rw2DensityMatrix,
+               const CAODensityMatrix&                 gsDensityMatrix,
+               const CMolecularGrid&                   molecularGrid,
+               const std::string&                      xcFuncLabel,
+               const std::string&                      quadMode) -> void {
+                auto        num_focks   = static_cast<int>(aoFockArrays.size());
+                auto        num_rw2_dens = rw2DensityMatrix.getNumberOfDensityMatrices();
+                //auto        num_gs_dens = static_cast<int>(gsDensityArrays.size());
+                std::string errnum("integrate_kxc_fock: Inconsistent number of numpy arrays");
+                errors::assertMsgCritical(num_rw2_dens == num_focks, errnum);
+                //errors::assertMsgCritical(num_gs_dens == 1, errnum);
+                auto nao = basis.dimensions_of_basis();
+                check_arrays("integrate_kxc_fock", aoFockArrays, nao);
+                //check_arrays("integrate_kxc_fock", rwDensityArrays, nao);
+                //check_arrays("integrate_kxc_fock", rw2DensityArrays, nao);
+                //check_arrays("integrate_kxc_fock", gsDensityArrays, nao);
+                auto fock_pointers    = arrays_to_mutable_pointers(aoFockArrays);
+                //auto rw_dens_pointers = arrays_to_const_pointers(rwDensityArrays);
+                //auto rw2_dens_pointers = arrays_to_const_pointers(rw2DensityArrays);
+                //auto gs_dens_pointers = arrays_to_const_pointers(gsDensityArrays);
+                self.integrateKxcFock(fock_pointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, xcFuncLabel, quadMode);
+            },
+            "Integrates 3rd-order exchange-correlation contribution.")
         .def("integrate_vxc_pdft", &integrate_vxc_pdft)
         .def(
             "compute_gto_values",

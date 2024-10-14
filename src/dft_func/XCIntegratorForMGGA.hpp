@@ -27,8 +27,10 @@
 
 #include <string>
 
+#include "AODensityMatrix.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
+#include "DensityGridQuad.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
@@ -194,6 +196,62 @@ auto integratePartialFxcFockForMGGA(const CXCFunctional& xcFunctional,
                                     const double*        v2sigmatau,
                                     const double*        v2sigma2,
                                     CMultiTimer&         timer) -> CDenseMatrix;
+
+auto
+integrateKxcFockForMGGA(const std::vector<double*>& aoFockPointers,
+                        const CMolecule&            molecule,
+                        const CMolecularBasis&      basis,
+                        const CAODensityMatrix&     rwDensityMatrix,
+                        const CAODensityMatrix&     rw2DensityMatrix,
+                        const CAODensityMatrix&     gsDensityMatrix,
+                        const CMolecularGrid&       molecularGrid,
+                        const double                screeningThresholdForGTOValues,
+                        const CXCFunctional&        xcFunctional,
+                        const std::string&          quadMode) -> void;
+
+auto
+integratePartialKxcFockForMGGA(const CXCFunctional&    xcFunctional,
+                               const double*           weights,
+                               const CDenseMatrix&     gtoValues,
+                               const CDenseMatrix&     gtoValuesX,
+                               const CDenseMatrix&     gtoValuesY,
+                               const CDenseMatrix&     gtoValuesZ,
+                               const double*           rhograd,
+                               const double*           vsigma,
+                               const double*           v2rho2,
+                               const double*           v2rhosigma,
+                               const double*           v2rholapl,
+                               const double*           v2rhotau,
+                               const double*           v2sigma2,
+                               const double*           v2sigmalapl,
+                               const double*           v2sigmatau,
+                               const double*           v2lapl2,
+                               const double*           v2lapltau,
+                               const double*           v2tau2,
+                               const double*           v3rho3,
+                               const double*           v3rho2sigma,
+                               const double*           v3rho2lapl,
+                               const double*           v3rho2tau,
+                               const double*           v3rhosigma2,
+                               const double*           v3rhosigmalapl,
+                               const double*           v3rhosigmatau,
+                               const double*           v3rholapl2,
+                               const double*           v3rholapltau,
+                               const double*           v3rhotau2,
+                               const double*           v3sigma3,
+                               const double*           v3sigma2lapl,
+                               const double*           v3sigma2tau,
+                               const double*           v3sigmalapl2,
+                               const double*           v3sigmalapltau,
+                               const double*           v3sigmatau2,
+                               const double*           v3lapl3,
+                               const double*           v3lapl2tau,
+                               const double*           v3lapltau2,
+                               const double*           v3tau3,
+                               const CDensityGridQuad& rwDensityGridQuad,
+                               const CDensityGrid&     rw2DensityGrid,
+                               const int               iFock,
+                               CMultiTimer&            timer) -> CDenseMatrix;
 
 }  // namespace xcintmgga
 

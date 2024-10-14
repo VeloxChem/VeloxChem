@@ -88,7 +88,7 @@ generatePairDensityForLDA(double*               rho,
                 auto MOu = MOs_on_grid.row(u);
 
                 auto tu_offset = t_offset + u * npoints;
-                #pragma omp simd aligned(mo_pair_val, MOt, MOu: VLX_ALIGN)
+                #pragma omp simd 
                 for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     mo_pair_val[tu_offset + g] += MOt[g] * MOu[g];
@@ -124,7 +124,7 @@ generatePairDensityForLDA(double*               rho,
 
         auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
 
-        #pragma omp simd aligned(rho : VLX_ALIGN)
+        #pragma omp simd 
         for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
         {
             rho[2 * g + 0] = 0.0;
@@ -137,7 +137,7 @@ generatePairDensityForLDA(double*               rho,
         {
             auto nu_offset = nu * npoints;
 
-            #pragma omp simd aligned(rho, F_val, chi_val : VLX_ALIGN)
+            #pragma omp simd 
             for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 rho[2 * g + 0] += F_val[nu_offset + g] * chi_val[nu_offset + g];
@@ -150,7 +150,7 @@ generatePairDensityForLDA(double*               rho,
         {
             auto vw_offset = vw * npoints;
 
-            #pragma omp simd aligned(rho, d_val, mo_pair_val : VLX_ALIGN)
+            #pragma omp simd 
             for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 rho[2 * g + 1] += d_val[vw_offset + g] * mo_pair_val[vw_offset + g];
@@ -246,7 +246,7 @@ generatePairDensityForGGA(double*               rho,
                 auto MOu = MOs_on_grid.row(u);
 
                 auto tu_offset = t_offset + u * npoints;
-                #pragma omp simd aligned(mo_pair_val, MOt, MOu: VLX_ALIGN)
+                #pragma omp simd 
                 for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     mo_pair_val[tu_offset + g] += MOt[g] * MOu[g];
@@ -287,7 +287,7 @@ generatePairDensityForGGA(double*               rho,
 
         auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
 
-        #pragma omp simd aligned(rho, rhograd : VLX_ALIGN)
+        #pragma omp simd 
         for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
         {
             rho[2 * g + 0] = 0.0;
@@ -307,7 +307,7 @@ generatePairDensityForGGA(double*               rho,
         {
             auto nu_offset = nu * npoints;
 
-            #pragma omp simd aligned(rho, rhograd, F_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
+            #pragma omp simd 
             for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 rho[2 * g + 0] += F_val[nu_offset + g] * chi_val[nu_offset + g];
@@ -324,7 +324,7 @@ generatePairDensityForGGA(double*               rho,
         {
             auto vw_offset = vw * npoints;
 
-            #pragma omp simd aligned(rho, d_val, mo_pair_val : VLX_ALIGN)
+            #pragma omp simd 
             for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 rho[2 * g + 1] += d_val[vw_offset + g] * mo_pair_val[vw_offset + g];
@@ -343,7 +343,7 @@ generatePairDensityForGGA(double*               rho,
 
                 auto MOw = MOs_on_grid.row(w);
 
-                #pragma omp simd aligned(rhograd, d_val, MOw, MOlX, MOlY, MOlZ: VLX_ALIGN)
+                #pragma omp simd 
                 for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     rhograd[6 * g + 3] += 4.0 * d_val[vw_offset + g] * MOw[g] * MOlX[g];
@@ -366,7 +366,7 @@ generatePairDensityForGGA(double*               rho,
 
         if (sigma != nullptr)
         {
-            #pragma omp simd aligned(rhograd, sigma : VLX_ALIGN)
+            #pragma omp simd 
             for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 sigma[3 * g + 0] = rhograd[6 * g + 0] * rhograd[6 * g + 0] +

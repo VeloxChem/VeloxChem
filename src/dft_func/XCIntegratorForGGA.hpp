@@ -27,8 +27,10 @@
 
 #include <string>
 
+#include "AODensityMatrix.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
+#include "DensityGridQuad.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
@@ -160,6 +162,39 @@ auto integratePartialFxcFockForGGA(const CXCFunctional& xcFunctional,
                                    const double*        v2rhosigma,
                                    const double*        v2sigma2,
                                    CMultiTimer&         timer) -> CDenseMatrix;
+
+auto
+integrateKxcFockForGGA(const std::vector<double*>& aoFockPointers,
+                       const CMolecule&            molecule,
+                       const CMolecularBasis&      basis,
+                       const CAODensityMatrix&     rwDensityMatrix,
+                       const CAODensityMatrix&     rw2DensityMatrix,
+                       const CAODensityMatrix&     gsDensityMatrix,
+                       const CMolecularGrid&       molecularGrid,
+                       const double                screeningThresholdForGTOValues,
+                       const CXCFunctional&        xcFunctional,
+                       const std::string&          quadMode) -> void;
+
+auto
+integratePartialKxcFockForGGA(const CXCFunctional&    xcFunctional,
+                              const double*           weights,
+                              const CDenseMatrix&     gtoValues,
+                              const CDenseMatrix&     gtoValuesX,
+                              const CDenseMatrix&     gtoValuesY,
+                              const CDenseMatrix&     gtoValuesZ,
+                              const double*           rhograd,
+                              const double*           vsigma,
+                              const double*           v2rho2,
+                              const double*           v2rhosigma,
+                              const double*           v2sigma2,
+                              const double*           v3rho3,
+                              const double*           v3rho2sigma,
+                              const double*           v3rhosigma2,
+                              const double*           v3sigma3,
+                              const CDensityGridQuad& rwDensityGridQuad,
+                              const CDensityGrid&     rw2DensityGrid,
+                              const int           iFock,
+                              CMultiTimer&            timer) -> CDenseMatrix;
 
 }  // namespace xcintgga
 

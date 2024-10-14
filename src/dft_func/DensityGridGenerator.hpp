@@ -25,8 +25,10 @@
 #ifndef DensityGridGenerator_hpp
 #define DensityGridGenerator_hpp
 
+#include "AODensityMatrix.hpp"
 #include "DenseLinearAlgebra.hpp"
 #include "DenseMatrix.hpp"
+#include "DensityGrid.hpp"
 #include "MultiTimer.hpp"
 
 namespace dengridgen {  // dengridgen namespace
@@ -55,6 +57,12 @@ auto generateDensityForLDA(double*             rho,
                            const CDenseMatrix& densityMatrixAlpha,
                            const CDenseMatrix& densityMatrixBeta,
                            CMultiTimer&        timer) -> void;
+
+auto
+generateDensityGridForLDA(const CDenseMatrix&     gtoValues,
+                          const CAODensityMatrix& densityMatrix,
+                          const xcfun             xcFunType,
+                          CMultiTimer&            timer) -> CDensityGrid;
 
 /**
  Generates density for GGA.
@@ -103,6 +111,15 @@ auto generateDensityForGGA(double*             rho,
                            const CDenseMatrix& densityMatrixAlpha,
                            const CDenseMatrix& densityMatrixBeta,
                            CMultiTimer&        timer) -> void;
+
+auto
+generateDensityGridForGGA(const CDenseMatrix&     gtoValues,
+                          const CDenseMatrix&     gtoValuesX,
+                          const CDenseMatrix&     gtoValuesY,
+                          const CDenseMatrix&     gtoValuesZ,
+                          const CAODensityMatrix& densityMatrix,
+                          const xcfun             xcFunType,
+                          CMultiTimer&            timer) -> CDensityGrid;
 
 /**
  Generates density for meta-GGA.
@@ -159,6 +176,15 @@ auto generateDensityForMGGA(double*             rho,
                             const CDenseMatrix& densityMatrixAlpha,
                             const CDenseMatrix& densityMatrixBeta,
                             CMultiTimer&        timer) -> void;
+
+auto
+generateDensityGridForMGGA(const CDenseMatrix&     gtoValues,
+                           const CDenseMatrix&     gtoValuesX,
+                           const CDenseMatrix&     gtoValuesY,
+                           const CDenseMatrix&     gtoValuesZ,
+                           const CAODensityMatrix& densityMatrix,
+                           const xcfun             xcFunType,
+                           CMultiTimer&            timer) -> CDensityGrid;
 
 }  // namespace dengridgen
 
