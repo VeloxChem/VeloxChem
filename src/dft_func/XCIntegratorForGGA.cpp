@@ -954,23 +954,23 @@ integrateKxcFockForGGA(const std::vector<double*>& aoFockPointers,
     auto       ggafunc = xcFunctional.getFunctionalPointerToGgaComponent();
     const auto dim     = &(ggafunc->dim);
 
-    CMemBlock<double> local_weights_data(max_npoints_per_box);
+    std::vector<double> local_weights_data(max_npoints_per_box);
 
-    CMemBlock<double> rho_data(dim->rho * max_npoints_per_box);
-    CMemBlock<double> rhograd_data(dim->rho * 3 * max_npoints_per_box);
-    CMemBlock<double> sigma_data(dim->sigma * max_npoints_per_box);
+    std::vector<double> rho_data(dim->rho * max_npoints_per_box);
+    std::vector<double> rhograd_data(dim->rho * 3 * max_npoints_per_box);
+    std::vector<double> sigma_data(dim->sigma * max_npoints_per_box);
 
-    CMemBlock<double> vrho_data(dim->vrho * max_npoints_per_box);
-    CMemBlock<double> vsigma_data(dim->vsigma * max_npoints_per_box);
+    std::vector<double> vrho_data(dim->vrho * max_npoints_per_box);
+    std::vector<double> vsigma_data(dim->vsigma * max_npoints_per_box);
 
-    CMemBlock<double> v2rho2_data(dim->v2rho2 * max_npoints_per_box);
-    CMemBlock<double> v2rhosigma_data(dim->v2rhosigma * max_npoints_per_box);
-    CMemBlock<double> v2sigma2_data(dim->v2sigma2 * max_npoints_per_box);
+    std::vector<double> v2rho2_data(dim->v2rho2 * max_npoints_per_box);
+    std::vector<double> v2rhosigma_data(dim->v2rhosigma * max_npoints_per_box);
+    std::vector<double> v2sigma2_data(dim->v2sigma2 * max_npoints_per_box);
 
-    CMemBlock<double> v3rho3_data(dim->v3rho3 * max_npoints_per_box);
-    CMemBlock<double> v3rho2sigma_data(dim->v3rho2sigma * max_npoints_per_box);
-    CMemBlock<double> v3rhosigma2_data(dim->v3rhosigma2 * max_npoints_per_box);
-    CMemBlock<double> v3sigma3_data(dim->v3sigma3 * max_npoints_per_box);
+    std::vector<double> v3rho3_data(dim->v3rho3 * max_npoints_per_box);
+    std::vector<double> v3rho2sigma_data(dim->v3rho2sigma * max_npoints_per_box);
+    std::vector<double> v3rhosigma2_data(dim->v3rhosigma2 * max_npoints_per_box);
+    std::vector<double> v3sigma3_data(dim->v3sigma3 * max_npoints_per_box);
 
     auto local_weights = local_weights_data.data();
 

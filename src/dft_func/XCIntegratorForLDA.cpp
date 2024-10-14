@@ -40,7 +40,6 @@
 #include "GtoFunc.hpp"
 #include "GtoValues.hpp"
 #include "MathFunc.hpp"
-#include "MemBlock.hpp"
 #include "MultiTimer.hpp"
 #include "Prescreener.hpp"
 #include "StringFormat.hpp"
@@ -745,15 +744,15 @@ integrateKxcFockForLDA(const std::vector<double*>& aoFockPointers,
 
     // density and functional derivatives
 
-    CMemBlock<double> local_weights_data(max_npoints_per_box);
+    std::vector<double> local_weights_data(max_npoints_per_box);
 
     auto       ldafunc = xcFunctional.getFunctionalPointerToLdaComponent();
     const auto dim     = &(ldafunc->dim);
 
-    CMemBlock<double> rho_data(dim->rho * max_npoints_per_box);
+    std::vector<double> rho_data(dim->rho * max_npoints_per_box);
 
-    CMemBlock<double> v2rho2_data(dim->v2rho2 * max_npoints_per_box);
-    CMemBlock<double> v3rho3_data(dim->v3rho3 * max_npoints_per_box);
+    std::vector<double> v2rho2_data(dim->v2rho2 * max_npoints_per_box);
+    std::vector<double> v3rho3_data(dim->v3rho3 * max_npoints_per_box);
 
     auto local_weights = local_weights_data.data();
 
