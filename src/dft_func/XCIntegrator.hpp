@@ -179,6 +179,21 @@ class CXCIntegrator
                           const CXCFunctional&    fvxc,
                           const std::string&      quadMode) const -> void;
 
+    /**
+     Integrates fourth-order exchnage-correlation functional contribution to AO
+     Fock matrix in cubic response.
+
+     @param aoFockMatrix the AO Fock matrix.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrix the one-time transformed densities.
+     @param rw2DensityMatrix the two-time transformed densities.
+     @param rw3DensityMatrix the three-time transformed densities.
+     @param gsDensityMatrix the ground state density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @param cubeMode a string that specifies which densities should be combined.
+     */
     auto integrateKxcLxcFock(const std::vector<double*>& aoFockPointers,
                              const CMolecule&        molecule,
                              const CMolecularBasis&  basis,
@@ -190,6 +205,21 @@ class CXCIntegrator
                              const std::string&      xcFuncLabel,
                              const std::string&      cubeMode) const -> void;
 
+    /**
+     Integrates fourth-order exchnage-correlation functional contribution to AO
+     Fock matrix in cubic response.
+
+     @param aoFockMatrix the AO Fock matrix.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrix the one-time transformed densities.
+     @param rw2DensityMatrix the two-time transformed densities.
+     @param rw3DensityMatrix the three-time transformed densities.
+     @param gsDensityMatrix the ground state density matrix.
+     @param molecularGrid the molecular grid.
+     @param fvxc the exchange-correlation functional.
+     @param cubeMode a string that specifies which densities should be combined.
+     */
     auto integrateKxcLxcFock(const std::vector<double*>& aoFockPointers,
                              const CMolecule&        molecule,
                              const CMolecularBasis&  basis,

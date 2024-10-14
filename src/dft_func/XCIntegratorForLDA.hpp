@@ -130,7 +130,7 @@ auto integratePartialFxcFockForLDA(const CXCFunctional& xcFunctional,
  Integrates third-order LDA exchange-correlation functional contribution
  to AO Fock matrix.
 
- @param aoFockMatrix the AO Fock matrix.
+ @param aoFockPointers the pointers to AO Fock matrices.
  @param molecule the molecule.
  @param basis the molecular basis.
  @param rwDensityMatrix the perturbed one-time transformed densities.
@@ -176,6 +176,22 @@ auto integratePartialKxcFockForLDA(const CXCFunctional&    xcFunctional,
                                    const int               iFock,
                                    CMultiTimer&            timer) -> CDenseMatrix;
 
+/**
+ Integrates fourth-order LDA exchnage-correlation functional contribution
+ to AO Fock matrix.
+
+ @param aoFockPointers the pointers to AO Fock matrices.
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ @param rwDensityMatrix the perturbed one-time transformed densities.
+ @param rw2DensityMatrix the two-time transformed densities.
+ @param rw3DensityMatrix the three-time transformed densities.
+ @param gsDensityMatrix the ground state density matrix.
+ @param molecularGrid the molecular grid.
+ @param screeningThresholdForGTOValues the screening threshold for GTO values.
+ @param xcFunctional the exchange-correlation functional.
+ @param cubeMode a string that specifies which densities should be combined.
+ */
 auto integrateKxcLxcFockForLDA(const std::vector<double*>& aoFockPointers,
                                const CMolecule&            molecule,
                                const CMolecularBasis&      basis,
@@ -188,6 +204,20 @@ auto integrateKxcLxcFockForLDA(const std::vector<double*>& aoFockPointers,
                                const CXCFunctional&        xcFunctional,
                                const std::string&          cubeMode) -> void;
 
+/**
+ Integrates LDA contribution to (third-order) Kxc matrix.
+
+ @param xcFunctional the exchange-correlation functional.
+ @param weights the weights of grid points.
+ @param gtoValues the GTO values on grid points.
+ @param v2rho2 the 2nd-order functional derivative wrt density.
+ @param v3rho3 the 3rd-order functional derivative wrt density.
+ @param rwDensityGridCubic the products of one and two-time transformed densities on grid points.
+ @param rw2DensityMatrix the two-time transformed densities on grid points.
+ @param iFock the index of the AO Fock matrix.
+ @param timer the timer.
+ @return the contribution as a CDenseMatrix object.
+ */
 auto integratePartialKxcFockForLDA2(const CXCFunctional&     xcFunctional,
                                     const double*            weights,
                                     const CDenseMatrix&      gtoValues,
@@ -195,9 +225,24 @@ auto integratePartialKxcFockForLDA2(const CXCFunctional&     xcFunctional,
                                     const double*            v3rho3,
                                     const CDensityGridCubic& rwDensityGridCubic,
                                     const CDensityGrid&      rw2DensityGrid,
-                                    const int            iFock,
+                                    const int                iFock,
                                     CMultiTimer&             timer) -> CDenseMatrix;
 
+/**
+ Integrates LDA contribution to (fourth-order) Lxc matrix.
+
+ @param xcFunctional the exchange-correlation functional.
+ @param weights the weights of grid points.
+ @param gtoValues the GTO values on grid points.
+ @param v2rho2 the 2nd-order functional derivative wrt density.
+ @param v3rho3 the 3rd-order functional derivative wrt density.
+ @param v4rho4 the 4rd-order functional derivative wrt density.
+ @param rwDensityGridCubic the products of one and two-time transformed densities on grid points.
+ @param rw3DensityMatrix the three-time transformed densities on grid points.
+ @param iFock the index of the AO Fock matrix.
+ @param timer the timer.
+ @return the contribution as a CDenseMatrix object.
+ */
 auto integratePartialLxcFockForLDA(const CXCFunctional&     xcFunctional,
                                    const double*            weights,
                                    const CDenseMatrix&      gtoValues,
@@ -206,7 +251,7 @@ auto integratePartialLxcFockForLDA(const CXCFunctional&     xcFunctional,
                                    const double*            v4rho4,
                                    const CDensityGridCubic& rwDensityGridCubic,
                                    const CDensityGrid&      rw3DensityGrid,
-                                   const int            iFock,
+                                   const int                iFock,
                                    CMultiTimer&             timer) -> CDenseMatrix;
 
 }  // namespace xcintlda
