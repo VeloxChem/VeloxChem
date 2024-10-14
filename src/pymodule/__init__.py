@@ -56,8 +56,11 @@ from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import extinction_coefficient_from_beta
 from .veloxchemlib import fine_structure_constant
 from .veloxchemlib import parse_xc_func
+from .veloxchemlib import make_matrix
+from .veloxchemlib import make_matrices
 
 # C++ enums
+from .veloxchemlib import mat_t
 from .veloxchemlib import denmat
 
 # Python enums
@@ -68,6 +71,8 @@ from .atomtypeidentifier import AtomTypeIdentifier
 from .seminario import Seminario
 from .inputparser import InputParser
 from .outputstream import OutputStream
+from .matrix import Matrix
+from .matrices import Matrices
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix
