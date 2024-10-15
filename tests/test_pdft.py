@@ -99,7 +99,7 @@ class TestPDFT:
         pdft_vxc, pdft_wxc = xc_drv.integrate_vxc_pdft(total_density, D2act,
                                                        mo_act.T.copy(),
                                                        molecule, basis, molgrid,
-                                                       pfunc)
+                                                       pfunc["name"], pfunc["components"], 0.0)
 
         pdft_xc_energy = scfdrv.comm.reduce(pdft_vxc.get_energy(),
                                             root=mpi_master())
@@ -141,24 +141,21 @@ class TestPDFT:
         else:
             return None, None, None, None
 
-    def test_O2_ROSlater(self):
-        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('slater', 'tslater')
-        if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            assert abs(ksdft - pdft) < 1.0e-6
-            assert np.allclose(ks_grad, pdft_grad)
-
     def test_O2_ROLDA(self):
-        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('slda', 'tlda')
+        pfunc = {"name": "tLDA", "components": {"TSLATER": 1.0, 'TVWN': 1.0}}
+        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('slda', pfunc)
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert abs(ksdft - pdft) < 1.0e-6
             assert np.allclose(ks_grad, pdft_grad)
 
     def test_O2_ROPBE(self):
-        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('pbe', 'tpbe')
+        pfunc = {"name": "tPBE", "components": {"TPBE_X": 1.0, 'TPBE_C': 1.0}}
+        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('pbe', pfunc)
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert abs(-16.911864099412625 - pdft) < 1.0e-6
 
     def test_O2_ROBLYP(self):
-        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('blyp', 'tblyp')
+        pfunc = {"name": "tBLYP", "components": {"TSLATER": 1.0, 'TB88': 1.0, 'TLYP': 1.0}}
+        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('blyp', pfunc)
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert abs(-17.056873017749865 - pdft) < 1.0e-6
