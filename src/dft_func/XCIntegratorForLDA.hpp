@@ -133,9 +133,9 @@ auto integratePartialFxcFockForLDA(const CXCFunctional& xcFunctional,
  @param aoFockPointers the pointers to AO Fock matrices.
  @param molecule the molecule.
  @param basis the molecular basis.
- @param rwDensityMatrix the perturbed one-time transformed densities.
- @param rw2DensityMatrix the two-time transformed densities.
- @param gsDensityMatrix the ground state density matrix.
+ @param rwDensityPointers the pointers to perturbed one-time transformed densities.
+ @param rw2DensityPointers the pointers to two-time transformed densities.
+ @param gsDensityPointers the pointers to ground state density matrix.
  @param molecularGrid the molecular grid.
  @param screeningThresholdForGTOValues the screening threshold for GTO values.
  @param xcFunctional the exchange-correlation functional.
@@ -161,7 +161,7 @@ auto integrateKxcFockForLDA(const std::vector<double*>& aoFockPointers,
  @param v2rho2 the 2nd-order functional derivative wrt density.
  @param v3rho3 the 3rd-order functional derivative wrt density.
  @param rwDensityGridQuad the products of one-time transformed densities on grid points.
- @param rw2DensityMatrix the two-time transformed densities on grid points.
+ @param rw2DensityGrid the two-time transformed densities on grid points.
  @param iFock the index of the AO Fock matrix.
  @param timer the timer.
  @return the contribution as a CDenseMatrix object.
@@ -183,10 +183,10 @@ auto integratePartialKxcFockForLDA(const CXCFunctional&    xcFunctional,
  @param aoFockPointers the pointers to AO Fock matrices.
  @param molecule the molecule.
  @param basis the molecular basis.
- @param rwDensityMatrix the perturbed one-time transformed densities.
- @param rw2DensityMatrix the two-time transformed densities.
- @param rw3DensityMatrix the three-time transformed densities.
- @param gsDensityMatrix the ground state density matrix.
+ @param rwDensityPointers the pointers to perturbed one-time transformed densities.
+ @param rw2DensityPointers the pointers to two-time transformed densities.
+ @param rw3DensityPointers the pointers to three-time transformed densities.
+ @param gsDensityPointers the pointers to ground state density matrix.
  @param molecularGrid the molecular grid.
  @param screeningThresholdForGTOValues the screening threshold for GTO values.
  @param xcFunctional the exchange-correlation functional.
@@ -213,7 +213,7 @@ auto integrateKxcLxcFockForLDA(const std::vector<double*>& aoFockPointers,
  @param v2rho2 the 2nd-order functional derivative wrt density.
  @param v3rho3 the 3rd-order functional derivative wrt density.
  @param rwDensityGridCubic the products of one and two-time transformed densities on grid points.
- @param rw2DensityMatrix the two-time transformed densities on grid points.
+ @param rw2DensityGrid the two-time transformed densities on grid points.
  @param iFock the index of the AO Fock matrix.
  @param timer the timer.
  @return the contribution as a CDenseMatrix object.
@@ -238,7 +238,7 @@ auto integratePartialKxcFockForLDA2(const CXCFunctional&     xcFunctional,
  @param v3rho3 the 3rd-order functional derivative wrt density.
  @param v4rho4 the 4rd-order functional derivative wrt density.
  @param rwDensityGridCubic the products of one and two-time transformed densities on grid points.
- @param rw3DensityMatrix the three-time transformed densities on grid points.
+ @param rw3DensityGrid the three-time transformed densities on grid points.
  @param iFock the index of the AO Fock matrix.
  @param timer the timer.
  @return the contribution as a CDenseMatrix object.
