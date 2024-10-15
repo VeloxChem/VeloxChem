@@ -45,6 +45,7 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpatransition import TpaTransition
+from .rsptpa import TPA
 #from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XtbDriver
@@ -159,6 +160,9 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
 
     elif prop_type == 'tpa transition':
         rsp_prop = TpaTransition(rsp_dict, method_dict)
+
+    elif prop_type == 'tpa':
+        rsp_prop = TPA(rsp_dict, method_dict)
 
     # elif prop_type == 'custom':
     #     rsp_prop = CustomProperty(rsp_dict, method_dict)

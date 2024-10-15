@@ -34,7 +34,10 @@ from .c6driver import C6Driver
 from .tdaeigensolver import TdaEigenSolver
 from .shgdriver import ShgDriver
 from .tpatransitiondriver import TpaTransitionDriver
+from .tpafulldriver import TpaFullDriver
+from .tpareddriver import TpaReducedDriver
 from .quadraticresponsedriver import QuadraticResponseDriver
+from .cubicresponsedriver import CubicResponseDriver
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 
@@ -195,6 +198,31 @@ class ResponseProperty:
               self._rsp_dict['complex'] == 'yes'):
 
             self._rsp_driver = TpaTransitionDriver(self.comm, self.ostream)
+
+        # Cubic response driver
+        elif (self.prop_type == 'custom' and
+              self._rsp_dict['order'] == 'cubic' and
+              self._rsp_dict['residue'] == 'none' and
+              self._rsp_dict['complex'] == 'yes'):
+
+            self._rsp_driver = CubicResponseDriver(self.comm, self.ostream)
+
+        # TPA (cubic response) driver
+        elif (self._rsp_dict['order'] == 'cubic' and
+              self._rsp_dict['residue'] == 'none' and
+              self._rsp_dict['complex'] == 'yes'):
+
+            if ('tpa_type' not in self._rsp_dict or
+                    self._rsp_dict['tpa_type'].lower() == 'full'):
+                self._rsp_driver = TpaFullDriver(self.comm, self.ostream)
+
+            elif ('tpa_type' in self._rsp_dict and
+                  self._rsp_dict['tpa_type'].lower() == 'reduced'):
+                self._rsp_driver = TpaReducedDriver(self.comm, self.ostream)
+
+            self._rsp_driver._input_keywords['response'].update({
+                'tpa_type': ('str_lower', 'full or reduced TPA calculation'),
+            })
 
         # Update driver settings
         self._rsp_driver.update_settings(self._rsp_dict, self._method_dict)
