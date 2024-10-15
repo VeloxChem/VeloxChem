@@ -34,21 +34,7 @@
 #include <vector>
 
 #include "XCComponent.hpp"
-
-/**
- Enumerate class xcfun:
-
- Defines supported exchange-correlation functional keys:
- xcfun::lda  - the local density approximation
- xcfun::gga  - the generalized gradient approximation
- xcfun::mgga - the meta-generalized gradient approximation
- */
-enum class xcfun
-{
-    lda,
-    gga,
-    mgga
-};
+#include "XCFunctionalType.hpp"
 
 /**
  * Class CXCFunctional is a wrapper to the C functions and structs provided by LibXC.

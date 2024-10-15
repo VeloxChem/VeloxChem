@@ -64,7 +64,6 @@ class LinearSolver:
 
     Instance variables
         - eri_thresh: The electron repulsion integrals screening threshold.
-        - qq_type: The electron repulsion integrals screening scheme.
         - batch_size: The batch size for computation of Fock matrices.
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
@@ -111,7 +110,6 @@ class LinearSolver:
 
         # ERI settings
         self.eri_thresh = 1.0e-15
-        self.qq_type = 'QQ_DEN'
         self.batch_size = None
 
         # dft
@@ -186,10 +184,8 @@ class LinearSolver:
         self._input_keywords = {
             'response': {
                 'eri_thresh': ('float', 'ERI screening threshold'),
-                'qq_type': ('str_upper', 'ERI screening scheme'),
                 'batch_size': ('int', 'batch size for Fock build'),
                 'conv_thresh': ('float', 'convergence threshold'),
-                'block_size_factor': ('int', 'OpenMP block size factor'),
                 'max_iter': ('int', 'maximum number of iterations'),
                 'norm_thresh': ('float', 'norm threshold for adding vector'),
                 'lindep_thresh': ('float', 'threshold for linear dependence'),
@@ -387,8 +383,12 @@ class LinearSolver:
                 'Using sub-communicators for {}.'.format(valstr))
             self.ostream.print_blank()
         else:
-            screening = T4CScreener()
-            screening.partition(basis, molecule, 'eri')
+            if self.rank == mpi_master():
+                screening = T4CScreener()
+                screening.partition(basis, molecule, 'eri')
+            else:
+                screening = None
+            screening = self.comm.bcast(screening, root=mpi_master())
 
         return {
             'screening': screening,
@@ -955,8 +955,6 @@ class LinearSolver:
 
         fock_drv._set_block_size_factor(self._block_size_factor)
 
-        fock_arrays = []
-
         # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'
         exchange_scaling_factor = 1.0
@@ -982,6 +980,7 @@ class LinearSolver:
                                     [fock_type for x in range(len(dens))],
                                     exchange_scaling_factor, 0.0, thresh_int)
 
+        fock_arrays = []
         for idx in range(num_densities):
             fock_np = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
             fock_arrays.append(fock_np)

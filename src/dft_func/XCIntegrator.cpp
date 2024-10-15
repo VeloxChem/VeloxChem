@@ -160,6 +160,127 @@ CXCIntegrator::integrateFxcFock(const std::vector<double*>&       aoFockPointers
 }
 
 auto
+CXCIntegrator::integrateKxcFock(const std::vector<double*>& aoFockPointers,
+                                const CMolecule&        molecule,
+                                const CMolecularBasis&  basis,
+                                const CAODensityMatrix& rwDensityMatrix,
+                                const CAODensityMatrix& rw2DensityMatrix,
+                                const CAODensityMatrix& gsDensityMatrix,
+                                const CMolecularGrid&   molecularGrid,
+                                const std::string&      xcFuncLabel,
+                                const std::string&      quadMode) const -> void
+{
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    return integrateKxcFock(aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, fvxc, quadMode);
+}
+
+auto
+CXCIntegrator::integrateKxcFock(const std::vector<double*>& aoFockPointers,
+                                const CMolecule&        molecule,
+                                const CMolecularBasis&  basis,
+                                const CAODensityMatrix& rwDensityMatrix,
+                                const CAODensityMatrix& rw2DensityMatrix,
+                                const CAODensityMatrix& gsDensityMatrix,
+                                const CMolecularGrid&   molecularGrid,
+                                const CXCFunctional&    fvxc,
+                                const std::string&      quadMode) const -> void
+{
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    if (rwDensityMatrix.isClosedShell() && rw2DensityMatrix.isClosedShell() && gsDensityMatrix.isClosedShell())
+    {
+        if (xcfuntype == xcfun::lda)
+        {
+            xcintlda::integrateKxcFockForLDA(aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
+        }
+        else if (xcfuntype == xcfun::gga)
+        {
+            xcintgga::integrateKxcFockForGGA(aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
+        }
+        else if (xcfuntype == xcfun::mgga)
+        {
+            xcintmgga::integrateKxcFockForMGGA(aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
+        }
+        else
+        {
+            std::string errxcfuntype("XCIntegrator.integrateKxcFock: Only implemented for LDA/GGA/meta-GGA");
+
+            errors::assertMsgCritical(false, errxcfuntype);
+        }
+    }
+    else
+    {
+        std::string erropenshell("XCIntegrator.integrateKxcFock: Not implemented for open-shell");
+
+        errors::assertMsgCritical(false, erropenshell);
+    }
+}
+
+auto
+CXCIntegrator::integrateKxcLxcFock(const std::vector<double*>& aoFockPointers,
+                                   const CMolecule&        molecule,
+                                   const CMolecularBasis&  basis,
+                                   const CAODensityMatrix& rwDensityMatrix,
+                                   const CAODensityMatrix& rw2DensityMatrix,
+                                   const CAODensityMatrix& rw3DensityMatrix,
+                                   const CAODensityMatrix& gsDensityMatrix,
+                                   const CMolecularGrid&   molecularGrid,
+                                   const std::string&      xcFuncLabel,
+                                   const std::string&      cubeMode) const -> void
+{
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    return integrateKxcLxcFock(aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, rw3DensityMatrix, gsDensityMatrix, molecularGrid, fvxc, cubeMode);
+}
+
+auto
+CXCIntegrator::integrateKxcLxcFock(const std::vector<double*>& aoFockPointers,
+                                   const CMolecule&        molecule,
+                                   const CMolecularBasis&  basis,
+                                   const CAODensityMatrix& rwDensityMatrix,
+                                   const CAODensityMatrix& rw2DensityMatrix,
+                                   const CAODensityMatrix& rw3DensityMatrix,
+                                   const CAODensityMatrix& gsDensityMatrix,
+                                   const CMolecularGrid&   molecularGrid,
+                                   const CXCFunctional&    fvxc,
+                                   const std::string&      cubeMode) const -> void
+{
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    if (rwDensityMatrix.isClosedShell() && rw2DensityMatrix.isClosedShell() && rw3DensityMatrix.isClosedShell() && gsDensityMatrix.isClosedShell())
+    {
+        if (xcfuntype == xcfun::lda)
+        {
+            xcintlda::integrateKxcLxcFockForLDA(
+                aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, rw3DensityMatrix, gsDensityMatrix, molecularGrid, _screeningThresholdForGTOValues, fvxc, cubeMode);
+        }
+        else if (xcfuntype == xcfun::gga)
+        {
+            xcintgga::integrateKxcLxcFockForGGA(
+                aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, rw3DensityMatrix, gsDensityMatrix, molecularGrid, _screeningThresholdForGTOValues, fvxc, cubeMode);
+        }
+        else if (xcfuntype == xcfun::mgga)
+        {
+            xcintmgga::integrateKxcLxcFockForMGGA(
+                aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, rw3DensityMatrix, gsDensityMatrix, molecularGrid, _screeningThresholdForGTOValues, fvxc, cubeMode);
+        }
+        else
+        {
+            std::string errxcfuntype("XCIntegrator.integrateKxcLxcFock: Only implemented for LDA/GGA/meta-GGA");
+
+            errors::assertMsgCritical(false, errxcfuntype);
+        }
+    }
+    else
+    {
+        std::string erropenshell("XCIntegrator.integrateKxcLxcFock: Not implemented for open-shell");
+
+        errors::assertMsgCritical(false, erropenshell);
+    }
+}
+
+auto
 CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&                  aoFockMatrix,
                                 CDense4DTensor&                     tensorWxc,
                                 const CMolecule&                    molecule,

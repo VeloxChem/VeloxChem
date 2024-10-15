@@ -186,6 +186,14 @@ class CAODensityMatrix
      @return the constant pointer to first element of spin-beta density matrix.
      */
     const double* betaDensity(const int iDensityMatrix) const;
+
+    /**
+     Gets constant reference to density matrix as dense matrix object.
+
+     @param iDensityMatrix the index of density matrix.
+     @return the constant reference to density matrix.
+     */
+    const CDenseMatrix& getReferenceToDensity(const int iDensityMatrix) const;
 };
 
 #endif /* AODensityMatrix_hpp */
