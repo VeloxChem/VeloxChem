@@ -14,10 +14,10 @@ from veloxchem.rsptpa import TPA
 class TestTPA:
 
     def run_scf(self, task):
-
+        scf_settings = {'conv_thresh': 1.0e-8}
+        method_settings = {'xcfun': 'BP86'}
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(task.input_dict['scf'],
-                                task.input_dict['method_settings'])
+        scf_drv.update_settings(scf_settings, method_settings)
         scf_results = scf_drv.compute(task.molecule, task.ao_basis,
                                       task.min_basis)
 
@@ -30,16 +30,18 @@ class TestTPA:
 
         scf_results = self.run_scf(task)
 
-        tpa_prop = TPA({
-            'damping': task.input_dict['response']['damping'],
-            'frequencies': task.input_dict['response']['frequencies'],
-            'conv_thresh': '1.0e-8',
-            'tpa_type': tpa_type,
-        })
+        tpa_prop = TPA(
+            {
+                'damping': task.input_dict['response']['damping'],
+                'frequencies': task.input_dict['response']['frequencies'],
+                'conv_thresh': '1.0e-8',
+                'tpa_type': tpa_type,
+            }, {'xcfun': 'BP86'})
+
         tpa_prop.init_driver(task.mpi_comm, task.ostream)
         tpa_prop.compute(task.molecule, task.ao_basis, scf_results)
 
-        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+        if task.mpi_rank == mpi_master():
             tpa_result = tpa_prop.rsp_property
 
             for key in ref_result:
@@ -50,18 +52,16 @@ class TestTPA:
 
     def test_tpa_full(self):
 
-        # vlxtag: RHF, TPA, CR
-
         w = 0.05
 
         ref_result = {
-            't4_dict': 11.43071305 + 0.04957732j,
-            't3_dict': -42.19841751 - 0.28695214j,
-            'NaX3NyNz': -81.62345190 - 0.35812832j,
-            'NaA3NxNy': -27.21320341 - 0.03029788j,
-            'NaX2Nyz': 270.69041328 + 2.67837597j,
-            'NxA2Nyz': 270.83461366 + 0.52758094j,
-            'gamma': 401.92066716 + 2.58015589j,
+            't4_dict': -39.81102482 - 0.37943318j,
+            't3_dict': -92.30945471 - 1.15690967j,
+            'NaX3NyNz': -154.11176435 - 1.18509718j,
+            'NaA3NxNy': -51.38898554 - 0.10346488j,
+            'NaX2Nyz': 621.17712859 + 10.77037598j,
+            'NxA2Nyz': 621.79142488 + 2.18017301j,
+            'gamma': 905.34732406 + 10.12564409j,
         }
 
         here = Path(__file__).parent
@@ -71,15 +71,13 @@ class TestTPA:
 
     def test_tpa_reduced(self):
 
-        # vlxtag: RHF, TPA, CR
-
         w = 0.05
 
         ref_result = {
-            't3_dict': -15.12982062 - 0.19793495j,
-            'NaX2Nyz': 96.30910639 + 1.72679037j,
-            'NxA2Nyz': 96.36431088 + 0.51886895j,
-            'gamma': 177.54359664 + 2.04772438j,
+            't3_dict': -35.37827126 - 0.92778160j,
+            'NaX2Nyz': 230.17180603 + 7.10669620j,
+            'NxA2Nyz': 230.43358578 + 2.16388980j,
+            'gamma': 425.22712055 + 8.34280441j,
         }
 
         here = Path(__file__).parent
