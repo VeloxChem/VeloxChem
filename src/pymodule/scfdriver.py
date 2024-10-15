@@ -242,7 +242,6 @@ class ScfDriver:
                 'max_iter': ('int', 'maximum number of SCF iterations'),
                 'conv_thresh': ('float', 'SCF convergence threshold'),
                 'eri_thresh': ('float', 'ERI screening threshold'),
-                'block_size_factor': ('int', 'OpenMP block size factor'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),

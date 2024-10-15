@@ -487,8 +487,23 @@ class CDensityGridCubic
     void DensityProd(const CDensityGrid& rwDensityGrid,
                      const CDensityGrid& rw2DensityGrid,
                      const xcfun         xcFuncType,
-                     const int       numdens,
+                     const int           numdens,
                      const std::string&  quadMode);
+
+    void DensityProdForLDA(const CDensityGrid& rwDensityGrid,
+                           const CDensityGrid& rw2DensityGrid,
+                           const int           numdens,
+                           const std::string&  quadMode);
+
+    void DensityProdForGGA(const CDensityGrid& rwDensityGrid,
+                           const CDensityGrid& rw2DensityGrid,
+                           const int           numdens,
+                           const std::string&  quadMode);
+
+    void DensityProdForMGGA(const CDensityGrid& rwDensityGrid,
+                            const CDensityGrid& rw2DensityGrid,
+                            const int           numdens,
+                            const std::string&  quadMode);
 };
 
 #endif /* DensityGridQuad_hpp */
