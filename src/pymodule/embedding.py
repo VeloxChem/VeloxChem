@@ -289,7 +289,8 @@ class PolarizableEmbeddingLRS(PolarizableEmbedding):
             external_fields=el_fields,
             threshold=self._threshold,
             max_iterations=self._max_iterations,
-            solver=self._solver
+            solver=self._solver,
+            exclude_static_internal_fields=True
         )
         f_el_ind = induction_interactions.ind_fock_matrix_contributions(
             classical_subsystem=self.classical_subsystem,

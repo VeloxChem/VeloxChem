@@ -648,7 +648,7 @@ class LinearSolver:
         # init PyFraME embedding
         if self.embedding_options is not None:
             if self.embedding_options['settings']['embedding_method'] == 'PE':
-                from .embeddding import PolarizableEmbeddingLRS
+                from .embedding import PolarizableEmbeddingLRS
                 self._embedding_drv = PolarizableEmbeddingLRS(molecule=molecule,
                                                               ao_basis=basis,
                                                               options=self.embedding_options,

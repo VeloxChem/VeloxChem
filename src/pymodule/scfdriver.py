@@ -587,7 +587,7 @@ class ScfDriver:
         if self.embedding_options is not None:
             settings = self.embedding_options['settings']
             if self.embedding_options['settings']['embedding_method'] == 'PE':
-                from .embeddding import PolarizableEmbeddingSCF
+                from .embedding import PolarizableEmbeddingSCF
                 self._embedding_drv = PolarizableEmbeddingSCF(molecule=molecule,
                                                               ao_basis=ao_basis,
                                                               options=self.embedding_options,
