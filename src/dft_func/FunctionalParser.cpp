@@ -149,7 +149,7 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 std::vector<std::string>
 getAvailablePairDensityFunctionals()
 {
-    return std::vector<std::string>({"tSLATER", "tVWN", "tPBE_X", "tPBE_C", "tB88", "tLYP"});
+    return std::vector<std::string>({"tSlater", "tSlater_erf", "tVWN_RPA", "tVWN5", "tPMGB06", "tP86", "tPBE_X", "tPBEX_erf", "tPBE_C", "tPBEC_erf", "tB88", "tB88_erf", "tLYP", "tLYP_erf", "HPG20"});
 }
 
 }

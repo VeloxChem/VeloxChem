@@ -26,11 +26,19 @@
 
 #include "ErrorHandler.hpp"
 #include "PairDensityBecke88.hpp"
+#include "PairDensityB88_erf.hpp"
 #include "PairDensityLYP.hpp"
+#include "PairDensityLYP_erf.hpp"
 #include "PairDensityPBE_C.hpp"
+#include "PairDensityPBEC_erf.hpp"
 #include "PairDensityPBE_X.hpp"
+#include "PairDensityPBEX_erf.hpp"
 #include "PairDensitySlater.hpp"
+#include "PairDensitySlater_erf.hpp"
 #include "PairDensityVWN.hpp"
+#include "PairDensityPMGB06.hpp"
+#include "PairDensityP86.hpp"
+#include "PairDensityHPG20.hpp"
 #include "StringFormat.hpp"
 
 CXCPairDensityFunctional::CXCPairDensityFunctional(const std::string&              nameOfFunctional,
@@ -131,7 +139,13 @@ CXCPairDensityFunctional::_isComponentPLDA(const std::string& compName) const
 
     if (upcasename == "TSLATER") return true;
 
-    if (upcasename == "TVWN") return true;
+    if (upcasename == "TSLATER_ERF") return true;
+
+    if (upcasename == "TVWN_RPA") return true;
+
+    if (upcasename == "TVWN5") return true;
+
+    if (upcasename == "TPMGB06") return true;
 
     return false;
 }
@@ -149,6 +163,18 @@ CXCPairDensityFunctional::_isComponentPGGA(const std::string& compName) const
 
     if (upcasename == "TLYP") return true;
 
+    if (upcasename == "TP86") return true;
+
+    if (upcasename == "HPG20") return true;
+
+    if (upcasename == "TPBEX_ERF") return true;
+
+    if (upcasename == "TPBEC_ERF") return true;
+
+    if (upcasename == "TB88_ERF") return true;
+
+    if (upcasename == "TLYP_ERF") return true;
+
     return false;
 }
 
@@ -161,13 +187,25 @@ CXCPairDensityFunctional::_plda_exc_vxc(const std::string& compName, const int n
     {
         pdftslater::compute_exc_vxc(np, rho, exc, vrho);
     }
-    else if (upcasename == "TVWN")
+    else if (upcasename == "TVWN_RPA")
     {
-        pdftvwn::compute_exc_vxc(np, rho, exc, vrho);
+        pdftvwn_rpa::compute_exc_vxc(np, rho, exc, vrho);
+    }
+    else if (upcasename == "TVWN5")
+    {
+        pdftvwn5::compute_exc_vxc(np, rho, exc, vrho);
+    }
+    else if (upcasename == "TSLATER_ERF")
+    {
+        pdftslater_erf::compute_exc_vxc(np, rho, exc, vrho, rs_omega);
+    }
+    else if (upcasename == "TPMGB06")
+    {
+        pdftpmgb06::compute_exc_vxc(np, rho, exc, vrho, rs_omega);
     }
     else
     {
-        std::string errmsg("XCPairDensityFunctional._plda_exc_vxc: Invalid functional name");
+        std::string errmsg("XCPairDensityFunctional._plda_exc_vxc: Invalid functional name "+upcasename);
 
         errors::assertMsgCritical(false, errmsg);
     }
@@ -201,9 +239,33 @@ CXCPairDensityFunctional::_pgga_exc_vxc(const std::string& compName,
     {
         pdftlyp::compute_exc_vxc(np, rho, sigma, exc, vrho, vsigma);
     }
+    else if (upcasename == "TP86")
+    {
+        pdftp86::compute_exc_vxc(np, rho, sigma, exc, vrho, vsigma);
+    }
+    else if (upcasename == "HPG20")
+    {
+        pdfthpg20::compute_exc_vxc(np, rho, sigma, exc, vrho, vsigma);
+    }
+    else if (upcasename == "TPBEX_ERF")
+    {
+        pdftpbex_erf::compute_exc_vxc(np, rho, sigma, exc, vrho, vsigma, rs_omega);
+    }
+    else if (upcasename == "TPBEC_ERF")
+    {
+        pdftpbec_erf::compute_exc_vxc(np, rho, sigma, exc, vrho, vsigma, rs_omega);
+    }
+    else if (upcasename == "TB88_ERF")
+    {
+        pdftb88_erf::compute_exc_vxc(np, rho, sigma, exc, vrho, vsigma, rs_omega);
+    }
+    else if (upcasename == "TLYP_ERF")
+    {
+        pdftlyp_erf::compute_exc_vxc(np, rho, sigma, exc, vrho, vsigma, rs_omega);
+    }
     else
     {
-        std::string errmsg("XCPairDensityFunctional._pgga_exc_vxc: Invalid functional name");
+        std::string errmsg("XCPairDensityFunctional._pgga_exc_vxc: Invalid functional name "+upcasename);
 
         errors::assertMsgCritical(false, errmsg);
     }

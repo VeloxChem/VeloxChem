@@ -23,15 +23,15 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef PairDensityLYP_hpp
-#define PairDensityLYP_hpp
+#ifndef PairDensityHPG20_hpp
+#define PairDensityHPG20_hpp
 
 #include <cstdint>
 
-namespace pdftlyp {  // pdftlyp namespace
+namespace pdfthpg20 {  // pdfthpg20 namespace
 
 /**
- Computes Exc and Vxc Fock for pair-density LYP correlation.
+ Computes Exc and Vxc Fock for pair-density HPG20 correlation.
 
  @param np the number of grid points.
  @param rho the density.
@@ -40,6 +40,6 @@ namespace pdftlyp {  // pdftlyp namespace
  */
 void compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma);
 
-}  // namespace pdftlyp
+}  // namespace pdfthpg20
 
-#endif /* PairDensityLYP_hpp */
+#endif /* PairDensityHPG20_hpp */

@@ -23,15 +23,15 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef PairDensityLYP_hpp
-#define PairDensityLYP_hpp
+#ifndef PairDensityP86_hpp
+#define PairDensityP86_hpp
 
 #include <cstdint>
 
-namespace pdftlyp {  // pdftlyp namespace
+namespace pdftp86 {  // pdftp86 namespace
 
 /**
- Computes Exc and Vxc Fock for pair-density LYP correlation.
+ Computes Exc and Vxc Fock for pair-density Perdew 86 correlation.
 
  @param np the number of grid points.
  @param rho the density.
@@ -40,6 +40,6 @@ namespace pdftlyp {  // pdftlyp namespace
  */
 void compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma);
 
-}  // namespace pdftlyp
+}  // namespace pdftp86
 
-#endif /* PairDensityLYP_hpp */
+#endif /* PairDensityP86_hpp */
