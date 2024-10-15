@@ -25,24 +25,18 @@
 #ifndef MemBlock2D_hpp
 #define MemBlock2D_hpp
 
-#include <algorithm>
-#include <cmath>
-#include <cstdint>
-#include <cstdlib>
-#include <sstream>
-#include <string>
+#include <vector>
 
 /**
  Templated class CMemBlock2D manages 2D memory block allocation, manipulation,
  and deallocation.
  */
-template <class T>
 class CMemBlock2D
 {
     /**
      The contiguous memory block.
      */
-    std::vector<T> _data;
+    std::vector<double> _data;
 
     /**
      The original sizes of data chunks in memory block.
@@ -96,14 +90,14 @@ class CMemBlock2D
 
      @param source the 2D memory block object.
      */
-    CMemBlock2D(const CMemBlock2D<T>& source);
+    CMemBlock2D(const CMemBlock2D& source);
 
     /**
      Creates a 2D memory block object by moving other 2D memory block object.
 
      @param source the 2D memory block object.
      */
-    CMemBlock2D(CMemBlock2D<T>&& source) noexcept;
+    CMemBlock2D(CMemBlock2D&& source) noexcept;
 
     /**
      Destroys a 2D memory block object.
@@ -115,14 +109,14 @@ class CMemBlock2D
 
      @param source the 2D memory block object.
      */
-    CMemBlock2D<T>& operator=(const CMemBlock2D<T>& source);
+    CMemBlock2D& operator=(const CMemBlock2D& source);
 
     /**
      Assigns a 2D memory block object by moving other 2D memory block object.
 
      @param source the 2D memory block object.
      */
-    CMemBlock2D<T>& operator=(CMemBlock2D<T>&& source) noexcept;
+    CMemBlock2D& operator=(CMemBlock2D&& source) noexcept;
 
     /**
      Compares 2D memory block object with other 2D memory block object.
@@ -130,7 +124,7 @@ class CMemBlock2D
      @param other the 2D memory block object.
      @return true if 2D memory block objects are equal, false otherwise.
      */
-    bool operator==(const CMemBlock2D<T>& other) const;
+    bool operator==(const CMemBlock2D& other) const;
 
     /**
      Compares 2D memory block object with other 2D memory block object.
@@ -138,7 +132,7 @@ class CMemBlock2D
      @param other the 2D memory block object.
      @return true if 2D memory block objects are not equal, false otherwise.
      */
-    bool operator!=(const CMemBlock2D<T>& other) const;
+    bool operator!=(const CMemBlock2D& other) const;
 
     /**
      Sets all elements of contiguous memory block to zero.
@@ -158,7 +152,7 @@ class CMemBlock2D
      @param iBlock the index of data chunk.
      @return the pointer to data chunk.
      */
-    T* data(const int iBlock);
+    double* data(const int iBlock);
 
     /**
      Gets constant pointer to specific data chunk in 2D memory block.
@@ -166,7 +160,7 @@ class CMemBlock2D
      @param iBlock the index of data chunk.
      @return the pointer to data chunk.
      */
-    const T* data(const int iBlock) const;
+    const double* data(const int iBlock) const;
 
     /**
      Gets pointer to specific element of selected data chunk in 2D memory block.
@@ -175,7 +169,7 @@ class CMemBlock2D
      @param iElement the index of element in memory block.
      @return the pointer to data chunk.
      */
-    T* data(const int iBlock, const int iElement);
+    double* data(const int iBlock, const int iElement);
 
     /**
      Gets constant pointer to specific elment of selected data chunk in 2D
@@ -185,7 +179,7 @@ class CMemBlock2D
      @param iElement the index of element in memory block.
      @return the pointer to data chunk.
      */
-    const T* data(const int iBlock, const int iElement) const;
+    const double* data(const int iBlock, const int iElement) const;
 
     /**
      Gets number of elements in specific data chunk.
@@ -210,278 +204,5 @@ class CMemBlock2D
      */
     int blocks() const;
 };
-
-template <class T>
-CMemBlock2D<T>::CMemBlock2D()
-
-    : _nElements(0)
-{
-}
-
-template <class T>
-CMemBlock2D<T>::CMemBlock2D(const int nElements, const int nBlocks)
-
-    : _nElements(0)
-{
-    _setOriginalSizes(nElements, nBlocks);
-
-    _setDimensions();
-
-    _data = std::vector<T>(_nElements);
-
-    std::fill(_data.begin(), _data.end(), static_cast<T>(0));
-}
-
-template <class T>
-CMemBlock2D<T>::CMemBlock2D(const CMemBlock2D<T>& source)
-
-    : _data(source._data)
-
-    , _originalSizes(source._originalSizes)
-
-    , _paddedSizes(source._paddedSizes)
-
-    , _positions(source._positions)
-
-    , _nElements(source._nElements)
-{
-}
-
-template <class T>
-CMemBlock2D<T>::CMemBlock2D(CMemBlock2D<T>&& source) noexcept
-
-    : _data(std::move(source._data))
-
-    , _originalSizes(std::move(source._originalSizes))
-
-    , _paddedSizes(std::move(source._paddedSizes))
-
-    , _positions(std::move(source._positions))
-
-    , _nElements(std::move(source._nElements))
-{
-}
-
-template <class T>
-CMemBlock2D<T>::~CMemBlock2D()
-{
-}
-
-template <class T>
-CMemBlock2D<T>&
-CMemBlock2D<T>::operator=(const CMemBlock2D<T>& source)
-{
-    if (this == &source) return *this;
-
-    _nElements = source._nElements;
-
-    _positions = source._positions;
-
-    _paddedSizes = source._paddedSizes;
-
-    _originalSizes = source._originalSizes;
-
-    _data = source._data;
-
-    return *this;
-}
-
-template <class T>
-CMemBlock2D<T>&
-CMemBlock2D<T>::operator=(CMemBlock2D<T>&& source) noexcept
-{
-    if (this == &source) return *this;
-
-    _nElements = std::move(source._nElements);
-
-    _positions = std::move(source._positions);
-
-    _paddedSizes = std::move(source._paddedSizes);
-
-    _originalSizes = std::move(source._originalSizes);
-
-    _data = std::move(source._data);
-
-    return *this;
-}
-
-template <class T>
-bool
-CMemBlock2D<T>::operator==(const CMemBlock2D<T>& other) const
-{
-    if (_nElements != other._nElements) return false;
-
-    if (_positions != other._positions) return false;
-
-    if (_paddedSizes != other._paddedSizes) return false;
-
-    if (_originalSizes != other._originalSizes) return false;
-
-    if (_data != other._data) return false;
-
-    return true;
-}
-
-template <class T>
-bool
-CMemBlock2D<T>::operator!=(const CMemBlock2D<T>& other) const
-{
-    return !(*this == other);
-}
-
-template <class T>
-void
-CMemBlock2D<T>::zero()
-{
-    std::fill(_data.begin(), _data.end(), static_cast<T>(0));
-}
-
-template <class T>
-bool
-CMemBlock2D<T>::isEmpty() const
-{
-    if (_nElements == 0) return true;
-
-    return false;
-}
-
-template <class T>
-T*
-CMemBlock2D<T>::data(const int iBlock)
-{
-    if (_originalSizes.size() > 0)
-    {
-        if (iBlock < 0) return nullptr;
-
-        if (iBlock >= blocks()) return nullptr;
-
-        return _data.data() + _positions.at(iBlock);
-    }
-
-    return nullptr;
-}
-
-template <class T>
-const T*
-CMemBlock2D<T>::data(const int iBlock) const
-{
-    if (_originalSizes.size() > 0)
-    {
-        if (iBlock < 0) return nullptr;
-
-        if (iBlock >= blocks()) return nullptr;
-
-        return _data.data() + _positions.at(iBlock);
-    }
-
-    return nullptr;
-}
-
-template <class T>
-T*
-CMemBlock2D<T>::data(const int iBlock, const int iElement)
-{
-    if (_originalSizes.size() > 0)
-    {
-        auto pdata = _data.data() + _positions.at(iBlock);
-
-        if (iElement < _originalSizes.at(iBlock))
-        {
-            return &(pdata[iElement]);
-        }
-
-        return nullptr;
-    }
-
-    return nullptr;
-}
-
-template <class T>
-const T*
-CMemBlock2D<T>::data(const int iBlock, const int iElement) const
-{
-    if (_originalSizes.size() > 0)
-    {
-        auto pdata = _data.data() + _positions.at(iBlock);
-
-        if (iElement < _originalSizes.at(iBlock))
-        {
-            return &(pdata[iElement]);
-        }
-
-        return nullptr;
-    }
-
-    return nullptr;
-}
-
-template <class T>
-int
-CMemBlock2D<T>::size(const int iBlock) const
-{
-    if (iBlock < _originalSizes.size()) return _originalSizes.at(iBlock);
-
-    return 0;
-}
-
-template <class T>
-int
-CMemBlock2D<T>::pitched_size(const int iBlock) const
-{
-    if (iBlock < _paddedSizes.size()) return _paddedSizes.at(iBlock);
-
-    return 0;
-}
-
-template <class T>
-int
-CMemBlock2D<T>::blocks() const
-{
-    return _originalSizes.size();
-}
-
-template <class T>
-void
-CMemBlock2D<T>::_setOriginalSizes(const int nElements, const int nBlocks)
-{
-    _originalSizes = std::vector<int>(nBlocks);
-
-    for (int i = 0; i < nBlocks; i++)
-        _originalSizes.at(i) = nElements;
-}
-
-template <class T>
-void
-CMemBlock2D<T>::_setDimensions()
-{
-    auto numblocks = _originalSizes.size();
-
-    _paddedSizes = std::vector<int>(numblocks);
-
-    _positions = std::vector<int>(numblocks);
-
-    // loop over data chunks
-
-    int primdim = 64 / sizeof(T);
-
-    _nElements = 0;
-
-    for (int i = 0; i < numblocks; i++)
-    {
-        // compute padded size of data chunk
-
-        auto pblocks = _originalSizes.at(i) / primdim;
-
-        if ((_originalSizes.at(i) % primdim) != 0) pblocks++;
-
-        _paddedSizes.at(i) = pblocks * primdim;
-
-        // determine start position of data chunk
-
-        _positions.at(i) = _nElements;
-
-        _nElements += _paddedSizes.at(i);
-    }
-}
 
 #endif /* MemBlock2D_hpp */

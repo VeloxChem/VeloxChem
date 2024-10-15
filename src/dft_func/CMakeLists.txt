@@ -19,6 +19,7 @@ target_sources(vlxobjs
     GtoValuesRecS.cpp
     LebedevLaikovQuadrature.cpp
     M4T2Quadrature.cpp
+    MemBlock2D.cpp
     MolecularGrid.cpp
     PartitionFunc.cpp
     Prescreener.cpp

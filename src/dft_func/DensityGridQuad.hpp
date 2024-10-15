@@ -50,7 +50,7 @@ class CDensityGridQuad
     /**
      The density variables values at grid points.
      */
-    CMemBlock2D<double> _densityValues;
+    CMemBlock2D _densityValues;
 
    public:
     /**
