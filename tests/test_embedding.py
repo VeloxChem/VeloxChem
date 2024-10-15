@@ -1,8 +1,10 @@
 import numpy as np
 import os
 import pytest
-from veloxchem.veloxchemlib import (Molecule, MolecularBasis, PolarizableEmbedding, ScfRestrictedDriver,
-                                    LinearResponseSolver)
+from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.lrsolver import LinearResponseSolver
 
 
 class TestPolarizableEmbedding:
