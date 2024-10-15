@@ -882,8 +882,8 @@ class NonlinearSolver:
                 elif mode_is_cubic:
                     # Compute XC contribution to three-time transformed Fock matrics
                     xc_drv.integrate_kxclxc_fock(fock_arrays, molecule,
-                                                 ao_basis, dens1, dens2, dens3,
-                                                 gs_den_mat, molgrid,
+                                                 ao_basis, dts1, dts2, dts3,
+                                                 gs_density, molgrid,
                                                  self.xcfun.get_func_label(),
                                                  mode)
 

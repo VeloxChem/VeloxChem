@@ -2241,10 +2241,10 @@ auto
 integrateKxcLxcFockForMGGA(const std::vector<double*>& aoFockPointers,
                            const CMolecule&            molecule,
                            const CMolecularBasis&      basis,
-                           const CAODensityMatrix&     rwDensityMatrix,
-                           const CAODensityMatrix&     rw2DensityMatrix,
-                           const CAODensityMatrix&     rw3DensityMatrix,
-                           const CAODensityMatrix&     gsDensityMatrix,
+                           const std::vector<const double*>& rwDensityPointers,
+                           const std::vector<const double*>& rw2DensityPointers,
+                           const std::vector<const double*>& rw3DensityPointers,
+                           const std::vector<const double*>& gsDensityPointers,
                            const CMolecularGrid&       molecularGrid,
                            const double                screeningThresholdForGTOValues,
                            const CXCFunctional&        xcFunctional,
@@ -2573,7 +2573,7 @@ integrateKxcLxcFockForMGGA(const std::vector<double*>& aoFockPointers,
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat = dftsubmat::getSubDensityMatrix(gsDensityMatrix.alphaDensity(0), aoinds, naos);
+        auto sub_dens_mat = dftsubmat::getSubDensityMatrix(gsDensityPointers[0], aoinds, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -2585,11 +2585,11 @@ integrateKxcLxcFockForMGGA(const std::vector<double*>& aoFockPointers,
 
         timer.start("Density matrix slicing");
 
-        auto rw_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rwDensityMatrix, aoinds);
+        auto rw_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rwDensityPointers, aoinds, naos);
 
-        auto rw2_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rw2DensityMatrix, aoinds);
+        auto rw2_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rw2DensityPointers, aoinds, naos);
 
-        auto rw3_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rw3DensityMatrix, aoinds);
+        auto rw3_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rw3DensityPointers, aoinds, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -2609,9 +2609,9 @@ integrateKxcLxcFockForMGGA(const std::vector<double*>& aoFockPointers,
 
         timer.start("Density grid quad");
 
-        auto numdens_rw3 = rw3DensityMatrix.getNumberOfDensityMatrices();
+        auto numdens_rw3 = static_cast<int>(rw3DensityPointers.size());
 
-        auto numdens_rw2 = rw2DensityMatrix.getNumberOfDensityMatrices();
+        auto numdens_rw2 = static_cast<int>(rw2DensityPointers.size());
 
         CDensityGridCubic rwdengridcube(npoints, (numdens_rw2 + numdens_rw3), xcfuntype, dengrid::ab);
 
