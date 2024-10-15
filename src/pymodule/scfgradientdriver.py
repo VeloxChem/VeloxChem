@@ -86,10 +86,16 @@ class ScfGradientDriver(GradientDriver):
         start_time = tm.time()
         self.print_header()
 
-        if scf_results['scf_type'] == 'restricted':
+        if self.rank == mpi_master():
+            scf_type = scf_results['scf_type']
+        else:
+            scf_type = None
+        scf_type = self.comm.bcast(scf_type, root=mpi_master())
+
+        if scf_type == 'restricted':
             self.compute_restricted(molecule, basis, scf_results)
 
-        elif scf_results['scf_type'] == 'unrestricted':
+        elif scf_type == 'unrestricted':
             self.compute_unrestricted(molecule, basis, scf_results)
 
         else:
