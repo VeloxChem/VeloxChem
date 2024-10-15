@@ -93,6 +93,41 @@ getSubAODensityMatrix(const CAODensityMatrix& densityMatrix, const std::vector<i
 }
 
 auto
+getSubAODensityMatrix(const std::vector<const double*>& densityPointers, const std::vector<int>& aoIndices, const int naos) -> CAODensityMatrix
+{
+    const auto aocount = static_cast<int>(aoIndices.size());
+
+    if (aocount > naos) return CAODensityMatrix();
+
+    std::vector<CDenseMatrix> submatrices;
+
+    auto numdens = static_cast<int>(densityPointers.size());
+
+    for (int idens = 0; idens < numdens; idens++)
+    {
+        CDenseMatrix sub_dens(aocount, aocount);
+
+        auto dens = densityPointers[idens];
+
+        for (int i = 0; i < aocount; i++)
+        {
+            auto sub_dens_row = sub_dens.row(i);
+
+            auto dens_row = dens + aoIndices[i] * naos;
+
+            for (int j = 0; j < aocount; j++)
+            {
+                sub_dens_row[j] = dens_row[aoIndices[j]];
+            }
+        }
+
+        submatrices.push_back(sub_dens);
+    }
+
+    return CAODensityMatrix(submatrices, denmat::rest);
+}
+
+auto
 getSubMatrixByColumnSlicing(const CDenseMatrix& denseMatrix, const std::vector<int>& aoIndices, const int naos) -> CDenseMatrix
 {
     const auto aocount = static_cast<int>(aoIndices.size());

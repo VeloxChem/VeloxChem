@@ -785,6 +785,25 @@ class NonlinearSolver:
 
             # broadcast densities
 
+            if self.rank == mpi_master():
+                num_dts1, num_dts2, num_dts3 = len(dts1), len(dts2), len(dts3)
+            else:
+                num_dts1, num_dts2, num_dts3 = None, None, None
+            num_dts1, num_dts2, num_dts3 = self.comm.bcast(
+                (num_dts1, num_dts2, num_dts3), root=mpi_master())
+
+            if self.rank != mpi_master():
+                dts1 = [None for x in range(num_dts1)]
+                dts2 = [None for x in range(num_dts2)]
+                dts3 = [None for x in range(num_dts3)]
+
+            for idx in range(num_dts1):
+                dts1[idx] = self.comm.bcast(dts1[idx], root=mpi_master())
+            for idx in range(num_dts2):
+                dts2[idx] = self.comm.bcast(dts2[idx], root=mpi_master())
+            for idx in range(num_dts3):
+                dts3[idx] = self.comm.bcast(dts3[idx], root=mpi_master())
+
             dens_for_fock = dens_for_fock.broadcast(self.comm,
                                                     root=mpi_master())
 
@@ -858,7 +877,7 @@ class NonlinearSolver:
                 if mode_is_quadratic:
                     # Compute XC contribution to two-time transformed Fock matrics
                     xc_drv.integrate_kxc_fock(fock_arrays, molecule, ao_basis,
-                                              dens1, dens2, gs_den_mat, molgrid,
+                                              dts1, dts2, gs_density, molgrid,
                                               self.xcfun.get_func_label(), mode)
                 elif mode_is_cubic:
                     # Compute XC contribution to three-time transformed Fock matrics
