@@ -35,11 +35,11 @@ CDensityGridCubic::CDensityGridCubic()
 
     , _nDensityMatrices(0)
 
-    , _densityValues(CMemBlock2D())
+    , _densityValues(CDensityGridData2D())
 {
 }
 
-CDensityGridCubic::CDensityGridCubic(const CMemBlock2D& densityValues, const dengrid gridType)
+CDensityGridCubic::CDensityGridCubic(const CDensityGridData2D& densityValues, const dengrid gridType)
 
     : _gridType(gridType)
 
@@ -66,7 +66,7 @@ CDensityGridCubic::CDensityGridCubic(const int nGridPoints, const int nDensityMa
         if (xcFuncType == xcfun::mgga) ncomp = 130;
     }
 
-    _densityValues = CMemBlock2D(nGridPoints, _nDensityMatrices * ncomp);
+    _densityValues = CDensityGridData2D(nGridPoints, _nDensityMatrices * ncomp);
 }
 
 CDensityGridCubic::CDensityGridCubic(const CDensityGridCubic& source)

@@ -22,19 +22,19 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "MemBlock2D.hpp"
+#include "DensityGridData2D.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
 
-CMemBlock2D::CMemBlock2D()
+CDensityGridData2D::CDensityGridData2D()
 
     : _nElements(0)
 {
 }
 
-CMemBlock2D::CMemBlock2D(const int nElements, const int nBlocks)
+CDensityGridData2D::CDensityGridData2D(const int nElements, const int nBlocks)
 
     : _nElements(0)
 {
@@ -47,7 +47,7 @@ CMemBlock2D::CMemBlock2D(const int nElements, const int nBlocks)
     std::fill(_data.begin(), _data.end(), 0.0);
 }
 
-CMemBlock2D::CMemBlock2D(const CMemBlock2D& source)
+CDensityGridData2D::CDensityGridData2D(const CDensityGridData2D& source)
 
     : _data(source._data)
 
@@ -61,7 +61,7 @@ CMemBlock2D::CMemBlock2D(const CMemBlock2D& source)
 {
 }
 
-CMemBlock2D::CMemBlock2D(CMemBlock2D&& source) noexcept
+CDensityGridData2D::CDensityGridData2D(CDensityGridData2D&& source) noexcept
 
     : _data(std::move(source._data))
 
@@ -75,12 +75,12 @@ CMemBlock2D::CMemBlock2D(CMemBlock2D&& source) noexcept
 {
 }
 
-CMemBlock2D::~CMemBlock2D()
+CDensityGridData2D::~CDensityGridData2D()
 {
 }
 
-CMemBlock2D&
-CMemBlock2D::operator=(const CMemBlock2D& source)
+CDensityGridData2D&
+CDensityGridData2D::operator=(const CDensityGridData2D& source)
 {
     if (this == &source) return *this;
 
@@ -97,8 +97,8 @@ CMemBlock2D::operator=(const CMemBlock2D& source)
     return *this;
 }
 
-CMemBlock2D&
-CMemBlock2D::operator=(CMemBlock2D&& source) noexcept
+CDensityGridData2D&
+CDensityGridData2D::operator=(CDensityGridData2D&& source) noexcept
 {
     if (this == &source) return *this;
 
@@ -116,7 +116,7 @@ CMemBlock2D::operator=(CMemBlock2D&& source) noexcept
 }
 
 bool
-CMemBlock2D::operator==(const CMemBlock2D& other) const
+CDensityGridData2D::operator==(const CDensityGridData2D& other) const
 {
     if (_nElements != other._nElements) return false;
 
@@ -132,27 +132,19 @@ CMemBlock2D::operator==(const CMemBlock2D& other) const
 }
 
 bool
-CMemBlock2D::operator!=(const CMemBlock2D& other) const
+CDensityGridData2D::operator!=(const CDensityGridData2D& other) const
 {
     return !(*this == other);
 }
 
 void
-CMemBlock2D::zero()
+CDensityGridData2D::zero()
 {
     std::fill(_data.begin(), _data.end(), 0.0);
 }
 
-bool
-CMemBlock2D::isEmpty() const
-{
-    if (_nElements == 0) return true;
-
-    return false;
-}
-
 double*
-CMemBlock2D::data(const int iBlock)
+CDensityGridData2D::data(const int iBlock)
 {
     if (_originalSizes.size() > 0)
     {
@@ -167,7 +159,7 @@ CMemBlock2D::data(const int iBlock)
 }
 
 const double*
-CMemBlock2D::data(const int iBlock) const
+CDensityGridData2D::data(const int iBlock) const
 {
     if (_originalSizes.size() > 0)
     {
@@ -182,7 +174,7 @@ CMemBlock2D::data(const int iBlock) const
 }
 
 double*
-CMemBlock2D::data(const int iBlock, const int iElement)
+CDensityGridData2D::data(const int iBlock, const int iElement)
 {
     if (_originalSizes.size() > 0)
     {
@@ -200,7 +192,7 @@ CMemBlock2D::data(const int iBlock, const int iElement)
 }
 
 const double*
-CMemBlock2D::data(const int iBlock, const int iElement) const
+CDensityGridData2D::data(const int iBlock, const int iElement) const
 {
     if (_originalSizes.size() > 0)
     {
@@ -218,7 +210,7 @@ CMemBlock2D::data(const int iBlock, const int iElement) const
 }
 
 int
-CMemBlock2D::size(const int iBlock) const
+CDensityGridData2D::size(const int iBlock) const
 {
     if (iBlock < _originalSizes.size()) return _originalSizes.at(iBlock);
 
@@ -226,7 +218,7 @@ CMemBlock2D::size(const int iBlock) const
 }
 
 int
-CMemBlock2D::pitched_size(const int iBlock) const
+CDensityGridData2D::pitched_size(const int iBlock) const
 {
     if (iBlock < _paddedSizes.size()) return _paddedSizes.at(iBlock);
 
@@ -234,13 +226,13 @@ CMemBlock2D::pitched_size(const int iBlock) const
 }
 
 int
-CMemBlock2D::blocks() const
+CDensityGridData2D::blocks() const
 {
     return _originalSizes.size();
 }
 
 void
-CMemBlock2D::_setOriginalSizes(const int nElements, const int nBlocks)
+CDensityGridData2D::_setOriginalSizes(const int nElements, const int nBlocks)
 {
     _originalSizes = std::vector<int>(nBlocks);
 
@@ -249,7 +241,7 @@ CMemBlock2D::_setOriginalSizes(const int nElements, const int nBlocks)
 }
 
 void
-CMemBlock2D::_setDimensions()
+CDensityGridData2D::_setDimensions()
 {
     auto numblocks = _originalSizes.size();
 

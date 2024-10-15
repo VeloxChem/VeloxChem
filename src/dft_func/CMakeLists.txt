@@ -3,6 +3,7 @@ target_sources(vlxobjs
     AOKohnShamMatrix.cpp
     DensityGrid.cpp
     DensityGridCubic.cpp
+    DensityGridData2D.cpp
     DensityGridGenerator.cpp
     DensityGridQuad.cpp
     DftFunc.cpp
@@ -19,7 +20,6 @@ target_sources(vlxobjs
     GtoValuesRecS.cpp
     LebedevLaikovQuadrature.cpp
     M4T2Quadrature.cpp
-    MemBlock2D.cpp
     MolecularGrid.cpp
     PartitionFunc.cpp
     Prescreener.cpp

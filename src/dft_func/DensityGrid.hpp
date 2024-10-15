@@ -28,7 +28,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "MemBlock2D.hpp"
+#include "DensityGridData2D.hpp"
 #include "MolecularGrid.hpp"
 #include "XCFunctionalType.hpp"
 
@@ -55,7 +55,7 @@ class CDensityGrid
     /**
      The density variables values at grid points.
      */
-    CMemBlock2D _densityValues;
+    CDensityGridData2D _densityValues;
 
    public:
     /**
