@@ -1,6 +1,6 @@
 import numpy as np
-from veloxchem.veloxchemlib import compute_nuclear_potential_integrals, compute_electric_field_integrals, \
-    compute_electric_field_values
+from .veloxchemlib import compute_electric_field_integrals, compute_electric_field_values
+from .oneeints import compute_nuclear_potential_integrals
 from pyframe.embedding import (read_input, electrostatic_interactions, induction_interactions, repulsion_interactions,
                                dispersion_interactions)
 from pyframe.embedding.logging_util import log_manager
@@ -34,14 +34,21 @@ class EmbeddingIntegralDriver:
                 Shape: (number of ao functions, number of ao functions)
                 Dtype: np.float64
         """
-        # if np.any(multipole_orders > 0):
-        #     raise NotImplementedError("""Multipole potential integrals not
-        #                                      implemented for order > 0.""")
+        if np.any(multipole_orders > 2):
+            raise NotImplementedError("""Multipole potential integrals not
+                                             implemented for order > 2.""")
         op = 0
         # 0 order
-        charge_coordinates = multipole_coordinates
-        charges = np.array([m[0] for m in multipoles])
-        op += compute_nuclear_potential_integrals(self.molecule, self.basis, charge_coordinates, charges).to_numpy()
+        idx = np.where(multipole_orders >= 0)[0]
+        charge_coordinates = multipole_coordinates[idx]
+        charges = np.array([multipoles[i][0] for i in idx])
+        op += compute_nuclear_potential_integrals(molecule=self.molecule, basis=self.basis,
+                                                  coordinates=charge_coordinates, charges=charges)
+        # 1 order
+        # if np.any(multipole_orders >= 1):
+        #     idx = np.where(multipole_orders >= 1)[0]
+        #     dipole_coordinates = multipole_coordinates[idx]
+        #     dipoles = np.array([multipoles[i][1:4] for i in idx])
         return op
 
     def electronic_fields(self,
