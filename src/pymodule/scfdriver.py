@@ -201,6 +201,10 @@ class ScfDriver:
         self._V_es = None
         self._pe_summary = ''
 
+        # PyFraME embedding
+        self.embedding_options = None
+        self._embedding_drv = None
+
         # split communicators
         self.use_split_comm = False
         self._split_comm_ratio = None
@@ -429,6 +433,10 @@ class ScfDriver:
 
         self._pe_sanity_check(method_dict)
 
+        if self.embedding_options is not None:
+            self._embedding_options_sanity_check(method_dict)
+
+        # TODO add embedding
         if self.electric_field is not None:
             assert_msg_critical(
                 len(self.electric_field) == 3,
@@ -441,6 +449,82 @@ class ScfDriver:
             # checkpoint file does not contain information about the electric
             # field
             self.restart = False
+
+    def _embedding_options_sanity_check(self, options=None):
+        from pyframe.embedding import subsystem
+        """
+        Checks the validity of the given options dictionary.
+
+        :param options: Dictionary with settings and inputs.
+            settings:
+                - embedding_method: string to set embedding method.
+                - vdw: dictionary with keys: method and combination_rule.
+                    - method: string
+                    - combination_rule: string
+                - induced_dipoles: dictionary with keys: threshold, max_iterations, and solver.
+                    - solver: string
+                    - threshold: float
+                    - max_iterations: integer
+                - environment_energy: bool which decides if the environment energy will be calculated.
+            inputs:
+                - json_file: string that is the path to the json file that contains the embedding potentials.
+                - objects:
+                    - quantum_subsystem: PyFraME class subsystem.QuantumSubsystem.
+                    - classical_subsystem: PyFraME class subsystem.ClassicalSubsystem.
+        """
+        if not isinstance(options, dict):
+            raise TypeError("The options parameter must be a dictionary.")
+        if 'settings' not in options:
+            raise KeyError("Missing 'settings' key in options dictionary.")
+        settings = options['settings']
+        if 'embedding_method' not in settings or not isinstance(settings['embedding_method'], str):
+            raise KeyError("Missing or invalid 'embedding_method' in settings.")
+        if 'vdw' in settings:
+            if not isinstance(settings['vdw'], dict):
+                raise TypeError("'vdw' must be a dictionary.")
+            vdw = settings['vdw']
+            if 'method' not in vdw or not isinstance(vdw['method'], str):
+                raise KeyError("Missing or invalid 'method' in 'vdw'.")
+            if 'combination_rule' not in vdw or not isinstance(vdw['combination_rule'], str):
+                raise KeyError("Missing or invalid 'combination_rule' in 'vdw'.")
+        if 'induced_dipoles' in settings:
+            if not isinstance(settings['induced_dipoles'], dict):
+                raise TypeError("'induced_dipoles' must be a dictionary.")
+            dipoles = settings['induced_dipoles']
+            if 'solver' in dipoles and not isinstance(dipoles['solver'], str):
+                raise KeyError("'solver' must be a string.")
+            if 'threshold' in dipoles and not isinstance(dipoles['threshold'], (int, float)):
+                raise KeyError("'threshold' must be an integer or float.")
+            if 'max_iterations' in dipoles and not isinstance(dipoles['max_iterations'], int):
+                raise KeyError("'max_iterations' must be an integer.")
+            if 'max_iterations' in dipoles and dipoles['max_iterations'] <= 0:
+                raise ValueError("'max_iterations' must be a positive integer.")
+        if 'environment_energy' in settings:
+            if not isinstance(settings['environment_energy'], bool):
+                raise TypeError("'environment_energy' must be a boolean.")
+        if 'inputs' not in options:
+            raise KeyError("Missing 'inputs' key in options dictionary.")
+        inputs = options['inputs']
+        if 'json_file' in inputs and not isinstance(inputs['json_file'], str):
+            raise TypeError("'json_file' must be a string.")
+        if 'objects' in inputs:
+            if not isinstance(inputs['objects'], dict):
+                raise TypeError("'objects' must be a dictionary.")
+            objects = inputs['objects']
+            if 'quantum_subsystem' not in objects:
+                raise KeyError("Missing 'quantum_subsystem' in 'objects'.")
+            if 'classical_subsystem' not in objects:
+                raise KeyError("Missing 'classical_subsystem' in 'objects'.")
+            if not isinstance(objects['quantum_subsystem'], subsystem.QuantumSubsystem):
+                raise TypeError(
+                    "'quantum_subsystem' must be an instance of PyFraME class subsystem.QuantumSubsystem.")
+            if not isinstance(objects['classical_subsystem'], subsystem.ClassicalSubsystem):
+                raise TypeError(
+                    "'classical_subsystem' must be an instance of PyFraME class subsystem.ClassicalSubsystem.")
+        if 'json_file' not in inputs and 'objects' not in inputs:
+            raise KeyError("At least one of 'json_file' or 'objects' must be provided in 'inputs'.")
+        # Sets embedding options
+        self.embedding_options = options
 
     def _pe_sanity_check(self, method_dict=None):
         """
@@ -503,6 +587,10 @@ class ScfDriver:
 
         # check pe setup
         self._pe_sanity_check()
+
+        # check embedding setup
+        if self.embedding_options is not None:
+            self._embedding_options_sanity_check(self.embedding_options)
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -569,6 +657,49 @@ class ScfDriver:
             pot_info = 'Reading polarizable embedding potential: {}'.format(
                 self.pe_options['potfile'])
             self.ostream.print_info(pot_info)
+            self.ostream.print_blank()
+
+        if self.embedding_options is not None:
+            settings = self.embedding_options['settings']
+            if self.embedding_options['settings']['embedding_method'] == 'PE':
+                from .embeddding import PolarizableEmbeddingSCF
+                self._embedding_drv = PolarizableEmbeddingSCF(molecule=molecule,
+                                                              ao_basis=ao_basis,
+                                                              options=self.embedding_options,
+                                                              comm=self.comm)
+            else:
+                raise NotImplementedError
+
+            def get_setting(setting_dict, *keys, default=None):
+                """Safely get a nested setting from a dictionary with a default."""
+                d = setting_dict
+                for key in keys:
+                    d = d.get(key, default)
+                    if d is default:
+                        break
+                return d
+
+            settings_str = (
+                "embedding_method: {}\n"
+                "vdw:\n"
+                "    - method: {}\n"
+                "    - combination_rule: {}\n"
+                "induced_dipoles:\n"
+                "    - solver: {}\n"
+                "    - threshold: {}\n"
+                "    - max_iterations: {}\n"
+                "environment_energy: {}"
+            ).format(
+                settings.get('embedding_method', 'PE'),
+                get_setting(settings, 'vdw', 'method', default='LJ'),
+                get_setting(settings, 'vdw', 'combination_rule', default='Lorentz-Berthelot'),
+                get_setting(settings, 'induced_dipoles', 'solver', default='jacobi'),
+                get_setting(settings, 'induced_dipoles', 'threshold', default='1e-8'),
+                get_setting(settings, 'induced_dipoles', 'max_iterations', default='100'),
+                settings.get('environment_energy', 'True')
+            )
+            emb_info = 'Reading embedding settings:\n{}'.format(settings_str)
+            self.ostream.print_info(emb_info)
             self.ostream.print_blank()
 
         # C2-DIIS method
@@ -1058,6 +1189,7 @@ class ScfDriver:
 
         self._density = tuple([x.copy() for x in den_mat])
 
+        # TODO add emb info
         if self.use_split_comm:
             self.use_split_comm = ((self._dft or self._pe) and self.nodes >= 8)
 
@@ -1101,15 +1233,15 @@ class ScfDriver:
 
             iter_start_time = tm.time()
 
-            fock_mat, vxc_mat, e_pe, V_pe = self._comp_2e_fock(
+            fock_mat, vxc_mat, e_emb, fock_mat_emb = self._comp_2e_fock(
                 den_mat, molecule, ao_basis, screener, e_grad, profiler)
 
             profiler.start_timer('ErrVec')
 
-            e_el = self._comp_energy(fock_mat, vxc_mat, e_pe, kin_mat, npot_mat,
+            e_el = self._comp_energy(fock_mat, vxc_mat, e_emb, kin_mat, npot_mat,
                                      den_mat)
 
-            self._comp_full_fock(fock_mat, vxc_mat, V_pe, kin_mat, npot_mat)
+            self._comp_full_fock(fock_mat, vxc_mat, fock_mat_emb, kin_mat, npot_mat)
 
             if self.rank == mpi_master() and self.electric_field is not None:
                 efpot = sum([
@@ -1271,6 +1403,11 @@ class ScfDriver:
                 if self._pe:
                     # pe info
                     self._scf_tensors['potfile'] = self.potfile
+
+                if self.embedding_options is not None:
+                    # pe energy and fock matrices
+                    self._scf_tensors['F_emb'] = fock_mat_emb
+                    self._scf_tensors['E_emb'] = e_emb
 
             else:
                 self._scf_tensors = None
@@ -1483,14 +1620,14 @@ class ScfDriver:
         """
 
         if self.use_split_comm and not self._first_step:
-            fock_mat, vxc_mat, e_pe, V_pe = self._comp_2e_fock_split_comm(
+            fock_mat, vxc_mat, e_emb, fock_mat_emb = self._comp_2e_fock_split_comm(
                 den_mat, molecule, basis, screener, e_grad, profiler)
 
         else:
-            fock_mat, vxc_mat, e_pe, V_pe = self._comp_2e_fock_single_comm(
+            fock_mat, vxc_mat, e_emb, fock_mat_emb = self._comp_2e_fock_single_comm(
                 den_mat, molecule, basis, screener, e_grad, profiler)
 
-        return fock_mat, vxc_mat, e_pe, V_pe
+        return fock_mat, vxc_mat, e_emb, fock_mat_emb
 
     def _comp_2e_fock_single_comm(self,
                                   den_mat,
@@ -1705,17 +1842,35 @@ class ScfDriver:
         if self.timing and self._dft:
             profiler.add_timing_info('FockXC', tm.time() - vxc_t0)
         pe_t0 = tm.time()
+        emb_t0 = tm.time()
 
         if self._pe and not self._first_step:
             # TODO: add PE contribution and update pe_summary
             pass
         else:
-            e_pe, V_pe = 0.0, None
+            e_emb, fock_mat_emb = 0.0, None
+
+        # pyframe contributions
+        if self.embedding_options is not None and not self._first_step:
+            if self.scf_type == 'restricted':
+                density_matrix = 2 * den_mat[0]
+            else:
+                density_matrix = den_mat[0] + den_mat[1]
+            if self._embedding_drv.__class__.__name__ == 'PolarizableEmbeddingSCF':
+                e_emb, fock_mat_emb = self._embedding_drv.compute_pe_contributions(density_matrix=density_matrix)
+            else:
+                e_emb, fock_mat_emb = 0.0, np.zeros(fock_mat[0].shape, dtype=fock_mat[0].dtype)
+        else:
+            e_emb, fock_mat_emb = 0.0, np.zeros(fock_mat[0].shape, dtype=fock_mat[0].dtype)
+
+        # TODO add emb
+        if self.timing and self.embedding_options is not None:
+            profiler.add_timing_info('FockEmb', tm.time() - emb_t0)
 
         if self.timing and self._pe:
             profiler.add_timing_info('FockPE', tm.time() - pe_t0)
 
-        return fock_mat, vxc_mat, e_pe, V_pe
+        return fock_mat, vxc_mat, e_emb, fock_mat_emb
 
     def _comp_2e_fock_split_comm(self,
                                  fock_mat,
@@ -1752,7 +1907,7 @@ class ScfDriver:
 
         return None
 
-    def _comp_energy(self, fock_mat, vxc_mat, e_pe, kin_mat, npot_mat, den_mat):
+    def _comp_energy(self, fock_mat, vxc_mat, e_emb, kin_mat, npot_mat, den_mat):
         """
         Computes the sum of SCF energy components: electronic energy, kinetic
         energy, and nuclear potential energy.
@@ -1761,8 +1916,8 @@ class ScfDriver:
             The Fock/Kohn-Sham matrix (only 2e-part).
         :param vxc_mat:
             The Vxc matrix.
-        :param e_pe:
-            The polarizable embedding energy.
+        :param e_emb:
+            The embedding energy.
         :param kin_mat:
             The kinetic energy matrix.
         :param npot_mat:
@@ -1796,7 +1951,9 @@ class ScfDriver:
             if self._dft and not self._first_step:
                 e_ee += xc_ene
             if self._pe and not self._first_step:
-                e_ee += e_pe
+                e_ee += e_emb
+            if self.embedding_options is not None and not self._first_step:
+                e_ee += e_emb
             e_sum = e_ee + e_kin + e_en
         else:
             e_sum = 0.0
@@ -1804,7 +1961,7 @@ class ScfDriver:
 
         return e_sum
 
-    def _comp_full_fock(self, fock_mat, vxc_mat, pe_mat, kin_mat, npot_mat):
+    def _comp_full_fock(self, fock_mat, vxc_mat, fock_mat_emb, kin_mat, npot_mat):
         """
         Computes full Fock/Kohn-Sham matrix by adding to 2e-part of
         Fock/Kohn-Sham matrix the kinetic energy and nuclear potential
@@ -1814,8 +1971,8 @@ class ScfDriver:
             The Fock/Kohn-Sham matrix (2e-part).
         :param vxc_mat:
             The Vxc matrix.
-        :param pe_mat:
-            The polarizable embedding matrix.
+        :param fock_mat_emb:
+            The embedding Fock matrix contributions.
         :param kin_mat:
             The kinetic energy matrix.
         :param npot_mat:
@@ -1845,6 +2002,10 @@ class ScfDriver:
             # TODO: add PE contribution to Fock
             if self._pe and not self._first_step:
                 pass
+
+            # TODO add emb treat fock matrix contributions separately?
+            if self.embedding_options is not None and not self._first_step:
+                fock_mat[0] += fock_mat_emb
 
     def _comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """
@@ -2148,6 +2309,12 @@ class ScfDriver:
         if self._pe:
             self.ostream.print_blank()
             for line in self._pe_summary.splitlines():
+                self.ostream.print_header(line.ljust(92))
+            self.ostream.flush()
+
+        if self.embedding_options is not None:
+            self.ostream.print_blank()
+            for line in self._embedding_drv.log_manager.get_logs().splitlines():
                 self.ostream.print_header(line.ljust(92))
             self.ostream.flush()
 
@@ -2503,6 +2670,8 @@ class ScfDriver:
                 potfile_text = '\n'.join(f_pot.readlines())
         else:
             potfile_text = ''
+
+        # TODO add emb?
 
         create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
         write_scf_results_to_hdf5(final_h5_fname, self.scf_tensors,
