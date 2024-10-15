@@ -52,6 +52,7 @@ namespace xcintpdft {  // xcintpdft namespace
  @param activeMOs the active molecular orbitals.
  @param molecularGrid the molecular grid.
  @param fvxc the exchange-correlation functional.
+ @param rs_omega the range-separation parameter.
  */
 void integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
                             CDense4DTensor&                 tensorWxc,
@@ -62,7 +63,8 @@ void integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
                             const CDenseMatrix&             activeMOs,
                             const CMolecularGrid&           molecularGrid,
                             const double                    screeningThresholdForGTOValues,
-                            const CXCPairDensityFunctional& xcFunctional);
+                            const CXCPairDensityFunctional& xcFunctional,
+                            const double                    rs_omega);
 
 /**
  Integrates first-order GGA pair-density functional contribution to
@@ -77,6 +79,7 @@ void integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
  @param activeMOs the active molecular orbitals.
  @param molecularGrid the molecular grid.
  @param fvxc the exchange-correlation functional.
+ @param rs_omega the range-separation parameter.
  */
 void integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMatrix,
                             CDense4DTensor&                 tensorWxc,
@@ -87,7 +90,8 @@ void integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMatrix,
                             const CDenseMatrix&             activeMOs,
                             const CMolecularGrid&           molecularGrid,
                             const double                    screeningThresholdForGTOValues,
-                            const CXCPairDensityFunctional& xcFunctional);
+                            const CXCPairDensityFunctional& xcFunctional,
+                            const double                    rs_omega);
 
 /**
  Integrates PLDA contribution to (first-order) Wxc tensor.

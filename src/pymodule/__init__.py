@@ -78,6 +78,7 @@ from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
 from .fockdriver import FockDriver
+from .griddriver import GridDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver

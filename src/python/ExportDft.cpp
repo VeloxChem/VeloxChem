@@ -22,6 +22,8 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+#include <iostream>
+
 #include "ExportDft.hpp"
 
 #include <pybind11/numpy.h>
@@ -103,7 +105,9 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
                    const CMolecule&           molecule,
                    const CMolecularBasis&     basis,
                    const CMolecularGrid&      molecularGrid,
-                   const std::string&         xcFuncLabel) -> py::list
+                   const std::string&         xcFuncLabel,
+                   const py::dict             components,
+                   const double               rs_omega) -> py::list
 {
     // active2DM
 
@@ -149,6 +153,17 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
     same_size = ((densityMatrix.ndim() == 2) && (densityMatrix.shape(0) == naos) && (densityMatrix.shape(1) == naos));
     errors::assertMsgCritical(same_size, errsizes);
 
+    // Functional
+
+    std::vector<std::string> labels;
+    std::vector<double> coeffs;
+    for (auto item : components)
+    {
+        labels.push_back(item.first.cast<std::string>());
+        coeffs.push_back(item.second.cast<double>());
+    };
+    CXCPairDensityFunctional xcfun = CXCPairDensityFunctional(xcFuncLabel, labels, coeffs);
+
     // Create output tensors
 
     CAOKohnShamMatrix matrixVxc(naos, naos, true);
@@ -157,11 +172,11 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
     CDense4DTensor tensorWxc(naos, n_active, n_active, n_active);
     tensorWxc.zero();
 
-    self.integrateVxcPDFT(matrixVxc, tensorWxc, molecule, basis, densityMatrix.data(), tensor2DM, denseActiveMO, molecularGrid, xcFuncLabel);
+    self.integrateVxcPDFT(matrixVxc, tensorWxc, molecule, basis, densityMatrix.data(), tensor2DM, denseActiveMO, molecularGrid, xcfun, rs_omega);
 
     py::list returnList;
     returnList.append(matrixVxc);
-    returnList.append(vlx_general::pointer_to_numpy(tensorWxc.values(), {naos, n_active * n_active * n_active}));
+    returnList.append(vlx_general::pointer_to_numpy(tensorWxc.values(), {naos, n_active, n_active, n_active}));
     return returnList;
 }
 

@@ -160,18 +160,17 @@ CXCIntegrator::integrateFxcFock(const std::vector<double*>&       aoFockPointers
 }
 
 auto
-CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&     aoFockMatrix,
-                                CDense4DTensor&        tensorWxc,
-                                const CMolecule&       molecule,
-                                const CMolecularBasis& basis,
-                                const double*          densityMatrixPointer,
-                                const CDenseMatrix&    twoBodyDensityMatrix,
-                                const CDenseMatrix&    activeMOs,
-                                const CMolecularGrid&  molecularGrid,
-                                const std::string&     xcFuncLabel) const -> void
+CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&                  aoFockMatrix,
+                                CDense4DTensor&                     tensorWxc,
+                                const CMolecule&                    molecule,
+                                const CMolecularBasis&              basis,
+                                const double*                       densityMatrixPointer,
+                                const CDenseMatrix&                 twoBodyDensityMatrix,
+                                const CDenseMatrix&                 activeMOs,
+                                const CMolecularGrid&               molecularGrid,
+                                const CXCPairDensityFunctional&     fvxc,
+                                const double                        rs_omega) const -> void
 {
-    auto fvxc = vxcfuncs::getPairDensityExchangeCorrelationFunctional(xcFuncLabel);
-
     auto xcfuntype = fvxc.getFunctionalType();
 
     if (xcfuntype == "PLDA")
@@ -185,7 +184,7 @@ CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&     aoFockMatrix,
                                           activeMOs,
                                           molecularGrid,
                                           _screeningThresholdForGTOValues,
-                                          fvxc);
+                                          fvxc, rs_omega);
     }
     else if (xcfuntype == "PGGA")
     {
@@ -198,7 +197,7 @@ CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&     aoFockMatrix,
                                           activeMOs,
                                           molecularGrid,
                                           _screeningThresholdForGTOValues,
-                                          fvxc);
+                                          fvxc, rs_omega);
     }
     else
     {

@@ -153,7 +153,7 @@ CXCPairDensityFunctional::_isComponentPGGA(const std::string& compName) const
 }
 
 void
-CXCPairDensityFunctional::_plda_exc_vxc(const std::string& compName, const int np, const double* rho, double* exc, double* vrho) const
+CXCPairDensityFunctional::_plda_exc_vxc(const std::string& compName, const int np, const double* rho, double* exc, double* vrho, double rs_omega) const
 {
     auto upcasename = format::upper_case(compName);
 
@@ -180,7 +180,8 @@ CXCPairDensityFunctional::_pgga_exc_vxc(const std::string& compName,
                                         const double*      sigma,
                                         double*            exc,
                                         double*            vrho,
-                                        double*            vsigma) const
+                                        double*            vsigma,
+                                        double             rs_omega) const
 {
     auto upcasename = format::upper_case(compName);
 
@@ -283,7 +284,7 @@ CXCPairDensityFunctional::getFunctionalType() const
 }
 
 auto
-CXCPairDensityFunctional::compute_exc_vxc_for_plda(int np, const double* rho, double* exc, double* vrho) const -> void
+CXCPairDensityFunctional::compute_exc_vxc_for_plda(int np, const double* rho, double* exc, double* vrho, double rs_omega) const -> void
 {
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
@@ -308,7 +309,7 @@ CXCPairDensityFunctional::compute_exc_vxc_for_plda(int np, const double* rho, do
 
         if (_isComponentPLDA(funcname))
         {
-            _plda_exc_vxc(funcname, np, rho, stage_exc, stage_vrho);
+            _plda_exc_vxc(funcname, np, rho, stage_exc, stage_vrho, rs_omega);
 
 #pragma omp simd
             for (auto g = 0; g < np; ++g)
@@ -329,7 +330,7 @@ CXCPairDensityFunctional::compute_exc_vxc_for_plda(int np, const double* rho, do
 }
 
 auto
-CXCPairDensityFunctional::compute_exc_vxc_for_pgga(int np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma)
+CXCPairDensityFunctional::compute_exc_vxc_for_pgga(int np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma, double rs_omega)
     const -> void
 {
     // should we allocate staging buffers? Or can we use the global one?
@@ -360,7 +361,7 @@ CXCPairDensityFunctional::compute_exc_vxc_for_pgga(int np, const double* rho, co
 
         if (_isComponentPLDA(funcname))
         {
-            _plda_exc_vxc(funcname, np, rho, stage_exc, stage_vrho);
+            _plda_exc_vxc(funcname, np, rho, stage_exc, stage_vrho, rs_omega);
 
 #pragma omp simd
             for (auto g = 0; g < np; ++g)
@@ -373,7 +374,7 @@ CXCPairDensityFunctional::compute_exc_vxc_for_pgga(int np, const double* rho, co
         }
         else if (_isComponentPGGA(funcname))
         {
-            _pgga_exc_vxc(funcname, np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
+            _pgga_exc_vxc(funcname, np, rho, sigma, stage_exc, stage_vrho, stage_vsigma, rs_omega);
 
 #pragma omp simd
             for (auto g = 0; g < np; ++g)
