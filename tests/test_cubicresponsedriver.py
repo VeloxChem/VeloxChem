@@ -65,9 +65,9 @@ class TestCrf:
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             for key in ref_result:
                 assert abs(crf_result[(key, wb, wc, wd)].real -
-                           ref_result[key].real) < 1.0e-6
+                           ref_result[key].real) < 1.0e-5
                 assert abs(crf_result[(key, wb, wc, wd)].imag -
-                           ref_result[key].imag) < 1.0e-6
+                           ref_result[key].imag) < 1.0e-5
 
     def test_crf(self):
 

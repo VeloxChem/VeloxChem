@@ -73,7 +73,7 @@ class TestQrf:
         qrf_result_yyx = qrf_drv.compute(molecule, basis, scf_results)
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            thresh = 1.0e-4
+            thresh = 1.0e-5
 
             # x-component
             assert abs(qrf_result_xxx[('qrf', 0.2, 0.2)].real -
