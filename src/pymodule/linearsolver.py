@@ -122,6 +122,10 @@ class LinearSolver:
         self.pe_options = {}
         self._pe = False
 
+        # PyFraME embedding
+        self.embedding_options = None
+        self._embedding_drv = None
+
         # split communicators
         self.use_split_comm = False
         self._split_comm_ratio = None
@@ -207,6 +211,7 @@ class LinearSolver:
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
+                'embedding_options': ('dict', 'dictionary to set the embedding options'),
                 'electric_field': ('seq_fixed', 'static electric field'),
                 # 'use_split_comm': ('bool', 'use split communicators'),
             },
@@ -315,6 +320,7 @@ class LinearSolver:
             assert_msg_critical(
                 len(self.electric_field) == 3,
                 'LinearSolver: Expecting 3 values in \'electric field\' input')
+            # TODO what to do here?
             assert_msg_critical(
                 not self._pe,
                 'LinearSolver: \'electric field\' input is incompatible ' +
@@ -639,6 +645,17 @@ class LinearSolver:
             The gerade and ungerade E2 b matrix vector product in half-size.
         """
 
+        # init PyFraME embedding
+        if self.embedding_options is not None:
+            if self.embedding_options['settings']['embedding_method'] == 'PE':
+                from .embeddding import PolarizableEmbeddingLRS
+                self._embedding_drv = PolarizableEmbeddingLRS(molecule=molecule,
+                                                              ao_basis=basis,
+                                                              options=self.embedding_options,
+                                                              comm=self.comm)
+            else:
+                raise NotImplementedError
+
         n_ger = vecs_ger.shape(1)
         n_ung = vecs_ung.shape(1)
 
@@ -866,7 +883,7 @@ class LinearSolver:
                     # Note: fak_mo_vec uses full MO coefficients matrix since
                     # it is only for fock_ger/fock_ung in nonlinear response
                     fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
-                                                      mo]).reshape(norb**2)
+                                                      mo]).reshape(norb ** 2)
 
                     if ifock < batch_ger:
                         e2_ger[:, ifock] = -gmo_vec_halfsize
@@ -925,8 +942,8 @@ class LinearSolver:
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
 
-        #V_es = pe_dict['V_es']
-        #pe_drv = pe_dict['pe_drv']
+        # V_es = pe_dict['V_es']
+        # pe_drv = pe_dict['pe_drv']
 
         if self.rank == mpi_master():
             num_densities = len(dens)
@@ -1017,6 +1034,16 @@ class LinearSolver:
             # TODO: add PE contribution
             if profiler is not None:
                 profiler.add_timing_info('FockPE', tm.time() - t0)
+
+        if self.embedding_options is not None:
+            t0 = tm.time()
+            for idx in range(num_densities):
+                dm = dens[idx] * 2.0  # FIXME only closed shell right now
+                fock_mat_emb = self._embedding_drv.compute_pe_contributions(density_matrix=dm)
+                if self.rank == mpi_master():
+                    fock_arrays[idx] += fock_mat_emb
+            if profiler is not None:
+                profiler.add_timing_info('FockEmb', tm.time() - t0)
 
         # TODO: look into split communicator
 
@@ -1623,9 +1650,9 @@ class LinearSolver:
 
         if num_core_orbitals is not None and num_core_orbitals > 0:
             mat[:num_core_orbitals,
-                num_core_orbitals:] = -A[:num_core_orbitals, num_core_orbitals:]
+            num_core_orbitals:] = -A[:num_core_orbitals, num_core_orbitals:]
             mat[num_core_orbitals:, :num_core_orbitals] = A[
-                num_core_orbitals:, :num_core_orbitals]
+                                                          num_core_orbitals:, :num_core_orbitals]
 
         else:
             mat[:nocc, nocc:] = -A[:nocc, nocc:]
@@ -1709,7 +1736,7 @@ class LinearSolver:
             vec = np.zeros(n_ov * 2, dtype=mat.dtype)
             # excitation and de-excitation
             vec[:n_ov] = mat[:num_core_orbitals,
-                             num_core_orbitals:].reshape(n_ov)
+                         num_core_orbitals:].reshape(n_ov)
             vec[n_ov:] = mat[num_core_orbitals:, :num_core_orbitals].T.reshape(
                 n_ov)
 
@@ -1917,7 +1944,7 @@ class LinearSolver:
 
         # SVD
         u_mat, s_diag, vh_mat = np.linalg.svd(t_mat, full_matrices=True)
-        lam_diag = s_diag**2
+        lam_diag = s_diag ** 2
 
         # holes in increasing order of lambda
         # particles in decreasing order of lambda

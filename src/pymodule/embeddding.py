@@ -1,6 +1,13 @@
 import numpy as np
-from .veloxchemlib import compute_electric_field_integrals, compute_electric_field_values
+from .veloxchemlib import compute_electric_field_integrals, compute_electric_field_values, compute_quadrupole_integrals
 from .oneeints import compute_nuclear_potential_integrals
+
+try:
+    import pyframe
+except ImportError:
+    raise ImportError(
+        'Unable to import PyFraME. Please install PyFraME.')
+
 from pyframe.embedding import (read_input, electrostatic_interactions, induction_interactions, repulsion_interactions,
                                dispersion_interactions)
 from pyframe.embedding.logging_util import log_manager
@@ -34,9 +41,9 @@ class EmbeddingIntegralDriver:
                 Shape: (number of ao functions, number of ao functions)
                 Dtype: np.float64
         """
-        if np.any(multipole_orders > 2):
-            raise NotImplementedError("""Multipole potential integrals not
-                                             implemented for order > 2.""")
+        # if np.any(multipole_orders > 2):
+        #     raise NotImplementedError("""Multipole potential integrals not
+        #                                      implemented for order > 2.""")
         op = 0
         # 0 order
         idx = np.where(multipole_orders >= 0)[0]
@@ -45,10 +52,11 @@ class EmbeddingIntegralDriver:
         op += compute_nuclear_potential_integrals(molecule=self.molecule, basis=self.basis,
                                                   coordinates=charge_coordinates, charges=charges)
         # 1 order
-        # if np.any(multipole_orders >= 1):
-        #     idx = np.where(multipole_orders >= 1)[0]
-        #     dipole_coordinates = multipole_coordinates[idx]
-        #     dipoles = np.array([multipoles[i][1:4] for i in idx])
+        if np.any(multipole_orders >= 1):
+            idx = np.where(multipole_orders >= 1)[0]
+            dipole_coordinates = multipole_coordinates[idx]
+            dipoles = np.array([multipoles[i][1:4] for i in idx])
+            op += compute_electric_field_integrals(self.molecule, self.basis, dipole_coordinates, dipoles)
         return op
 
     def electronic_fields(self,
