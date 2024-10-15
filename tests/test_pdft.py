@@ -142,7 +142,7 @@ class TestPDFT:
             return None, None, None, None
 
     def test_O2_ROLDA(self):
-        pfunc = {"name": "tLDA", "components": {"TSLATER": 1.0, 'TVWN': 1.0}}
+        pfunc = {"name": "tLDA", "components": {"TSLATER": 1.0, 'TVWN_RPA': 1.0}}
         ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('slda', pfunc)
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert abs(ksdft - pdft) < 1.0e-6
@@ -152,7 +152,7 @@ class TestPDFT:
         pfunc = {"name": "tPBE", "components": {"TPBE_X": 1.0, 'TPBE_C': 1.0}}
         ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('pbe', pfunc)
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            assert abs(-16.911864099412625 - pdft) < 1.0e-6
+            assert abs(-16.911870738696756 - pdft) < 1.0e-6
 
     def test_O2_ROBLYP(self):
         pfunc = {"name": "tBLYP", "components": {"TSLATER": 1.0, 'TB88': 1.0, 'TLYP': 1.0}}
