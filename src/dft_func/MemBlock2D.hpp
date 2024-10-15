@@ -32,8 +32,6 @@
 #include <sstream>
 #include <string>
 
-#include "MemBlock.hpp"
-
 /**
  Templated class CMemBlock2D manages 2D memory block allocation, manipulation,
  and deallocation.
@@ -44,22 +42,22 @@ class CMemBlock2D
     /**
      The contiguous memory block.
      */
-    CMemBlock<T> _data;
+    std::vector<T> _data;
 
     /**
      The original sizes of data chunks in memory block.
      */
-    CMemBlock<int> _originalSizes;
+    std::vector<int> _originalSizes;
 
     /**
      The padded sizes of data chunks in memory block.
      */
-    CMemBlock<int> _paddedSizes;
+    std::vector<int> _paddedSizes;
 
     /**
      The start positions of data chunks in memory block.
      */
-    CMemBlock<int> _positions;
+    std::vector<int> _positions;
 
     /**
      The number of elements in memory block.
@@ -229,9 +227,9 @@ CMemBlock2D<T>::CMemBlock2D(const int nElements, const int nBlocks)
 
     _setDimensions();
 
-    _data = CMemBlock<T>(_nElements);
+    _data = std::vector<T>(_nElements);
 
-    _data.zero();
+    std::fill(_data.begin(), _data.end(), static_cast<T>(0));
 }
 
 template <class T>
@@ -335,7 +333,7 @@ template <class T>
 void
 CMemBlock2D<T>::zero()
 {
-    _data.zero();
+    std::fill(_data.begin(), _data.end(), static_cast<T>(0));
 }
 
 template <class T>
@@ -357,7 +355,7 @@ CMemBlock2D<T>::data(const int iBlock)
 
         if (iBlock >= blocks()) return nullptr;
 
-        return _data.data(_positions.at(iBlock));
+        return _data.data() + _positions.at(iBlock);
     }
 
     return nullptr;
@@ -373,7 +371,7 @@ CMemBlock2D<T>::data(const int iBlock) const
 
         if (iBlock >= blocks()) return nullptr;
 
-        return _data.data(_positions.at(iBlock));
+        return _data.data() + _positions.at(iBlock);
     }
 
     return nullptr;
@@ -385,7 +383,7 @@ CMemBlock2D<T>::data(const int iBlock, const int iElement)
 {
     if (_originalSizes.size() > 0)
     {
-        auto pdata = _data.data(_positions.at(iBlock));
+        auto pdata = _data.data() + _positions.at(iBlock);
 
         if (iElement < _originalSizes.at(iBlock))
         {
@@ -404,7 +402,7 @@ CMemBlock2D<T>::data(const int iBlock, const int iElement) const
 {
     if (_originalSizes.size() > 0)
     {
-        auto pdata = _data.data(_positions.at(iBlock));
+        auto pdata = _data.data() + _positions.at(iBlock);
 
         if (iElement < _originalSizes.at(iBlock))
         {
@@ -446,7 +444,7 @@ template <class T>
 void
 CMemBlock2D<T>::_setOriginalSizes(const int nElements, const int nBlocks)
 {
-    _originalSizes = CMemBlock<int>(nBlocks);
+    _originalSizes = std::vector<int>(nBlocks);
 
     for (int i = 0; i < nBlocks; i++)
         _originalSizes.at(i) = nElements;
@@ -458,13 +456,13 @@ CMemBlock2D<T>::_setDimensions()
 {
     auto numblocks = _originalSizes.size();
 
-    _paddedSizes = CMemBlock<int>(numblocks);
+    _paddedSizes = std::vector<int>(numblocks);
 
-    _positions = CMemBlock<int>(numblocks);
+    _positions = std::vector<int>(numblocks);
 
     // loop over data chunks
 
-    int primdim = VLX_ALIGN / sizeof(T);
+    int primdim = 64 / sizeof(T);
 
     _nElements = 0;
 
