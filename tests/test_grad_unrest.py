@@ -30,18 +30,6 @@ class TestGradUnrestrictedSCF:
         grad_drv.compute(molecule, basis, scf_results)
         grad = grad_drv.get_gradient()
 
-        """
-        grad_drv.delta_h = 0.0005
-        grad_drv.compute_numerical_gradient(molecule, basis, scf_results)
-        numgrad = grad_drv.get_gradient()
-        np.set_printoptions(suppress=True, precision=9)
-        print()
-        print('    ref_grad = np.array(',
-              np.array2string(numgrad, separator=', '), ')')
-        ref_grad = numgrad
-        """
-
-        print(np.max(np.abs(grad - ref_grad)))
         assert np.max(np.abs(grad - ref_grad)) < tol
 
     def test_nh3_tzvp(self):
@@ -73,6 +61,20 @@ class TestGradUnrestrictedSCF:
         ])
 
         self.run_grad(mol, 'slda', 'def2-tzvp', ref_grad, 1.0e-3)
+
+        ref_grad = np.array([[-2.407691473, 1.018158314, 0.11031899],
+                             [-0.107273535, -2.482263778, -0.121327734],
+                             [1.207918349, 0.83272141, -2.008731851],
+                             [1.307046644, 0.631384109, 2.019740596]])
+
+        self.run_grad(mol, 'blyp', 'def2-tzvp', ref_grad, 1.0e-3)
+
+        ref_grad = np.array([[-2.404693831, 1.016859978, 0.110144742],
+                             [-0.108078426, -2.481352867, -0.121261112],
+                             [1.206827125, 0.832875139, -2.008254371],
+                             [1.305945115, 0.631617805, 2.019370742]])
+
+        self.run_grad(mol, 'b3lyp', 'def2-tzvp', ref_grad, 1.0e-3)
 
     def test_c2h4_svp(self):
 
@@ -111,3 +113,19 @@ class TestGradUnrestrictedSCF:
         ])
 
         self.run_grad(mol, 'slda', 'def2-svp', ref_grad, 1.0e-4)
+
+        ref_grad = np.array([[0.189529949, 0., 0.], [-0.189529949, -0., 0.],
+                             [0.008659375, -0.005825038, -0.],
+                             [0.008659375, 0.005825038, -0.],
+                             [-0.008659375, -0.005825038, 0.],
+                             [-0.008659375, 0.005825038, -0.]])
+
+        self.run_grad(mol, 'blyp', 'def2-svp', ref_grad, 1.0e-4)
+
+        ref_grad = np.array([[0.190927027, 0., -0.], [-0.190927026, 0., -0.],
+                             [0.00593267, -0.00172427, -0.],
+                             [0.00593267, 0.001724269, 0.],
+                             [-0.00593267, -0.00172427, -0.],
+                             [-0.00593267, 0.00172427, -0.]])
+
+        self.run_grad(mol, 'b3lyp', 'def2-svp', ref_grad, 1.0e-4)
