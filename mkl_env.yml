@@ -26,7 +26,7 @@ dependencies:
   - cppe
   - xtb
   - geometric
-  - libxc
+  - libxc<7
   - clang-format
   - yapf
   - toml
