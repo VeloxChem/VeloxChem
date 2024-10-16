@@ -98,9 +98,9 @@ class MpiTask:
 
         # initialize molecule, basis set and output stream
 
-        self.molecule = None
-        self.ao_basis = None
-        self.min_basis = None
+        self.molecule = Molecule()
+        self.ao_basis = MolecularBasis()
+        self.min_basis = MolecularBasis()
         self.ostream = OutputStream(output_fname)
 
         # process input file on master node
