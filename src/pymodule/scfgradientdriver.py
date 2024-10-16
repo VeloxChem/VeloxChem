@@ -126,10 +126,8 @@ class ScfGradientDriver(GradientDriver):
         """
 
         if self.rank == mpi_master():
-            nocc = molecule.number_of_alpha_electrons()
-
             D = scf_results['D_alpha']
-
+            nocc = molecule.number_of_alpha_electrons()
             ene_occ = scf_results['E_alpha'][:nocc]
             mo_occ = scf_results['C_alpha'][:, :nocc].copy()
             W = np.linalg.multi_dot([mo_occ, np.diag(ene_occ), mo_occ.T])
@@ -218,9 +216,8 @@ class ScfGradientDriver(GradientDriver):
         need_omega = (use_dft and xcfun.is_range_separated())
         if need_omega:
             assert_msg_critical(
-                False,
-                'ScfGradientDriver: Not implemented for range-separated functional'
-            )
+                False, 'ScfGradientDriver: Not implemented for' +
+                ' range-separated functional')
 
         den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
         den_mat_for_fock.set_values(D)
@@ -261,7 +258,7 @@ class ScfGradientDriver(GradientDriver):
 
             grad_drv = XCMolecularGradient()
             self.gradient += grad_drv.integrate_vxc_gradient(
-                molecule, basis, D, mol_grid, xcfun_label)
+                molecule, basis, [D], mol_grid, xcfun_label)
 
         else:
             xcfun_label = 'hf'
@@ -295,11 +292,11 @@ class ScfGradientDriver(GradientDriver):
         """
 
         if self.rank == mpi_master():
-            nocc_a = molecule.number_of_alpha_electrons()
-            nocc_b = molecule.number_of_beta_electrons()
-
             Da = scf_results['D_alpha']
             Db = scf_results['D_beta']
+
+            nocc_a = molecule.number_of_alpha_electrons()
+            nocc_b = molecule.number_of_beta_electrons()
 
             ene_occ_a = scf_results['E_alpha'][:nocc_a]
             ene_occ_b = scf_results['E_beta'][:nocc_b]
@@ -398,9 +395,8 @@ class ScfGradientDriver(GradientDriver):
         need_omega = (use_dft and xcfun.is_range_separated())
         if need_omega:
             assert_msg_critical(
-                False,
-                'ScfGradientDriver: Not implemented for range-separated functional'
-            )
+                False, 'ScfGradientDriver: Not implemented for' +
+                ' range-separated functional')
 
         Da_for_fock = make_matrix(basis, mat_t.symmetric)
         Da_for_fock.set_values(Da)
@@ -459,7 +455,7 @@ class ScfGradientDriver(GradientDriver):
 
             grad_drv = XCMolecularGradient()
             self.gradient += grad_drv.integrate_vxc_gradient(
-                molecule, basis, D, mol_grid, xcfun_label)
+                molecule, basis, [Da, Db], mol_grid, xcfun_label)
 
         else:
             xcfun_label = 'hf'

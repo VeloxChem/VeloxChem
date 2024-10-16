@@ -37,6 +37,7 @@
 #include "DenseLinearAlgebra.hpp"
 #include "DensityGridGenerator.hpp"
 #include "DftSubMatrix.hpp"
+#include "ErrorHandler.hpp"
 #include "FunctionalParser.hpp"
 #include "GridScreener.hpp"
 #include "GtoFunc.hpp"
@@ -53,18 +54,18 @@ CXCMolecularGradient::CXCMolecularGradient()
 CDenseMatrix
 CXCMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
                                            const CMolecularBasis&  basis,
-                                           const double*           gsDensityPointer,
+                                           const std::vector<const double*>& gsDensityPointers,
                                            const CMolecularGrid&   molecularGrid,
                                            const std::string&      xcFuncLabel) const
 {
-    return integrateVxcGradient(molecule, basis, gsDensityPointer, gsDensityPointer, molecularGrid, xcFuncLabel);
+    return integrateVxcGradient(molecule, basis, gsDensityPointers, gsDensityPointers, molecularGrid, xcFuncLabel);
 }
 
 CDenseMatrix
 CXCMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
                                            const CMolecularBasis&  basis,
-                                           const double*           rwDensityPointer,
-                                           const double*           gsDensityPointer,
+                                           const std::vector<const double*>& rwDensityPointers,
+                                           const std::vector<const double*>& gsDensityPointers,
                                            const CMolecularGrid&   molecularGrid,
                                            const std::string&      xcFuncLabel) const
 {
@@ -72,24 +73,22 @@ CXCMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
 
     auto xcfuntype = fvxc.getFunctionalType();
 
-    //if (rwDensityMatrix.isClosedShell() && gsDensityPointer.isClosedShell())
+    if (gsDensityPointers.size() == 1)
     {
         if (xcfuntype == xcfun::lda)
         {
-            return _integrateVxcGradientForLDA(molecule, basis, rwDensityPointer, gsDensityPointer, molecularGrid, fvxc);
+            return _integrateVxcGradientForLDA(molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return _integrateVxcGradientForGGA(molecule, basis, rwDensityPointer, gsDensityPointer, molecularGrid, fvxc);
+            return _integrateVxcGradientForGGA(molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, fvxc);
         }
-        /*
         else
         {
             std::string errxcfuntype("XCMolecularGradient.integrateVxcGradient: Only implemented for LDA/GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
-        */
     }
     //else
     {
@@ -117,8 +116,8 @@ CXCMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
 auto
 CXCMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        molecule,
                                                   const CMolecularBasis&  basis,
-                                                  const double*           rwDensityPointer,
-                                                  const double*           gsDensityPointer,
+                                                  const std::vector<const double*>& rwDensityPointers,
+                                                  const std::vector<const double*>& gsDensityPointers,
                                                   const CMolecularGrid&   molecularGrid,
                                                   const CXCFunctional&    xcFunctional) const -> CDenseMatrix
 {
@@ -297,8 +296,8 @@ CXCMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        molecu
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = dftsubmat::getSubDensityMatrix(gsDensityPointer, aoinds, naos);
-        auto rw_sub_dens_mat = dftsubmat::getSubDensityMatrix(rwDensityPointer, aoinds, naos);
+        auto gs_sub_dens_mat = dftsubmat::getSubDensityMatrix(gsDensityPointers[0], aoinds, naos);
+        auto rw_sub_dens_mat = dftsubmat::getSubDensityMatrix(rwDensityPointers[0], aoinds, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -445,8 +444,8 @@ CXCMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        molecu
 CDenseMatrix
 CXCMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        molecule,
                                                   const CMolecularBasis&  basis,
-                                                  const double*           rwDensityPointer,
-                                                  const double*           gsDensityPointer,
+                                                  const std::vector<const double*>& rwDensityPointers,
+                                                  const std::vector<const double*>& gsDensityPointers,
                                                   const CMolecularGrid&   molecularGrid,
                                                   const CXCFunctional&    xcFunctional) const
 {
@@ -663,8 +662,8 @@ CXCMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        molecu
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = dftsubmat::getSubDensityMatrix(gsDensityPointer, aoinds, naos);
-        auto rw_sub_dens_mat = dftsubmat::getSubDensityMatrix(rwDensityPointer, aoinds, naos);
+        auto gs_sub_dens_mat = dftsubmat::getSubDensityMatrix(gsDensityPointers[0], aoinds, naos);
+        auto rw_sub_dens_mat = dftsubmat::getSubDensityMatrix(rwDensityPointers[0], aoinds, naos);
 
         timer.stop("Density matrix slicing");
 
