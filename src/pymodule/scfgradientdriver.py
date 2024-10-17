@@ -276,7 +276,7 @@ class ScfGradientDriver(GradientDriver):
                 self.gradient += disp.get_gradient().to_numpy()
             
             if self.scf_driver._cpcm: # maybe add condition for COSMO, specifically
-                self.gradient += self.scf_driver._cpcm_drv.cosmo_grad_contribution(
+                self.gradient += self.scf_driver.cpcm_drv.cosmo_grad_contribution(
                                                 molecule, 
                                                 basis,
                                                 self.scf_driver._cpcm_grid,

@@ -207,6 +207,7 @@ class ScfDriver:
         self.cpcm_epsilon = 78.39 # standard setting is for that
                                   # of water as the solvent
         self.cpcm_x = 0 # x in scaling function f
+        self.cpcm_erf = False
 
         # split communicators
         self.use_split_comm = False
@@ -518,7 +519,7 @@ class ScfDriver:
         self._pe_sanity_check()
 
         if self._cpcm:
-            self._cpcm_drv = CosmoDriver(self.comm, self.ostream)
+            self.cpcm_drv = CosmoDriver(self.comm, self.ostream)
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -588,11 +589,11 @@ class ScfDriver:
             self.ostream.print_blank()
 
         if self._cpcm:
-            self._cpcm_grid, self._cpcm_sw_func = self._cpcm_drv.generate_cosmo_grid(
+            self._cpcm_grid, self._cpcm_sw_func = self.cpcm_drv.generate_cosmo_grid(
                 molecule)
-            self._cpcm_Amat = self._cpcm_drv.form_matrix_A(
+            self._cpcm_Amat = self.cpcm_drv.form_matrix_A(
                 self._cpcm_grid, self._cpcm_sw_func)
-            self._cpcm_Bmat = self._cpcm_drv.form_matrix_B(
+            self._cpcm_Bmat = self.cpcm_drv.form_matrix_B(
                 self._cpcm_grid, molecule)
             self._cpcm_Bzvec = np.dot(self._cpcm_Bmat,
                                      molecule.get_element_ids())
@@ -1138,7 +1139,7 @@ class ScfDriver:
             self._comp_full_fock(fock_mat, vxc_mat, V_pe, kin_mat, npot_mat)
 
             if self._cpcm:
-                Cvec = self._cpcm_drv.form_vector_C(
+                Cvec = self.cpcm_drv.form_vector_C(
                     self._cpcm_grid, molecule, ao_basis,
                     den_mat[0] + den_mat[0])
                     #den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0))
@@ -1148,12 +1149,12 @@ class ScfDriver:
                 q = np.linalg.solve(self._cpcm_Amat, rhs)
                 self._cpcm_q = q
 
-                e_sol = 0.5 * np.vdot(q, self._cpcm_Bzvec + Cvec)
+                e_sol = self.cpcm_drv.compute(self._cpcm_Bzvec, Cvec, q)
                 e_el += e_sol
                 self._cpcm_epol = e_sol
 
-                Fock_sol = self._cpcm_drv.get_contribution_to_Fock(molecule, ao_basis,
-                    self._cpcm_grid, q)
+                Fock_sol = self.cpcm_drv.get_contribution_to_Fock(molecule, ao_basis,
+                    self._cpcm_grid, q, self.cpcm_erf)
                 fock_mat[0] += Fock_sol
 
             if self.rank == mpi_master() and self.electric_field is not None:

@@ -28,6 +28,7 @@ from .veloxchemlib import BasisFunction
 from .veloxchemlib import OverlapDriver
 from .veloxchemlib import KineticEnergyDriver
 from .veloxchemlib import NuclearPotentialDriver
+from .veloxchemlib import NuclearPotentialErfDriver
 from .veloxchemlib import ElectricDipoleMomentDriver
 from .veloxchemlib import OverlapGeom100Driver
 from .veloxchemlib import KineticEnergyGeom100Driver

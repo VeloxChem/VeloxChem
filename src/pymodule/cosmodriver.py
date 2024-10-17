@@ -27,6 +27,7 @@ from mpi4py import MPI
 import numpy as np
 import math
 import sys
+from scipy.special import erf
 
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .veloxchemlib import gen_lebedev_grid
@@ -34,6 +35,8 @@ from .subcommunicators import SubCommunicators
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .oneeints import compute_nuclear_potential_integrals
+from .veloxchemlib import NuclearPotentialDriver
+from .veloxchemlib import NuclearPotentialErfDriver
 from .veloxchemlib import NuclearPotentialGeom010Driver
 from .veloxchemlib import NuclearPotentialGeom100Driver
 
@@ -83,18 +86,22 @@ class CosmoDriver:
             },
         }
 
-    def compute(self, molecule):
+    def compute(self, Bzvec, Cvec, q, molecule=False):
         """
-        Computes COSMO energy.
-
+        Computes (electrostatic component of) C-PCM energy.
+        TODO: add other components of the energy
         :param molecule:
             The molecule.
+        :param Bzvec:
+            The nuclear potential on the grid.
+        :param Cvec:
+            The electronic potential on the grid.
 
         :return:
-            TODO
+            The C-PCM energy.
         """
 
-        pass
+        return 0.5 * np.vdot(q, Bzvec + Cvec)
 
     def generate_cosmo_grid(self, molecule):
         """
@@ -245,10 +252,11 @@ class CosmoDriver:
         end = sum(counts[:self.rank + 1])
 
         local_esp = np.zeros(end - start)
+        npot_drv = NuclearPotentialDriver()
 
         for i in range(start, end):
-            epi_matrix = -1.0 * compute_nuclear_potential_integrals(molecule, basis, [1.0],
-                                         [grid[i,:3].tolist()])
+            epi_matrix = npot_drv.compute(molecule, basis, [1.0],
+                                         [grid[i,:3]]).full_matrix().to_numpy()
             if local_comm.Get_rank() == mpi_master():
                 local_esp[i - start] -= np.sum(np.array(epi_matrix) * D)
 
@@ -264,15 +272,17 @@ class CosmoDriver:
         else:
             return None
 
-    def get_contribution_to_Fock(self, molecule, basis,  grid, q):
-
+    def get_contribution_to_Fock(self, molecule, basis,  grid, q, erf=False):
         grid_coords = grid[:, :3].copy()
-
-        #npot_drv = NuclearPotentialDriver(self.comm)
+        zeta        = grid[:, 4].copy()
 
         if self.rank == mpi_master():
-            V_es = compute_nuclear_potential_integrals(molecule, basis, q,
-                                           grid_coords)
+            if erf:
+                nerf_drv = NuclearPotentialErfDriver()
+                V_es = -1.0 * nerf_drv.compute(molecule, basis, q, grid_coords, zeta).full_matrix().to_numpy()
+            else:
+                npot_drv = NuclearPotentialDriver()
+                V_es = -1.0 * npot_drv.compute(molecule, basis, q, grid_coords).full_matrix().to_numpy()
         else:
             V_es = None
 
@@ -391,14 +401,14 @@ class CosmoDriver:
                     grad_010 = geom010_drv.compute(molecule, basis, [charge], [gra[i].tolist()])
                     temp_ = []
                     for label in labels:
-                        temp_.append(-1*grad_010.matrix(label).full_matrix().to_numpy())
+                        temp_.append(-1.0 *grad_010.matrix(label).full_matrix().to_numpy())
                     geom010_mats.append(np.array(temp_))
 
                 grad_100 = geom100_drv.compute(basis, molecule, a, q, grid[:, :3])
 
                 for label in labels:
-                    geom100_mats.append(-1*grad_100.matrix(label).full_matrix().to_numpy())
-                    geom001_mats.append(-1*grad_100.matrix(label).full_matrix().to_numpy().T)
+                    geom100_mats.append(-1.0 *grad_100.matrix(label).full_matrix().to_numpy())
+                    geom001_mats.append(-1.0 *grad_100.matrix(label).full_matrix().to_numpy().T)
                 
                 geom010_mats = np.array(geom010_mats)
                 geom100_mats = np.array(geom100_mats)
@@ -414,39 +424,32 @@ class CosmoDriver:
 
         def grad_Aij(molecule, grid, q, eps, x):
             two_sqrt_invpi = 2 / math.sqrt(math.pi)
-            natoms = molecule.number_of_atoms()
-            scale_f = -(eps - 1) / (eps + x)
-            grad = np.zeros((grid.shape[0], grid.shape[0], natoms, 3))
+            natoms         = molecule.number_of_atoms()
+            scale_f        = -(eps - 1) / (eps + x)
+            grad           = np.zeros((grid.shape[0], grid.shape[0], natoms, 3)) # (grid_pts, grid_pts, natoms, 3)
+            grid_coords    = grid[:, :3]
+            weights        = grid[:, 3]
+            zeta           = grid[:, 4]
+            atom_indices   = grid[:, 5]
+            zeta_2         = zeta**2
 
-            if transl_inv:
-                natoms -= 1
-            for a in range(natoms):
-                for i in range(grid.shape[0]):
-                    xi, yi, zi, wi, zeta_i, atom_idx_i = grid[i]
+            delta_r = grid_coords[:, None] - grid_coords[None, :]
+            r_ij_2  = np.sum(delta_r**2, axis=-1) 
+            r_ij    = np.sqrt(r_ij_2)
+            np.fill_diagonal(r_ij, 1e-12), np.fill_diagonal(r_ij_2, 1e-12)
+            dr_rij  = delta_r / r_ij[..., None]
 
-                    r_i = np.array([xi, yi, zi])
-                    zeta_i2 = zeta_i**2
-                    for j in range(i+1, grid.shape[0]):
-                        xj, yj, zj, wj, zeta_j, atom_idx_j = grid[j]
-                        r_j = np.array([xj, yj, zj])
-                        
-                        zeta_j2 = zeta_j**2
-                        zeta_ij = zeta_i * zeta_j / math.sqrt(zeta_i2 + zeta_j2)
-                        
-                        r_ij_2 = (xi - xj)**2 + (yi - yj)**2 + (zi - zj)**2
-                        r_ij = math.sqrt(r_ij_2)
-
-                        factor = delta_ij(a, atom_idx_i, atom_idx_j) 
-                        
-                        dr_ij = factor * dr_rij(r_i, r_j) 
-                        dA_dr = -1.0 * (math.erf(zeta_ij * r_ij) - two_sqrt_invpi * zeta_ij * r_ij * 
-                                        math.exp(-1.0 * zeta_ij**2 * r_ij_2)) / r_ij_2
-                        grad[i,j,a] = dA_dr * dr_ij
-                        grad[j,i,a] = grad[i,j,a] 
-            if transl_inv:
-                grad[:,:,-1] = -np.sum(grad[:,:,:-1], axis=2)
-
-            gradAij = (-0.5 / scale_f) * np.einsum('i,ijax,j -> ax', q, grad, q)
+            zeta_ij  = (zeta[:, None] * zeta[None, :]) / np.sqrt((zeta_2[:, None] + zeta_2[None, :]))
+            delta_ij = np.array([(a == atom_indices[:, None]).astype(int) - (a == atom_indices[None, :]).astype(int) for a in range(natoms - 1)])
+            dA_dr    = -1.0 * (erf(zeta_ij * r_ij) - two_sqrt_invpi * zeta_ij * r_ij * np.exp(-1.0 * zeta_ij**2 * r_ij_2)) / r_ij_2
+            
+            for a in range(natoms - 1):
+                _delta      = delta_ij[a]
+                dr_ij       = _delta[..., None] * dr_rij
+                grad[:,:,a] = dA_dr[..., None] * dr_ij
+            
+            grad[:,:,-1] = -np.sum(grad[:,:,:-1], axis=2)
+            gradAij = (-0.5 / scale_f) * np.einsum('i,ijax,j -> ax', q, grad, q, optimize=True)
             return gradAij
 
         def grad_Aii(molecule, grid, sw_f, q, eps, x):
