@@ -165,33 +165,20 @@ CGtoBlock::CGtoBlock(const CGtoBlock &other)
 
 CGtoBlock::CGtoBlock(CGtoBlock &&other) noexcept
 
-    : _coordinates{}
+    : _coordinates(std::move(other._coordinates))
 
-    , _exponents{}
+    , _exponents(std::move(other._exponents))
 
-    , _norms{}
+    , _norms(std::move(other._norms))
 
-    , _orb_indices{}
+    , _orb_indices(std::move(other._orb_indices))
 
-    , _atm_indices{}
+    , _atm_indices(std::move(other._atm_indices))
 
-    , _angular_momentum{-1}
+    , _angular_momentum(std::move(other._angular_momentum))
 
-    , _npgtos{0}
+    , _npgtos(std::move(other._npgtos))
 {
-    std::swap(_coordinates, other._coordinates);
-
-    std::swap(_exponents, other._exponents);
-
-    std::swap(_norms, other._norms);
-
-    std::swap(_orb_indices, other._orb_indices);
-
-    std::swap(_atm_indices, other._atm_indices);
-
-    std::swap(_angular_momentum, other._angular_momentum);
-
-    std::swap(_npgtos, other._npgtos);
 }
 
 auto
@@ -217,19 +204,22 @@ CGtoBlock::operator=(const CGtoBlock &other) -> CGtoBlock &
 auto
 CGtoBlock::operator=(CGtoBlock &&other) noexcept -> CGtoBlock &
 {
-    std::swap(_coordinates, other._coordinates);
+    if (this != &other)
+    {
+        _coordinates = std::move(other._coordinates);
 
-    std::swap(_exponents, other._exponents);
+        _exponents = std::move(other._exponents);
 
-    std::swap(_norms, other._norms);
+        _norms = std::move(other._norms);
 
-    std::swap(_orb_indices, other._orb_indices);
+        _orb_indices = std::move(other._orb_indices);
 
-    std::swap(_atm_indices, other._atm_indices);
+        _atm_indices = std::move(other._atm_indices);
 
-    std::swap(_angular_momentum, other._angular_momentum);
+        _angular_momentum = std::move(other._angular_momentum);
 
-    std::swap(_npgtos, other._npgtos);
+        _npgtos = std::move(other._npgtos);
+    }
 
     return *this;
 }

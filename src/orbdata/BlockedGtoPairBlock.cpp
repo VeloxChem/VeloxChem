@@ -159,9 +159,8 @@ CBlockedGtoPairBlock::CBlockedGtoPairBlock(const CBlockedGtoPairBlock &other)
 
 CBlockedGtoPairBlock::CBlockedGtoPairBlock(CBlockedGtoPairBlock &&other) noexcept
 
-    : _gto_pair_blocks{}
+    : _gto_pair_blocks(std::move(other._gto_pair_blocks))
 {
-    std::swap(_gto_pair_blocks, other._gto_pair_blocks);
 }
 
 auto
@@ -175,7 +174,10 @@ CBlockedGtoPairBlock::operator=(const CBlockedGtoPairBlock &other) -> CBlockedGt
 auto
 CBlockedGtoPairBlock::operator=(CBlockedGtoPairBlock &&other) noexcept -> CBlockedGtoPairBlock &
 {
-    std::swap(_gto_pair_blocks, other._gto_pair_blocks);
+    if (this != &other)
+    {
+        _gto_pair_blocks = std::move(other._gto_pair_blocks);
+    }
 
     return *this;
 }
