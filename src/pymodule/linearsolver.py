@@ -37,7 +37,7 @@ from .veloxchemlib import MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import make_matrix, mat_t
-from .matrices import Matrices
+from .matrix import Matrix
 from .distributedarray import DistributedArray
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
@@ -941,13 +941,6 @@ class LinearSolver:
         for idx in range(num_densities):
             dens[idx] = self.comm.bcast(dens[idx], root=mpi_master())
 
-        den_mat_for_fock = Matrices()
-
-        for idx in range(num_densities):
-            den_mat = make_matrix(basis, mat_t.general)
-            den_mat.set_values(dens[idx])
-            den_mat_for_fock.add(den_mat, str(idx))
-
         thresh_int = int(-math.log10(self.eri_thresh))
 
         t0 = tm.time()
@@ -977,33 +970,31 @@ class LinearSolver:
         else:
             erf_k_coef, omega = None, None
 
-        fock_mat = fock_drv.compute(screening, den_mat_for_fock,
-                                    [fock_type for x in range(len(dens))],
-                                    exchange_scaling_factor, 0.0, thresh_int)
-
         fock_arrays = []
+
         for idx in range(num_densities):
-            fock_np = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
+            den_mat_for_fock = make_matrix(basis, mat_t.general)
+            den_mat_for_fock.set_values(dens[idx])
+
+            fock_mat = fock_drv.compute(screening, den_mat_for_fock, fock_type,
+                                        exchange_scaling_factor, 0.0,
+                                        thresh_int)
+            fock_np = fock_mat.full_matrix().to_numpy()
+
+            if fock_type == 'j':
+                # for pure functional
+                fock_np *= 2.0
+
+            if need_omega:
+                # for range-separated functional
+                fock_mat = fock_drv.compute(screening, den_mat_for_fock,
+                                            'kx_rs', erf_k_coef, omega,
+                                            thresh_int)
+                fock_np -= fock_mat.full_matrix().to_numpy()
+
             fock_arrays.append(fock_np)
 
-        fock_mat = Matrices()
-
-        if fock_type == 'j':
-            # for pure functional
-            for idx in range(num_densities):
-                fock_arrays[idx] *= 2.0
-
-        if need_omega:
-            # for range-separated functional
-            fock_mat = fock_drv.compute(screening, den_mat_for_fock,
-                                        ['kx_rs' for x in range(len(dens))],
-                                        erf_k_coef, omega, thresh_int)
-
-            for idx in range(num_densities):
-                fock_erf_k = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
-                fock_arrays[idx] -= fock_erf_k
-
-            fock_mat = Matrices()
+        fock_mat = Matrix()
 
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)
@@ -1218,10 +1209,6 @@ class LinearSolver:
         cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
             self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
-        if self.batch_size is not None:
-            cur_str = 'Batch Size of Fock Matrices     : {:d}'.format(
-                self.batch_size)
-            self.ostream.print_header(cur_str.ljust(str_width))
 
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '

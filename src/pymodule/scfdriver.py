@@ -41,7 +41,6 @@ from .veloxchemlib import xcfun
 from .veloxchemlib import denmat, mat_t
 from .veloxchemlib import make_matrix
 from .matrix import Matrix
-from .matrices import Matrices
 from .aodensitymatrix import AODensityMatrix
 from .fockdriver import FockDriver
 from .profiler import Profiler
@@ -1545,18 +1544,10 @@ class ScfDriver:
                 den_mat_for_Kb = None
                 den_mat_for_Jab = None
 
-            den_mat_for_fock = Matrices()
-
-            dm_fock = self.comm.bcast(den_mat_for_Ka, root=mpi_master())
-            den_mat_for_fock.add(dm_fock, '0')
-
-            dm_fock = self.comm.bcast(den_mat_for_Kb, root=mpi_master())
-            den_mat_for_fock.add(dm_fock, '1')
-
-            dm_fock = self.comm.bcast(den_mat_for_Jab, root=mpi_master())
-            den_mat_for_fock.add(dm_fock, '2')
-
-            dm_fock = None
+            den_mat_for_Ka = self.comm.bcast(den_mat_for_Ka, root=mpi_master())
+            den_mat_for_Kb = self.comm.bcast(den_mat_for_Kb, root=mpi_master())
+            den_mat_for_Jab = self.comm.bcast(den_mat_for_Jab,
+                                              root=mpi_master())
 
         if e_grad is None:
             thresh_int = int(-math.log10(self.eri_thresh))
@@ -1626,6 +1617,8 @@ class ScfDriver:
 
             fock_mat_np = self.comm.reduce(fock_mat_np, root=mpi_master())
 
+            den_mat_for_fock = Matrix()
+
             if self.rank == mpi_master():
                 # Note: make fock_mat a list
                 fock_mat = [fock_mat_np]
@@ -1637,9 +1630,8 @@ class ScfDriver:
             if fock_type == 'j':
                 # for pure functional
                 # den_mat_for_fock.matrix('2') is D_total
-                fock_mat = fock_drv.compute(screener,
-                                            den_mat_for_fock.matrix('2'), 'j',
-                                            0.0, 0.0, thresh_int)
+                fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j', 0.0,
+                                            0.0, thresh_int)
 
                 J_ab_np = fock_mat.full_matrix().to_numpy()
 
@@ -1649,37 +1641,44 @@ class ScfDriver:
                 fock_mat = Matrix()
 
             else:
-                fock_mat = fock_drv.compute(screener, den_mat_for_fock,
-                                            ['kx', 'kx', 'j'],
+                fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
+                K_a_np = fock_mat.full_matrix().to_numpy()
 
-                K_a_np = fock_mat.matrix('0').full_matrix().to_numpy()
-                K_b_np = fock_mat.matrix('1').full_matrix().to_numpy()
-                J_ab_np = fock_mat.matrix('2').full_matrix().to_numpy()
+                fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx',
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+                K_b_np = fock_mat.full_matrix().to_numpy()
+
+                fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+                J_ab_np = fock_mat.full_matrix().to_numpy()
 
                 fock_mat_a_np = J_ab_np - K_a_np
                 fock_mat_b_np = J_ab_np - K_b_np
 
-                fock_mat = Matrices()
+                fock_mat = Matrix()
 
             if need_omega:
                 # for range-separated functional
-                den_mat_for_erf_k = Matrices()
-                den_mat_for_erf_k.add(den_mat_for_fock.matrix('0'), '0')
-                den_mat_for_erf_k.add(den_mat_for_fock.matrix('1'), '1')
+                fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx_rs',
+                                            erf_k_coef, omega, thresh_int)
+                fock_mat_a_np -= fock_mat.full_matrix().to_numpy()
 
-                fock_mat = fock_drv.compute(screener, den_mat_for_erf_k,
-                                            ['kx_rs', 'kx_rs'], erf_k_coef,
-                                            omega, thresh_int)
+                fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx_rs',
+                                            erf_k_coef, omega, thresh_int)
+                fock_mat_b_np -= fock_mat.full_matrix().to_numpy()
 
-                fock_mat_a_np -= fock_mat.matrix('0').full_matrix().to_numpy()
-                fock_mat_b_np -= fock_mat.matrix('1').full_matrix().to_numpy()
-
-                fock_mat = Matrices()
+                fock_mat = Matrix()
 
             fock_mat_a_np = self.comm.reduce(fock_mat_a_np, root=mpi_master())
             fock_mat_b_np = self.comm.reduce(fock_mat_b_np, root=mpi_master())
+
+            den_mat_for_Ka = Matrix()
+            den_mat_for_Kb = Matrix()
+            den_mat_for_Jab = Matrix()
 
             if self.rank == mpi_master():
                 # Note: make fock_mat a list
