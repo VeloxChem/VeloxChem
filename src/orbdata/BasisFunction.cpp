@@ -40,17 +40,12 @@ CBasisFunction::CBasisFunction(const CBasisFunction &other)
 
 CBasisFunction::CBasisFunction(CBasisFunction &&other) noexcept
 
-    : _exponents{}
+    : _exponents(std::move(other._exponents))
 
-    , _norms{}
+    , _norms(std::move(other._norms))
 
-    , _angular_momentum(-1)
+    , _angular_momentum(std::move(other._angular_momentum))
 {
-    std::swap(_exponents, other._exponents);
-
-    std::swap(_norms, other._norms);
-
-    std::swap(_angular_momentum, other._angular_momentum);
 }
 
 auto
@@ -68,11 +63,14 @@ CBasisFunction::operator=(const CBasisFunction &other) -> CBasisFunction &
 auto
 CBasisFunction::operator=(CBasisFunction &&other) noexcept -> CBasisFunction &
 {
-    std::swap(_exponents, other._exponents);
+    if (this != &other)
+    {
+        _exponents = std::move(other._exponents);
 
-    std::swap(_norms, other._norms);
+        _norms = std::move(other._norms);
 
-    std::swap(_angular_momentum, other._angular_momentum);
+        _angular_momentum = std::move(other._angular_momentum);
+    }
 
     return *this;
 }
