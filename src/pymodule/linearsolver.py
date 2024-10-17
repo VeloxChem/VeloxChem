@@ -33,10 +33,11 @@ from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import (compute_linear_momentum_integrals,
                            compute_angular_momentum_integrals)
 from .veloxchemlib import T4CScreener
-from .veloxchemlib import Matrices, make_matrix, mat_t
 from .veloxchemlib import MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .veloxchemlib import rotatory_strength_in_cgs
+from .veloxchemlib import make_matrix, mat_t
+from .matrices import Matrices
 from .distributedarray import DistributedArray
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
@@ -985,6 +986,8 @@ class LinearSolver:
             fock_np = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
             fock_arrays.append(fock_np)
 
+        fock_mat = Matrices()
+
         if fock_type == 'j':
             # for pure functional
             for idx in range(num_densities):
@@ -999,6 +1002,8 @@ class LinearSolver:
             for idx in range(num_densities):
                 fock_erf_k = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
                 fock_arrays[idx] -= fock_erf_k
+
+            fock_mat = Matrices()
 
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)

@@ -38,7 +38,8 @@ from .veloxchemlib import (hartree_in_ev, bohr_in_angstrom,
                            rotatory_strength_in_cgs)
 from .veloxchemlib import get_dimer_ao_indices, parse_xc_func, make_matrix
 from .veloxchemlib import mpi_master, mat_t
-from .veloxchemlib import Matrices, T4CScreener
+from .veloxchemlib import T4CScreener
+from .matrices import Matrices
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .outputstream import OutputStream
