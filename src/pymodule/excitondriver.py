@@ -34,12 +34,12 @@ from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import compute_linear_momentum_integrals
 from .veloxchemlib import compute_angular_momentum_integrals
 from .veloxchemlib import KineticEnergyDriver, XCIntegrator
+from .veloxchemlib import T4CScreener
 from .veloxchemlib import (hartree_in_ev, bohr_in_angstrom,
                            rotatory_strength_in_cgs)
 from .veloxchemlib import get_dimer_ao_indices, parse_xc_func, make_matrix
 from .veloxchemlib import mpi_master, mat_t
-from .veloxchemlib import T4CScreener
-from .matrices import Matrices
+from .matrix import Matrix
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .outputstream import OutputStream
@@ -1205,11 +1205,18 @@ class ExcitonModelDriver:
                 exchange_scaling_factor = 0.0
 
         # TODO: range-separated
+        need_omega = (self.dft and xcfun.is_range_separated())
+        if need_omega:
+            assert_msg_critical(
+                False, 'ExcitonModelDriver: Not implemented for' +
+                ' range-separated functional')
 
         fock_mat = fock_drv.compute(screening, den_mat_for_fock, fock_type,
                                     exchange_scaling_factor, 0.0, thresh_int)
 
         fock_mat_np = fock_mat.full_matrix().to_numpy()
+
+        fock_mat = Matrix()
 
         if fock_type == 'j':
             # for pure functional
@@ -1497,13 +1504,6 @@ class ExcitonModelDriver:
             ao_dens = self.comm.bcast(ao_dens, root=mpi_master())
             tdens.append(ao_dens)
 
-        den_mat_for_fock = Matrices()
-
-        for idx in range(num_ci_vecs):
-            den_mat = make_matrix(basis, mat_t.general)
-            den_mat.set_values(tdens[idx])
-            den_mat_for_fock.add(den_mat, str(idx))
-
         # screening
         thresh_int = int(-math.log10(self.eri_thresh))
 
@@ -1529,20 +1529,31 @@ class ExcitonModelDriver:
                 exchange_scaling_factor = 0.0
 
         # TODO: range-separated
-
-        fock_mat = fock_drv.compute(screening, den_mat_for_fock,
-                                    [fock_type for x in range(num_ci_vecs)],
-                                    exchange_scaling_factor, 0.0, thresh_int)
+        need_omega = (self.dft and xcfun.is_range_separated())
+        if need_omega:
+            assert_msg_critical(
+                False, 'ExcitonModelDriver: Not implemented for' +
+                ' range-separated functional')
 
         fock_arrays = []
+
         for idx in range(num_ci_vecs):
-            fock_np = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
+            den_mat_for_fock = make_matrix(basis, mat_t.general)
+            den_mat_for_fock.set_values(tdens[idx])
+
+            fock_mat = fock_drv.compute(screening, den_mat_for_fock, fock_type,
+                                        exchange_scaling_factor, 0.0,
+                                        thresh_int)
+
+            fock_np = fock_mat.full_matrix().to_numpy()
+
+            if fock_type == 'j':
+                # for pure functional
+                fock_np *= 2.0
+
             fock_arrays.append(fock_np)
 
-        if fock_type == 'j':
-            # for pure functional
-            for idx in range(num_ci_vecs):
-                fock_arrays[idx] *= 2.0
+            fock_mat = Matrix()
 
         if self.dft:
             gs_dens = dimer_prop['density']

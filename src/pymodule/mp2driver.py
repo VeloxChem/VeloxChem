@@ -27,9 +27,10 @@ import numpy as np
 import math
 import sys
 
+from .veloxchemlib import T4CScreener
 from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import make_matrix
-from .veloxchemlib import T4CScreener, Matrices
+from .matrix import Matrix
 from .fockdriver import FockDriver
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
@@ -386,31 +387,28 @@ class Mp2Driver:
 
                 dks.append(ao_dens)
 
-            den_mat_for_fock = Matrices()
-
-            for idx in range(len(batch_ids)):
-                den_mat = make_matrix(basis, mat_t.general)
-                den_mat.set_values(dks[idx])
-                den_mat_for_fock.add(den_mat, str(idx))
-
             fock_drv = FockDriver(local_comm)
 
             fock_type = 'k'
             exchange_scaling_factor = 1.0
 
-            fock_mat = fock_drv.compute(
-                screening, den_mat_for_fock,
-                [fock_type for x in range(len(batch_ids))],
-                exchange_scaling_factor, 0.0, thresh_int)
-
             fock_arrays = []
+
             for idx in range(len(batch_ids)):
-                fock_np = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
+                den_mat_for_fock = make_matrix(basis, mat_t.general)
+                den_mat_for_fock.set_values(dks[idx])
+
+                fock_mat = fock_drv.compute(screening, den_mat_for_fock,
+                                            fock_type, exchange_scaling_factor,
+                                            0.0, thresh_int)
+
+                fock_np = fock_mat.full_matrix().to_numpy()
+
+                fock_np = local_comm.reduce(fock_np, root=mpi_master())
+
                 fock_arrays.append(fock_np)
 
-            for idx in range(len(fock_arrays)):
-                fock_arrays[idx] = local_comm.reduce(fock_arrays[idx],
-                                                     root=mpi_master())
+                fock_mat = Matrix()
 
             if local_master:
 
@@ -488,8 +486,6 @@ class Mp2Driver:
 
         str_width = 60
         cur_str = 'Number of Fock Matrices      : ' + str(num_matrices)
-        self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Size of Fock Matrices Batch  : ' + str(batch_size)
         self.ostream.print_header(cur_str.ljust(str_width))
 
         cur_str = 'Number of Subcommunicators   : '
