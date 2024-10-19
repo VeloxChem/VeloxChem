@@ -134,7 +134,7 @@ class NonlinearSolver:
         self.filename = None
 
         self._debug = False
-        self._block_size_factor = 2
+        self._block_size_factor = 16
 
         # input keywords
         self._input_keywords = {
