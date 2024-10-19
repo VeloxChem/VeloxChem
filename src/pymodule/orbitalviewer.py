@@ -121,7 +121,7 @@ class OrbitalViewer:
         """
 
         # Define box size
-        self._atomnr = molecule.get_element_ids()
+        self._atomnr = np.array(molecule.get_identifiers()) - 1
         self._coords = molecule.get_coordinates_in_bohr()
         if self.atom_centers is None:
             xmin = self._coords[:, 0].min() - self.grid_margins
@@ -543,13 +543,12 @@ class OrbitalViewer:
         ]
 
         natoms = molecule.number_of_atoms()
-        atomnr = molecule.elem_ids_to_numpy() - 1
         coords = molecule.get_coordinates_in_bohr().astype('float32')
 
         # Create a list of colors and radii
         colors = []
         radii = []
-        for nr in atomnr:
+        for nr in self._atomnr:
             if nr < len(atomcolor):
                 colors.append(atomcolor[nr])
             else:
@@ -573,10 +572,11 @@ class OrbitalViewer:
         labels = molecule.get_labels()
         names = {}
         for i in range(natoms):
-            if atomnr[i] not in bonddict:
-                bonddict[atomnr[i]] = []
-            if atomnr[i] not in names:
-                names[atomnr[i]] = labels[i]
+            atom_id = self._atomnr[i]
+            if atom_id not in bonddict:
+                bonddict[atom_id] = []
+            if atom_id not in names:
+                names[atom_id] = labels[i]
 
         newcoords = []
         ncoords = natoms
@@ -587,13 +587,13 @@ class OrbitalViewer:
                 if np.linalg.norm(coords[i, :] - coords[j, :]) > 1.25 * bond:
                     continue
                 # If single atom type, just record it
-                if atomnr[i] == atomnr[j]:
-                    bonddict[atomnr[i]].append([i, j])
+                if self._atomnr[i] == self._atomnr[j]:
+                    bonddict[self._atomnr[i]].append([i, j])
                 # Else do 2 segments (which means adding a new middle-vertex)
                 else:
                     newcoords.append(0.5 * (coords[i, :] + coords[j, :]))
-                    bonddict[atomnr[i]].append([i, ncoords])
-                    bonddict[atomnr[j]].append([ncoords, j])
+                    bonddict[self._atomnr[i]].append([i, ncoords])
+                    bonddict[self._atomnr[j]].append([ncoords, j])
                     ncoords += 1
 
         finalcoords = np.append(coords, newcoords)
