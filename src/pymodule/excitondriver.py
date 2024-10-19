@@ -1215,7 +1215,6 @@ class ExcitonModelDriver:
                                     exchange_scaling_factor, 0.0, thresh_int)
 
         fock_mat_np = fock_mat.to_numpy()
-
         fock_mat = Matrix()
 
         if fock_type == 'j':
@@ -1546,14 +1545,13 @@ class ExcitonModelDriver:
                                         thresh_int)
 
             fock_np = fock_mat.to_numpy()
+            fock_mat = Matrix()
 
             if fock_type == 'j':
                 # for pure functional
                 fock_np *= 2.0
 
             fock_arrays.append(fock_np)
-
-            fock_mat = Matrix()
 
         if self.dft:
             gs_dens = dimer_prop['density']

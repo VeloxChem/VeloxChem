@@ -1612,7 +1612,6 @@ class ScfDriver:
             self._print_debug_info('after  rest Fock build')
 
             fock_mat_np = fock_mat.to_numpy()
-
             fock_mat = Matrix()
 
             if fock_type == 'j':
@@ -1627,7 +1626,6 @@ class ScfDriver:
                 self._print_debug_info('after  rest erf Fock build')
 
                 fock_mat_np -= fock_mat.to_numpy()
-
                 fock_mat = Matrix()
 
             fock_mat_np = self.comm.reduce(fock_mat_np, root=mpi_master())
@@ -1651,11 +1649,10 @@ class ScfDriver:
                 self._print_debug_info('after  unrest Fock J build')
 
                 J_ab_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
 
                 fock_mat_a_np = J_ab_np
                 fock_mat_b_np = J_ab_np.copy()
-
-                fock_mat = Matrix()
 
             else:
                 self._print_debug_info('before unrest Fock Ka build')
@@ -1663,26 +1660,30 @@ class ScfDriver:
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
                 self._print_debug_info('after  unrest Fock Kb build')
+
                 K_a_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
 
                 self._print_debug_info('before unrest Fock Kb build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
                 self._print_debug_info('after  unrest Fock Kb build')
+
                 K_b_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
 
                 self._print_debug_info('before unrest Fock J build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
                 self._print_debug_info('after  unrest Fock J build')
+
                 J_ab_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
 
                 fock_mat_a_np = J_ab_np - K_a_np
                 fock_mat_b_np = J_ab_np - K_b_np
-
-                fock_mat = Matrix()
 
             if need_omega:
                 # for range-separated functional
@@ -1690,14 +1691,16 @@ class ScfDriver:
                 fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
                 self._print_debug_info('after  unrest erf Fock Ka build')
+
                 fock_mat_a_np -= fock_mat.to_numpy()
+                fock_mat = Matrix()
 
                 self._print_debug_info('before unrest erf Fock Kb build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
                 self._print_debug_info('after  unrest erf Fock Kb build')
-                fock_mat_b_np -= fock_mat.to_numpy()
 
+                fock_mat_b_np -= fock_mat.to_numpy()
                 fock_mat = Matrix()
 
             fock_mat_a_np = self.comm.reduce(fock_mat_a_np, root=mpi_master())

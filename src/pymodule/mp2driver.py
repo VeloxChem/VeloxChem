@@ -403,12 +403,11 @@ class Mp2Driver:
                                             0.0, thresh_int)
 
                 fock_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
 
                 fock_np = local_comm.reduce(fock_np, root=mpi_master())
 
                 fock_arrays.append(fock_np)
-
-                fock_mat = Matrix()
 
             if local_master:
 

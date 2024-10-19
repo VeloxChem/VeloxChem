@@ -987,7 +987,9 @@ class LinearSolver:
                                         exchange_scaling_factor, 0.0,
                                         thresh_int)
             self._print_mem_debug_info('after  restgen Fock build')
+
             fock_np = fock_mat.to_numpy()
+            fock_mat = Matrix()
 
             if fock_type == 'j':
                 # for pure functional
@@ -1000,11 +1002,11 @@ class LinearSolver:
                                             'kx_rs', erf_k_coef, omega,
                                             thresh_int)
                 self._print_mem_debug_info('after  restgen erf Fock build')
+
                 fock_np -= fock_mat.to_numpy()
+                fock_mat = Matrix()
 
             fock_arrays.append(fock_np)
-
-        fock_mat = Matrix()
 
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)
