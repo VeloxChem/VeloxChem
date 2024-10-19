@@ -115,7 +115,7 @@ monkey:python_tests:
     - mpiexec -n 2 python -m pytest --capture=no --log-cli-level=INFO --pyargs veloxchem
         -m "solvers" --durations=10
     - python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO --pyargs veloxchem
-        -m "not finitediff" --durations=10
+        -m "not timeconsuming" --durations=10
 
 include:
   - '.gitlab/cron-deploy.yml'

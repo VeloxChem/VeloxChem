@@ -141,76 +141,6 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho, 
 
          double da_dpi = da_dzeta_abs*dzeta_abs_dpi;
 
-         double b = a_fact/cbrt(1 - zeta_abs);
-
-         double db_dzeta_abs = (1.0/3.0)*a_fact/pow(1 - zeta_abs, 4.0/3.0);
-
-         double db_drho = da_fact_drho/cbrt(1 - zeta_abs) + db_dzeta_abs*dzeta_abs_drho;
-
-         double db_dpi = db_dzeta_abs*dzeta_abs_dpi;
-
-         att_erf_aux1 = sqrt(M_PI)*erf((1.0/2.0)/b);
-
-         double datt_erf_aux1_db = -exp(-(1.0/4.0)/pow(b, 2))/pow(b, 2);
-
-         datt_erf_aux1_drho = datt_erf_aux1_db*db_drho;
-
-         double datt_erf_aux1_dpi = datt_erf_aux1_db*db_dpi;
-
-         double att_erf_aux2 = 0;
-
-         double datt_erf_aux2_dpi = 0;
-
-         double datt_erf_aux2_db = 0;
-
-         double datt_erf_aux2_drho = 0;
-
-         if (b < 5)
-         {
-            att_erf_aux2 = -1 + exp(-(1.0/4.0)/pow(b, 2));
-
-            datt_erf_aux2_db = (1.0/2.0)*exp(-(1.0/4.0)/pow(b, 2))/pow(b, 3);
-
-            datt_erf_aux2_drho = datt_erf_aux2_db*db_drho;
-
-            datt_erf_aux2_dpi = datt_erf_aux2_db*db_dpi;
-
-         }
-         else
-         {
-            att_erf_aux2 = -1.0/4.0*(1 - (1.0/2.0)/pow(b, 2))/pow(b, 2);
-
-            datt_erf_aux2_db = (1.0/2.0)*(1 - (1.0/2.0)/pow(b, 2))/pow(b, 3) - (1.0/4.0)/pow(b, 5);
-
-            datt_erf_aux2_drho = datt_erf_aux2_db*db_drho;
-
-            datt_erf_aux2_dpi = datt_erf_aux2_db*db_dpi;
-
-         }
-         att_erf_aux3 = 2*att_erf_aux2*pow(b, 2) + 1.0/2.0;
-
-         double datt_erf_aux3_db = 4*att_erf_aux2*b;
-
-         double datt_erf_aux3_datt_erf_aux2 = 2*pow(b, 2);
-
-         datt_erf_aux3_drho = datt_erf_aux2_drho*datt_erf_aux3_datt_erf_aux2 + datt_erf_aux3_db*db_drho;
-
-         double datt_erf_aux3_dpi = datt_erf_aux2_dpi*datt_erf_aux3_datt_erf_aux2 + datt_erf_aux3_db*db_dpi;
-
-         att_erf0 = -8.0/3.0*b*(att_erf_aux1 + 2*b*(att_erf_aux2 - att_erf_aux3)) + 1;
-
-         double datt_erf0_db = -8.0/3.0*att_erf_aux1 - 16.0/3.0*b*(att_erf_aux2 - att_erf_aux3) - 8.0/3.0*b*(2*att_erf_aux2 - 2*att_erf_aux3);
-
-         double datt_erf0_datt_erf_aux2 = -16.0/3.0*pow(b, 2);
-
-         double datt_erf0_datt_erf_aux3 = (16.0/3.0)*pow(b, 2);
-
-         double datt_erf0_datt_erf_aux1 = -8.0/3.0*b;
-
-         datt_erf0_drho = datt_erf0_datt_erf_aux1*datt_erf_aux1_drho + datt_erf0_datt_erf_aux2*datt_erf_aux2_drho + datt_erf0_datt_erf_aux3*datt_erf_aux3_drho + datt_erf0_db*db_drho;
-
-         double datt_erf0_dpi = datt_erf0_datt_erf_aux1*datt_erf_aux1_dpi + datt_erf0_datt_erf_aux2*datt_erf_aux2_dpi + datt_erf0_datt_erf_aux3*datt_erf_aux3_dpi + datt_erf0_db*db_dpi;
-
          double att_erf_aux1_2 = sqrt(M_PI)*erf((1.0/2.0)/a);
 
          double datt_erf_aux1_2_da = -exp(-(1.0/4.0)/pow(a, 2))/pow(a, 2);
@@ -273,18 +203,102 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho, 
 
          double datt_erf0_2_dpi = da_dpi*datt_erf0_2_da + datt_erf0_2_datt_erf_aux1_2*datt_erf_aux1_2_dpi + datt_erf0_2_datt_erf_aux2_2*datt_erf_aux2_2_dpi + datt_erf0_2_datt_erf_aux3_2*datt_erf_aux3_2_dpi;
 
-         fpol = att_erf0*pow(1 - zeta_abs, 4.0/3.0) + att_erf0_2*pow(zeta_abs + 1, 4.0/3.0);
+         fpol = att_erf0_2*pow(zeta_abs + 1, 4.0/3.0);
 
          double dfpol_datt_erf0_2 = pow(zeta_abs + 1, 4.0/3.0);
 
-         double dfpol_dzeta_abs = -4.0/3.0*att_erf0*cbrt(1 - zeta_abs) + (4.0/3.0)*att_erf0_2*cbrt(zeta_abs + 1);
+         double dfpol_dzeta_abs = (4.0/3.0)*att_erf0_2*cbrt(zeta_abs + 1);
 
-         double dfpol_datt_erf0 = pow(1 - zeta_abs, 4.0/3.0);
+         dfpol_drho = datt_erf0_2_drho*dfpol_datt_erf0_2;
 
-         dfpol_drho = datt_erf0_2_drho*dfpol_datt_erf0_2 + datt_erf0_drho*dfpol_datt_erf0 + dfpol_dzeta_abs*dzeta_abs_drho;
+         dfpol_dpi = datt_erf0_2_dpi*dfpol_datt_erf0_2;
 
-         dfpol_dpi = datt_erf0_2_dpi*dfpol_datt_erf0_2 + datt_erf0_dpi*dfpol_datt_erf0 + dfpol_dzeta_abs*dzeta_abs_dpi;
+         if ( 1-zeta_abs > 1.0e-16)
+         {
+             double b = a_fact/cbrt(1 - zeta_abs);
 
+             double db_dzeta_abs = (1.0/3.0)*a_fact/pow(1 - zeta_abs, 4.0/3.0);
+
+             double db_drho = da_fact_drho/cbrt(1 - zeta_abs) + db_dzeta_abs*dzeta_abs_drho;
+
+             double db_dpi = db_dzeta_abs*dzeta_abs_dpi;
+
+             att_erf_aux1 = sqrt(M_PI)*erf((1.0/2.0)/b);
+
+             double datt_erf_aux1_db = -exp(-(1.0/4.0)/pow(b, 2))/pow(b, 2);
+
+             datt_erf_aux1_drho = datt_erf_aux1_db*db_drho;
+
+             double datt_erf_aux1_dpi = datt_erf_aux1_db*db_dpi;
+
+             double att_erf_aux2 = 0;
+
+             double datt_erf_aux2_dpi = 0;
+
+             double datt_erf_aux2_db = 0;
+
+             double datt_erf_aux2_drho = 0;
+
+             if (b < 5)
+             {
+                att_erf_aux2 = -1 + exp(-(1.0/4.0)/pow(b, 2));
+
+                datt_erf_aux2_db = (1.0/2.0)*exp(-(1.0/4.0)/pow(b, 2))/pow(b, 3);
+
+                datt_erf_aux2_drho = datt_erf_aux2_db*db_drho;
+
+                datt_erf_aux2_dpi = datt_erf_aux2_db*db_dpi;
+
+             }
+             else
+             {
+                att_erf_aux2 = -1.0/4.0*(1 - (1.0/2.0)/pow(b, 2))/pow(b, 2);
+
+                datt_erf_aux2_db = (1.0/2.0)*(1 - (1.0/2.0)/pow(b, 2))/pow(b, 3) - (1.0/4.0)/pow(b, 5);
+
+                datt_erf_aux2_drho = datt_erf_aux2_db*db_drho;
+
+                datt_erf_aux2_dpi = datt_erf_aux2_db*db_dpi;
+
+             }
+             att_erf_aux3 = 2*att_erf_aux2*pow(b, 2) + 1.0/2.0;
+
+             double datt_erf_aux3_db = 4*att_erf_aux2*b;
+
+             double datt_erf_aux3_datt_erf_aux2 = 2*pow(b, 2);
+
+             datt_erf_aux3_drho = datt_erf_aux2_drho*datt_erf_aux3_datt_erf_aux2 + datt_erf_aux3_db*db_drho;
+
+             double datt_erf_aux3_dpi = datt_erf_aux2_dpi*datt_erf_aux3_datt_erf_aux2 + datt_erf_aux3_db*db_dpi;
+
+             att_erf0 = -8.0/3.0*b*(att_erf_aux1 + 2*b*(att_erf_aux2 - att_erf_aux3)) + 1;
+
+             double datt_erf0_db = -8.0/3.0*att_erf_aux1 - 16.0/3.0*b*(att_erf_aux2 - att_erf_aux3) - 8.0/3.0*b*(2*att_erf_aux2 - 2*att_erf_aux3);
+
+             double datt_erf0_datt_erf_aux2 = -16.0/3.0*pow(b, 2);
+
+             double datt_erf0_datt_erf_aux3 = (16.0/3.0)*pow(b, 2);
+
+             double datt_erf0_datt_erf_aux1 = -8.0/3.0*b;
+
+             datt_erf0_drho = datt_erf0_datt_erf_aux1*datt_erf_aux1_drho + datt_erf0_datt_erf_aux2*datt_erf_aux2_drho + datt_erf0_datt_erf_aux3*datt_erf_aux3_drho + datt_erf0_db*db_drho;
+
+             double datt_erf0_dpi = datt_erf0_datt_erf_aux1*datt_erf_aux1_dpi + datt_erf0_datt_erf_aux2*datt_erf_aux2_dpi + datt_erf0_datt_erf_aux3*datt_erf_aux3_dpi + datt_erf0_db*db_dpi;
+
+             fpol += att_erf0*pow(1 - zeta_abs, 4.0/3.0);
+
+             dfpol_dzeta_abs += -4.0/3.0*att_erf0*cbrt(1 - zeta_abs);
+
+             double dfpol_datt_erf0 = pow(1 - zeta_abs, 4.0/3.0);
+
+             dfpol_drho += datt_erf0_drho*dfpol_datt_erf0;
+
+             dfpol_dpi += datt_erf0_dpi*dfpol_datt_erf0;
+         }
+
+         dfpol_drho += dfpol_dzeta_abs*dzeta_abs_drho;
+
+         dfpol_dpi += dfpol_dzeta_abs*dzeta_abs_dpi;
       }
       else
       {

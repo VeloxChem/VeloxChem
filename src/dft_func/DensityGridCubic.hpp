@@ -26,7 +26,7 @@
 #define DensityGridCubic_hpp
 
 #include "DensityGrid.hpp"
-#include "MemBlock2D.hpp"
+#include "DensityGridData2D.hpp"
 #include "XCFunctionalType.hpp"
 
 /**
@@ -47,7 +47,7 @@ class CDensityGridCubic
     /**
      The density variables values at grid points.
      */
-    CMemBlock2D<double> _densityValues;
+    CDensityGridData2D _densityValues;
 
    public:
     /**
@@ -61,7 +61,7 @@ class CDensityGridCubic
      @param densityValues the 2D memory block object with density values data.
      @param gridType the type of density grid.
      */
-    CDensityGridCubic(const CMemBlock2D<double>& densityValues, const dengrid gridType);
+    CDensityGridCubic(const CDensityGridData2D& densityValues, const dengrid gridType);
 
     /**
      Creates a density grid object.
@@ -487,8 +487,23 @@ class CDensityGridCubic
     void DensityProd(const CDensityGrid& rwDensityGrid,
                      const CDensityGrid& rw2DensityGrid,
                      const xcfun         xcFuncType,
-                     const int       numdens,
+                     const int           numdens,
                      const std::string&  quadMode);
+
+    void DensityProdForLDA(const CDensityGrid& rwDensityGrid,
+                           const CDensityGrid& rw2DensityGrid,
+                           const int           numdens,
+                           const std::string&  quadMode);
+
+    void DensityProdForGGA(const CDensityGrid& rwDensityGrid,
+                           const CDensityGrid& rw2DensityGrid,
+                           const int           numdens,
+                           const std::string&  quadMode);
+
+    void DensityProdForMGGA(const CDensityGrid& rwDensityGrid,
+                            const CDensityGrid& rw2DensityGrid,
+                            const int           numdens,
+                            const std::string&  quadMode);
 };
 
 #endif /* DensityGridQuad_hpp */

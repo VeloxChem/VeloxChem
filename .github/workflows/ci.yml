@@ -62,4 +62,4 @@ jobs:
           OMP_NUM_THREADS=2 mpiexec -n 2 python -m pytest --capture=no --log-cli-level=INFO \
             --pyargs veloxchem -m "solvers" --durations=10
           OMP_NUM_THREADS=4 python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO \
-            --pyargs veloxchem -m "not finitediff" --durations=10
+            --pyargs veloxchem -m "not timeconsuming" --durations=10

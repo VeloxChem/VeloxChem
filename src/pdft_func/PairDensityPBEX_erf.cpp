@@ -159,6 +159,8 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
       double fpol = 0;
 
+      double dfpol_dpi = 0;
+
       if (fabs(pair_density) > 1.0000000000000001e-32)
       {
          double dzeta_abs_dpi = 0;
@@ -209,14 +211,6 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
          double da_dpi = da_dzeta_abs*dzeta_abs_dpi;
 
-         double b = a_fact/cbrt(1 - zeta_abs);
-
-         double db_dzeta_abs = (1.0/3.0)*a_fact/pow(1 - zeta_abs, 4.0/3.0);
-
-         double db_drho = da_fact_drho/cbrt(1 - zeta_abs) + db_dzeta_abs*dzeta_abs_drho;
-
-         double db_dpi = db_dzeta_abs*dzeta_abs_dpi;
-
          double rs_a = cbrt(2)*rs/cbrt(zeta_abs + 1);
 
          double drs_a_dzeta_abs = -1.0/3.0*cbrt(2)*rs/pow(zeta_abs + 1, 4.0/3.0);
@@ -224,14 +218,6 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
          double drs_a_drho = drs_a_dzeta_abs*dzeta_abs_drho + cbrt(2)*drs_drho/cbrt(zeta_abs + 1);
 
          double drs_a_dpi = drs_a_dzeta_abs*dzeta_abs_dpi;
-
-         double rs_b = cbrt(2)*rs/cbrt(1 - zeta_abs);
-
-         double drs_b_dzeta_abs = (1.0/3.0)*cbrt(2)*rs/pow(1 - zeta_abs, 4.0/3.0);
-
-         double drs_b_drho = drs_b_dzeta_abs*dzeta_abs_drho + cbrt(2)*drs_drho/cbrt(1 - zeta_abs);
-
-         double drs_b_dpi = drs_b_dzeta_abs*dzeta_abs_dpi;
 
          double xsa2 = xfact/pow(zeta_abs + 1, 2.0/3.0);
 
@@ -244,18 +230,6 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
          double dxsa2_dsig = dxfact_dsig*dxsa2_dxfact;
 
          double dxsa2_dpi = dxsa2_dzeta_abs*dzeta_abs_dpi;
-
-         double xsb2 = xfact/pow(1 - zeta_abs, 2.0/3.0);
-
-         double dxsb2_dxfact = pow(1 - zeta_abs, -2.0/3.0);
-
-         double dxsb2_dzeta_abs = (2.0/3.0)*xfact/pow(1 - zeta_abs, 5.0/3.0);
-
-         double dxsb2_drho = dxfact_drho*dxsb2_dxfact + dxsb2_dzeta_abs*dzeta_abs_drho;
-
-         double dxsb2_dsig = dxfact_dsig*dxsb2_dxfact;
-
-         double dxsb2_dpi = dxsb2_dzeta_abs*dzeta_abs_dpi;
 
          kf = cbrt(3)*pow(M_PI, 2.0/3.0)*cbrt(rs_a);
 
@@ -498,259 +472,293 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
          double dexa_dsig = dexa_dpbe_F*dpbe_F_dsig;
 
-         double kf_2 = cbrt(3)*pow(M_PI, 2.0/3.0)*cbrt(rs_b);
+         fpol = exa;
 
-         double dkf_2_drs_b = (1.0/3.0)*cbrt(3)*pow(M_PI, 2.0/3.0)/pow(rs_b, 2.0/3.0);
+         dfpol_dpi = dexa_dpi;
 
-         double dkf_2_drho = dkf_2_drs_b*drs_b_drho;
+         dfpol_drho = dexa_drho;
 
-         double dkf_2_dpi = dkf_2_drs_b*drs_b_dpi;
+         dfpol_dsig = dexa_dsig;
 
-         double mu_t_2 = (1.0/2.0)*mu/kf_2;
-
-         double dmu_t_2_dkf_2 = -1.0/2.0*mu/pow(kf_2, 2);
-
-         double dmu_t_2_drho = dkf_2_drho*dmu_t_2_dkf_2;
-
-         double dmu_t_2_dpi = dkf_2_dpi*dmu_t_2_dkf_2;
-
-         double mu_t2_2 = pow(mu_t_2, 2);
-
-         double dmu_t2_2_dmu_t_2 = 2*mu_t_2;
-
-         double dmu_t2_2_drho = dmu_t2_2_dmu_t_2*dmu_t_2_drho;
-
-         double dmu_t2_2_dpi = dmu_t2_2_dmu_t_2*dmu_t_2_dpi;
-
-         double mu_t4_2 = pow(mu_t2_2, 2);
-
-         double dmu_t4_2_dmu_t2_2 = 2*mu_t2_2;
-
-         double dmu_t4_2_drho = dmu_t2_2_drho*dmu_t4_2_dmu_t2_2;
-
-         double dmu_t4_2_dpi = dmu_t2_2_dpi*dmu_t4_2_dmu_t2_2;
-
-         double erfmu_2 = erf((1.0/2.0)/mu_t_2);
-
-         double derfmu_2_dmu_t_2 = -exp(-(1.0/4.0)/pow(mu_t_2, 2))/(sqrt(M_PI)*pow(mu_t_2, 2));
-
-         double derfmu_2_drho = derfmu_2_dmu_t_2*dmu_t_2_drho;
-
-         double derfmu_2_dpi = derfmu_2_dmu_t_2*dmu_t_2_dpi;
-
-         double c1_2 = 22*mu_t2_2 + 144*mu_t4_2 + 1;
-
-         double dc1_2_dmu_t2_2 = 22;
-
-         double dc1_2_dmu_t4_2 = 144;
-
-         double dc1_2_drho = dc1_2_dmu_t2_2*dmu_t2_2_drho + dc1_2_dmu_t4_2*dmu_t4_2_drho;
-
-         double dc1_2_dpi = dc1_2_dmu_t2_2*dmu_t2_2_dpi + dc1_2_dmu_t4_2*dmu_t4_2_dpi;
-
-         double c2_2 = 2*mu_t2_2*(72*mu_t2_2 - 7);
-
-         double dc2_2_dmu_t2_2 = 288*mu_t2_2 - 14;
-
-         double dc2_2_drho = dc2_2_dmu_t2_2*dmu_t2_2_drho;
-
-         double dc2_2_dpi = dc2_2_dmu_t2_2*dmu_t2_2_dpi;
-
-         double c3_2 = -864*mu_t4_2*(2*mu_t2_2 - 1);
-
-         double dc3_2_dmu_t2_2 = -1728*mu_t4_2;
-
-         double dc3_2_dmu_t4_2 = 864 - 1728*mu_t2_2;
-
-         double dc3_2_drho = dc3_2_dmu_t2_2*dmu_t2_2_drho + dc3_2_dmu_t4_2*dmu_t4_2_drho;
-
-         double dc3_2_dpi = dc3_2_dmu_t2_2*dmu_t2_2_dpi + dc3_2_dmu_t4_2*dmu_t4_2_dpi;
-
-         double c4_2 = mu_t2_2*(8*sqrt(M_PI)*erfmu_2*mu_t_2 - 24*mu_t2_2 + 32*mu_t4_2 - 3);
-
-         double dc4_2_derfmu_2 = 8*sqrt(M_PI)*mu_t2_2*mu_t_2;
-
-         double dc4_2_dmu_t2_2 = 8*sqrt(M_PI)*erfmu_2*mu_t_2 - 48*mu_t2_2 + 32*mu_t4_2 - 3;
-
-         double dc4_2_dmu_t_2 = 8*sqrt(M_PI)*erfmu_2*mu_t2_2;
-
-         double dc4_2_dmu_t4_2 = 32*mu_t2_2;
-
-         double dc4_2_drho = dc4_2_derfmu_2*derfmu_2_drho + dc4_2_dmu_t2_2*dmu_t2_2_drho + dc4_2_dmu_t4_2*dmu_t4_2_drho + dc4_2_dmu_t_2*dmu_t_2_drho;
-
-         double dc4_2_dpi = dc4_2_derfmu_2*derfmu_2_dpi + dc4_2_dmu_t2_2*dmu_t2_2_dpi + dc4_2_dmu_t4_2*dmu_t4_2_dpi + dc4_2_dmu_t_2*dmu_t_2_dpi;
-
-         double dbt_2_dpi = 0;
-
-         double dbt_2_drho = 0;
-
-         double bt_2 = 0;
-
-         if (mu_t_2 < 0.050000000000000003)
+         if (1 - zeta_abs > 1.0e-16)
          {
-            bt_2 = (1.0/54.0)*c2_2/c4_2;
+            double b = a_fact/cbrt(1 - zeta_abs);
 
-            double dbt_2_dc4_2 = -1.0/54.0*c2_2/pow(c4_2, 2);
+            double db_dzeta_abs = (1.0/3.0)*a_fact/pow(1 - zeta_abs, 4.0/3.0);
 
-            double dbt_2_dc2_2 = (1.0/54.0)/c4_2;
+            double db_drho = da_fact_drho/cbrt(1 - zeta_abs) + db_dzeta_abs*dzeta_abs_drho;
 
-            dbt_2_drho = dbt_2_dc2_2*dc2_2_drho + dbt_2_dc4_2*dc4_2_drho;
+            double db_dpi = db_dzeta_abs*dzeta_abs_dpi;
 
-            dbt_2_dpi = dbt_2_dc2_2*dc2_2_dpi + dbt_2_dc4_2*dc4_2_dpi;
+            double rs_b = cbrt(2)*rs/cbrt(1 - zeta_abs);
 
+            double drs_b_dzeta_abs = (1.0/3.0)*cbrt(2)*rs/pow(1 - zeta_abs, 4.0/3.0);
+
+            double drs_b_drho = drs_b_dzeta_abs*dzeta_abs_drho + cbrt(2)*drs_drho/cbrt(1 - zeta_abs);
+
+            double drs_b_dpi = drs_b_dzeta_abs*dzeta_abs_dpi;
+
+            double xsb2 = xfact/pow(1 - zeta_abs, 2.0/3.0);
+
+            double dxsb2_dxfact = pow(1 - zeta_abs, -2.0/3.0);
+
+            double dxsb2_dzeta_abs = (2.0/3.0)*xfact/pow(1 - zeta_abs, 5.0/3.0);
+
+            double dxsb2_drho = dxfact_drho*dxsb2_dxfact + dxsb2_dzeta_abs*dzeta_abs_drho;
+
+            double dxsb2_dsig = dxfact_dsig*dxsb2_dxfact;
+
+            double dxsb2_dpi = dxsb2_dzeta_abs*dzeta_abs_dpi;
+
+            double kf_2 = cbrt(3)*pow(M_PI, 2.0/3.0)*cbrt(rs_b);
+
+            double dkf_2_drs_b = (1.0/3.0)*cbrt(3)*pow(M_PI, 2.0/3.0)/pow(rs_b, 2.0/3.0);
+
+            double dkf_2_drho = dkf_2_drs_b*drs_b_drho;
+
+            double dkf_2_dpi = dkf_2_drs_b*drs_b_dpi;
+
+            double mu_t_2 = (1.0/2.0)*mu/kf_2;
+
+            double dmu_t_2_dkf_2 = -1.0/2.0*mu/pow(kf_2, 2);
+
+            double dmu_t_2_drho = dkf_2_drho*dmu_t_2_dkf_2;
+
+            double dmu_t_2_dpi = dkf_2_dpi*dmu_t_2_dkf_2;
+
+            double mu_t2_2 = pow(mu_t_2, 2);
+
+            double dmu_t2_2_dmu_t_2 = 2*mu_t_2;
+
+            double dmu_t2_2_drho = dmu_t2_2_dmu_t_2*dmu_t_2_drho;
+
+            double dmu_t2_2_dpi = dmu_t2_2_dmu_t_2*dmu_t_2_dpi;
+
+            double mu_t4_2 = pow(mu_t2_2, 2);
+
+            double dmu_t4_2_dmu_t2_2 = 2*mu_t2_2;
+
+            double dmu_t4_2_drho = dmu_t2_2_drho*dmu_t4_2_dmu_t2_2;
+
+            double dmu_t4_2_dpi = dmu_t2_2_dpi*dmu_t4_2_dmu_t2_2;
+
+            double erfmu_2 = erf((1.0/2.0)/mu_t_2);
+
+            double derfmu_2_dmu_t_2 = -exp(-(1.0/4.0)/pow(mu_t_2, 2))/(sqrt(M_PI)*pow(mu_t_2, 2));
+
+            double derfmu_2_drho = derfmu_2_dmu_t_2*dmu_t_2_drho;
+
+            double derfmu_2_dpi = derfmu_2_dmu_t_2*dmu_t_2_dpi;
+
+            double c1_2 = 22*mu_t2_2 + 144*mu_t4_2 + 1;
+
+            double dc1_2_dmu_t2_2 = 22;
+
+            double dc1_2_dmu_t4_2 = 144;
+
+            double dc1_2_drho = dc1_2_dmu_t2_2*dmu_t2_2_drho + dc1_2_dmu_t4_2*dmu_t4_2_drho;
+
+            double dc1_2_dpi = dc1_2_dmu_t2_2*dmu_t2_2_dpi + dc1_2_dmu_t4_2*dmu_t4_2_dpi;
+
+            double c2_2 = 2*mu_t2_2*(72*mu_t2_2 - 7);
+
+            double dc2_2_dmu_t2_2 = 288*mu_t2_2 - 14;
+
+            double dc2_2_drho = dc2_2_dmu_t2_2*dmu_t2_2_drho;
+
+            double dc2_2_dpi = dc2_2_dmu_t2_2*dmu_t2_2_dpi;
+
+            double c3_2 = -864*mu_t4_2*(2*mu_t2_2 - 1);
+
+            double dc3_2_dmu_t2_2 = -1728*mu_t4_2;
+
+            double dc3_2_dmu_t4_2 = 864 - 1728*mu_t2_2;
+
+            double dc3_2_drho = dc3_2_dmu_t2_2*dmu_t2_2_drho + dc3_2_dmu_t4_2*dmu_t4_2_drho;
+
+            double dc3_2_dpi = dc3_2_dmu_t2_2*dmu_t2_2_dpi + dc3_2_dmu_t4_2*dmu_t4_2_dpi;
+
+            double c4_2 = mu_t2_2*(8*sqrt(M_PI)*erfmu_2*mu_t_2 - 24*mu_t2_2 + 32*mu_t4_2 - 3);
+
+            double dc4_2_derfmu_2 = 8*sqrt(M_PI)*mu_t2_2*mu_t_2;
+
+            double dc4_2_dmu_t2_2 = 8*sqrt(M_PI)*erfmu_2*mu_t_2 - 48*mu_t2_2 + 32*mu_t4_2 - 3;
+
+            double dc4_2_dmu_t_2 = 8*sqrt(M_PI)*erfmu_2*mu_t2_2;
+
+            double dc4_2_dmu_t4_2 = 32*mu_t2_2;
+
+            double dc4_2_drho = dc4_2_derfmu_2*derfmu_2_drho + dc4_2_dmu_t2_2*dmu_t2_2_drho + dc4_2_dmu_t4_2*dmu_t4_2_drho + dc4_2_dmu_t_2*dmu_t_2_drho;
+
+            double dc4_2_dpi = dc4_2_derfmu_2*derfmu_2_dpi + dc4_2_dmu_t2_2*dmu_t2_2_dpi + dc4_2_dmu_t4_2*dmu_t4_2_dpi + dc4_2_dmu_t_2*dmu_t_2_dpi;
+
+            double dbt_2_dpi = 0;
+
+            double dbt_2_drho = 0;
+
+            double bt_2 = 0;
+
+            if (mu_t_2 < 0.050000000000000003)
+            {
+               bt_2 = (1.0/54.0)*c2_2/c4_2;
+
+               double dbt_2_dc4_2 = -1.0/54.0*c2_2/pow(c4_2, 2);
+
+               double dbt_2_dc2_2 = (1.0/54.0)/c4_2;
+
+               dbt_2_drho = dbt_2_dc2_2*dc2_2_drho + dbt_2_dc4_2*dc4_2_drho;
+
+               dbt_2_dpi = dbt_2_dc2_2*dc2_2_dpi + dbt_2_dc4_2*dc4_2_dpi;
+
+            }
+            else if (mu_t_2 < 10000000000.0)
+            {
+               double expmu = exp((1.0/4.0)/mu_t2_2);
+
+               double dexpmu_dmu_t2_2 = -1.0/4.0*exp((1.0/4.0)/mu_t2_2)/pow(mu_t2_2, 2);
+
+               double dexpmu_drho = dexpmu_dmu_t2_2*dmu_t2_2_drho;
+
+               double dexpmu_dpi = dexpmu_dmu_t2_2*dmu_t2_2_dpi;
+
+               bt_2 = (-c1_2 + c2_2*expmu)/(c3_2 + 54*c4_2*expmu);
+
+               double dbt_2_dc3_2 = -(-c1_2 + c2_2*expmu)/pow(c3_2 + 54*c4_2*expmu, 2);
+
+               double dbt_2_dc2_2 = expmu/(c3_2 + 54*c4_2*expmu);
+
+               double dbt_2_dc1_2 = -1/(c3_2 + 54*c4_2*expmu);
+
+               double dbt_2_dc4_2 = -54*expmu*(-c1_2 + c2_2*expmu)/pow(c3_2 + 54*c4_2*expmu, 2);
+
+               double dbt_2_dexpmu = c2_2/(c3_2 + 54*c4_2*expmu) - 54*c4_2*(-c1_2 + c2_2*expmu)/pow(c3_2 + 54*c4_2*expmu, 2);
+
+               dbt_2_drho = dbt_2_dc1_2*dc1_2_drho + dbt_2_dc2_2*dc2_2_drho + dbt_2_dc3_2*dc3_2_drho + dbt_2_dc4_2*dc4_2_drho + dbt_2_dexpmu*dexpmu_drho;
+
+               dbt_2_dpi = dbt_2_dc1_2*dc1_2_dpi + dbt_2_dc2_2*dc2_2_dpi + dbt_2_dc3_2*dc3_2_dpi + dbt_2_dc4_2*dc4_2_dpi + dbt_2_dexpmu*dexpmu_dpi;
+
+            }
+            else
+            {
+               bt_2 = -(23.0/358400.0)/pow(mu_t_2, 6) - (1.0/17280.0)/mu_t4_2 + (1.0/72.0)/mu_t2_2;
+
+               double dbt_2_dmu_t_2 = (69.0/179200.0)/pow(mu_t_2, 7);
+
+               double dbt_2_dmu_t4_2 = (1.0/17280.0)/pow(mu_t4_2, 2);
+
+               double dbt_2_dmu_t2_2 = -(1.0/72.0)/pow(mu_t2_2, 2);
+
+               dbt_2_drho = dbt_2_dmu_t2_2*dmu_t2_2_drho + dbt_2_dmu_t4_2*dmu_t4_2_drho + dbt_2_dmu_t_2*dmu_t_2_drho;
+
+               dbt_2_dpi = dbt_2_dmu_t2_2*dmu_t2_2_dpi + dbt_2_dmu_t4_2*dmu_t4_2_dpi + dbt_2_dmu_t_2*dmu_t_2_dpi;
+
+            }
+            double bmu_2 = bt_2*pbe_b*exp(-ax*pow(mu_t_2, 2))/b0;
+
+            double dbmu_2_dmu_t_2 = -2*ax*bt_2*mu_t_2*pbe_b*exp(-ax*pow(mu_t_2, 2))/b0;
+
+            double dbmu_2_dbt_2 = pbe_b*exp(-ax*pow(mu_t_2, 2))/b0;
+
+            double dbmu_2_drho = dbmu_2_dbt_2*dbt_2_drho + dbmu_2_dmu_t_2*dmu_t_2_drho;
+
+            double dbmu_2_dpi = dbmu_2_dbt_2*dbt_2_dpi + dbmu_2_dmu_t_2*dmu_t_2_dpi;
+
+            double pbe_F_2 = kappa - kappa/(bmu_2*xsb2/kappa + 1) + 1;
+
+            double dpbe_F_2_dbmu_2 = xsb2/pow(bmu_2*xsb2/kappa + 1, 2);
+
+            double dpbe_F_2_dxsb2 = bmu_2/pow(bmu_2*xsb2/kappa + 1, 2);
+
+            double dpbe_F_2_dpi = dbmu_2_dpi*dpbe_F_2_dbmu_2 + dpbe_F_2_dxsb2*dxsb2_dpi;
+
+            double dpbe_F_2_drho = dbmu_2_drho*dpbe_F_2_dbmu_2 + dpbe_F_2_dxsb2*dxsb2_drho;
+
+            double dpbe_F_2_dsig = dpbe_F_2_dxsb2*dxsb2_dsig;
+
+            double att_erf_aux1_2 = sqrt(M_PI)*erf((1.0/2.0)/b);
+
+            double datt_erf_aux1_2_db = -exp(-(1.0/4.0)/pow(b, 2))/pow(b, 2);
+
+            double datt_erf_aux1_2_drho = datt_erf_aux1_2_db*db_drho;
+
+            double datt_erf_aux1_2_dpi = datt_erf_aux1_2_db*db_dpi;
+
+            double att_erf_aux2_2 = 0;
+
+            double datt_erf_aux2_2_db = 0;
+
+            double datt_erf_aux2_2_dpi = 0;
+
+            double datt_erf_aux2_2_drho = 0;
+
+            if (b < 5)
+            {
+               att_erf_aux2_2 = -1 + exp(-(1.0/4.0)/pow(b, 2));
+
+               datt_erf_aux2_2_db = (1.0/2.0)*exp(-(1.0/4.0)/pow(b, 2))/pow(b, 3);
+
+               datt_erf_aux2_2_drho = datt_erf_aux2_2_db*db_drho;
+
+               datt_erf_aux2_2_dpi = datt_erf_aux2_2_db*db_dpi;
+
+            }
+            else
+            {
+               att_erf_aux2_2 = -1.0/4.0*(1 - (1.0/2.0)/pow(b, 2))/pow(b, 2);
+
+               datt_erf_aux2_2_db = (1.0/2.0)*(1 - (1.0/2.0)/pow(b, 2))/pow(b, 3) - (1.0/4.0)/pow(b, 5);
+
+               datt_erf_aux2_2_drho = datt_erf_aux2_2_db*db_drho;
+
+               datt_erf_aux2_2_dpi = datt_erf_aux2_2_db*db_dpi;
+
+            }
+            double att_erf_aux3_2 = 2*att_erf_aux2_2*pow(b, 2) + 1.0/2.0;
+
+            double datt_erf_aux3_2_db = 4*att_erf_aux2_2*b;
+
+            double datt_erf_aux3_2_datt_erf_aux2_2 = 2*pow(b, 2);
+
+            double datt_erf_aux3_2_drho = datt_erf_aux2_2_drho*datt_erf_aux3_2_datt_erf_aux2_2 + datt_erf_aux3_2_db*db_drho;
+
+            double datt_erf_aux3_2_dpi = datt_erf_aux2_2_dpi*datt_erf_aux3_2_datt_erf_aux2_2 + datt_erf_aux3_2_db*db_dpi;
+
+            double att_erf0_2 = -8.0/3.0*b*(att_erf_aux1_2 + 2*b*(att_erf_aux2_2 - att_erf_aux3_2)) + 1;
+
+            double datt_erf0_2_datt_erf_aux3_2 = (16.0/3.0)*pow(b, 2);
+
+            double datt_erf0_2_db = -8.0/3.0*att_erf_aux1_2 - 16.0/3.0*b*(att_erf_aux2_2 - att_erf_aux3_2) - 8.0/3.0*b*(2*att_erf_aux2_2 - 2*att_erf_aux3_2);
+
+            double datt_erf0_2_datt_erf_aux2_2 = -16.0/3.0*pow(b, 2);
+
+            double datt_erf0_2_datt_erf_aux1_2 = -8.0/3.0*b;
+
+            double datt_erf0_2_drho = datt_erf0_2_datt_erf_aux1_2*datt_erf_aux1_2_drho + datt_erf0_2_datt_erf_aux2_2*datt_erf_aux2_2_drho + datt_erf0_2_datt_erf_aux3_2*datt_erf_aux3_2_drho + datt_erf0_2_db*db_drho;
+
+            double datt_erf0_2_dpi = datt_erf0_2_datt_erf_aux1_2*datt_erf_aux1_2_dpi + datt_erf0_2_datt_erf_aux2_2*datt_erf_aux2_2_dpi + datt_erf0_2_datt_erf_aux3_2*datt_erf_aux3_2_dpi + datt_erf0_2_db*db_dpi;
+
+            double exb = att_erf0_2*pbe_F_2*pow(1 - zeta_abs, 4.0/3.0);
+
+            double dexb_datt_erf0_2 = pbe_F_2*pow(1 - zeta_abs, 4.0/3.0);
+
+            double dexb_dzeta_abs = -4.0/3.0*att_erf0_2*pbe_F_2*cbrt(1 - zeta_abs);
+
+            double dexb_dpbe_F_2 = att_erf0_2*pow(1 - zeta_abs, 4.0/3.0);
+
+            double dexb_dpi = datt_erf0_2_dpi*dexb_datt_erf0_2 + dexb_dpbe_F_2*dpbe_F_2_dpi + dexb_dzeta_abs*dzeta_abs_dpi;
+
+            double dexb_drho = datt_erf0_2_drho*dexb_datt_erf0_2 + dexb_dpbe_F_2*dpbe_F_2_drho + dexb_dzeta_abs*dzeta_abs_drho;
+
+            double dexb_dsig = dexb_dpbe_F_2*dpbe_F_2_dsig;
+
+            fpol += exb;
+
+            dfpol_drho += dexb_drho;
+
+            dfpol_dpi += dexb_dpi;
+
+            dfpol_dsig += dexb_dsig;
          }
-         else if (mu_t_2 < 10000000000.0)
-         {
-            double expmu = exp((1.0/4.0)/mu_t2_2);
-
-            double dexpmu_dmu_t2_2 = -1.0/4.0*exp((1.0/4.0)/mu_t2_2)/pow(mu_t2_2, 2);
-
-            double dexpmu_drho = dexpmu_dmu_t2_2*dmu_t2_2_drho;
-
-            double dexpmu_dpi = dexpmu_dmu_t2_2*dmu_t2_2_dpi;
-
-            bt_2 = (-c1_2 + c2_2*expmu)/(c3_2 + 54*c4_2*expmu);
-
-            double dbt_2_dc3_2 = -(-c1_2 + c2_2*expmu)/pow(c3_2 + 54*c4_2*expmu, 2);
-
-            double dbt_2_dc2_2 = expmu/(c3_2 + 54*c4_2*expmu);
-
-            double dbt_2_dc1_2 = -1/(c3_2 + 54*c4_2*expmu);
-
-            double dbt_2_dc4_2 = -54*expmu*(-c1_2 + c2_2*expmu)/pow(c3_2 + 54*c4_2*expmu, 2);
-
-            double dbt_2_dexpmu = c2_2/(c3_2 + 54*c4_2*expmu) - 54*c4_2*(-c1_2 + c2_2*expmu)/pow(c3_2 + 54*c4_2*expmu, 2);
-
-            dbt_2_drho = dbt_2_dc1_2*dc1_2_drho + dbt_2_dc2_2*dc2_2_drho + dbt_2_dc3_2*dc3_2_drho + dbt_2_dc4_2*dc4_2_drho + dbt_2_dexpmu*dexpmu_drho;
-
-            dbt_2_dpi = dbt_2_dc1_2*dc1_2_dpi + dbt_2_dc2_2*dc2_2_dpi + dbt_2_dc3_2*dc3_2_dpi + dbt_2_dc4_2*dc4_2_dpi + dbt_2_dexpmu*dexpmu_dpi;
-
-         }
-         else
-         {
-            bt_2 = -(23.0/358400.0)/pow(mu_t_2, 6) - (1.0/17280.0)/mu_t4_2 + (1.0/72.0)/mu_t2_2;
-
-            double dbt_2_dmu_t_2 = (69.0/179200.0)/pow(mu_t_2, 7);
-
-            double dbt_2_dmu_t4_2 = (1.0/17280.0)/pow(mu_t4_2, 2);
-
-            double dbt_2_dmu_t2_2 = -(1.0/72.0)/pow(mu_t2_2, 2);
-
-            dbt_2_drho = dbt_2_dmu_t2_2*dmu_t2_2_drho + dbt_2_dmu_t4_2*dmu_t4_2_drho + dbt_2_dmu_t_2*dmu_t_2_drho;
-
-            dbt_2_dpi = dbt_2_dmu_t2_2*dmu_t2_2_dpi + dbt_2_dmu_t4_2*dmu_t4_2_dpi + dbt_2_dmu_t_2*dmu_t_2_dpi;
-
-         }
-         double bmu_2 = bt_2*pbe_b*exp(-ax*pow(mu_t_2, 2))/b0;
-
-         double dbmu_2_dmu_t_2 = -2*ax*bt_2*mu_t_2*pbe_b*exp(-ax*pow(mu_t_2, 2))/b0;
-
-         double dbmu_2_dbt_2 = pbe_b*exp(-ax*pow(mu_t_2, 2))/b0;
-
-         double dbmu_2_drho = dbmu_2_dbt_2*dbt_2_drho + dbmu_2_dmu_t_2*dmu_t_2_drho;
-
-         double dbmu_2_dpi = dbmu_2_dbt_2*dbt_2_dpi + dbmu_2_dmu_t_2*dmu_t_2_dpi;
-
-         double pbe_F_2 = kappa - kappa/(bmu_2*xsb2/kappa + 1) + 1;
-
-         double dpbe_F_2_dbmu_2 = xsb2/pow(bmu_2*xsb2/kappa + 1, 2);
-
-         double dpbe_F_2_dxsb2 = bmu_2/pow(bmu_2*xsb2/kappa + 1, 2);
-
-         double dpbe_F_2_dpi = dbmu_2_dpi*dpbe_F_2_dbmu_2 + dpbe_F_2_dxsb2*dxsb2_dpi;
-
-         double dpbe_F_2_drho = dbmu_2_drho*dpbe_F_2_dbmu_2 + dpbe_F_2_dxsb2*dxsb2_drho;
-
-         double dpbe_F_2_dsig = dpbe_F_2_dxsb2*dxsb2_dsig;
-
-         double att_erf_aux1_2 = sqrt(M_PI)*erf((1.0/2.0)/b);
-
-         double datt_erf_aux1_2_db = -exp(-(1.0/4.0)/pow(b, 2))/pow(b, 2);
-
-         double datt_erf_aux1_2_drho = datt_erf_aux1_2_db*db_drho;
-
-         double datt_erf_aux1_2_dpi = datt_erf_aux1_2_db*db_dpi;
-
-         double att_erf_aux2_2 = 0;
-
-         double datt_erf_aux2_2_db = 0;
-
-         double datt_erf_aux2_2_dpi = 0;
-
-         double datt_erf_aux2_2_drho = 0;
-
-         if (b < 5)
-         {
-            att_erf_aux2_2 = -1 + exp(-(1.0/4.0)/pow(b, 2));
-
-            datt_erf_aux2_2_db = (1.0/2.0)*exp(-(1.0/4.0)/pow(b, 2))/pow(b, 3);
-
-            datt_erf_aux2_2_drho = datt_erf_aux2_2_db*db_drho;
-
-            datt_erf_aux2_2_dpi = datt_erf_aux2_2_db*db_dpi;
-
-         }
-         else
-         {
-            att_erf_aux2_2 = -1.0/4.0*(1 - (1.0/2.0)/pow(b, 2))/pow(b, 2);
-
-            datt_erf_aux2_2_db = (1.0/2.0)*(1 - (1.0/2.0)/pow(b, 2))/pow(b, 3) - (1.0/4.0)/pow(b, 5);
-
-            datt_erf_aux2_2_drho = datt_erf_aux2_2_db*db_drho;
-
-            datt_erf_aux2_2_dpi = datt_erf_aux2_2_db*db_dpi;
-
-         }
-         double att_erf_aux3_2 = 2*att_erf_aux2_2*pow(b, 2) + 1.0/2.0;
-
-         double datt_erf_aux3_2_db = 4*att_erf_aux2_2*b;
-
-         double datt_erf_aux3_2_datt_erf_aux2_2 = 2*pow(b, 2);
-
-         double datt_erf_aux3_2_drho = datt_erf_aux2_2_drho*datt_erf_aux3_2_datt_erf_aux2_2 + datt_erf_aux3_2_db*db_drho;
-
-         double datt_erf_aux3_2_dpi = datt_erf_aux2_2_dpi*datt_erf_aux3_2_datt_erf_aux2_2 + datt_erf_aux3_2_db*db_dpi;
-
-         double att_erf0_2 = -8.0/3.0*b*(att_erf_aux1_2 + 2*b*(att_erf_aux2_2 - att_erf_aux3_2)) + 1;
-
-         double datt_erf0_2_datt_erf_aux3_2 = (16.0/3.0)*pow(b, 2);
-
-         double datt_erf0_2_db = -8.0/3.0*att_erf_aux1_2 - 16.0/3.0*b*(att_erf_aux2_2 - att_erf_aux3_2) - 8.0/3.0*b*(2*att_erf_aux2_2 - 2*att_erf_aux3_2);
-
-         double datt_erf0_2_datt_erf_aux2_2 = -16.0/3.0*pow(b, 2);
-
-         double datt_erf0_2_datt_erf_aux1_2 = -8.0/3.0*b;
-
-         double datt_erf0_2_drho = datt_erf0_2_datt_erf_aux1_2*datt_erf_aux1_2_drho + datt_erf0_2_datt_erf_aux2_2*datt_erf_aux2_2_drho + datt_erf0_2_datt_erf_aux3_2*datt_erf_aux3_2_drho + datt_erf0_2_db*db_drho;
-
-         double datt_erf0_2_dpi = datt_erf0_2_datt_erf_aux1_2*datt_erf_aux1_2_dpi + datt_erf0_2_datt_erf_aux2_2*datt_erf_aux2_2_dpi + datt_erf0_2_datt_erf_aux3_2*datt_erf_aux3_2_dpi + datt_erf0_2_db*db_dpi;
-
-         double exb = att_erf0_2*pbe_F_2*pow(1 - zeta_abs, 4.0/3.0);
-
-         double dexb_datt_erf0_2 = pbe_F_2*pow(1 - zeta_abs, 4.0/3.0);
-
-         double dexb_dzeta_abs = -4.0/3.0*att_erf0_2*pbe_F_2*cbrt(1 - zeta_abs);
-
-         double dexb_dpbe_F_2 = att_erf0_2*pow(1 - zeta_abs, 4.0/3.0);
-
-         double dexb_dpi = datt_erf0_2_dpi*dexb_datt_erf0_2 + dexb_dpbe_F_2*dpbe_F_2_dpi + dexb_dzeta_abs*dzeta_abs_dpi;
-
-         double dexb_drho = datt_erf0_2_drho*dexb_datt_erf0_2 + dexb_dpbe_F_2*dpbe_F_2_drho + dexb_dzeta_abs*dzeta_abs_drho;
-
-         double dexb_dsig = dexb_dpbe_F_2*dpbe_F_2_dsig;
-
-         fpol = exa + exb;
-
-         double dfpol_dexa = 1;
-
-         double dfpol_dexb = 1;
-
-         double dfpol_dpi = dexa_dpi*dfpol_dexa + dexb_dpi*dfpol_dexb;
-
-         dfpol_drho = dexa_drho*dfpol_dexa + dexb_drho*dfpol_dexb;
-
-         dfpol_dsig = dexa_dsig*dfpol_dexa + dexb_dsig*dfpol_dexb;
-
       }
       else
       {
@@ -879,15 +887,17 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
       double df_dfpol = 0;
 
+      double df_dpi = 0;
+
       if (pair_density < 1.0000000000000001e-32)
       {
          f = fpol;
 
-         df_dfpol = 1;
+         df_drho = dfpol_drho;
 
-         df_drho = df_dfpol*dfpol_drho;
+         df_dsig = dfpol_dsig;
 
-         df_dsig = df_dfpol*dfpol_dsig;
+         df_dpi = dfpol_dpi;
 
       }
       else
@@ -1007,6 +1017,8 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
          df_drho = 4.0*datt_erf0_2_drho*pbe_F_2 + df_dfpol*dfpol_drho + df_dpbe_F_2*dpbe_F_2_drho;
 
+         df_dpi = df_dfpol*dfpol_dpi;
+
          df_dsig = df_dfpol*dfpol_dsig + df_dpbe_F_2*dpbe_F_2_dsig;
 
       }
@@ -1015,6 +1027,8 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
       double dExc_df = pow(density, 4.0/3.0)*fre;
 
       vrho[2 * g + 0] =  dExc_df*df_drho + (4.0/3.0)*cbrt(density)*f*fre;
+
+      vrho[2 * g + 1] =  dExc_df*df_dpi;
 
       vsigma[3 * g + 0] =  dExc_df*df_dsig;
 

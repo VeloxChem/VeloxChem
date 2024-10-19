@@ -107,6 +107,7 @@ export_general(py::module &m) -> void
 
     // exposing functions from Codata.hpp
     m.def("bohr_in_angstrom", &units::bohr_in_angstrom, "Gets Bohr value in Angstroms.");
+    m.def("bohr_in_angstroms", &units::bohr_in_angstrom, "Gets Bohr value in Angstroms.");
     m.def("hartree_in_ev", &units::hartree_in_ev, "Gets Hartree value in electronvolts.");
     m.def("hartree_in_kcalpermol", &units::getHartreeValueInKiloCaloriePerMole, "Gets Hartree value in kcal/mol.");
     m.def("hartree_in_inverse_nm", &units::getHartreeValueInInverseNanometer, "Gets Hartree value in inverse nanometer.");

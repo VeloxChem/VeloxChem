@@ -45,6 +45,7 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpatransition import TpaTransition
+from .rsptpa import TPA
 #from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XtbDriver
@@ -160,6 +161,9 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     elif prop_type == 'tpa transition':
         rsp_prop = TpaTransition(rsp_dict, method_dict)
 
+    elif prop_type == 'tpa':
+        rsp_prop = TPA(rsp_dict, method_dict)
+
     # elif prop_type == 'custom':
     #     rsp_prop = CustomProperty(rsp_dict, method_dict)
 
@@ -273,12 +277,12 @@ def main():
 
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
-        'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'hessian',
-        'optimize', 'response', 'pulses', 'visualization', 'loprop'
+        'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'uscf_gradient',
+        'hessian', 'optimize', 'response', 'pulses', 'visualization', 'loprop'
     ]
 
     scf_type = 'restricted'
-    if task_type in ['uhf', 'uscf', 'ump2']:
+    if task_type in ['uhf', 'uscf', 'ump2', 'uscf_gradient']:
         scf_type = 'unrestricted'
     elif task_type in ['rohf', 'roscf', 'romp2']:
         scf_type = 'restricted_openshell'
@@ -321,7 +325,7 @@ def main():
 
     # Gradient
 
-    if task_type == 'gradient':
+    if task_type in ['gradient', 'uscf_gradient']:
 
         grad_dict = (dict(task.input_dict['gradient'])
                      if 'gradient' in task.input_dict else {})
@@ -338,7 +342,7 @@ def main():
                 grad_drv.update_settings(grad_dict, method_dict)
                 grad_drv.compute(task.molecule)
 
-            elif scf_drv.scf_type == 'restricted':
+            else:
                 grad_drv = ScfGradientDriver(scf_drv)
                 grad_drv.update_settings(grad_dict, method_dict)
                 grad_drv.compute(task.molecule, task.ao_basis, scf_results)
@@ -392,7 +396,7 @@ def main():
                 opt_drv.update_settings(opt_dict)
                 opt_results = opt_drv.compute(task.molecule)
 
-            elif scf_drv.scf_type == 'restricted':
+            else:
                 grad_drv = ScfGradientDriver(scf_drv)
                 opt_drv = OptimizationDriver(grad_drv)
                 opt_drv.keep_files = True

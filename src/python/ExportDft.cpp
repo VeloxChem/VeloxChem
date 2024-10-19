@@ -145,27 +145,35 @@ CXCIntegrator_integrate_fxc_fock(const CXCIntegrator&                    self,
 }
 
 static auto
-CXCIntegrator_integrate_kxc_fock(const CXCIntegrator&              self,
-                                 std::vector<py::array_t<double>>& aoFockArrays,
-                                 const CMolecule&                  molecule,
-                                 const CMolecularBasis&            basis,
-                                 const CAODensityMatrix&           rwDensityMatrix,
-                                 const CAODensityMatrix&           rw2DensityMatrix,
-                                 const CAODensityMatrix&           gsDensityMatrix,
-                                 const CMolecularGrid&             molecularGrid,
-                                 const CXCFunctional&              fvxc,
-                                 const std::string&                quadMode) -> void
+CXCIntegrator_integrate_kxc_fock(const CXCIntegrator&                    self,
+                                 std::vector<py::array_t<double>>&       aoFockArrays,
+                                 const CMolecule&                        molecule,
+                                 const CMolecularBasis&                  basis,
+                                 const std::vector<py::array_t<double>>& rwDensityArrays,
+                                 const std::vector<py::array_t<double>>& rw2DensityArrays,
+                                 const std::vector<py::array_t<double>>& gsDensityArrays,
+                                 const CMolecularGrid&                   molecularGrid,
+                                 const CXCFunctional&                    fvxc,
+                                 const std::string&                      quadMode) -> void
 {
     auto        num_focks    = static_cast<int>(aoFockArrays.size());
-    auto        num_rw2_dens = rw2DensityMatrix.getNumberOfDensityMatrices();
+    auto        num_rw2_dens = static_cast<int>(rw2DensityArrays.size());
+    auto        num_gs_dens = static_cast<int>(gsDensityArrays.size());
     std::string errnum("integrate_kxc_fock: Inconsistent number of numpy arrays");
     errors::assertMsgCritical(num_rw2_dens == num_focks, errnum);
+    errors::assertMsgCritical(num_gs_dens == 1, errnum);
 
     auto nao = basis.dimensions_of_basis();
     check_arrays("integrate_kxc_fock", aoFockArrays, nao);
+    check_arrays("integrate_kxc_fock", rwDensityArrays, nao);
+    check_arrays("integrate_kxc_fock", rw2DensityArrays, nao);
+    check_arrays("integrate_kxc_fock", gsDensityArrays, nao);
 
     auto fock_pointers = arrays_to_mutable_pointers(aoFockArrays);
-    self.integrateKxcFock(fock_pointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, fvxc, quadMode);
+    auto rw_dens_pointers = arrays_to_const_pointers(rwDensityArrays);
+    auto rw2_dens_pointers = arrays_to_const_pointers(rw2DensityArrays);
+    auto gs_dens_pointers = arrays_to_const_pointers(gsDensityArrays);
+    self.integrateKxcFock(fock_pointers, molecule, basis, rw_dens_pointers, rw2_dens_pointers, gs_dens_pointers, molecularGrid, fvxc, quadMode);
 }
 
 static auto
@@ -173,29 +181,39 @@ CXCIntegrator_integrate_kxclxc_fock(const CXCIntegrator&              self,
                                     std::vector<py::array_t<double>>& aoFockArrays,
                                     const CMolecule&                  molecule,
                                     const CMolecularBasis&            basis,
-                                    const CAODensityMatrix&           rwDensityMatrix,
-                                    const CAODensityMatrix&           rw2DensityMatrix,
-                                    const CAODensityMatrix&           rw3DensityMatrix,
-                                    const CAODensityMatrix&           gsDensityMatrix,
+                                    const std::vector<py::array_t<double>>& rwDensityArrays,
+                                    const std::vector<py::array_t<double>>& rw2DensityArrays,
+                                    const std::vector<py::array_t<double>>& rw3DensityArrays,
+                                    const std::vector<py::array_t<double>>& gsDensityArrays,
                                     const CMolecularGrid&             molecularGrid,
                                     const CXCFunctional&              fvxc,
                                     const std::string&                cubeMode) -> void
 {
     auto        num_focks    = static_cast<int>(aoFockArrays.size());
-    auto        num_rw2_dens = rw2DensityMatrix.getNumberOfDensityMatrices();
-    auto        num_rw3_dens = rw3DensityMatrix.getNumberOfDensityMatrices();
+    auto        num_rw2_dens = static_cast<int>(rw2DensityArrays.size());
+    auto        num_rw3_dens = static_cast<int>(rw3DensityArrays.size());
+    auto        num_gs_dens  = static_cast<int>(gsDensityArrays.size());
     std::string errnum("integrate_kxclxc_fock: Inconsistent number of numpy arrays");
     errors::assertMsgCritical(num_rw2_dens + num_rw3_dens == num_focks, errnum);
+    errors::assertMsgCritical(num_gs_dens == 1, errnum);
 
     auto nao = basis.dimensions_of_basis();
     check_arrays("integrate_kxclxc_fock", aoFockArrays, nao);
+    check_arrays("integrate_kxclxc_fock", rwDensityArrays, nao);
+    check_arrays("integrate_kxclxc_fock", rw2DensityArrays, nao);
+    check_arrays("integrate_kxclxc_fock", rw3DensityArrays, nao);
+    check_arrays("integrate_kxclxc_fock", gsDensityArrays, nao);
 
     auto fock_pointers = arrays_to_mutable_pointers(aoFockArrays);
-    self.integrateKxcLxcFock(fock_pointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, rw3DensityMatrix, gsDensityMatrix, molecularGrid, fvxc, cubeMode);
+    auto rw_dens_pointers = arrays_to_const_pointers(rwDensityArrays);
+    auto rw2_dens_pointers = arrays_to_const_pointers(rw2DensityArrays);
+    auto rw3_dens_pointers = arrays_to_const_pointers(rw3DensityArrays);
+    auto gs_dens_pointers = arrays_to_const_pointers(gsDensityArrays);
+    self.integrateKxcLxcFock(fock_pointers, molecule, basis, rw_dens_pointers, rw2_dens_pointers, rw3_dens_pointers, gs_dens_pointers, molecularGrid, fvxc, cubeMode);
 }
 
 static auto
-integrate_vxc_pdft(const CXCIntegrator&       self,
+CXCIntegrator_integrate_vxc_pdft(const CXCIntegrator&       self,
                    const py::array_t<double>& densityMatrix,
                    const py::array_t<double>& active2DM,
                    const py::array_t<double>& activeMOs,
@@ -275,6 +293,31 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
     returnList.append(matrixVxc);
     returnList.append(vlx_general::pointer_to_numpy(tensorWxc.values(), {naos, n_active, n_active, n_active}));
     return returnList;
+}
+
+auto
+CXCIntegrator_integrate_vxc_gradient(CXCMolecularGradient&      self,
+                                     const CMolecule&           molecule,
+                                     const CMolecularBasis&     basis,
+                                     const std::vector<py::array_t<double>>& rwDensityArrays,
+                                     const std::vector<py::array_t<double>>& gsDensityArrays,
+                                     const CMolecularGrid&      molecularGrid,
+                                     const std::string&         xcFuncLabel) -> py::array_t<double>
+{
+    auto        num_rw_dens = static_cast<int>(rwDensityArrays.size());
+    auto        num_gs_dens = static_cast<int>(gsDensityArrays.size());
+    std::string errnum("integrate_vxc_gradient: Inconsistent number of numpy arrays");
+    errors::assertMsgCritical(num_rw_dens == num_gs_dens, errnum);
+    errors::assertMsgCritical((num_gs_dens == 1) || (num_gs_dens == 2), errnum);
+
+    auto nao = basis.dimensions_of_basis();
+    check_arrays("integrate_vxc_gradient", rwDensityArrays, nao);
+    check_arrays("integrate_vxc_gradient", gsDensityArrays, nao);
+
+    auto rw_dens_pointers = arrays_to_const_pointers(rwDensityArrays);
+    auto gs_dens_pointers = arrays_to_const_pointers(gsDensityArrays);
+    auto molgrad          = self.integrateVxcGradient(molecule, basis, rw_dens_pointers, gs_dens_pointers, molecularGrid, xcFuncLabel);
+    return vlx_general::pointer_to_numpy(molgrad.values(), {molgrad.getNumberOfRows(), molgrad.getNumberOfColumns()});
 }
 
 // Exports classes/functions in src/dft to python
@@ -427,14 +470,14 @@ export_dft(py::module& m)
                std::vector<py::array_t<double>>&       aoFockArrays,
                const CMolecule&                        molecule,
                const CMolecularBasis&                  basis,
-               const CAODensityMatrix&                 rwDensityMatrix,
-               const CAODensityMatrix&                 rw2DensityMatrix,
-               const CAODensityMatrix&                 gsDensityMatrix,
+               const std::vector<py::array_t<double>>& rwDensityArrays,
+               const std::vector<py::array_t<double>>& rw2DensityArrays,
+               const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&                   molecularGrid,
                const std::string&                      xcFuncLabel,
                const std::string&                      quadMode) -> void {
                 auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
-                CXCIntegrator_integrate_kxc_fock(self, aoFockArrays, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, fvxc, quadMode);
+                CXCIntegrator_integrate_kxc_fock(self, aoFockArrays, molecule, basis, rwDensityArrays, rw2DensityArrays, gsDensityArrays, molecularGrid, fvxc, quadMode);
             },
             "Integrates 3rd-order exchange-correlation contribution.")
         .def(
@@ -443,13 +486,13 @@ export_dft(py::module& m)
                std::vector<py::array_t<double>>&       aoFockArrays,
                const CMolecule&                        molecule,
                const CMolecularBasis&                  basis,
-               const CAODensityMatrix&                 rwDensityMatrix,
-               const CAODensityMatrix&                 rw2DensityMatrix,
-               const CAODensityMatrix&                 gsDensityMatrix,
+               const std::vector<py::array_t<double>>& rwDensityArrays,
+               const std::vector<py::array_t<double>>& rw2DensityArrays,
+               const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&                   molecularGrid,
                const CXCFunctional&                    fvxc,
                const std::string&                      quadMode) -> void {
-                CXCIntegrator_integrate_kxc_fock(self, aoFockArrays, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, fvxc, quadMode);
+                CXCIntegrator_integrate_kxc_fock(self, aoFockArrays, molecule, basis, rwDensityArrays, rw2DensityArrays, gsDensityArrays, molecularGrid, fvxc, quadMode);
             },
             "Integrates 3rd-order exchange-correlation contribution.")
         .def(
@@ -458,15 +501,15 @@ export_dft(py::module& m)
                std::vector<py::array_t<double>>&       aoFockArrays,
                const CMolecule&                        molecule,
                const CMolecularBasis&                  basis,
-               const CAODensityMatrix&                 rwDensityMatrix,
-               const CAODensityMatrix&                 rw2DensityMatrix,
-               const CAODensityMatrix&                 rw3DensityMatrix,
-               const CAODensityMatrix&                 gsDensityMatrix,
+               const std::vector<py::array_t<double>>& rwDensityArrays,
+               const std::vector<py::array_t<double>>& rw2DensityArrays,
+               const std::vector<py::array_t<double>>& rw3DensityArrays,
+               const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&                   molecularGrid,
                const std::string&                      xcFuncLabel,
                const std::string&                      cubeMode) -> void {
                 auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
-                CXCIntegrator_integrate_kxclxc_fock(self, aoFockArrays, molecule, basis, rwDensityMatrix, rw2DensityMatrix, rw3DensityMatrix, gsDensityMatrix, molecularGrid, fvxc, cubeMode);
+                CXCIntegrator_integrate_kxclxc_fock(self, aoFockArrays, molecule, basis, rwDensityArrays, rw2DensityArrays, rw3DensityArrays, gsDensityArrays, molecularGrid, fvxc, cubeMode);
             },
             "Integrates 4th-order exchange-correlation contribution.")
         .def(
@@ -475,17 +518,17 @@ export_dft(py::module& m)
                std::vector<py::array_t<double>>&       aoFockArrays,
                const CMolecule&                        molecule,
                const CMolecularBasis&                  basis,
-               const CAODensityMatrix&                 rwDensityMatrix,
-               const CAODensityMatrix&                 rw2DensityMatrix,
-               const CAODensityMatrix&                 rw3DensityMatrix,
-               const CAODensityMatrix&                 gsDensityMatrix,
+               const std::vector<py::array_t<double>>& rwDensityArrays,
+               const std::vector<py::array_t<double>>& rw2DensityArrays,
+               const std::vector<py::array_t<double>>& rw3DensityArrays,
+               const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&                   molecularGrid,
                const CXCFunctional&                    fvxc,
                const std::string&                      cubeMode) -> void {
-                CXCIntegrator_integrate_kxclxc_fock(self, aoFockArrays, molecule, basis, rwDensityMatrix, rw2DensityMatrix, rw3DensityMatrix, gsDensityMatrix, molecularGrid, fvxc, cubeMode);
+                CXCIntegrator_integrate_kxclxc_fock(self, aoFockArrays, molecule, basis, rwDensityArrays, rw2DensityArrays, rw3DensityArrays, gsDensityArrays, molecularGrid, fvxc, cubeMode);
             },
             "Integrates 4th-order exchange-correlation contribution.")
-        .def("integrate_vxc_pdft", &integrate_vxc_pdft)
+        .def("integrate_vxc_pdft", &CXCIntegrator_integrate_vxc_pdft)
         .def(
             "compute_gto_values",
             [](CXCIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid)
@@ -507,17 +550,15 @@ export_dft(py::module& m)
             [](CXCMolecularGradient&      self,
                const CMolecule&           molecule,
                const CMolecularBasis&     basis,
-               const py::array_t<double>& gsDensity,
+               const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&      molecularGrid,
                const std::string&         xcFuncLabel) -> py::array_t<double> {
-                auto gsDensityPointer = gsDensity.data();
-                auto molgrad          = self.integrateVxcGradient(molecule, basis, gsDensityPointer, molecularGrid, xcFuncLabel);
-                return vlx_general::pointer_to_numpy(molgrad.values(), {molgrad.getNumberOfRows(), molgrad.getNumberOfColumns()});
+                return CXCIntegrator_integrate_vxc_gradient(self, molecule, basis, gsDensityArrays, gsDensityArrays, molecularGrid, xcFuncLabel);
             },
             "Integrates 1st-order exchange-correlation contribution to molecular gradient.",
             "molecule"_a,
             "basis"_a,
-            "gsDensity"_a,
+            "gsDensityArrays"_a,
             "molecularGrid"_a,
             "xcFuncLabel"_a)
         .def(
@@ -525,20 +566,17 @@ export_dft(py::module& m)
             [](CXCMolecularGradient&      self,
                const CMolecule&           molecule,
                const CMolecularBasis&     basis,
-               const py::array_t<double>& rwDensity,
-               const py::array_t<double>& gsDensity,
+               const std::vector<py::array_t<double>>& rwDensityArrays,
+               const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&      molecularGrid,
                const std::string&         xcFuncLabel) -> py::array_t<double> {
-                auto rwDensityPointer = rwDensity.data();
-                auto gsDensityPointer = gsDensity.data();
-                auto molgrad          = self.integrateVxcGradient(molecule, basis, rwDensityPointer, gsDensityPointer, molecularGrid, xcFuncLabel);
-                return vlx_general::pointer_to_numpy(molgrad.values(), {molgrad.getNumberOfRows(), molgrad.getNumberOfColumns()});
+                return CXCIntegrator_integrate_vxc_gradient(self, molecule, basis, rwDensityArrays, gsDensityArrays, molecularGrid, xcFuncLabel);
             },
             "Integrates 1st-order exchange-correlation contribution to molecular gradient.",
             "molecule"_a,
             "basis"_a,
-            "rwDensity"_a,
-            "gsDensity"_a,
+            "rwDensityArrays"_a,
+            "gsDensityArrays"_a,
             "molecularGrid"_a,
             "xcFuncLabel"_a);
 

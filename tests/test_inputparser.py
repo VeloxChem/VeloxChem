@@ -118,9 +118,9 @@ def test_parse_bool(input_bool, expected):
 @pytest.mark.parametrize(
     'input_str, flag, expected',
     [
-        ('Qq', 'upper', 'QQ'),
-        ('Qq', 'lower', 'qq'),
-        ('Qq', None, 'Qq'),
+        ('Diis', 'upper', 'DIIS'),
+        ('Diis', 'lower', 'diis'),
+        ('Diis', None, 'Diis'),
     ],
 )
 def test_parse_str(input_str, flag, expected):

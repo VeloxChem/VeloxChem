@@ -139,9 +139,9 @@ class CXCIntegrator
      @param aoFockPointers the pointers to AO Fock matrices.
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param rwDensityMatrix the one-time transformed densities.
-     @param rw2DensityMatrix the two-time transformed densities.
-     @param gsDensityMatrix the ground state density matrix.
+     @param rwDensityPointers the pointers to one-time transformed densities.
+     @param rw2DensityPointers the pointers to two-time transformed densities.
+     @param gsDensityPointers the pointers to ground state density matrix.
      @param molecularGrid the molecular grid.
      @param xcFuncLabel the label of exchange-correlation functional.
      @param quadMode a string that specifies which densities should be combined.
@@ -149,9 +149,9 @@ class CXCIntegrator
     auto integrateKxcFock(const std::vector<double*>& aoFockPointers,
                           const CMolecule&        molecule,
                           const CMolecularBasis&  basis,
-                          const CAODensityMatrix& rwDensityMatrix,
-                          const CAODensityMatrix& rw2DensityMatrix,
-                          const CAODensityMatrix& gsDensityMatrix,
+                          const std::vector<const double*>& rwDensityPointers,
+                          const std::vector<const double*>& rw2DensityPointers,
+                          const std::vector<const double*>& gsDensityPointers,
                           const CMolecularGrid&   molecularGrid,
                           const std::string&      xcFuncLabel,
                           const std::string&      quadMode) const -> void;
@@ -163,9 +163,9 @@ class CXCIntegrator
      @param aoFockPointers the pointers to AO Fock matrices.
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param rwDensityMatrix the one-time transformed densities.
-     @param rw2DensityMatrix the two-time transformed densities.
-     @param gsDensityMatrix the ground state density matrix.
+     @param rwDensityPointers the pointers to one-time transformed densities.
+     @param rw2DensityPointers the pointers to two-time transformed densities.
+     @param gsDensityPointers the pointers to ground state density matrix.
      @param molecularGrid the molecular grid.
      @param fvxc the exchange-correlation functional.
      @param quadMode a string that specifies which densities should be combined.
@@ -173,9 +173,9 @@ class CXCIntegrator
     auto integrateKxcFock(const std::vector<double*>& aoFockPointers,
                           const CMolecule&        molecule,
                           const CMolecularBasis&  basis,
-                          const CAODensityMatrix& rwDensityMatrix,
-                          const CAODensityMatrix& rw2DensityMatrix,
-                          const CAODensityMatrix& gsDensityMatrix,
+                          const std::vector<const double*>& rwDensityPointers,
+                          const std::vector<const double*>& rw2DensityPointers,
+                          const std::vector<const double*>& gsDensityPointers,
                           const CMolecularGrid&   molecularGrid,
                           const CXCFunctional&    fvxc,
                           const std::string&      quadMode) const -> void;
@@ -184,13 +184,13 @@ class CXCIntegrator
      Integrates fourth-order exchnage-correlation functional contribution to AO
      Fock matrix in cubic response.
 
-     @param aoFockMatrix the AO Fock matrix.
+     @param aoFockPointers the pointers to AO Fock matrix.
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param rwDensityMatrix the one-time transformed densities.
-     @param rw2DensityMatrix the two-time transformed densities.
-     @param rw3DensityMatrix the three-time transformed densities.
-     @param gsDensityMatrix the ground state density matrix.
+     @param rwDensityPointers the pointers to one-time transformed densities.
+     @param rw2DensityPointers the pointers to two-time transformed densities.
+     @param rw3DensityPointers the pointers to three-time transformed densities.
+     @param gsDensityPointers the pointers to ground state density matrix.
      @param molecularGrid the molecular grid.
      @param xcFuncLabel the label of exchange-correlation functional.
      @param cubeMode a string that specifies which densities should be combined.
@@ -198,10 +198,10 @@ class CXCIntegrator
     auto integrateKxcLxcFock(const std::vector<double*>& aoFockPointers,
                              const CMolecule&        molecule,
                              const CMolecularBasis&  basis,
-                             const CAODensityMatrix& rwDensityMatrix,
-                             const CAODensityMatrix& rw2DensityMatrix,
-                             const CAODensityMatrix& rw3DensityMatrix,
-                             const CAODensityMatrix& gsDensityMatrix,
+                             const std::vector<const double*>& rwDensityPointers,
+                             const std::vector<const double*>& rw2DensityPointers,
+                             const std::vector<const double*>& rw3DensityPointers,
+                             const std::vector<const double*>& gsDensityPointers,
                              const CMolecularGrid&   molecularGrid,
                              const std::string&      xcFuncLabel,
                              const std::string&      cubeMode) const -> void;
@@ -210,13 +210,13 @@ class CXCIntegrator
      Integrates fourth-order exchnage-correlation functional contribution to AO
      Fock matrix in cubic response.
 
-     @param aoFockMatrix the AO Fock matrix.
+     @param aoFockPointers the pointers to AO Fock matrix.
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param rwDensityMatrix the one-time transformed densities.
-     @param rw2DensityMatrix the two-time transformed densities.
-     @param rw3DensityMatrix the three-time transformed densities.
-     @param gsDensityMatrix the ground state density matrix.
+     @param rwDensityPointers the pointers to one-time transformed densities.
+     @param rw2DensityPointers the pointers to two-time transformed densities.
+     @param rw3DensityPointers the pointers to three-time transformed densities.
+     @param gsDensityPointers the pointers to ground state density matrix.
      @param molecularGrid the molecular grid.
      @param fvxc the exchange-correlation functional.
      @param cubeMode a string that specifies which densities should be combined.
@@ -224,10 +224,10 @@ class CXCIntegrator
     auto integrateKxcLxcFock(const std::vector<double*>& aoFockPointers,
                              const CMolecule&        molecule,
                              const CMolecularBasis&  basis,
-                             const CAODensityMatrix& rwDensityMatrix,
-                             const CAODensityMatrix& rw2DensityMatrix,
-                             const CAODensityMatrix& rw3DensityMatrix,
-                             const CAODensityMatrix& gsDensityMatrix,
+                             const std::vector<const double*>& rwDensityPointers,
+                             const std::vector<const double*>& rw2DensityPointers,
+                             const std::vector<const double*>& rw3DensityPointers,
+                             const std::vector<const double*>& gsDensityPointers,
                              const CMolecularGrid&   molecularGrid,
                              const CXCFunctional&    fvxc,
                              const std::string&      cubeMode) const -> void;

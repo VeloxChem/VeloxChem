@@ -46,6 +46,7 @@ from .veloxchemlib import chemical_element_label
 from .veloxchemlib import chemical_element_identifier
 from .veloxchemlib import chemical_element_mass
 from .veloxchemlib import chemical_element_max_angular_momentum
+from .veloxchemlib import available_functionals
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import hartree_in_ev
@@ -84,6 +85,8 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
+from .xtbdriver import XtbDriver
+from .xtbgradientdriver import XtbGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .mp2driver import Mp2Driver
 from .cubicgrid import CubicGrid
@@ -95,6 +98,12 @@ from .lreigensolver import LinearResponseEigenSolver
 from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
 from .c6driver import C6Driver
+from .quadraticresponsedriver import QuadraticResponseDriver
+from .cubicresponsedriver import CubicResponseDriver
+from .shgdriver import ShgDriver
+from .tpatransitiondriver import TpaTransitionDriver
+from .tpafulldriver import TpaFullDriver
+from .tpareddriver import TpaReducedDriver
 from .respchargesdriver import RespChargesDriver
 from .rspproperty import ResponseProperty
 from .rsplinabscross import LinearAbsorptionCrossSection
@@ -102,6 +111,9 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .rspc6 import C6
+from .rspshg import SHG
+from .rsptpa import TPA
+#from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .firstorderprop import FirstOrderProperties

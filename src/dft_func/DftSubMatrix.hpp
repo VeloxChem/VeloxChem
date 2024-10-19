@@ -47,12 +47,11 @@ auto getSubDensityMatrix(const double* densityPointer, const std::vector<int>& a
 /**
  Gets sub AO density matrices from AO density matrices.
 
- @param densityMatrix the AO density matrix.
+ @param densityPointers the pointers to AO density matrix.
  @param aoIndices the index mapping from submatrix to full matrix.
  @return the sub AO density matrices.
  */
-auto
-getSubAODensityMatrix(const CAODensityMatrix& densityMatrix, const std::vector<int>& aoIndices) -> CAODensityMatrix;
+auto getSubAODensityMatrix(const std::vector<const double*>& densityPointers, const std::vector<int>& aoIndices, const int naos) -> CAODensityMatrix;
 
 /**
  Gets sub matrix from an arbitrary matrix by slicing the columns.

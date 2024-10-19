@@ -349,159 +349,178 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
          dityh_f_dsig = datt_erf0_dsig*dityh_f_datt_erf0 + db88_denom_dsig*dityh_f_db88_denom;
 
-         double rho_s_2 = 0.5*density*(1 - zeta_abs);
+         f = ityh_f*pow(zeta_abs + 1, 2.0/3.0);
 
-         double drho_s_2_dzeta_abs = -0.5*density;
-
-         double drho_s_2_drho = drho_s_2_dzeta_abs*dzeta_abs_drho - 0.5*zeta_abs + 0.5;
-
-         double drho_s_2_dpi = drho_s_2_dzeta_abs*dzeta_abs_dpi;
-
-         double xs_2 = cbrt(2)*xt/cbrt(1 - zeta_abs);
-
-         double dxs_2_dxt = cbrt(2)/cbrt(1 - zeta_abs);
-
-         double dxs_2_dzeta_abs = (1.0/3.0)*cbrt(2)*xt/pow(1 - zeta_abs, 4.0/3.0);
-
-         double dxs_2_drho = dxs_2_dxt*dxt_drho + dxs_2_dzeta_abs*dzeta_abs_drho;
-
-         double dxs_2_dsig = dxs_2_dxt*dxt_dsig;
-
-         double dxs_2_dpi = dxs_2_dzeta_abs*dzeta_abs_dpi;
-
-         double b88_denom_2 = b88_beta*b88_gamma*xs_2*asinh(xs_2) + 1;
-
-         double db88_denom_2_dxs_2 = b88_beta*b88_gamma*xs_2/sqrt(pow(xs_2, 2) + 1) + b88_beta*b88_gamma*asinh(xs_2);
-
-         double db88_denom_2_drho = db88_denom_2_dxs_2*dxs_2_drho;
-
-         double db88_denom_2_dsig = db88_denom_2_dxs_2*dxs_2_dsig;
-
-         double db88_denom_2_dpi = db88_denom_2_dxs_2*dxs_2_dpi;
-
-         double b88_f_2 = b88_beta*pow(xs_2, 2)/(b88_denom_2*x_factor_c) + 1;
-
-         double db88_f_2_dxs_2 = 2*b88_beta*xs_2/(b88_denom_2*x_factor_c);
-
-         double db88_f_2_db88_denom_2 = -b88_beta*pow(xs_2, 2)/(pow(b88_denom_2, 2)*x_factor_c);
-
-         double db88_f_2_drho = db88_denom_2_drho*db88_f_2_db88_denom_2 + db88_f_2_dxs_2*dxs_2_drho;
-
-         double db88_f_2_dpi = db88_denom_2_dpi*db88_f_2_db88_denom_2 + db88_f_2_dxs_2*dxs_2_dpi;
-
-         double db88_f_2_dsig = db88_denom_2_dsig*db88_f_2_db88_denom_2 + db88_f_2_dxs_2*dxs_2_dsig;
-
-         double ityh_k_GGA_2 = (3.0/2.0)*M_SQRT2*sqrt(M_PI)*cbrt(rho_s_2)*sqrt(1/(b88_f_2*x_factor_c));
-
-         double dityh_k_GGA_2_drho_s_2 = (1.0/2.0)*M_SQRT2*sqrt(M_PI)*sqrt(1/(b88_f_2*x_factor_c))/pow(rho_s_2, 2.0/3.0);
-
-         double dityh_k_GGA_2_db88_f_2 = -3.0/4.0*M_SQRT2*sqrt(M_PI)*cbrt(rho_s_2)*sqrt(1/(b88_f_2*x_factor_c))/b88_f_2;
-
-         double dityh_k_GGA_2_drho = db88_f_2_drho*dityh_k_GGA_2_db88_f_2 + dityh_k_GGA_2_drho_s_2*drho_s_2_drho;
-
-         double dityh_k_GGA_2_dpi = db88_f_2_dpi*dityh_k_GGA_2_db88_f_2 + dityh_k_GGA_2_drho_s_2*drho_s_2_dpi;
-
-         double dityh_k_GGA_2_dsig = db88_f_2_dsig*dityh_k_GGA_2_db88_f_2;
-
-         double att_erf_aux1_2 = sqrt(M_PI)*erf(ityh_k_GGA_2/mu);
-
-         double datt_erf_aux1_2_dityh_k_GGA_2 = 2*exp(-pow(ityh_k_GGA_2, 2)/pow(mu, 2))/mu;
-
-         double datt_erf_aux1_2_drho = datt_erf_aux1_2_dityh_k_GGA_2*dityh_k_GGA_2_drho;
-
-         double datt_erf_aux1_2_dsig = datt_erf_aux1_2_dityh_k_GGA_2*dityh_k_GGA_2_dsig;
-
-         double datt_erf_aux1_2_dpi = datt_erf_aux1_2_dityh_k_GGA_2*dityh_k_GGA_2_dpi;
-
-         double datt_erf_aux2_2_dpi = 0;
-
-         double datt_erf_aux2_2_dsig = 0;
-
-         double att_erf_aux2_2 = 0;
-
-         double datt_erf_aux2_2_dityh_k_GGA_2 = 0;
-
-         double datt_erf_aux2_2_drho = 0;
-
-         if ((1.0/2.0)*mu/ityh_k_GGA_2 < 5)
-         {
-            att_erf_aux2_2 = -1 + exp(-pow(ityh_k_GGA_2, 2)/pow(mu, 2));
-
-            datt_erf_aux2_2_dityh_k_GGA_2 = -2*ityh_k_GGA_2*exp(-pow(ityh_k_GGA_2, 2)/pow(mu, 2))/pow(mu, 2);
-
-            datt_erf_aux2_2_drho = datt_erf_aux2_2_dityh_k_GGA_2*dityh_k_GGA_2_drho;
-
-            datt_erf_aux2_2_dsig = datt_erf_aux2_2_dityh_k_GGA_2*dityh_k_GGA_2_dsig;
-
-            datt_erf_aux2_2_dpi = datt_erf_aux2_2_dityh_k_GGA_2*dityh_k_GGA_2_dpi;
-
-         }
-         else
-         {
-            att_erf_aux2_2 = -pow(ityh_k_GGA_2, 2)*(-2*pow(ityh_k_GGA_2, 2)/pow(mu, 2) + 1)/pow(mu, 2);
-
-            datt_erf_aux2_2_dityh_k_GGA_2 = 4*pow(ityh_k_GGA_2, 3)/pow(mu, 4) - 2*ityh_k_GGA_2*(-2*pow(ityh_k_GGA_2, 2)/pow(mu, 2) + 1)/pow(mu, 2);
-
-            datt_erf_aux2_2_drho = datt_erf_aux2_2_dityh_k_GGA_2*dityh_k_GGA_2_drho;
-
-            datt_erf_aux2_2_dsig = datt_erf_aux2_2_dityh_k_GGA_2*dityh_k_GGA_2_dsig;
-
-            datt_erf_aux2_2_dpi = datt_erf_aux2_2_dityh_k_GGA_2*dityh_k_GGA_2_dpi;
-
-         }
-         double att_erf_aux3_2 = (1.0/2.0)*att_erf_aux2_2*pow(mu, 2)/pow(ityh_k_GGA_2, 2) + 1.0/2.0;
-
-         double datt_erf_aux3_2_dityh_k_GGA_2 = -att_erf_aux2_2*pow(mu, 2)/pow(ityh_k_GGA_2, 3);
-
-         double datt_erf_aux3_2_datt_erf_aux2_2 = (1.0/2.0)*pow(mu, 2)/pow(ityh_k_GGA_2, 2);
-
-         double datt_erf_aux3_2_drho = datt_erf_aux2_2_drho*datt_erf_aux3_2_datt_erf_aux2_2 + datt_erf_aux3_2_dityh_k_GGA_2*dityh_k_GGA_2_drho;
-
-         double datt_erf_aux3_2_dsig = datt_erf_aux2_2_dsig*datt_erf_aux3_2_datt_erf_aux2_2 + datt_erf_aux3_2_dityh_k_GGA_2*dityh_k_GGA_2_dsig;
-
-         double datt_erf_aux3_2_dpi = datt_erf_aux2_2_dpi*datt_erf_aux3_2_datt_erf_aux2_2 + datt_erf_aux3_2_dityh_k_GGA_2*dityh_k_GGA_2_dpi;
-
-         double att_erf0_2 = 1 - 4.0/3.0*mu*(att_erf_aux1_2 + mu*(att_erf_aux2_2 - att_erf_aux3_2)/ityh_k_GGA_2)/ityh_k_GGA_2;
-
-         double datt_erf0_2_dityh_k_GGA_2 = (4.0/3.0)*mu*(att_erf_aux1_2 + mu*(att_erf_aux2_2 - att_erf_aux3_2)/ityh_k_GGA_2)/pow(ityh_k_GGA_2, 2) + (4.0/3.0)*pow(mu, 2)*(att_erf_aux2_2 - att_erf_aux3_2)/pow(ityh_k_GGA_2, 3);
-
-         double datt_erf0_2_datt_erf_aux2_2 = -4.0/3.0*pow(mu, 2)/pow(ityh_k_GGA_2, 2);
-
-         double datt_erf0_2_datt_erf_aux3_2 = (4.0/3.0)*pow(mu, 2)/pow(ityh_k_GGA_2, 2);
-
-         double datt_erf0_2_datt_erf_aux1_2 = -4.0/3.0*mu/ityh_k_GGA_2;
-
-         double datt_erf0_2_drho = datt_erf0_2_datt_erf_aux1_2*datt_erf_aux1_2_drho + datt_erf0_2_datt_erf_aux2_2*datt_erf_aux2_2_drho + datt_erf0_2_datt_erf_aux3_2*datt_erf_aux3_2_drho + datt_erf0_2_dityh_k_GGA_2*dityh_k_GGA_2_drho;
-
-         double datt_erf0_2_dpi = datt_erf0_2_datt_erf_aux1_2*datt_erf_aux1_2_dpi + datt_erf0_2_datt_erf_aux2_2*datt_erf_aux2_2_dpi + datt_erf0_2_datt_erf_aux3_2*datt_erf_aux3_2_dpi + datt_erf0_2_dityh_k_GGA_2*dityh_k_GGA_2_dpi;
-
-         double datt_erf0_2_dsig = datt_erf0_2_datt_erf_aux1_2*datt_erf_aux1_2_dsig + datt_erf0_2_datt_erf_aux2_2*datt_erf_aux2_2_dsig + datt_erf0_2_datt_erf_aux3_2*datt_erf_aux3_2_dsig + datt_erf0_2_dityh_k_GGA_2*dityh_k_GGA_2_dsig;
-
-         double ityh_f_2 = att_erf0_2/b88_denom_2;
-
-         double dityh_f_2_datt_erf0_2 = 1.0/b88_denom_2;
-
-         double dityh_f_2_db88_denom_2 = -att_erf0_2/pow(b88_denom_2, 2);
-
-         double dityh_f_2_drho = datt_erf0_2_drho*dityh_f_2_datt_erf0_2 + db88_denom_2_drho*dityh_f_2_db88_denom_2;
-
-         double dityh_f_2_dpi = datt_erf0_2_dpi*dityh_f_2_datt_erf0_2 + db88_denom_2_dpi*dityh_f_2_db88_denom_2;
-
-         double dityh_f_2_dsig = datt_erf0_2_dsig*dityh_f_2_datt_erf0_2 + db88_denom_2_dsig*dityh_f_2_db88_denom_2;
-
-         f = ityh_f*pow(zeta_abs + 1, 2.0/3.0) + ityh_f_2*pow(1 - zeta_abs, 2.0/3.0);
-
-         double df_dityh_f_2 = pow(1 - zeta_abs, 2.0/3.0);
-
-         double df_dzeta_abs = (2.0/3.0)*ityh_f/cbrt(zeta_abs + 1) - 2.0/3.0*ityh_f_2/cbrt(1 - zeta_abs);
+         double df_dzeta_abs = (2.0/3.0)*ityh_f/cbrt(zeta_abs + 1);
 
          double df_dityh_f = pow(zeta_abs + 1, 2.0/3.0);
 
-         df_drho = df_dityh_f*dityh_f_drho + df_dityh_f_2*dityh_f_2_drho + df_dzeta_abs*dzeta_abs_drho;
+         df_drho = 0;
 
-         df_dpi = df_dityh_f*dityh_f_dpi + df_dityh_f_2*dityh_f_2_dpi + df_dzeta_abs*dzeta_abs_dpi;
+         df_dpi = 0;
 
-         df_dsig = df_dityh_f*dityh_f_dsig + df_dityh_f_2*dityh_f_2_dsig;
+         df_dsig = 0;
+
+         if (1 - zeta_abs > 1.0e-16)
+         {
+            double rho_s_2 = 0.5*density*(1 - zeta_abs);
+
+            double drho_s_2_dzeta_abs = -0.5*density;
+
+            double drho_s_2_drho = drho_s_2_dzeta_abs*dzeta_abs_drho - 0.5*zeta_abs + 0.5;
+
+            double drho_s_2_dpi = drho_s_2_dzeta_abs*dzeta_abs_dpi;
+
+            double xs_2 = cbrt(2)*xt/cbrt(1 - zeta_abs);
+
+            double dxs_2_dxt = cbrt(2)/cbrt(1 - zeta_abs);
+
+            double dxs_2_dzeta_abs = (1.0/3.0)*cbrt(2)*xt/pow(1 - zeta_abs, 4.0/3.0);
+
+            double dxs_2_drho = dxs_2_dxt*dxt_drho + dxs_2_dzeta_abs*dzeta_abs_drho;
+
+            double dxs_2_dsig = dxs_2_dxt*dxt_dsig;
+
+            double dxs_2_dpi = dxs_2_dzeta_abs*dzeta_abs_dpi;
+
+            double b88_denom_2 = b88_beta*b88_gamma*xs_2*asinh(xs_2) + 1;
+
+            double db88_denom_2_dxs_2 = b88_beta*b88_gamma*xs_2/sqrt(pow(xs_2, 2) + 1) + b88_beta*b88_gamma*asinh(xs_2);
+
+            double db88_denom_2_drho = db88_denom_2_dxs_2*dxs_2_drho;
+
+            double db88_denom_2_dsig = db88_denom_2_dxs_2*dxs_2_dsig;
+
+            double db88_denom_2_dpi = db88_denom_2_dxs_2*dxs_2_dpi;
+
+            double b88_f_2 = b88_beta*pow(xs_2, 2)/(b88_denom_2*x_factor_c) + 1;
+
+            double db88_f_2_dxs_2 = 2*b88_beta*xs_2/(b88_denom_2*x_factor_c);
+
+            double db88_f_2_db88_denom_2 = -b88_beta*pow(xs_2, 2)/(pow(b88_denom_2, 2)*x_factor_c);
+
+            double db88_f_2_drho = db88_denom_2_drho*db88_f_2_db88_denom_2 + db88_f_2_dxs_2*dxs_2_drho;
+
+            double db88_f_2_dpi = db88_denom_2_dpi*db88_f_2_db88_denom_2 + db88_f_2_dxs_2*dxs_2_dpi;
+
+            double db88_f_2_dsig = db88_denom_2_dsig*db88_f_2_db88_denom_2 + db88_f_2_dxs_2*dxs_2_dsig;
+
+            double ityh_k_GGA_2 = (3.0/2.0)*M_SQRT2*sqrt(M_PI)*cbrt(rho_s_2)*sqrt(1/(b88_f_2*x_factor_c));
+
+            double dityh_k_GGA_2_drho_s_2 = (1.0/2.0)*M_SQRT2*sqrt(M_PI)*sqrt(1/(b88_f_2*x_factor_c))/pow(rho_s_2, 2.0/3.0);
+
+            double dityh_k_GGA_2_db88_f_2 = -3.0/4.0*M_SQRT2*sqrt(M_PI)*cbrt(rho_s_2)*sqrt(1/(b88_f_2*x_factor_c))/b88_f_2;
+
+            double dityh_k_GGA_2_drho = db88_f_2_drho*dityh_k_GGA_2_db88_f_2 + dityh_k_GGA_2_drho_s_2*drho_s_2_drho;
+
+            double dityh_k_GGA_2_dpi = db88_f_2_dpi*dityh_k_GGA_2_db88_f_2 + dityh_k_GGA_2_drho_s_2*drho_s_2_dpi;
+
+            double dityh_k_GGA_2_dsig = db88_f_2_dsig*dityh_k_GGA_2_db88_f_2;
+
+            double att_erf_aux1_2 = sqrt(M_PI)*erf(ityh_k_GGA_2/mu);
+
+            double datt_erf_aux1_2_dityh_k_GGA_2 = 2*exp(-pow(ityh_k_GGA_2, 2)/pow(mu, 2))/mu;
+
+            double datt_erf_aux1_2_drho = datt_erf_aux1_2_dityh_k_GGA_2*dityh_k_GGA_2_drho;
+
+            double datt_erf_aux1_2_dsig = datt_erf_aux1_2_dityh_k_GGA_2*dityh_k_GGA_2_dsig;
+
+            double datt_erf_aux1_2_dpi = datt_erf_aux1_2_dityh_k_GGA_2*dityh_k_GGA_2_dpi;
+
+            double datt_erf_aux2_2_dpi = 0;
+
+            double datt_erf_aux2_2_dsig = 0;
+
+            double att_erf_aux2_2 = 0;
+
+            double datt_erf_aux2_2_dityh_k_GGA_2 = 0;
+
+            double datt_erf_aux2_2_drho = 0;
+
+            if ((1.0/2.0)*mu/ityh_k_GGA_2 < 5)
+            {
+               att_erf_aux2_2 = -1 + exp(-pow(ityh_k_GGA_2, 2)/pow(mu, 2));
+
+               datt_erf_aux2_2_dityh_k_GGA_2 = -2*ityh_k_GGA_2*exp(-pow(ityh_k_GGA_2, 2)/pow(mu, 2))/pow(mu, 2);
+
+               datt_erf_aux2_2_drho = datt_erf_aux2_2_dityh_k_GGA_2*dityh_k_GGA_2_drho;
+
+               datt_erf_aux2_2_dsig = datt_erf_aux2_2_dityh_k_GGA_2*dityh_k_GGA_2_dsig;
+
+               datt_erf_aux2_2_dpi = datt_erf_aux2_2_dityh_k_GGA_2*dityh_k_GGA_2_dpi;
+
+            }
+            else
+            {
+               att_erf_aux2_2 = -pow(ityh_k_GGA_2, 2)*(-2*pow(ityh_k_GGA_2, 2)/pow(mu, 2) + 1)/pow(mu, 2);
+
+               datt_erf_aux2_2_dityh_k_GGA_2 = 4*pow(ityh_k_GGA_2, 3)/pow(mu, 4) - 2*ityh_k_GGA_2*(-2*pow(ityh_k_GGA_2, 2)/pow(mu, 2) + 1)/pow(mu, 2);
+
+               datt_erf_aux2_2_drho = datt_erf_aux2_2_dityh_k_GGA_2*dityh_k_GGA_2_drho;
+
+               datt_erf_aux2_2_dsig = datt_erf_aux2_2_dityh_k_GGA_2*dityh_k_GGA_2_dsig;
+
+               datt_erf_aux2_2_dpi = datt_erf_aux2_2_dityh_k_GGA_2*dityh_k_GGA_2_dpi;
+
+            }
+            double att_erf_aux3_2 = (1.0/2.0)*att_erf_aux2_2*pow(mu, 2)/pow(ityh_k_GGA_2, 2) + 1.0/2.0;
+
+            double datt_erf_aux3_2_dityh_k_GGA_2 = -att_erf_aux2_2*pow(mu, 2)/pow(ityh_k_GGA_2, 3);
+
+            double datt_erf_aux3_2_datt_erf_aux2_2 = (1.0/2.0)*pow(mu, 2)/pow(ityh_k_GGA_2, 2);
+
+            double datt_erf_aux3_2_drho = datt_erf_aux2_2_drho*datt_erf_aux3_2_datt_erf_aux2_2 + datt_erf_aux3_2_dityh_k_GGA_2*dityh_k_GGA_2_drho;
+
+            double datt_erf_aux3_2_dsig = datt_erf_aux2_2_dsig*datt_erf_aux3_2_datt_erf_aux2_2 + datt_erf_aux3_2_dityh_k_GGA_2*dityh_k_GGA_2_dsig;
+
+            double datt_erf_aux3_2_dpi = datt_erf_aux2_2_dpi*datt_erf_aux3_2_datt_erf_aux2_2 + datt_erf_aux3_2_dityh_k_GGA_2*dityh_k_GGA_2_dpi;
+
+            double att_erf0_2 = 1 - 4.0/3.0*mu*(att_erf_aux1_2 + mu*(att_erf_aux2_2 - att_erf_aux3_2)/ityh_k_GGA_2)/ityh_k_GGA_2;
+
+            double datt_erf0_2_dityh_k_GGA_2 = (4.0/3.0)*mu*(att_erf_aux1_2 + mu*(att_erf_aux2_2 - att_erf_aux3_2)/ityh_k_GGA_2)/pow(ityh_k_GGA_2, 2) + (4.0/3.0)*pow(mu, 2)*(att_erf_aux2_2 - att_erf_aux3_2)/pow(ityh_k_GGA_2, 3);
+
+            double datt_erf0_2_datt_erf_aux2_2 = -4.0/3.0*pow(mu, 2)/pow(ityh_k_GGA_2, 2);
+
+            double datt_erf0_2_datt_erf_aux3_2 = (4.0/3.0)*pow(mu, 2)/pow(ityh_k_GGA_2, 2);
+
+            double datt_erf0_2_datt_erf_aux1_2 = -4.0/3.0*mu/ityh_k_GGA_2;
+
+            double datt_erf0_2_drho = datt_erf0_2_datt_erf_aux1_2*datt_erf_aux1_2_drho + datt_erf0_2_datt_erf_aux2_2*datt_erf_aux2_2_drho + datt_erf0_2_datt_erf_aux3_2*datt_erf_aux3_2_drho + datt_erf0_2_dityh_k_GGA_2*dityh_k_GGA_2_drho;
+
+            double datt_erf0_2_dpi = datt_erf0_2_datt_erf_aux1_2*datt_erf_aux1_2_dpi + datt_erf0_2_datt_erf_aux2_2*datt_erf_aux2_2_dpi + datt_erf0_2_datt_erf_aux3_2*datt_erf_aux3_2_dpi + datt_erf0_2_dityh_k_GGA_2*dityh_k_GGA_2_dpi;
+
+            double datt_erf0_2_dsig = datt_erf0_2_datt_erf_aux1_2*datt_erf_aux1_2_dsig + datt_erf0_2_datt_erf_aux2_2*datt_erf_aux2_2_dsig + datt_erf0_2_datt_erf_aux3_2*datt_erf_aux3_2_dsig + datt_erf0_2_dityh_k_GGA_2*dityh_k_GGA_2_dsig;
+
+            double ityh_f_2 = att_erf0_2/b88_denom_2;
+
+            double dityh_f_2_datt_erf0_2 = 1.0/b88_denom_2;
+
+            double dityh_f_2_db88_denom_2 = -att_erf0_2/pow(b88_denom_2, 2);
+
+            double dityh_f_2_drho = datt_erf0_2_drho*dityh_f_2_datt_erf0_2 + db88_denom_2_drho*dityh_f_2_db88_denom_2;
+
+            double dityh_f_2_dpi = datt_erf0_2_dpi*dityh_f_2_datt_erf0_2 + db88_denom_2_dpi*dityh_f_2_db88_denom_2;
+
+            double dityh_f_2_dsig = datt_erf0_2_dsig*dityh_f_2_datt_erf0_2 + db88_denom_2_dsig*dityh_f_2_db88_denom_2;
+
+            f += ityh_f_2*pow(1 - zeta_abs, 2.0/3.0);
+
+            double df_dityh_f_2 = pow(1 - zeta_abs, 2.0/3.0);
+
+            df_dzeta_abs += - 2.0/3.0*ityh_f_2/cbrt(1 - zeta_abs);
+
+            df_drho = df_dityh_f_2*dityh_f_2_drho;
+
+            df_dpi = df_dityh_f_2*dityh_f_2_dpi;
+
+            df_dsig = df_dityh_f_2*dityh_f_2_dsig;
+         }
+
+         df_drho += df_dityh_f*dityh_f_drho + df_dzeta_abs*dzeta_abs_drho;
+
+         df_dpi += df_dityh_f*dityh_f_dpi + df_dzeta_abs*dzeta_abs_dpi;
+
+         df_dsig += df_dityh_f*dityh_f_dsig;
 
       }
       else
