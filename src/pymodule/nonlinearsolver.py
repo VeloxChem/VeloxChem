@@ -809,7 +809,7 @@ class NonlinearSolver:
 
                 fock_mat = fock_drv.compute(screening, den_mat, fock_type,
                                             fock_k_factor, 0.0, thresh_int)
-                fock_np = fock_mat.full_matrix().to_numpy()
+                fock_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
                 if fock_type == 'j':
@@ -820,7 +820,7 @@ class NonlinearSolver:
                     # for range-separated functional
                     erf_k_mat = fock_drv.compute(screening, den_mat, 'kx_rs',
                                                  erf_k_coef, omega, thresh_int)
-                    fock_np -= erf_k_mat.full_matrix().to_numpy()
+                    fock_np -= erf_k_mat.to_numpy()
                     erf_k_mat = Matrix()
 
                 fock_arrays.append(fock_np)

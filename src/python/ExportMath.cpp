@@ -221,11 +221,7 @@ export_math(py::module &m) -> void
         .def(
             "to_numpy",
             [](const CSubMatrix &self) -> py::array_t<double> {
-                const auto nrows = static_cast<py::ssize_t>(self.number_of_rows());
-                const auto ncols = static_cast<py::ssize_t>(self.number_of_columns());
-                const auto tdim  = static_cast<py::ssize_t>(sizeof(double));
-                return py::array_t<double>(
-                    std::vector<py::ssize_t>({nrows, ncols}), std::vector<py::ssize_t>({ncols * tdim, tdim}), self.get_values().data());
+                return vlx_general::pointer_to_numpy(self.data(), {static_cast<int>(self.number_of_rows()), static_cast<int>(self.number_of_columns())});
             },
             "Converts submatrix to numpy array.")
         .def("get_dimensions", &CSubMatrix::get_dimensions, "Gets dimensions of submatrix.")
@@ -301,6 +297,13 @@ export_math(py::module &m) -> void
             "full_matrix",
             [](const CMatrix &self) -> std::shared_ptr<CSubMatrix> { return std::make_shared<CSubMatrix>(self.full_matrix()); },
             "Creates full matrix representation of matrix.")
+        .def(
+            "to_numpy",
+            [](const CMatrix &self) -> py::array_t<double> {
+                const auto mat = self.full_matrix();
+                return vlx_general::pointer_to_numpy(mat.data(), {static_cast<int>(mat.number_of_rows()), static_cast<int>(mat.number_of_columns())});
+            },
+            "Create full matrix representation of matrix and convert to numpy array.")
         .def("__add__", [](const CMatrix &self, const CMatrix &other) { return self + other; })
         .def("__eq__", [](const CMatrix &self, const CMatrix &other) { return self == other; })
         .def("__ne__", [](const CMatrix &self, const CMatrix &other) { return self != other; })
@@ -344,6 +347,22 @@ export_math(py::module &m) -> void
                 }
             },
             "Gets specific matrix from matrices.")
+        .def(
+            "matrix_to_numpy",
+            [](const CMatrices &self, const std::string& key) -> py::array_t<double> {
+                const auto matptr = self.matrix(key);
+                const auto mat = matptr->full_matrix();
+                return vlx_general::pointer_to_numpy(mat.data(), {static_cast<int>(mat.number_of_rows()), static_cast<int>(mat.number_of_columns())});
+            },
+            "Gets specific matrix from matrices and convert to numpy array.")
+        .def(
+            "matrix_to_numpy",
+            [](const CMatrices &self, const int key) -> py::array_t<double> {
+                const auto matptr = self.matrix(key);
+                const auto mat = matptr->full_matrix();
+                return vlx_general::pointer_to_numpy(mat.data(), {static_cast<int>(mat.number_of_rows()), static_cast<int>(mat.number_of_columns())});
+            },
+            "Gets specific matrix from matrices and convert to numpy array.")
         .def("__eq__", [](const CMatrices &self, const CMatrices &other) { return self == other; })
         .def("__ne__", [](const CMatrices &self, const CMatrices &other) { return self != other; })
         .def("__copy__", [](const CMatrices &self) { return CMatrices(self); })

@@ -979,7 +979,7 @@ class LinearSolver:
             fock_mat = fock_drv.compute(screening, den_mat_for_fock, fock_type,
                                         exchange_scaling_factor, 0.0,
                                         thresh_int)
-            fock_np = fock_mat.full_matrix().to_numpy()
+            fock_np = fock_mat.to_numpy()
 
             if fock_type == 'j':
                 # for pure functional
@@ -990,7 +990,7 @@ class LinearSolver:
                 fock_mat = fock_drv.compute(screening, den_mat_for_fock,
                                             'kx_rs', erf_k_coef, omega,
                                             thresh_int)
-                fock_np -= fock_mat.full_matrix().to_numpy()
+                fock_np -= fock_mat.to_numpy()
 
             fock_arrays.append(fock_np)
 

@@ -1359,14 +1359,14 @@ class ScfDriver:
 
             ovl_drv = OverlapDriver()
             ovl_mat = ovl_drv.compute(molecule, basis)
-            ovl_mat = ovl_mat.full_matrix().to_numpy()
+            ovl_mat = ovl_mat.to_numpy()
 
             ovl_dt = tm.time() - t0
             t0 = tm.time()
 
             kin_drv = KineticEnergyDriver()
             kin_mat = kin_drv.compute(molecule, basis)
-            kin_mat = kin_mat.full_matrix().to_numpy()
+            kin_mat = kin_mat.to_numpy()
 
             kin_dt = tm.time() - t0
         else:
@@ -1611,7 +1611,7 @@ class ScfDriver:
                                         thresh_int)
             self._print_debug_info('after  rest Fock build')
 
-            fock_mat_np = fock_mat.full_matrix().to_numpy()
+            fock_mat_np = fock_mat.to_numpy()
 
             fock_mat = Matrix()
 
@@ -1626,7 +1626,7 @@ class ScfDriver:
                                             erf_k_coef, omega, thresh_int)
                 self._print_debug_info('after  rest erf Fock build')
 
-                fock_mat_np -= fock_mat.full_matrix().to_numpy()
+                fock_mat_np -= fock_mat.to_numpy()
 
                 fock_mat = Matrix()
 
@@ -1650,7 +1650,7 @@ class ScfDriver:
                                             0.0, thresh_int)
                 self._print_debug_info('after  unrest Fock J build')
 
-                J_ab_np = fock_mat.full_matrix().to_numpy()
+                J_ab_np = fock_mat.to_numpy()
 
                 fock_mat_a_np = J_ab_np
                 fock_mat_b_np = J_ab_np.copy()
@@ -1663,21 +1663,21 @@ class ScfDriver:
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
                 self._print_debug_info('after  unrest Fock Kb build')
-                K_a_np = fock_mat.full_matrix().to_numpy()
+                K_a_np = fock_mat.to_numpy()
 
                 self._print_debug_info('before unrest Fock Kb build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
                 self._print_debug_info('after  unrest Fock Kb build')
-                K_b_np = fock_mat.full_matrix().to_numpy()
+                K_b_np = fock_mat.to_numpy()
 
                 self._print_debug_info('before unrest Fock J build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
                 self._print_debug_info('after  unrest Fock J build')
-                J_ab_np = fock_mat.full_matrix().to_numpy()
+                J_ab_np = fock_mat.to_numpy()
 
                 fock_mat_a_np = J_ab_np - K_a_np
                 fock_mat_b_np = J_ab_np - K_b_np
@@ -1690,13 +1690,13 @@ class ScfDriver:
                 fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
                 self._print_debug_info('after  unrest erf Fock Ka build')
-                fock_mat_a_np -= fock_mat.full_matrix().to_numpy()
+                fock_mat_a_np -= fock_mat.to_numpy()
 
                 self._print_debug_info('before unrest erf Fock Kb build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
                 self._print_debug_info('after  unrest erf Fock Kb build')
-                fock_mat_b_np -= fock_mat.full_matrix().to_numpy()
+                fock_mat_b_np -= fock_mat.to_numpy()
 
                 fock_mat = Matrix()
 

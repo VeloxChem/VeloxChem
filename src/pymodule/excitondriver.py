@@ -1148,7 +1148,7 @@ class ExcitonModelDriver:
         if self.rank == mpi_master():
             kin_drv = KineticEnergyDriver()
             kin_mat = kin_drv.compute(dimer, basis)
-            kin_mat = kin_mat.full_matrix().to_numpy()
+            kin_mat = kin_mat.to_numpy()
         kin_mat = self.comm.bcast(kin_mat, root=mpi_master())
 
         npot_mat = None
@@ -1214,7 +1214,7 @@ class ExcitonModelDriver:
         fock_mat = fock_drv.compute(screening, den_mat_for_fock, fock_type,
                                     exchange_scaling_factor, 0.0, thresh_int)
 
-        fock_mat_np = fock_mat.full_matrix().to_numpy()
+        fock_mat_np = fock_mat.to_numpy()
 
         fock_mat = Matrix()
 
@@ -1545,7 +1545,7 @@ class ExcitonModelDriver:
                                         exchange_scaling_factor, 0.0,
                                         thresh_int)
 
-            fock_np = fock_mat.full_matrix().to_numpy()
+            fock_np = fock_mat.to_numpy()
 
             if fock_type == 'j':
                 # for pure functional

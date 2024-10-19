@@ -402,7 +402,7 @@ class Mp2Driver:
                                             fock_type, exchange_scaling_factor,
                                             0.0, thresh_int)
 
-                fock_np = fock_mat.full_matrix().to_numpy()
+                fock_np = fock_mat.to_numpy()
 
                 fock_np = local_comm.reduce(fock_np, root=mpi_master())
 
