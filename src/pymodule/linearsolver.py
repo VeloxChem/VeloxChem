@@ -953,7 +953,8 @@ class LinearSolver:
 
         fock_drv = FockDriver(self.comm)
 
-        fock_drv._set_block_size_factor(self._block_size_factor)
+        fock_drv._set_block_size_factor(self._block_size_factor,
+                                        basis.get_dimensions_of_basis())
 
         # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'

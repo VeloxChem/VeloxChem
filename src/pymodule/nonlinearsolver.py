@@ -446,7 +446,8 @@ class NonlinearSolver:
 
         fock_drv = FockDriver(self.comm)
 
-        fock_drv._set_block_size_factor(self._block_size_factor)
+        fock_drv._set_block_size_factor(self._block_size_factor,
+                                        ao_basis.get_dimensions_of_basis())
 
         # TODO: take screening from eri_dict
         if self.rank == mpi_master():
