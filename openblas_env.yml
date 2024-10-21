@@ -15,7 +15,7 @@ dependencies:
   - setuptools
   - wheel
   - pybind11-global
-  - python>=3.8
+  - python>=3.9
   - psutil
   - pytest
   - mdanalysis
