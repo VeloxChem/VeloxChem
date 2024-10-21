@@ -155,15 +155,15 @@ class CubicResponseDriver(NonlinearSolver):
 
         assert_msg_critical(
             self.b_component in ['x', 'y', 'z'],
-            'CubicResponseDriver: Undefined or invalid a_component')
+            'CubicResponseDriver: Undefined or invalid b_component')
 
         assert_msg_critical(
             self.c_component in ['x', 'y', 'z'],
-            'CubicResponseDriver: Undefined or invalid a_component')
+            'CubicResponseDriver: Undefined or invalid c_component')
 
         assert_msg_critical(
             self.d_component in ['x', 'y', 'z'],
-            'CubicResponseDriver: Undefined or invalid a_component')
+            'CubicResponseDriver: Undefined or invalid d_component')
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
