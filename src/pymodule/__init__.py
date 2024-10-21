@@ -38,6 +38,7 @@ from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
+from .veloxchemlib import DispersionModel
 
 # C++ functions
 from .veloxchemlib import is_chemical_element
