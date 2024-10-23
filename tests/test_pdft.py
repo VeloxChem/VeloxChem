@@ -8,6 +8,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.griddriver import GridDriver
 from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
+from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
 @pytest.mark.solvers
@@ -117,7 +118,7 @@ class TestPDFT:
             assert not np.isnan(pdft_vxc_mat).any()
             assert not np.isnan(pdft_vxc_mat).any()
 
-    def run_RODFT(self, func, pfunc):
+    def test_O2_ROLDA(self):
 
         O2_xyz = """
             O 0.0 0.0 -0.6
@@ -126,6 +127,9 @@ class TestPDFT:
         molecule = Molecule.read_str(O2_xyz)
         molecule.set_multiplicity(3)
         basis = MolecularBasis.read(molecule, 'cc-pvdz', ostream=None)
+
+        func = "SLDA"
+        pfunc = {"name": "tLDA", "components": {"TSLATER": 1.0, 'TVWN_RPA': 1.0}}
 
         # Optimize ROHF wavefunction
         scfdrv = ScfRestrictedOpenDriver()
@@ -214,25 +218,86 @@ class TestPDFT:
                 [Dact, mo_act.T, Fock, C])
             grad_pdft[nIn:nInAct, :] += np.matmul(C.T, Qpt).T
 
-            return (xc_energy, pdft_xc_energy, grad_ks, grad_pdft)
+            assert abs(xc_energy - pdft_xc_energy) < 1.0e-6
+            assert np.allclose(grad_ks, grad_pdft)
+
+    def run_RDFT(self, func, pfunc):
+        mol_str = """
+H    0.7493682    0.0000000    0.4424329
+O    0.0000000    0.0000000   -0.1653507
+H   -0.7493682    0.0000000    0.4424329
+                  """
+        molecule = Molecule.read_str(mol_str, units='angstrom')
+        basis = MolecularBasis.read(molecule, "def2-svp")
+
+       # Optimize ROHF wavefunction
+        scfdrv = ScfRestrictedDriver()
+        scfdrv.ostream.mute()
+        scf_results = scfdrv.compute(molecule, basis)
+
+        # Compute DFT correction
+        grid_drv = GridDriver()
+        molgrid = grid_drv.generate(molecule)
+
+        xc_drv = XCIntegrator()
+        if scfdrv.rank == mpi_master():
+            Da, Db = scf_results['D_alpha'], scf_results['D_beta']
         else:
-            return None, None, None, None
+            Da, Db = None, None
+        Da = scfdrv.comm.bcast(Da, root=mpi_master())
+        Db = scfdrv.comm.bcast(Db, root=mpi_master())
 
-    def test_O2_ROLDA(self):
-        pfunc = {"name": "tLDA", "components": {"TSLATER": 1.0, 'TVWN_RPA': 1.0}}
-        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('slda', pfunc)
-        if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            assert abs(ksdft - pdft) < 1.0e-6
-            assert np.allclose(ks_grad, pdft_grad)
+        vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, [Da, Db], molgrid,
+        #vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, Da, molgrid,
+                                            func)
 
-    def test_O2_ROPBE(self):
+        xc_energy = scfdrv.comm.reduce(vxc_mat.get_energy(), root=mpi_master())
+
+        np_xcmat_a = scfdrv.comm.reduce(vxc_mat.alpha_to_numpy(),
+                                        root=mpi_master())
+
+        # Compute total and on-top pair densities
+        if scfdrv.rank == mpi_master():
+            total_density = scf_results['D_alpha'] + scf_results['D_beta']
+        else:
+            total_density = None
+        total_density = scfdrv.comm.bcast(total_density, root=mpi_master())
+
+        # Arrays of size 0
+        D2act = np.empty((0,0,0,0))
+        mo_act = np.empty((Da.shape[0],0))
+
+        pdft_vxc, pdft_wxc = xc_drv.integrate_vxc_pdft(total_density, D2act,
+                                                       mo_act.T.copy(),
+                                                       molecule, basis, molgrid,
+                                                       pfunc["name"], pfunc["components"], 0.0)
+
+        pdft_xc_energy = scfdrv.comm.reduce(pdft_vxc.get_energy(),
+                                            root=mpi_master())
+
+        pdft_np_xcmat_a = scfdrv.comm.reduce(pdft_vxc.alpha_to_numpy(),
+                                             root=mpi_master())
+
+        return xc_energy, pdft_xc_energy, np_xcmat_a, pdft_np_xcmat_a
+
+
+    def test_H20_PBE(self):
         pfunc = {"name": "tPBE", "components": {"TPBE_X": 1.0, 'TPBE_C': 1.0}}
-        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('pbe', pfunc)
+        xc_energy, pdft_xc_energy, np_xcmat_a, pdft_np_xcmat_a = self.run_RDFT('pbe', pfunc)
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            assert abs(-16.911870738696756 - pdft) < 1.0e-6
+            assert abs(xc_energy - pdft_xc_energy) < 3.0e-6
+            assert np.allclose(np_xcmat_a, pdft_np_xcmat_a)
 
-    def test_O2_ROBLYP(self):
+    def test_H2O_BLYP(self):
         pfunc = {"name": "tBLYP", "components": {"TSLATER": 1.0, 'TB88': 1.0, 'TLYP': 1.0}}
-        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('blyp', pfunc)
+        xc_energy, pdft_xc_energy, np_xcmat_a, pdft_np_xcmat_a = self.run_RDFT('blyp', pfunc)
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            assert abs(-17.056873017749865 - pdft) < 1.0e-6
+            assert abs(xc_energy - pdft_xc_energy) < 1.0e-6
+            assert np.allclose(np_xcmat_a, pdft_np_xcmat_a)
+
+    def test_H2O_BP86(self):
+        pfunc = {"name": "tBLYP", "components": {"TSLATER": 1.0, 'TB88': 1.0, 'TP86': 1.0}}
+        xc_energy, pdft_xc_energy, np_xcmat_a, pdft_np_xcmat_a = self.run_RDFT('bp86', pfunc)
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert abs(xc_energy - pdft_xc_energy) < 1.0e-6
+            assert np.allclose(np_xcmat_a, pdft_np_xcmat_a)
